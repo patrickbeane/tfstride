@@ -63,11 +63,26 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertEqual(database_finding.severity_reasoning.final_score, 6)
         self.assertEqual(database_finding.severity_reasoning.severity, Severity.HIGH)
 
+    def test_unencrypted_rds_instances_are_detected_with_evidence(self) -> None:
+        nightmare_result = self.engine.analyze_plan(NIGHTMARE_FIXTURE_PATH)
+        findings_by_title = {finding.title: finding for finding in nightmare_result.findings}
+        encryption_finding = findings_by_title["Database storage encryption is disabled"]
+
+        self.assertEqual(encryption_finding.severity, Severity.MEDIUM)
+        self.assertEqual(encryption_finding.affected_resources, ["aws_db_instance.customer"])
+        self.assertIsNone(encryption_finding.trust_boundary_id)
+        evidence_by_key = {item.key: item.values for item in encryption_finding.evidence}
+        self.assertEqual(
+            evidence_by_key["encryption_posture"],
+            ["storage_encrypted is false", "engine is postgres"],
+        )
+        self.assertEqual(encryption_finding.severity_reasoning.final_score, 3)
+
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
             "safe": (SAFE_FIXTURE_PATH, 1, {"medium": 1}),
             "mixed": (FIXTURE_PATH, 8, {"high": 3, "medium": 5}),
-            "nightmare": (NIGHTMARE_FIXTURE_PATH, 13, {"high": 5, "medium": 8}),
+            "nightmare": (NIGHTMARE_FIXTURE_PATH, 14, {"high": 5, "medium": 9}),
         }
 
         expected_titles = {
@@ -83,6 +98,7 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
             },
             "nightmare": {
                 "Database is reachable from overly permissive sources": 1,
+                "Database storage encryption is disabled": 1,
                 "Private data tier directly trusts the public application tier": 1,
                 "Role trust relationship expands blast radius": 2,
                 "Workload role carries sensitive permissions": 2,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **19 trust boundaries** and **13 findings** across **25 normalized resources**.
+This run identified **19 trust boundaries** and **14 findings** across **25 normalized resources**.
 
 - High severity findings: `5`
-- Medium severity findings: `8`
+- Medium severity findings: `9`
 - Low severity findings: `0`
 
 ## Discovered Trust Boundaries
@@ -215,6 +215,17 @@ This run identified **19 trust boundaries** and **13 findings** across **25 norm
   - policy statements: Allow actions=[iam:*, iam:PassRole, s3:*] resources=[*]
 
 ### Medium
+
+#### Database storage encryption is disabled
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_db_instance.customer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: aws_db_instance.customer stores sensitive data, but `storage_encrypted` is disabled. That weakens data-at-rest protections for underlying storage, snapshots, and backup handling.
+- Recommended mitigation: Enable RDS storage encryption with a managed KMS key, enforce encryption by default in database modules, and migrate plaintext instances to encrypted replacements where needed.
+- Evidence:
+  - encryption posture: storage_encrypted is false; engine is postgres
 
 #### IAM policy grants wildcard privileges
 

@@ -34,6 +34,7 @@ class StrideRuleEngine:
 
         findings.extend(self._detect_public_compute_exposure(inventory, boundary_index))
         findings.extend(self._detect_database_exposure(inventory, boundary_index))
+        findings.extend(self._detect_unencrypted_databases(inventory))
         findings.extend(self._detect_public_object_storage(inventory, boundary_index))
         findings.extend(self._detect_iam_wildcards(inventory))
         findings.extend(self._detect_workload_role_risk(inventory, boundary_index))
@@ -228,6 +229,48 @@ class StrideRuleEngine:
                                 for _, _, workloads in public_tier_rules
                                 for workload in workloads
                                 for posture in _subnet_posture(workload, inventory)
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def _detect_unencrypted_databases(self, inventory: ResourceInventory) -> list[Finding]:
+        findings: list[Finding] = []
+        for database in inventory.by_type("aws_db_instance"):
+            if bool(database.metadata.get("storage_encrypted", False)):
+                continue
+            severity_reasoning = _build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                Finding(
+                    title="Database storage encryption is disabled",
+                    category=StrideCategory.INFORMATION_DISCLOSURE,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=None,
+                    rule_id="aws-rds-storage-encryption-disabled",
+                    rationale=(
+                        f"{database.display_name} stores sensitive data, but `storage_encrypted` is disabled. "
+                        "That weakens data-at-rest protections for underlying storage, snapshots, and backup handling."
+                    ),
+                    recommended_mitigation=(
+                        "Enable RDS storage encryption with a managed KMS key, enforce encryption by default in "
+                        "database modules, and migrate plaintext instances to encrypted replacements where needed."
+                    ),
+                    evidence=_collect_evidence(
+                        _evidence_item(
+                            "encryption_posture",
+                            [
+                                "storage_encrypted is false",
+                                f"engine is {database.metadata.get('engine', 'unknown')}",
                             ],
                         ),
                     ),
