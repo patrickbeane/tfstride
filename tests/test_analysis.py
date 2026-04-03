@@ -13,6 +13,7 @@ FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_alb_ec2_rds_plan.json"
+LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_lambda_deploy_role_plan.json"
 
 
 class CloudThreatModelerAnalysisTests(unittest.TestCase):
@@ -208,6 +209,28 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)
         self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 2)
         self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
+
+    def test_realistic_lambda_deploy_role_fixture_surfaces_two_medium_findings(self) -> None:
+        result = self.engine.analyze_plan(LAMBDA_DEPLOY_ROLE_FIXTURE_PATH)
+        boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
+        severity_counts = Counter(finding.severity.value for finding in result.findings)
+        title_counts = Counter(finding.title for finding in result.findings)
+
+        self.assertEqual(len(result.inventory.resources), 13)
+        self.assertEqual(len(result.findings), 2)
+        self.assertEqual(dict(severity_counts), {"medium": 2})
+        self.assertEqual(
+            dict(title_counts),
+            {
+                "Role trust relationship expands blast radius": 1,
+                "Workload role carries sensitive permissions": 1,
+            },
+        )
+        self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 0)
+        self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 1)
+        self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
+        self.assertEqual(boundary_types[BoundaryType.CONTROL_TO_WORKLOAD], 1)
+        self.assertEqual(boundary_types[BoundaryType.CROSS_ACCOUNT_OR_ROLE], 1)
 
 
 if __name__ == "__main__":

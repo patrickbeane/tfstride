@@ -14,6 +14,7 @@ FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_alb_ec2_rds_plan.json"
+LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_lambda_deploy_role_plan.json"
 EXAMPLES_DIR = ROOT / "examples"
 
 
@@ -42,6 +43,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
             FIXTURE_PATH: EXAMPLES_DIR / "sample_report.md",
             NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "nightmare_report.md",
             ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "alb_ec2_rds_report.md",
+            LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "lambda_deploy_role_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():

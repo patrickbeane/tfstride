@@ -46,9 +46,10 @@ CLI gating:
 
 ## Demo Scenarios
 
-The repo includes three ready-to-run Terraform plan fixtures:
+The repo includes several ready-to-run Terraform plan fixtures:
 
 - `sample_aws_alb_ec2_rds_plan.json`: a realistic web-tier baseline with a public ALB, private EC2 app tier, and private encrypted RDS so the engine can demonstrate restraint on a common architecture.
+- `sample_aws_lambda_deploy_role_plan.json`: a realistic private Lambda deployment path with scoped S3 access, a VPC-attached deployer function, and deliberate cross-account trust so the engine can exercise IAM and trust-boundary findings without broad network noise.
 - `sample_aws_safe_plan.json`: a mostly well-segmented environment with one deliberate IAM hygiene issue so the engine shows restraint.
 - `sample_aws_plan.json`: a realistic middle case with public exposure, permissive database reachability, risky IAM, and cross-account trust.
 - `sample_aws_nightmare_plan.json`: a deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion.
@@ -231,6 +232,8 @@ The rule engine then evaluates those normalized resources instead of reasoning d
 - Safe report: [`examples/safe_report.md`](examples/safe_report.md)
 - ALB + EC2 + RDS fixture: [`fixtures/sample_aws_alb_ec2_rds_plan.json`](fixtures/sample_aws_alb_ec2_rds_plan.json)
 - ALB + EC2 + RDS report: [`examples/alb_ec2_rds_report.md`](examples/alb_ec2_rds_report.md)
+- Lambda deploy-role fixture: [`fixtures/sample_aws_lambda_deploy_role_plan.json`](fixtures/sample_aws_lambda_deploy_role_plan.json)
+- Lambda deploy-role report: [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
 - Mixed fixture: [`fixtures/sample_aws_plan.json`](fixtures/sample_aws_plan.json)
 - Mixed report: [`examples/sample_report.md`](examples/sample_report.md)
 - Nightmare fixture: [`fixtures/sample_aws_nightmare_plan.json`](fixtures/sample_aws_nightmare_plan.json)
