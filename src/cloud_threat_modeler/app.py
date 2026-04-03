@@ -13,8 +13,8 @@ from cloud_threat_modeler.reporting.markdown import MarkdownReportRenderer
 DEFAULT_LIMITATIONS = [
     "AWS support is intentionally limited to a curated v1 resource set rather than the full Terraform AWS provider.",
     "Subnet public/private classification uses Terraform plan attributes plus route-table heuristics and does not model every association resource.",
-    "IAM analysis focuses on inline role policies, standalone policy documents, and trust policies; it does not yet build a full attachment graph.",
-    "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or resource-based policies beyond basic S3 checks.",
+    "IAM analysis focuses on inline role policies, standalone policy documents, role-policy attachments, and trust policies; it does not yet build a full attachment graph.",
+    "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or resource-based policies beyond scoped S3 public-access checks.",
 ]
 
 

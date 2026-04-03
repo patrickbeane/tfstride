@@ -18,11 +18,14 @@ from cloud_threat_modeler.providers.base import ProviderNormalizer
 SUPPORTED_AWS_TYPES = {
     "aws_instance",
     "aws_security_group",
+    "aws_security_group_rule",
     "aws_lb",
     "aws_db_instance",
     "aws_s3_bucket",
+    "aws_s3_bucket_public_access_block",
     "aws_iam_role",
     "aws_iam_policy",
+    "aws_iam_role_policy_attachment",
     "aws_lambda_function",
     "aws_subnet",
     "aws_vpc",
@@ -124,6 +127,17 @@ class AwsNormalizer(ProviderNormalizer):
                     "group_name": values.get("name"),
                 },
             )
+        if resource.resource_type == "aws_security_group_rule":
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.NETWORK,
+                identifier=values.get("id") or resource.address,
+                network_rules=[_parse_standalone_security_group_rule(values)],
+                metadata={"security_group_id": values.get("security_group_id")},
+            )
         if resource.resource_type == "aws_instance":
             return NormalizedResource(
                 address=resource.address,
@@ -199,6 +213,22 @@ class AwsNormalizer(ProviderNormalizer):
                     "policy_document": policy_document,
                 },
             )
+        if resource.resource_type == "aws_s3_bucket_public_access_block":
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("id") or values.get("bucket") or resource.address,
+                metadata={
+                    "bucket": values.get("bucket"),
+                    "block_public_acls": bool(values.get("block_public_acls", False)),
+                    "block_public_policy": bool(values.get("block_public_policy", False)),
+                    "ignore_public_acls": bool(values.get("ignore_public_acls", False)),
+                    "restrict_public_buckets": bool(values.get("restrict_public_buckets", False)),
+                },
+            )
         if resource.resource_type == "aws_iam_role":
             assume_role_policy = _load_json_document(values.get("assume_role_policy"))
             inline_policies = _as_list(values.get("inline_policy"))
@@ -233,6 +263,19 @@ class AwsNormalizer(ProviderNormalizer):
                 policy_statements=_parse_policy_statements(policy_document),
                 metadata={"policy_document": policy_document},
             )
+        if resource.resource_type == "aws_iam_role_policy_attachment":
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.IAM,
+                identifier=values.get("id") or resource.address,
+                metadata={
+                    "role": values.get("role"),
+                    "policy_arn": values.get("policy_arn"),
+                },
+            )
         if resource.resource_type == "aws_lambda_function":
             vpc_config = _first_item(values.get("vpc_config"))
             return NormalizedResource(
@@ -259,6 +302,27 @@ class AwsNormalizer(ProviderNormalizer):
         security_groups = {
             resource.identifier: resource for resource in resources if resource.resource_type == "aws_security_group"
         }
+        buckets = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_s3_bucket"
+            for key in (resource.identifier, resource.address, resource.arn)
+            if key
+        }
+        role_index = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_iam_role"
+            for key in (resource.identifier, resource.address, resource.arn)
+            if key
+        }
+        policy_index = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_iam_policy"
+            for key in (resource.identifier, resource.address, resource.arn)
+            if key
+        }
         vpcs_with_igw = {
             resource.vpc_id for resource in resources if resource.resource_type == "aws_internet_gateway" and resource.vpc_id
         }
@@ -267,6 +331,62 @@ class AwsNormalizer(ProviderNormalizer):
             for resource in resources
             if resource.resource_type == "aws_route_table" and _has_internet_route(resource.metadata.get("routes", []))
         }
+
+        # Standalone SG rule resources carry the same security meaning as inline rules, so fold
+        # them into the parent security group before any exposure analysis runs.
+        for rule_resource in resources:
+            if rule_resource.resource_type != "aws_security_group_rule":
+                continue
+            target_group = security_groups.get(rule_resource.metadata.get("security_group_id"))
+            if target_group is None:
+                continue
+            target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
+            _append_unique(target_group.metadata, "standalone_rule_addresses", rule_resource.address)
+
+        # Role-policy attachments change the workload's effective privileges, so merge any
+        # in-plan customer-managed policy statements onto the target role.
+        for attachment_resource in resources:
+            if attachment_resource.resource_type != "aws_iam_role_policy_attachment":
+                continue
+            role = role_index.get(attachment_resource.metadata.get("role"))
+            policy = policy_index.get(attachment_resource.metadata.get("policy_arn"))
+            if role is None:
+                continue
+            if policy is None:
+                _append_unique(
+                    role.metadata,
+                    "unresolved_attached_policy_arns",
+                    str(attachment_resource.metadata.get("policy_arn")),
+                )
+                continue
+            role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
+            _append_unique(role.metadata, "attached_policy_arns", policy.arn or policy.identifier or policy.address)
+            _append_unique(role.metadata, "attached_policy_addresses", policy.address)
+
+        # Public access blocks can neutralize otherwise-public bucket ACLs or policies, so
+        # recompute effective public exposure after the control is applied.
+        for access_block_resource in resources:
+            if access_block_resource.resource_type != "aws_s3_bucket_public_access_block":
+                continue
+            bucket = buckets.get(access_block_resource.metadata.get("bucket"))
+            if bucket is None:
+                continue
+            public_access_block = {
+                "block_public_acls": bool(access_block_resource.metadata.get("block_public_acls")),
+                "block_public_policy": bool(access_block_resource.metadata.get("block_public_policy")),
+                "ignore_public_acls": bool(access_block_resource.metadata.get("ignore_public_acls")),
+                "restrict_public_buckets": bool(access_block_resource.metadata.get("restrict_public_buckets")),
+            }
+            bucket.metadata["public_access_block"] = public_access_block
+            public_via_acl = bucket.metadata.get("acl") in {"public-read", "public-read-write", "website"}
+            public_via_policy = _policy_allows_public_access(bucket.metadata.get("policy_document", {}))
+            bucket.public_exposure = (
+                public_via_acl and not (public_access_block["block_public_acls"] or public_access_block["ignore_public_acls"])
+            ) or (
+                public_via_policy
+                and not (public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"])
+            )
+
         public_subnet_ids = set()
         for subnet in subnets.values():
             # v1 intentionally uses a simple heuristic: a subnet is "public" when it both
@@ -331,6 +451,22 @@ def _parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRul
                 )
             )
     return rules
+
+
+def _parse_standalone_security_group_rule(values: dict[str, Any]) -> SecurityGroupRule:
+    referenced_security_group_ids = _compact([values.get("source_security_group_id")])
+    if values.get("self") and values.get("security_group_id"):
+        referenced_security_group_ids.append(str(values["security_group_id"]))
+    return SecurityGroupRule(
+        direction=str(values.get("type", "ingress")),
+        protocol=str(values.get("protocol", "-1")),
+        from_port=_as_optional_int(values.get("from_port")),
+        to_port=_as_optional_int(values.get("to_port")),
+        cidr_blocks=_as_list(values.get("cidr_blocks")),
+        ipv6_cidr_blocks=_as_list(values.get("ipv6_cidr_blocks")),
+        referenced_security_group_ids=referenced_security_group_ids,
+        description=values.get("description"),
+    )
 
 
 def _parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyStatement]:
@@ -417,6 +553,42 @@ def _parse_account_id(arn: str | None) -> str | None:
     if len(parts) < 5:
         return None
     return parts[4] or None
+
+
+def _clone_security_group_rules(rules: list[SecurityGroupRule]) -> list[SecurityGroupRule]:
+    return [
+        SecurityGroupRule(
+            direction=rule.direction,
+            protocol=rule.protocol,
+            from_port=rule.from_port,
+            to_port=rule.to_port,
+            cidr_blocks=list(rule.cidr_blocks),
+            ipv6_cidr_blocks=list(rule.ipv6_cidr_blocks),
+            referenced_security_group_ids=list(rule.referenced_security_group_ids),
+            description=rule.description,
+        )
+        for rule in rules
+    ]
+
+
+def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPolicyStatement]:
+    return [
+        IAMPolicyStatement(
+            effect=statement.effect,
+            actions=list(statement.actions),
+            resources=list(statement.resources),
+            principals=list(statement.principals),
+        )
+        for statement in statements
+    ]
+
+
+def _append_unique(metadata: dict[str, Any], key: str, value: str | None) -> None:
+    if not value:
+        return
+    values = metadata.setdefault(key, [])
+    if value not in values:
+        values.append(value)
 
 
 def _compact(values: list[Any]) -> list[str]:

@@ -81,11 +81,14 @@ The MVP intentionally supports a focused resource set:
 
 - `aws_instance`
 - `aws_security_group`
+- `aws_security_group_rule`
 - `aws_lb`
 - `aws_db_instance`
 - `aws_s3_bucket`
+- `aws_s3_bucket_public_access_block`
 - `aws_iam_role`
 - `aws_iam_policy`
+- `aws_iam_role_policy_attachment`
 - `aws_lambda_function`
 - `aws_subnet`
 - `aws_vpc`
@@ -174,10 +177,12 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 The AWS normalizer converts Terraform resources into a shared internal model that captures:
 
 - network placement
-- security group rules
+- security group rules, including standalone `aws_security_group_rule` resources
 - IAM policy statements
+- effective role permissions from `aws_iam_role_policy_attachment`
 - trust policy principals
 - public exposure hints
+- S3 public-access suppression from `aws_s3_bucket_public_access_block`
 - workload-to-role relationships
 
 The rule engine then evaluates those normalized resources instead of reasoning directly over raw Terraform JSON. That keeps the analysis explainable and makes future providers easier to add.
@@ -187,7 +192,7 @@ The rule engine then evaluates those normalized resources instead of reasoning d
 - AWS only in v1
 - deliberately incomplete Terraform resource coverage
 - subnet classification uses route-table heuristics rather than full association modeling
-- IAM attachment analysis is partial and focuses on inline policies, standalone policies, and trust policies
+- IAM attachment analysis is partial and focuses on inline policies, standalone policies, role-policy attachments, and trust policies
 - no runtime validation, cloud API calls, or drift detection
 - no architecture diagrams, frontend, or graph visualization in v1
 

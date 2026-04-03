@@ -146,19 +146,7 @@
             "name": "safe-app-sg",
             "description": "Application tier only reachable from the load balancer",
             "vpc_id": "vpc-safe-001",
-            "ingress": [
-              {
-                "description": "App traffic from ALB",
-                "from_port": 8080,
-                "to_port": 8080,
-                "protocol": "tcp",
-                "cidr_blocks": [],
-                "ipv6_cidr_blocks": [],
-                "security_groups": [
-                  "sg-safe-lb-001"
-                ]
-              }
-            ],
+            "ingress": [],
             "egress": [
               {
                 "from_port": 0,
@@ -174,6 +162,25 @@
           }
         },
         {
+          "address": "aws_security_group_rule.app_from_lb",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "app_from_lb",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-safe-app-001",
+            "security_group_id": "sg-safe-app-001",
+            "type": "ingress",
+            "from_port": 8080,
+            "to_port": 8080,
+            "protocol": "tcp",
+            "cidr_blocks": [],
+            "ipv6_cidr_blocks": [],
+            "source_security_group_id": "sg-safe-lb-001",
+            "description": "App traffic from ALB"
+          }
+        },
+        {
           "address": "aws_security_group.db",
           "mode": "managed",
           "type": "aws_security_group",
@@ -184,19 +191,7 @@
             "name": "safe-db-sg",
             "description": "Database ingress only from the app tier",
             "vpc_id": "vpc-safe-001",
-            "ingress": [
-              {
-                "description": "Postgres from app tier",
-                "from_port": 5432,
-                "to_port": 5432,
-                "protocol": "tcp",
-                "cidr_blocks": [],
-                "ipv6_cidr_blocks": [],
-                "security_groups": [
-                  "sg-safe-app-001"
-                ]
-              }
-            ],
+            "ingress": [],
             "egress": [
               {
                 "from_port": 0,
@@ -209,6 +204,25 @@
                 "security_groups": []
               }
             ]
+          }
+        },
+        {
+          "address": "aws_security_group_rule.db_from_app",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "db_from_app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-safe-db-001",
+            "security_group_id": "sg-safe-db-001",
+            "type": "ingress",
+            "from_port": 5432,
+            "to_port": 5432,
+            "protocol": "tcp",
+            "cidr_blocks": [],
+            "ipv6_cidr_blocks": [],
+            "source_security_group_id": "sg-safe-app-001",
+            "description": "Postgres from app tier"
           }
         },
         {
@@ -281,7 +295,23 @@
             "id": "safe-artifacts",
             "arn": "arn:aws:s3:::safe-artifacts",
             "bucket": "safe-artifacts",
-            "acl": "private"
+            "acl": "public-read",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":\"arn:aws:s3:::safe-artifacts/*\"}]}"
+          }
+        },
+        {
+          "address": "aws_s3_bucket_public_access_block.artifacts",
+          "mode": "managed",
+          "type": "aws_s3_bucket_public_access_block",
+          "name": "artifacts",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-artifacts-public-block",
+            "bucket": "safe-artifacts",
+            "block_public_acls": true,
+            "block_public_policy": true,
+            "ignore_public_acls": true,
+            "restrict_public_buckets": true
           }
         },
         {
@@ -295,12 +325,32 @@
             "name": "safe-workload-role",
             "arn": "arn:aws:iam::222233334444:role/safe-workload-role",
             "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}]}",
-            "inline_policy": [
-              {
-                "name": "safe-workload-inline",
-                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::safe-artifacts/*\"]}]}"
-              }
-            ]
+            "inline_policy": []
+          }
+        },
+        {
+          "address": "aws_iam_policy.artifact_read",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "artifact_read",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-artifact-read",
+            "name": "safe-artifact-read",
+            "arn": "arn:aws:iam::222233334444:policy/safe-artifact-read",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::safe-artifacts/*\"]}]}"
+          }
+        },
+        {
+          "address": "aws_iam_role_policy_attachment.workload_artifact_read",
+          "mode": "managed",
+          "type": "aws_iam_role_policy_attachment",
+          "name": "workload_artifact_read",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-workload-artifact-read",
+            "role": "safe-workload-role",
+            "policy_arn": "arn:aws:iam::222233334444:policy/safe-artifact-read"
           }
         },
         {

@@ -20,8 +20,11 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.result = self.engine.analyze_plan(FIXTURE_PATH)
 
     def test_analysis_normalizes_supported_resources_and_tracks_unsupported(self) -> None:
-        self.assertEqual(len(self.result.inventory.resources), 14)
+        self.assertEqual(len(self.result.inventory.resources), 19)
         self.assertIn("aws_cloudwatch_log_group.processor", self.result.inventory.unsupported_resources)
+        resource_types = {resource.resource_type for resource in self.result.inventory.resources}
+        self.assertIn("aws_security_group_rule", resource_types)
+        self.assertIn("aws_iam_role_policy_attachment", resource_types)
 
     def test_analysis_discovers_expected_trust_boundaries(self) -> None:
         boundary_types = {boundary.boundary_type for boundary in self.result.trust_boundaries}
@@ -84,6 +87,42 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
                 self.assertEqual(len(result.findings), expected_count)
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
+
+    def test_safe_fixture_public_access_block_suppresses_bucket_exposure(self) -> None:
+        result = self.engine.analyze_plan(SAFE_FIXTURE_PATH)
+        bucket = result.inventory.get_by_address("aws_s3_bucket.artifacts")
+
+        self.assertIsNotNone(bucket)
+        self.assertFalse(bucket.public_exposure)
+        self.assertIn("public_access_block", bucket.metadata)
+        finding_titles = {finding.title for finding in result.findings}
+        self.assertNotIn("Object storage is publicly accessible", finding_titles)
+
+    def test_role_policy_attachments_extend_effective_role_permissions(self) -> None:
+        safe_result = self.engine.analyze_plan(SAFE_FIXTURE_PATH)
+        mixed_result = self.engine.analyze_plan(FIXTURE_PATH)
+
+        safe_role = safe_result.inventory.get_by_address("aws_iam_role.workload")
+        mixed_role = mixed_result.inventory.get_by_address("aws_iam_role.workload")
+
+        self.assertIn("aws_iam_policy.artifact_read", safe_role.metadata.get("attached_policy_addresses", []))
+        self.assertTrue(
+            any("s3:GetObject" in statement.actions for statement in safe_role.policy_statements)
+        )
+        self.assertIn("aws_iam_policy.admin_like", mixed_role.metadata.get("attached_policy_addresses", []))
+
+    def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
+        safe_result = self.engine.analyze_plan(SAFE_FIXTURE_PATH)
+        mixed_result = self.engine.analyze_plan(FIXTURE_PATH)
+
+        safe_app_group = safe_result.inventory.get_by_address("aws_security_group.app")
+        mixed_db_group = mixed_result.inventory.get_by_address("aws_security_group.db")
+
+        self.assertIn("aws_security_group_rule.app_from_lb", safe_app_group.metadata.get("standalone_rule_addresses", []))
+        self.assertEqual(len(safe_app_group.network_rules), 2)
+        self.assertIn("aws_security_group_rule.db_from_public_app", mixed_db_group.metadata.get("standalone_rule_addresses", []))
+        self.assertIn("aws_security_group_rule.db_from_internet", mixed_db_group.metadata.get("standalone_rule_addresses", []))
+        self.assertEqual(len(mixed_db_group.network_rules), 3)
 
 
 if __name__ == "__main__":

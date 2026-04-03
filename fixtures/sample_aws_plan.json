@@ -91,30 +91,7 @@
             "name": "app-sg",
             "description": "Public application tier",
             "vpc_id": "vpc-001",
-            "ingress": [
-              {
-                "description": "SSH from internet",
-                "from_port": 22,
-                "to_port": 22,
-                "protocol": "tcp",
-                "cidr_blocks": [
-                  "0.0.0.0/0"
-                ],
-                "ipv6_cidr_blocks": [],
-                "security_groups": []
-              },
-              {
-                "description": "App port from internet",
-                "from_port": 8080,
-                "to_port": 8080,
-                "protocol": "tcp",
-                "cidr_blocks": [
-                  "0.0.0.0/0"
-                ],
-                "ipv6_cidr_blocks": [],
-                "security_groups": []
-              }
-            ],
+            "ingress": [],
             "egress": [
               {
                 "from_port": 0,
@@ -130,6 +107,46 @@
           }
         },
         {
+          "address": "aws_security_group_rule.app_ssh_from_internet",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "app_ssh_from_internet",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-app-ssh-001",
+            "security_group_id": "sg-app-001",
+            "type": "ingress",
+            "from_port": 22,
+            "to_port": 22,
+            "protocol": "tcp",
+            "cidr_blocks": [
+              "0.0.0.0/0"
+            ],
+            "ipv6_cidr_blocks": [],
+            "description": "SSH from internet"
+          }
+        },
+        {
+          "address": "aws_security_group_rule.app_http_from_internet",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "app_http_from_internet",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-app-http-001",
+            "security_group_id": "sg-app-001",
+            "type": "ingress",
+            "from_port": 8080,
+            "to_port": 8080,
+            "protocol": "tcp",
+            "cidr_blocks": [
+              "0.0.0.0/0"
+            ],
+            "ipv6_cidr_blocks": [],
+            "description": "App port from internet"
+          }
+        },
+        {
           "address": "aws_security_group.db",
           "mode": "managed",
           "type": "aws_security_group",
@@ -140,30 +157,7 @@
             "name": "db-sg",
             "description": "Database tier",
             "vpc_id": "vpc-001",
-            "ingress": [
-              {
-                "description": "Postgres from public app tier",
-                "from_port": 5432,
-                "to_port": 5432,
-                "protocol": "tcp",
-                "cidr_blocks": [],
-                "ipv6_cidr_blocks": [],
-                "security_groups": [
-                  "sg-app-001"
-                ]
-              },
-              {
-                "description": "Postgres from internet",
-                "from_port": 5432,
-                "to_port": 5432,
-                "protocol": "tcp",
-                "cidr_blocks": [
-                  "0.0.0.0/0"
-                ],
-                "ipv6_cidr_blocks": [],
-                "security_groups": []
-              }
-            ],
+            "ingress": [],
             "egress": [
               {
                 "from_port": 0,
@@ -176,6 +170,45 @@
                 "security_groups": []
               }
             ]
+          }
+        },
+        {
+          "address": "aws_security_group_rule.db_from_public_app",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "db_from_public_app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-db-app-001",
+            "security_group_id": "sg-db-001",
+            "type": "ingress",
+            "from_port": 5432,
+            "to_port": 5432,
+            "protocol": "tcp",
+            "cidr_blocks": [],
+            "ipv6_cidr_blocks": [],
+            "source_security_group_id": "sg-app-001",
+            "description": "Postgres from public app tier"
+          }
+        },
+        {
+          "address": "aws_security_group_rule.db_from_internet",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "db_from_internet",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sgrule-db-public-001",
+            "security_group_id": "sg-db-001",
+            "type": "ingress",
+            "from_port": 5432,
+            "to_port": 5432,
+            "protocol": "tcp",
+            "cidr_blocks": [
+              "0.0.0.0/0"
+            ],
+            "ipv6_cidr_blocks": [],
+            "description": "Postgres from internet"
           }
         },
         {
@@ -282,6 +315,18 @@
             "name": "admin-like",
             "arn": "arn:aws:iam::111122223333:policy/admin-like",
             "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"ec2:*\",\"iam:*\"],\"Resource\":\"*\"}]}"
+          }
+        },
+        {
+          "address": "aws_iam_role_policy_attachment.workload_admin_like",
+          "mode": "managed",
+          "type": "aws_iam_role_policy_attachment",
+          "name": "workload_admin_like",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "workload-admin-like",
+            "role": "workload-role",
+            "policy_arn": "arn:aws:iam::111122223333:policy/admin-like"
           }
         },
         {
