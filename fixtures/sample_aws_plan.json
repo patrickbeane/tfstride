@@ -1,0 +1,325 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_vpc.main",
+          "mode": "managed",
+          "type": "aws_vpc",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "vpc-001",
+            "cidr_block": "10.0.0.0/16",
+            "tags": {
+              "Name": "main"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.public_app",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "public_app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-public-001",
+            "vpc_id": "vpc-001",
+            "cidr_block": "10.0.1.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": true,
+            "tags": {
+              "Tier": "public"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.private_data",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_data",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-private-001",
+            "vpc_id": "vpc-001",
+            "cidr_block": "10.0.2.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": false,
+            "tags": {
+              "Tier": "private"
+            }
+          }
+        },
+        {
+          "address": "aws_internet_gateway.main",
+          "mode": "managed",
+          "type": "aws_internet_gateway",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "igw-001",
+            "vpc_id": "vpc-001"
+          }
+        },
+        {
+          "address": "aws_route_table.public",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "public",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "rtb-001",
+            "vpc_id": "vpc-001",
+            "route": [
+              {
+                "cidr_block": "0.0.0.0/0",
+                "gateway_id": "igw-001"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.app",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-app-001",
+            "name": "app-sg",
+            "description": "Public application tier",
+            "vpc_id": "vpc-001",
+            "ingress": [
+              {
+                "description": "SSH from internet",
+                "from_port": 22,
+                "to_port": 22,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              },
+              {
+                "description": "App port from internet",
+                "from_port": 8080,
+                "to_port": 8080,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.db",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "db",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-db-001",
+            "name": "db-sg",
+            "description": "Database tier",
+            "vpc_id": "vpc-001",
+            "ingress": [
+              {
+                "description": "Postgres from public app tier",
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": [],
+                "ipv6_cidr_blocks": [],
+                "security_groups": [
+                  "sg-app-001"
+                ]
+              },
+              {
+                "description": "Postgres from internet",
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_lb.web",
+          "mode": "managed",
+          "type": "aws_lb",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "alb-001",
+            "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/123456",
+            "name": "web-alb",
+            "internal": false,
+            "load_balancer_type": "application",
+            "security_groups": [
+              "sg-app-001"
+            ],
+            "subnets": [
+              "subnet-public-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_instance.app",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "i-001",
+            "arn": "arn:aws:ec2:us-east-1:111122223333:instance/i-001",
+            "ami": "ami-1234567890",
+            "instance_type": "t3.micro",
+            "subnet_id": "subnet-public-001",
+            "vpc_security_group_ids": [
+              "sg-app-001"
+            ],
+            "associate_public_ip_address": true,
+            "tags": {
+              "Tier": "app"
+            }
+          }
+        },
+        {
+          "address": "aws_db_instance.app",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "db-001",
+            "identifier": "customer-db",
+            "arn": "arn:aws:rds:us-east-1:111122223333:db:customer-db",
+            "engine": "postgres",
+            "publicly_accessible": false,
+            "storage_encrypted": true,
+            "db_subnet_group_name": "private-data",
+            "vpc_security_group_ids": [
+              "sg-db-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket.assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "customer-assets",
+            "arn": "arn:aws:s3:::customer-assets",
+            "bucket": "customer-assets",
+            "acl": "public-read",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":\"arn:aws:s3:::customer-assets/*\"}]}"
+          }
+        },
+        {
+          "address": "aws_iam_role.workload",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "workload",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "workload-role",
+            "name": "workload-role",
+            "arn": "arn:aws:iam::111122223333:role/workload-role",
+            "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}},{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"AWS\":\"arn:aws:iam::999988887777:root\"}}]}",
+            "inline_policy": [
+              {
+                "name": "workload-inline",
+                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:*\",\"kms:Decrypt\",\"iam:PassRole\",\"sts:AssumeRole\"],\"Resource\":\"*\"}]}"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_iam_policy.admin_like",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "admin_like",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "admin-like",
+            "name": "admin-like",
+            "arn": "arn:aws:iam::111122223333:policy/admin-like",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"ec2:*\",\"iam:*\"],\"Resource\":\"*\"}]}"
+          }
+        },
+        {
+          "address": "aws_lambda_function.processor",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "processor",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "processor",
+            "function_name": "processor",
+            "arn": "arn:aws:lambda:us-east-1:111122223333:function:processor",
+            "role": "arn:aws:iam::111122223333:role/workload-role",
+            "handler": "handler.main",
+            "runtime": "python3.12",
+            "vpc_config": [
+              {
+                "subnet_ids": [
+                  "subnet-private-001"
+                ],
+                "security_group_ids": [
+                  "sg-app-001"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_cloudwatch_log_group.processor",
+          "mode": "managed",
+          "type": "aws_cloudwatch_log_group",
+          "name": "processor",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "name": "/aws/lambda/processor"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,347 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_vpc.main",
+          "mode": "managed",
+          "type": "aws_vpc",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "vpc-safe-001",
+            "cidr_block": "10.10.0.0/16",
+            "tags": {
+              "Name": "safe-main"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.public_edge",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "public_edge",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-safe-public-001",
+            "vpc_id": "vpc-safe-001",
+            "cidr_block": "10.10.1.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": true,
+            "tags": {
+              "Tier": "edge"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.private_app",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-safe-private-app-001",
+            "vpc_id": "vpc-safe-001",
+            "cidr_block": "10.10.2.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": false,
+            "tags": {
+              "Tier": "app"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.private_data",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_data",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-safe-private-data-001",
+            "vpc_id": "vpc-safe-001",
+            "cidr_block": "10.10.3.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": false,
+            "tags": {
+              "Tier": "data"
+            }
+          }
+        },
+        {
+          "address": "aws_internet_gateway.main",
+          "mode": "managed",
+          "type": "aws_internet_gateway",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "igw-safe-001",
+            "vpc_id": "vpc-safe-001"
+          }
+        },
+        {
+          "address": "aws_route_table.public",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "public",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "rtb-safe-001",
+            "vpc_id": "vpc-safe-001",
+            "route": [
+              {
+                "cidr_block": "0.0.0.0/0",
+                "gateway_id": "igw-safe-001"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.lb",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "lb",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-safe-lb-001",
+            "name": "safe-lb-sg",
+            "description": "Public load balancer ingress only",
+            "vpc_id": "vpc-safe-001",
+            "ingress": [
+              {
+                "description": "HTTPS from internet",
+                "from_port": 443,
+                "to_port": 443,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.app",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-safe-app-001",
+            "name": "safe-app-sg",
+            "description": "Application tier only reachable from the load balancer",
+            "vpc_id": "vpc-safe-001",
+            "ingress": [
+              {
+                "description": "App traffic from ALB",
+                "from_port": 8080,
+                "to_port": 8080,
+                "protocol": "tcp",
+                "cidr_blocks": [],
+                "ipv6_cidr_blocks": [],
+                "security_groups": [
+                  "sg-safe-lb-001"
+                ]
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.db",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "db",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-safe-db-001",
+            "name": "safe-db-sg",
+            "description": "Database ingress only from the app tier",
+            "vpc_id": "vpc-safe-001",
+            "ingress": [
+              {
+                "description": "Postgres from app tier",
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": [],
+                "ipv6_cidr_blocks": [],
+                "security_groups": [
+                  "sg-safe-app-001"
+                ]
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_lb.web",
+          "mode": "managed",
+          "type": "aws_lb",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "alb-safe-001",
+            "arn": "arn:aws:elasticloadbalancing:us-east-1:222233334444:loadbalancer/app/safe-web/123456",
+            "name": "safe-web",
+            "internal": false,
+            "load_balancer_type": "application",
+            "security_groups": [
+              "sg-safe-lb-001"
+            ],
+            "subnets": [
+              "subnet-safe-public-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_instance.app",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "i-safe-001",
+            "arn": "arn:aws:ec2:us-east-1:222233334444:instance/i-safe-001",
+            "ami": "ami-safe-123456",
+            "instance_type": "t3.small",
+            "subnet_id": "subnet-safe-private-app-001",
+            "vpc_security_group_ids": [
+              "sg-safe-app-001"
+            ],
+            "associate_public_ip_address": false,
+            "tags": {
+              "Tier": "app"
+            }
+          }
+        },
+        {
+          "address": "aws_db_instance.app",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "db-safe-001",
+            "identifier": "safe-customer-db",
+            "arn": "arn:aws:rds:us-east-1:222233334444:db:safe-customer-db",
+            "engine": "postgres",
+            "publicly_accessible": false,
+            "storage_encrypted": true,
+            "db_subnet_group_name": "safe-private-data",
+            "vpc_security_group_ids": [
+              "sg-safe-db-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket.artifacts",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "artifacts",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-artifacts",
+            "arn": "arn:aws:s3:::safe-artifacts",
+            "bucket": "safe-artifacts",
+            "acl": "private"
+          }
+        },
+        {
+          "address": "aws_iam_role.workload",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "workload",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-workload-role",
+            "name": "safe-workload-role",
+            "arn": "arn:aws:iam::222233334444:role/safe-workload-role",
+            "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}]}",
+            "inline_policy": [
+              {
+                "name": "safe-workload-inline",
+                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::safe-artifacts/*\"]}]}"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_iam_policy.observability",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "observability",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-observability",
+            "name": "safe-observability",
+            "arn": "arn:aws:iam::222233334444:policy/safe-observability",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"logs:*\"],\"Resource\":\"*\"}]}"
+          }
+        },
+        {
+          "address": "aws_lambda_function.processor",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "processor",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "safe-processor",
+            "function_name": "safe-processor",
+            "arn": "arn:aws:lambda:us-east-1:222233334444:function:safe-processor",
+            "role": "arn:aws:iam::222233334444:role/safe-workload-role",
+            "handler": "handler.main",
+            "runtime": "python3.12",
+            "vpc_config": [
+              {
+                "subnet_ids": [
+                  "subnet-safe-private-app-001"
+                ],
+                "security_group_ids": [
+                  "sg-safe-app-001"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

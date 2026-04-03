@@ -1,0 +1,438 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_vpc.main",
+          "mode": "managed",
+          "type": "aws_vpc",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "vpc-bad-001",
+            "cidr_block": "10.20.0.0/16",
+            "tags": {
+              "Name": "nightmare-main"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.public_web",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "public_web",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-bad-public-001",
+            "vpc_id": "vpc-bad-001",
+            "cidr_block": "10.20.1.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": true,
+            "tags": {
+              "Tier": "public"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.private_ops",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_ops",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-bad-private-ops-001",
+            "vpc_id": "vpc-bad-001",
+            "cidr_block": "10.20.2.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": false,
+            "tags": {
+              "Tier": "ops"
+            }
+          }
+        },
+        {
+          "address": "aws_subnet.private_data",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_data",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "subnet-bad-private-data-001",
+            "vpc_id": "vpc-bad-001",
+            "cidr_block": "10.20.3.0/24",
+            "availability_zone": "us-east-1a",
+            "map_public_ip_on_launch": false,
+            "tags": {
+              "Tier": "data"
+            }
+          }
+        },
+        {
+          "address": "aws_internet_gateway.main",
+          "mode": "managed",
+          "type": "aws_internet_gateway",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "igw-bad-001",
+            "vpc_id": "vpc-bad-001"
+          }
+        },
+        {
+          "address": "aws_route_table.public",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "public",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "rtb-bad-001",
+            "vpc_id": "vpc-bad-001",
+            "route": [
+              {
+                "cidr_block": "0.0.0.0/0",
+                "gateway_id": "igw-bad-001"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.frontend",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "frontend",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-bad-front-001",
+            "name": "bad-front-sg",
+            "description": "Open frontend security group",
+            "vpc_id": "vpc-bad-001",
+            "ingress": [
+              {
+                "description": "Everything from the internet",
+                "from_port": 0,
+                "to_port": 65535,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.admin",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "admin",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-bad-admin-001",
+            "name": "bad-admin-sg",
+            "description": "Remote admin directly from the internet",
+            "vpc_id": "vpc-bad-001",
+            "ingress": [
+              {
+                "description": "RDP from internet",
+                "from_port": 3389,
+                "to_port": 3389,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.db",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "db",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "sg-bad-db-001",
+            "name": "bad-db-sg",
+            "description": "Database tier exposed to public and public app tiers",
+            "vpc_id": "vpc-bad-001",
+            "ingress": [
+              {
+                "description": "Postgres from internet",
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              },
+              {
+                "description": "Postgres from public tiers",
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": [],
+                "ipv6_cidr_blocks": [],
+                "security_groups": [
+                  "sg-bad-front-001",
+                  "sg-bad-admin-001"
+                ]
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "ipv6_cidr_blocks": [],
+                "security_groups": []
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_lb.web",
+          "mode": "managed",
+          "type": "aws_lb",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "alb-bad-001",
+            "arn": "arn:aws:elasticloadbalancing:us-east-1:555566667777:loadbalancer/app/nightmare-web/123456",
+            "name": "nightmare-web",
+            "internal": false,
+            "load_balancer_type": "application",
+            "security_groups": [
+              "sg-bad-front-001"
+            ],
+            "subnets": [
+              "subnet-bad-public-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_instance.frontend",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "frontend",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "i-bad-front-001",
+            "arn": "arn:aws:ec2:us-east-1:555566667777:instance/i-bad-front-001",
+            "ami": "ami-bad-frontend",
+            "instance_type": "t3.micro",
+            "subnet_id": "subnet-bad-public-001",
+            "vpc_security_group_ids": [
+              "sg-bad-front-001"
+            ],
+            "associate_public_ip_address": true,
+            "tags": {
+              "Tier": "frontend"
+            }
+          }
+        },
+        {
+          "address": "aws_instance.admin",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "admin",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "i-bad-admin-001",
+            "arn": "arn:aws:ec2:us-east-1:555566667777:instance/i-bad-admin-001",
+            "ami": "ami-bad-admin",
+            "instance_type": "t3.micro",
+            "subnet_id": "subnet-bad-public-001",
+            "vpc_security_group_ids": [
+              "sg-bad-admin-001"
+            ],
+            "associate_public_ip_address": true,
+            "tags": {
+              "Tier": "admin"
+            }
+          }
+        },
+        {
+          "address": "aws_db_instance.customer",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "customer",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "db-bad-001",
+            "identifier": "nightmare-customer-db",
+            "arn": "arn:aws:rds:us-east-1:555566667777:db:nightmare-customer-db",
+            "engine": "postgres",
+            "publicly_accessible": false,
+            "storage_encrypted": false,
+            "db_subnet_group_name": "bad-private-data",
+            "vpc_security_group_ids": [
+              "sg-bad-db-001"
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket.assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-assets",
+            "arn": "arn:aws:s3:::nightmare-assets",
+            "bucket": "nightmare-assets",
+            "acl": "public-read",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":\"arn:aws:s3:::nightmare-assets/*\"}]}"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.backups",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "backups",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-backups",
+            "arn": "arn:aws:s3:::nightmare-backups",
+            "bucket": "nightmare-backups",
+            "acl": "public-read-write"
+          }
+        },
+        {
+          "address": "aws_iam_role.app",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-app-role",
+            "name": "nightmare-app-role",
+            "arn": "arn:aws:iam::555566667777:role/nightmare-app-role",
+            "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}},{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"AWS\":\"*\"}}]}",
+            "inline_policy": [
+              {
+                "name": "nightmare-app-inline",
+                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"*\",\"kms:Decrypt\",\"sts:AssumeRole\"],\"Resource\":\"*\"}]}"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_iam_role.pipeline",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "pipeline",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-pipeline-role",
+            "name": "nightmare-pipeline-role",
+            "arn": "arn:aws:iam::555566667777:role/nightmare-pipeline-role",
+            "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}},{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"AWS\":\"arn:aws:iam::444455556666:root\"}}]}",
+            "inline_policy": [
+              {
+                "name": "nightmare-pipeline-inline",
+                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:*\",\"iam:PassRole\",\"s3:*\"],\"Resource\":\"*\"}]}"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_iam_policy.admin_like",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "admin_like",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-admin-like",
+            "name": "nightmare-admin-like",
+            "arn": "arn:aws:iam::555566667777:policy/nightmare-admin-like",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"ec2:*\",\"s3:*\",\"iam:*\"],\"Resource\":\"*\"}]}"
+          }
+        },
+        {
+          "address": "aws_lambda_function.processor",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "processor",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-processor",
+            "function_name": "nightmare-processor",
+            "arn": "arn:aws:lambda:us-east-1:555566667777:function:nightmare-processor",
+            "role": "arn:aws:iam::555566667777:role/nightmare-app-role",
+            "handler": "handler.main",
+            "runtime": "python3.12",
+            "vpc_config": [
+              {
+                "subnet_ids": [
+                  "subnet-bad-private-ops-001"
+                ],
+                "security_group_ids": [
+                  "sg-bad-front-001"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_lambda_function.deployer",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "deployer",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "nightmare-deployer",
+            "function_name": "nightmare-deployer",
+            "arn": "arn:aws:lambda:us-east-1:555566667777:function:nightmare-deployer",
+            "role": "arn:aws:iam::555566667777:role/nightmare-pipeline-role",
+            "handler": "handler.main",
+            "runtime": "python3.12",
+            "vpc_config": [
+              {
+                "subnet_ids": [
+                  "subnet-bad-private-ops-001"
+                ],
+                "security_group_ids": [
+                  "sg-bad-admin-001"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
