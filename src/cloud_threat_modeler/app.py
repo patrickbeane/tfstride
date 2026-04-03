@@ -8,6 +8,7 @@ from cloud_threat_modeler.input.terraform_plan import load_terraform_plan
 from cloud_threat_modeler.models import AnalysisResult
 from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
 from cloud_threat_modeler.reporting.markdown import MarkdownReportRenderer
+from cloud_threat_modeler.reporting.sarif import SarifReportRenderer
 
 
 DEFAULT_LIMITATIONS = [
@@ -24,6 +25,7 @@ class CloudThreatModeler:
         self.boundary_detector = TrustBoundaryDetector()
         self.rule_engine = StrideRuleEngine()
         self.report_renderer = MarkdownReportRenderer()
+        self.sarif_renderer = SarifReportRenderer()
 
     def analyze_plan(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> AnalysisResult:
         terraform_plan = load_terraform_plan(plan_path)
@@ -33,6 +35,7 @@ class CloudThreatModeler:
         return AnalysisResult(
             title=title,
             analyzed_file=Path(terraform_plan.source_path).name,
+            analyzed_path=str(terraform_plan.source_path),
             inventory=inventory,
             trust_boundaries=trust_boundaries,
             findings=findings,
@@ -42,3 +45,7 @@ class CloudThreatModeler:
     def render_markdown_report(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> str:
         result = self.analyze_plan(plan_path, title=title)
         return self.report_renderer.render(result)
+
+    def render_sarif_report(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> str:
+        result = self.analyze_plan(plan_path, title=title)
+        return self.sarif_renderer.render(result)

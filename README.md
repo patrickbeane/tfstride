@@ -36,11 +36,13 @@ Output:
 - findings grouped by severity
 - rationale and recommended mitigation for each finding
 - limitations and unsupported resources
+- optional SARIF 2.1.0 output for scanner-compatible integrations
 
 CLI gating:
 
 - optional policy gating with `--fail-on high`, `--fail-on medium`, or `--fail-on low`
 - emits the markdown report as usual, but returns exit code `3` when findings meet or exceed the threshold
+- optional SARIF side output with `--sarif-output report.sarif`
 
 ## Demo Scenarios
 
@@ -171,6 +173,12 @@ Generate the included demo report:
 
 ```bash
 PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json --output examples/sample_report.md
+```
+
+Generate markdown plus SARIF for CI or scanner upload:
+
+```bash
+PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json --output examples/sample_report.md --sarif-output report.sarif
 ```
 
 Fail a CI job when high-severity findings are present:

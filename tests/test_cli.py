@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -60,6 +61,29 @@ class CliTests(unittest.TestCase):
             self.assertTrue(output_path.exists())
             self.assertIn("Policy gate failed", stderr_buffer.getvalue())
             self.assertIn("5 medium", stderr_buffer.getvalue())
+
+    def test_cli_can_write_sarif_alongside_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "report.md"
+            sarif_output_path = Path(tmp_dir) / "report.sarif"
+
+            exit_code = main(
+                [
+                    str(FIXTURE_PATH),
+                    "--output",
+                    str(output_path),
+                    "--sarif-output",
+                    str(sarif_output_path),
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(output_path.exists())
+            self.assertTrue(sarif_output_path.exists())
+
+            sarif_payload = json.loads(sarif_output_path.read_text(encoding="utf-8"))
+            self.assertEqual(sarif_payload["version"], "2.1.0")
+            self.assertEqual(sarif_payload["runs"][0]["tool"]["driver"]["name"], "cloud-threat-modeler")
 
 
 if __name__ == "__main__":

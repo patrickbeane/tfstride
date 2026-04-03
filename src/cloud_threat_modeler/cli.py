@@ -28,6 +28,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to write the markdown report. If omitted, the report is printed to stdout.",
     )
     parser.add_argument(
+        "--sarif-output",
+        help="Optional path to write a SARIF 2.1.0 report alongside the markdown output.",
+    )
+    parser.add_argument(
         "--title",
         default="Cloud Threat Model Report",
         help="Optional custom report title.",
@@ -50,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     engine = CloudThreatModeler()
     result = engine.analyze_plan(args.plan, title=args.title)
     report = engine.report_renderer.render(result)
+    sarif_report = engine.sarif_renderer.render(result) if args.sarif_output else None
 
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
@@ -57,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(report)
         if not report.endswith("\n"):
             sys.stdout.write("\n")
+    if args.sarif_output and sarif_report is not None:
+        Path(args.sarif_output).write_text(sarif_report, encoding="utf-8")
 
     if not args.fail_on:
         return 0

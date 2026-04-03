@@ -188,6 +188,7 @@ class Finding:
 class AnalysisResult:
     title: str
     analyzed_file: str
+    analyzed_path: str
     inventory: ResourceInventory
     trust_boundaries: list[TrustBoundary]
     findings: list[Finding]
