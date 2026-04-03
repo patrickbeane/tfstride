@@ -37,6 +37,11 @@ Output:
 - rationale and recommended mitigation for each finding
 - limitations and unsupported resources
 
+CLI gating:
+
+- optional policy gating with `--fail-on high`, `--fail-on medium`, or `--fail-on low`
+- emits the markdown report as usual, but returns exit code `3` when findings meet or exceed the threshold
+
 ## Demo Scenarios
 
 The repo includes three ready-to-run Terraform plan fixtures:
@@ -166,6 +171,18 @@ Generate the included demo report:
 
 ```bash
 PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json --output examples/sample_report.md
+```
+
+Fail a CI job when high-severity findings are present:
+
+```bash
+PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json --fail-on high
+```
+
+Gate more aggressively on medium or higher findings before `terraform apply`:
+
+```bash
+PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json --fail-on medium
 ```
 
 Run the unit tests:

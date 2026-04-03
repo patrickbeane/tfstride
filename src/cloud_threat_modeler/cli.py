@@ -5,6 +5,15 @@ import sys
 from pathlib import Path
 
 from cloud_threat_modeler.app import CloudThreatModeler
+from cloud_threat_modeler.models import Severity
+
+
+POLICY_VIOLATION_EXIT_CODE = 3
+SEVERITY_RANK = {
+    Severity.LOW: 0,
+    Severity.MEDIUM: 1,
+    Severity.HIGH: 2,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="Cloud Threat Model Report",
         help="Optional custom report title.",
     )
+    parser.add_argument(
+        "--fail-on",
+        choices=[severity.value for severity in (Severity.LOW, Severity.MEDIUM, Severity.HIGH)],
+        help=(
+            "Return a non-zero exit code when findings meet or exceed the given severity threshold. "
+            "Useful for CI policy gating."
+        ),
+    )
     return parser
 
 
@@ -31,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     engine = CloudThreatModeler()
-    report = engine.render_markdown_report(args.plan, title=args.title)
+    result = engine.analyze_plan(args.plan, title=args.title)
+    report = engine.report_renderer.render(result)
 
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
@@ -39,4 +57,26 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(report)
         if not report.endswith("\n"):
             sys.stdout.write("\n")
-    return 0
+
+    if not args.fail_on:
+        return 0
+
+    threshold = Severity(args.fail_on)
+    violating_findings = [finding for finding in result.findings if _meets_or_exceeds(finding.severity, threshold)]
+    if not violating_findings:
+        return 0
+
+    summary = ", ".join(
+        f"{count} {severity.value}"
+        for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW)
+        if (count := sum(1 for finding in violating_findings if finding.severity == severity))
+    )
+    sys.stderr.write(
+        f"Policy gate failed: {len(violating_findings)} finding(s) meet or exceed `{threshold.value}`"
+        f" ({summary}).\n"
+    )
+    return POLICY_VIOLATION_EXIT_CODE
+
+
+def _meets_or_exceeds(severity: Severity, threshold: Severity) -> bool:
+    return SEVERITY_RANK[severity] >= SEVERITY_RANK[threshold]
