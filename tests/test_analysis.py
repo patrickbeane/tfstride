@@ -12,6 +12,7 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
+ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_alb_ec2_rds_plan.json"
 
 
 class CloudThreatModelerAnalysisTests(unittest.TestCase):
@@ -197,6 +198,16 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertFalse(mixed_db.public_exposure)
         self.assertTrue(mixed_db.metadata.get("internet_ingress_capable"))
         self.assertEqual(internet_boundaries_to_db, [])
+
+    def test_realistic_alb_ec2_rds_fixture_stays_quiet_but_preserves_boundaries(self) -> None:
+        result = self.engine.analyze_plan(ALB_EC2_RDS_FIXTURE_PATH)
+        boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
+
+        self.assertEqual(len(result.findings), 0)
+        self.assertEqual(len(result.inventory.resources), 19)
+        self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)
+        self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 2)
+        self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
 
 
 if __name__ == "__main__":
