@@ -97,6 +97,8 @@ class StrideRuleEngine:
         boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     ) -> list[Finding]:
         findings: list[Finding] = []
+        # Treat security groups attached to internet-reachable workloads as the "public tier"
+        # so database rules can reason about indirect exposure, not just raw 0.0.0.0/0 ingress.
         public_workloads = {
             security_group_id
             for resource in inventory.resources
@@ -446,6 +448,8 @@ def _score_severity(
     lateral_movement: int,
     blast_radius: int,
 ) -> Severity:
+    # The v1 model is intentionally additive and explainable: each detector supplies a few
+    # concrete signals and the final banding stays easy to tune without hiding logic in ML.
     score = 0
     score += 2 if internet_exposure else 0
     score += privilege_breadth

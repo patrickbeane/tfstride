@@ -32,6 +32,8 @@ def _collect_module_resources(module: dict[str, Any]) -> list[TerraformResource]
                 values=resource.get("values", {}),
             )
         )
+    # Terraform nests resources under child modules recursively; flatten them here so
+    # the rest of the engine can analyze one uniform resource list.
     for child_module in module.get("child_modules", []):
         resources.extend(_collect_module_resources(child_module))
     return resources

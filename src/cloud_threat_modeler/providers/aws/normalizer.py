@@ -269,6 +269,8 @@ class AwsNormalizer(ProviderNormalizer):
         }
         public_subnet_ids = set()
         for subnet in subnets.values():
+            # v1 intentionally uses a simple heuristic: a subnet is "public" when it both
+            # auto-assigns public IPs and lives in a VPC that has an IGW-backed default route.
             is_public = bool(subnet.metadata.get("map_public_ip_on_launch")) and subnet.vpc_id in vpcs_with_igw.intersection(
                 vpcs_with_public_routes
             )
@@ -278,6 +280,8 @@ class AwsNormalizer(ProviderNormalizer):
 
         for resource in resources:
             if not resource.vpc_id:
+                # Some Terraform resources omit a direct VPC reference, so infer it from the
+                # attached subnet first and fall back to attached security groups.
                 for subnet_id in resource.subnet_ids:
                     subnet = subnets.get(subnet_id)
                     if subnet and subnet.vpc_id:
@@ -299,6 +303,9 @@ class AwsNormalizer(ProviderNormalizer):
             )
             resource.metadata["internet_ingress"] = internet_ingress
             resource.metadata["public_subnet"] = any(subnet_id in public_subnet_ids for subnet_id in resource.subnet_ids)
+            # Public exposure is inferred conservatively from network placement and ingress
+            # rules so later detectors can reason over a normalized signal instead of
+            # provider-specific fields.
             if resource.resource_type == "aws_instance":
                 resource.public_exposure = resource.public_exposure or (
                     resource.metadata["public_subnet"] and internet_ingress
