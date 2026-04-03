@@ -130,6 +130,16 @@ Severity is intentionally simple and explainable. Each finding scores a few conc
 
 The resulting score maps to `low`, `medium`, or `high`.
 
+## Design Notes
+
+### Trust boundary modeling
+
+The engine models trust boundaries as deterministic crossings between distinct security zones in Terraform-described infrastructure. In v1, those zones include internet-to-service exposure, public-to-private subnet transitions, workload-to-data-store access, cross-account or cross-role trust, and control-plane-to-workload relationships through IAM roles. The goal is not to build a perfect network graph, but to identify the boundaries that matter most for security review and map findings back to those crossings in an explainable way.
+
+### Severity approach
+
+Severity is intentionally simple and explainable in v1. Findings are scored from a small set of concrete signals: internet exposure, privilege breadth, data sensitivity proxy, lateral movement potential, and blast radius. That keeps the model deterministic and easy to reason about, while still separating low-signal hygiene issues from genuinely risky exposure paths. The scoring is designed to be readable and adjustable rather than pretending to be a full risk engine.
+
 ## How To Run It
 
 ### Option 1: run directly from source
