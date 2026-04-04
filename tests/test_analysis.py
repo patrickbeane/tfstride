@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 from cloud_threat_modeler.app import CloudThreatModeler
-from cloud_threat_modeler.models import BoundaryType, Severity
+from cloud_threat_modeler.models import BoundaryType, Severity, TerraformResource
+from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -143,6 +144,26 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         )
         self.assertIn("aws_iam_policy.admin_like", mixed_role.metadata.get("attached_policy_addresses", []))
 
+    def test_analysis_surfaces_trust_statement_summaries_on_roles(self) -> None:
+        role = self.result.inventory.get_by_address("aws_iam_role.workload")
+
+        self.assertIsNotNone(role)
+        self.assertEqual(
+            role.metadata.get("trust_statements"),
+            [
+                {
+                    "principals": ["lambda.amazonaws.com"],
+                    "narrowing_condition_keys": [],
+                    "has_narrowing_conditions": False,
+                },
+                {
+                    "principals": ["arn:aws:iam::999988887777:root"],
+                    "narrowing_condition_keys": [],
+                    "has_narrowing_conditions": False,
+                },
+            ],
+        )
+
     def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
         safe_result = self.engine.analyze_plan(SAFE_FIXTURE_PATH)
         mixed_result = self.engine.analyze_plan(FIXTURE_PATH)
@@ -231,6 +252,73 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
         self.assertEqual(boundary_types[BoundaryType.CONTROL_TO_WORKLOAD], 1)
         self.assertEqual(boundary_types[BoundaryType.CROSS_ACCOUNT_OR_ROLE], 1)
+
+
+class AwsNormalizerTrustConditionTests(unittest.TestCase):
+    def test_normalizer_extracts_supported_trust_narrowing_condition_keys(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="aws_iam_role.constrained",
+                    mode="managed",
+                    resource_type="aws_iam_role",
+                    name="constrained",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "constrained-role",
+                        "name": "constrained-role",
+                        "arn": "arn:aws:iam::111122223333:role/constrained-role",
+                        "assume_role_policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRole",
+                                    "Principal": {"Service": "lambda.amazonaws.com"},
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRole",
+                                    "Principal": {"AWS": "arn:aws:iam::444455556666:role/deployer"},
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "sts:ExternalId": "release-pipeline",
+                                            "aws:SourceAccount": "444455556666",
+                                            "aws:PrincipalArn": "arn:aws:iam::444455556666:role/deployer",
+                                        },
+                                        "ArnLike": {
+                                            "aws:SourceArn": "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                )
+            ]
+        )
+        role = inventory.get_by_address("aws_iam_role.constrained")
+
+        self.assertIsNotNone(role)
+        self.assertEqual(
+            role.metadata.get("trust_statements"),
+            [
+                {
+                    "principals": ["lambda.amazonaws.com"],
+                    "narrowing_condition_keys": [],
+                    "has_narrowing_conditions": False,
+                },
+                {
+                    "principals": ["arn:aws:iam::444455556666:role/deployer"],
+                    "narrowing_condition_keys": [
+                        "aws:SourceAccount",
+                        "aws:SourceArn",
+                        "sts:ExternalId",
+                    ],
+                    "has_narrowing_conditions": True,
+                },
+            ],
+        )
 
 
 if __name__ == "__main__":

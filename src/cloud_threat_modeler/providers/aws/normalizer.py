@@ -35,6 +35,12 @@ SUPPORTED_AWS_TYPES = {
     "aws_route_table_association",
 }
 
+SUPPORTED_TRUST_NARROWING_CONDITION_KEYS = {
+    "sts:ExternalId",
+    "aws:SourceArn",
+    "aws:SourceAccount",
+}
+
 
 class AwsNormalizer(ProviderNormalizer):
     provider = "aws"
@@ -296,6 +302,7 @@ class AwsNormalizer(ProviderNormalizer):
                 metadata={
                     "assume_role_policy": assume_role_policy,
                     "trust_principals": _extract_principals(assume_role_policy),
+                    "trust_statements": _extract_trust_statements(assume_role_policy),
                     "inline_policy_names": [policy.get("name") for policy in inline_policies],
                 },
             )
@@ -600,6 +607,43 @@ def _extract_principals(policy_document: dict[str, Any]) -> list[str]:
     for statement in _parse_policy_statements(policy_document):
         principals.extend(statement.principals)
     return sorted(set(principals))
+
+
+def _extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, Any]]:
+    trust_statements: list[dict[str, Any]] = []
+    for statement in _as_list(policy_document.get("Statement")):
+        if str(statement.get("Effect", "Allow")) != "Allow":
+            continue
+        principals = sorted(set(_extract_principal_values(statement.get("Principal"))))
+        if not principals:
+            continue
+        narrowing_condition_keys = _extract_supported_trust_narrowing_condition_keys(statement.get("Condition"))
+        trust_statements.append(
+            {
+                "principals": principals,
+                "narrowing_condition_keys": narrowing_condition_keys,
+                "has_narrowing_conditions": bool(narrowing_condition_keys),
+            }
+        )
+    return trust_statements
+
+
+def _extract_supported_trust_narrowing_condition_keys(raw_condition: Any) -> list[str]:
+    found_keys: set[str] = set()
+    _collect_supported_trust_narrowing_condition_keys(raw_condition, found_keys)
+    return sorted(found_keys)
+
+
+def _collect_supported_trust_narrowing_condition_keys(raw_condition: Any, found_keys: set[str]) -> None:
+    if isinstance(raw_condition, dict):
+        for key, value in raw_condition.items():
+            if key in SUPPORTED_TRUST_NARROWING_CONDITION_KEYS:
+                found_keys.add(key)
+            _collect_supported_trust_narrowing_condition_keys(value, found_keys)
+        return
+    if isinstance(raw_condition, list):
+        for item in raw_condition:
+            _collect_supported_trust_narrowing_condition_keys(item, found_keys)
 
 
 def _extract_principal_values(raw_principal: Any) -> list[str]:
