@@ -9,7 +9,7 @@ from cloud_threat_modeler.analysis.rule_registry import RulePolicy
 from cloud_threat_modeler.app import CloudThreatModeler
 from cloud_threat_modeler.filtering import apply_finding_filters, render_baseline
 from cloud_threat_modeler.models import Severity
-from cloud_threat_modeler.reporting.json_report import JsonReportRenderer
+from cloud_threat_modeler.reporting.json_report import JsonReportRenderer, REPORT_FORMAT_VERSION, REPORT_KIND
 from cloud_threat_modeler.reporting.markdown import MarkdownReportRenderer
 from cloud_threat_modeler.reporting.sarif import SarifReportRenderer
 
@@ -190,13 +190,86 @@ class JsonReportRendererTests(unittest.TestCase):
         report = JsonReportRenderer().render(result)
         payload = json.loads(report)
 
-        self.assertEqual(payload["version"], "1.0")
+        self.assertEqual(payload["kind"], REPORT_KIND)
+        self.assertEqual(payload["version"], REPORT_FORMAT_VERSION)
         self.assertEqual(payload["tool"]["name"], "cloud-threat-modeler")
         self.assertEqual(payload["summary"]["active_findings"], 9)
         self.assertEqual(payload["summary"]["total_findings"], 9)
         self.assertEqual(payload["inventory"]["provider"], "aws")
         self.assertEqual(len(payload["findings"]), 9)
         self.assertTrue(payload["findings"][0]["fingerprint"].startswith("sha256:"))
+
+    def test_json_report_contract_exposes_stable_ui_sections(self) -> None:
+        engine = CloudThreatModeler()
+        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+
+        self.assertEqual(
+            list(payload),
+            [
+                "kind",
+                "version",
+                "tool",
+                "title",
+                "analyzed_file",
+                "analyzed_path",
+                "summary",
+                "filtering",
+                "inventory",
+                "trust_boundaries",
+                "findings",
+                "suppressed_findings",
+                "baselined_findings",
+                "observations",
+                "limitations",
+            ],
+        )
+        self.assertEqual(
+            list(payload["summary"]),
+            [
+                "normalized_resources",
+                "unsupported_resources",
+                "trust_boundaries",
+                "active_findings",
+                "total_findings",
+                "suppressed_findings",
+                "baselined_findings",
+                "severity_counts",
+            ],
+        )
+        self.assertEqual(
+            payload["summary"]["severity_counts"],
+            {"high": 3, "medium": 6, "low": 0},
+        )
+        self.assertEqual(
+            list(payload["inventory"]),
+            ["provider", "unsupported_resources", "metadata", "resources"],
+        )
+        self.assertEqual(
+            list(payload["findings"][0]),
+            [
+                "fingerprint",
+                "title",
+                "rule_id",
+                "category",
+                "severity",
+                "affected_resources",
+                "trust_boundary_id",
+                "rationale",
+                "recommended_mitigation",
+                "evidence",
+                "severity_reasoning",
+            ],
+        )
+
+    def test_json_report_sorts_inventory_resources_and_trust_boundaries_for_stable_consumers(self) -> None:
+        engine = CloudThreatModeler()
+        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+
+        resource_addresses = [resource["address"] for resource in payload["inventory"]["resources"]]
+        boundary_ids = [boundary["identifier"] for boundary in payload["trust_boundaries"]]
+
+        self.assertEqual(resource_addresses, sorted(resource_addresses))
+        self.assertEqual(boundary_ids, sorted(boundary_ids))
 
     def test_json_report_includes_suppressed_and_baselined_findings(self) -> None:
         engine = CloudThreatModeler()

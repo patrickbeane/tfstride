@@ -51,6 +51,11 @@ Emit a machine-readable JSON report:
 cloud-threat-modeler tfplan.json --quiet --json-output threat-model.json
 ```
 
+The JSON report contract is versioned for downstream consumers. The current report payload uses:
+
+- `kind: "cloud-threat-model-report"`
+- `version: "1.1"`
+
 Capture the current unsuppressed findings as a baseline and later gate only on new findings:
 
 ```bash
@@ -193,6 +198,34 @@ Outputs include:
 - JSON output with normalized resources, findings, observations, fingerprints, and filtering summary
 - markdown for human review
 - SARIF 2.1.0 for scanner-compatible integrations
+
+## JSON Contract
+
+The JSON report is intended to be the stable machine interface for future dashboards and automation.
+
+Top-level sections:
+
+- `kind`
+- `version`
+- `tool`
+- `title`
+- `analyzed_file`
+- `analyzed_path`
+- `summary`
+- `filtering`
+- `inventory`
+- `trust_boundaries`
+- `findings`
+- `suppressed_findings`
+- `baselined_findings`
+- `observations`
+- `limitations`
+
+Contract notes:
+
+- additive fields may appear within the same major version
+- breaking structural changes should increment the major version
+- `inventory.resources` and `trust_boundaries` are serialized in stable sorted order for downstream consumers
 
 ## Suppressions And Baselines
 

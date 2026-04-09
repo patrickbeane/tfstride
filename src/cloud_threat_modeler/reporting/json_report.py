@@ -20,8 +20,8 @@ from cloud_threat_modeler.models import (
     TrustBoundary,
 )
 
-
-REPORT_FORMAT_VERSION = "1.0"
+REPORT_KIND = "cloud-threat-model-report"
+REPORT_FORMAT_VERSION = "1.1"
 
 
 class JsonReportRenderer:
@@ -40,6 +40,7 @@ class JsonReportRenderer:
         }
         severity_counts = Counter(finding.severity.value for finding in result.findings)
         return {
+            "kind": REPORT_KIND,
             "version": REPORT_FORMAT_VERSION,
             "tool": {
                 "name": "cloud-threat-modeler",
@@ -64,11 +65,20 @@ class JsonReportRenderer:
             },
             "filtering": dict(filter_summary),
             "inventory": _serialize_inventory(result.inventory),
-            "trust_boundaries": [_serialize_trust_boundary(boundary) for boundary in result.trust_boundaries],
+            "trust_boundaries": [
+                _serialize_trust_boundary(boundary)
+                for boundary in sorted(result.trust_boundaries, key=lambda boundary: boundary.identifier)
+            ],
             "findings": [_serialize_finding(finding) for finding in result.findings],
             "suppressed_findings": [_serialize_finding(finding) for finding in result.suppressed_findings],
             "baselined_findings": [_serialize_finding(finding) for finding in result.baselined_findings],
-            "observations": [_serialize_observation(observation) for observation in result.observations],
+            "observations": [
+                _serialize_observation(observation)
+                for observation in sorted(
+                    result.observations,
+                    key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id),
+                )
+            ],
             "limitations": list(result.limitations),
         }
 
@@ -78,7 +88,7 @@ def _serialize_inventory(inventory: ResourceInventory) -> dict[str, Any]:
         "provider": inventory.provider,
         "unsupported_resources": list(inventory.unsupported_resources),
         "metadata": dict(inventory.metadata),
-        "resources": [_serialize_resource(resource) for resource in inventory.resources],
+        "resources": [_serialize_resource(resource) for resource in sorted(inventory.resources, key=lambda resource: resource.address)],
     }
 
 
