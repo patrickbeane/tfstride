@@ -19,6 +19,7 @@ if FASTAPI_DEPS_AVAILABLE:
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
+NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
 
 
 @unittest.skipUnless(FASTAPI_DEPS_AVAILABLE, "dashboard dependencies are not installed")
@@ -62,6 +63,19 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Database is reachable from overly permissive sources", response.text)
         self.assertIn("JSON report", response.text)
         self.assertIn(FIXTURE_PATH.name, response.text)
+
+    def test_html_analyze_renders_nightmare_fixture(self) -> None:
+        with NIGHTMARE_FIXTURE_PATH.open("rb") as fixture_file:
+            response = self.client.post(
+                "/analyze",
+                data={"title": "Nightmare Dashboard Test"},
+                files={"plan": (NIGHTMARE_FIXTURE_PATH.name, fixture_file, "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Nightmare Dashboard Test", response.text)
+        self.assertIn("Public object storage allows internet reads", response.text)
+        self.assertIn("policy statements", response.text)
 
     def test_api_rejects_empty_uploads(self) -> None:
         response = self.client.post(

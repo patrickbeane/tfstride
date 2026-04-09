@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 from collections import Counter
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from cloud_threat_modeler.input.terraform_plan import TerraformPlanLoadError
 
 APP_ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(APP_ROOT / "templates"))
+TEMPLATE_RESPONSE_ACCEPTS_REQUEST = "request" in inspect.signature(TEMPLATES.TemplateResponse).parameters
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 DEFAULT_REPORT_TITLE = "Cloud Threat Model Report"
 
@@ -138,15 +140,14 @@ def _template_response(
     *,
     status_code: int = 200,
 ) -> HTMLResponse:
-    try:
+    if TEMPLATE_RESPONSE_ACCEPTS_REQUEST:
         return TEMPLATES.TemplateResponse(
             request=request,
             name=template_name,
             context=context,
             status_code=status_code,
         )
-    except TypeError:
-        return TEMPLATES.TemplateResponse(template_name, context, status_code=status_code)
+    return TEMPLATES.TemplateResponse(template_name, context, status_code=status_code)
 
 
 def _report_context(request: Request, analysis: DashboardAnalysis) -> dict[str, object]:

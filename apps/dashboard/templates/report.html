@@ -71,7 +71,7 @@
                       <summary>Evidence</summary>
                       <ul class="evidence-list">
                         {% for item in finding.evidence %}
-                          <li><strong>{{ item.key.replace("_", " ") }}</strong>: {{ item.values | join("; ") }}</li>
+                          <li><strong>{{ item["key"].replace("_", " ") }}</strong>: {{ item["values"] | join("; ") }}</li>
                         {% endfor %}
                       </ul>
                     </details>
