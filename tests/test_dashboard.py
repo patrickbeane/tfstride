@@ -57,11 +57,17 @@ class DashboardAppTests(unittest.TestCase):
         response = self.client.get("/api/docs")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("/api/openapi.json", response.text)
+        self.assertIn("/openapi.json", response.text)
         self.assertIn("defaultModelsExpandDepth", response.text)
         self.assertIn(".swagger-ui .topbar", response.text)
         self.assertIn("section.models", response.text)
-        self.assertNotIn('"/openapi.json"', response.text)
+
+    def test_openapi_spec_route_is_available(self) -> None:
+        response = self.client.get("/openapi.json")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("/api/analyze", payload["paths"])
 
     def test_html_analyze_renders_finding_content(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:

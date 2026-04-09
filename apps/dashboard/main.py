@@ -147,7 +147,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Cloud Threat Modeler Dashboard",
         docs_url=None,
-        openapi_url="/api/openapi.json",
+        openapi_url="/openapi.json",
         redoc_url=None,
     )
     app.mount("/static", StaticFiles(directory=str(APP_ROOT / "static")), name="static")
@@ -158,7 +158,7 @@ def create_app() -> FastAPI:
     @app.get("/api/docs", include_in_schema=False)
     async def api_docs() -> HTMLResponse:
         swagger_ui = get_swagger_ui_html(
-            openapi_url=app.openapi_url or "/api/openapi.json",
+            openapi_url=app.openapi_url or "/openapi.json",
             title=f"{app.title} - API Docs",
             swagger_ui_parameters={
                 "defaultModelsExpandDepth": -1,
