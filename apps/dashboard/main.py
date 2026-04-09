@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,6 +24,17 @@ TEMPLATES = Jinja2Templates(directory=str(APP_ROOT / "templates"))
 TEMPLATE_RESPONSE_ACCEPTS_REQUEST = "request" in inspect.signature(TEMPLATES.TemplateResponse).parameters
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 DEFAULT_REPORT_TITLE = "Cloud Threat Model Report"
+DOCS_CHROME_HIDE_STYLE = """
+<style>
+  .swagger-ui .topbar {
+    display: none !important;
+  }
+
+  .swagger-ui section.models {
+    display: none !important;
+  }
+</style>
+"""
 
 
 class DashboardInputError(ValueError):
@@ -134,13 +146,26 @@ DEMO_SCENARIO_DEFINITIONS = (
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Cloud Threat Modeler Dashboard",
-        docs_url="/api/docs",
+        docs_url=None,
+        openapi_url="/api/openapi.json",
         redoc_url=None,
     )
     app.mount("/static", StaticFiles(directory=str(APP_ROOT / "static")), name="static")
     engine = CloudThreatModeler()
     demo_scenarios = _build_demo_scenarios(engine)
     demo_scenarios_by_id = {scenario.scenario_id: scenario for scenario in demo_scenarios}
+
+    @app.get("/api/docs", include_in_schema=False)
+    async def api_docs() -> HTMLResponse:
+        swagger_ui = get_swagger_ui_html(
+            openapi_url=app.openapi_url or "/api/openapi.json",
+            title=f"{app.title} - API Docs",
+            swagger_ui_parameters={
+                "defaultModelsExpandDepth": -1,
+            },
+        )
+        content = swagger_ui.body.decode("utf-8").replace("</head>", f"{DOCS_CHROME_HIDE_STYLE}</head>")
+        return HTMLResponse(content=content, status_code=swagger_ui.status_code)
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
