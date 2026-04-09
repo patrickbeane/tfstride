@@ -201,10 +201,6 @@ def create_app() -> FastAPI:
 
     return app
 
-
-app = create_app()
-
-
 async def _analyze_upload(
     upload: UploadFile,
     *,
@@ -345,3 +341,6 @@ def _report_context(
         "finding_counter": Counter(finding["severity"] for finding in findings),
         "scenario": scenario,
     }
+
+
+app = create_app()
