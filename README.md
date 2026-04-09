@@ -88,7 +88,8 @@ uvicorn apps.dashboard.main:app --reload --port 8001
 
 Useful routes:
 
-- `/`: upload form and rendered report view
+- `/`: upload form for plan analysis
+- `/scenarios`: built-in fixture gallery page
 - `/demo/{scenario_id}`: built-in fixture scenarios such as `safe`, `mixed`, and `nightmare`
 - `/api/analyze`: multipart upload endpoint that returns the JSON report contract
 - `/api/docs`: OpenAPI docs for the dashboard API

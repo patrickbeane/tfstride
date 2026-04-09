@@ -232,7 +232,7 @@ def create_app() -> FastAPI:
         response_class=HTMLResponse,
         tags=["dashboard"],
         summary="Render dashboard landing page",
-        description="Server-rendered landing page with the plan upload form and the built-in demo scenario gallery.",
+        description="Server-rendered landing page with the plan upload form.",
         responses={
             200: {
                 "description": "HTML dashboard landing page.",
@@ -241,7 +241,19 @@ def create_app() -> FastAPI:
         },
     )
     async def index(request: Request) -> HTMLResponse:
-        return _template_response(request, "index.html", _base_context(request, demo_scenarios=demo_scenarios))
+        return _template_response(request, "index.html", _base_context(request))
+
+    @app.get("/scenarios", response_class=HTMLResponse, include_in_schema=False)
+    async def scenarios_page(request: Request) -> HTMLResponse:
+        return _template_response(
+            request,
+            "scenarios.html",
+            _base_context(
+                request,
+                page_title="Cloud Threat Modeler Scenarios",
+                demo_scenarios=demo_scenarios,
+            ),
+        )
 
     @app.get(
         "/healthz",
@@ -570,13 +582,14 @@ def _prune_api_report_example(payload: dict[str, object]) -> dict[str, object]:
 def _base_context(
     request: Request,
     *,
+    page_title: str = "Cloud Threat Modeler Dashboard",
     error: str | None = None,
     form_title: str = DEFAULT_REPORT_TITLE,
     demo_scenarios: tuple[DemoScenario, ...] = (),
 ) -> dict[str, object]:
     return {
         "request": request,
-        "page_title": "Cloud Threat Modeler Dashboard",
+        "page_title": page_title,
         "error": error,
         "form_title": form_title,
         "max_upload_mebibytes": MAX_UPLOAD_BYTES // (1024 * 1024),

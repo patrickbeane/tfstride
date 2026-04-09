@@ -35,8 +35,16 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Analyze plan", response.text)
         self.assertIn("Terraform plan JSON", response.text)
+        self.assertIn(">Demos<", response.text)
+        self.assertNotIn("Built-in scenarios", response.text)
+
+    def test_scenarios_page_renders_demo_gallery(self) -> None:
+        response = self.client.get("/scenarios")
+
+        self.assertEqual(response.status_code, 200)
         self.assertIn("Built-in scenarios", response.text)
         self.assertIn("Nightmare Plan", response.text)
+        self.assertIn("Run built-in report", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:
@@ -71,6 +79,7 @@ class DashboardAppTests(unittest.TestCase):
         payload = response.json()
         self.assertIn("/api/analyze", payload["paths"])
         self.assertIn("/demo/{scenario_id}", payload["paths"])
+        self.assertNotIn("/scenarios", payload["paths"])
         self.assertEqual(
             payload["paths"]["/api/analyze"]["post"]["summary"],
             "Analyze Terraform plan JSON",

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel scenario-page-hero">
+    <div class="panel-header">
+      <p class="eyebrow">Built-in scenarios</p>
+      <h1>Run the curated fixture catalog in one click.</h1>
+    </div>
+    <p class="lede">
+      These demos are pulled from the same checked-in fixture plans used to exercise the analyzer in the repo.
+      They make the project scope legible without asking someone to prepare Terraform first.
+    </p>
+    <div class="scenario-page-actions">
+      <a class="button-secondary" href="{{ request.url_for('index') }}">Back to upload</a>
+    </div>
+  </section>
+
+  {% if demo_scenarios %}
+    <section class="scenario-section">
+      <div class="scenario-grid">
+        {% for scenario in demo_scenarios %}
+          <article class="scenario-card scenario-{{ scenario.theme }}">
+            <div class="scenario-card-topline">
+              <p class="eyebrow">{{ scenario.emphasis }}</p>
+              <span class="scenario-file">{{ scenario.fixture_name }}</span>
+            </div>
+            <h3>{{ scenario.title }}</h3>
+            <p class="scenario-description">{{ scenario.description }}</p>
+            <dl class="scenario-metrics">
+              <div>
+                <dt>Findings</dt>
+                <dd>{{ scenario.active_findings }}</dd>
+              </div>
+              <div>
+                <dt>Boundaries</dt>
+                <dd>{{ scenario.trust_boundaries }}</dd>
+              </div>
+              <div>
+                <dt>Resources</dt>
+                <dd>{{ scenario.normalized_resources }}</dd>
+              </div>
+            </dl>
+            <div class="scenario-severity-strip">
+              <span class="severity-mini severity-high">{{ scenario.high_findings }} high</span>
+              <span class="severity-mini severity-medium">{{ scenario.medium_findings }} medium</span>
+              <span class="severity-mini severity-low">{{ scenario.low_findings }} low</span>
+            </div>
+            <a class="button-secondary" href="{{ request.url_for('demo_view', scenario_id=scenario.scenario_id) }}">
+              Run built-in report
+            </a>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -217,6 +217,21 @@ h2 {
   padding: 1.5rem;
 }
 
+.scenario-page-hero {
+  display: grid;
+  gap: 1rem;
+}
+
+.scenario-page-hero h1 {
+  font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+  line-height: 1.08;
+}
+
+.scenario-page-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .panel-header {
   margin-bottom: 1.1rem;
 }
