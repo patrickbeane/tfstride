@@ -17,6 +17,7 @@ from apps.dashboard.api_models import (
     CloudThreatModelReportModel,
     DashboardApiErrorModel,
     HealthResponseModel,
+    ValidationErrorResponseModel,
 )
 from cloud_threat_modeler.app import CloudThreatModeler
 from cloud_threat_modeler.input.terraform_plan import TerraformPlanLoadError
@@ -68,6 +69,17 @@ HTML_REPORT_EXAMPLE = "<!doctype html><html><body><main>Cloud Threat Modeler rep
 API_ERROR_EXAMPLE = {
     "kind": "cloud-threat-model-error",
     "message": "Upload a non-empty Terraform plan JSON file.",
+}
+UPLOAD_VALIDATION_ERROR_EXAMPLE = {
+    "detail": [
+        {
+            "loc": ["body", "plan"],
+            "msg": "Field required",
+            "type": "missing",
+            "input": None,
+            "ctx": None,
+        }
+    ]
 }
 
 
@@ -296,6 +308,11 @@ def create_app() -> FastAPI:
                 "description": "HTML page with an upload or parsing error message.",
                 "content": {"text/html": {"example": HTML_LANDING_EXAMPLE}},
             },
+            422: {
+                "model": ValidationErrorResponseModel,
+                "description": "Request validation error, such as a missing uploaded plan file.",
+                "content": {"application/json": {"example": UPLOAD_VALIDATION_ERROR_EXAMPLE}},
+            },
         },
     )
     async def analyze_view(
@@ -341,6 +358,11 @@ def create_app() -> FastAPI:
                 "model": DashboardApiErrorModel,
                 "description": "Input validation or parsing error for the uploaded plan.",
                 "content": {"application/json": {"example": API_ERROR_EXAMPLE}},
+            },
+            422: {
+                "model": ValidationErrorResponseModel,
+                "description": "Request validation error, such as a missing uploaded plan file.",
+                "content": {"application/json": {"example": UPLOAD_VALIDATION_ERROR_EXAMPLE}},
             },
         },
     )
