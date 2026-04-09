@@ -70,6 +70,35 @@ cloud-threat-modeler tfplan.json --quiet
 cloud-threat-modeler tfplan.json --config ./cloud-threat-modeler.toml --json-output threat-model.json
 ```
 
+## Dashboard
+
+The repo also includes a thin FastAPI dashboard in `apps/dashboard/`. It reuses the same engine, findings, and JSON contract as the CLI rather than adding a second analysis path.
+
+Install the web dependencies:
+
+```bash
+python3 -m pip install -e '.[dashboard]'
+```
+
+Run the dashboard locally from the repo root:
+
+```bash
+uvicorn apps.dashboard.main:app --reload
+```
+
+Useful routes:
+
+- `/`: upload form and rendered report view
+- `/api/analyze`: multipart upload endpoint that returns the JSON report contract
+- `/api/docs`: OpenAPI docs for the dashboard API
+- `/healthz`: simple health endpoint for process and proxy checks
+
+Deployment notes:
+
+- a `systemd` unit example lives at `apps/dashboard/deploy/cloud-threat-modeler-dashboard.service`
+- the service binds `uvicorn` to `127.0.0.1:8000` and sets `PYTHONPATH` to the repo `src/` directory
+- a simple Caddy reverse-proxy example lives at `apps/dashboard/deploy/Caddyfile.example`
+
 ## Example Output
 
 Example finding excerpt:
@@ -334,6 +363,17 @@ Unsupported resources are skipped and called out in the report.
 │   ├── nightmare_report.md
 │   ├── sample_report.md
 │   └── safe_report.md
+├── apps/
+│   └── dashboard/
+│       ├── deploy/
+│       │   ├── Caddyfile.example
+│       │   └── cloud-threat-modeler-dashboard.service
+│       ├── static/dashboard.css
+│       ├── templates/
+│       │   ├── base.html
+│       │   ├── index.html
+│       │   └── report.html
+│       └── main.py
 ├── src/
 │   └── cloud_threat_modeler/
 │       ├── analysis/

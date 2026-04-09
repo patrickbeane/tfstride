@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="report-hero">
+    <div>
+      <p class="eyebrow">Analysis result</p>
+      <h1>{{ payload.title }}</h1>
+      <p class="lede">
+        Analyzed <strong>{{ payload.analyzed_file }}</strong> with {{ payload.summary.normalized_resources }}
+        normalized resources and {{ payload.summary.trust_boundaries }} trust boundaries.
+      </p>
+    </div>
+    <a class="button-secondary" href="{{ request.url_for('index') }}">Analyze another plan</a>
+  </section>
+
+  <section class="summary-card-grid">
+    {% for card in summary_cards %}
+      <article class="metric-card">
+        <p>{{ card.label }}</p>
+        <strong>{{ card.value }}</strong>
+      </article>
+    {% endfor %}
+  </section>
+
+  <section class="risk-band">
+    {% for bucket in top_risks %}
+      <article class="risk-chip risk-{{ bucket.label|lower }}">
+        <span>{{ bucket.label }}</span>
+        <strong>{{ bucket.value }}</strong>
+      </article>
+    {% endfor %}
+  </section>
+
+  <section class="content-grid">
+    <div class="content-column">
+      <section class="panel">
+        <div class="panel-header">
+          <p class="eyebrow">Findings</p>
+          <h2>Severity bands</h2>
+        </div>
+        {% for severity in ("high", "medium", "low") %}
+          <div class="severity-block">
+            <div class="severity-header">
+              <h3>{{ severity.title() }}</h3>
+              <span class="severity-count">{{ findings_by_severity[severity]|length }}</span>
+            </div>
+            {% if findings_by_severity[severity] %}
+              {% for finding in findings_by_severity[severity] %}
+                <article class="finding-card finding-{{ severity }}">
+                  <header>
+                    <h4>{{ finding.title }}</h4>
+                    <span class="pill">{{ finding.rule_id }}</span>
+                  </header>
+                  <p>{{ finding.rationale }}</p>
+                  <dl class="detail-grid">
+                    <div>
+                      <dt>Category</dt>
+                      <dd>{{ finding.category }}</dd>
+                    </div>
+                    <div>
+                      <dt>Boundary</dt>
+                      <dd>{{ finding.trust_boundary_id or "not-applicable" }}</dd>
+                    </div>
+                    <div class="detail-span">
+                      <dt>Resources</dt>
+                      <dd>{{ finding.affected_resources | join(", ") }}</dd>
+                    </div>
+                  </dl>
+                  {% if finding.evidence %}
+                    <details>
+                      <summary>Evidence</summary>
+                      <ul class="evidence-list">
+                        {% for item in finding.evidence %}
+                          <li><strong>{{ item.key.replace("_", " ") }}</strong>: {{ item.values | join("; ") }}</li>
+                        {% endfor %}
+                      </ul>
+                    </details>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            {% else %}
+              <p class="empty-state">No {{ severity }} findings.</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <p class="eyebrow">Observations</p>
+          <h2>Controls and mitigating signals</h2>
+        </div>
+        {% if payload.observations %}
+          {% for observation in payload.observations %}
+            <article class="observation-card">
+              <h3>{{ observation.title }}</h3>
+              <p>{{ observation.rationale }}</p>
+              <p class="meta-line">{{ observation.affected_resources | join(", ") }}</p>
+            </article>
+          {% endfor %}
+        {% else %}
+          <p class="empty-state">No observations were recorded for this plan.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="content-column">
+      <section class="panel">
+        <div class="panel-header">
+          <p class="eyebrow">Trust boundaries</p>
+          <h2>Crossings that drive the model</h2>
+        </div>
+        {% if payload.trust_boundaries %}
+          <div class="boundary-list">
+            {% for boundary in payload.trust_boundaries %}
+              <article class="boundary-card">
+                <h3>{{ boundary.boundary_type }}</h3>
+                <p><strong>{{ boundary.source }}</strong> -> <strong>{{ boundary.target }}</strong></p>
+                <p>{{ boundary.rationale }}</p>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No trust boundaries were discovered.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <p class="eyebrow">Raw outputs</p>
+          <h2>Stable contract and markdown</h2>
+        </div>
+        <details open>
+          <summary>JSON report</summary>
+          <pre class="code-block"><code>{{ raw_json }}</code></pre>
+        </details>
+        <details>
+          <summary>Markdown report</summary>
+          <pre class="code-block"><code>{{ raw_markdown }}</code></pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <p class="eyebrow">Limits</p>
+          <h2>Unsupported or intentionally scoped areas</h2>
+        </div>
+        <ul class="feature-list">
+          {% for limitation in payload.limitations %}
+            <li>{{ limitation }}</li>
+          {% endfor %}
+          {% for resource in unsupported_resources %}
+            <li>Unsupported resource skipped: {{ resource }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+  </section>
+{% endblock %}

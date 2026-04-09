@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='dashboard.css') }}">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="wordmark" href="{{ request.url_for('index') }}">
+          <span class="wordmark-mark">CTM</span>
+          <span class="wordmark-text">Cloud Threat Modeler</span>
+        </a>
+        <nav class="site-nav">
+          <a href="{{ request.url_for('index') }}">Upload</a>
+          <a href="{{ request.url_for('healthz') }}">Health</a>
+          <a href="{{ request.url_for('swagger_ui_html') }}">API Docs</a>
+        </nav>
+      </header>
+      <main class="page-main">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

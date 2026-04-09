@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero-panel">
+    <div class="hero-copy">
+      <p class="eyebrow">Pre-deploy threat review</p>
+      <h1>Upload a Terraform plan and get a deterministic STRIDE-oriented readout.</h1>
+      <p class="lede">
+        The dashboard is intentionally thin. It runs the same engine as the CLI and renders the same
+        evidence-backed findings, trust boundaries, observations, and machine-readable JSON contract.
+      </p>
+    </div>
+    <div class="hero-sidecar">
+      <div class="sidecar-card">
+        <h2>What you get</h2>
+        <ul class="feature-list">
+          <li>Findings grouped by severity</li>
+          <li>Trust boundaries and observed controls</li>
+          <li>Raw JSON contract and markdown report</li>
+          <li>No cloud API calls or runtime dependencies</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="upload-grid">
+    <div class="panel panel-form">
+      <div class="panel-header">
+        <p class="eyebrow">Analyze</p>
+        <h2>Run the engine against a plan upload</h2>
+      </div>
+      {% if error %}
+        <div class="alert-error">{{ error }}</div>
+      {% endif %}
+      <form class="upload-form" action="{{ request.url_for('analyze_view') }}" method="post" enctype="multipart/form-data">
+        <label class="field">
+          <span>Report title</span>
+          <input type="text" name="title" value="{{ form_title }}" maxlength="120">
+        </label>
+        <label class="field file-field">
+          <span>Terraform plan JSON</span>
+          <input type="file" name="plan" accept=".json,application/json" required>
+          <small>Maximum upload size: {{ max_upload_mebibytes }} MiB</small>
+        </label>
+        <button class="button-primary" type="submit">Analyze plan</button>
+      </form>
+    </div>
+
+    <div class="panel panel-notes">
+      <div class="panel-header">
+        <p class="eyebrow">Stack</p>
+        <h2>FastAPI plus server-rendered views</h2>
+      </div>
+      <div class="note-block">
+        <p>The dashboard intentionally avoids copying analysis logic into the web layer.</p>
+        <pre><code>python3 -m pip install -e '.[dashboard]'
+uvicorn apps.dashboard.main:app --reload</code></pre>
+      </div>
+      <div class="note-block">
+        <p>For deployment, run `uvicorn` behind `systemd` and proxy with Caddy or another reverse proxy.</p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

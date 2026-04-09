@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloud Threat Modeler Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=cloud-threat-modeler
+Group=cloud-threat-modeler
+WorkingDirectory=/opt/cloud-threat-modeler
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/cloud-threat-modeler/src
+ExecStart=/opt/cloud-threat-modeler/.venv/bin/uvicorn apps.dashboard.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
