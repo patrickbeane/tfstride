@@ -15,6 +15,7 @@ from cloud_threat_modeler.reporting.sarif import SarifReportRenderer
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
@@ -77,6 +78,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
     def test_checked_in_example_reports_match_renderer_output(self) -> None:
         engine = CloudThreatModeler()
         scenarios = {
+            BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "baseline_report.md",
             SAFE_FIXTURE_PATH: EXAMPLES_DIR / "safe_report.md",
             FIXTURE_PATH: EXAMPLES_DIR / "sample_report.md",
             NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "nightmare_report.md",
@@ -128,7 +130,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
         engine = CloudThreatModeler(
             rule_policy=RulePolicy(severity_overrides={"aws-iam-wildcard-permissions": Severity.LOW})
         )
-        result = engine.analyze_plan(SAFE_FIXTURE_PATH)
+        result = engine.analyze_plan(BASELINE_FIXTURE_PATH)
         report = MarkdownReportRenderer().render(result)
 
         self.assertIn("overridden by config", report)

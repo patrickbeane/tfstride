@@ -13,6 +13,7 @@ from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
+BASELINE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_baseline_plan.json"
 FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
@@ -93,13 +94,15 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
 
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
-            "safe": (SAFE_FIXTURE_PATH, 2, {"medium": 2}),
+            "safe": (SAFE_FIXTURE_PATH, 0, {}),
+            "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
         }
 
         expected_titles = {
-            "safe": {
+            "safe": {},
+            "baseline": {
                 "IAM policy grants wildcard privileges": 1,
                 "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
             },

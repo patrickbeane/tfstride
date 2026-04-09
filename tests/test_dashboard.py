@@ -18,6 +18,7 @@ if FASTAPI_DEPS_AVAILABLE:
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
@@ -114,12 +115,12 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Public object storage allows internet reads", response.text)
         self.assertIn("policy statements", response.text)
 
-    def test_demo_route_renders_safe_fixture_report(self) -> None:
-        response = self.client.get("/demo/safe")
+    def test_demo_route_renders_baseline_fixture_report(self) -> None:
+        response = self.client.get("/demo/baseline")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Safe Plan Demo", response.text)
-        self.assertIn(SAFE_FIXTURE_PATH.name, response.text)
+        self.assertIn("Baseline Plan Demo", response.text)
+        self.assertIn(BASELINE_FIXTURE_PATH.name, response.text)
         self.assertIn("IAM policy grants wildcard privileges", response.text)
 
     def test_demo_route_returns_not_found_for_unknown_scenario(self) -> None:

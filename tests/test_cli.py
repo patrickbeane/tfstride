@@ -13,6 +13,7 @@ from cloud_threat_modeler.config import CONFIG_FILENAME
 
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
+BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_baseline_plan.json"
 SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_safe_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_cross_account_trust_unconstrained_plan.json"
@@ -261,7 +262,7 @@ class CliTests(unittest.TestCase):
                 with redirect_stderr(stderr_buffer):
                     exit_code = main(
                         [
-                            str(SAFE_FIXTURE_PATH),
+                            str(BASELINE_FIXTURE_PATH),
                             "--quiet",
                             "--json-output",
                             str(json_output_path),
