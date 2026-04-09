@@ -455,13 +455,15 @@ def _build_api_report_example(engine: CloudThreatModeler) -> dict[str, object]:
     sample_fixture_path = FIXTURES_DIR / "sample_aws_plan.json"
     if sample_fixture_path.is_file():
         try:
-            return _analyze_plan_path(sample_fixture_path, title="Mixed AWS Plan Demo", engine=engine).payload
+            payload = _analyze_plan_path(sample_fixture_path, title="Mixed AWS Plan Demo", engine=engine).payload
+            return _prune_api_report_example(payload)
         except TerraformPlanLoadError:
             pass
     safe_fixture_path = FIXTURES_DIR / "sample_aws_safe_plan.json"
     if safe_fixture_path.is_file():
         try:
-            return _analyze_plan_path(safe_fixture_path, title="Safe Plan Demo", engine=engine).payload
+            payload = _analyze_plan_path(safe_fixture_path, title="Safe Plan Demo", engine=engine).payload
+            return _prune_api_report_example(payload)
         except TerraformPlanLoadError:
             pass
     return {
@@ -496,6 +498,57 @@ def _build_api_report_example(engine: CloudThreatModeler) -> dict[str, object]:
         "baselined_findings": [],
         "observations": [],
         "limitations": [],
+    }
+
+
+def _prune_api_report_example(payload: dict[str, object]) -> dict[str, object]:
+    inventory = dict(payload.get("inventory", {}))
+    inventory_resources = list(inventory.get("resources", []))
+    trust_boundaries = list(payload.get("trust_boundaries", []))
+    findings = list(payload.get("findings", []))
+    observations = list(payload.get("observations", []))
+    limitations = list(payload.get("limitations", []))
+
+    pruned_resources = inventory_resources[:2]
+    pruned_boundaries = trust_boundaries[:2]
+    pruned_findings = findings[:2]
+    pruned_observations = observations[:1]
+    pruned_limitations = limitations[:2]
+
+    summary = dict(payload.get("summary", {}))
+    summary["normalized_resources"] = len(pruned_resources)
+    summary["trust_boundaries"] = len(pruned_boundaries)
+    summary["active_findings"] = len(pruned_findings)
+    summary["total_findings"] = len(pruned_findings)
+    summary["suppressed_findings"] = 0
+    summary["baselined_findings"] = 0
+    summary["severity_counts"] = {
+        "high": sum(1 for finding in pruned_findings if finding.get("severity") == "high"),
+        "medium": sum(1 for finding in pruned_findings if finding.get("severity") == "medium"),
+        "low": sum(1 for finding in pruned_findings if finding.get("severity") == "low"),
+    }
+
+    filtering = dict(payload.get("filtering", {}))
+    filtering["total_findings"] = len(pruned_findings)
+    filtering["active_findings"] = len(pruned_findings)
+    filtering["suppressed_findings"] = 0
+    filtering["baselined_findings"] = 0
+    filtering["suppressions_path"] = None
+    filtering["baseline_path"] = None
+
+    inventory["resources"] = pruned_resources
+
+    return {
+        **payload,
+        "summary": summary,
+        "filtering": filtering,
+        "inventory": inventory,
+        "trust_boundaries": pruned_boundaries,
+        "findings": pruned_findings,
+        "suppressed_findings": [],
+        "baselined_findings": [],
+        "observations": pruned_observations,
+        "limitations": pruned_limitations,
     }
 
 
