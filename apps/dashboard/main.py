@@ -42,10 +42,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
-        return TEMPLATES.TemplateResponse(
-            "index.html",
-            _base_context(request),
-        )
+        return _template_response(request, "index.html", _base_context(request))
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
@@ -65,12 +62,9 @@ def create_app() -> FastAPI:
                 error=str(exc),
                 form_title=title or DEFAULT_REPORT_TITLE,
             )
-            return TEMPLATES.TemplateResponse("index.html", context, status_code=400)
+            return _template_response(request, "index.html", context, status_code=400)
 
-        return TEMPLATES.TemplateResponse(
-            "report.html",
-            _report_context(request, analysis),
-        )
+        return _template_response(request, "report.html", _report_context(request, analysis))
 
     @app.post("/api/analyze")
     async def analyze_api(
@@ -135,6 +129,24 @@ def _base_context(
         "form_title": form_title,
         "max_upload_mebibytes": MAX_UPLOAD_BYTES // (1024 * 1024),
     }
+
+
+def _template_response(
+    request: Request,
+    template_name: str,
+    context: dict[str, object],
+    *,
+    status_code: int = 200,
+) -> HTMLResponse:
+    try:
+        return TEMPLATES.TemplateResponse(
+            request=request,
+            name=template_name,
+            context=context,
+            status_code=status_code,
+        )
+    except TypeError:
+        return TEMPLATES.TemplateResponse(template_name, context, status_code=status_code)
 
 
 def _report_context(request: Request, analysis: DashboardAnalysis) -> dict[str, object]:
