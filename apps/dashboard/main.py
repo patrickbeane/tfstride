@@ -276,7 +276,7 @@ def create_app() -> FastAPI:
                 "Built-in fixture scenario to render. "
                 f"Known scenario IDs: {known_demo_scenarios or 'safe, mixed, nightmare'}."
             ),
-            example="safe",
+            examples=["safe"],
         ),
     ) -> HTMLResponse:
         scenario = demo_scenarios_by_id.get(scenario_id)
