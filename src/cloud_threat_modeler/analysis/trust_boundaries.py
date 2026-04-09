@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from cloud_threat_modeler.analysis.policy_conditions import PrincipalAssessment, assess_principal
 from cloud_threat_modeler.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 
 
@@ -95,14 +96,14 @@ class TrustBoundaryDetector:
         primary_account_id = inventory.metadata.get("primary_account_id")
         for role in inventory.by_type("aws_iam_role"):
             for principal in role.metadata.get("trust_principals", []):
-                if principal.endswith(".amazonaws.com"):
+                assessment = assess_principal(principal, primary_account_id)
+                if assessment.is_service:
                     continue
-                account_id = _parse_account_id_from_principal(principal)
-                if principal == "*":
+                if assessment.is_wildcard:
                     description = f"{role.display_name} trusts any principal."
                 else:
                     description = f"{role.display_name} trusts {principal}."
-                if account_id and primary_account_id and account_id != primary_account_id:
+                if assessment.is_foreign_account:
                     rationale = "A foreign AWS account can cross into this role's trust boundary."
                 else:
                     rationale = "An additional role or principal can cross into this role's trust boundary."
@@ -117,13 +118,13 @@ class TrustBoundaryDetector:
         for resource in resources:
             if resource.resource_type == "aws_iam_role":
                 continue
-            for principal in _resource_policy_principals(resource, primary_account_id):
-                account_id = _parse_account_id_from_principal(principal)
-                if principal == "*":
+            for assessment in _resource_policy_principals(resource, primary_account_id):
+                principal = assessment.principal
+                if assessment.is_wildcard:
                     description = f"{resource.display_name} allows any principal through a resource policy."
                 else:
                     description = f"{resource.display_name} allows {principal} through a resource policy."
-                if principal == "*" or (account_id and primary_account_id and account_id != primary_account_id):
+                if assessment.is_wildcard or assessment.is_foreign_account:
                     rationale = "A broad or foreign AWS principal can cross into this resource's policy boundary."
                 else:
                     rationale = "An additional account-level principal can cross into this resource's policy boundary."
@@ -267,54 +268,25 @@ def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
     return bool(workload.metadata.get("public_subnet") or workload.metadata.get("has_nat_gateway_egress"))
 
 
-def _parse_account_id_from_principal(principal: str) -> str | None:
-    if principal == "*":
-        return None
-    if principal.isdigit() and len(principal) == 12:
-        return principal
-    if principal.startswith("arn:"):
-        parts = principal.split(":")
-        if len(parts) >= 5:
-            return parts[4] or None
-    return None
-
-
-def _resource_policy_principals(resource: NormalizedResource, primary_account_id: str | None) -> list[str]:
-    principals: list[str] = []
+def _resource_policy_principals(
+    resource: NormalizedResource,
+    primary_account_id: str | None,
+) -> list[PrincipalAssessment]:
+    principals: list[PrincipalAssessment] = []
     for statement in resource.policy_statements:
         if statement.effect != "Allow":
             continue
         for principal in statement.principals:
-            if principal.endswith(".amazonaws.com"):
+            assessment = assess_principal(principal, primary_account_id)
+            if assessment.is_service:
                 continue
-            if resource.resource_type == "aws_s3_bucket" and principal == "*":
+            if resource.resource_type == "aws_s3_bucket" and assessment.is_wildcard:
                 continue
-            if _resource_policy_scope(principal, primary_account_id) is None:
+            if assessment.scope_description is None:
                 continue
-            if principal not in principals:
-                principals.append(principal)
+            if all(existing.principal != assessment.principal for existing in principals):
+                principals.append(assessment)
     return principals
-
-
-def _resource_policy_scope(principal: str, primary_account_id: str | None) -> str | None:
-    if principal == "*":
-        return "principal is wildcard"
-    account_id = _parse_account_id_from_principal(principal)
-    if account_id and primary_account_id and account_id != primary_account_id:
-        if _is_root_like_principal(principal):
-            return f"principal is foreign account root {account_id}"
-        return f"principal belongs to foreign account {account_id}"
-    if _is_root_like_principal(principal):
-        if account_id:
-            return f"principal is account root {account_id}"
-        return "principal is account root"
-    return None
-
-
-def _is_root_like_principal(principal: str) -> bool:
-    return (principal.startswith("arn:") and principal.endswith(":root")) or (
-        principal.isdigit() and len(principal) == 12
-    )
 
 
 def _allows_secret_read(action: str) -> bool:

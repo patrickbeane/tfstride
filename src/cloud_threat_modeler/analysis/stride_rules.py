@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from cloud_threat_modeler.analysis.policy_conditions import (
+    assess_principal,
+    describe_trust_narrowing,
+    trust_statement_has_supported_narrowing,
+)
 from cloud_threat_modeler.analysis.rule_registry import get_rule
 from cloud_threat_modeler.models import (
     BoundaryType,
@@ -66,29 +71,28 @@ class StrideRuleEngine:
                 if statement.effect != "Allow" or not statement.principals:
                     continue
                 for principal in statement.principals:
-                    if principal.endswith(".amazonaws.com"):
+                    assessment = assess_principal(principal, primary_account_id)
+                    if assessment.is_service:
                         continue
-                    scope_description = _describe_unconstrained_trust_scope(principal, primary_account_id)
-                    if scope_description is None:
+                    if assessment.scope_description is None:
                         continue
                     if resource.resource_type == "aws_s3_bucket":
-                        if principal == "*" and not resource.public_exposure:
+                        if assessment.is_wildcard and not resource.public_exposure:
                             continue
-                        if principal == "*" and resource.public_exposure:
+                        if assessment.is_wildcard and resource.public_exposure:
                             # Public S3 exposure is already covered by the dedicated object-storage rule.
                             continue
                     finding_key = (resource.address, principal)
                     if finding_key in seen:
                         continue
                     seen.add(finding_key)
-                    account_id = _parse_account_id(principal)
                     sensitive_resource = resource.resource_type in SENSITIVE_RESOURCE_POLICY_TYPES
                     severity_reasoning = _build_severity_reasoning(
-                        internet_exposure=principal == "*",
-                        privilege_breadth=2 if principal == "*" or _is_root_principal(principal) else 1,
+                        internet_exposure=assessment.is_wildcard,
+                        privilege_breadth=2 if assessment.is_wildcard or assessment.is_root_like else 1,
                         data_sensitivity=2 if sensitive_resource else 0,
                         lateral_movement=1,
-                        blast_radius=2 if principal == "*" or (account_id and account_id != primary_account_id) else 1,
+                        blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
                     boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, resource.address))
                     findings.append(
@@ -110,7 +114,7 @@ class StrideRuleEngine:
                             ),
                             evidence=_collect_evidence(
                                 _evidence_item("trust_principals", [principal]),
-                                _evidence_item("trust_scope", [scope_description]),
+                                _evidence_item("trust_scope", [assessment.scope_description]),
                                 _evidence_item("policy_actions", sorted(statement.actions)),
                                 _evidence_item("policy_statements", [_describe_policy_statement(statement)]),
                                 _evidence_item(
@@ -579,18 +583,17 @@ class StrideRuleEngine:
         primary_account_id = inventory.metadata.get("primary_account_id")
         for role in inventory.by_type("aws_iam_role"):
             for principal in role.metadata.get("trust_principals", []):
-                if principal.endswith(".amazonaws.com"):
+                assessment = assess_principal(principal, primary_account_id)
+                if assessment.is_service:
                     continue
-                scope_description = _describe_unconstrained_trust_scope(principal, primary_account_id)
-                if scope_description is None:
+                if assessment.scope_description is None:
                     continue
-                account_id = _parse_account_id(principal)
                 severity_reasoning = _build_severity_reasoning(
                     internet_exposure=False,
-                    privilege_breadth=2 if principal == "*" else 1,
+                    privilege_breadth=2 if assessment.is_wildcard else 1,
                     data_sensitivity=0,
                     lateral_movement=2,
-                    blast_radius=2 if principal == "*" or (account_id and account_id != primary_account_id) else 1,
+                    blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                 )
                 boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                 findings.append(
@@ -607,7 +610,7 @@ class StrideRuleEngine:
                             _evidence_item("trust_principals", [principal]),
                             _evidence_item(
                                 "trust_path",
-                                [_describe_trust_principal(principal, primary_account_id)],
+                                [assessment.trust_path_description],
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -625,26 +628,24 @@ class StrideRuleEngine:
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
             for trust_statement in role.metadata.get("trust_statements", []):
-                narrowing_condition_keys = trust_statement.get("narrowing_condition_keys", [])
-                if narrowing_condition_keys:
+                if trust_statement_has_supported_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
-                    if principal.endswith(".amazonaws.com"):
+                    assessment = assess_principal(principal, primary_account_id)
+                    if assessment.is_service:
                         continue
-                    scope_description = _describe_unconstrained_trust_scope(principal, primary_account_id)
-                    if scope_description is None:
+                    if assessment.scope_description is None:
                         continue
                     finding_key = (role.address, principal)
                     if finding_key in seen:
                         continue
                     seen.add(finding_key)
-                    account_id = _parse_account_id(principal)
                     severity_reasoning = _build_severity_reasoning(
                         internet_exposure=False,
-                        privilege_breadth=2 if principal == "*" or _is_root_principal(principal) else 1,
+                        privilege_breadth=2 if assessment.is_wildcard or assessment.is_root_like else 1,
                         data_sensitivity=0,
                         lateral_movement=1,
-                        blast_radius=2 if principal == "*" or (account_id and account_id != primary_account_id) else 1,
+                        blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
                     boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
@@ -660,14 +661,8 @@ class StrideRuleEngine:
                             ),
                             evidence=_collect_evidence(
                                 _evidence_item("trust_principals", [principal]),
-                                _evidence_item("trust_scope", [scope_description]),
-                                _evidence_item(
-                                    "trust_narrowing",
-                                    [
-                                        "supported narrowing conditions present: false",
-                                        "supported narrowing condition keys: none",
-                                    ],
-                                ),
+                                _evidence_item("trust_scope", [assessment.scope_description]),
+                                _evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
                             ),
                             severity_reasoning=severity_reasoning,
                         )
@@ -727,14 +722,13 @@ class StrideRuleEngine:
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
             for trust_statement in role.metadata.get("trust_statements", []):
-                narrowing_condition_keys = trust_statement.get("narrowing_condition_keys", [])
-                if not narrowing_condition_keys:
+                if not trust_statement_has_supported_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
-                    if principal.endswith(".amazonaws.com"):
+                    assessment = assess_principal(principal, primary_account_id)
+                    if assessment.is_service:
                         continue
-                    scope_description = _describe_unconstrained_trust_scope(principal, primary_account_id)
-                    if scope_description is None:
+                    if assessment.scope_description is None:
                         continue
                     observation_key = (role.address, principal)
                     if observation_key in seen:
@@ -752,14 +746,8 @@ class StrideRuleEngine:
                             ),
                             evidence=_collect_evidence(
                                 _evidence_item("trust_principals", [principal]),
-                                _evidence_item("trust_scope", [scope_description]),
-                                _evidence_item(
-                                    "trust_narrowing",
-                                    [
-                                        "supported narrowing conditions present: true",
-                                        "supported narrowing condition keys: " + ", ".join(narrowing_condition_keys),
-                                    ],
-                                ),
+                                _evidence_item("trust_scope", [assessment.scope_description]),
+                                _evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
                             ),
                         )
                     )
@@ -854,17 +842,6 @@ def _statement_matches_sensitive_actions(statement: IAMPolicyStatement, sensitiv
         if action.startswith("ssm:GetParameter") and "ssm:GetParameter*" in sensitive_actions:
             return True
     return False
-
-
-def _parse_account_id(principal: str) -> str | None:
-    if principal.isdigit() and len(principal) == 12:
-        return principal
-    if not principal.startswith("arn:"):
-        return None
-    parts = principal.split(":")
-    if len(parts) < 5:
-        return None
-    return parts[4] or None
 
 
 def _build_finding(
@@ -1000,38 +977,6 @@ def _describe_policy_statement(statement: IAMPolicyStatement) -> str:
         )
         return f"{statement.effect} actions=[{actions}] resources=[{resources}] conditions=[{conditions}]"
     return f"{statement.effect} actions=[{actions}] resources=[{resources}]"
-
-
-def _describe_trust_principal(principal: str, primary_account_id: str | None) -> str:
-    if principal == "*":
-        return "trust policy allows any AWS principal"
-    account_id = _parse_account_id(principal)
-    if account_id and primary_account_id and account_id != primary_account_id:
-        return f"trust principal belongs to foreign account {account_id}"
-    if account_id:
-        return f"trust principal belongs to account {account_id}"
-    return f"trust policy includes principal {principal}"
-
-
-def _describe_unconstrained_trust_scope(principal: str, primary_account_id: str | None) -> str | None:
-    if principal == "*":
-        return "principal is wildcard"
-    account_id = _parse_account_id(principal)
-    if account_id and primary_account_id and account_id != primary_account_id:
-        if _is_root_principal(principal):
-            return f"principal is foreign account root {account_id}"
-        return f"principal belongs to foreign account {account_id}"
-    if _is_root_principal(principal):
-        if account_id:
-            return f"principal is account root {account_id}"
-        return "principal is account root"
-    return None
-
-
-def _is_root_principal(principal: str) -> bool:
-    return (principal.startswith("arn:") and principal.endswith(":root")) or (
-        principal.isdigit() and len(principal) == 12
-    )
 
 
 def _subnet_posture(resource: NormalizedResource | None, inventory: ResourceInventory) -> list[str]:

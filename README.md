@@ -303,6 +303,7 @@ Unsupported resources are skipped and called out in the report.
 ├── src/
 │   └── cloud_threat_modeler/
 │       ├── analysis/
+│       │   ├── policy_conditions.py
 │       │   ├── rule_registry.py
 │       │   ├── stride_rules.py
 │       │   └── trust_boundaries.py
