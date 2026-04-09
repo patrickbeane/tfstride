@@ -170,11 +170,11 @@ terraform apply tfplan
 
 The repo includes several ready-to-run Terraform plan fixtures:
 
-- `sample_aws_alb_ec2_rds_plan.json`: public ALB, private EC2 app tier, and private encrypted RDS to demonstrate restraint on a common web architecture
+- `sample_aws_alb_ec2_rds_plan.json`: public ALB, private EC2 app tier, and private encrypted RDS to demonstrate a composed transitive data-path finding on a common web architecture
 - `sample_aws_cross_account_trust_unconstrained_plan.json`: minimal cross-account assume-role trust without narrowing conditions to exercise the IAM trust finding path
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_aws_safe_plan.json`: mostly well-segmented environment with one deliberate IAM hygiene issue
+- `sample_aws_safe_plan.json`: mostly well-segmented environment with one deliberate IAM hygiene issue plus a composed transitive path into a private data tier
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
 
@@ -217,7 +217,7 @@ Current rules include:
 - wildcard IAM privileges
 - workload roles with sensitive permissions
 - missing segmentation between public workloads and private data tiers
-- hidden transitive paths from internet-facing services into private data tiers
+- sensitive data tiers transitively reachable from internet-exposed paths
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
 

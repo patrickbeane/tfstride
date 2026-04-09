@@ -158,11 +158,11 @@ DEFAULT_RULE_REGISTRY = RuleRegistry(
         ),
         RuleMetadata(
             rule_id="aws-private-data-transitive-exposure",
-            title="Private data tier is transitively reachable from an internet-exposed service",
+            title="Sensitive data tier is transitively reachable from an internet-exposed path",
             category=StrideCategory.INFORMATION_DISCLOSURE,
             recommended_mitigation=(
-                "Keep internet-adjacent tiers from chaining into secondary workloads that retain database or secret access, "
-                "narrow workload-to-workload security group trust, and isolate data-access responsibilities behind more "
+                "Keep internet-adjacent entry points from chaining into workloads that retain database or secret access, "
+                "narrow edge-to-workload and workload-to-workload trust, and isolate sensitive data access behind more "
                 "deliberate service boundaries."
             ),
             tags=("aws", "network", "segmentation", "transitive-path"),

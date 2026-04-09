@@ -93,13 +93,16 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
 
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
-            "safe": (SAFE_FIXTURE_PATH, 1, {"medium": 1}),
+            "safe": (SAFE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
         }
 
         expected_titles = {
-            "safe": {"IAM policy grants wildcard privileges": 1},
+            "safe": {
+                "IAM policy grants wildcard privileges": 1,
+                "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
+            },
             "mixed": {
                 "Cross-account or broad role trust lacks narrowing conditions": 1,
                 "Database is reachable from overly permissive sources": 1,
@@ -480,12 +483,17 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertTrue(mixed_db.metadata.get("internet_ingress_capable"))
         self.assertEqual(internet_boundaries_to_db, [])
 
-    def test_realistic_alb_ec2_rds_fixture_stays_quiet_but_preserves_boundaries(self) -> None:
+    def test_realistic_alb_ec2_rds_fixture_surfaces_transitive_data_path(self) -> None:
         result = self.engine.analyze_plan(ALB_EC2_RDS_FIXTURE_PATH)
         boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
+        title_counts = Counter(finding.title for finding in result.findings)
 
-        self.assertEqual(len(result.findings), 0)
+        self.assertEqual(len(result.findings), 1)
         self.assertEqual(len(result.inventory.resources), 19)
+        self.assertEqual(
+            dict(title_counts),
+            {"Sensitive data tier is transitively reachable from an internet-exposed path": 1},
+        )
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)
         self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 2)
         self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
@@ -829,7 +837,7 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         transitive_finding = next(
             finding
             for finding in result.findings
-            if finding.title == "Private data tier is transitively reachable from an internet-exposed service"
+            if finding.title == "Sensitive data tier is transitively reachable from an internet-exposed path"
         )
         evidence_by_key = {item.key: item.values for item in transitive_finding.evidence}
 

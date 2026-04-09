@@ -603,48 +603,32 @@ class StrideRuleEngine:
             if entry is None:
                 continue
 
-            if entry.resource_type == "aws_instance":
-                for downstream, security_group, rule in trusted_workload_hops.get(entry.address, []):
-                    for data_store, data_boundary in private_data_paths.get(downstream.address, []):
-                        finding_key = (entry.address, downstream.address, data_store.address)
-                        if finding_key in seen:
-                            continue
-                        seen.add(finding_key)
-                        findings.append(
-                            _build_transitive_private_data_finding(
-                                rule_id="aws-private-data-transitive-exposure",
-                                inventory=inventory,
-                                entry=entry,
-                                path_workloads=[downstream],
-                                security_group_hops=[(security_group, rule)],
-                                data_store=data_store,
-                                data_boundary=data_boundary,
-                            )
-                        )
-
-            for intermediate, first_hop_group, first_hop_rule in trusted_workload_hops.get(entry.address, []):
-                for downstream, second_hop_group, second_hop_rule in trusted_workload_hops.get(intermediate.address, []):
-                    if downstream.address == entry.address:
+            for path_workloads, security_group_hops in _iter_transitive_workload_paths(
+                entry,
+                trusted_workload_hops,
+                max_hops=2,
+            ):
+                terminal_workload = path_workloads[-1]
+                for data_store, data_boundary in private_data_paths.get(terminal_workload.address, []):
+                    finding_key = (
+                        entry.address,
+                        *[workload.address for workload in path_workloads],
+                        data_store.address,
+                    )
+                    if finding_key in seen:
                         continue
-                    for data_store, data_boundary in private_data_paths.get(downstream.address, []):
-                        finding_key = (entry.address, intermediate.address, downstream.address, data_store.address)
-                        if finding_key in seen:
-                            continue
-                        seen.add(finding_key)
-                        findings.append(
-                            _build_transitive_private_data_finding(
-                                rule_id="aws-private-data-transitive-exposure",
-                                inventory=inventory,
-                                entry=entry,
-                                path_workloads=[intermediate, downstream],
-                                security_group_hops=[
-                                    (first_hop_group, first_hop_rule),
-                                    (second_hop_group, second_hop_rule),
-                                ],
-                                data_store=data_store,
-                                data_boundary=data_boundary,
-                            )
+                    seen.add(finding_key)
+                    findings.append(
+                        _build_transitive_private_data_finding(
+                            rule_id="aws-private-data-transitive-exposure",
+                            inventory=inventory,
+                            entry=entry,
+                            path_workloads=path_workloads,
+                            security_group_hops=security_group_hops,
+                            data_store=data_store,
+                            data_boundary=data_boundary,
                         )
+                    )
         return findings
 
     def _detect_trust_expansion(
@@ -1128,6 +1112,35 @@ def _trusted_workload_hops(
     return trusted_hops
 
 
+def _iter_transitive_workload_paths(
+    entry: NormalizedResource,
+    trusted_workload_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]],
+    *,
+    max_hops: int,
+) -> list[tuple[list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]]:
+    discovered_paths: list[tuple[list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = []
+    frontier: list[tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = [
+        (entry, [], [])
+    ]
+
+    for _ in range(max_hops):
+        next_frontier: list[tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = []
+        for source, path_workloads, security_group_hops in frontier:
+            for downstream, security_group, rule in trusted_workload_hops.get(source.address, []):
+                if downstream.address == entry.address:
+                    continue
+                if any(workload.address == downstream.address for workload in path_workloads):
+                    continue
+                new_path = [*path_workloads, downstream]
+                new_hops = [*security_group_hops, (security_group, rule)]
+                discovered_paths.append((new_path, new_hops))
+                next_frontier.append((downstream, new_path, new_hops))
+        frontier = next_frontier
+        if not frontier:
+            break
+    return discovered_paths
+
+
 def _private_workload_data_paths(
     boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     inventory: ResourceInventory,
@@ -1165,7 +1178,7 @@ def _build_transitive_private_data_finding(
     workload_path = [entry, *path_workloads]
     hop_descriptions = [
         f"{source.display_name} can reach {target.display_name}"
-        for source, target in zip(workload_path, path_workloads)
+        for source, target in zip(workload_path[:-1], workload_path[1:])
     ]
     data_posture = [
         f"{data_store.address} is not directly public",
@@ -1196,7 +1209,7 @@ def _build_transitive_private_data_finding(
                 f"internet reaches {entry.address}",
                 *[
                     f"{source.address} reaches {target.address}"
-                    for source, target in zip(workload_path, path_workloads)
+                    for source, target in zip(workload_path[:-1], workload_path[1:])
                 ],
                 f"{terminal_workload.address} reaches {data_store.address}",
             ]),

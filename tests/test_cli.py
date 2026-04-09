@@ -245,6 +245,9 @@ class CliTests(unittest.TestCase):
                     [
                         'fail_on = "medium"',
                         "",
+                        "[rules]",
+                        'disable = ["aws-private-data-transitive-exposure"]',
+                        "",
                         "[rules.severity_overrides]",
                         'aws-iam-wildcard-permissions = "low"',
                         "",
