@@ -61,6 +61,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("defaultModelsExpandDepth", response.text)
         self.assertIn(".swagger-ui .topbar", response.text)
         self.assertIn("section.models", response.text)
+        self.assertIn('a[href$="/openapi.json"]', response.text)
 
     def test_openapi_spec_route_is_available(self) -> None:
         response = self.client.get("/openapi.json")

@@ -35,6 +35,15 @@ DOCS_CHROME_HIDE_STYLE = """
   }
 </style>
 """
+DOCS_LINK_CLEANUP_SCRIPT = """
+<script>
+  window.addEventListener("load", () => {
+    for (const link of document.querySelectorAll('a[href$="/openapi.json"], a[href="openapi.json"]')) {
+      link.style.display = "none";
+    }
+  });
+</script>
+"""
 
 
 class DashboardInputError(ValueError):
@@ -164,7 +173,10 @@ def create_app() -> FastAPI:
                 "defaultModelsExpandDepth": -1,
             },
         )
-        content = swagger_ui.body.decode("utf-8").replace("</head>", f"{DOCS_CHROME_HIDE_STYLE}</head>")
+        content = swagger_ui.body.decode("utf-8").replace(
+            "</head>",
+            f"{DOCS_CHROME_HIDE_STYLE}{DOCS_LINK_CLEANUP_SCRIPT}</head>",
+        )
         return HTMLResponse(content=content, status_code=swagger_ui.status_code)
 
     @app.get("/", response_class=HTMLResponse)
