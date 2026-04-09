@@ -23,11 +23,20 @@ SUPPORTED_AWS_TYPES = {
     "aws_lb",
     "aws_db_instance",
     "aws_s3_bucket",
+    "aws_s3_bucket_policy",
     "aws_s3_bucket_public_access_block",
     "aws_iam_role",
     "aws_iam_policy",
+    "aws_iam_role_policy",
     "aws_iam_role_policy_attachment",
+    "aws_iam_instance_profile",
     "aws_lambda_function",
+    "aws_lambda_permission",
+    "aws_kms_key",
+    "aws_sns_topic",
+    "aws_sqs_queue",
+    "aws_secretsmanager_secret",
+    "aws_secretsmanager_secret_policy",
     "aws_subnet",
     "aws_vpc",
     "aws_internet_gateway",
@@ -191,6 +200,7 @@ class AwsNormalizer(ProviderNormalizer):
                     "ami": values.get("ami"),
                     "instance_type": values.get("instance_type"),
                     "associate_public_ip_address": public_ip_requested,
+                    "iam_instance_profile": values.get("iam_instance_profile"),
                     "public_access_reasons": (
                         ["instance requests an associated public IP address"]
                         if public_ip_requested
@@ -266,6 +276,7 @@ class AwsNormalizer(ProviderNormalizer):
                 public_access_configured=public_access_configured,
                 public_exposure=public_access_configured,
                 data_sensitivity="sensitive",
+                policy_statements=_parse_policy_statements(policy_document),
                 metadata={
                     "bucket": values.get("bucket"),
                     "acl": bucket_acl,
@@ -278,6 +289,21 @@ class AwsNormalizer(ProviderNormalizer):
                         bucket_acl,
                         public_policy=public_policy,
                     ),
+                },
+            )
+        if resource.resource_type == "aws_s3_bucket_policy":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("id") or resource.address,
+                policy_statements=_parse_policy_statements(policy_document),
+                metadata={
+                    "bucket": values.get("bucket"),
+                    "policy_document": policy_document,
                 },
             )
         if resource.resource_type == "aws_s3_bucket_public_access_block":
@@ -331,6 +357,22 @@ class AwsNormalizer(ProviderNormalizer):
                 policy_statements=_parse_policy_statements(policy_document),
                 metadata={"policy_document": policy_document},
             )
+        if resource.resource_type == "aws_iam_role_policy":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.IAM,
+                identifier=values.get("id") or resource.address,
+                policy_statements=_parse_policy_statements(policy_document),
+                metadata={
+                    "role": values.get("role"),
+                    "policy_document": policy_document,
+                    "policy_name": values.get("name"),
+                },
+            )
         if resource.resource_type == "aws_iam_role_policy_attachment":
             return NormalizedResource(
                 address=resource.address,
@@ -342,6 +384,20 @@ class AwsNormalizer(ProviderNormalizer):
                 metadata={
                     "role": values.get("role"),
                     "policy_arn": values.get("policy_arn"),
+                },
+            )
+        if resource.resource_type == "aws_iam_instance_profile":
+            role_references = _compact(_as_list(values.get("roles")) + [values.get("role")])
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.IAM,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                metadata={
+                    "role_references": role_references,
                 },
             )
         if resource.resource_type == "aws_lambda_function":
@@ -363,6 +419,111 @@ class AwsNormalizer(ProviderNormalizer):
                     "vpc_enabled": bool(vpc_config),
                 },
             )
+        if resource.resource_type == "aws_lambda_permission":
+            function_name = values.get("function_name") or values.get("function_arn")
+            source_arn = values.get("source_arn")
+            source_account = values.get("source_account")
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.COMPUTE,
+                identifier=values.get("statement_id") or values.get("id") or resource.address,
+                policy_statements=[
+                    IAMPolicyStatement(
+                        effect="Allow",
+                        actions=_compact([values.get("action")]),
+                        resources=_compact([function_name]),
+                        principals=_compact([values.get("principal")]),
+                    )
+                ],
+                metadata={
+                    "function_name": function_name,
+                    "source_arn": source_arn,
+                    "source_account": source_account,
+                },
+            )
+        if resource.resource_type == "aws_kms_key":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("key_id") or values.get("id"),
+                arn=values.get("arn"),
+                policy_statements=_parse_policy_statements(policy_document),
+                data_sensitivity="sensitive",
+                metadata={
+                    "policy_document": policy_document,
+                    "key_usage": values.get("key_usage"),
+                    "enable_key_rotation": bool(values.get("enable_key_rotation", False)),
+                },
+            )
+        if resource.resource_type == "aws_sns_topic":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.EDGE,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                policy_statements=_parse_policy_statements(policy_document),
+                metadata={
+                    "policy_document": policy_document,
+                    "display_name": values.get("display_name"),
+                },
+            )
+        if resource.resource_type == "aws_sqs_queue":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                policy_statements=_parse_policy_statements(policy_document),
+                metadata={
+                    "policy_document": policy_document,
+                    "queue_url": values.get("url"),
+                },
+            )
+        if resource.resource_type == "aws_secretsmanager_secret":
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                data_sensitivity="sensitive",
+                metadata={
+                    "name": values.get("name"),
+                    "kms_key_id": values.get("kms_key_id"),
+                },
+            )
+        if resource.resource_type == "aws_secretsmanager_secret_policy":
+            policy_document = _load_json_document(values.get("policy"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+                identifier=values.get("id") or resource.address,
+                policy_statements=_parse_policy_statements(policy_document),
+                metadata={
+                    "secret_arn": values.get("secret_arn"),
+                    "policy_document": policy_document,
+                },
+            )
         raise ValueError(f"Unsupported resource type reached normalizer: {resource.resource_type}")
 
     def _decorate_resources(self, resources: list[NormalizedResource]) -> None:
@@ -380,10 +541,31 @@ class AwsNormalizer(ProviderNormalizer):
             for key in (resource.identifier, resource.address, resource.arn)
             if key
         }
+        secrets = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_secretsmanager_secret"
+            for key in (resource.identifier, resource.address, resource.arn, resource.metadata.get("name"))
+            if key
+        }
+        lambda_functions = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_lambda_function"
+            for key in (resource.identifier, resource.address, resource.arn)
+            if key
+        }
         role_index = {
             key: resource
             for resource in resources
             if resource.resource_type == "aws_iam_role"
+            for key in (resource.identifier, resource.address, resource.arn)
+            if key
+        }
+        instance_profile_index = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_iam_instance_profile"
             for key in (resource.identifier, resource.address, resource.arn)
             if key
         }
@@ -419,6 +601,18 @@ class AwsNormalizer(ProviderNormalizer):
             target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
             _append_unique(target_group.metadata, "standalone_rule_addresses", rule_resource.address)
 
+        # Inline role-policy resources extend a role's effective permissions in the same way as
+        # inline policies declared directly on the role block.
+        for role_policy_resource in resources:
+            if role_policy_resource.resource_type != "aws_iam_role_policy":
+                continue
+            role = role_index.get(role_policy_resource.metadata.get("role"))
+            if role is None:
+                continue
+            role.policy_statements.extend(_clone_policy_statements(role_policy_resource.policy_statements))
+            _append_unique(role.metadata, "inline_policy_resource_addresses", role_policy_resource.address)
+            _append_unique(role.metadata, "inline_policy_names", role_policy_resource.metadata.get("policy_name"))
+
         # Role-policy attachments change the workload's effective privileges, so merge any
         # in-plan customer-managed policy statements onto the target role.
         for attachment_resource in resources:
@@ -438,6 +632,80 @@ class AwsNormalizer(ProviderNormalizer):
             role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
             _append_unique(role.metadata, "attached_policy_arns", policy.arn or policy.identifier or policy.address)
             _append_unique(role.metadata, "attached_policy_addresses", policy.address)
+
+        # Instance profiles are the normal way EC2 inherits role credentials, so resolve them
+        # to attached roles before workload-risk and trust-boundary analysis runs.
+        for instance_profile_resource in resources:
+            if instance_profile_resource.resource_type != "aws_iam_instance_profile":
+                continue
+            resolved_role_refs: list[str] = []
+            for role_ref in instance_profile_resource.metadata.get("role_references", []):
+                role = role_index.get(role_ref)
+                if role is None:
+                    _append_unique(instance_profile_resource.metadata, "unresolved_role_references", role_ref)
+                    continue
+                resolved_role_ref = role.arn or role.identifier or role.address
+                if resolved_role_ref:
+                    resolved_role_refs.append(resolved_role_ref)
+                _append_unique(instance_profile_resource.metadata, "resolved_role_addresses", role.address)
+            instance_profile_resource.metadata["resolved_role_references"] = resolved_role_refs
+
+        for workload_resource in resources:
+            if workload_resource.resource_type != "aws_instance":
+                continue
+            instance_profile_ref = workload_resource.metadata.get("iam_instance_profile")
+            if not instance_profile_ref:
+                continue
+            instance_profile = instance_profile_index.get(instance_profile_ref)
+            if instance_profile is None:
+                _append_unique(workload_resource.metadata, "unresolved_instance_profiles", str(instance_profile_ref))
+                continue
+            _append_unique(workload_resource.metadata, "resolved_instance_profile_addresses", instance_profile.address)
+            for resolved_role_ref in instance_profile.metadata.get("resolved_role_references", []):
+                if resolved_role_ref not in workload_resource.attached_role_arns:
+                    workload_resource.attached_role_arns.append(resolved_role_ref)
+
+        # Resource-policy resources should flow into the target resource so later analysis can
+        # reason over one consolidated policy surface.
+        for bucket_policy_resource in resources:
+            if bucket_policy_resource.resource_type != "aws_s3_bucket_policy":
+                continue
+            bucket = buckets.get(bucket_policy_resource.metadata.get("bucket"))
+            if bucket is None:
+                continue
+            _merge_resource_policy(
+                bucket,
+                bucket_policy_resource.policy_statements,
+                bucket_policy_resource.metadata.get("policy_document", {}),
+                bucket_policy_resource.address,
+            )
+
+        for secret_policy_resource in resources:
+            if secret_policy_resource.resource_type != "aws_secretsmanager_secret_policy":
+                continue
+            secret = secrets.get(secret_policy_resource.metadata.get("secret_arn"))
+            if secret is None:
+                continue
+            _merge_resource_policy(
+                secret,
+                secret_policy_resource.policy_statements,
+                secret_policy_resource.metadata.get("policy_document", {}),
+                secret_policy_resource.address,
+            )
+
+        for lambda_permission_resource in resources:
+            if lambda_permission_resource.resource_type != "aws_lambda_permission":
+                continue
+            function_name = lambda_permission_resource.metadata.get("function_name")
+            target_function = lambda_functions.get(function_name)
+            if target_function is None:
+                continue
+            _merge_resource_policy(
+                target_function,
+                lambda_permission_resource.policy_statements,
+                {},
+                lambda_permission_resource.address,
+            )
 
         # Public access blocks can neutralize otherwise-public bucket ACLs or policies, so
         # recompute effective public exposure after the control is applied.
@@ -818,6 +1086,32 @@ def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPo
         )
         for statement in statements
     ]
+
+
+def _merge_resource_policy(
+    resource: NormalizedResource,
+    policy_statements: list[IAMPolicyStatement],
+    policy_document: dict[str, Any],
+    source_address: str,
+) -> None:
+    resource.policy_statements.extend(_clone_policy_statements(policy_statements))
+    _append_unique(resource.metadata, "resource_policy_source_addresses", source_address)
+    merged_document = _merge_policy_documents(resource.metadata.get("policy_document", {}), policy_document)
+    if merged_document:
+        resource.metadata["policy_document"] = merged_document
+
+
+def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str, Any]:
+    base = base_document if isinstance(base_document, dict) else {}
+    extra = extra_document if isinstance(extra_document, dict) else {}
+    base_statements = _as_list(base.get("Statement"))
+    extra_statements = _as_list(extra.get("Statement"))
+    merged_statements = [statement for statement in [*base_statements, *extra_statements] if isinstance(statement, dict)]
+    if not merged_statements:
+        return base or extra
+    merged_document = dict(base) if base else dict(extra)
+    merged_document["Statement"] = merged_statements
+    return merged_document
 
 
 def _append_unique(metadata: dict[str, Any], key: str, value: str | None) -> None:

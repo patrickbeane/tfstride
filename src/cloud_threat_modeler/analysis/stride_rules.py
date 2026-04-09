@@ -27,6 +27,9 @@ SENSITIVE_ACTION_PREFIXES = {
     "*",
 }
 
+SENSITIVE_RESOURCE_POLICY_TYPES = {"aws_s3_bucket", "aws_kms_key", "aws_secretsmanager_secret"}
+SERVICE_RESOURCE_POLICY_TYPES = {"aws_lambda_function", "aws_sqs_queue", "aws_sns_topic"}
+
 
 class StrideRuleEngine:
     def evaluate(self, inventory: ResourceInventory, boundaries: list[TrustBoundary]) -> list[Finding]:
@@ -37,6 +40,7 @@ class StrideRuleEngine:
         findings.extend(self._detect_database_exposure(inventory, boundary_index))
         findings.extend(self._detect_unencrypted_databases(inventory))
         findings.extend(self._detect_public_object_storage(inventory, boundary_index))
+        findings.extend(self._detect_resource_policy_exposure(inventory, boundary_index))
         findings.extend(self._detect_iam_wildcards(inventory))
         findings.extend(self._detect_workload_role_risk(inventory, boundary_index))
         findings.extend(self._detect_missing_segmentation(inventory, boundary_index))
@@ -45,6 +49,92 @@ class StrideRuleEngine:
 
         severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
         findings.sort(key=lambda finding: (severity_order[finding.severity], finding.title))
+        return findings
+
+    def _detect_resource_policy_exposure(
+        self,
+        inventory: ResourceInventory,
+        boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        primary_account_id = inventory.metadata.get("primary_account_id")
+        seen: set[tuple[str, str]] = set()
+        for resource in inventory.resources:
+            if resource.resource_type not in SENSITIVE_RESOURCE_POLICY_TYPES.union(SERVICE_RESOURCE_POLICY_TYPES):
+                continue
+            for statement in resource.policy_statements:
+                if statement.effect != "Allow" or not statement.principals:
+                    continue
+                for principal in statement.principals:
+                    if principal.endswith(".amazonaws.com"):
+                        continue
+                    scope_description = _describe_unconstrained_trust_scope(principal, primary_account_id)
+                    if scope_description is None:
+                        continue
+                    if resource.resource_type == "aws_s3_bucket":
+                        if principal == "*" and not resource.public_exposure:
+                            continue
+                        if principal == "*" and resource.public_exposure:
+                            # Public S3 exposure is already covered by the dedicated object-storage rule.
+                            continue
+                    finding_key = (resource.address, principal)
+                    if finding_key in seen:
+                        continue
+                    seen.add(finding_key)
+                    account_id = _parse_account_id(principal)
+                    sensitive_resource = resource.resource_type in SENSITIVE_RESOURCE_POLICY_TYPES
+                    severity_reasoning = _build_severity_reasoning(
+                        internet_exposure=principal == "*",
+                        privilege_breadth=2 if principal == "*" or _is_root_principal(principal) else 1,
+                        data_sensitivity=2 if sensitive_resource else 0,
+                        lateral_movement=1,
+                        blast_radius=2 if principal == "*" or (account_id and account_id != primary_account_id) else 1,
+                    )
+                    boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, resource.address))
+                    findings.append(
+                        Finding(
+                            title=(
+                                "Sensitive resource policy allows public or cross-account access"
+                                if sensitive_resource
+                                else "Service resource policy allows public or cross-account access"
+                            ),
+                            category=(
+                                StrideCategory.INFORMATION_DISCLOSURE
+                                if sensitive_resource
+                                else StrideCategory.ELEVATION_OF_PRIVILEGE
+                            ),
+                            severity=severity_reasoning.severity,
+                            affected_resources=[
+                                resource.address,
+                                *resource.metadata.get("resource_policy_source_addresses", []),
+                            ],
+                            trust_boundary_id=boundary.identifier if boundary else None,
+                            rule_id=(
+                                "aws-sensitive-resource-policy-external-access"
+                                if sensitive_resource
+                                else "aws-service-resource-policy-external-access"
+                            ),
+                            rationale=(
+                                f"{resource.display_name} allows {principal} through a resource policy. "
+                                "Broad or foreign-account principals expand who can invoke, read, decrypt, or consume this resource."
+                            ),
+                            recommended_mitigation=(
+                                "Limit resource policies to exact service principals or workload roles, avoid wildcard "
+                                "and account-root principals, and require source-account or source-ARN constraints where supported."
+                            ),
+                            evidence=_collect_evidence(
+                                _evidence_item("trust_principals", [principal]),
+                                _evidence_item("trust_scope", [scope_description]),
+                                _evidence_item("policy_actions", sorted(statement.actions)),
+                                _evidence_item("policy_statements", [_describe_policy_statement(statement)]),
+                                _evidence_item(
+                                    "resource_policy_sources",
+                                    resource.metadata.get("resource_policy_source_addresses", []),
+                                ),
+                            ),
+                            severity_reasoning=severity_reasoning,
+                        )
+                    )
         return findings
 
     def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
@@ -836,6 +926,8 @@ def _statement_matches_sensitive_actions(statement: IAMPolicyStatement, sensitiv
 
 
 def _parse_account_id(principal: str) -> str | None:
+    if principal.isdigit() and len(principal) == 12:
+        return principal
     if not principal.startswith("arn:"):
         return None
     parts = principal.split(":")
@@ -975,7 +1067,9 @@ def _describe_unconstrained_trust_scope(principal: str, primary_account_id: str 
 
 
 def _is_root_principal(principal: str) -> bool:
-    return principal.startswith("arn:") and principal.endswith(":root")
+    return (principal.startswith("arn:") and principal.endswith(":root")) or (
+        principal.isdigit() and len(principal) == 12
+    )
 
 
 def _subnet_posture(resource: NormalizedResource | None, inventory: ResourceInventory) -> list[str]:

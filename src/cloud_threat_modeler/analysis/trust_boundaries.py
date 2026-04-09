@@ -4,7 +4,7 @@ from cloud_threat_modeler.models import BoundaryType, NormalizedResource, Resour
 
 
 WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function"}
-DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket"}
+DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}
 
 
 class TrustBoundaryDetector:
@@ -114,6 +114,27 @@ class TrustBoundaryDetector:
                     rationale,
                 )
 
+        for resource in resources:
+            if resource.resource_type == "aws_iam_role":
+                continue
+            for principal in _resource_policy_principals(resource, primary_account_id):
+                account_id = _parse_account_id_from_principal(principal)
+                if principal == "*":
+                    description = f"{resource.display_name} allows any principal through a resource policy."
+                else:
+                    description = f"{resource.display_name} allows {principal} through a resource policy."
+                if principal == "*" or (account_id and primary_account_id and account_id != primary_account_id):
+                    rationale = "A broad or foreign AWS principal can cross into this resource's policy boundary."
+                else:
+                    rationale = "An additional account-level principal can cross into this resource's policy boundary."
+                add_boundary(
+                    BoundaryType.CROSS_ACCOUNT_OR_ROLE,
+                    principal,
+                    resource.address,
+                    description,
+                    rationale,
+                )
+
         return boundaries
 
 
@@ -166,6 +187,25 @@ def _workload_reaches_data_store(
         return (
             "Application or function workloads cross into a higher-sensitivity data plane when their "
             f"attached role allows S3 actions such as {action_text}."
+        )
+    if data_store.resource_type == "aws_secretsmanager_secret":
+        if attached_role is None:
+            return None
+        allowed_actions = sorted(
+            {
+                action
+                for statement in attached_role.policy_statements
+                if statement.effect == "Allow"
+                for action in statement.actions
+                if _allows_secret_read(action)
+            }
+        )
+        if not allowed_actions:
+            return None
+        action_text = ", ".join(allowed_actions)
+        return (
+            "Application or function workloads cross into a higher-sensitivity secret plane when their "
+            f"attached role allows Secrets Manager retrieval actions such as {action_text}."
         )
     return None
 
@@ -230,8 +270,52 @@ def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
 def _parse_account_id_from_principal(principal: str) -> str | None:
     if principal == "*":
         return None
+    if principal.isdigit() and len(principal) == 12:
+        return principal
     if principal.startswith("arn:"):
         parts = principal.split(":")
         if len(parts) >= 5:
             return parts[4] or None
     return None
+
+
+def _resource_policy_principals(resource: NormalizedResource, primary_account_id: str | None) -> list[str]:
+    principals: list[str] = []
+    for statement in resource.policy_statements:
+        if statement.effect != "Allow":
+            continue
+        for principal in statement.principals:
+            if principal.endswith(".amazonaws.com"):
+                continue
+            if resource.resource_type == "aws_s3_bucket" and principal == "*":
+                continue
+            if _resource_policy_scope(principal, primary_account_id) is None:
+                continue
+            if principal not in principals:
+                principals.append(principal)
+    return principals
+
+
+def _resource_policy_scope(principal: str, primary_account_id: str | None) -> str | None:
+    if principal == "*":
+        return "principal is wildcard"
+    account_id = _parse_account_id_from_principal(principal)
+    if account_id and primary_account_id and account_id != primary_account_id:
+        if _is_root_like_principal(principal):
+            return f"principal is foreign account root {account_id}"
+        return f"principal belongs to foreign account {account_id}"
+    if _is_root_like_principal(principal):
+        if account_id:
+            return f"principal is account root {account_id}"
+        return "principal is account root"
+    return None
+
+
+def _is_root_like_principal(principal: str) -> bool:
+    return (principal.startswith("arn:") and principal.endswith(":root")) or (
+        principal.isdigit() and len(principal) == 12
+    )
+
+
+def _allows_secret_read(action: str) -> bool:
+    return action == "*" or action == "secretsmanager:*" or action.startswith("secretsmanager:GetSecretValue")

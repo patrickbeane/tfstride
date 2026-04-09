@@ -12,6 +12,8 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 
 - deterministic Terraform plan analysis with no LLM in the core pipeline
 - trust-boundary detection plus STRIDE-oriented findings
+- IAM graph resolution for inline policies, role attachments, and EC2 instance profiles present in the plan
+- resource-policy analysis for sensitive data services and invoke/publish/queue surfaces
 - informational controls observed for clear mitigating signals
 - machine-readable JSON output with stable finding fingerprints
 - markdown and SARIF 2.1.0 output
@@ -166,6 +168,8 @@ Current rules include:
 - databases reachable from public or otherwise permissive sources
 - unencrypted RDS storage
 - public S3 exposure
+- sensitive resource policies that allow public or cross-account access
+- service resource policies that allow public or cross-account access
 - wildcard IAM privileges
 - workload roles with sensitive permissions
 - missing segmentation between public workloads and private data tiers
@@ -216,11 +220,20 @@ The MVP intentionally supports a focused resource set:
 - `aws_lb`
 - `aws_db_instance`
 - `aws_s3_bucket`
+- `aws_s3_bucket_policy`
 - `aws_s3_bucket_public_access_block`
 - `aws_iam_role`
 - `aws_iam_policy`
+- `aws_iam_role_policy`
 - `aws_iam_role_policy_attachment`
+- `aws_iam_instance_profile`
 - `aws_lambda_function`
+- `aws_lambda_permission`
+- `aws_kms_key`
+- `aws_sns_topic`
+- `aws_sqs_queue`
+- `aws_secretsmanager_secret`
+- `aws_secretsmanager_secret_policy`
 - `aws_subnet`
 - `aws_vpc`
 - `aws_internet_gateway`
