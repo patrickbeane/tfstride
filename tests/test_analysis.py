@@ -510,6 +510,369 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertEqual(boundary_types[BoundaryType.CONTROL_TO_WORKLOAD], 1)
         self.assertEqual(boundary_types[BoundaryType.CROSS_ACCOUNT_OR_ROLE], 1)
 
+    def test_transitive_private_data_path_from_public_edge_is_detected(self) -> None:
+        payload = {
+            "format_version": "1.2",
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "aws_vpc.main",
+                            "mode": "managed",
+                            "type": "aws_vpc",
+                            "name": "main",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {"id": "vpc-1", "cidr_block": "10.42.0.0/16"},
+                        },
+                        {
+                            "address": "aws_subnet.public_edge",
+                            "mode": "managed",
+                            "type": "aws_subnet",
+                            "name": "public_edge",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "subnet-public-1",
+                                "vpc_id": "vpc-1",
+                                "cidr_block": "10.42.1.0/24",
+                                "map_public_ip_on_launch": True,
+                            },
+                        },
+                        {
+                            "address": "aws_subnet.private_app",
+                            "mode": "managed",
+                            "type": "aws_subnet",
+                            "name": "private_app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "subnet-private-app-1",
+                                "vpc_id": "vpc-1",
+                                "cidr_block": "10.42.2.0/24",
+                                "map_public_ip_on_launch": False,
+                            },
+                        },
+                        {
+                            "address": "aws_subnet.private_worker",
+                            "mode": "managed",
+                            "type": "aws_subnet",
+                            "name": "private_worker",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "subnet-private-worker-1",
+                                "vpc_id": "vpc-1",
+                                "cidr_block": "10.42.3.0/24",
+                                "map_public_ip_on_launch": False,
+                            },
+                        },
+                        {
+                            "address": "aws_internet_gateway.main",
+                            "mode": "managed",
+                            "type": "aws_internet_gateway",
+                            "name": "main",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {"id": "igw-1", "vpc_id": "vpc-1"},
+                        },
+                        {
+                            "address": "aws_route_table.public",
+                            "mode": "managed",
+                            "type": "aws_route_table",
+                            "name": "public",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "rtb-public-1",
+                                "vpc_id": "vpc-1",
+                                "route": [{"cidr_block": "0.0.0.0/0", "gateway_id": "igw-1"}],
+                            },
+                        },
+                        {
+                            "address": "aws_nat_gateway.main",
+                            "mode": "managed",
+                            "type": "aws_nat_gateway",
+                            "name": "main",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "nat-1",
+                                "subnet_id": "subnet-public-1",
+                                "allocation_id": "eipalloc-1",
+                                "connectivity_type": "public",
+                            },
+                        },
+                        {
+                            "address": "aws_route_table.private",
+                            "mode": "managed",
+                            "type": "aws_route_table",
+                            "name": "private",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "rtb-private-1",
+                                "vpc_id": "vpc-1",
+                                "route": [{"cidr_block": "0.0.0.0/0", "nat_gateway_id": "nat-1"}],
+                            },
+                        },
+                        {
+                            "address": "aws_route_table_association.public_edge",
+                            "mode": "managed",
+                            "type": "aws_route_table_association",
+                            "name": "public_edge",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "assoc-public-1",
+                                "subnet_id": "subnet-public-1",
+                                "route_table_id": "rtb-public-1",
+                            },
+                        },
+                        {
+                            "address": "aws_route_table_association.private_app",
+                            "mode": "managed",
+                            "type": "aws_route_table_association",
+                            "name": "private_app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "assoc-private-app-1",
+                                "subnet_id": "subnet-private-app-1",
+                                "route_table_id": "rtb-private-1",
+                            },
+                        },
+                        {
+                            "address": "aws_route_table_association.private_worker",
+                            "mode": "managed",
+                            "type": "aws_route_table_association",
+                            "name": "private_worker",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "assoc-private-worker-1",
+                                "subnet_id": "subnet-private-worker-1",
+                                "route_table_id": "rtb-private-1",
+                            },
+                        },
+                        {
+                            "address": "aws_security_group.lb",
+                            "mode": "managed",
+                            "type": "aws_security_group",
+                            "name": "lb",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sg-lb-1",
+                                "vpc_id": "vpc-1",
+                                "ingress": [
+                                    {
+                                        "protocol": "tcp",
+                                        "from_port": 443,
+                                        "to_port": 443,
+                                        "cidr_blocks": ["0.0.0.0/0"],
+                                    }
+                                ],
+                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                            },
+                        },
+                        {
+                            "address": "aws_security_group.app",
+                            "mode": "managed",
+                            "type": "aws_security_group",
+                            "name": "app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sg-app-1",
+                                "vpc_id": "vpc-1",
+                                "ingress": [],
+                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                            },
+                        },
+                        {
+                            "address": "aws_security_group_rule.app_from_lb",
+                            "mode": "managed",
+                            "type": "aws_security_group_rule",
+                            "name": "app_from_lb",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sgr-app-from-lb",
+                                "type": "ingress",
+                                "protocol": "tcp",
+                                "from_port": 8443,
+                                "to_port": 8443,
+                                "security_group_id": "sg-app-1",
+                                "source_security_group_id": "sg-lb-1",
+                            },
+                        },
+                        {
+                            "address": "aws_security_group.worker",
+                            "mode": "managed",
+                            "type": "aws_security_group",
+                            "name": "worker",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sg-worker-1",
+                                "vpc_id": "vpc-1",
+                                "ingress": [],
+                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                            },
+                        },
+                        {
+                            "address": "aws_security_group_rule.worker_from_app",
+                            "mode": "managed",
+                            "type": "aws_security_group_rule",
+                            "name": "worker_from_app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sgr-worker-from-app",
+                                "type": "ingress",
+                                "protocol": "tcp",
+                                "from_port": 9000,
+                                "to_port": 9000,
+                                "security_group_id": "sg-worker-1",
+                                "source_security_group_id": "sg-app-1",
+                            },
+                        },
+                        {
+                            "address": "aws_security_group.db",
+                            "mode": "managed",
+                            "type": "aws_security_group",
+                            "name": "db",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sg-db-1",
+                                "vpc_id": "vpc-1",
+                                "ingress": [],
+                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                            },
+                        },
+                        {
+                            "address": "aws_security_group_rule.db_from_worker",
+                            "mode": "managed",
+                            "type": "aws_security_group_rule",
+                            "name": "db_from_worker",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "sgr-db-from-worker",
+                                "type": "ingress",
+                                "protocol": "tcp",
+                                "from_port": 5432,
+                                "to_port": 5432,
+                                "security_group_id": "sg-db-1",
+                                "source_security_group_id": "sg-worker-1",
+                            },
+                        },
+                        {
+                            "address": "aws_lb.edge",
+                            "mode": "managed",
+                            "type": "aws_lb",
+                            "name": "edge",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "alb-1",
+                                "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/edge/123456",
+                                "name": "edge",
+                                "internal": False,
+                                "load_balancer_type": "application",
+                                "security_groups": ["sg-lb-1"],
+                                "subnets": ["subnet-public-1"],
+                            },
+                        },
+                        {
+                            "address": "aws_instance.app",
+                            "mode": "managed",
+                            "type": "aws_instance",
+                            "name": "app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "i-app-1",
+                                "arn": "arn:aws:ec2:us-east-1:111122223333:instance/i-app-1",
+                                "subnet_id": "subnet-private-app-1",
+                                "vpc_security_group_ids": ["sg-app-1"],
+                                "associate_public_ip_address": False,
+                            },
+                        },
+                        {
+                            "address": "aws_instance.worker",
+                            "mode": "managed",
+                            "type": "aws_instance",
+                            "name": "worker",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "i-worker-1",
+                                "arn": "arn:aws:ec2:us-east-1:111122223333:instance/i-worker-1",
+                                "subnet_id": "subnet-private-worker-1",
+                                "vpc_security_group_ids": ["sg-worker-1"],
+                                "associate_public_ip_address": False,
+                            },
+                        },
+                        {
+                            "address": "aws_db_instance.app",
+                            "mode": "managed",
+                            "type": "aws_db_instance",
+                            "name": "app",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "db-1",
+                                "identifier": "private-app-db",
+                                "arn": "arn:aws:rds:us-east-1:111122223333:db:private-app-db",
+                                "engine": "postgres",
+                                "publicly_accessible": False,
+                                "storage_encrypted": True,
+                                "db_subnet_group_name": "private-data",
+                                "vpc_security_group_ids": ["sg-db-1"],
+                            },
+                        },
+                    ]
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            result = self.engine.analyze_plan(plan_path)
+
+        transitive_finding = next(
+            finding
+            for finding in result.findings
+            if finding.title == "Private data tier is transitively reachable from an internet-exposed service"
+        )
+        evidence_by_key = {item.key: item.values for item in transitive_finding.evidence}
+
+        self.assertEqual(transitive_finding.severity, Severity.MEDIUM)
+        self.assertEqual(
+            transitive_finding.affected_resources,
+            [
+                "aws_lb.edge",
+                "aws_instance.app",
+                "aws_instance.worker",
+                "aws_db_instance.app",
+                "aws_security_group.app",
+                "aws_security_group.worker",
+            ],
+        )
+        self.assertEqual(
+            evidence_by_key["network_path"],
+            [
+                "internet reaches aws_lb.edge",
+                "aws_lb.edge reaches aws_instance.app",
+                "aws_instance.app reaches aws_instance.worker",
+                "aws_instance.worker reaches aws_db_instance.app",
+            ],
+        )
+        self.assertIn(
+            "aws_security_group.app ingress tcp 8443 from sg-lb-1",
+            evidence_by_key["security_group_rules"][0],
+        )
+        self.assertIn(
+            "aws_security_group.worker ingress tcp 9000 from sg-app-1",
+            evidence_by_key["security_group_rules"][1],
+        )
+        self.assertEqual(
+            evidence_by_key["data_tier_posture"],
+            [
+                "aws_db_instance.app is not directly public",
+                "database has no direct internet ingress path",
+            ],
+        )
+        self.assertIsNotNone(transitive_finding.trust_boundary_id)
+        self.assertEqual(
+            transitive_finding.trust_boundary_id,
+            "workload-to-data-store:aws_instance.worker->aws_db_instance.app",
+        )
+        self.assertEqual(transitive_finding.severity_reasoning.final_score, 5)
+
     def test_rule_policy_can_disable_rules_and_override_severity(self) -> None:
         enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
         enabled_rule_ids.remove("aws-database-permissive-ingress")

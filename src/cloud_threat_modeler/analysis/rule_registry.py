@@ -157,6 +157,18 @@ DEFAULT_RULE_REGISTRY = RuleRegistry(
             severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
         ),
         RuleMetadata(
+            rule_id="aws-private-data-transitive-exposure",
+            title="Private data tier is transitively reachable from an internet-exposed service",
+            category=StrideCategory.INFORMATION_DISCLOSURE,
+            recommended_mitigation=(
+                "Keep internet-adjacent tiers from chaining into secondary workloads that retain database or secret access, "
+                "narrow workload-to-workload security group trust, and isolate data-access responsibilities behind more "
+                "deliberate service boundaries."
+            ),
+            tags=("aws", "network", "segmentation", "transitive-path"),
+            severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+        ),
+        RuleMetadata(
             rule_id="aws-role-trust-expansion",
             title="Role trust relationship expands blast radius",
             category=StrideCategory.ELEVATION_OF_PRIVILEGE,

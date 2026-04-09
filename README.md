@@ -217,6 +217,7 @@ Current rules include:
 - wildcard IAM privileges
 - workload roles with sensitive permissions
 - missing segmentation between public workloads and private data tiers
+- hidden transitive paths from internet-facing services into private data tiers
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
 

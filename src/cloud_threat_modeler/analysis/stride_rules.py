@@ -51,6 +51,7 @@ class StrideRuleEngine:
         findings.extend(self._detect_iam_wildcards(inventory))
         findings.extend(self._detect_workload_role_risk(inventory, boundary_index))
         findings.extend(self._detect_missing_segmentation(inventory, boundary_index))
+        findings.extend(self._detect_transitive_private_data_exposure(inventory, boundary_index))
         findings.extend(self._detect_trust_expansion(inventory, boundary_index))
         findings.extend(self._detect_unconstrained_trust(inventory, boundary_index))
 
@@ -578,6 +579,74 @@ class StrideRuleEngine:
                 )
         return findings
 
+    def _detect_transitive_private_data_exposure(
+        self,
+        inventory: ResourceInventory,
+        boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        trusted_workload_hops = _trusted_workload_hops(inventory)
+        private_data_paths = _private_workload_data_paths(boundary_index, inventory)
+        seen: set[tuple[str, ...]] = set()
+
+        internet_boundaries = sorted(
+            (
+                boundary
+                for boundary in boundary_index.values()
+                if boundary.boundary_type == BoundaryType.INTERNET_TO_SERVICE
+            ),
+            key=lambda boundary: (boundary.target, boundary.identifier),
+        )
+
+        for internet_boundary in internet_boundaries:
+            entry = inventory.get_by_address(internet_boundary.target)
+            if entry is None:
+                continue
+
+            if entry.resource_type == "aws_instance":
+                for downstream, security_group, rule in trusted_workload_hops.get(entry.address, []):
+                    for data_store, data_boundary in private_data_paths.get(downstream.address, []):
+                        finding_key = (entry.address, downstream.address, data_store.address)
+                        if finding_key in seen:
+                            continue
+                        seen.add(finding_key)
+                        findings.append(
+                            _build_transitive_private_data_finding(
+                                rule_id="aws-private-data-transitive-exposure",
+                                inventory=inventory,
+                                entry=entry,
+                                path_workloads=[downstream],
+                                security_group_hops=[(security_group, rule)],
+                                data_store=data_store,
+                                data_boundary=data_boundary,
+                            )
+                        )
+
+            for intermediate, first_hop_group, first_hop_rule in trusted_workload_hops.get(entry.address, []):
+                for downstream, second_hop_group, second_hop_rule in trusted_workload_hops.get(intermediate.address, []):
+                    if downstream.address == entry.address:
+                        continue
+                    for data_store, data_boundary in private_data_paths.get(downstream.address, []):
+                        finding_key = (entry.address, intermediate.address, downstream.address, data_store.address)
+                        if finding_key in seen:
+                            continue
+                        seen.add(finding_key)
+                        findings.append(
+                            _build_transitive_private_data_finding(
+                                rule_id="aws-private-data-transitive-exposure",
+                                inventory=inventory,
+                                entry=entry,
+                                path_workloads=[intermediate, downstream],
+                                security_group_hops=[
+                                    (first_hop_group, first_hop_rule),
+                                    (second_hop_group, second_hop_rule),
+                                ],
+                                data_store=data_store,
+                                data_boundary=data_boundary,
+                            )
+                        )
+        return findings
+
     def _detect_trust_expansion(
         self,
         inventory: ResourceInventory,
@@ -1029,3 +1098,115 @@ def _join_clauses(clauses: list[str]) -> str:
     if len(clauses) == 1:
         return clauses[0]
     return f"{', '.join(clauses[:-1])}, and {clauses[-1]}"
+
+
+def _trusted_workload_hops(
+    inventory: ResourceInventory,
+) -> dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]]:
+    resources_by_security_group: dict[str, list[NormalizedResource]] = {}
+    for resource in inventory.resources:
+        for security_group_id in resource.security_group_ids:
+            resources_by_security_group.setdefault(security_group_id, []).append(resource)
+
+    trusted_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]] = {}
+    for workload in inventory.by_type("aws_instance"):
+        for security_group in _attached_security_groups(workload, inventory):
+            for rule in security_group.network_rules:
+                if rule.direction != "ingress" or not rule.referenced_security_group_ids:
+                    continue
+                matched_sources = sorted(
+                    {
+                        source.address: source
+                        for security_group_id in rule.referenced_security_group_ids
+                        for source in resources_by_security_group.get(security_group_id, [])
+                        if source.address != workload.address
+                    }.values(),
+                    key=lambda source: source.address,
+                )
+                for source in matched_sources:
+                    trusted_hops.setdefault(source.address, []).append((workload, security_group, rule))
+    return trusted_hops
+
+
+def _private_workload_data_paths(
+    boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+    inventory: ResourceInventory,
+) -> dict[str, list[tuple[NormalizedResource, TrustBoundary]]]:
+    data_paths: dict[str, list[tuple[NormalizedResource, TrustBoundary]]] = {}
+    for boundary in boundary_index.values():
+        if boundary.boundary_type != BoundaryType.WORKLOAD_TO_DATA_STORE:
+            continue
+        data_store = inventory.get_by_address(boundary.target)
+        if data_store is None or not _is_hidden_data_store(data_store):
+            continue
+        data_paths.setdefault(boundary.source, []).append((data_store, boundary))
+    return data_paths
+
+
+def _is_hidden_data_store(resource: NormalizedResource) -> bool:
+    return not (
+        resource.public_exposure
+        or bool(resource.metadata.get("direct_internet_reachable"))
+        or bool(resource.metadata.get("internet_ingress_capable"))
+    )
+
+
+def _build_transitive_private_data_finding(
+    *,
+    rule_id: str,
+    inventory: ResourceInventory,
+    entry: NormalizedResource,
+    path_workloads: list[NormalizedResource],
+    security_group_hops: list[tuple[NormalizedResource, SecurityGroupRule]],
+    data_store: NormalizedResource,
+    data_boundary: TrustBoundary,
+) -> Finding:
+    terminal_workload = path_workloads[-1]
+    workload_path = [entry, *path_workloads]
+    hop_descriptions = [
+        f"{source.display_name} can reach {target.display_name}"
+        for source, target in zip(workload_path, path_workloads)
+    ]
+    data_posture = [
+        f"{data_store.address} is not directly public",
+    ]
+    if data_store.resource_type == "aws_db_instance":
+        data_posture.append("database has no direct internet ingress path")
+    severity_reasoning = _build_severity_reasoning(
+        internet_exposure=False,
+        privilege_breadth=0,
+        data_sensitivity=2 if data_store.data_sensitivity == "sensitive" else 1,
+        lateral_movement=2,
+        blast_radius=1,
+    )
+    affected_resources = [entry.address, *[workload.address for workload in path_workloads], data_store.address]
+    affected_resources.extend(security_group.address for security_group, _ in security_group_hops)
+    return _build_finding(
+        rule_id=rule_id,
+        severity=severity_reasoning.severity,
+        affected_resources=list(dict.fromkeys(affected_resources)),
+        trust_boundary_id=data_boundary.identifier,
+        rationale=(
+            f"{data_store.display_name} is not directly public, but internet traffic can first reach {entry.display_name}, "
+            f"move through {_join_clauses(hop_descriptions)}, and then cross into the private data tier through "
+            f"{terminal_workload.display_name}. That creates a quieter transitive exposure path than a directly public data store."
+        ),
+        evidence=_collect_evidence(
+            _evidence_item("network_path", [
+                f"internet reaches {entry.address}",
+                *[
+                    f"{source.address} reaches {target.address}"
+                    for source, target in zip(workload_path, path_workloads)
+                ],
+                f"{terminal_workload.address} reaches {data_store.address}",
+            ]),
+            _evidence_item(
+                "security_group_rules",
+                [_describe_security_group_rule(security_group, rule) for security_group, rule in security_group_hops],
+            ),
+            _evidence_item("subnet_posture", [posture for workload in workload_path for posture in _subnet_posture(workload, inventory)]),
+            _evidence_item("data_tier_posture", data_posture),
+            _evidence_item("boundary_rationale", [data_boundary.rationale]),
+        ),
+        severity_reasoning=severity_reasoning,
+    )
