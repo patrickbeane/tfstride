@@ -19,6 +19,7 @@ if FASTAPI_DEPS_AVAILABLE:
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
+SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
 
 
@@ -33,6 +34,8 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Analyze plan", response.text)
         self.assertIn("Terraform plan JSON", response.text)
+        self.assertIn("Built-in scenarios", response.text)
+        self.assertIn("Nightmare Plan", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:
@@ -76,6 +79,19 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Nightmare Dashboard Test", response.text)
         self.assertIn("Public object storage allows internet reads", response.text)
         self.assertIn("policy statements", response.text)
+
+    def test_demo_route_renders_safe_fixture_report(self) -> None:
+        response = self.client.get("/demo/safe")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Safe Plan Demo", response.text)
+        self.assertIn(SAFE_FIXTURE_PATH.name, response.text)
+        self.assertIn("IAM policy grants wildcard privileges", response.text)
+
+    def test_demo_route_returns_not_found_for_unknown_scenario(self) -> None:
+        response = self.client.get("/demo/not-a-scenario")
+
+        self.assertEqual(response.status_code, 404)
 
     def test_api_rejects_empty_uploads(self) -> None:
         response = self.client.post(

@@ -3,7 +3,14 @@
 {% block content %}
   <section class="report-hero">
     <div>
-      <p class="eyebrow">Analysis result</p>
+      {% if scenario %}
+        <div class="report-label-row">
+          <p class="eyebrow">Built-in scenario</p>
+          <span class="scenario-file">{{ scenario.fixture_name }}</span>
+        </div>
+      {% else %}
+        <p class="eyebrow">Analysis result</p>
+      {% endif %}
       <h1>{{ payload.title }}</h1>
       <p class="lede">
         Analyzed <strong>{{ payload.analyzed_file }}</strong> with {{ payload.summary.normalized_resources }}

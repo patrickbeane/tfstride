@@ -49,7 +49,8 @@ a {
 .summary-card-grid,
 .risk-band,
 .content-grid,
-.upload-grid {
+.upload-grid,
+.scenario-section {
   animation: rise-in 420ms ease both;
 }
 
@@ -269,6 +270,11 @@ h2 {
   color: var(--accent-strong);
 }
 
+.section-copy {
+  display: grid;
+  gap: 0.6rem;
+}
+
 .alert-error {
   margin-bottom: 1rem;
   padding: 0.95rem 1rem;
@@ -299,6 +305,14 @@ h2 {
   justify-content: space-between;
   gap: 1rem;
   align-items: end;
+}
+
+.report-label-row,
+.scenario-card-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
 }
 
 .summary-card-grid,
@@ -348,6 +362,120 @@ h2 {
 
 .risk-low {
   background: linear-gradient(180deg, rgba(45, 106, 79, 0.18), rgba(255, 252, 246, 0.85));
+}
+
+.scenario-section {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.scenario-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+}
+
+.scenario-card h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.scenario-description {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.scenario-safe {
+  background:
+    linear-gradient(180deg, rgba(45, 106, 79, 0.12), rgba(255, 252, 246, 0.88)),
+    var(--surface);
+}
+
+.scenario-mixed,
+.scenario-balanced,
+.scenario-trust {
+  background:
+    linear-gradient(180deg, rgba(13, 92, 99, 0.1), rgba(255, 252, 246, 0.88)),
+    var(--surface);
+}
+
+.scenario-nightmare {
+  background:
+    linear-gradient(180deg, rgba(176, 58, 46, 0.16), rgba(255, 252, 246, 0.88)),
+    var(--surface);
+}
+
+.scenario-file {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(31, 41, 51, 0.08);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.scenario-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.scenario-metrics dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scenario-metrics dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.scenario-severity-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.severity-mini {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.severity-high {
+  background: rgba(176, 58, 46, 0.12);
+  color: var(--high);
+}
+
+.severity-medium {
+  background: rgba(183, 123, 21, 0.14);
+  color: var(--medium);
+}
+
+.severity-low {
+  background: rgba(45, 106, 79, 0.12);
+  color: var(--low);
 }
 
 .severity-block + .severity-block,
@@ -474,7 +602,8 @@ details + details {
   .upload-grid,
   .content-grid,
   .summary-card-grid,
-  .risk-band {
+  .risk-band,
+  .scenario-grid {
     grid-template-columns: 1fr;
   }
 
@@ -502,6 +631,10 @@ details + details {
   }
 
   .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-metrics {
     grid-template-columns: 1fr;
   }
 }
