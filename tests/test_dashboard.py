@@ -78,10 +78,7 @@ class DashboardAppTests(unittest.TestCase):
             payload["paths"]["/api/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]["kind"],
             "cloud-threat-model-report",
         )
-        self.assertIn(
-            "AnalyzeApiUploadRequest",
-            payload["components"]["schemas"],
-        )
+        self.assertIn("multipart/form-data", payload["paths"]["/api/analyze"]["post"]["requestBody"]["content"])
 
     def test_html_analyze_renders_finding_content(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:

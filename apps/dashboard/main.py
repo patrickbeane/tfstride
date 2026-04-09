@@ -9,7 +9,6 @@ from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, File, Form, HTTPException, Path as FastApiPath, Request, UploadFile
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,7 +18,6 @@ from apps.dashboard.api_models import (
     DashboardApiErrorModel,
     HealthResponseModel,
 )
-from cloud_threat_modeler import __version__
 from cloud_threat_modeler.app import CloudThreatModeler
 from cloud_threat_modeler.input.terraform_plan import TerraformPlanLoadError
 
@@ -192,10 +190,6 @@ def create_app() -> FastAPI:
     demo_scenarios_by_id = {scenario.scenario_id: scenario for scenario in demo_scenarios}
     known_demo_scenarios = ", ".join(scenario.scenario_id for scenario in demo_scenarios)
     api_report_example = _build_api_report_example(engine)
-    app.openapi = _custom_openapi_factory(
-        app=app,
-        api_report_example=api_report_example,
-    )
 
     @app.get("/api/docs", include_in_schema=False)
     async def api_docs() -> HTMLResponse:
@@ -270,7 +264,7 @@ def create_app() -> FastAPI:
                 "Built-in fixture scenario to render. "
                 f"Known scenario IDs: {known_demo_scenarios or 'safe, mixed, nightmare'}."
             ),
-            examples=["safe"],
+            example="safe",
         ),
     ) -> HTMLResponse:
         scenario = demo_scenarios_by_id.get(scenario_id)
@@ -459,7 +453,7 @@ def _build_api_report_example(engine: CloudThreatModeler) -> dict[str, object]:
     return {
         "kind": "cloud-threat-model-report",
         "version": "1.1",
-        "tool": {"name": "cloud-threat-modeler", "version": __version__},
+        "tool": {"name": "cloud-threat-modeler", "version": "0.1.0"},
         "title": "Cloud Threat Model Report",
         "analyzed_file": "tfplan.json",
         "analyzed_path": "tfplan.json",
@@ -540,147 +534,6 @@ def _prune_api_report_example(payload: dict[str, object]) -> dict[str, object]:
         "observations": pruned_observations,
         "limitations": pruned_limitations,
     }
-
-
-def _custom_openapi_factory(
-    *,
-    app: FastAPI,
-    api_report_example: dict[str, object],
-):
-    def _custom_openapi() -> dict[str, object]:
-        if app.openapi_schema:
-            return app.openapi_schema
-
-        openapi_schema = get_openapi(
-            title=app.title,
-            version=__version__,
-            description=(
-                "Server-rendered dashboard endpoints plus a machine-readable JSON analysis API "
-                "for Terraform plan threat modeling."
-            ),
-            routes=app.routes,
-        )
-
-        _rename_openapi_schema(
-            openapi_schema,
-            old_name="body_analyze_api_api_analyze_post",
-            new_name="AnalyzeApiUploadRequest",
-        )
-        _rename_openapi_schema(
-            openapi_schema,
-            old_name="body_analyze_view_analyze_post",
-            new_name="AnalyzeHtmlUploadRequest",
-        )
-        _patch_request_schema(
-            openapi_schema,
-            schema_name="AnalyzeApiUploadRequest",
-            schema_title="AnalyzeApiUploadRequest",
-            example={"title": "Mixed AWS Plan Demo", "plan": "tfplan.json"},
-        )
-        _patch_request_schema(
-            openapi_schema,
-            schema_name="AnalyzeHtmlUploadRequest",
-            schema_title="AnalyzeHtmlUploadRequest",
-            example={"title": "Nightmare Dashboard Test", "plan": "sample_aws_nightmare_plan.json"},
-        )
-
-        api_analyze_operation = (
-            openapi_schema.get("paths", {})
-            .get("/api/analyze", {})
-            .get("post", {})
-        )
-        request_body = api_analyze_operation.get("requestBody", {})
-        if isinstance(request_body, dict):
-            request_body["description"] = (
-                "Multipart form upload containing a Terraform plan JSON file and an optional report title."
-            )
-            content = request_body.get("content", {})
-            multipart_content = content.get("multipart/form-data")
-            if isinstance(multipart_content, dict):
-                multipart_content["example"] = {"title": "Mixed AWS Plan Demo", "plan": "tfplan.json"}
-
-        responses = api_analyze_operation.get("responses", {})
-        response_200 = responses.get("200")
-        if isinstance(response_200, dict):
-            content = response_200.get("content", {})
-            app_json = content.get("application/json")
-            if isinstance(app_json, dict):
-                app_json["example"] = api_report_example
-
-        app.openapi_schema = openapi_schema
-        return openapi_schema
-
-    return _custom_openapi
-
-
-def _rename_openapi_schema(
-    openapi_schema: dict[str, object],
-    *,
-    old_name: str,
-    new_name: str,
-) -> None:
-    components = openapi_schema.get("components")
-    if not isinstance(components, dict):
-        return
-    schemas = components.get("schemas")
-    if not isinstance(schemas, dict):
-        return
-    if old_name not in schemas or new_name in schemas:
-        return
-
-    schemas[new_name] = schemas.pop(old_name)
-    schema_definition = schemas.get(new_name)
-    if isinstance(schema_definition, dict):
-        schema_definition["title"] = new_name
-    _rewrite_openapi_refs(openapi_schema, f"#/components/schemas/{old_name}", f"#/components/schemas/{new_name}")
-
-
-def _patch_request_schema(
-    openapi_schema: dict[str, object],
-    *,
-    schema_name: str,
-    schema_title: str,
-    example: dict[str, object],
-) -> None:
-    components = openapi_schema.get("components")
-    if not isinstance(components, dict):
-        return
-    schemas = components.get("schemas")
-    if not isinstance(schemas, dict):
-        return
-    schema_definition = schemas.get(schema_name)
-    if not isinstance(schema_definition, dict):
-        return
-
-    schema_definition["title"] = schema_title
-    schema_definition["example"] = example
-    properties = schema_definition.get("properties")
-    if not isinstance(properties, dict):
-        return
-
-    title_property = properties.get("title")
-    if isinstance(title_property, dict):
-        title_property["title"] = "Report Title"
-        title_property["description"] = "Optional report title shown in the rendered output."
-        title_property["example"] = str(example.get("title", DEFAULT_REPORT_TITLE))
-
-    plan_property = properties.get("plan")
-    if isinstance(plan_property, dict):
-        plan_property["title"] = "Terraform Plan JSON"
-        plan_property["description"] = "Terraform plan JSON file generated by `terraform show -json tfplan`."
-        plan_property["example"] = str(example.get("plan", "tfplan.json"))
-
-
-def _rewrite_openapi_refs(value: object, old_ref: str, new_ref: str) -> None:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if key == "$ref" and item == old_ref:
-                value[key] = new_ref
-            else:
-                _rewrite_openapi_refs(item, old_ref, new_ref)
-    elif isinstance(value, list):
-        for item in value:
-            _rewrite_openapi_refs(item, old_ref, new_ref)
 
 
 def _base_context(
