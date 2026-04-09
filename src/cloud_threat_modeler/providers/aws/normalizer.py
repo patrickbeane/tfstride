@@ -45,10 +45,27 @@ SUPPORTED_AWS_TYPES = {
     "aws_route_table_association",
 }
 
-SUPPORTED_TRUST_NARROWING_CONDITION_KEYS = {
-    "sts:ExternalId",
-    "aws:SourceArn",
-    "aws:SourceAccount",
+SUPPORTED_TRUST_NARROWING_CONDITIONS = {
+    "sts:ExternalId": {
+        "StringEquals",
+        "StringLike",
+        "ForAnyValue:StringEquals",
+        "ForAnyValue:StringLike",
+    },
+    "aws:SourceArn": {
+        "ArnEquals",
+        "ArnLike",
+        "StringEquals",
+        "StringLike",
+        "ForAnyValue:ArnEquals",
+        "ForAnyValue:ArnLike",
+    },
+    "aws:SourceAccount": {
+        "StringEquals",
+        "StringLike",
+        "ForAnyValue:StringEquals",
+        "ForAnyValue:StringLike",
+    },
 }
 
 
@@ -925,17 +942,20 @@ def _parse_standalone_security_group_rule(values: dict[str, Any]) -> SecurityGro
 def _parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyStatement]:
     statements: list[IAMPolicyStatement] = []
     for statement in _as_list(policy_document.get("Statement")):
-        principals = _extract_principal_values(statement.get("Principal"))
-        statements.append(
-            IAMPolicyStatement(
-                effect=str(statement.get("Effect", "Allow")),
-                actions=_as_list(statement.get("Action")),
-                resources=_as_list(statement.get("Resource")),
-                principals=principals,
-                conditions=_parse_condition_entries(statement.get("Condition")),
-            )
-        )
+        statements.append(_parse_policy_statement(statement))
     return statements
+
+
+def _parse_policy_statement(statement: Any) -> IAMPolicyStatement:
+    statement_dict = statement if isinstance(statement, dict) else {}
+    principals = _extract_principal_values(statement_dict.get("Principal"))
+    return IAMPolicyStatement(
+        effect=str(statement_dict.get("Effect", "Allow")),
+        actions=_as_list(statement_dict.get("Action")),
+        resources=_as_list(statement_dict.get("Resource")),
+        principals=principals,
+        conditions=_parse_condition_entries(statement_dict.get("Condition")),
+    )
 
 
 def _extract_principals(policy_document: dict[str, Any]) -> list[str]:
@@ -947,39 +967,48 @@ def _extract_principals(policy_document: dict[str, Any]) -> list[str]:
 
 def _extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, Any]]:
     trust_statements: list[dict[str, Any]] = []
-    for statement in _as_list(policy_document.get("Statement")):
-        if str(statement.get("Effect", "Allow")) != "Allow":
+    for raw_statement in _as_list(policy_document.get("Statement")):
+        statement = _parse_policy_statement(raw_statement)
+        if statement.effect != "Allow":
             continue
-        principals = sorted(set(_extract_principal_values(statement.get("Principal"))))
+        principals = sorted(set(statement.principals))
         if not principals:
             continue
-        narrowing_condition_keys = _extract_supported_trust_narrowing_condition_keys(statement.get("Condition"))
+        narrowing_conditions = _extract_supported_trust_narrowing_conditions(statement.conditions)
         trust_statements.append(
             {
                 "principals": principals,
-                "narrowing_condition_keys": narrowing_condition_keys,
-                "has_narrowing_conditions": bool(narrowing_condition_keys),
+                "narrowing_condition_keys": sorted({condition.key for condition in narrowing_conditions}),
+                "narrowing_conditions": [
+                    {
+                        "operator": condition.operator,
+                        "key": condition.key,
+                        "values": list(condition.values),
+                    }
+                    for condition in narrowing_conditions
+                ],
+                "has_narrowing_conditions": bool(narrowing_conditions),
             }
         )
     return trust_statements
 
 
-def _extract_supported_trust_narrowing_condition_keys(raw_condition: Any) -> list[str]:
-    found_keys: set[str] = set()
-    _collect_supported_trust_narrowing_condition_keys(raw_condition, found_keys)
-    return sorted(found_keys)
-
-
-def _collect_supported_trust_narrowing_condition_keys(raw_condition: Any, found_keys: set[str]) -> None:
-    if isinstance(raw_condition, dict):
-        for key, value in raw_condition.items():
-            if key in SUPPORTED_TRUST_NARROWING_CONDITION_KEYS:
-                found_keys.add(key)
-            _collect_supported_trust_narrowing_condition_keys(value, found_keys)
-        return
-    if isinstance(raw_condition, list):
-        for item in raw_condition:
-            _collect_supported_trust_narrowing_condition_keys(item, found_keys)
+def _extract_supported_trust_narrowing_conditions(
+    conditions: list[IAMPolicyCondition],
+) -> list[IAMPolicyCondition]:
+    supported: list[IAMPolicyCondition] = []
+    for condition in conditions:
+        supported_operators = SUPPORTED_TRUST_NARROWING_CONDITIONS.get(condition.key)
+        if supported_operators is None or condition.operator not in supported_operators:
+            continue
+        supported.append(
+            IAMPolicyCondition(
+                operator=condition.operator,
+                key=condition.key,
+                values=list(condition.values),
+            )
+        )
+    return supported
 
 
 def _extract_principal_values(raw_principal: Any) -> list[str]:

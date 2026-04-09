@@ -290,11 +290,13 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
                 {
                     "principals": ["lambda.amazonaws.com"],
                     "narrowing_condition_keys": [],
+                    "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
                 },
                 {
                     "principals": ["arn:aws:iam::999988887777:root"],
                     "narrowing_condition_keys": [],
+                    "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
                 },
             ],
@@ -626,6 +628,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                 {
                     "principals": ["lambda.amazonaws.com"],
                     "narrowing_condition_keys": [],
+                    "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
                 },
                 {
@@ -635,8 +638,96 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                         "aws:SourceArn",
                         "sts:ExternalId",
                     ],
+                    "narrowing_conditions": [
+                        {
+                            "operator": "ArnLike",
+                            "key": "aws:SourceArn",
+                            "values": [
+                                "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
+                            ],
+                        },
+                        {
+                            "operator": "StringEquals",
+                            "key": "aws:SourceAccount",
+                            "values": ["444455556666"],
+                        },
+                        {
+                            "operator": "StringEquals",
+                            "key": "sts:ExternalId",
+                            "values": ["release-pipeline"],
+                        },
+                    ],
                     "has_narrowing_conditions": True,
                 },
+            ],
+        )
+
+    def test_normalizer_tracks_supported_trust_condition_operators(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="aws_iam_role.operator_constrained",
+                    mode="managed",
+                    resource_type="aws_iam_role",
+                    name="operator_constrained",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "operator-constrained-role",
+                        "name": "operator-constrained-role",
+                        "arn": "arn:aws:iam::111122223333:role/operator-constrained-role",
+                        "assume_role_policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRole",
+                                    "Principal": {"AWS": "arn:aws:iam::444455556666:role/deployer"},
+                                    "Condition": {
+                                        "NumericEquals": {
+                                            "aws:SourceAccount": "444455556666",
+                                        },
+                                        "StringLike": {
+                                            "sts:ExternalId": "release-*",
+                                        },
+                                        "ArnLike": {
+                                            "aws:SourceArn": "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                )
+            ]
+        )
+        role = inventory.get_by_address("aws_iam_role.operator_constrained")
+
+        self.assertIsNotNone(role)
+        self.assertEqual(
+            role.metadata.get("trust_statements"),
+            [
+                {
+                    "principals": ["arn:aws:iam::444455556666:role/deployer"],
+                    "narrowing_condition_keys": [
+                        "aws:SourceArn",
+                        "sts:ExternalId",
+                    ],
+                    "narrowing_conditions": [
+                        {
+                            "operator": "ArnLike",
+                            "key": "aws:SourceArn",
+                            "values": [
+                                "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
+                            ],
+                        },
+                        {
+                            "operator": "StringLike",
+                            "key": "sts:ExternalId",
+                            "values": ["release-*"],
+                        },
+                    ],
+                    "has_narrowing_conditions": True,
+                }
             ],
         )
 
