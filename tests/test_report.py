@@ -234,6 +234,63 @@ class JsonReportRendererTests(unittest.TestCase):
         self.assertEqual(len(payload["suppressed_findings"]), 1)
         self.assertEqual(len(payload["baselined_findings"]), 2)
 
+    def test_json_report_serializes_policy_statement_conditions(self) -> None:
+        payload = {
+            "format_version": "1.2",
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "aws_lambda_permission.invoke",
+                            "mode": "managed",
+                            "type": "aws_lambda_permission",
+                            "name": "invoke",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {
+                                "id": "permission-1",
+                                "statement_id": "allow-events",
+                                "action": "lambda:InvokeFunction",
+                                "function_name": "processor",
+                                "principal": "events.amazonaws.com",
+                                "source_arn": "arn:aws:events:us-east-1:111122223333:rule/release-trigger",
+                                "source_account": "111122223333",
+                            },
+                        }
+                    ]
+                }
+            },
+        }
+
+        engine = CloudThreatModeler()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            result = engine.analyze_plan(plan_path)
+
+        rendered = json.loads(JsonReportRenderer().render(result))
+        lambda_permission = next(
+            resource
+            for resource in rendered["inventory"]["resources"]
+            if resource["address"] == "aws_lambda_permission.invoke"
+        )
+
+        self.assertEqual(
+            lambda_permission["policy_statements"][0]["conditions"],
+            [
+                {
+                    "operator": "ArnLike",
+                    "key": "aws:SourceArn",
+                    "values": ["arn:aws:events:us-east-1:111122223333:rule/release-trigger"],
+                },
+                {
+                    "operator": "StringEquals",
+                    "key": "aws:SourceAccount",
+                    "values": ["111122223333"],
+                },
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

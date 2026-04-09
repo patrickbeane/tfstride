@@ -8,7 +8,7 @@ from pathlib import Path
 
 from cloud_threat_modeler.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
 from cloud_threat_modeler.app import CloudThreatModeler
-from cloud_threat_modeler.models import BoundaryType, Severity, TerraformResource
+from cloud_threat_modeler.models import BoundaryType, IAMPolicyCondition, Severity, TerraformResource
 from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
 
 
@@ -637,6 +637,94 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                     ],
                     "has_narrowing_conditions": True,
                 },
+            ],
+        )
+
+    def test_normalizer_preserves_structured_policy_conditions(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="aws_iam_policy.publisher",
+                    mode="managed",
+                    resource_type="aws_iam_policy",
+                    name="publisher",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "publisher",
+                        "name": "publisher",
+                        "arn": "arn:aws:iam::111122223333:policy/publisher",
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sns:Publish",
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "ArnLike": {
+                                            "aws:SourceArn": "arn:aws:events:us-east-1:111122223333:rule/release-*"
+                                        },
+                                        "StringEquals": {
+                                            "aws:SourceAccount": "111122223333",
+                                        },
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                ),
+                TerraformResource(
+                    address="aws_lambda_permission.invoke",
+                    mode="managed",
+                    resource_type="aws_lambda_permission",
+                    name="invoke",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "permission-1",
+                        "statement_id": "allow-events",
+                        "action": "lambda:InvokeFunction",
+                        "function_name": "processor",
+                        "principal": "events.amazonaws.com",
+                        "source_arn": "arn:aws:events:us-east-1:111122223333:rule/release-trigger",
+                        "source_account": "111122223333",
+                    },
+                ),
+            ]
+        )
+
+        policy = inventory.get_by_address("aws_iam_policy.publisher")
+        lambda_permission = inventory.get_by_address("aws_lambda_permission.invoke")
+
+        self.assertIsNotNone(policy)
+        self.assertIsNotNone(lambda_permission)
+        self.assertEqual(
+            policy.policy_statements[0].conditions,
+            [
+                IAMPolicyCondition(
+                    operator="ArnLike",
+                    key="aws:SourceArn",
+                    values=["arn:aws:events:us-east-1:111122223333:rule/release-*"],
+                ),
+                IAMPolicyCondition(
+                    operator="StringEquals",
+                    key="aws:SourceAccount",
+                    values=["111122223333"],
+                ),
+            ],
+        )
+        self.assertEqual(
+            lambda_permission.policy_statements[0].conditions,
+            [
+                IAMPolicyCondition(
+                    operator="ArnLike",
+                    key="aws:SourceArn",
+                    values=["arn:aws:events:us-east-1:111122223333:rule/release-trigger"],
+                ),
+                IAMPolicyCondition(
+                    operator="StringEquals",
+                    key="aws:SourceAccount",
+                    values=["111122223333"],
+                ),
             ],
         )
 

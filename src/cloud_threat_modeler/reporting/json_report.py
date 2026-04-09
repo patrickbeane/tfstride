@@ -10,6 +10,7 @@ from cloud_threat_modeler.models import (
     AnalysisResult,
     EvidenceItem,
     Finding,
+    IAMPolicyCondition,
     IAMPolicyStatement,
     NormalizedResource,
     Observation,
@@ -122,6 +123,15 @@ def _serialize_policy_statement(statement: IAMPolicyStatement) -> dict[str, Any]
         "actions": list(statement.actions),
         "resources": list(statement.resources),
         "principals": list(statement.principals),
+        "conditions": [_serialize_policy_condition(condition) for condition in statement.conditions],
+    }
+
+
+def _serialize_policy_condition(condition: IAMPolicyCondition) -> dict[str, Any]:
+    return {
+        "operator": condition.operator,
+        "key": condition.key,
+        "values": list(condition.values),
     }
 
 

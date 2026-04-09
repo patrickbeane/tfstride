@@ -87,12 +87,20 @@ class IAMPolicyStatement:
     actions: list[str] = field(default_factory=list)
     resources: list[str] = field(default_factory=list)
     principals: list[str] = field(default_factory=list)
+    conditions: list["IAMPolicyCondition"] = field(default_factory=list)
 
     def has_wildcard_action(self) -> bool:
         return any(action == "*" or action.endswith(":*") for action in self.actions)
 
     def has_wildcard_resource(self) -> bool:
         return any(resource == "*" for resource in self.resources)
+
+
+@dataclass(slots=True)
+class IAMPolicyCondition:
+    operator: str
+    key: str
+    values: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)

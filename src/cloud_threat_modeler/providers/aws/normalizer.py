@@ -5,6 +5,7 @@ from collections import Counter
 from typing import Any
 
 from cloud_threat_modeler.models import (
+    IAMPolicyCondition,
     IAMPolicyStatement,
     NormalizedResource,
     ResourceCategory,
@@ -436,6 +437,20 @@ class AwsNormalizer(ProviderNormalizer):
                         actions=_compact([values.get("action")]),
                         resources=_compact([function_name]),
                         principals=_compact([values.get("principal")]),
+                        conditions=_compact_condition_entries(
+                            [
+                                _condition_entry(
+                                    operator="ArnLike",
+                                    key="aws:SourceArn",
+                                    values=_compact([source_arn]),
+                                ),
+                                _condition_entry(
+                                    operator="StringEquals",
+                                    key="aws:SourceAccount",
+                                    values=_compact([source_account]),
+                                ),
+                            ]
+                        ),
                     )
                 ],
                 metadata={
@@ -917,6 +932,7 @@ def _parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyS
                 actions=_as_list(statement.get("Action")),
                 resources=_as_list(statement.get("Resource")),
                 principals=principals,
+                conditions=_parse_condition_entries(statement.get("Condition")),
             )
         )
     return statements
@@ -1083,6 +1099,14 @@ def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPo
             actions=list(statement.actions),
             resources=list(statement.resources),
             principals=list(statement.principals),
+            conditions=[
+                IAMPolicyCondition(
+                    operator=condition.operator,
+                    key=condition.key,
+                    values=list(condition.values),
+                )
+                for condition in statement.conditions
+            ],
         )
         for statement in statements
     ]
@@ -1183,3 +1207,50 @@ def _as_optional_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _parse_condition_entries(raw_condition: Any) -> list[IAMPolicyCondition]:
+    if not isinstance(raw_condition, dict):
+        return []
+
+    entries: list[IAMPolicyCondition] = []
+    for operator in sorted(raw_condition):
+        keyed_values = raw_condition.get(operator)
+        if not isinstance(keyed_values, dict):
+            continue
+        for key in sorted(keyed_values):
+            entry = _condition_entry(
+                operator=str(operator),
+                key=str(key),
+                values=_normalize_condition_values(keyed_values.get(key)),
+            )
+            if entry is not None:
+                entries.append(entry)
+    return entries
+
+
+def _condition_entry(*, operator: str, key: str, values: list[str]) -> IAMPolicyCondition | None:
+    if not operator or not key or not values:
+        return None
+    return IAMPolicyCondition(operator=operator, key=key, values=values)
+
+
+def _compact_condition_entries(
+    entries: list[IAMPolicyCondition | None],
+) -> list[IAMPolicyCondition]:
+    return [entry for entry in entries if entry is not None]
+
+
+def _normalize_condition_values(value: Any) -> list[str]:
+    raw_values = _as_list(value)
+    normalized: list[str] = []
+    for raw_value in raw_values:
+        if raw_value in (None, "", []):
+            continue
+        if isinstance(raw_value, dict):
+            text = json.dumps(raw_value, sort_keys=True)
+        else:
+            text = str(raw_value)
+        if text not in normalized:
+            normalized.append(text)
+    return normalized

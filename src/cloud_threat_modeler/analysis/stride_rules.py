@@ -993,6 +993,12 @@ def _describe_security_group_rule(security_group: NormalizedResource, rule: Secu
 def _describe_policy_statement(statement: IAMPolicyStatement) -> str:
     actions = ", ".join(statement.actions) if statement.actions else "no actions"
     resources = ", ".join(statement.resources) if statement.resources else "no resources"
+    if statement.conditions:
+        conditions = "; ".join(
+            f"{condition.operator} {condition.key}=[{', '.join(condition.values)}]"
+            for condition in statement.conditions
+        )
+        return f"{statement.effect} actions=[{actions}] resources=[{resources}] conditions=[{conditions}]"
     return f"{statement.effect} actions=[{actions}] resources=[{resources}]"
 
 
