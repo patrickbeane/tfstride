@@ -19,6 +19,7 @@ if FASTAPI_DEPS_AVAILABLE:
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
+ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_ecs_fargate_plan.json"
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
@@ -43,6 +44,7 @@ class DashboardAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Built-in scenarios", response.text)
+        self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
         self.assertIn("Run built-in report", response.text)
 
@@ -131,6 +133,14 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Baseline Plan Demo", response.text)
         self.assertIn(BASELINE_FIXTURE_PATH.name, response.text)
         self.assertIn("IAM policy grants wildcard privileges", response.text)
+
+    def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:
+        response = self.client.get("/demo/ecs-fargate")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("ECS / Fargate Demo", response.text)
+        self.assertIn(ECS_FARGATE_FIXTURE_PATH.name, response.text)
+        self.assertIn("aws_ecs_service.app", response.text)
 
     def test_demo_route_returns_not_found_for_unknown_scenario(self) -> None:
         response = self.client.get("/demo/not-a-scenario")

@@ -169,6 +169,15 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="balanced",
     ),
     DemoScenarioDefinition(
+        scenario_id="ecs-fargate",
+        title="ECS / Fargate",
+        report_title="ECS / Fargate Demo",
+        fixture_name="sample_aws_ecs_fargate_plan.json",
+        description="Internet-facing ALB, private ECS tasks, RDS security-group trust, and Secrets Manager access through the task role.",
+        emphasis="Container workload",
+        theme="balanced",
+    ),
+    DemoScenarioDefinition(
         scenario_id="lambda-deploy-role",
         title="Lambda Deploy Role",
         report_title="Lambda Deploy Role Demo",
