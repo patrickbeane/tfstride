@@ -21,7 +21,7 @@ from cloud_threat_modeler.models import (
 )
 
 REPORT_KIND = "cloud-threat-model-report"
-REPORT_FORMAT_VERSION = "1.1"
+REPORT_FORMAT_VERSION = "1.0"
 
 
 class JsonReportRenderer:

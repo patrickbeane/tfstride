@@ -55,7 +55,7 @@ cloud-threat-modeler tfplan.json --quiet --json-output threat-model.json
 The JSON report contract is versioned for downstream consumers. The current report payload uses:
 
 - `kind: "cloud-threat-model-report"`
-- `version: "1.1"`
+- `version: "1.0"`
 
 Capture the current unsuppressed findings as a baseline and later gate only on new findings:
 

@@ -504,8 +504,8 @@ def _build_api_report_example(engine: CloudThreatModeler) -> dict[str, object]:
             pass
     return {
         "kind": "cloud-threat-model-report",
-        "version": "1.1",
-        "tool": {"name": "cloud-threat-modeler", "version": "0.1.0"},
+        "version": "1.0",
+        "tool": {"name": "cloud-threat-modeler", "version": "0.2.0"},
         "title": "Cloud Threat Model Report",
         "analyzed_file": "tfplan.json",
         "analyzed_path": "tfplan.json",

@@ -59,7 +59,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["kind"], "cloud-threat-model-report")
-        self.assertEqual(payload["version"], "1.1")
+        self.assertEqual(payload["version"], "1.0")
         self.assertEqual(payload["title"], "Dashboard Test")
         self.assertEqual(payload["analyzed_file"], FIXTURE_PATH.name)
         self.assertTrue(payload["findings"])
