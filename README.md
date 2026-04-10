@@ -221,6 +221,7 @@ Current rules include:
 - workload roles with sensitive permissions
 - missing segmentation between public workloads and private data tiers
 - sensitive data tiers transitively reachable from internet-exposed paths
+- broad or cross-account control-plane paths that reach workloads with private database or secret access
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
 

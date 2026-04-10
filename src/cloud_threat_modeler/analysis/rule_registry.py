@@ -171,6 +171,18 @@ DEFAULT_RULE_REGISTRY = RuleRegistry(
             severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
         ),
         RuleMetadata(
+            rule_id="aws-control-plane-sensitive-workload-chain",
+            title="Broad or cross-account control-plane path can influence a sensitive workload",
+            category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+            recommended_mitigation=(
+                "Keep external CI or deployment principals away from runtime workload roles, separate deployment "
+                "and execution identities, require narrowing conditions on cross-account trust, and avoid giving "
+                "data-bearing workloads broad secret or database access where a smaller brokered path would work."
+            ),
+            tags=("aws", "iam", "control-plane", "transitive-path"),
+            severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+        ),
+        RuleMetadata(
             rule_id="aws-role-trust-expansion",
             title="Role trust relationship expands blast radius",
             category=StrideCategory.ELEVATION_OF_PRIVILEGE,

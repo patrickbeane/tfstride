@@ -32,6 +32,12 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.engine = CloudThreatModeler()
         self.result = self.engine.analyze_plan(FIXTURE_PATH)
 
+    def _analyze_payload(self, payload: dict) -> object:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            return self.engine.analyze_plan(plan_path)
+
     def test_analysis_normalizes_supported_resources_and_tracks_unsupported(self) -> None:
         self.assertEqual(len(self.result.inventory.resources), 23)
         self.assertIn("aws_cloudwatch_log_group.processor", self.result.inventory.unsupported_resources)
@@ -952,6 +958,232 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
 
         self.assertEqual(result.trust_boundaries[0].boundary_type, BoundaryType.CROSS_ACCOUNT_OR_ROLE)
         self.assertEqual(result.findings, [])
+
+    def test_cross_account_control_plane_path_to_private_secret_and_database_is_detected(self) -> None:
+        result = self._analyze_payload(
+            {
+                "format_version": "1.2",
+                "terraform_version": "1.8.5",
+                "planned_values": {
+                    "root_module": {
+                        "resources": [
+                            {
+                                "address": "aws_vpc.main",
+                                "mode": "managed",
+                                "type": "aws_vpc",
+                                "name": "main",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {"id": "vpc-1", "cidr_block": "10.50.0.0/16"},
+                            },
+                            {
+                                "address": "aws_subnet.private_app",
+                                "mode": "managed",
+                                "type": "aws_subnet",
+                                "name": "private_app",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "subnet-private-1",
+                                    "vpc_id": "vpc-1",
+                                    "cidr_block": "10.50.1.0/24",
+                                    "map_public_ip_on_launch": False,
+                                },
+                            },
+                            {
+                                "address": "aws_security_group.lambda",
+                                "mode": "managed",
+                                "type": "aws_security_group",
+                                "name": "lambda",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "sg-lambda-1",
+                                    "vpc_id": "vpc-1",
+                                    "ingress": [],
+                                    "egress": [
+                                        {
+                                            "from_port": 0,
+                                            "to_port": 0,
+                                            "protocol": "-1",
+                                            "cidr_blocks": ["0.0.0.0/0"],
+                                            "ipv6_cidr_blocks": [],
+                                            "security_groups": [],
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "address": "aws_security_group.db",
+                                "mode": "managed",
+                                "type": "aws_security_group",
+                                "name": "db",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "sg-db-1",
+                                    "vpc_id": "vpc-1",
+                                    "ingress": [
+                                        {
+                                            "from_port": 5432,
+                                            "to_port": 5432,
+                                            "protocol": "tcp",
+                                            "cidr_blocks": [],
+                                            "ipv6_cidr_blocks": [],
+                                            "security_groups": ["sg-lambda-1"],
+                                        }
+                                    ],
+                                    "egress": [],
+                                },
+                            },
+                            {
+                                "address": "aws_iam_role.deployer",
+                                "mode": "managed",
+                                "type": "aws_iam_role",
+                                "name": "deployer",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "deployer",
+                                    "name": "deployer",
+                                    "arn": "arn:aws:iam::111122223333:role/deployer",
+                                    "assume_role_policy": {
+                                        "Version": "2012-10-17",
+                                        "Statement": [
+                                            {
+                                                "Effect": "Allow",
+                                                "Action": "sts:AssumeRole",
+                                                "Principal": {
+                                                    "AWS": "arn:aws:iam::444455556666:role/ci-deployer"
+                                                },
+                                            },
+                                            {
+                                                "Effect": "Allow",
+                                                "Action": "sts:AssumeRole",
+                                                "Principal": {"Service": "lambda.amazonaws.com"},
+                                            },
+                                        ],
+                                    },
+                                    "inline_policy": [
+                                        {
+                                            "name": "data-access",
+                                            "policy": {
+                                                "Version": "2012-10-17",
+                                                "Statement": [
+                                                    {
+                                                        "Effect": "Allow",
+                                                        "Action": "secretsmanager:GetSecretValue",
+                                                        "Resource": "*",
+                                                    }
+                                                ],
+                                            },
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "address": "aws_lambda_function.deployer",
+                                "mode": "managed",
+                                "type": "aws_lambda_function",
+                                "name": "deployer",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "release-deployer",
+                                    "function_name": "release-deployer",
+                                    "arn": "arn:aws:lambda:us-east-1:111122223333:function:release-deployer",
+                                    "role": "arn:aws:iam::111122223333:role/deployer",
+                                    "runtime": "python3.12",
+                                    "handler": "handler.main",
+                                    "vpc_config": [
+                                        {
+                                            "subnet_ids": ["subnet-private-1"],
+                                            "security_group_ids": ["sg-lambda-1"],
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "address": "aws_db_instance.customer",
+                                "mode": "managed",
+                                "type": "aws_db_instance",
+                                "name": "customer",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "customer-db",
+                                    "identifier": "customer-db",
+                                    "engine": "postgres",
+                                    "publicly_accessible": False,
+                                    "storage_encrypted": True,
+                                    "vpc_security_group_ids": ["sg-db-1"],
+                                },
+                            },
+                            {
+                                "address": "aws_secretsmanager_secret.app",
+                                "mode": "managed",
+                                "type": "aws_secretsmanager_secret",
+                                "name": "app",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "app-secret",
+                                    "name": "app-secret",
+                                    "arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:app-secret",
+                                },
+                            },
+                        ]
+                    }
+                },
+            }
+        )
+
+        findings = [
+            finding
+            for finding in result.findings
+            if finding.title == "Broad or cross-account control-plane path can influence a sensitive workload"
+        ]
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        evidence = {item.key: item.values for item in finding.evidence}
+
+        self.assertEqual(finding.severity, Severity.HIGH)
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "aws_iam_role.deployer",
+                "aws_lambda_function.deployer",
+                "aws_db_instance.customer",
+                "aws_secretsmanager_secret.app",
+            ],
+        )
+        self.assertEqual(
+            evidence["trust_principals"],
+            ["arn:aws:iam::444455556666:role/ci-deployer"],
+        )
+        self.assertEqual(
+            evidence["trust_scope"],
+            ["principal belongs to foreign account 444455556666"],
+        )
+        self.assertEqual(
+            evidence["sensitive_data_targets"],
+            ["aws_db_instance.customer", "aws_secretsmanager_secret.app"],
+        )
+        self.assertIn(
+            "arn:aws:iam::444455556666:role/ci-deployer assumes aws_iam_role.deployer",
+            evidence["control_path"],
+        )
+        self.assertIn(
+            "aws_iam_role.deployer governs aws_lambda_function.deployer",
+            evidence["control_path"],
+        )
+        self.assertIn(
+            "aws_lambda_function.deployer reaches aws_db_instance.customer",
+            evidence["control_path"],
+        )
+        self.assertIn(
+            "aws_lambda_function.deployer reaches aws_secretsmanager_secret.app",
+            evidence["control_path"],
+        )
+        self.assertIsNotNone(finding.trust_boundary_id)
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "cross-account-or-role-access:arn:aws:iam::444455556666:role/ci-deployer->aws_iam_role.deployer",
+        )
+        self.assertEqual(finding.severity_reasoning.final_score, 6)
 
 
 class AwsNormalizerTrustConditionTests(unittest.TestCase):

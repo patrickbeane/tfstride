@@ -52,6 +52,7 @@ class StrideRuleEngine:
         findings.extend(self._detect_workload_role_risk(inventory, boundary_index))
         findings.extend(self._detect_missing_segmentation(inventory, boundary_index))
         findings.extend(self._detect_transitive_private_data_exposure(inventory, boundary_index))
+        findings.extend(self._detect_control_plane_sensitive_workload_chain(inventory, boundary_index))
         findings.extend(self._detect_trust_expansion(inventory, boundary_index))
         findings.extend(self._detect_unconstrained_trust(inventory, boundary_index))
 
@@ -706,6 +707,115 @@ class StrideRuleEngine:
                     )
         return findings
 
+    def _detect_control_plane_sensitive_workload_chain(
+        self,
+        inventory: ResourceInventory,
+        boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        primary_account_id = inventory.metadata.get("primary_account_id")
+        control_boundaries_by_role = _control_workload_boundaries_by_role(boundary_index)
+        sensitive_data_paths = _private_sensitive_controlled_data_paths(boundary_index, inventory)
+        seen: set[tuple[str, str, tuple[str, ...], tuple[str, ...]]] = set()
+
+        for role in inventory.by_type("aws_iam_role"):
+            control_boundaries = control_boundaries_by_role.get(role.address, [])
+            if not control_boundaries:
+                continue
+            for trust_statement in role.metadata.get("trust_statements", []):
+                if trust_statement_has_effective_narrowing(trust_statement):
+                    continue
+                for principal in trust_statement.get("principals", []):
+                    assessment = assess_principal(principal, primary_account_id)
+                    if assessment.is_service:
+                        continue
+                    if not (assessment.is_foreign_account or assessment.is_wildcard):
+                        continue
+
+                    chained_paths: list[tuple[NormalizedResource, TrustBoundary, NormalizedResource, TrustBoundary]] = []
+                    for control_boundary in control_boundaries:
+                        workload = inventory.get_by_address(control_boundary.target)
+                        if workload is None:
+                            continue
+                        for data_store, data_boundary in sensitive_data_paths.get(workload.address, []):
+                            chained_paths.append((workload, control_boundary, data_store, data_boundary))
+                    if not chained_paths:
+                        continue
+
+                    workload_addresses = tuple(sorted({workload.address for workload, _, _, _ in chained_paths}))
+                    data_store_addresses = tuple(sorted({data_store.address for _, _, data_store, _ in chained_paths}))
+                    finding_key = (role.address, principal, workload_addresses, data_store_addresses)
+                    if finding_key in seen:
+                        continue
+                    seen.add(finding_key)
+
+                    privilege_breadth = 2 if assessment.is_wildcard else 1
+                    blast_radius = 2 if assessment.is_wildcard or len(data_store_addresses) > 1 else 1
+                    severity_reasoning = _build_severity_reasoning(
+                        internet_exposure=False,
+                        privilege_breadth=privilege_breadth,
+                        data_sensitivity=2,
+                        lateral_movement=1,
+                        blast_radius=blast_radius,
+                    )
+                    trust_boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
+                    findings.append(
+                        _build_finding(
+                            rule_id="aws-control-plane-sensitive-workload-chain",
+                            severity=severity_reasoning.severity,
+                            affected_resources=[
+                                role.address,
+                                *workload_addresses,
+                                *data_store_addresses,
+                            ],
+                            trust_boundary_id=trust_boundary.identifier if trust_boundary else None,
+                            rationale=(
+                                f"{principal} can assume {role.display_name}, and that role governs workload paths into "
+                                f"{', '.join(data_store.display_name for data_store in sorted({data_store.address: data_store for _, _, data_store, _ in chained_paths}.values(), key=lambda resource: resource.address))}. "
+                                "A broad or foreign control-plane principal can therefore influence a workload that already "
+                                "retains sensitive secret or database access."
+                            ),
+                            evidence=_collect_evidence(
+                                _evidence_item("trust_principals", [principal]),
+                                _evidence_item("trust_scope", [assessment.scope_description] if assessment.scope_description else []),
+                                _evidence_item(
+                                    "control_path",
+                                    [
+                                        f"{principal} assumes {role.address}",
+                                        *[
+                                            f"{control_boundary.source} governs {control_boundary.target}"
+                                            for _, control_boundary, _, _ in chained_paths
+                                        ],
+                                        *[
+                                            f"{data_boundary.source} reaches {data_boundary.target}"
+                                            for _, _, _, data_boundary in chained_paths
+                                        ],
+                                    ],
+                                ),
+                                _evidence_item(
+                                    "boundary_rationale",
+                                    [
+                                        *[
+                                            control_boundary.rationale
+                                            for _, control_boundary, _, _ in chained_paths
+                                        ],
+                                        *[
+                                            data_boundary.rationale
+                                            for _, _, _, data_boundary in chained_paths
+                                        ],
+                                    ],
+                                ),
+                                _evidence_item(
+                                    "sensitive_data_targets",
+                                    list(data_store_addresses),
+                                ),
+                                _evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
+                            ),
+                            severity_reasoning=severity_reasoning,
+                        )
+                    )
+        return findings
+
     def _detect_unconstrained_trust(
         self,
         inventory: ResourceInventory,
@@ -1179,12 +1289,42 @@ def _private_workload_data_paths(
     return data_paths
 
 
+def _private_sensitive_controlled_data_paths(
+    boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+    inventory: ResourceInventory,
+) -> dict[str, list[tuple[NormalizedResource, TrustBoundary]]]:
+    data_paths: dict[str, list[tuple[NormalizedResource, TrustBoundary]]] = {}
+    for boundary in boundary_index.values():
+        if boundary.boundary_type != BoundaryType.WORKLOAD_TO_DATA_STORE:
+            continue
+        data_store = inventory.get_by_address(boundary.target)
+        if data_store is None or not _is_control_plane_sensitive_data_store(data_store):
+            continue
+        data_paths.setdefault(boundary.source, []).append((data_store, boundary))
+    return data_paths
+
+
+def _control_workload_boundaries_by_role(
+    boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+) -> dict[str, list[TrustBoundary]]:
+    boundaries_by_role: dict[str, list[TrustBoundary]] = {}
+    for boundary in boundary_index.values():
+        if boundary.boundary_type != BoundaryType.CONTROL_TO_WORKLOAD:
+            continue
+        boundaries_by_role.setdefault(boundary.source, []).append(boundary)
+    return boundaries_by_role
+
+
 def _is_hidden_data_store(resource: NormalizedResource) -> bool:
     return not (
         resource.public_exposure
         or bool(resource.metadata.get("direct_internet_reachable"))
         or bool(resource.metadata.get("internet_ingress_capable"))
     )
+
+
+def _is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool:
+    return resource.resource_type in {"aws_db_instance", "aws_secretsmanager_secret"} and _is_hidden_data_store(resource)
 
 
 def _build_transitive_private_data_finding(
