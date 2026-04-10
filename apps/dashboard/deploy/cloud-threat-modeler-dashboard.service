@@ -1,17 +1,23 @@
 [Unit]
 Description=Cloud Threat Modeler Dashboard
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=cloud-threat-modeler
-Group=cloud-threat-modeler
-WorkingDirectory=/opt/cloud-threat-modeler
+User=fleet
+Group=fleet
+WorkingDirectory=/home/fleet/cloud-threat-modeler
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=/opt/cloud-threat-modeler/src
-ExecStart=/opt/cloud-threat-modeler/.venv/bin/uvicorn apps.dashboard.main:app --host 127.0.0.1 --port 8001 --workers 2 --proxy-headers
+Environment=PYTHONPATH=/home/fleet/cloud-threat-modeler/src
+ExecStart=/home/fleet/cloud-threat-modeler/.venv/bin/uvicorn apps.dashboard.main:app --host 127.0.0.1 --port 8001 --workers 2 --proxy-headers
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

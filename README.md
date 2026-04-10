@@ -97,8 +97,9 @@ Useful routes:
 
 Deployment notes:
 
-- a `systemd` unit example lives at `apps/dashboard/deploy/cloud-threat-modeler-dashboard.service`
-- the service binds `uvicorn` to `127.0.0.1:8001` and sets `PYTHONPATH` to the repo `src/` directory
+- a repo-tracked `systemd` unit example lives at `apps/dashboard/deploy/cloud-threat-modeler-dashboard.service`
+- the checked-in example assumes the app lives at `/home/fleet/cloud-threat-modeler`, runs as user `fleet`, binds `uvicorn` to `127.0.0.1:8001`, and sets `PYTHONPATH` to the repo `src/` directory
+- copy that unit to `/etc/systemd/system/cloud-threat-modeler-dashboard.service` on the host, then run `sudo systemctl daemon-reload && sudo systemctl enable --now cloud-threat-modeler-dashboard`
 - a simple Caddy reverse-proxy example lives at `apps/dashboard/deploy/Caddyfile.example`
 
 ## Example Output
