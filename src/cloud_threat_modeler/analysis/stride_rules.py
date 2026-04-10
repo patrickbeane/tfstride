@@ -479,7 +479,7 @@ class StrideRuleEngine:
     ) -> list[Finding]:
         findings: list[Finding] = []
         role_index = _role_index(inventory)
-        for workload in inventory.by_type("aws_instance", "aws_lambda_function"):
+        for workload in inventory.by_type("aws_instance", "aws_lambda_function", "aws_ecs_service"):
             role = _resolve_role(workload, role_index)
             if role is None:
                 continue
@@ -1226,7 +1226,7 @@ def _trusted_workload_hops(
             resources_by_security_group.setdefault(security_group_id, []).append(resource)
 
     trusted_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]] = {}
-    for workload in inventory.by_type("aws_instance"):
+    for workload in inventory.by_type("aws_instance", "aws_ecs_service"):
         for security_group in _attached_security_groups(workload, inventory):
             for rule in security_group.network_rules:
                 if rule.direction != "ingress" or not rule.referenced_security_group_ids:

@@ -18,6 +18,9 @@ from cloud_threat_modeler.providers.base import ProviderNormalizer
 
 SUPPORTED_AWS_TYPES = {
     "aws_instance",
+    "aws_ecs_service",
+    "aws_ecs_task_definition",
+    "aws_ecs_cluster",
     "aws_security_group",
     "aws_security_group_rule",
     "aws_nat_gateway",
@@ -226,6 +229,70 @@ class AwsNormalizer(ProviderNormalizer):
                     ),
                     "public_exposure_reasons": [],
                     "tags": values.get("tags", {}),
+                },
+            )
+        if resource.resource_type == "aws_ecs_cluster":
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.COMPUTE,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                metadata={
+                    "name": values.get("name"),
+                    "capacity_providers": _as_list(values.get("capacity_providers")),
+                },
+            )
+        if resource.resource_type == "aws_ecs_task_definition":
+            family = values.get("family")
+            revision = _as_optional_int(values.get("revision"))
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.COMPUTE,
+                identifier=_ecs_task_definition_identifier(family, revision) or values.get("id") or family,
+                arn=values.get("arn"),
+                metadata={
+                    "family": family,
+                    "revision": revision,
+                    "network_mode": values.get("network_mode"),
+                    "requires_compatibilities": _compact(_as_list(values.get("requires_compatibilities"))),
+                    "task_role_arn": values.get("task_role_arn"),
+                    "execution_role_arn": values.get("execution_role_arn"),
+                },
+            )
+        if resource.resource_type == "aws_ecs_service":
+            network_configuration = _first_item(values.get("network_configuration"))
+            assign_public_ip = _as_bool(network_configuration.get("assign_public_ip")) if network_configuration else False
+            return NormalizedResource(
+                address=resource.address,
+                provider=self.provider,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.COMPUTE,
+                identifier=values.get("name") or values.get("id"),
+                arn=values.get("arn"),
+                subnet_ids=_compact(network_configuration.get("subnets", []) if network_configuration else []),
+                security_group_ids=_compact(network_configuration.get("security_groups", []) if network_configuration else []),
+                public_access_configured=assign_public_ip,
+                metadata={
+                    "cluster": values.get("cluster"),
+                    "task_definition": values.get("task_definition"),
+                    "desired_count": _as_optional_int(values.get("desired_count")),
+                    "launch_type": values.get("launch_type"),
+                    "platform_version": values.get("platform_version"),
+                    "assign_public_ip": assign_public_ip,
+                    "load_balancers": _as_list(values.get("load_balancer")),
+                    "public_access_reasons": (
+                        ["ECS service assigns public IPs to tasks"]
+                        if assign_public_ip
+                        else []
+                    ),
+                    "public_exposure_reasons": [],
                 },
             )
         if resource.resource_type == "aws_lb":
@@ -587,6 +654,29 @@ class AwsNormalizer(ProviderNormalizer):
             for key in (resource.identifier, resource.address, resource.arn)
             if key
         }
+        ecs_clusters = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_ecs_cluster"
+            for key in (resource.identifier, resource.address, resource.arn, resource.metadata.get("name"))
+            if key
+        }
+        ecs_task_definitions = {
+            key: resource
+            for resource in resources
+            if resource.resource_type == "aws_ecs_task_definition"
+            for key in (
+                resource.identifier,
+                resource.address,
+                resource.arn,
+                resource.metadata.get("family"),
+                _ecs_task_definition_identifier(
+                    resource.metadata.get("family"),
+                    resource.metadata.get("revision"),
+                ),
+            )
+            if key
+        }
         role_index = {
             key: resource
             for resource in resources
@@ -696,6 +786,64 @@ class AwsNormalizer(ProviderNormalizer):
             for resolved_role_ref in instance_profile.metadata.get("resolved_role_references", []):
                 if resolved_role_ref not in workload_resource.attached_role_arns:
                     workload_resource.attached_role_arns.append(resolved_role_ref)
+
+        for ecs_service_resource in resources:
+            if ecs_service_resource.resource_type != "aws_ecs_service":
+                continue
+            cluster_ref = ecs_service_resource.metadata.get("cluster")
+            if cluster_ref:
+                cluster = ecs_clusters.get(cluster_ref)
+                if cluster is None:
+                    _append_unique(ecs_service_resource.metadata, "unresolved_cluster_references", str(cluster_ref))
+                else:
+                    _append_unique(ecs_service_resource.metadata, "resolved_cluster_addresses", cluster.address)
+
+            task_definition_ref = ecs_service_resource.metadata.get("task_definition")
+            if not task_definition_ref:
+                continue
+            task_definition = ecs_task_definitions.get(task_definition_ref)
+            if task_definition is None:
+                _append_unique(
+                    ecs_service_resource.metadata,
+                    "unresolved_task_definition_references",
+                    str(task_definition_ref),
+                )
+                continue
+            _append_unique(
+                ecs_service_resource.metadata,
+                "resolved_task_definition_addresses",
+                task_definition.address,
+            )
+            ecs_service_resource.metadata["network_mode"] = task_definition.metadata.get("network_mode")
+            ecs_service_resource.metadata["requires_compatibilities"] = list(
+                task_definition.metadata.get("requires_compatibilities", [])
+            )
+            task_role_arn = task_definition.metadata.get("task_role_arn")
+            execution_role_arn = task_definition.metadata.get("execution_role_arn")
+            if task_role_arn:
+                ecs_service_resource.metadata["task_role_arn"] = task_role_arn
+                if task_role_arn not in ecs_service_resource.attached_role_arns:
+                    ecs_service_resource.attached_role_arns.append(task_role_arn)
+                task_role = role_index.get(task_role_arn)
+                if task_role is not None:
+                    _append_unique(ecs_service_resource.metadata, "resolved_task_role_addresses", task_role.address)
+                else:
+                    _append_unique(ecs_service_resource.metadata, "unresolved_task_role_arns", str(task_role_arn))
+            if execution_role_arn:
+                ecs_service_resource.metadata["execution_role_arn"] = execution_role_arn
+                execution_role = role_index.get(execution_role_arn)
+                if execution_role is not None:
+                    _append_unique(
+                        ecs_service_resource.metadata,
+                        "resolved_execution_role_addresses",
+                        execution_role.address,
+                    )
+                else:
+                    _append_unique(
+                        ecs_service_resource.metadata,
+                        "unresolved_execution_role_arns",
+                        str(execution_role_arn),
+                    )
 
         # Resource-policy resources should flow into the target resource so later analysis can
         # reason over one consolidated policy surface.
@@ -870,6 +1018,18 @@ class AwsNormalizer(ProviderNormalizer):
                         "public_exposure_reasons",
                         "instance has a public IP path and attached security groups allow internet ingress",
                     )
+            elif resource.resource_type == "aws_ecs_service":
+                resource.public_exposure = bool(
+                    resource.public_access_configured
+                    and resource.metadata["in_public_subnet"]
+                    and internet_ingress
+                )
+                if resource.public_exposure:
+                    _append_unique(
+                        resource.metadata,
+                        "public_exposure_reasons",
+                        "ECS service assigns public IPs in a public subnet and attached security groups allow internet ingress",
+                    )
             elif resource.resource_type == "aws_db_instance":
                 resource.public_exposure = bool(
                     resource.public_access_configured and (internet_ingress or not attached_security_groups)
@@ -903,6 +1063,30 @@ class AwsNormalizer(ProviderNormalizer):
                         "load balancer is configured as internet-facing",
                     )
             resource.metadata["direct_internet_reachable"] = resource.public_exposure
+
+        internet_facing_load_balancers_by_security_group: dict[str, list[NormalizedResource]] = {}
+        for resource in resources:
+            if resource.resource_type != "aws_lb" or not resource.public_exposure:
+                continue
+            for security_group_id in resource.security_group_ids:
+                internet_facing_load_balancers_by_security_group.setdefault(security_group_id, []).append(resource)
+
+        for resource in resources:
+            if resource.resource_type != "aws_ecs_service":
+                continue
+            fronting_load_balancers: list[str] = []
+            attached_security_groups = [security_groups[sg_id] for sg_id in resource.security_group_ids if sg_id in security_groups]
+            for security_group in attached_security_groups:
+                for rule in security_group.network_rules:
+                    if rule.direction != "ingress":
+                        continue
+                    for security_group_id in rule.referenced_security_group_ids:
+                        for load_balancer in internet_facing_load_balancers_by_security_group.get(security_group_id, []):
+                            if load_balancer.address not in fronting_load_balancers:
+                                fronting_load_balancers.append(load_balancer.address)
+            resource.metadata["fronted_by_internet_facing_load_balancer"] = bool(fronting_load_balancers)
+            if fronting_load_balancers:
+                resource.metadata["internet_facing_load_balancer_addresses"] = fronting_load_balancers
 
 
 def _parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
@@ -1212,6 +1396,18 @@ def _compact(values: list[Any]) -> list[str]:
     return [str(value) for value in values if value not in (None, "", [])]
 
 
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "enabled", "yes"}:
+            return True
+        if normalized in {"false", "disabled", "no"}:
+            return False
+    return bool(value)
+
+
 def _as_list(value: Any) -> list[Any]:
     if value is None:
         return []
@@ -1228,6 +1424,16 @@ def _first_item(value: Any) -> dict[str, Any] | None:
     if isinstance(first, dict):
         return first
     return None
+
+
+def _ecs_task_definition_identifier(family: Any, revision: Any) -> str | None:
+    family_text = str(family).strip() if family not in (None, "") else ""
+    if not family_text:
+        return None
+    revision_text = str(revision).strip() if revision not in (None, "") else ""
+    if revision_text:
+        return f"{family_text}:{revision_text}"
+    return family_text
 
 
 def _as_optional_int(value: Any) -> int | None:

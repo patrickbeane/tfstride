@@ -18,6 +18,7 @@ FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_alb_ec2_rds_plan.json"
+ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_ecs_fargate_plan.json"
 LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_lambda_deploy_role_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "sample_aws_cross_account_trust_unconstrained_plan.json"
@@ -506,6 +507,54 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)
         self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 2)
         self.assertEqual(boundary_types[BoundaryType.WORKLOAD_TO_DATA_STORE], 1)
+
+    def test_realistic_ecs_fargate_fixture_models_private_workload_boundaries(self) -> None:
+        result = self.engine.analyze_plan(ECS_FARGATE_FIXTURE_PATH)
+        ecs_service = result.inventory.get_by_address("aws_ecs_service.app")
+        boundary_pairs = {(boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries}
+        findings_by_title = Counter(finding.title for finding in result.findings)
+
+        self.assertIsNotNone(ecs_service)
+        self.assertFalse(ecs_service.public_exposure)
+        self.assertFalse(ecs_service.metadata.get("in_public_subnet"))
+        self.assertTrue(ecs_service.metadata.get("fronted_by_internet_facing_load_balancer"))
+        self.assertEqual(
+            ecs_service.metadata.get("internet_facing_load_balancer_addresses"),
+            ["aws_lb.web"],
+        )
+        self.assertEqual(
+            ecs_service.attached_role_arns,
+            ["arn:aws:iam::111122223333:role/app-task-role"],
+        )
+        self.assertEqual(
+            ecs_service.metadata.get("execution_role_arn"),
+            "arn:aws:iam::111122223333:role/app-execution-role",
+        )
+        self.assertIn(
+            (BoundaryType.INTERNET_TO_SERVICE, "internet", "aws_lb.web"),
+            boundary_pairs,
+        )
+        self.assertNotIn(
+            (BoundaryType.INTERNET_TO_SERVICE, "internet", "aws_ecs_service.app"),
+            boundary_pairs,
+        )
+        self.assertIn(
+            (BoundaryType.WORKLOAD_TO_DATA_STORE, "aws_ecs_service.app", "aws_db_instance.app"),
+            boundary_pairs,
+        )
+        self.assertIn(
+            (BoundaryType.WORKLOAD_TO_DATA_STORE, "aws_ecs_service.app", "aws_secretsmanager_secret.app"),
+            boundary_pairs,
+        )
+        self.assertIn(
+            (BoundaryType.CONTROL_TO_WORKLOAD, "aws_iam_role.task", "aws_ecs_service.app"),
+            boundary_pairs,
+        )
+        self.assertNotIn(
+            (BoundaryType.CONTROL_TO_WORKLOAD, "aws_iam_role.execution", "aws_ecs_service.app"),
+            boundary_pairs,
+        )
+        self.assertEqual(findings_by_title["Workload role carries sensitive permissions"], 1)
 
     def test_realistic_lambda_deploy_role_fixture_surfaces_three_medium_findings(self) -> None:
         result = self.engine.analyze_plan(LAMBDA_DEPLOY_ROLE_FIXTURE_PATH)
@@ -1184,6 +1233,56 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
             "cross-account-or-role-access:arn:aws:iam::444455556666:role/ci-deployer->aws_iam_role.deployer",
         )
         self.assertEqual(finding.severity_reasoning.final_score, 6)
+
+    def test_ecs_service_with_missing_task_definition_and_network_data_degrades_gracefully(self) -> None:
+        result = self._analyze_payload(
+            {
+                "format_version": "1.2",
+                "terraform_version": "1.8.5",
+                "planned_values": {
+                    "root_module": {
+                        "resources": [
+                            {
+                                "address": "aws_ecs_cluster.main",
+                                "mode": "managed",
+                                "type": "aws_ecs_cluster",
+                                "name": "main",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "arn:aws:ecs:us-east-1:111122223333:cluster/main",
+                                    "arn": "arn:aws:ecs:us-east-1:111122223333:cluster/main",
+                                    "name": "main",
+                                },
+                            },
+                            {
+                                "address": "aws_ecs_service.app",
+                                "mode": "managed",
+                                "type": "aws_ecs_service",
+                                "name": "app",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "arn:aws:ecs:us-east-1:111122223333:service/main/app",
+                                    "name": "app",
+                                    "cluster": "arn:aws:ecs:us-east-1:111122223333:cluster/main",
+                                },
+                            },
+                        ]
+                    }
+                },
+            }
+        )
+
+        ecs_service = result.inventory.get_by_address("aws_ecs_service.app")
+
+        self.assertIsNotNone(ecs_service)
+        self.assertEqual(ecs_service.subnet_ids, [])
+        self.assertEqual(ecs_service.security_group_ids, [])
+        self.assertEqual(ecs_service.attached_role_arns, [])
+        self.assertFalse(ecs_service.public_exposure)
+        self.assertFalse(ecs_service.metadata.get("fronted_by_internet_facing_load_balancer", False))
+        self.assertEqual(result.inventory.unsupported_resources, [])
+        self.assertEqual(result.findings, [])
+        self.assertEqual(result.trust_boundaries, [])
 
 
 class AwsNormalizerTrustConditionTests(unittest.TestCase):

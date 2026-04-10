@@ -4,7 +4,7 @@ from cloud_threat_modeler.analysis.policy_conditions import PrincipalAssessment,
 from cloud_threat_modeler.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 
 
-WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function"}
+WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function", "aws_ecs_service"}
 DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}
 
 

@@ -13,6 +13,7 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - deterministic Terraform plan analysis with no LLM in the core pipeline
 - trust-boundary detection plus STRIDE-oriented findings
 - IAM graph resolution for inline policies, role attachments, and EC2 instance profiles present in the plan
+- initial ECS/Fargate workload modeling via ECS service and task definition normalization
 - resource-policy analysis for sensitive data services and invoke/publish/queue surfaces
 - condition-aware narrowing for trust and resource policies using supported source constraints
 - informational controls observed for clear mitigating signals
@@ -323,6 +324,9 @@ Supported config keys:
 The MVP intentionally supports a focused resource set:
 
 - `aws_instance`
+- `aws_ecs_service`
+- `aws_ecs_task_definition`
+- `aws_ecs_cluster`
 - `aws_security_group`
 - `aws_security_group_rule`
 - `aws_nat_gateway`
@@ -360,6 +364,7 @@ Unsupported resources are skipped and called out in the report.
 │   ├── sample_aws_baseline_plan.json
 │   ├── sample_aws_cross_account_trust_constrained_plan.json
 │   ├── sample_aws_cross_account_trust_unconstrained_plan.json
+│   ├── sample_aws_ecs_fargate_plan.json
 │   ├── sample_aws_lambda_deploy_role_plan.json
 │   ├── sample_aws_nightmare_plan.json
 │   ├── sample_aws_plan.json
@@ -426,6 +431,8 @@ Unsupported resources are skipped and called out in the report.
 - Realistic ALB / EC2 / RDS:
   [`fixtures/sample_aws_alb_ec2_rds_plan.json`](fixtures/sample_aws_alb_ec2_rds_plan.json),
   [`examples/alb_ec2_rds_report.md`](examples/alb_ec2_rds_report.md)
+- ECS / Fargate:
+  [`fixtures/sample_aws_ecs_fargate_plan.json`](fixtures/sample_aws_ecs_fargate_plan.json)
 - Cross-account trust, unconstrained:
   [`fixtures/sample_aws_cross_account_trust_unconstrained_plan.json`](fixtures/sample_aws_cross_account_trust_unconstrained_plan.json)
 - Cross-account trust, narrowed:
