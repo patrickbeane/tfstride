@@ -1,0 +1,78 @@
+name: threat-model
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: Install cloud-threat-modeler
+        run: python -m pip install -e .
+
+      - name: Terraform init
+        run: terraform -chdir=ci/terraform init -input=false
+
+      - name: Terraform plan
+        run: terraform -chdir=ci/terraform plan -refresh=false -input=false -out tfplan
+
+      - name: Render Terraform plan JSON
+        run: terraform -chdir=ci/terraform show -json tfplan > ci/terraform/tfplan.json
+
+      - name: Analyze Terraform plan
+        run: cloud-threat-modeler ci/terraform/tfplan.json --quiet --fail-on high --sarif-output ci/terraform/cloud-threat-modeler.sarif
+
+      - name: Verify SARIF contains findings
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          sarif_path = Path("ci/terraform/cloud-threat-modeler.sarif")
+          sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
+          results = sarif["runs"][0]["results"]
+
+          if not results:
+              raise SystemExit("Expected the smoke plan to produce at least one SARIF result.")
+
+          print(f"Smoke plan produced {len(results)} SARIF result(s).")
+          PY
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-threat-modeler-sarif
+          path: ci/terraform/cloud-threat-modeler.sarif
+
+      - name: Upload SARIF to GitHub code scanning
+        if: ${{ always() && vars.ENABLE_CODE_SCANNING == 'true' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ci/terraform/cloud-threat-modeler.sarif
+
+      - name: Skip code scanning upload
+        if: ${{ always() && vars.ENABLE_CODE_SCANNING != 'true' }}
+        run: |
+          echo "Skipping GitHub code scanning upload."
+          echo "Enable code scanning in repository settings and set ENABLE_CODE_SCANNING=true to turn this step on."
