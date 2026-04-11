@@ -123,6 +123,25 @@ h4 {
   gap: 1.25rem;
 }
 
+.site-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding: 0.35rem 0 0.2rem;
+}
+
+.site-footer a {
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+
+.site-footer a:hover,
+.site-footer a:focus-visible {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
 .hero-panel,
 .upload-grid,
 .content-grid {
