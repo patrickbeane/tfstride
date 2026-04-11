@@ -40,6 +40,13 @@ python3 -m pip install -e .
 cloud-threat-modeler fixtures/sample_aws_plan.json --output threat-model.md
 ```
 
+Generate a Terraform plan JSON from an infrastructure repo:
+
+```bash
+terraform plan -out tfplan
+terraform show -json tfplan > tfplan.json
+```
+
 Gate a plan in CI and emit SARIF alongside the markdown report:
 
 ```bash
@@ -355,7 +362,7 @@ The MVP intentionally supports a focused resource set:
 
 Unsupported resources are skipped and called out in the report.
 
-## Repo Layout
+## Repo Layout (Abridged)
 
 ```text
 .
@@ -378,6 +385,7 @@ Unsupported resources are skipped and called out in the report.
 │   └── safe_report.md
 ├── apps/
 │   └── dashboard/
+│       ├── api_models.py
 │       ├── deploy/
 │       │   ├── Caddyfile.example
 │       │   └── cloud-threat-modeler-dashboard.service
@@ -385,10 +393,12 @@ Unsupported resources are skipped and called out in the report.
 │       ├── templates/
 │       │   ├── base.html
 │       │   ├── index.html
-│       │   └── report.html
+│       │   ├── report.html
+│       │   └── scenarios.html
 │       └── main.py
 ├── src/
 │   └── cloud_threat_modeler/
+│       ├── __init__.py
 │       ├── analysis/
 │       │   ├── policy_conditions.py
 │       │   ├── rule_registry.py
@@ -406,6 +416,7 @@ Unsupported resources are skipped and called out in the report.
 │       ├── app.py
 │       ├── cli.py
 │       ├── config.py
+│       ├── filtering.py
 │       └── models.py
 └── tests/
 ```
