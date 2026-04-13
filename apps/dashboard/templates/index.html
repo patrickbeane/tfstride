@@ -42,6 +42,12 @@
           <input type="file" name="plan" accept=".json,application/json" required>
           <small>Maximum upload size: {{ max_upload_mebibytes }} MiB</small>
         </label>
+        <details class="upload-help">
+          <summary>How do I generate this file?</summary>
+          <p>Run these commands in your Terraform working directory, then upload <code>tfplan.json</code>.</p>
+          <pre class="code-block"><code>terraform plan -out tfplan
+terraform show -json tfplan &gt; tfplan.json</code></pre>
+        </details>
         <p class="upload-note">
           Uploaded Terraform plans are analyzed on this server using a temporary file created only for the request.
           Files are deleted after analysis and are not stored or forwarded to third parties.
