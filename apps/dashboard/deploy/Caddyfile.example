@@ -1,5 +1,5 @@
 # Replace with the hostname that serves your public dashboard.
-ctm.example.com {
+tfstride.example.com {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8001
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from cloud_threat_modeler.analysis.policy_conditions import (
+from tfstride.analysis.policy_conditions import (
     assess_principal,
     describe_trust_narrowing,
     resource_policy_statement_has_effective_narrowing,
@@ -11,7 +11,7 @@ from cloud_threat_modeler.analysis.policy_conditions import (
     trust_statement_narrowing_conditions,
     trust_statement_narrowing_keys,
 )
-from cloud_threat_modeler.models import IAMPolicyCondition, IAMPolicyStatement
+from tfstride.models import IAMPolicyCondition, IAMPolicyStatement
 
 
 class PolicyConditionsTests(unittest.TestCase):

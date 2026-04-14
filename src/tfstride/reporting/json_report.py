@@ -4,9 +4,9 @@ import json
 from collections import Counter
 from typing import Any
 
-from cloud_threat_modeler import __version__
-from cloud_threat_modeler.filtering import finding_fingerprint
-from cloud_threat_modeler.models import (
+from tfstride import __version__
+from tfstride.filtering import finding_fingerprint
+from tfstride.models import (
     AnalysisResult,
     EvidenceItem,
     Finding,
@@ -20,7 +20,7 @@ from cloud_threat_modeler.models import (
     TrustBoundary,
 )
 
-REPORT_KIND = "cloud-threat-model-report"
+REPORT_KIND = "tfstride-threat-model-report"
 REPORT_FORMAT_VERSION = "1.0"
 
 
@@ -43,7 +43,7 @@ class JsonReportRenderer:
             "kind": REPORT_KIND,
             "version": REPORT_FORMAT_VERSION,
             "tool": {
-                "name": "cloud-threat-modeler",
+                "name": "tfstride",
                 "version": __version__,
             },
             "title": result.title,

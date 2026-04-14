@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cloud_threat_modeler.models import TerraformPlan, TerraformResource
+from tfstride.models import TerraformPlan, TerraformResource
 
 
 class TerraformPlanLoadError(ValueError):

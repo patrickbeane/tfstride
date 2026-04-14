@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cloud_threat_modeler.analysis.rule_registry import RulePolicy, apply_rule_policy
-from cloud_threat_modeler.analysis.stride_rules import StrideRuleEngine
-from cloud_threat_modeler.filtering import apply_finding_filters
-from cloud_threat_modeler.analysis.trust_boundaries import TrustBoundaryDetector
-from cloud_threat_modeler.input.terraform_plan import load_terraform_plan
-from cloud_threat_modeler.models import AnalysisResult
-from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
-from cloud_threat_modeler.reporting.json_report import JsonReportRenderer
-from cloud_threat_modeler.reporting.markdown import MarkdownReportRenderer
-from cloud_threat_modeler.reporting.sarif import SarifReportRenderer
+from tfstride.analysis.rule_registry import RulePolicy, apply_rule_policy
+from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.filtering import apply_finding_filters
+from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
+from tfstride.input.terraform_plan import load_terraform_plan
+from tfstride.models import AnalysisResult
+from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.reporting.json_report import JsonReportRenderer
+from tfstride.reporting.markdown import MarkdownReportRenderer
+from tfstride.reporting.sarif import SarifReportRenderer
 
 
 DEFAULT_LIMITATIONS = [
@@ -23,7 +23,7 @@ DEFAULT_LIMITATIONS = [
 ]
 
 
-class CloudThreatModeler:
+class TfStride:
     def __init__(self, *, rule_policy: RulePolicy | None = None) -> None:
         self.aws_normalizer = AwsNormalizer()
         self.boundary_detector = TrustBoundaryDetector()
@@ -33,7 +33,7 @@ class CloudThreatModeler:
         self.sarif_renderer = SarifReportRenderer()
         self.rule_policy = rule_policy
 
-    def analyze_plan(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> AnalysisResult:
+    def analyze_plan(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> AnalysisResult:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self.aws_normalizer.normalize(terraform_plan.resources)
         trust_boundaries = self.boundary_detector.detect(inventory)
@@ -63,14 +63,14 @@ class CloudThreatModeler:
             baseline_path=baseline_path,
         )
 
-    def render_markdown_report(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> str:
+    def render_markdown_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
         result = self.analyze_plan(plan_path, title=title)
         return self.report_renderer.render(result)
 
-    def render_json_report(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> str:
+    def render_json_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
         result = self.analyze_plan(plan_path, title=title)
         return self.json_renderer.render(result)
 
-    def render_sarif_report(self, plan_path: str | Path, title: str = "Cloud Threat Model Report") -> str:
+    def render_sarif_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
         result = self.analyze_plan(plan_path, title=title)
         return self.sarif_renderer.render(result)

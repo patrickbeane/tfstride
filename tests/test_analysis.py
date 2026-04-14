@@ -6,10 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cloud_threat_modeler.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
-from cloud_threat_modeler.app import CloudThreatModeler
-from cloud_threat_modeler.models import BoundaryType, IAMPolicyCondition, Severity, TerraformResource
-from cloud_threat_modeler.providers.aws.normalizer import AwsNormalizer
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
+from tfstride.app import TfStride
+from tfstride.models import BoundaryType, IAMPolicyCondition, Severity, TerraformResource
+from tfstride.providers.aws.normalizer import AwsNormalizer
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -28,9 +28,9 @@ CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
 )
 
 
-class CloudThreatModelerAnalysisTests(unittest.TestCase):
+class TfStrideAnalysisTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.engine = CloudThreatModeler()
+        self.engine = TfStride()
         self.result = self.engine.analyze_plan(FIXTURE_PATH)
 
     def _analyze_payload(self, payload: dict) -> object:
@@ -945,7 +945,7 @@ class CloudThreatModelerAnalysisTests(unittest.TestCase):
     def test_rule_policy_can_disable_rules_and_override_severity(self) -> None:
         enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
         enabled_rule_ids.remove("aws-database-permissive-ingress")
-        engine = CloudThreatModeler(
+        engine = TfStride(
             rule_policy=RulePolicy(
                 enabled_rule_ids=frozenset(enabled_rule_ids),
                 severity_overrides={"aws-workload-role-sensitive-permissions": Severity.LOW},
@@ -1531,7 +1531,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
 
 class AwsCoverageExpansionTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.engine = CloudThreatModeler()
+        self.engine = TfStride()
 
     def _analyze_payload(self, payload: dict) -> object:
         with tempfile.TemporaryDirectory() as tmp_dir:

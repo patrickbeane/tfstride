@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from cloud_threat_modeler.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
-from cloud_threat_modeler.models import Severity
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
+from tfstride.models import Severity
 
 
-CONFIG_FILENAME = "cloud-threat-modeler.toml"
+CONFIG_FILENAME = "tfstride.toml"
 CONFIG_FORMAT_VERSION = "1.0"
 
 

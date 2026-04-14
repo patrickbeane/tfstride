@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cloud_threat_modeler.input.terraform_plan import TerraformPlanLoadError, load_terraform_plan
+from tfstride.input.terraform_plan import TerraformPlanLoadError, load_terraform_plan
 
 
 class TerraformPlanParserTests(unittest.TestCase):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from cloud_threat_modeler.models import Finding, Severity, StrideCategory
+from tfstride.models import Finding, Severity, StrideCategory
 
 
 @dataclass(frozen=True, slots=True)

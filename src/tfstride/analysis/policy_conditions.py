@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from cloud_threat_modeler.models import IAMPolicyCondition
+from tfstride.models import IAMPolicyCondition
 
 EFFECTIVE_TRUST_NARROWING_KEYS = frozenset({"sts:ExternalId", "aws:SourceArn", "aws:SourceAccount"})
 EFFECTIVE_RESOURCE_POLICY_NARROWING_KEYS = frozenset({"aws:SourceArn", "aws:SourceAccount"})

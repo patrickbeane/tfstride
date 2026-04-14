@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from cloud_threat_modeler.models import AnalysisResult, Severity
+from tfstride.models import AnalysisResult, Severity
 
 
 class MarkdownReportRenderer:

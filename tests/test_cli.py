@@ -8,8 +8,8 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from cloud_threat_modeler.cli import INPUT_ERROR_EXIT_CODE, POLICY_VIOLATION_EXIT_CODE, main
-from cloud_threat_modeler.config import CONFIG_FILENAME
+from tfstride.cli import INPUT_ERROR_EXIT_CODE, POLICY_VIOLATION_EXIT_CODE, main
+from tfstride.config import CONFIG_FILENAME
 
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
@@ -89,7 +89,7 @@ class CliTests(unittest.TestCase):
 
             sarif_payload = json.loads(sarif_output_path.read_text(encoding="utf-8"))
             self.assertEqual(sarif_payload["version"], "2.1.0")
-            self.assertEqual(sarif_payload["runs"][0]["tool"]["driver"]["name"], "cloud-threat-modeler")
+            self.assertEqual(sarif_payload["runs"][0]["tool"]["driver"]["name"], "tfstride")
 
     def test_cli_can_write_json_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -108,7 +108,7 @@ class CliTests(unittest.TestCase):
             self.assertTrue(json_output_path.exists())
 
             payload = json.loads(json_output_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["tool"]["name"], "cloud-threat-modeler")
+            self.assertEqual(payload["tool"]["name"], "tfstride")
             self.assertEqual(payload["summary"]["active_findings"], 9)
             self.assertEqual(payload["summary"]["total_findings"], 9)
             self.assertEqual(len(payload["findings"]), 9)

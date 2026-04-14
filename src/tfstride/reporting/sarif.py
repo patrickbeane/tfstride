@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cloud_threat_modeler import __version__
-from cloud_threat_modeler.analysis.rule_registry import get_rule
-from cloud_threat_modeler.models import AnalysisResult, EvidenceItem, Finding, Severity
+from tfstride import __version__
+from tfstride.analysis.rule_registry import get_rule
+from tfstride.models import AnalysisResult, EvidenceItem, Finding, Severity
 
 
 SARIF_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
@@ -33,7 +33,7 @@ class SarifReportRenderer:
                 {
                     "tool": {
                         "driver": {
-                            "name": "cloud-threat-modeler",
+                            "name": "tfstride",
                             "semanticVersion": __version__,
                             "rules": rules,
                         }

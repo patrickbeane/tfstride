@@ -1,4 +1,4 @@
-# Cloud Threat Model Report
+# tfSTRIDE Threat Model Report
 
 - Analyzed file: `sample_aws_safe_plan.json`
 - Provider: `aws`

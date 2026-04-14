@@ -1,1 +1,1 @@
-"""FastAPI dashboard for the cloud threat modeler."""
+"""FastAPI dashboard for tfSTRIDE."""

@@ -22,13 +22,13 @@ provider "aws" {
   skip_requesting_account_id  = true
   default_tags {
     tags = {
-      Purpose = "cloud-threat-modeler-github-actions-smoke"
+      Purpose = "tfstride-github-actions-smoke"
     }
   }
 }
 
 resource "aws_iam_role" "smoke" {
-  name = "cloud-threat-modeler-gha-smoke-role"
+  name = "tfstride-gha-smoke-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cloud_threat_modeler.analysis.policy_conditions import PrincipalAssessment, assess_principal
-from cloud_threat_modeler.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
+from tfstride.analysis.policy_conditions import PrincipalAssessment, assess_principal
+from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 
 
 WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function", "aws_ecs_service"}

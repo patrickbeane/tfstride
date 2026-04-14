@@ -5,8 +5,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from cloud_threat_modeler.config import CONFIG_FILENAME, ProjectConfigLoadError, load_project_config
-from cloud_threat_modeler.models import Severity
+from tfstride.config import CONFIG_FILENAME, ProjectConfigLoadError, load_project_config
+from tfstride.models import Severity
 
 
 class ProjectConfigTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-from cloud_threat_modeler.cli import main
+from tfstride.cli import main
 
 
 if __name__ == "__main__":

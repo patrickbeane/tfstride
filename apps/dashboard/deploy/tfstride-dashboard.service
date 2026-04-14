@@ -1,17 +1,17 @@
 [Unit]
-Description=Cloud Threat Modeler Dashboard
+Description=tfSTRIDE Dashboard
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 # Example service account and install path for a public demo deployment.
-User=ctm
-Group=ctm
-WorkingDirectory=/srv/cloud-threat-modeler
+User=tfstride
+Group=tfstride
+WorkingDirectory=/srv/tfstride
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=/srv/cloud-threat-modeler/src
-ExecStart=/srv/cloud-threat-modeler/.venv/bin/uvicorn apps.dashboard.main:app --host 127.0.0.1 --port 8001 --workers 2 --proxy-headers
+Environment=PYTHONPATH=/srv/tfstride/src
+ExecStart=/srv/tfstride/.venv/bin/uvicorn apps.dashboard.main:app --host 127.0.0.1 --port 8001 --workers 2 --proxy-headers
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=20

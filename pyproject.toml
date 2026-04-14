@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cloud-threat-modeler"
+name = "tfstride"
 version = "0.2.0"
 description = "Deterministic cloud threat modeling for Terraform plan JSON."
 readme = "README.md"
@@ -24,7 +24,7 @@ dashboard = [
 ]
 
 [project.scripts]
-cloud-threat-modeler = "cloud_threat_modeler.cli:main"
+tfstride = "tfstride.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

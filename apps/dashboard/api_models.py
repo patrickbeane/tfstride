@@ -157,7 +157,7 @@ class ObservationModel(BaseModel):
     evidence: list[EvidenceItemModel] = Field(default_factory=list)
 
 
-class CloudThreatModelReportModel(BaseModel):
+class TfStrideReportModel(BaseModel):
     kind: str
     version: str
     tool: ToolInfoModel

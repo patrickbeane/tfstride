@@ -1,4 +1,4 @@
-# Cloud Threat Model Report
+# tfSTRIDE Threat Model Report
 
 - Analyzed file: `sample_aws_alb_ec2_rds_plan.json`
 - Provider: `aws`

@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cloud_threat_modeler import __version__
-from cloud_threat_modeler.models import AnalysisResult, Finding, Severity
+from tfstride import __version__
+from tfstride.models import AnalysisResult, Finding, Severity
 
 
 BASELINE_FORMAT_VERSION = "1.0"
@@ -107,7 +107,7 @@ def build_baseline_payload(findings: list[Finding]) -> dict[str, Any]:
         "version": BASELINE_FORMAT_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "tool": {
-            "name": "cloud-threat-modeler",
+            "name": "tfstride",
             "version": __version__,
         },
         "findings": entries,

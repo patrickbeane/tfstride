@@ -5,13 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cloud_threat_modeler.analysis.rule_registry import RulePolicy
-from cloud_threat_modeler.app import CloudThreatModeler
-from cloud_threat_modeler.filtering import apply_finding_filters, render_baseline
-from cloud_threat_modeler.models import Severity
-from cloud_threat_modeler.reporting.json_report import JsonReportRenderer, REPORT_FORMAT_VERSION, REPORT_KIND
-from cloud_threat_modeler.reporting.markdown import MarkdownReportRenderer
-from cloud_threat_modeler.reporting.sarif import SarifReportRenderer
+from tfstride.analysis.rule_registry import RulePolicy
+from tfstride.app import TfStride
+from tfstride.filtering import apply_finding_filters, render_baseline
+from tfstride.models import Severity
+from tfstride.reporting.json_report import JsonReportRenderer, REPORT_FORMAT_VERSION, REPORT_KIND
+from tfstride.reporting.markdown import MarkdownReportRenderer
+from tfstride.reporting.sarif import SarifReportRenderer
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,11 +28,11 @@ EXAMPLES_DIR = ROOT / "examples"
 
 class MarkdownReportRendererTests(unittest.TestCase):
     def test_report_contains_summary_findings_and_limitations(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
         report = MarkdownReportRenderer().render(result)
 
-        self.assertIn("# Cloud Threat Model Report", report)
+        self.assertIn("# tfSTRIDE Threat Model Report", report)
         self.assertIn("## Summary", report)
         self.assertIn("## Discovered Trust Boundaries", report)
         self.assertIn("## Findings", report)
@@ -47,7 +47,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
         self.assertIn("aws_cloudwatch_log_group.processor", report)
 
     def test_report_renders_unconstrained_trust_evidence(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         result = engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)
         report = MarkdownReportRenderer().render(result)
 
@@ -56,7 +56,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
         self.assertIn("supported narrowing condition keys: none", report)
 
     def test_report_renders_controls_observed_section(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         safe_report = MarkdownReportRenderer().render(engine.analyze_plan(SAFE_FIXTURE_PATH))
         constrained_trust_report = MarkdownReportRenderer().render(
             engine.analyze_plan(CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH)
@@ -76,7 +76,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
         )
 
     def test_checked_in_example_reports_match_renderer_output(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         scenarios = {
             BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "baseline_report.md",
             SAFE_FIXTURE_PATH: EXAMPLES_DIR / "safe_report.md",
@@ -93,7 +93,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
                 self.assertEqual(actual, expected)
 
     def test_report_surfaces_suppressed_and_baselined_counts_when_filters_apply(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         raw_result = engine.analyze_plan(FIXTURE_PATH)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -127,7 +127,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
         self.assertIn("- Baselined findings: `2`", report)
 
     def test_report_mentions_when_severity_is_overridden_by_config(self) -> None:
-        engine = CloudThreatModeler(
+        engine = TfStride(
             rule_policy=RulePolicy(severity_overrides={"aws-iam-wildcard-permissions": Severity.LOW})
         )
         result = engine.analyze_plan(BASELINE_FIXTURE_PATH)
@@ -138,7 +138,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
 
 class SarifReportRendererTests(unittest.TestCase):
     def test_sarif_report_contains_rules_results_and_finding_metadata(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
         report = SarifReportRenderer().render(result)
         payload = json.loads(report)
@@ -148,7 +148,7 @@ class SarifReportRendererTests(unittest.TestCase):
         self.assertEqual(len(payload["runs"]), 1)
 
         run = payload["runs"][0]
-        self.assertEqual(run["tool"]["driver"]["name"], "cloud-threat-modeler")
+        self.assertEqual(run["tool"]["driver"]["name"], "tfstride")
         self.assertTrue(run["tool"]["driver"]["rules"])
         self.assertEqual(len(run["results"]), len(result.findings))
 
@@ -177,24 +177,24 @@ class SarifReportRendererTests(unittest.TestCase):
         self.assertTrue(trust_result["properties"]["evidence"])
 
     def test_app_can_render_sarif_report(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         report = engine.render_sarif_report(FIXTURE_PATH)
         payload = json.loads(report)
 
         self.assertEqual(payload["version"], "2.1.0")
-        self.assertEqual(payload["runs"][0]["tool"]["driver"]["name"], "cloud-threat-modeler")
+        self.assertEqual(payload["runs"][0]["tool"]["driver"]["name"], "tfstride")
 
 
 class JsonReportRendererTests(unittest.TestCase):
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
         report = JsonReportRenderer().render(result)
         payload = json.loads(report)
 
         self.assertEqual(payload["kind"], REPORT_KIND)
         self.assertEqual(payload["version"], REPORT_FORMAT_VERSION)
-        self.assertEqual(payload["tool"]["name"], "cloud-threat-modeler")
+        self.assertEqual(payload["tool"]["name"], "tfstride")
         self.assertEqual(payload["summary"]["active_findings"], 9)
         self.assertEqual(payload["summary"]["total_findings"], 9)
         self.assertEqual(payload["inventory"]["provider"], "aws")
@@ -202,7 +202,7 @@ class JsonReportRendererTests(unittest.TestCase):
         self.assertTrue(payload["findings"][0]["fingerprint"].startswith("sha256:"))
 
     def test_json_report_contract_exposes_stable_ui_sections(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
 
         self.assertEqual(
@@ -264,7 +264,7 @@ class JsonReportRendererTests(unittest.TestCase):
         )
 
     def test_json_report_sorts_inventory_resources_and_trust_boundaries_for_stable_consumers(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
 
         resource_addresses = [resource["address"] for resource in payload["inventory"]["resources"]]
@@ -274,7 +274,7 @@ class JsonReportRendererTests(unittest.TestCase):
         self.assertEqual(boundary_ids, sorted(boundary_ids))
 
     def test_json_report_includes_suppressed_and_baselined_findings(self) -> None:
-        engine = CloudThreatModeler()
+        engine = TfStride()
         raw_result = engine.analyze_plan(FIXTURE_PATH)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -337,7 +337,7 @@ class JsonReportRendererTests(unittest.TestCase):
             },
         }
 
-        engine = CloudThreatModeler()
+        engine = TfStride()
         with tempfile.TemporaryDirectory() as tmp_dir:
             plan_path = Path(tmp_dir) / "plan.json"
             plan_path.write_text(json.dumps(payload), encoding="utf-8")

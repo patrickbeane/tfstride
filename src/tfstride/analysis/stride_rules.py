@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from cloud_threat_modeler.analysis.policy_conditions import (
+from tfstride.analysis.policy_conditions import (
     assess_principal,
     describe_trust_narrowing,
     resource_policy_statement_has_effective_narrowing,
     trust_statement_has_effective_narrowing,
     trust_statement_has_supported_narrowing,
 )
-from cloud_threat_modeler.analysis.rule_registry import get_rule
-from cloud_threat_modeler.models import (
+from tfstride.analysis.rule_registry import get_rule
+from tfstride.models import (
     BoundaryType,
     EvidenceItem,
     Finding,

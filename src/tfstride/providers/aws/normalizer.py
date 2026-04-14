@@ -4,7 +4,7 @@ import json
 from collections import Counter
 from typing import Any
 
-from cloud_threat_modeler.models import (
+from tfstride.models import (
     IAMPolicyCondition,
     IAMPolicyStatement,
     NormalizedResource,
@@ -13,7 +13,7 @@ from cloud_threat_modeler.models import (
     SecurityGroupRule,
     TerraformResource,
 )
-from cloud_threat_modeler.providers.base import ProviderNormalizer
+from tfstride.providers.base import ProviderNormalizer
 
 
 SUPPORTED_AWS_TYPES = {

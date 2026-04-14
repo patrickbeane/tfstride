@@ -1,6 +1,6 @@
-# Cloud Threat Modeler & Policy Gate
+# tfSTRIDE & Policy Gate
 
-`cloud-threat-modeler` converts Terraform plan JSON into deterministic cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for AWS infrastructure before deployment.
+`tfstride` converts Terraform plan JSON into deterministic cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for AWS infrastructure before deployment.
 
 ## Overview
 
@@ -30,14 +30,14 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 Run directly from source:
 
 ```bash
-PYTHONPATH=src python3 -m cloud_threat_modeler fixtures/sample_aws_plan.json
+PYTHONPATH=src python3 -m tfstride fixtures/sample_aws_plan.json
 ```
 
 Install the CLI locally:
 
 ```bash
 python3 -m pip install -e .
-cloud-threat-modeler fixtures/sample_aws_plan.json --output threat-model.md
+tfstride fixtures/sample_aws_plan.json --output threat-model.md
 ```
 
 Generate a Terraform plan JSON from an infrastructure repo:
@@ -50,39 +50,39 @@ terraform show -json tfplan > tfplan.json
 Gate a plan in CI and emit SARIF alongside the markdown report:
 
 ```bash
-cloud-threat-modeler tfplan.json --quiet --fail-on high --output threat-model.md --sarif-output threat-model.sarif
+tfstride tfplan.json --quiet --fail-on high --output threat-model.md --sarif-output threat-model.sarif
 ```
 
 Emit a machine-readable JSON report:
 
 ```bash
-cloud-threat-modeler tfplan.json --quiet --json-output threat-model.json
+tfstride tfplan.json --quiet --json-output threat-model.json
 ```
 
 The JSON report contract is versioned for downstream consumers. The current report payload uses:
 
-- `kind: "cloud-threat-model-report"`
+- `kind: "tfstride-threat-model-report"`
 - `version: "1.0"`
 
 Capture the current unsuppressed findings as a baseline and later gate only on new findings:
 
 ```bash
-cloud-threat-modeler tfplan.json --quiet --baseline-output baseline.json
-cloud-threat-modeler tfplan.json --quiet --fail-on high --baseline baseline.json
+tfstride tfplan.json --quiet --baseline-output baseline.json
+tfstride tfplan.json --quiet --fail-on high --baseline baseline.json
 ```
 
 Use a checked-in repo config so CI and local runs share the same defaults:
 
 ```bash
-cloud-threat-modeler tfplan.json --quiet
-cloud-threat-modeler tfplan.json --config ./cloud-threat-modeler.toml --json-output threat-model.json
+tfstride tfplan.json --quiet
+tfstride tfplan.json --config ./tfstride.toml --json-output threat-model.json
 ```
 
 ## Dashboard
 
 The repo also includes a thin FastAPI dashboard in `apps/dashboard/`. It reuses the same engine, findings, and JSON contract as the CLI rather than adding a second analysis path.
 
-Live demo: `https://ctm.beane.me`
+Live demo: `https://tfstride.beane.me`
 
 Install the web dependencies:
 
@@ -107,11 +107,11 @@ Useful routes:
 
 Deployment notes:
 
-- a repo-tracked systemd unit example lives at apps/dashboard/deploy/cloud-threat-modeler-dashboard.service
+- a repo-tracked systemd unit example lives at apps/dashboard/deploy/tfstride-dashboard.service
 - the checked-in systemd unit and Caddy config are deployment examples, not fixed requirements
-- the checked-in examples use a generic `ctm` service account, `/srv/cloud-threat-modeler` install path, and `ctm.example.com` hostname
+- the checked-in examples use a generic `tfstride` service account, `/srv/tfstride` install path, and `tfstride.example.com` hostname
 - update the working directory, service user, virtualenv path, bind address, and port to match your host before installing the unit under /etc/systemd/system/
-- after updating the unit, run sudo systemctl daemon-reload && sudo systemctl enable --now cloud-threat-modeler-dashboard
+- after updating the unit, run sudo systemctl daemon-reload && sudo systemctl enable --now tfstride-dashboard
 - a simple Caddy reverse-proxy example lives at apps/dashboard/deploy/Caddyfile.example
 
 ## Example Output
@@ -164,11 +164,11 @@ jobs:
       - run: python -m pip install -e .
       - run: terraform plan -out tfplan
       - run: terraform show -json tfplan > tfplan.json
-      - run: cloud-threat-modeler tfplan.json --quiet --fail-on high --sarif-output cloud-threat-modeler.sarif
+      - run: tfstride tfplan.json --quiet --fail-on high --sarif-output tfstride.sarif
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: cloud-threat-modeler.sarif
+          sarif_file: tfstride.sarif
 ```
 
 Pre-apply gating example:
@@ -176,7 +176,7 @@ Pre-apply gating example:
 ```bash
 terraform plan -out tfplan
 terraform show -json tfplan > tfplan.json
-cloud-threat-modeler tfplan.json --quiet --fail-on medium --output threat-model.md --sarif-output threat-model.sarif
+tfstride tfplan.json --quiet --fail-on medium --output threat-model.md --sarif-output threat-model.sarif
 terraform apply tfplan
 ```
 
@@ -294,13 +294,13 @@ Suppressions are explicit, reviewable exceptions. The CLI accepts a JSON file wi
 Baselines are generated by the tool and keyed by stable finding fingerprints so CI can focus on newly introduced findings:
 
 ```bash
-cloud-threat-modeler tfplan.json --quiet --baseline-output baseline.json
-cloud-threat-modeler tfplan.json --quiet --baseline baseline.json --fail-on high
+tfstride tfplan.json --quiet --baseline-output baseline.json
+tfstride tfplan.json --quiet --baseline baseline.json --fail-on high
 ```
 
 ## Repo Config
 
-The CLI auto-discovers `cloud-threat-modeler.toml` from the current working directory or the plan file directory. You can also pass it explicitly with `--config`.
+The CLI auto-discovers `tfstride.toml` from the current working directory or the plan file directory. You can also pass it explicitly with `--config`.
 
 CLI flags still win over config values when both are present.
 
@@ -310,8 +310,8 @@ Example:
 version = "1.0"
 title = "Platform Threat Model"
 fail_on = "high"
-baseline = ".cloud-threat-modeler/baseline.json"
-suppressions = ".cloud-threat-modeler/suppressions.json"
+baseline = ".tfstride/baseline.json"
+suppressions = ".tfstride/suppressions.json"
 
 [rules]
 disable = ["aws-role-trust-expansion"]
@@ -392,7 +392,7 @@ Unsupported resources are skipped and called out in the report.
 │       ├── api_models.py
 │       ├── deploy/
 │       │   ├── Caddyfile.example
-│       │   └── cloud-threat-modeler-dashboard.service
+│       │   └── tfstride-dashboard.service
 │       ├── static/dashboard.css
 │       ├── templates/
 │       │   ├── base.html
@@ -401,7 +401,7 @@ Unsupported resources are skipped and called out in the report.
 │       │   └── scenarios.html
 │       └── main.py
 ├── src/
-│   └── cloud_threat_modeler/
+│   └── tfstride/
 │       ├── __init__.py
 │       ├── analysis/
 │       │   ├── policy_conditions.py
