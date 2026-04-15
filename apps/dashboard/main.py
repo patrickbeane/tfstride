@@ -8,10 +8,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, File, Form, HTTPException, Path as FastApiPath, Request, UploadFile
+from fastapi.routing import APIRoute
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import FormData
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.formparsers import MultiPartException, MultiPartParser
+from starlette.requests import Request as StarletteRequest
 
 from apps.dashboard.api_models import (
     TfStrideReportModel,
@@ -29,6 +34,10 @@ FIXTURES_DIR = REPO_ROOT / "fixtures"
 TEMPLATES = Jinja2Templates(directory=str(APP_ROOT / "templates"))
 TEMPLATE_RESPONSE_ACCEPTS_REQUEST = "request" in inspect.signature(TEMPLATES.TemplateResponse).parameters
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_MULTIPART_FILES = 1
+MAX_MULTIPART_FIELDS = 1
+MAX_MULTIPART_FIELD_BYTES = 64 * 1024
+UPLOAD_COPY_CHUNK_BYTES = 64 * 1024
 DEFAULT_REPORT_TITLE = "tfSTRIDE Threat Model Report"
 DOCS_CHROME_HIDE_STYLE = """
 <style>
@@ -85,6 +94,102 @@ UPLOAD_VALIDATION_ERROR_EXAMPLE = {
 
 class DashboardInputError(ValueError):
     """Raised when an uploaded plan cannot be analyzed by the dashboard."""
+
+
+class DashboardMultipartParser(MultiPartParser):
+    """Enforce the dashboard upload limit while multipart data is still being parsed."""
+
+    def __init__(self, *args, max_file_size: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.max_file_size = max_file_size
+        self._current_file_size = 0
+
+    def on_part_begin(self) -> None:
+        super().on_part_begin()
+        self._current_file_size = 0
+
+    def on_part_data(self, data: bytes, start: int, end: int) -> None:
+        if self._current_part.file is not None:
+            self._current_file_size += end - start
+            if self._current_file_size > self.max_file_size:
+                raise MultiPartException(_upload_limit_error_message())
+        super().on_part_data(data, start, end)
+
+
+class DashboardUploadRequest(StarletteRequest):
+    async def _get_form(
+        self,
+        *,
+        max_files: int | float = 1000,
+        max_fields: int | float = 1000,
+        max_part_size: int = 1024 * 1024,
+    ) -> FormData:
+        if self._form is not None:
+            return self._form
+
+        enforced_max_files = min(max_files, MAX_MULTIPART_FILES)
+        enforced_max_fields = min(max_fields, MAX_MULTIPART_FIELDS)
+        enforced_max_part_size = min(max_part_size, MAX_MULTIPART_FIELD_BYTES)
+        content_type = self.headers.get("content-type", "").lower()
+
+        if not content_type.startswith("multipart/form-data"):
+            return await super()._get_form(
+                max_files=enforced_max_files,
+                max_fields=enforced_max_fields,
+                max_part_size=enforced_max_part_size,
+            )
+
+        try:
+            multipart_parser = DashboardMultipartParser(
+                self.headers,
+                self.stream(),
+                max_files=enforced_max_files,
+                max_fields=enforced_max_fields,
+                max_part_size=enforced_max_part_size,
+                max_file_size=MAX_UPLOAD_BYTES,
+            )
+            self._form = await multipart_parser.parse()
+        except MultiPartException as exc:
+            if "app" in self.scope:
+                raise StarletteHTTPException(status_code=400, detail=exc.message) from exc
+            raise
+
+        return self._form
+
+
+class DashboardRoute(APIRoute):
+    def get_route_handler(self):
+        route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request: StarletteRequest):
+            dashboard_request = DashboardUploadRequest(request.scope, request.receive)
+            try:
+                return await route_handler(dashboard_request)
+            except StarletteHTTPException as exc:
+                if exc.status_code != 400 or not isinstance(exc.detail, str):
+                    raise
+                if dashboard_request.url.path == "/api/analyze":
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "kind": "tfstride-error",
+                            "message": exc.detail,
+                        },
+                    )
+                if dashboard_request.url.path == "/analyze":
+                    return _template_response(
+                        dashboard_request,
+                        "index.html",
+                        _base_context(
+                            dashboard_request,
+                            error=exc.detail,
+                            demo_scenarios=getattr(dashboard_request.app.state, "demo_scenarios", ()),
+                        ),
+                        status_code=400,
+                    )
+                raise
+
+        return custom_route_handler
 
 
 @dataclass(slots=True)
@@ -214,9 +319,11 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         redoc_url=None,
     )
+    app.router.route_class = DashboardRoute
     app.mount("/static", StaticFiles(directory=str(APP_ROOT / "static")), name="static")
     engine = TfStride()
     demo_scenarios = _build_demo_scenarios(engine)
+    app.state.demo_scenarios = demo_scenarios
     demo_scenarios_by_id = {scenario.scenario_id: scenario for scenario in demo_scenarios}
     known_demo_scenarios = ", ".join(scenario.scenario_id for scenario in demo_scenarios)
     api_report_example = _build_api_report_example(engine)
@@ -427,20 +534,40 @@ async def _analyze_upload(
     engine: TfStride,
 ) -> DashboardAnalysis:
     filename = Path(upload.filename or "uploaded-plan.json").name or "uploaded-plan.json"
-    file_bytes = await upload.read()
-    await upload.close()
+    await upload.seek(0)
 
-    if not file_bytes:
-        raise DashboardInputError("Upload a non-empty Terraform plan JSON file.")
-    if len(file_bytes) > MAX_UPLOAD_BYTES:
-        raise DashboardInputError(
-            f"Uploaded plan exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB dashboard limit."
-        )
+    try:
+        with TemporaryDirectory(prefix="tfstride-dashboard-") as tmp_dir:
+            plan_path = Path(tmp_dir) / filename
+            bytes_written = 0
 
-    with TemporaryDirectory(prefix="tfstride-dashboard-") as tmp_dir:
-        plan_path = Path(tmp_dir) / filename
-        plan_path.write_bytes(file_bytes)
-        return _analyze_plan_path(plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
+            with plan_path.open("wb") as plan_file:
+                while chunk := await upload.read(UPLOAD_COPY_CHUNK_BYTES):
+                    bytes_written += len(chunk)
+                    if bytes_written > MAX_UPLOAD_BYTES:
+                        raise DashboardInputError(_upload_limit_error_message())
+                    plan_file.write(chunk)
+
+            if bytes_written == 0:
+                raise DashboardInputError("Upload a non-empty Terraform plan JSON file.")
+
+            return _analyze_plan_path(plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
+    finally:
+        await upload.close()
+
+
+def _upload_limit_error_message() -> str:
+    return f"Uploaded plan exceeds the {_format_byte_size(MAX_UPLOAD_BYTES)} dashboard limit."
+
+
+def _format_byte_size(num_bytes: int) -> str:
+    for unit, size in (("GiB", 1024**3), ("MiB", 1024**2), ("KiB", 1024), ("B", 1)):
+        if num_bytes >= size:
+            value = num_bytes / size
+            if size == 1 or value.is_integer():
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+    return "0 B"
 
 
 def _analyze_plan_path(

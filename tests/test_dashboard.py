@@ -4,6 +4,7 @@ import importlib.util
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 FASTAPI_DEPS_AVAILABLE = all(
@@ -162,6 +163,42 @@ class DashboardAppTests(unittest.TestCase):
                 "message": "Upload a non-empty Terraform plan JSON file.",
             },
         )
+
+    def test_api_rejects_oversized_uploads_before_plan_parsing(self) -> None:
+        with (
+            patch("apps.dashboard.main.MAX_UPLOAD_BYTES", 32),
+            patch("apps.dashboard.main._analyze_plan_path") as analyze_plan_path,
+        ):
+            response = self.client.post(
+                "/api/analyze",
+                data={"title": "Too Large"},
+                files={"plan": ("too-large.json", b"x" * 33, "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {
+                "kind": "tfstride-error",
+                "message": "Uploaded plan exceeds the 32 B dashboard limit.",
+            },
+        )
+        analyze_plan_path.assert_not_called()
+
+    def test_html_analyze_rejects_oversized_uploads_before_plan_parsing(self) -> None:
+        with (
+            patch("apps.dashboard.main.MAX_UPLOAD_BYTES", 32),
+            patch("apps.dashboard.main._analyze_plan_path") as analyze_plan_path,
+        ):
+            response = self.client.post(
+                "/analyze",
+                data={"title": "Too Large"},
+                files={"plan": ("too-large.json", b"x" * 33, "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Uploaded plan exceeds the 32 B dashboard limit.", response.text)
+        analyze_plan_path.assert_not_called()
 
     def test_healthz_returns_ok(self) -> None:
         response = self.client.get("/healthz")
