@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 
 from fastapi import FastAPI, File, Form, HTTPException, Path as FastApiPath, Request, UploadFile
 from fastapi.routing import APIRoute
@@ -76,14 +77,14 @@ DOCS_LINK_CLEANUP_SCRIPT = """
 HTML_LANDING_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE dashboard landing page</main></body></html>"
 HTML_REPORT_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE report page</main></body></html>"
 API_REPORT_EXAMPLE: TFSReportPayload = {
-	"kind": "tfstride-report",
-	"version": "1.0",
-	"tool": {"name": "tfstride", "version": "0.2.0"},
-	"title": "tfSTRIDE Report",
-	"analyzed_file": "tfplan.json",
+    "kind": "tfstride-threat-model-report",
+    "version": "1.0",
+    "tool": {"name": "tfstride", "version": "0.2.0"},
+    "title": "tfSTRIDE Report",
+    "analyzed_file": "tfplan.json",
     "analyzed_path": "tfplan.json",
     "summary": {
-       "normalized_resources": 0,
+        "normalized_resources": 0,
         "unsupported_resources": 0,
         "trust_boundaries": 0,
         "active_findings": 0,
@@ -91,7 +92,7 @@ API_REPORT_EXAMPLE: TFSReportPayload = {
         "suppressed_findings": 0,
         "baselined_findings": 0,
         "severity_counts": {"high": 0, "medium": 0, "low": 0},
-	},
+    },
     "filtering": {
         "total_findings": 0,
         "active_findings": 0,
@@ -653,24 +654,24 @@ def _build_demo_scenarios(engine: TfStride) -> tuple[DemoScenario, ...]:
 
 
 def _engine(app: FastAPI) -> TfStride:
-	    return cast(TFS, app.state.engine)
+    return cast(TfStride, app.state.engine)
 
 
 def _get_demo_scenarios(app: FastAPI) -> tuple[DemoScenario, ...]:
-	    cached = getattr(app.state, "demo_scenarios", None)
-	    if cached is None:
-	        cached = _build_demo_scenarios(_engine(app))
-	        app.state.demo_scenarios = cached
-	    return cast(tuple[DemoScenario, ...], cached)
+    cached = getattr(app.state, "demo_scenarios", None)
+    if cached is None:
+        cached = _build_demo_scenarios(_engine(app))
+        app.state.demo_scenarios = cached
+    return cast(tuple[DemoScenario, ...], cached)
 
 
 def _get_demo_scenarios_by_id(app: FastAPI) -> dict[str, DemoScenario]:
-	    cached = getattr(app.state, "demo_scenarios_by_id", None)
-	    if cached is None:
-	        cached = {scenario.scenario_id: scenario for scenario in _get_demo_scenarios(app)}
-	        app.state.demo_scenarios_by_id = cached
-	    return cast(dict[str, DemoScenario], cached)
-        
+    cached = getattr(app.state, "demo_scenarios_by_id", None)
+    if cached is None:
+        cached = {scenario.scenario_id: scenario for scenario in _get_demo_scenarios(app)}
+        app.state.demo_scenarios_by_id = cached
+    return cast(dict[str, DemoScenario], cached)
+
 
 def _base_context(
     request: Request,

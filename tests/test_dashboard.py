@@ -140,7 +140,7 @@ class DashboardAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Nightmare Dashboard Test", response.text)
-        self.assertIn("Public object storage allows internet reads", response.text)
+        self.assertIn("Object storage is publicly accessible", response.text)
         self.assertIn("policy statements", response.text)
 
     def test_demo_route_renders_baseline_fixture_report(self) -> None:
