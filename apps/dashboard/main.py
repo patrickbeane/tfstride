@@ -77,7 +77,7 @@ DOCS_LINK_CLEANUP_SCRIPT = """
 HTML_LANDING_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE dashboard landing page</main></body></html>"
 HTML_REPORT_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE report page</main></body></html>"
 API_REPORT_EXAMPLE: TFSReportPayload = {
-    "kind": "tfstride-threat-model-report",
+    "kind": "tfstride-report",
     "version": "1.0",
     "tool": {"name": "tfstride", "version": "0.2.0"},
     "title": "tfSTRIDE Report",

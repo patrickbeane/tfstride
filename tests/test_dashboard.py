@@ -74,7 +74,7 @@ class DashboardAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["kind"], "tfstride-threat-model-report")
+        self.assertEqual(payload["kind"], "tfstride-report")
         self.assertEqual(payload["version"], "1.0")
         self.assertEqual(payload["title"], "Dashboard Test")
         self.assertEqual(payload["analyzed_file"], FIXTURE_PATH.name)
@@ -105,7 +105,7 @@ class DashboardAppTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["paths"]["/api/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]["kind"],
-            "tfstride-threat-model-report",
+            "tfstride-report",
         )
         self.assertIn("multipart/form-data", payload["paths"]["/api/analyze"]["post"]["requestBody"]["content"])
         self.assertEqual(

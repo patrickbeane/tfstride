@@ -32,7 +32,7 @@ from tfstride.reporting.report_contract import (
 	TrustBoundaryPayload,
 )
 
-REPORT_KIND = "tfstride-threat-model-report"
+REPORT_KIND = "tfstride-report"
 REPORT_FORMAT_VERSION = "1.0"
 
 
