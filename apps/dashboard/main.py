@@ -744,7 +744,6 @@ def _report_context(
         "unsupported_resources": payload["inventory"]["unsupported_resources"],
         "raw_json": json.dumps(payload, indent=2),
         "raw_markdown": analysis.markdown_report,
-        "finding_counter": Counter(finding["severity"] for finding in findings),
         "scenario": scenario,
     }
 

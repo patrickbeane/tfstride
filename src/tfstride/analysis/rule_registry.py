@@ -39,9 +39,6 @@ class RuleRegistry:
         except KeyError as exc:
             raise KeyError(f"Unknown rule ID `{rule_id}`.") from exc
 
-    def all(self) -> list[RuleMetadata]:
-        return list(self._rules_by_id.values())
-
     def known_rule_ids(self) -> set[str]:
         return set(self._rules_by_id)
 
