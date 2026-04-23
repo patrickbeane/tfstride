@@ -208,7 +208,7 @@ class StrideRuleEngine:
                         _evidence_item(
                             "security_group_rules",
                             [describe_security_group_rule(security_group, rule) for security_group, rule in risky_rules],                        ),
-                        _evidence_item("public_exposure_reasons", resource.metadata.get("public_exposure_reasons", [])),
+                        _evidence_item("public_exposure_reasons", resource.public_exposure_reasons),
                         _evidence_item("subnet_posture", _subnet_posture(resource, inventory)),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -254,9 +254,7 @@ class StrideRuleEngine:
                     if matched_workloads:
                         public_tier_rules.append((security_group, rule, matched_workloads))
 
-            direct_internet_reachable = bool(
-                database.metadata.get("direct_internet_reachable") and (internet_rules or not attached_security_groups)
-            )
+            direct_internet_reachable = database.direct_internet_reachable and (internet_rules or not attached_security_groups)
             if not internet_rules and not public_tier_rules and not direct_internet_reachable:
                 continue
             boundary = None
@@ -328,7 +326,7 @@ class StrideRuleEngine:
                                 for security_group, rule, workloads in public_tier_rules
                             ],
                         ),
-                        _evidence_item("public_exposure_reasons", database.metadata.get("public_exposure_reasons", [])),
+                        _evidence_item("public_exposure_reasons", database.public_exposure_reasons),
                         _evidence_item(
                             "subnet_posture",
                             [
@@ -347,7 +345,7 @@ class StrideRuleEngine:
     def _detect_unencrypted_databases(self, inventory: ResourceInventory) -> list[Finding]:
         findings: list[Finding] = []
         for database in inventory.by_type("aws_db_instance"):
-            if bool(database.metadata.get("storage_encrypted", False)):
+            if database.storage_encrypted:
                 continue
             severity_reasoning = _build_severity_reasoning(
                 internet_exposure=False,
@@ -408,7 +406,7 @@ class StrideRuleEngine:
                         "Public object access is a common source of unintended data disclosure."
                     ),
                     evidence=_collect_evidence(
-                        _evidence_item("public_exposure_reasons", bucket.metadata.get("public_exposure_reasons", [])),
+                        _evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -516,7 +514,7 @@ class StrideRuleEngine:
                                 and _statement_matches_sensitive_actions(statement, sensitive_actions)
                             ],
                         ),
-                        _evidence_item("public_exposure_reasons", workload.metadata.get("public_exposure_reasons", [])),
+                        _evidence_item("public_exposure_reasons", workload.public_exposure_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -954,13 +952,13 @@ class StrideRuleEngine:
     def _observe_private_encrypted_databases(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
         for database in inventory.by_type("aws_db_instance"):
-            if not bool(database.metadata.get("storage_encrypted", False)):
+            if not database.storage_encrypted:
                 continue
-            if bool(database.metadata.get("publicly_accessible", False)):
+            if database.publicly_accessible:
                 continue
-            if bool(database.metadata.get("direct_internet_reachable")):
+            if database.direct_internet_reachable:
                 continue
-            if bool(database.metadata.get("internet_ingress_capable")):
+            if database.internet_ingress_capable:
                 continue
             posture_signals = [
                 "publicly_accessible is false",
@@ -1148,16 +1146,16 @@ def _subnet_posture(resource: NormalizedResource | None, inventory: ResourceInve
         subnet = inventory.get_by_identifier(subnet_id)
         if subnet is None or subnet.resource_type != "aws_subnet":
             continue
-        if subnet.metadata.get("is_public_subnet"):
+        if subnet.is_public_subnet:
             posture = f"{resource.address} sits in public subnet {subnet.address}"
         else:
             posture = f"{resource.address} sits in private subnet {subnet.address}"
-        if subnet.metadata.get("has_public_route"):
+        if subnet.has_public_route:
             posture += " with an internet route"
-        elif subnet.metadata.get("has_nat_gateway_egress"):
+        elif subnet.has_nat_gateway_egress:
             posture += " with NAT-backed egress"
         postures.append(posture)
-    if not postures and resource.metadata.get("in_public_subnet"):
+    if not postures and resource.in_public_subnet:
         postures.append(f"{resource.address} is classified in a public subnet")
     return postures
 
@@ -1271,8 +1269,8 @@ def _control_workload_boundaries_by_role(
 def _is_hidden_data_store(resource: NormalizedResource) -> bool:
     return not (
         resource.public_exposure
-        or bool(resource.metadata.get("direct_internet_reachable"))
-        or bool(resource.metadata.get("internet_ingress_capable"))
+        or resource.direct_internet_reachable
+        or resource.internet_ingress_capable
     )
 
 

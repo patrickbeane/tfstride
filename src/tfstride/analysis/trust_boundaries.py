@@ -41,7 +41,7 @@ class TrustBoundaryDetector:
         role_index = _role_index(resources)
 
         for resource in resources:
-            if resource.metadata.get("direct_internet_reachable") and resource.resource_type in {
+            if resource.direct_internet_reachable and resource.resource_type in {
                 "aws_instance",
                 "aws_lb",
                 "aws_db_instance",
@@ -55,8 +55,10 @@ class TrustBoundaryDetector:
                     "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
                 )
 
-        public_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and resource.metadata.get("is_public_subnet")]
-        private_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and not resource.metadata.get("is_public_subnet")]
+        public_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and resource.is_public_subnet]
+        private_subnets = [
+            resource for resource in resources if resource.resource_type == "aws_subnet" and not resource.is_public_subnet
+        ]
         for public_subnet in public_subnets:
             for private_subnet in private_subnets:
                 # Model segmentation at the trust-zone level rather than every possible route;
@@ -217,7 +219,7 @@ def _database_reachability_rationale(
     inventory: ResourceInventory,
 ) -> str | None:
     if workload.vpc_id and data_store.vpc_id and workload.vpc_id != data_store.vpc_id:
-        if not data_store.metadata.get("direct_internet_reachable"):
+        if not data_store.direct_internet_reachable:
             return None
 
     if _database_allows_workload_security_group(workload, data_store, inventory):
@@ -226,7 +228,7 @@ def _database_reachability_rationale(
             "database ingress security groups explicitly trust the workload security group."
         )
 
-    if data_store.metadata.get("direct_internet_reachable") and _workload_has_general_egress_path(workload):
+    if data_store.direct_internet_reachable and _workload_has_general_egress_path(workload):
         return (
             "Application or function workloads cross into a higher-sensitivity data plane when "
             "a directly internet-reachable database is reachable from a workload subnet with general egress."
@@ -263,9 +265,9 @@ def _database_allows_workload_security_group(
 
 
 def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
-    if workload.resource_type == "aws_lambda_function" and not workload.metadata.get("vpc_enabled", True):
+    if workload.resource_type == "aws_lambda_function" and not workload.vpc_enabled:
         return True
-    return bool(workload.metadata.get("in_public_subnet") or workload.metadata.get("has_nat_gateway_egress"))
+    return workload.in_public_subnet or workload.has_nat_gateway_egress
 
 
 def _resource_policy_principals(

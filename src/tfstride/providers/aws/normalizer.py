@@ -905,7 +905,7 @@ class AwsNormalizer(ProviderNormalizer):
             bucket.metadata["public_access_block"] = public_access_block
             public_via_acl = bucket.metadata.get("acl") in {"public-read", "public-read-write", "website"}
             public_via_policy = policy_allows_public_access(bucket.metadata.get("policy_document", {}))
-            bucket.metadata["public_access_reasons"] = _bucket_public_exposure_reasons(
+            bucket.public_access_reasons = _bucket_public_exposure_reasons(
                 bucket.metadata.get("acl", ""),
                 public_policy=public_via_policy,
             )
@@ -915,7 +915,7 @@ class AwsNormalizer(ProviderNormalizer):
                 public_via_policy
                 and not (public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"])
             )
-            bucket.metadata["public_exposure_reasons"] = _bucket_public_exposure_reasons(
+            bucket.public_exposure_reasons = _bucket_public_exposure_reasons(
                 bucket.metadata.get("acl", ""),
                 public_policy=public_via_policy,
                 public_access_block=public_access_block,
@@ -953,10 +953,10 @@ class AwsNormalizer(ProviderNormalizer):
                     vpcs_with_public_routes
                 )
                 has_nat_route = False
-            subnet.metadata["is_public_subnet"] = is_public
+            subnet.is_public_subnet = is_public
             subnet.metadata["route_table_ids"] = associated_route_table_ids
-            subnet.metadata["has_public_route"] = has_public_route
-            subnet.metadata["has_nat_gateway_egress"] = has_nat_route
+            subnet.has_public_route = has_public_route
+            subnet.has_nat_gateway_egress = has_nat_route
             if is_public and subnet.identifier:
                 public_subnet_ids.add(subnet.identifier)
 
@@ -983,26 +983,28 @@ class AwsNormalizer(ProviderNormalizer):
                 for security_group in attached_security_groups
                 for rule in security_group.network_rules
             )
-            resource.metadata.setdefault("public_access_reasons", [])
-            resource.metadata.setdefault("public_exposure_reasons", [])
+            if "public_access_reasons" not in resource.metadata:
+	            resource.public_access_reasons = []
+            if "public_exposure_reasons" not in resource.metadata:
+	            resource.public_exposure_reasons = []
             resource.metadata["public_access_configured"] = resource.public_access_configured
             resource.metadata["internet_ingress"] = internet_ingress
-            resource.metadata["internet_ingress_capable"] = internet_ingress
-            resource.metadata["internet_ingress_reasons"] = _internet_ingress_reasons(attached_security_groups)
+            resource.internet_ingress_capable = internet_ingress
+            resource.internet_ingress_reasons = _internet_ingress_reasons(attached_security_groups)
             if resource.resource_type != "aws_subnet":
-                resource.metadata["in_public_subnet"] = (
+                resource.in_public_subnet = (
                     any(subnet_id in public_subnet_ids for subnet_id in resource.subnet_ids)
                     if resource.subnet_ids
-                    else resource.metadata.get("in_public_subnet", False)
+                    else resource.in_public_subnet
                 )
-            resource.metadata["has_nat_gateway_egress"] = (
+            resource.has_nat_gateway_egress = (
                 any(
-                    subnets[subnet_id].metadata.get("has_nat_gateway_egress")
+                    subnets[subnet_id].has_nat_gateway_egress
                     for subnet_id in resource.subnet_ids
                     if subnet_id in subnets
                 )
                 if resource.subnet_ids
-                else resource.metadata.get("has_nat_gateway_egress", False)
+                else resource.has_nat_gateway_egress
             )
             # Public exposure is inferred conservatively from network placement and ingress
             # rules so later detectors can reason over a normalized signal instead of
@@ -1010,7 +1012,7 @@ class AwsNormalizer(ProviderNormalizer):
             if resource.resource_type == "aws_instance":
                 resource.public_exposure = bool(
                     resource.public_access_configured
-                    and resource.metadata["in_public_subnet"]
+                    and resource.in_public_subnet
                     and internet_ingress
                 )
                 if resource.public_exposure:
@@ -1022,7 +1024,7 @@ class AwsNormalizer(ProviderNormalizer):
             elif resource.resource_type == "aws_ecs_service":
                 resource.public_exposure = bool(
                     resource.public_access_configured
-                    and resource.metadata["in_public_subnet"]
+                    and resource.in_public_subnet
                     and internet_ingress
                 )
                 if resource.public_exposure:
@@ -1063,7 +1065,7 @@ class AwsNormalizer(ProviderNormalizer):
                         "public_exposure_reasons",
                         "load balancer is configured as internet-facing",
                     )
-            resource.metadata["direct_internet_reachable"] = resource.public_exposure
+            resource.direct_internet_reachable = resource.public_exposure
 
         internet_facing_load_balancers_by_security_group: dict[str, list[NormalizedResource]] = {}
         for resource in resources:

@@ -127,6 +127,119 @@ class NormalizedResource:
     def display_name(self) -> str:
         return f"{self.resource_type}.{self.name}"
 
+    # Keep high-traffic posture fields metadata-backed for report compatibility,
+    # but expose them through typed accessors so analysis code stops depending on raw keys.
+    def _metadata_bool(self, key: str, *, default: bool = False) -> bool:
+        return bool(self.metadata.get(key, default))
+
+    def _set_metadata_bool(self, key: str, value: bool) -> None:
+        self.metadata[key] = bool(value)
+
+    def _metadata_string_list(self, key: str) -> list[str]:
+        values = self.metadata.get(key)
+        if not isinstance(values, list):
+            return []
+        return [str(value) for value in values if value not in (None, "")]
+
+    def _set_metadata_string_list(self, key: str, values: list[str]) -> None:
+        self.metadata[key] = [str(value) for value in values if value not in (None, "")]
+
+    @property
+    def direct_internet_reachable(self) -> bool:
+        return self._metadata_bool("direct_internet_reachable")
+
+    @direct_internet_reachable.setter
+    def direct_internet_reachable(self, value: bool) -> None:
+        self._set_metadata_bool("direct_internet_reachable", value)
+
+    @property
+    def internet_ingress_capable(self) -> bool:
+        return self._metadata_bool("internet_ingress_capable")
+
+    @internet_ingress_capable.setter
+    def internet_ingress_capable(self, value: bool) -> None:
+        self._set_metadata_bool("internet_ingress_capable", value)
+
+    @property
+    def in_public_subnet(self) -> bool:
+        return self._metadata_bool("in_public_subnet")
+
+    @in_public_subnet.setter
+    def in_public_subnet(self, value: bool) -> None:
+        self._set_metadata_bool("in_public_subnet", value)
+
+    @property
+    def has_nat_gateway_egress(self) -> bool:
+        return self._metadata_bool("has_nat_gateway_egress")
+
+    @has_nat_gateway_egress.setter
+    def has_nat_gateway_egress(self, value: bool) -> None:
+        self._set_metadata_bool("has_nat_gateway_egress", value)
+
+    @property
+    def is_public_subnet(self) -> bool:
+        return self._metadata_bool("is_public_subnet")
+
+    @is_public_subnet.setter
+    def is_public_subnet(self, value: bool) -> None:
+        self._set_metadata_bool("is_public_subnet", value)
+
+    @property
+    def has_public_route(self) -> bool:
+        return self._metadata_bool("has_public_route")
+
+    @has_public_route.setter
+    def has_public_route(self, value: bool) -> None:
+        self._set_metadata_bool("has_public_route", value)
+
+    @property
+    def vpc_enabled(self) -> bool:
+        return self._metadata_bool("vpc_enabled", default=True)
+
+    @vpc_enabled.setter
+    def vpc_enabled(self, value: bool) -> None:
+        self._set_metadata_bool("vpc_enabled", value)
+
+    @property
+    def storage_encrypted(self) -> bool:
+        return self._metadata_bool("storage_encrypted")
+
+    @storage_encrypted.setter
+    def storage_encrypted(self, value: bool) -> None:
+        self._set_metadata_bool("storage_encrypted", value)
+
+    @property
+    def publicly_accessible(self) -> bool:
+        return self._metadata_bool("publicly_accessible")
+
+    @publicly_accessible.setter
+    def publicly_accessible(self, value: bool) -> None:
+        self._set_metadata_bool("publicly_accessible", value)
+
+    @property
+    def public_access_reasons(self) -> list[str]:
+        return self._metadata_string_list("public_access_reasons")
+
+    @public_access_reasons.setter
+    def public_access_reasons(self, values: list[str]) -> None:
+        self._set_metadata_string_list("public_access_reasons", values)
+
+    @property
+    def public_exposure_reasons(self) -> list[str]:
+        return self._metadata_string_list("public_exposure_reasons")
+
+    @public_exposure_reasons.setter
+    def public_exposure_reasons(self, values: list[str]) -> None:
+        self._set_metadata_string_list("public_exposure_reasons", values)
+
+    @property
+    def internet_ingress_reasons(self) -> list[str]:
+        return self._metadata_string_list("internet_ingress_reasons")
+
+    @internet_ingress_reasons.setter
+    def internet_ingress_reasons(self, values: list[str]) -> None:
+        self._set_metadata_string_list("internet_ingress_reasons", values)
+        
 
 @dataclass(slots=True)
 class ResourceInventory:
