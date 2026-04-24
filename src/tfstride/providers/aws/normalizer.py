@@ -851,13 +851,13 @@ class AwsNormalizer(ProviderNormalizer):
         for bucket_policy_resource in resources:
             if bucket_policy_resource.resource_type != "aws_s3_bucket_policy":
                 continue
-            bucket = buckets.get(bucket_policy_resource.metadata.get("bucket"))
+            bucket = buckets.get(bucket_policy_resource.bucket_name)
             if bucket is None:
                 continue
             _merge_resource_policy(
                 bucket,
                 bucket_policy_resource.policy_statements,
-                bucket_policy_resource.metadata.get("policy_document", {}),
+                bucket_policy_resource.policy_document,
                 bucket_policy_resource.address,
             )
 
@@ -870,7 +870,7 @@ class AwsNormalizer(ProviderNormalizer):
             _merge_resource_policy(
                 secret,
                 secret_policy_resource.policy_statements,
-                secret_policy_resource.metadata.get("policy_document", {}),
+                secret_policy_resource.policy_document,
                 secret_policy_resource.address,
             )
 
@@ -902,11 +902,11 @@ class AwsNormalizer(ProviderNormalizer):
                 "ignore_public_acls": bool(access_block_resource.metadata.get("ignore_public_acls")),
                 "restrict_public_buckets": bool(access_block_resource.metadata.get("restrict_public_buckets")),
             }
-            bucket.metadata["public_access_block"] = public_access_block
-            public_via_acl = bucket.metadata.get("acl") in {"public-read", "public-read-write", "website"}
-            public_via_policy = policy_allows_public_access(bucket.metadata.get("policy_document", {}))
+            bucket.public_access_block = public_access_block
+            public_via_acl = bucket.bucket_acl in {"public-read", "public-read-write", "website"}
+            public_via_policy = policy_allows_public_access(bucket.policy_document)
             bucket.public_access_reasons = _bucket_public_exposure_reasons(
-                bucket.metadata.get("acl", ""),
+                bucket.bucket_acl,
                 public_policy=public_via_policy,
             )
             bucket.public_exposure = (
@@ -916,7 +916,7 @@ class AwsNormalizer(ProviderNormalizer):
                 and not (public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"])
             )
             bucket.public_exposure_reasons = _bucket_public_exposure_reasons(
-                bucket.metadata.get("acl", ""),
+                bucket.bucket_acl,
                 public_policy=public_via_policy,
                 public_access_block=public_access_block,
             )
@@ -1327,10 +1327,12 @@ def _merge_resource_policy(
     source_address: str,
 ) -> None:
     resource.policy_statements.extend(_clone_policy_statements(policy_statements))
-    _append_unique(resource.metadata, "resource_policy_source_addresses", source_address)
-    merged_document = _merge_policy_documents(resource.metadata.get("policy_document", {}), policy_document)
+    resource_policy_source_addresses = resource.resource_policy_source_addresses
+    if source_address not in resource_policy_source_addresses:
+	    resource.resource_policy_source_addresses = [*resource_policy_source_addresses, source_address]
+    merged_document = _merge_policy_documents(resource.policy_document, policy_document)
     if merged_document:
-        resource.metadata["policy_document"] = merged_document
+        resource.policy_document = merged_document
 
 
 def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str, Any]:

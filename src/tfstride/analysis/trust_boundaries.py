@@ -95,9 +95,9 @@ class TrustBoundaryDetector:
                     "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
                 )
 
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         for role in inventory.by_type("aws_iam_role"):
-            for principal in role.metadata.get("trust_principals", []):
+            for principal in role.trust_principals:
                 assessment = assess_principal(principal, primary_account_id)
                 if assessment.is_service:
                     continue

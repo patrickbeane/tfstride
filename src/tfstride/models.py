@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -144,6 +145,40 @@ class NormalizedResource:
     def _set_metadata_string_list(self, key: str, values: list[str]) -> None:
         self.metadata[key] = [str(value) for value in values if value not in (None, "")]
 
+    def _metadata_optional_string(self, key: str) -> str | None:
+	    value = self.metadata.get(key)
+	    if value is None:
+	        return None
+	    text = str(value).strip()
+	    return text or None
+	
+    def _set_metadata_optional_string(self, key: str, value: str | None) -> None:
+	    if value is None or not str(value).strip():
+	        self.metadata.pop(key, None)
+	        return
+	    self.metadata[key] = str(value).strip()
+	
+    def _metadata_dict(self, key: str) -> dict[str, Any]:
+	    value = self.metadata.get(key)
+	    if not isinstance(value, dict):
+	        return {}
+	    return deepcopy(value)
+	
+    def _set_metadata_dict(self, key: str, value: dict[str, Any] | None) -> None:
+	    if value is None:
+	        self.metadata.pop(key, None)
+	        return
+	    self.metadata[key] = deepcopy(value)
+	
+    def _metadata_dict_list(self, key: str) -> list[dict[str, Any]]:
+	    values = self.metadata.get(key)
+	    if not isinstance(values, list):
+	        return []
+	    return [deepcopy(value) for value in values if isinstance(value, dict)]
+	
+    def _set_metadata_dict_list(self, key: str, values: list[dict[str, Any]]) -> None:
+	    self.metadata[key] = [deepcopy(value) for value in values if isinstance(value, dict)]
+
     @property
     def direct_internet_reachable(self) -> bool:
         return self._metadata_bool("direct_internet_reachable")
@@ -239,7 +274,77 @@ class NormalizedResource:
     @internet_ingress_reasons.setter
     def internet_ingress_reasons(self, values: list[str]) -> None:
         self._set_metadata_string_list("internet_ingress_reasons", values)
-        
+
+    @property
+    def trust_principals(self) -> list[str]:
+	    return self._metadata_string_list("trust_principals")
+	
+    @trust_principals.setter
+    def trust_principals(self, values: list[str]) -> None:
+	    self._set_metadata_string_list("trust_principals", values)
+	
+    @property
+    def trust_statements(self) -> list[dict[str, Any]]:
+	    return self._metadata_dict_list("trust_statements")
+	
+    @trust_statements.setter
+    def trust_statements(self, values: list[dict[str, Any]]) -> None:
+	    self._set_metadata_dict_list("trust_statements", values)
+	
+    @property
+    def resource_policy_source_addresses(self) -> list[str]:
+        return self._metadata_string_list("resource_policy_source_addresses")
+	
+    @resource_policy_source_addresses.setter
+    def resource_policy_source_addresses(self, values: list[str]) -> None:
+        self._set_metadata_string_list("resource_policy_source_addresses", values)
+	
+    @property
+    def policy_document(self) -> dict[str, Any]:
+        return self._metadata_dict("policy_document")
+	
+    @policy_document.setter
+    def policy_document(self, value: dict[str, Any] | None) -> None:
+        self._set_metadata_dict("policy_document", value)
+	
+    @property
+    def public_access_block(self) -> dict[str, bool] | None:
+        value = self.metadata.get("public_access_block")
+        if not isinstance(value, dict):
+            return None
+        return {str(key): bool(item) for key, item in value.items()}
+	
+    @public_access_block.setter
+    def public_access_block(self, value: dict[str, bool] | None) -> None:
+        if value is None:
+            self.metadata.pop("public_access_block", None)
+            return
+        self.metadata["public_access_block"] = {str(key): bool(item) for key, item in value.items()}
+	
+    @property
+    def bucket_name(self) -> str | None:
+        return self._metadata_optional_string("bucket")
+	
+    @bucket_name.setter
+    def bucket_name(self, value: str | None) -> None:
+        self._set_metadata_optional_string("bucket", value)
+	
+    @property
+    def bucket_acl(self) -> str:
+        return self._metadata_optional_string("acl") or ""
+	
+    @bucket_acl.setter
+    def bucket_acl(self, value: str | None) -> None:
+        self._set_metadata_optional_string("acl", value)
+	
+    @property
+    def engine(self) -> str | None:
+        return self._metadata_optional_string("engine")
+	
+    @engine.setter
+    def engine(self, value: str | None) -> None:
+        self._set_metadata_optional_string("engine", value)
+
 
 @dataclass(slots=True)
 class ResourceInventory:
@@ -274,6 +379,21 @@ class ResourceInventory:
 	    self._resources_by_address = resources_by_address
 	    self._resources_by_identifier = resources_by_identifier
 	    self._resource_positions = resource_positions
+
+    @property
+    def primary_account_id(self) -> str | None:
+        value = self.metadata.get("primary_account_id")
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+	
+    @primary_account_id.setter
+    def primary_account_id(self, value: str | None) -> None:
+        if value is None or not str(value).strip():
+            self.metadata.pop("primary_account_id", None)
+            return
+        self.metadata["primary_account_id"] = str(value).strip()
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:

@@ -83,6 +83,19 @@ class ResourceInventoryTests(unittest.TestCase):
         self.assertIs(inventory.get_by_address("aws_instance.web"), target)
         self.assertIsNone(inventory.get_by_address("aws_instance.missing"))
 
+    def test_primary_account_id_property_defaults_and_setter_use_metadata(self) -> None:
+	    inventory = ResourceInventory(provider="aws", resources=[])
+	
+	    self.assertIsNone(inventory.primary_account_id)
+	
+	    inventory.primary_account_id = "111122223333"
+	    self.assertEqual(inventory.primary_account_id, "111122223333")
+	    self.assertEqual(inventory.metadata["primary_account_id"], "111122223333")
+	
+	    inventory.primary_account_id = None
+	    self.assertIsNone(inventory.primary_account_id)
+	    self.assertNotIn("primary_account_id", inventory.metadata)
+
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
     def test_posture_property_defaults_do_not_require_metadata_keys(self) -> None:
@@ -135,6 +148,51 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
             ["aws_security_group.web ingress tcp 443 from 0.0.0.0/0"],
         )
         
+    def test_policy_and_trust_property_defaults_do_not_require_metadata_keys(self) -> None:
+	    resource = _resource(address="aws_iam_role.app", resource_type="aws_iam_role")
+	
+	    self.assertEqual(resource.trust_principals, [])
+	    self.assertEqual(resource.trust_statements, [])
+	    self.assertEqual(resource.resource_policy_source_addresses, [])
+	    self.assertEqual(resource.policy_document, {})
+	    self.assertIsNone(resource.public_access_block)
+	    self.assertEqual(resource.bucket_acl, "")
+	    self.assertIsNone(resource.bucket_name)
+	    self.assertIsNone(resource.engine)
+	    self.assertEqual(resource.metadata, {})
+	
+    def test_policy_and_trust_property_setters_update_metadata(self) -> None:
+	    resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")
+	
+	    resource.trust_principals = ["arn:aws:iam::111122223333:root"]
+	    resource.trust_statements = [
+	        {
+	            "principals": ["arn:aws:iam::111122223333:root"],
+	            "has_narrowing_conditions": True,
+	        }
+	    ]
+	    resource.resource_policy_source_addresses = ["aws_s3_bucket_policy.logs"]
+	    resource.policy_document = {"Version": "2012-10-17", "Statement": []}
+	    resource.public_access_block = {"block_public_policy": True, "restrict_public_buckets": False}
+	    resource.bucket_acl = "public-read"
+	    resource.bucket_name = "logs"
+	    resource.engine = "postgres"
+	
+	    self.assertEqual(resource.metadata["trust_principals"], ["arn:aws:iam::111122223333:root"])
+	    self.assertEqual(
+	        resource.metadata["trust_statements"],
+	        [{"principals": ["arn:aws:iam::111122223333:root"], "has_narrowing_conditions": True}],
+	    )
+	    self.assertEqual(resource.metadata["resource_policy_source_addresses"], ["aws_s3_bucket_policy.logs"])
+	    self.assertEqual(resource.metadata["policy_document"], {"Version": "2012-10-17", "Statement": []})
+	    self.assertEqual(
+	        resource.metadata["public_access_block"],
+	        {"block_public_policy": True, "restrict_public_buckets": False},
+	    )
+	    self.assertEqual(resource.metadata["acl"], "public-read")
+	    self.assertEqual(resource.metadata["bucket"], "logs")
+	    self.assertEqual(resource.metadata["engine"], "postgres")
+
 
 if __name__ == "__main__":
     unittest.main()

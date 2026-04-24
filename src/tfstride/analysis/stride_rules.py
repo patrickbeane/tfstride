@@ -67,7 +67,7 @@ class StrideRuleEngine:
         boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
         for resource in inventory.resources:
             if resource.resource_type not in SENSITIVE_RESOURCE_POLICY_TYPES.union(SERVICE_RESOURCE_POLICY_TYPES):
@@ -138,7 +138,7 @@ class StrideRuleEngine:
                             severity=severity_reasoning.severity,
                             affected_resources=[
                                 resource.address,
-                                *resource.metadata.get("resource_policy_source_addresses", []),
+                                *resource.resource_policy_source_addresses,
                             ],
                             trust_boundary_id=boundary.identifier if boundary else None,
                             rationale=rationale,
@@ -149,7 +149,7 @@ class StrideRuleEngine:
                                 _evidence_item("policy_statements", [_describe_policy_statement(statement)]),
                                 _evidence_item(
                                     "resource_policy_sources",
-                                    resource.metadata.get("resource_policy_source_addresses", []),
+                                    resource.resource_policy_source_addresses,
                                 ),
                             ),
                             severity_reasoning=severity_reasoning,
@@ -369,7 +369,7 @@ class StrideRuleEngine:
                             "encryption_posture",
                             [
                                 "storage_encrypted is false",
-                                f"engine is {database.metadata.get('engine', 'unknown')}",
+                                f"engine is {database.engine or 'unknown'}",
                             ],
                         ),
                     ),
@@ -659,10 +659,10 @@ class StrideRuleEngine:
         boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
-            for trust_statement in role.metadata.get("trust_statements", []):
+            for trust_statement in role.trust_statements:
                 if trust_statement_has_effective_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
@@ -711,7 +711,7 @@ class StrideRuleEngine:
         boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         control_boundaries_by_role = _control_workload_boundaries_by_role(boundary_index)
         sensitive_data_paths = _private_sensitive_controlled_data_paths(boundary_index, inventory)
         seen: set[tuple[str, str, tuple[str, ...], tuple[str, ...]]] = set()
@@ -720,7 +720,7 @@ class StrideRuleEngine:
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
-            for trust_statement in role.metadata.get("trust_statements", []):
+            for trust_statement in role.trust_statements:
                 if trust_statement_has_effective_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
@@ -820,10 +820,10 @@ class StrideRuleEngine:
         boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
-            for trust_statement in role.metadata.get("trust_statements", []):
+            for trust_statement in role.trust_statements:
                 if trust_statement_has_supported_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
@@ -868,23 +868,24 @@ class StrideRuleEngine:
     def _observe_bucket_public_access_blocks(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
         access_block_index = {
-            access_block.metadata.get("bucket"): access_block
+            access_block.bucket_name: access_block
             for access_block in inventory.by_type("aws_s3_bucket_public_access_block")
+            if access_block.bucket_name
         }
         for bucket in inventory.by_type("aws_s3_bucket"):
-            access_block = bucket.metadata.get("public_access_block")
+            access_block = bucket.public_access_block
             if not access_block or bucket.public_exposure:
                 continue
             mitigation_signals: list[str] = []
-            acl = bucket.metadata.get("acl", "")
+            acl = bucket.bucket_acl
             if acl in {"public-read", "public-read-write", "website"}:
                 mitigation_signals.append(f"bucket ACL `{acl}` would otherwise grant public access")
-            if policy_allows_public_access(bucket.metadata.get("policy_document", {})):
+            if policy_allows_public_access(bucket.policy_document):
                 mitigation_signals.append("bucket policy would otherwise allow anonymous access")
             if not mitigation_signals:
                 continue
             affected_resources = [bucket.address]
-            access_block_resource = access_block_index.get(bucket.metadata.get("bucket"))
+            access_block_resource = access_block_index.get(bucket.bucket_name)
             if access_block_resource is not None:
                 affected_resources.append(access_block_resource.address)
             observations.append(
@@ -914,10 +915,10 @@ class StrideRuleEngine:
 
     def _observe_narrowed_trust(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
-        primary_account_id = inventory.metadata.get("primary_account_id")
+        primary_account_id = inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
-            for trust_statement in role.metadata.get("trust_statements", []):
+            for trust_statement in role.trust_statements:
                 if not trust_statement_has_effective_narrowing(trust_statement):
                     continue
                 for principal in trust_statement.get("principals", []):
@@ -965,7 +966,7 @@ class StrideRuleEngine:
                 "storage_encrypted is true",
                 "no attached security group allows internet ingress",
             ]
-            engine = database.metadata.get("engine")
+            engine = database.engine
             if engine:
                 posture_signals.append(f"engine is {engine}")
             observations.append(
