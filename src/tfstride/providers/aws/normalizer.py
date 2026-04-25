@@ -695,7 +695,7 @@ class AwsNormalizer(ProviderNormalizer):
 	            key: resource
 	            for resource in resources
 	            if resource.resource_type == "aws_secretsmanager_secret"
-	            for key in (resource.identifier, resource.address, resource.arn, resource.metadata.get("name"))
+                for key in (resource.identifier, resource.address, resource.arn, resource.secret_name)
 	            if key
 	        },
 	        lambda_functions={
@@ -709,7 +709,7 @@ class AwsNormalizer(ProviderNormalizer):
 	            key: resource
 	            for resource in resources
 	            if resource.resource_type == "aws_ecs_cluster"
-	            for key in (resource.identifier, resource.address, resource.arn, resource.metadata.get("name"))
+	            for key in (resource.identifier, resource.address, resource.arn, resource.cluster_name)
 	            if key
 	        },
 	        ecs_task_definitions={
@@ -720,10 +720,10 @@ class AwsNormalizer(ProviderNormalizer):
 	                resource.identifier,
 	                resource.address,
 	                resource.arn,
-	                resource.metadata.get("family"),
+	                resource.task_definition_family,
 	                _ecs_task_definition_identifier(
-	                    resource.metadata.get("family"),
-	                    resource.metadata.get("revision"),
+	                    resource.task_definition_family,
+	                    resource.task_definition_revision,
 	                ),
 	            )
 	            if key
@@ -759,7 +759,7 @@ class AwsNormalizer(ProviderNormalizer):
                 for resource in resources
 	            if resource.resource_type == "aws_route_table"
 	            and resource.vpc_id
-	            and _has_internet_route(resource.metadata.get("routes", []))
+	            and _has_internet_route(resource.routes)
             },
 	        nat_gateway_ids={
 	            resource.identifier
@@ -779,7 +779,7 @@ class AwsNormalizer(ProviderNormalizer):
         for rule_resource in resources:
             if rule_resource.resource_type != "aws_security_group_rule":
                 continue
-            target_group = security_groups.get(rule_resource.metadata.get("security_group_id"))
+            target_group = security_groups.get(rule_resource.security_group_id)
             if target_group is None:
                 continue
             target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
@@ -797,27 +797,27 @@ class AwsNormalizer(ProviderNormalizer):
         for role_policy_resource in resources:
             if role_policy_resource.resource_type != "aws_iam_role_policy":
                 continue
-            role = role_index.get(role_policy_resource.metadata.get("role"))
+            role = role_index.get(role_policy_resource.role_reference)
             if role is None:
                 continue
             role.policy_statements.extend(_clone_policy_statements(role_policy_resource.policy_statements))
             _append_unique(role.metadata, "inline_policy_resource_addresses", role_policy_resource.address)
-            _append_unique(role.metadata, "inline_policy_names", role_policy_resource.metadata.get("policy_name"))
+            _append_unique(role.metadata, "inline_policy_names", role_policy_resource.policy_name)
 
         # Role-policy attachments change the workload's effective privileges, so merge any
         # in-plan customer-managed policy statements onto the target role.
         for attachment_resource in resources:
             if attachment_resource.resource_type != "aws_iam_role_policy_attachment":
                 continue
-            role = role_index.get(attachment_resource.metadata.get("role"))
-            policy = policy_index.get(attachment_resource.metadata.get("policy_arn"))
+            role = role_index.get(attachment_resource.role_reference)
+            policy = policy_index.get(attachment_resource.policy_arn)
             if role is None:
                 continue
             if policy is None:
                 _append_unique(
                     role.metadata,
                     "unresolved_attached_policy_arns",
-                    str(attachment_resource.metadata.get("policy_arn")),
+                    str(attachment_resource.policy_arn)
                 )
                 continue
             role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
@@ -837,7 +837,7 @@ class AwsNormalizer(ProviderNormalizer):
             if instance_profile_resource.resource_type != "aws_iam_instance_profile":
                 continue
             resolved_role_refs: list[str] = []
-            for role_ref in instance_profile_resource.metadata.get("role_references", []):
+            for role_ref in instance_profile_resource.role_references:
                 role = role_index.get(role_ref)
                 if role is None:
                     _append_unique(instance_profile_resource.metadata, "unresolved_role_references", role_ref)
@@ -846,12 +846,12 @@ class AwsNormalizer(ProviderNormalizer):
                 if resolved_role_ref:
                     resolved_role_refs.append(resolved_role_ref)
                 _append_unique(instance_profile_resource.metadata, "resolved_role_addresses", role.address)
-            instance_profile_resource.metadata["resolved_role_references"] = resolved_role_refs
+            instance_profile_resource.resolved_role_references = resolved_role_refs
 
         for workload_resource in resources:
             if workload_resource.resource_type != "aws_instance":
                 continue
-            instance_profile_ref = workload_resource.metadata.get("iam_instance_profile")
+            instance_profile_ref = workload_resource.iam_instance_profile
             if not instance_profile_ref:
                 continue
             instance_profile = instance_profile_index.get(instance_profile_ref)
@@ -859,7 +859,7 @@ class AwsNormalizer(ProviderNormalizer):
                 _append_unique(workload_resource.metadata, "unresolved_instance_profiles", str(instance_profile_ref))
                 continue
             _append_unique(workload_resource.metadata, "resolved_instance_profile_addresses", instance_profile.address)
-            for resolved_role_ref in instance_profile.metadata.get("resolved_role_references", []):
+            for resolved_role_ref in instance_profile.resolved_role_references:
                 if resolved_role_ref not in workload_resource.attached_role_arns:
                     workload_resource.attached_role_arns.append(resolved_role_ref)
 
@@ -874,7 +874,7 @@ class AwsNormalizer(ProviderNormalizer):
         for ecs_service_resource in resources:
             if ecs_service_resource.resource_type != "aws_ecs_service":
                 continue
-            cluster_ref = ecs_service_resource.metadata.get("cluster")
+            cluster_ref = ecs_service_resource.cluster_reference
             if cluster_ref:
                 cluster = ecs_clusters.get(cluster_ref)
                 if cluster is None:
@@ -882,7 +882,7 @@ class AwsNormalizer(ProviderNormalizer):
                 else:
                     _append_unique(ecs_service_resource.metadata, "resolved_cluster_addresses", cluster.address)
 
-            task_definition_ref = ecs_service_resource.metadata.get("task_definition")
+            task_definition_ref = ecs_service_resource.task_definition_reference
             if not task_definition_ref:
                 continue
             task_definition = ecs_task_definitions.get(task_definition_ref)
@@ -898,14 +898,12 @@ class AwsNormalizer(ProviderNormalizer):
                 "resolved_task_definition_addresses",
                 task_definition.address,
             )
-            ecs_service_resource.metadata["network_mode"] = task_definition.metadata.get("network_mode")
-            ecs_service_resource.metadata["requires_compatibilities"] = list(
-                task_definition.metadata.get("requires_compatibilities", [])
-            )
-            task_role_arn = task_definition.metadata.get("task_role_arn")
-            execution_role_arn = task_definition.metadata.get("execution_role_arn")
+            ecs_service_resource.network_mode = task_definition.network_mode
+            ecs_service_resource.requires_compatibilities = task_definition.requires_compatibilities
+            task_role_arn = task_definition.task_role_arn
+            execution_role_arn = task_definition.execution_role_arn
             if task_role_arn:
-                ecs_service_resource.metadata["task_role_arn"] = task_role_arn
+                ecs_service_resource.task_role_arn = task_role_arn
                 if task_role_arn not in ecs_service_resource.attached_role_arns:
                     ecs_service_resource.attached_role_arns.append(task_role_arn)
                 task_role = role_index.get(task_role_arn)
@@ -914,7 +912,7 @@ class AwsNormalizer(ProviderNormalizer):
                 else:
                     _append_unique(ecs_service_resource.metadata, "unresolved_task_role_arns", str(task_role_arn))
             if execution_role_arn:
-                ecs_service_resource.metadata["execution_role_arn"] = execution_role_arn
+                ecs_service_resource.execution_role_arn = execution_role_arn
                 execution_role = role_index.get(execution_role_arn)
                 if execution_role is not None:
                     _append_unique(
@@ -955,7 +953,7 @@ class AwsNormalizer(ProviderNormalizer):
         for secret_policy_resource in resources:
             if secret_policy_resource.resource_type != "aws_secretsmanager_secret_policy":
                 continue
-            secret = secrets.get(secret_policy_resource.metadata.get("secret_arn"))
+            secret = secrets.get(secret_policy_resource.secret_arn)
             if secret is None:
                 continue
             _merge_resource_policy(
@@ -968,7 +966,7 @@ class AwsNormalizer(ProviderNormalizer):
         for lambda_permission_resource in resources:
             if lambda_permission_resource.resource_type != "aws_lambda_permission":
                 continue
-            function_name = lambda_permission_resource.metadata.get("function_name")
+            function_name = lambda_permission_resource.function_name
             target_function = lambda_functions.get(function_name)
             if target_function is None:
                 continue
@@ -989,14 +987,14 @@ class AwsNormalizer(ProviderNormalizer):
         for access_block_resource in resources:
             if access_block_resource.resource_type != "aws_s3_bucket_public_access_block":
                 continue
-            bucket = buckets.get(access_block_resource.metadata.get("bucket"))
+            bucket = buckets.get(access_block_resource.bucket_name)
             if bucket is None:
                 continue
             public_access_block = {
-                "block_public_acls": bool(access_block_resource.metadata.get("block_public_acls")),
-                "block_public_policy": bool(access_block_resource.metadata.get("block_public_policy")),
-                "ignore_public_acls": bool(access_block_resource.metadata.get("ignore_public_acls")),
-                "restrict_public_buckets": bool(access_block_resource.metadata.get("restrict_public_buckets")),
+                "block_public_acls": access_block_resource.block_public_acls,
+	            "block_public_policy": access_block_resource.block_public_policy,
+	            "ignore_public_acls": access_block_resource.ignore_public_acls,
+	            "restrict_public_buckets": access_block_resource.restrict_public_buckets,
             }
             bucket.public_access_block = public_access_block
             public_via_acl = bucket.bucket_acl in {"public-read", "public-read-write", "website"}
@@ -1030,8 +1028,8 @@ class AwsNormalizer(ProviderNormalizer):
         for association_resource in resources:
             if association_resource.resource_type != "aws_route_table_association":
                 continue
-            subnet_id = association_resource.metadata.get("subnet_id")
-            route_table_id = association_resource.metadata.get("route_table_id")
+            subnet_id = association_resource.subnet_id
+            route_table_id = association_resource.route_table_id
             if not subnet_id or not route_table_id:
                 continue
             subnet_route_table_ids.setdefault(str(subnet_id), []).append(str(route_table_id))
@@ -1040,12 +1038,12 @@ class AwsNormalizer(ProviderNormalizer):
         for subnet in subnets.values():
             associated_route_table_ids = subnet_route_table_ids.get(subnet.identifier or "", [])
             has_public_route = any(
-                route_table_id in route_tables and _has_internet_route(route_tables[route_table_id].metadata.get("routes", []))
+                route_table_id in route_tables and _has_internet_route(route_tables[route_table_id].routes)
                 for route_table_id in associated_route_table_ids
             )
             has_nat_route = any(
                 route_table_id in route_tables
-                and _has_nat_gateway_route(route_tables[route_table_id].metadata.get("routes", []), nat_gateway_ids)
+                and _has_nat_gateway_route(route_tables[route_table_id].routes, nat_gateway_ids)
                 for route_table_id in associated_route_table_ids
             )
             if associated_route_table_ids:
@@ -1054,7 +1052,7 @@ class AwsNormalizer(ProviderNormalizer):
                 is_public = has_public_route
             else:
                 # Fall back to the original heuristic when route table associations are absent.
-                is_public = bool(subnet.metadata.get("map_public_ip_on_launch")) and subnet.vpc_id in vpcs_with_igw.intersection(
+                is_public = subnet.map_public_ip_on_launch and subnet.vpc_id in vpcs_with_igw.intersection(
                     vpcs_with_public_routes
                 )
                 has_nat_route = False
@@ -1066,23 +1064,29 @@ class AwsNormalizer(ProviderNormalizer):
                 public_subnet_ids.add(subnet.identifier)
         return public_subnet_ids
 
+    def _infer_vpc_ids(
+        self,
+        resources: list[NormalizedResource],
+        subnets: dict[str | None, NormalizedResource],
+        security_groups: dict[str | None, NormalizedResource],
+    ) -> None:
         for resource in resources:
-	        if resource.vpc_id:
-	            continue
-	        # Some Terraform resources omit a direct VPC reference, so infer it from the
-	        # attached subnet first and fall back to attached security groups.
-	        for subnet_id in resource.subnet_ids:
-	            subnet = subnets.get(subnet_id)
-	            if subnet and subnet.vpc_id:
-	                resource.vpc_id = subnet.vpc_id
-	                break
-	        if resource.vpc_id:
-	            continue
-	        for security_group_id in resource.security_group_ids:
-	            security_group = security_groups.get(security_group_id)
-	            if security_group and security_group.vpc_id:
-	                resource.vpc_id = security_group.vpc_id
-	                break
+            if resource.vpc_id:
+                continue
+            # Some Terraform resources omit a direct VPC reference, so infer it from the
+            # attached subnet first and fall back to attached security groups.
+            for subnet_id in resource.subnet_ids:
+                subnet = subnets.get(subnet_id)
+                if subnet and subnet.vpc_id:
+                    resource.vpc_id = subnet.vpc_id
+                    break
+            if resource.vpc_id:
+                continue
+            for security_group_id in resource.security_group_ids:
+                security_group = security_groups.get(security_group_id)
+                if security_group and security_group.vpc_id:
+                    resource.vpc_id = security_group.vpc_id
+                    break
 
     def _derive_public_exposure(
 	    self,

@@ -157,6 +157,21 @@ class NormalizedResource:
 	        self.metadata.pop(key, None)
 	        return
 	    self.metadata[key] = str(value).strip()
+
+    def _metadata_optional_int(self, key: str) -> int | None:
+	    value = self.metadata.get(key)
+	    if value is None or value == "":
+	        return None
+	    try:
+	        return int(value)
+	    except (TypeError, ValueError):
+	        return None
+	
+    def _set_metadata_optional_int(self, key: str, value: int | None) -> None:
+	    if value is None:
+	        self.metadata.pop(key, None)
+	        return
+	    self.metadata[key] = int(value)
 	
     def _metadata_dict(self, key: str) -> dict[str, Any]:
 	    value = self.metadata.get(key)
@@ -274,6 +289,222 @@ class NormalizedResource:
     @internet_ingress_reasons.setter
     def internet_ingress_reasons(self, values: list[str]) -> None:
         self._set_metadata_string_list("internet_ingress_reasons", values)
+
+    @property
+    def security_group_id(self) -> str | None:
+	    return self._metadata_optional_string("security_group_id")
+	
+    @security_group_id.setter
+    def security_group_id(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("security_group_id", value)
+
+    @property
+    def role_reference(self) -> str | None:
+	    return self._metadata_optional_string("role")
+	
+    @role_reference.setter
+    def role_reference(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("role", value)
+	
+    @property
+    def role_references(self) -> list[str]:
+	    return self._metadata_string_list("role_references")
+	
+    @role_references.setter
+    def role_references(self, values: list[str]) -> None:
+	    self._set_metadata_string_list("role_references", values)
+	
+    @property
+    def resolved_role_references(self) -> list[str]:
+	    return self._metadata_string_list("resolved_role_references")
+	
+    @resolved_role_references.setter
+    def resolved_role_references(self, values: list[str]) -> None:
+	    self._set_metadata_string_list("resolved_role_references", values)
+	
+    @property
+    def iam_instance_profile(self) -> str | None:
+	    return self._metadata_optional_string("iam_instance_profile")
+	
+    @iam_instance_profile.setter
+    def iam_instance_profile(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("iam_instance_profile", value)
+	
+    @property
+    def policy_arn(self) -> str | None:
+	    return self._metadata_optional_string("policy_arn")
+	
+    @policy_arn.setter
+    def policy_arn(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("policy_arn", value)
+	
+    @property
+    def policy_name(self) -> str | None:
+	    return self._metadata_optional_string("policy_name")
+	
+    @policy_name.setter
+    def policy_name(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("policy_name", value)
+	
+    @property
+    def cluster_reference(self) -> str | None:
+	        return self._metadata_optional_string("cluster")
+	
+    @cluster_reference.setter
+    def cluster_reference(self, value: str | None) -> None:
+        self._set_metadata_optional_string("cluster", value)
+	
+    @property
+    def cluster_name(self) -> str | None:
+        return self._metadata_optional_string("name")
+	
+    @cluster_name.setter
+    def cluster_name(self, value: str | None) -> None:
+        self._set_metadata_optional_string("name", value)
+	
+    @property
+    def task_definition_reference(self) -> str | None:
+        return self._metadata_optional_string("task_definition")
+	
+    @task_definition_reference.setter
+    def task_definition_reference(self, value: str | None) -> None:
+        self._set_metadata_optional_string("task_definition", value)
+	
+    @property
+    def task_definition_family(self) -> str | None:
+        return self._metadata_optional_string("family")
+	
+    @task_definition_family.setter
+    def task_definition_family(self, value: str | None) -> None:
+        self._set_metadata_optional_string("family", value)
+	
+    @property
+    def task_definition_revision(self) -> int | None:
+        return self._metadata_optional_int("revision")
+	
+    @task_definition_revision.setter
+    def task_definition_revision(self, value: int | None) -> None:
+        self._set_metadata_optional_int("revision", value)
+	
+    @property
+    def network_mode(self) -> str | None:
+        return self._metadata_optional_string("network_mode")
+	
+    @network_mode.setter
+    def network_mode(self, value: str | None) -> None:
+        self._set_metadata_optional_string("network_mode", value)
+	
+    @property
+    def requires_compatibilities(self) -> list[str]:
+        return self._metadata_string_list("requires_compatibilities")
+	
+    @requires_compatibilities.setter
+    def requires_compatibilities(self, values: list[str]) -> None:
+	    self._set_metadata_string_list("requires_compatibilities", values)
+	
+    @property
+    def task_role_arn(self) -> str | None:
+	    return self._metadata_optional_string("task_role_arn")
+	
+    @task_role_arn.setter
+    def task_role_arn(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("task_role_arn", value)
+	
+    @property
+    def execution_role_arn(self) -> str | None:
+	    return self._metadata_optional_string("execution_role_arn")
+	
+    @execution_role_arn.setter
+    def execution_role_arn(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("execution_role_arn", value)
+	
+    @property
+    def secret_arn(self) -> str | None:
+	    return self._metadata_optional_string("secret_arn")
+	
+    @secret_arn.setter
+    def secret_arn(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("secret_arn", value)
+	
+    @property
+    def function_name(self) -> str | None:
+	    return self._metadata_optional_string("function_name")
+	
+    @function_name.setter
+    def function_name(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("function_name", value)
+	
+    @property
+    def secret_name(self) -> str | None:
+	    return self._metadata_optional_string("name")
+	
+    @secret_name.setter
+    def secret_name(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("name", value)
+	
+    @property
+    def route_table_id(self) -> str | None:
+	    return self._metadata_optional_string("route_table_id")
+	
+    @route_table_id.setter
+    def route_table_id(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("route_table_id", value)
+	
+    @property
+    def subnet_id(self) -> str | None:
+	    return self._metadata_optional_string("subnet_id")
+	
+    @subnet_id.setter
+    def subnet_id(self, value: str | None) -> None:
+	    self._set_metadata_optional_string("subnet_id", value)
+	
+    @property
+    def routes(self) -> list[dict[str, Any]]:
+	    return self._metadata_dict_list("routes")
+	
+    @routes.setter
+    def routes(self, values: list[dict[str, Any]]) -> None:
+	    self._set_metadata_dict_list("routes", values)
+	
+    @property
+    def map_public_ip_on_launch(self) -> bool:
+	    return self._metadata_bool("map_public_ip_on_launch")
+	
+    @map_public_ip_on_launch.setter
+    def map_public_ip_on_launch(self, value: bool) -> None:
+	    self._set_metadata_bool("map_public_ip_on_launch", value)
+	
+    @property
+    def block_public_acls(self) -> bool:
+	    return self._metadata_bool("block_public_acls")
+	
+    @block_public_acls.setter
+    def block_public_acls(self, value: bool) -> None:
+	    self._set_metadata_bool("block_public_acls", value)
+	
+    @property
+    def block_public_policy(self) -> bool:
+        return self._metadata_bool("block_public_policy")
+	
+    @block_public_policy.setter
+    def block_public_policy(self, value: bool) -> None:
+	    self._set_metadata_bool("block_public_policy", value)
+	
+    @property
+    def ignore_public_acls(self) -> bool:
+	    return self._metadata_bool("ignore_public_acls")
+	
+    @ignore_public_acls.setter
+    def ignore_public_acls(self, value: bool) -> None:
+        self._set_metadata_bool("ignore_public_acls", value)
+	
+    @property
+    def restrict_public_buckets(self) -> bool:
+	    return self._metadata_bool("restrict_public_buckets")
+	
+    @restrict_public_buckets.setter
+    def restrict_public_buckets(self, value: bool) -> None:
+	    self._set_metadata_bool("restrict_public_buckets", value)
 
     @property
     def trust_principals(self) -> list[str]:

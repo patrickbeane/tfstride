@@ -193,6 +193,114 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
 	    self.assertEqual(resource.metadata["bucket"], "logs")
 	    self.assertEqual(resource.metadata["engine"], "postgres")
 
+    def test_decoration_property_defaults_do_not_require_metadata_keys(self) -> None:
+        resource = _resource(address="aws_ecs_service.app", resource_type="aws_ecs_service")
+
+        self.assertIsNone(resource.security_group_id)
+        self.assertIsNone(resource.role_reference)
+        self.assertEqual(resource.role_references, [])
+        self.assertEqual(resource.resolved_role_references, [])
+        self.assertIsNone(resource.iam_instance_profile)
+        self.assertIsNone(resource.policy_arn)
+        self.assertIsNone(resource.policy_name)
+        self.assertIsNone(resource.cluster_reference)
+        self.assertIsNone(resource.cluster_name)
+        self.assertIsNone(resource.task_definition_reference)
+        self.assertIsNone(resource.task_definition_family)
+        self.assertIsNone(resource.task_definition_revision)
+        self.assertIsNone(resource.network_mode)
+        self.assertEqual(resource.requires_compatibilities, [])
+        self.assertIsNone(resource.task_role_arn)
+        self.assertIsNone(resource.execution_role_arn)
+        self.assertIsNone(resource.secret_arn)
+        self.assertIsNone(resource.secret_name)
+        self.assertIsNone(resource.function_name)
+        self.assertIsNone(resource.route_table_id)
+        self.assertIsNone(resource.subnet_id)
+        self.assertEqual(resource.routes, [])
+        self.assertFalse(resource.map_public_ip_on_launch)
+        self.assertFalse(resource.block_public_acls)
+        self.assertFalse(resource.block_public_policy)
+        self.assertFalse(resource.ignore_public_acls)
+        self.assertFalse(resource.restrict_public_buckets)
+        self.assertEqual(resource.metadata, {})
+
+    def test_decoration_property_setters_update_metadata(self) -> None:
+        resource = _resource(address="aws_ecs_service.app", resource_type="aws_ecs_service")
+        cluster_resource = _resource(address="aws_ecs_cluster.app", resource_type="aws_ecs_cluster")
+        secret_resource = _resource(
+            address="aws_secretsmanager_secret.app",
+            resource_type="aws_secretsmanager_secret",
+        )
+
+        resource.security_group_id = "sg-123"
+        resource.role_reference = "app-role"
+        resource.role_references = ["app-role", ""]
+        resource.resolved_role_references = ["arn:aws:iam::111122223333:role/app"]
+        resource.iam_instance_profile = "app-profile"
+        resource.policy_arn = "arn:aws:iam::111122223333:policy/app"
+        resource.policy_name = "app-inline"
+        resource.cluster_reference = "arn:aws:ecs:us-east-1:111122223333:cluster/app"
+        resource.task_definition_reference = "app:12"
+        resource.task_definition_family = "app"
+        resource.task_definition_revision = 12
+        resource.network_mode = "awsvpc"
+        resource.requires_compatibilities = ["FARGATE", ""]
+        resource.task_role_arn = "arn:aws:iam::111122223333:role/task"
+        resource.execution_role_arn = "arn:aws:iam::111122223333:role/execution"
+        resource.secret_arn = "arn:aws:secretsmanager:us-east-1:111122223333:secret:app"
+        resource.function_name = "app-worker"
+        resource.route_table_id = "rtb-123"
+        resource.subnet_id = "subnet-123"
+        resource.routes = [{"gateway_id": "igw-123"}]
+        resource.map_public_ip_on_launch = True
+        resource.block_public_acls = True
+        resource.block_public_policy = True
+        resource.ignore_public_acls = True
+        resource.restrict_public_buckets = True
+        cluster_resource.cluster_name = "app-cluster"
+        secret_resource.secret_name = "app/secret"
+
+        self.assertEqual(resource.metadata["security_group_id"], "sg-123")
+        self.assertEqual(resource.metadata["role"], "app-role")
+        self.assertEqual(resource.metadata["role_references"], ["app-role"])
+        self.assertEqual(
+            resource.metadata["resolved_role_references"],
+            ["arn:aws:iam::111122223333:role/app"],
+        )
+        self.assertEqual(resource.metadata["iam_instance_profile"], "app-profile")
+        self.assertEqual(resource.metadata["policy_arn"], "arn:aws:iam::111122223333:policy/app")
+        self.assertEqual(resource.metadata["policy_name"], "app-inline")
+        self.assertEqual(
+            resource.metadata["cluster"],
+            "arn:aws:ecs:us-east-1:111122223333:cluster/app",
+        )
+        self.assertEqual(resource.metadata["task_definition"], "app:12")
+        self.assertEqual(resource.metadata["family"], "app")
+        self.assertEqual(resource.metadata["revision"], 12)
+        self.assertEqual(resource.metadata["network_mode"], "awsvpc")
+        self.assertEqual(resource.metadata["requires_compatibilities"], ["FARGATE"])
+        self.assertEqual(resource.metadata["task_role_arn"], "arn:aws:iam::111122223333:role/task")
+        self.assertEqual(
+            resource.metadata["execution_role_arn"],
+            "arn:aws:iam::111122223333:role/execution",
+        )
+        self.assertEqual(
+            resource.metadata["secret_arn"],
+            "arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
+        )
+        self.assertEqual(resource.metadata["function_name"], "app-worker")
+        self.assertEqual(resource.metadata["route_table_id"], "rtb-123")
+        self.assertEqual(resource.metadata["subnet_id"], "subnet-123")
+        self.assertEqual(resource.metadata["routes"], [{"gateway_id": "igw-123"}])
+        self.assertTrue(resource.metadata["map_public_ip_on_launch"])
+        self.assertTrue(resource.metadata["block_public_acls"])
+        self.assertTrue(resource.metadata["block_public_policy"])
+        self.assertTrue(resource.metadata["ignore_public_acls"])
+        self.assertTrue(resource.metadata["restrict_public_buckets"])
+        self.assertEqual(cluster_resource.metadata["name"], "app-cluster")
+        self.assertEqual(secret_resource.metadata["name"], "app/secret")
+        
 
 if __name__ == "__main__":
     unittest.main()
