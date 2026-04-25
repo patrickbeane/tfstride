@@ -38,7 +38,10 @@ class TfStride:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self.aws_normalizer.normalize(terraform_plan.resources)
         trust_boundaries = self.boundary_detector.detect(inventory)
-        findings = apply_rule_policy(self.rule_engine.evaluate(inventory, trust_boundaries), self.rule_policy)
+        findings = apply_rule_policy(
+	        self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
+	        self.rule_policy,
+	    )
         observations = self.rule_engine.observe_controls(inventory)
         return AnalysisResult(
             title=title,

@@ -9,7 +9,7 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_supported_narrowing,
 )
 from tfstride.analysis.rule_definitions import BoundaryIndex, ExecutableRule, RuleEvaluationContext
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleRegistry
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy, RuleRegistry
 from tfstride.models import (
     BoundaryType,
     EvidenceItem,
@@ -43,19 +43,30 @@ SERVICE_RESOURCE_POLICY_TYPES = {"aws_lambda_function", "aws_sqs_queue", "aws_sn
 
 class StrideRuleEngine:
     def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
+        self._rule_registry = rule_registry
         self._finding_factory = FindingFactory(rule_registry)
         self._iam_rules = (
 	        ExecutableRule("aws-iam-wildcard-permissions", self._detect_iam_wildcards_rule),
 	        ExecutableRule("aws-workload-role-sensitive-permissions", self._detect_workload_role_risk_rule),
 	    )
 
-    def evaluate(self, inventory: ResourceInventory, boundaries: list[TrustBoundary]) -> list[Finding]:
+    def evaluate(
+	    self,
+	    inventory: ResourceInventory,
+	    boundaries: list[TrustBoundary],
+	    *,
+	    rule_policy: RulePolicy | None = None,
+	) -> list[Finding]:
         findings: list[Finding] = []
         boundary_index: BoundaryIndex = {
 	        (boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries
 	    }
-        context = RuleEvaluationContext(inventory=inventory, boundary_index=boundary_index)
-
+        context = RuleEvaluationContext(
+	        inventory=inventory,
+            boundary_index=boundary_index,
+            rule_registry=self._rule_registry,
+            rule_policy=rule_policy,
+	    )
         findings.extend(self._detect_public_compute_exposure(inventory, boundary_index))
         findings.extend(self._detect_database_exposure(inventory, boundary_index))
         findings.extend(self._detect_unencrypted_databases(inventory))

@@ -173,6 +173,61 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             "Registry supplied workload role mitigation.",
         )
 
+    def test_rule_engine_skips_disabled_iam_executable_rules(self) -> None:
+        wildcard_policy = NormalizedResource(
+            address="aws_iam_policy.admin",
+            provider="aws",
+            resource_type="aws_iam_policy",
+            name="admin",
+            category=ResourceCategory.IAM,
+            policy_statements=[
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["s3:*"],
+                    resources=["arn:aws:s3:::customer-data/*"],
+                )
+            ],
+        )
+        role = NormalizedResource(
+            address="aws_iam_role.worker",
+            provider="aws",
+            resource_type="aws_iam_role",
+            name="worker",
+            category=ResourceCategory.IAM,
+            arn="arn:aws:iam::111122223333:role/worker",
+            policy_statements=[
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["secretsmanager:GetSecretValue"],
+                    resources=["arn:aws:secretsmanager:us-east-1:111122223333:secret:customer"],
+                )
+            ],
+        )
+        workload = NormalizedResource(
+            address="aws_lambda_function.worker",
+            provider="aws",
+            resource_type="aws_lambda_function",
+            name="worker",
+            category=ResourceCategory.COMPUTE,
+            attached_role_arns=["arn:aws:iam::111122223333:role/worker"],
+        )
+        inventory = ResourceInventory(provider="aws", resources=[wildcard_policy, role, workload])
+        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids.difference_update(
+            {
+                "aws-iam-wildcard-permissions",
+                "aws-workload-role-sensitive-permissions",
+            }
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset(enabled_rule_ids)),
+        )
+
+        self.assertEqual(findings, [])
+
 
 class TFSAnalysisTests(unittest.TestCase):
     def setUp(self) -> None:
