@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.policy_conditions import (
     assess_principal,
     describe_trust_narrowing,
@@ -41,7 +42,7 @@ SERVICE_RESOURCE_POLICY_TYPES = {"aws_lambda_function", "aws_sqs_queue", "aws_sn
 
 class StrideRuleEngine:
     def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
-        self._rule_registry = rule_registry
+        self._finding_factory = FindingFactory(rule_registry)
 
     def evaluate(self, inventory: ResourceInventory, boundaries: list[TrustBoundary]) -> list[Finding]:
         findings: list[Finding] = []
@@ -75,7 +76,7 @@ class StrideRuleEngine:
         evidence: list[EvidenceItem],
         severity_reasoning: SeverityReasoning | None = None,
     ) -> Finding:
-        return _build_finding(
+        return self._finding_factory.build(
             rule_id=rule_id,
             severity=severity,
             affected_resources=affected_resources,
@@ -83,7 +84,6 @@ class StrideRuleEngine:
             rationale=rationale,
             evidence=evidence,
             severity_reasoning=severity_reasoning,
-            rule_registry=self._rule_registry,
         )
 
     def _detect_resource_policy_exposure(
@@ -669,7 +669,7 @@ class StrideRuleEngine:
                     findings.append(
                         _build_transitive_private_data_finding(
                             rule_id="aws-private-data-transitive-exposure",
-                            rule_registry=self._rule_registry,
+                            finding_factory=self._finding_factory,
                             inventory=inventory,
                             entry=entry,
                             path_workloads=path_workloads,
@@ -1068,32 +1068,6 @@ def _statement_matches_sensitive_actions(statement: IAMPolicyStatement, sensitiv
     return False
 
 
-def _build_finding(
-    *,
-    rule_id: str,
-    severity: Severity,
-    affected_resources: list[str],
-    trust_boundary_id: str | None,
-    rationale: str,
-    evidence: list[EvidenceItem],
-    severity_reasoning: SeverityReasoning | None = None,
-    rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY,
-) -> Finding:
-    rule = rule_registry.get(rule_id)
-    return Finding(
-        title=rule.title,
-        category=rule.category,
-        severity=severity,
-        affected_resources=affected_resources,
-        trust_boundary_id=trust_boundary_id,
-        rationale=rationale,
-        recommended_mitigation=rule.recommended_mitigation,
-        rule_id=rule.rule_id,
-        evidence=evidence,
-        severity_reasoning=severity_reasoning,
-    )
-
-
 def _build_severity_reasoning(
     *,
     internet_exposure: bool,
@@ -1301,7 +1275,7 @@ def _is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool
 def _build_transitive_private_data_finding(
     *,
     rule_id: str,
-    rule_registry: RuleRegistry,
+    finding_factory: FindingFactory,
     inventory: ResourceInventory,
     entry: NormalizedResource,
     path_workloads: list[NormalizedResource],
@@ -1329,7 +1303,7 @@ def _build_transitive_private_data_finding(
     )
     affected_resources = [entry.address, *[workload.address for workload in path_workloads], data_store.address]
     affected_resources.extend(security_group.address for security_group, _ in security_group_hops)
-    return _build_finding(
+    return finding_factory.build(
         rule_id=rule_id,
         severity=severity_reasoning.severity,
         affected_resources=list(dict.fromkeys(affected_resources)),
@@ -1357,5 +1331,4 @@ def _build_transitive_private_data_finding(
             _evidence_item("boundary_rationale", [data_boundary.rationale]),
         ),
         severity_reasoning=severity_reasoning,
-        rule_registry=rule_registry,
     )
