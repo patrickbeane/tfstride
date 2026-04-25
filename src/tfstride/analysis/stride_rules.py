@@ -7,7 +7,7 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_effective_narrowing,
     trust_statement_has_supported_narrowing,
 )
-from tfstride.analysis.rule_registry import get_rule
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleRegistry
 from tfstride.models import (
     BoundaryType,
     EvidenceItem,
@@ -40,6 +40,9 @@ SERVICE_RESOURCE_POLICY_TYPES = {"aws_lambda_function", "aws_sqs_queue", "aws_sn
 
 
 class StrideRuleEngine:
+    def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
+        self._rule_registry = rule_registry
+
     def evaluate(self, inventory: ResourceInventory, boundaries: list[TrustBoundary]) -> list[Finding]:
         findings: list[Finding] = []
         boundary_index = {(boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries}
@@ -60,6 +63,28 @@ class StrideRuleEngine:
         severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
         findings.sort(key=lambda finding: (severity_order[finding.severity], finding.title))
         return findings
+
+    def _build_finding(
+        self,
+        *,
+        rule_id: str,
+        severity: Severity,
+        affected_resources: list[str],
+        trust_boundary_id: str | None,
+        rationale: str,
+        evidence: list[EvidenceItem],
+        severity_reasoning: SeverityReasoning | None = None,
+    ) -> Finding:
+        return _build_finding(
+            rule_id=rule_id,
+            severity=severity,
+            affected_resources=affected_resources,
+            trust_boundary_id=trust_boundary_id,
+            rationale=rationale,
+            evidence=evidence,
+            severity_reasoning=severity_reasoning,
+            rule_registry=self._rule_registry,
+        )
 
     def _detect_resource_policy_exposure(
         self,
@@ -129,7 +154,7 @@ class StrideRuleEngine:
                         )
                     boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, resource.address))
                     findings.append(
-                        _build_finding(
+                        self._build_finding(
                             rule_id=(
                                 "aws-sensitive-resource-policy-external-access"
                                 if sensitive_resource
@@ -194,7 +219,7 @@ class StrideRuleEngine:
             )
             boundary = boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address))
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-public-compute-broad-ingress",
                     severity=severity_reasoning.severity,
                     affected_resources=[resource.address, *[sg.address for sg in attached_security_groups]],
@@ -207,7 +232,8 @@ class StrideRuleEngine:
                     evidence=_collect_evidence(
                         _evidence_item(
                             "security_group_rules",
-                            [describe_security_group_rule(security_group, rule) for security_group, rule in risky_rules],                        ),
+                            [describe_security_group_rule(security_group, rule) for security_group, rule in risky_rules],
+                        ),
                         _evidence_item("public_exposure_reasons", resource.public_exposure_reasons),
                         _evidence_item("subnet_posture", _subnet_posture(resource, inventory)),
                     ),
@@ -296,7 +322,7 @@ class StrideRuleEngine:
             if public_tier_rules:
                 path_signals.append("database trusts security groups attached to internet-exposed workloads")
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-database-permissive-ingress",
                     severity=severity_reasoning.severity,
                     affected_resources=[database.address, *[sg.address for sg in attached_security_groups]],
@@ -355,7 +381,7 @@ class StrideRuleEngine:
                 blast_radius=1,
             )
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-rds-storage-encryption-disabled",
                     severity=severity_reasoning.severity,
                     affected_resources=[database.address],
@@ -396,7 +422,7 @@ class StrideRuleEngine:
                 blast_radius=1,
             )
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-s3-public-access",
                     severity=severity_reasoning.severity,
                     affected_resources=[bucket.address],
@@ -448,7 +474,7 @@ class StrideRuleEngine:
                 blast_radius=2,
             )
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-iam-wildcard-permissions",
                     severity=severity_reasoning.severity,
                     affected_resources=[policy_resource.address],
@@ -493,7 +519,7 @@ class StrideRuleEngine:
                 blast_radius=2,
             )
             findings.append(
-                _build_finding(
+                self._build_finding(
                     rule_id="aws-workload-role-sensitive-permissions",
                     severity=severity_reasoning.severity,
                     affected_resources=[workload.address, role.address],
@@ -563,7 +589,7 @@ class StrideRuleEngine:
                     blast_radius=1,
                 )
                 findings.append(
-                    _build_finding(
+                    self._build_finding(
                         rule_id="aws-missing-tier-segmentation",
                         severity=severity_reasoning.severity,
                         affected_resources=[database.address, *exposed_workloads, security_group.address],
@@ -643,6 +669,7 @@ class StrideRuleEngine:
                     findings.append(
                         _build_transitive_private_data_finding(
                             rule_id="aws-private-data-transitive-exposure",
+                            rule_registry=self._rule_registry,
                             inventory=inventory,
                             entry=entry,
                             path_workloads=path_workloads,
@@ -684,7 +711,7 @@ class StrideRuleEngine:
                     )
                     boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
-                        _build_finding(
+                        self._build_finding(
                             rule_id="aws-role-trust-expansion",
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
@@ -758,7 +785,7 @@ class StrideRuleEngine:
                     )
                     trust_boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
-                        _build_finding(
+                        self._build_finding(
                             rule_id="aws-control-plane-sensitive-workload-chain",
                             severity=severity_reasoning.severity,
                             affected_resources=[
@@ -845,7 +872,7 @@ class StrideRuleEngine:
                     )
                     boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
-                        _build_finding(
+                        self._build_finding(
                             rule_id="aws-role-trust-missing-narrowing",
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
@@ -1050,8 +1077,9 @@ def _build_finding(
     rationale: str,
     evidence: list[EvidenceItem],
     severity_reasoning: SeverityReasoning | None = None,
+    rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY,
 ) -> Finding:
-    rule = get_rule(rule_id)
+    rule = rule_registry.get(rule_id)
     return Finding(
         title=rule.title,
         category=rule.category,
@@ -1116,15 +1144,6 @@ def _evidence_item(key: str, values: list[str]) -> EvidenceItem | None:
     if not deduped_values:
         return None
     return EvidenceItem(key=key, values=deduped_values)
-
-
-def _policy_allows_public_access(policy_document: dict) -> bool:
-    for statement in _policy_statements(policy_document):
-        if statement.effect != "Allow":
-            continue
-        if "*" in statement.principals:
-            return True
-    return False
 
 
 def _describe_policy_statement(statement: IAMPolicyStatement) -> str:
@@ -1282,6 +1301,7 @@ def _is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool
 def _build_transitive_private_data_finding(
     *,
     rule_id: str,
+    rule_registry: RuleRegistry,
     inventory: ResourceInventory,
     entry: NormalizedResource,
     path_workloads: list[NormalizedResource],
@@ -1337,4 +1357,5 @@ def _build_transitive_private_data_finding(
             _evidence_item("boundary_rationale", [data_boundary.rationale]),
         ),
         severity_reasoning=severity_reasoning,
+        rule_registry=rule_registry,
     )

@@ -6,9 +6,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RulePolicy, RuleRegistry
+from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.app import TfStride
-from tfstride.models import BoundaryType, IAMPolicyCondition, Severity, TerraformResource
+from tfstride.models import (
+    BoundaryType,
+    IAMPolicyCondition,
+    NormalizedResource,
+    ResourceCategory,
+    ResourceInventory,
+    SecurityGroupRule,
+    Severity,
+    StrideCategory,
+    TerraformResource,
+)
 from tfstride.providers.aws.normalizer import AwsNormalizer
 
 
@@ -26,6 +37,57 @@ CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
 CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "sample_aws_cross_account_trust_constrained_plan.json"
 )
+
+
+class RuleRegistryIntegrationTests(unittest.TestCase):
+    def test_rule_engine_uses_injected_registry_metadata_for_findings(self) -> None:
+        registry = RuleRegistry(
+            [
+                RuleMetadata(
+                    rule_id="aws-public-compute-broad-ingress",
+                    title="Registry supplied public compute title",
+                    category=StrideCategory.DENIAL_OF_SERVICE,
+                    recommended_mitigation="Registry supplied mitigation.",
+                )
+            ]
+        )
+        security_group = NormalizedResource(
+            address="aws_security_group.web",
+            provider="aws",
+            resource_type="aws_security_group",
+            name="web",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-web",
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=22,
+                    to_port=22,
+                    cidr_blocks=["0.0.0.0/0"],
+                )
+            ],
+        )
+        instance = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            security_group_ids=["sg-web"],
+            public_exposure=True,
+            metadata={"public_exposure_reasons": ["instance has a public internet path"]},
+        )
+        inventory = ResourceInventory(provider="aws", resources=[instance, security_group])
+
+        findings = StrideRuleEngine(rule_registry=registry).evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "aws-public-compute-broad-ingress")
+        self.assertEqual(finding.title, "Registry supplied public compute title")
+        self.assertEqual(finding.category, StrideCategory.DENIAL_OF_SERVICE)
+        self.assertEqual(finding.recommended_mitigation, "Registry supplied mitigation.")
 
 
 class TfStrideAnalysisTests(unittest.TestCase):
