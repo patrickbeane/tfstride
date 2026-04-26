@@ -42,6 +42,12 @@ CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
 
 
 class RuleRegistryIntegrationTests(unittest.TestCase):
+    def test_rule_registry_matches_configured_executable_rules(self) -> None:
+        self.assertEqual(
+        StrideRuleEngine().configured_rule_ids(),
+	    DEFAULT_RULE_REGISTRY.known_rule_ids(),
+	)
+    
     def test_rule_engine_uses_injected_registry_metadata_for_findings(self) -> None:
         registry = RuleRegistry(
             [

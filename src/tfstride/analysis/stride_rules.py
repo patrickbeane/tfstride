@@ -102,6 +102,13 @@ class StrideRuleEngine:
             ),
         )
 
+    def configured_rule_ids(self) -> set[str]:
+	    return {
+	        rule.rule_id
+	        for rule_group in self._rule_groups()
+	        for rule in rule_group
+	    }
+
     def evaluate(
         self,
         inventory: ResourceInventory,
@@ -120,12 +127,8 @@ class StrideRuleEngine:
             rule_policy=rule_policy,
         )
 
-        findings.extend(self._evaluate_rules(self._posture_rules, context))
-        findings.extend(self._evaluate_rules(self._network_data_rules, context))
-        findings.extend(self._evaluate_rules(self._resource_policy_rules, context))
-        findings.extend(self._evaluate_rules(self._iam_rules, context))
-        findings.extend(self._evaluate_rules(self._path_chain_rules, context))
-        findings.extend(self._evaluate_rules(self._trust_rules, context))
+        for rules in self._rule_groups():
+	        findings.extend(self._evaluate_rules(rules, context))
 
         severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
         findings.sort(key=lambda finding: (severity_order[finding.severity], finding.title))
@@ -162,6 +165,15 @@ class StrideRuleEngine:
             findings.extend(rule.evaluate(context))
         return findings
 
+    def _rule_groups(self) -> tuple[tuple[ExecutableRule, ...], ...]:
+        return (
+            self._posture_rules,
+            self._network_data_rules,
+            self._resource_policy_rules,
+            self._iam_rules,
+            self._path_chain_rules,
+            self._trust_rules,
+	    )
 
     def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
