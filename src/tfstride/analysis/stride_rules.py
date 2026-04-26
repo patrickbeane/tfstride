@@ -37,6 +37,20 @@ class StrideRuleEngine:
         self._finding_factory = FindingFactory(rule_registry)
         self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
         self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
+        self._posture_rules = (
+	        ExecutableRule(
+               "aws-public-compute-broad-ingress",
+                self._detect_public_compute_exposure,
+            ),
+            ExecutableRule(
+                "aws-rds-storage-encryption-disabled",
+                self._detect_unencrypted_databases,
+            ),
+            ExecutableRule(
+                "aws-s3-public-access",
+                self._detect_public_object_storage,
+            ),
+        )
         self._resource_policy_rules = (
             ExecutableRule(
                 "aws-sensitive-resource-policy-external-access",
@@ -86,10 +100,8 @@ class StrideRuleEngine:
             rule_policy=rule_policy,
         )
 
-        findings.extend(self._detect_public_compute_exposure(inventory, boundary_index))
+        findings.extend(self._evaluate_rules(self._posture_rules, context))
         findings.extend(self._detect_database_exposure(inventory, boundary_index))
-        findings.extend(self._detect_unencrypted_databases(inventory))
-        findings.extend(self._detect_public_object_storage(inventory, boundary_index))
         findings.extend(self._evaluate_rules(self._resource_policy_rules, context))
         findings.extend(self._evaluate_rules(self._iam_rules, context))
         findings.extend(self._detect_missing_segmentation(inventory, boundary_index))
@@ -143,10 +155,11 @@ class StrideRuleEngine:
 
     def _detect_public_compute_exposure(
         self,
-        inventory: ResourceInventory,
-        boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+        context: RuleEvaluationContext,
+	    rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
+        inventory = context.inventory
         for resource in inventory.by_type("aws_instance"):
             if not resource.public_exposure:
                 continue
@@ -168,12 +181,17 @@ class StrideRuleEngine:
                 lateral_movement=1,
                 blast_radius=1,
             )
-            boundary = boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address))
+            boundary = context.boundary_index.get(
+	            (BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address)
+	        )
             findings.append(
                 self._build_finding(
-                    rule_id="aws-public-compute-broad-ingress",
+                    rule_id=rule_id,
                     severity=severity_reasoning.severity,
-                    affected_resources=[resource.address, *[sg.address for sg in attached_security_groups]],
+ 	                affected_resources=[
+	                    resource.address,
+	                    *[sg.address for sg in attached_security_groups],
+	                ],
                     trust_boundary_id=boundary.identifier if boundary else None,
                     rationale=(
                         f"{resource.display_name} is reachable from the internet and at least one attached "
@@ -319,8 +337,13 @@ class StrideRuleEngine:
             )
         return findings
 
-    def _detect_unencrypted_databases(self, inventory: ResourceInventory) -> list[Finding]:
+    def _detect_unencrypted_databases(
+	    self,
+	    context: RuleEvaluationContext,
+	    rule_id: str,
+	) -> list[Finding]:
         findings: list[Finding] = []
+        inventory = context.inventory
         for database in inventory.by_type("aws_db_instance"):
             if database.storage_encrypted:
                 continue
@@ -333,7 +356,7 @@ class StrideRuleEngine:
             )
             findings.append(
                 self._build_finding(
-                    rule_id="aws-rds-storage-encryption-disabled",
+                    rule_id=rule_id,
                     severity=severity_reasoning.severity,
                     affected_resources=[database.address],
                     trust_boundary_id=None,
@@ -357,14 +380,17 @@ class StrideRuleEngine:
 
     def _detect_public_object_storage(
         self,
-        inventory: ResourceInventory,
-        boundary_index: dict[tuple[BoundaryType, str, str], TrustBoundary],
+        context: RuleEvaluationContext,
+        rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
+        inventory = context.inventory
         for bucket in inventory.by_type("aws_s3_bucket"):
             if not bucket.public_exposure:
                 continue
-            boundary = boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address))
+            boundary = context.boundary_index.get(
+	            (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
+	        )
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
@@ -374,7 +400,7 @@ class StrideRuleEngine:
             )
             findings.append(
                 self._build_finding(
-                    rule_id="aws-s3-public-access",
+                    rule_id=rule_id,
                     severity=severity_reasoning.severity,
                     affected_resources=[bucket.address],
                     trust_boundary_id=boundary.identifier if boundary else None,

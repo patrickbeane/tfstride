@@ -315,6 +315,77 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             ["aws-role-trust-missing-narrowing"],
         )
 
+    def test_rule_engine_skips_disabled_posture_executable_rule_only(self) -> None:
+        security_group = NormalizedResource(
+            address="aws_security_group.web",
+            provider="aws",
+            resource_type="aws_security_group",
+            name="web",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-web",
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=22,
+                    to_port=22,
+                    cidr_blocks=["0.0.0.0/0"],
+                )
+            ],
+        )
+        instance = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            security_group_ids=["sg-web"],
+            public_exposure=True,
+            metadata={"public_exposure_reasons": ["instance has a public internet path"]},
+        )
+        database = NormalizedResource(
+            address="aws_db_instance.customer",
+            provider="aws",
+            resource_type="aws_db_instance",
+            name="customer",
+            category=ResourceCategory.DATA,
+            metadata={"engine": "postgres"},
+        )
+        bucket = NormalizedResource(
+            address="aws_s3_bucket.assets",
+            provider="aws",
+            resource_type="aws_s3_bucket",
+            name="assets",
+            category=ResourceCategory.DATA,
+            public_exposure=True,
+            metadata={"public_exposure_reasons": ["bucket policy allows public read"]},
+        )
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[security_group, instance, database, bucket],
+        )
+        posture_rule_ids = {
+            "aws-public-compute-broad-ingress",
+            "aws-rds-storage-encryption-disabled",
+            "aws-s3-public-access",
+        }
+
+        for disabled_rule_id in posture_rule_ids:
+            with self.subTest(disabled_rule_id=disabled_rule_id):
+                enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+                enabled_rule_ids.remove(disabled_rule_id)
+
+                findings = StrideRuleEngine().evaluate(
+                    inventory,
+                    [],
+                    rule_policy=RulePolicy(enabled_rule_ids=frozenset(enabled_rule_ids)),
+                )
+
+                self.assertEqual(
+                    {finding.rule_id for finding in findings},
+                    posture_rule_ids - {disabled_rule_id},
+                )
+                
 
 class TFSAnalysisTests(unittest.TestCase):
     def setUp(self) -> None:
