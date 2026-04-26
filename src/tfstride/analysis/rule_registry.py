@@ -210,18 +210,15 @@ def get_rule(rule_id: str) -> RuleMetadata:
     return DEFAULT_RULE_REGISTRY.get(rule_id)
 
 
-def apply_rule_policy(
+def apply_severity_overrides(
     findings: list[Finding],
     policy: RulePolicy | None,
-    registry: RuleRegistry = DEFAULT_RULE_REGISTRY,
 ) -> list[Finding]:
     if policy is None:
         return sort_findings(findings)
 
     adjusted_findings: list[Finding] = []
     for finding in findings:
-        if not policy.is_enabled(finding.rule_id, registry):
-            continue
         severity_override = policy.severity_overrides.get(finding.rule_id)
         if severity_override and severity_override != finding.severity:
             severity_reasoning = finding.severity_reasoning

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tfstride.analysis.rule_registry import RulePolicy, apply_rule_policy
+from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.filtering import apply_finding_filters
 from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
@@ -38,7 +38,7 @@ class TfStride:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self.aws_normalizer.normalize(terraform_plan.resources)
         trust_boundaries = self.boundary_detector.detect(inventory)
-        findings = apply_rule_policy(
+        findings = apply_severity_overrides(
 	        self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
 	        self.rule_policy,
 	    )
