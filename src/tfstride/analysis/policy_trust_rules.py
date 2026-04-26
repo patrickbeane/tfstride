@@ -26,14 +26,44 @@ class PolicyTrustRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 
-    def detect_resource_policy_exposure(self, context: RuleEvaluationContext) -> list[Finding]:
+    def detect_sensitive_resource_policy_exposure(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_resource_policy_exposure(
+            context,
+            rule_id=rule_id,
+            resource_types=SENSITIVE_RESOURCE_POLICY_TYPES,
+            sensitive_resource=True,
+        )
+	
+    def detect_service_resource_policy_exposure(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_resource_policy_exposure(
+            context,
+            rule_id=rule_id,
+            resource_types=SERVICE_RESOURCE_POLICY_TYPES,
+            sensitive_resource=False,
+        )
+
+    def _detect_resource_policy_exposure(
+        self,
+        context: RuleEvaluationContext,
+        *,
+        rule_id: str,
+        resource_types: set[str],
+        sensitive_resource: bool,
+	) -> list[Finding]:
         findings: list[Finding] = []
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
-        resource_policy_types = SENSITIVE_RESOURCE_POLICY_TYPES.union(SERVICE_RESOURCE_POLICY_TYPES)
 
         for resource in context.inventory.resources:
-            if resource.resource_type not in resource_policy_types:
+            if resource.resource_type not in resource_types:
                 continue
             for statement in resource.policy_statements:
                 if statement.effect != "Allow" or not statement.principals:
@@ -57,7 +87,6 @@ class PolicyTrustRuleDetectors:
                         continue
                     seen.add(finding_key)
 
-                    sensitive_resource = resource.resource_type in SENSITIVE_RESOURCE_POLICY_TYPES
                     same_account_kms_root = (
                         resource.resource_type == "aws_kms_key"
                         and assessment.is_root_like
@@ -97,11 +126,7 @@ class PolicyTrustRuleDetectors:
                     )
                     findings.append(
                         self._finding_factory.build(
-                            rule_id=(
-                                "aws-sensitive-resource-policy-external-access"
-                                if sensitive_resource
-                                else "aws-service-resource-policy-external-access"
-                            ),
+                            rule_id=rule_id,
                             severity=severity_reasoning.severity,
                             affected_resources=[
                                 resource.address,
@@ -127,7 +152,11 @@ class PolicyTrustRuleDetectors:
                     )
         return findings
 
-    def detect_trust_expansion(self, context: RuleEvaluationContext) -> list[Finding]:
+    def detect_trust_expansion(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+	) -> list[Finding]:
         findings: list[Finding] = []
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
@@ -159,7 +188,7 @@ class PolicyTrustRuleDetectors:
                     )
                     findings.append(
                         self._finding_factory.build(
-                            rule_id="aws-role-trust-expansion",
+                            rule_id=rule_id,
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
                             trust_boundary_id=boundary.identifier if boundary else None,
@@ -180,7 +209,11 @@ class PolicyTrustRuleDetectors:
                     )
         return findings
 
-    def detect_unconstrained_trust(self, context: RuleEvaluationContext) -> list[Finding]:
+    def detect_unconstrained_trust(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
         findings: list[Finding] = []
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
@@ -212,7 +245,7 @@ class PolicyTrustRuleDetectors:
                     )
                     findings.append(
                         self._finding_factory.build(
-                            rule_id="aws-role-trust-missing-narrowing",
+                            rule_id=rule_id,
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
                             trust_boundary_id=boundary.identifier if boundary else None,

@@ -228,6 +228,93 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
+    def test_rule_engine_skips_disabled_resource_policy_executable_rule_only(self) -> None:
+        sensitive_secret = NormalizedResource(
+            address="aws_secretsmanager_secret.customer",
+            provider="aws",
+            resource_type="aws_secretsmanager_secret",
+            name="customer",
+            category=ResourceCategory.DATA,
+            policy_statements=[
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["secretsmanager:GetSecretValue"],
+                    resources=["*"],
+                    principals=["arn:aws:iam::444455556666:root"],
+                )
+            ],
+        )
+        service_queue = NormalizedResource(
+            address="aws_sqs_queue.jobs",
+            provider="aws",
+            resource_type="aws_sqs_queue",
+            name="jobs",
+            category=ResourceCategory.COMPUTE,
+            policy_statements=[
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["sqs:SendMessage"],
+                    resources=["*"],
+                    principals=["*"],
+                )
+            ],
+        )
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[sensitive_secret, service_queue],
+            metadata={"primary_account_id": "111122223333"},
+        )
+        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids.remove("aws-sensitive-resource-policy-external-access")
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset(enabled_rule_ids)),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["aws-service-resource-policy-external-access"],
+        )
+
+    def test_rule_engine_skips_disabled_trust_executable_rule_only(self) -> None:
+        role = NormalizedResource(
+            address="aws_iam_role.deployer",
+            provider="aws",
+            resource_type="aws_iam_role",
+            name="deployer",
+            category=ResourceCategory.IAM,
+            metadata={
+                "trust_statements": [
+                    {
+                        "principals": ["arn:aws:iam::444455556666:role/deployer"],
+                        "narrowing_condition_keys": [],
+                        "narrowing_conditions": [],
+                        "has_narrowing_conditions": False,
+                    }
+                ]
+            },
+        )
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[role],
+            metadata={"primary_account_id": "111122223333"},
+        )
+        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids.remove("aws-role-trust-expansion")
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset(enabled_rule_ids)),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["aws-role-trust-missing-narrowing"],
+        )
+
 
 class TFSAnalysisTests(unittest.TestCase):
     def setUp(self) -> None:

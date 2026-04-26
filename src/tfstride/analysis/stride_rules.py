@@ -37,6 +37,16 @@ class StrideRuleEngine:
         self._finding_factory = FindingFactory(rule_registry)
         self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
         self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
+        self._resource_policy_rules = (
+            ExecutableRule(
+                "aws-sensitive-resource-policy-external-access",
+                self._policy_trust_rule_detectors.detect_sensitive_resource_policy_exposure,
+            ),
+            ExecutableRule(
+                "aws-service-resource-policy-external-access",
+                self._policy_trust_rule_detectors.detect_service_resource_policy_exposure,
+	        ),
+	    )
         self._iam_rules = (
             ExecutableRule(
                 "aws-iam-wildcard-permissions",
@@ -45,6 +55,16 @@ class StrideRuleEngine:
             ExecutableRule(
                 "aws-workload-role-sensitive-permissions",
                 self._iam_rule_detectors.detect_workload_role_sensitive_permissions,
+            ),
+        )
+        self._trust_rules = (
+            ExecutableRule(
+                "aws-role-trust-expansion",
+                self._policy_trust_rule_detectors.detect_trust_expansion,
+            ),
+            ExecutableRule(
+                "aws-role-trust-missing-narrowing",
+                self._policy_trust_rule_detectors.detect_unconstrained_trust,
             ),
         )
 
@@ -70,13 +90,12 @@ class StrideRuleEngine:
         findings.extend(self._detect_database_exposure(inventory, boundary_index))
         findings.extend(self._detect_unencrypted_databases(inventory))
         findings.extend(self._detect_public_object_storage(inventory, boundary_index))
-        findings.extend(self._policy_trust_rule_detectors.detect_resource_policy_exposure(context))
+        findings.extend(self._evaluate_rules(self._resource_policy_rules, context))
         findings.extend(self._evaluate_rules(self._iam_rules, context))
         findings.extend(self._detect_missing_segmentation(inventory, boundary_index))
         findings.extend(self._detect_transitive_private_data_exposure(inventory, boundary_index))
         findings.extend(self._detect_control_plane_sensitive_workload_chain(inventory, boundary_index))
-        findings.extend(self._policy_trust_rule_detectors.detect_trust_expansion(context))
-        findings.extend(self._policy_trust_rule_detectors.detect_unconstrained_trust(context))
+        findings.extend(self._evaluate_rules(self._trust_rules, context))
 
         severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
         findings.sort(key=lambda finding: (severity_order[finding.severity], finding.title))

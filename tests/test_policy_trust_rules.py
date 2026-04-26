@@ -51,7 +51,10 @@ class PolicyTrustRuleDetectorsTests(unittest.TestCase):
         )
         context = _context([secret], [boundary])
 
-        findings = self.detectors.detect_resource_policy_exposure(context)
+        findings = self.detectors.detect_sensitive_resource_policy_exposure(
+	        context,
+	        "aws-sensitive-resource-policy-external-access",
+	    )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -107,8 +110,14 @@ class PolicyTrustRuleDetectorsTests(unittest.TestCase):
         )
         context = _context([role], [boundary])
 
-        expansion_findings = self.detectors.detect_trust_expansion(context)
-        narrowing_findings = self.detectors.detect_unconstrained_trust(context)
+        expansion_findings = self.detectors.detect_trust_expansion(
+	        context,
+	        "aws-role-trust-expansion",
+	    )
+        narrowing_findings = self.detectors.detect_unconstrained_trust(
+	        context,
+	        "aws-role-trust-missing-narrowing",
+	    )
 
         self.assertEqual(len(expansion_findings), 1)
         expansion = expansion_findings[0]
