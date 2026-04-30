@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -14,6 +15,8 @@ from tfstride.models import Severity
 
 INPUT_ERROR_EXIT_CODE = 2
 POLICY_VIOLATION_EXIT_CODE = 3
+RULE_CATALOG_KIND = "tfstride-rule-catalog"
+RULE_CATALOG_VERSION = "1.0"
 SEVERITY_RANK = {
     Severity.LOW: 0,
     Severity.MEDIUM: 1,
@@ -31,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
 	    "--list-rules",
 	    action="store_true",
 	    help="List registered rules and exit without analyzing a Terraform plan.",
+    )
+    parser.add_argument(
+	    "--json",
+        action="store_true",
+        help="Emit the rule listing as JSON. Only valid with `--list-rules`.",
 	)
     parser.add_argument(
         "--config",
@@ -89,8 +97,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.list_rules:
-        sys.stdout.write(render_rule_list(DEFAULT_RULE_REGISTRY))
+        if args.json:
+	        sys.stdout.write(render_rule_catalog_json(DEFAULT_RULE_REGISTRY))
+        else:
+	        sys.stdout.write(render_rule_list(DEFAULT_RULE_REGISTRY))
         return 0
+    if args.json:
+	    parser.error("argument --json: only valid with --list-rules")
 
     plan_path = args.plan
     if plan_path is None:
@@ -162,6 +175,27 @@ def render_rule_list(registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> str:
         lines.extend(_render_rule(rule))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_rule_catalog_json(registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> str:
+    payload = {
+        "kind": RULE_CATALOG_KIND,
+        "version": RULE_CATALOG_VERSION,
+        "rules": [_rule_catalog_entry(rule) for rule in registry.rules()],
+    }
+    return json.dumps(payload, indent=2) + "\n"
+	
+	
+def _rule_catalog_entry(rule: RuleMetadata) -> dict[str, object]:
+    return {
+        "rule_id": rule.rule_id,
+        "title": rule.title,
+        "category": rule.category.value,
+        "enabled_by_default": rule.enabled_by_default,
+        "tags": list(rule.tags),
+        "severity_factors": list(rule.severity_factors),
+        "recommended_mitigation": rule.recommended_mitigation,
+    }
 	
 	
 def _render_rule(rule: RuleMetadata) -> list[str]:

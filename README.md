@@ -19,7 +19,7 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - informational controls observed for clear mitigating signals
 - machine-readable JSON output with stable finding fingerprints
 - markdown and SARIF 2.1.0 output
-- CLI rule registry listing for reviewable rule IDs, STRIDE categories, tags, and mitigations
+- CLI rule registry listing in text and JSON for reviewable rule IDs, STRIDE categories, tags, and mitigations
 - CI policy gating with `--fail-on low|medium|high`
 - suppressions and baselines to focus gating on active new findings
 - repo-level TOML config for default gating, rule selection, and severity overrides
@@ -64,6 +64,7 @@ List the registered rules and their metadata without analyzing a plan:
 
 ```bash
 tfstride --list-rules
+tfstride --list-rules --json
 ```
 
 The JSON report contract is versioned for downstream consumers. The current report payload uses:

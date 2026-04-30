@@ -8,7 +8,13 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from tfstride.cli import INPUT_ERROR_EXIT_CODE, POLICY_VIOLATION_EXIT_CODE, main
+from tfstride.cli import (
+    INPUT_ERROR_EXIT_CODE,
+    POLICY_VIOLATION_EXIT_CODE,
+    RULE_CATALOG_KIND,
+    RULE_CATALOG_VERSION,
+    main,
+)
 from tfstride.config import CONFIG_FILENAME
 
 
@@ -40,6 +46,41 @@ class CliTests(unittest.TestCase):
         self.assertIn("  Mitigation: Restrict ingress to expected client ports", output)
         self.assertIn("- aws-role-trust-missing-narrowing", output)
         self.assertTrue(output.endswith("\n"))
+
+    def test_cli_lists_rules_as_json_without_plan(self) -> None:
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+            exit_code = main(["--list-rules", "--json"])
+
+        payload = json.loads(stdout_buffer.getvalue())
+        first_rule = payload["rules"][0]
+	
+        self.assertEqual(exit_code, 0)
+        self.assertEqual("", stderr_buffer.getvalue())
+        self.assertEqual(payload["kind"], RULE_CATALOG_KIND)
+        self.assertEqual(payload["version"], RULE_CATALOG_VERSION)
+        self.assertGreater(len(payload["rules"]), 0)
+        self.assertEqual(first_rule["rule_id"], "aws-public-compute-broad-ingress")
+        self.assertEqual(first_rule["title"], "Internet-exposed compute service permits overly broad ingress")
+        self.assertEqual(first_rule["category"], "Spoofing")
+        self.assertIs(first_rule["enabled_by_default"], True)
+        self.assertEqual(first_rule["tags"], ["aws", "network", "compute", "internet"])
+        self.assertEqual(first_rule["severity_factors"], ["internet_exposure", "lateral_movement", "blast_radius"])
+        self.assertIn("Restrict ingress to expected client ports", first_rule["recommended_mitigation"])
+	
+    def test_cli_rejects_json_without_list_rules(self) -> None:
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+            with self.assertRaises(SystemExit) as raised:
+                main([str(SAFE_FIXTURE_PATH), "--json"])
+	
+        self.assertEqual(raised.exception.code, 2)
+        self.assertEqual("", stdout_buffer.getvalue())
+        self.assertIn("argument --json: only valid with --list-rules", stderr_buffer.getvalue())
 
     def test_cli_writes_markdown_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
