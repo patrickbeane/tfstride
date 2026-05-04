@@ -47,6 +47,8 @@ class MarkdownReportRenderer:
                 lines.append(f"- Suppressions file: `{filter_summary['suppressions_path']}`")
             if filter_summary.get("baseline_path"):
                 lines.append(f"- Baseline file: `{filter_summary['baseline_path']}`")
+        lines.extend(["", "## Analysis Coverage", ""])
+        lines.extend(_render_analysis_coverage(result))
         lines.extend(["", "## Discovered Trust Boundaries", ""])
 
         if result.trust_boundaries:
@@ -136,6 +138,62 @@ class MarkdownReportRenderer:
             lines.append("- No additional limitations were recorded.")
         lines.append("")
         return "\n".join(lines)
+
+
+def _render_analysis_coverage(result: AnalysisResult) -> list[str]:
+    coverage = result.analysis_coverage
+    finding_counts = Counter(
+        finding.rule_id
+        for findings in (result.findings, result.suppressed_findings, result.baselined_findings)
+        for finding in findings
+    )
+    lines = [
+        f"- Terraform resources seen: `{coverage.resources.total_resources}`",
+        f"- Provider resources considered: `{coverage.resources.provider_resources}`",
+        f"- Normalized resources: `{coverage.resources.normalized_resources}`",
+        f"- Unsupported resources: `{coverage.resources.unsupported_resources}`",
+        f"- Registered rules: `{coverage.rules.registered_rule_count}`",
+        f"- Enabled rules: `{len(coverage.rules.enabled_rules)}`",
+        f"- Disabled rules: `{len(coverage.rules.disabled_rules)}`",
+        f"- Severity overrides: `{len(coverage.rules.severity_overrides)}`",
+        f"- Unresolved in-plan references: `{coverage.references.unresolved_reference_count}`",
+    ]
+	
+    if coverage.resources.unsupported_resource_types:
+        lines.append("- Unsupported resource types:")
+        for resource_type, count in sorted(coverage.resources.unsupported_resource_types.items()):
+            lines.append(f"  - `{resource_type}`: `{count}`")
+	
+    nonzero_finding_counts = {
+        rule_id: finding_counts[rule_id]
+        for rule_id in coverage.rules.enabled_rules
+        if finding_counts[rule_id]
+    }
+    if nonzero_finding_counts:
+        lines.append("- Findings by rule:")
+        for rule_id, count in nonzero_finding_counts.items():
+            lines.append(f"  - `{rule_id}`: `{count}`")
+	
+    if coverage.rules.disabled_rules:
+        lines.append("- Disabled rule IDs:")
+        for rule_id in coverage.rules.disabled_rules:
+            lines.append(f"  - `{rule_id}`")
+	
+    if coverage.rules.severity_overrides:
+        lines.append("- Severity override rules:")
+        for rule_id, severity in coverage.rules.severity_overrides.items():
+            lines.append(f"  - `{rule_id}`: `{severity.value}`")
+	
+    if coverage.references.unresolved_references:
+        lines.append("- Unresolved references:")
+        for reference in coverage.references.unresolved_references:
+            reference_values = [
+                f"{key}: {', '.join(f'`{value}`' for value in values)}"
+                for key, values in sorted(reference.references.items())
+            ]
+            lines.append(f"  - `{reference.resource}`: {'; '.join(reference_values)}")
+	
+    return lines
 
 
 def _format_severity_reasoning(finding) -> str:

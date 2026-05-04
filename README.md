@@ -250,6 +250,7 @@ Outputs include:
 - summary counts and discovered trust boundaries
 - findings grouped by severity with rationale, mitigation, evidence, and severity reasoning
 - controls observed when the engine sees clear mitigating signals such as S3 public access blocks, narrowed trust, or private encrypted RDS
+- analysis coverage showing resource coverage, unsupported types, rule posture, finding counts, and unresolved in-plan references
 - JSON output with normalized resources, findings, observations, fingerprints, and filtering summary
 - markdown for human review
 - SARIF 2.1.0 for scanner-compatible integrations

@@ -13,6 +13,21 @@ This run identified **7 trust boundaries** and **2 findings** across **26 normal
 - Medium severity findings: `2`
 - Low severity findings: `0`
 
+## Analysis Coverage
+
+- Terraform resources seen: `26`
+- Provider resources considered: `26`
+- Normalized resources: `26`
+- Unsupported resources: `0`
+- Registered rules: `13`
+- Enabled rules: `13`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Findings by rule:
+  - `aws-iam-wildcard-permissions`: `1`
+  - `aws-private-data-transitive-exposure`: `1`
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

@@ -13,6 +13,28 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Medium severity findings: `11`
 - Low severity findings: `0`
 
+## Analysis Coverage
+
+- Terraform resources seen: `25`
+- Provider resources considered: `25`
+- Normalized resources: `25`
+- Unsupported resources: `0`
+- Registered rules: `13`
+- Enabled rules: `13`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Findings by rule:
+  - `aws-public-compute-broad-ingress`: `2`
+  - `aws-database-permissive-ingress`: `1`
+  - `aws-rds-storage-encryption-disabled`: `1`
+  - `aws-s3-public-access`: `2`
+  - `aws-iam-wildcard-permissions`: `3`
+  - `aws-workload-role-sensitive-permissions`: `2`
+  - `aws-missing-tier-segmentation`: `1`
+  - `aws-role-trust-expansion`: `2`
+  - `aws-role-trust-missing-narrowing`: `2`
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

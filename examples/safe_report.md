@@ -13,6 +13,18 @@ This run identified **6 trust boundaries** and **0 findings** across **26 normal
 - Medium severity findings: `0`
 - Low severity findings: `0`
 
+## Analysis Coverage
+
+- Terraform resources seen: `26`
+- Provider resources considered: `26`
+- Normalized resources: `26`
+- Unsupported resources: `0`
+- Registered rules: `13`
+- Enabled rules: `13`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+
 ## Discovered Trust Boundaries
 
 ### `public-subnet-to-private-subnet`

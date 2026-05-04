@@ -13,6 +13,29 @@ This run identified **9 trust boundaries** and **9 findings** across **23 normal
 - Medium severity findings: `6`
 - Low severity findings: `0`
 
+## Analysis Coverage
+
+- Terraform resources seen: `24`
+- Provider resources considered: `24`
+- Normalized resources: `23`
+- Unsupported resources: `1`
+- Registered rules: `13`
+- Enabled rules: `13`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Unsupported resource types:
+  - `aws_cloudwatch_log_group`: `1`
+- Findings by rule:
+  - `aws-public-compute-broad-ingress`: `1`
+  - `aws-database-permissive-ingress`: `1`
+  - `aws-s3-public-access`: `1`
+  - `aws-iam-wildcard-permissions`: `2`
+  - `aws-workload-role-sensitive-permissions`: `1`
+  - `aws-missing-tier-segmentation`: `1`
+  - `aws-role-trust-expansion`: `1`
+  - `aws-role-trust-missing-narrowing`: `1`
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

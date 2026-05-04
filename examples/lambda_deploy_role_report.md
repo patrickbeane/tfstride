@@ -13,6 +13,22 @@ This run identified **4 trust boundaries** and **3 findings** across **13 normal
 - Medium severity findings: `3`
 - Low severity findings: `0`
 
+## Analysis Coverage
+
+- Terraform resources seen: `13`
+- Provider resources considered: `13`
+- Normalized resources: `13`
+- Unsupported resources: `0`
+- Registered rules: `13`
+- Enabled rules: `13`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Findings by rule:
+  - `aws-workload-role-sensitive-permissions`: `1`
+  - `aws-role-trust-expansion`: `1`
+  - `aws-role-trust-missing-narrowing`: `1`
+
 ## Discovered Trust Boundaries
 
 ### `public-subnet-to-private-subnet`

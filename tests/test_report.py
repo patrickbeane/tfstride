@@ -34,6 +34,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
 
         self.assertIn("# tfSTRIDE Threat Model Report", report)
         self.assertIn("## Summary", report)
+        self.assertIn("## Analysis Coverage", report)
         self.assertIn("## Discovered Trust Boundaries", report)
         self.assertIn("## Findings", report)
         self.assertIn("### High", report)
@@ -45,6 +46,19 @@ class MarkdownReportRendererTests(unittest.TestCase):
         self.assertIn("security group rules", report)
         self.assertIn("## Limitations / Unsupported Resources", report)
         self.assertIn("aws_cloudwatch_log_group.processor", report)
+
+    def test_report_renders_analysis_coverage_for_auditing(self) -> None:
+        engine = TfStride()
+        report = MarkdownReportRenderer().render(engine.analyze_plan(FIXTURE_PATH))
+
+        self.assertIn("- Terraform resources seen: `24`", report)
+        self.assertIn("- Provider resources considered: `24`", report)
+        self.assertIn("- Registered rules: `13`", report)
+        self.assertIn("- Unresolved in-plan references: `0`", report)
+        self.assertIn("- Unsupported resource types:", report)
+        self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
+        self.assertIn("- Findings by rule:", report)
+        self.assertIn("  - `aws-database-permissive-ingress`: `1`", report)
 
     def test_report_renders_unconstrained_trust_evidence(self) -> None:
         engine = TfStride()
