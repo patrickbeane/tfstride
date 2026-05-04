@@ -1,16 +1,16 @@
 # tfSTRIDE & Policy Gate
 
-`tfstride` converts Terraform plan JSON into deterministic cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for AWS infrastructure before deployment.
+`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for AWS infrastructure before deployment.
 
 ## Overview
 
-This project turns Terraform plan JSON into a deterministic cloud threat model for AWS infrastructure before deployment. It normalizes supported resources, identifies trust boundaries, evaluates STRIDE-oriented rules, and produces evidence-backed findings plus observed protective controls for human review and CI gating.
+This project turns Terraform plan JSON into a cloud threat model for AWS infrastructure before deployment. It normalizes supported resources, identifies trust boundaries, evaluates STRIDE-oriented rules, and produces evidence-backed findings plus observed protective controls for human review and CI gating.
 
 The engine is intentionally small and explainable: no LLMs in the core path, no full graph engine, and no runtime cloud access. The goal is to make risky infrastructure patterns easier to review before `terraform apply`.
 
 ## Features
 
-- deterministic Terraform plan analysis with no LLM in the core pipeline
+- offline Terraform plan analysis with no LLM in the core pipeline
 - trust-boundary detection plus STRIDE-oriented findings
 - IAM graph resolution for inline policies, role attachments, and EC2 instance profiles present in the plan
 - initial ECS/Fargate workload modeling via ECS service and task definition normalization
@@ -212,7 +212,7 @@ Pipeline:
 1. Parse the Terraform plan into raw resource records.
 2. Normalize supported AWS resources into a provider-agnostic internal model.
 3. Detect trust boundaries such as internet-to-service, public-to-private segmentation, workload-to-data-store access, control-plane-to-workload relationships, and cross-account trust.
-4. Evaluate deterministic STRIDE-oriented rules and observe clear risk-reducing controls.
+4. Evaluate rule-based STRIDE checks and observe clear risk-reducing controls.
 5. Render markdown and optionally SARIF output.
 
 The engine is intentionally simple and explainable:
@@ -480,7 +480,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 ## Why This Project Exists
 
-Terraform plans are readable, but they are still easy to misjudge when network posture, IAM trust, and data-tier exposure interact. This project exists to make those paths explicit with deterministic analysis, concrete evidence, and CI-friendly outputs.
+Terraform plans are readable, but they are still easy to misjudge when network posture, IAM trust, and data-tier exposure interact. This project exists to make those paths explicit with repeatable analysis, concrete evidence, and CI-friendly outputs.
 
 It is intentionally scoped to a small AWS-first surface area so the output stays understandable and stable rather than pretending to be a full cloud policy engine.
 
