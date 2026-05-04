@@ -70,7 +70,7 @@ tfstride --list-rules --json
 The JSON report contract is versioned for downstream consumers. The current report payload uses:
 
 - `kind: "tfstride-report"`
-- `version: "1.0"`
+- `version: "1.1"`
 
 Capture the current unsuppressed findings as a baseline and later gate only on new findings:
 
@@ -268,6 +268,7 @@ Top-level sections:
 - `analyzed_path`
 - `summary`
 - `filtering`
+- `analysis_coverage`
 - `inventory`
 - `trust_boundaries`
 - `findings`
@@ -281,6 +282,7 @@ Contract notes:
 - additive fields may appear within the same major version
 - breaking structural changes should increment the major version
 - `inventory.resources` and `trust_boundaries` are serialized in stable sorted order for downstream consumers
+- `analysis_coverage` summarizes parsed resource coverage, enabled rules, severity overrides, finding counts by rule, and unresolved in-plan references
 
 ## Suppressions And Baselines
 

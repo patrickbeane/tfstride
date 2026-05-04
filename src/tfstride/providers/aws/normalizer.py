@@ -87,6 +87,11 @@ class AwsNormalizer(ProviderNormalizer):
             for resource in resources
             if resource.provider_name.endswith("/aws") or resource.resource_type.startswith("aws_")
         ]
+        unsupported_resource_types = Counter(
+            resource.resource_type
+            for resource in aws_resources
+            if resource.resource_type not in SUPPORTED_AWS_TYPES
+        )
         unsupported = sorted(
             resource.address for resource in aws_resources if resource.resource_type not in SUPPORTED_AWS_TYPES
         )
@@ -104,6 +109,10 @@ class AwsNormalizer(ProviderNormalizer):
             metadata={
                 "primary_account_id": primary_account_id,
                 "supported_resource_types": sorted(SUPPORTED_AWS_TYPES),
+                "total_input_resources": len(resources),
+                "provider_resource_count": len(aws_resources),
+                "normalized_resource_count": len(normalized),
+                "unsupported_resource_types": dict(sorted(unsupported_resource_types.items())),
             },
         )
 

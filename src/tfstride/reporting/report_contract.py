@@ -39,6 +39,38 @@ class FilteringSummaryPayload(TypedDict):
     baseline_path: str | None
 
 
+class ResourceCoveragePayload(TypedDict):
+    total_resources: int
+    provider_resources: int
+    normalized_resources: int
+    unsupported_resources: int
+    unsupported_resource_types: dict[str, int]
+	
+	
+class RuleCoveragePayload(TypedDict):
+    registered_rule_count: int
+    enabled_rules: list[str]
+    disabled_rules: list[str]
+    severity_overrides: dict[str, str]
+    finding_counts_by_rule: dict[str, int]
+	
+	
+class UnresolvedReferencePayload(TypedDict):
+    resource: str
+    references: dict[str, list[str]]
+	
+	
+class ReferenceCoveragePayload(TypedDict):
+    unresolved_reference_count: int
+    unresolved_references: list[UnresolvedReferencePayload]
+	
+	
+class AnalysisCoveragePayload(TypedDict):
+    resources: ResourceCoveragePayload
+    rules: RuleCoveragePayload
+    references: ReferenceCoveragePayload
+
+
 class SecurityGroupRulePayload(TypedDict):
     direction: str
     protocol: str
@@ -149,6 +181,7 @@ class TFSReportPayload(TypedDict):
     summary: ReportSummaryPayload
     filtering: FilteringSummaryPayload
     inventory: InventoryPayload
+    analysis_coverage: AnalysisCoveragePayload
     trust_boundaries: list[TrustBoundaryPayload]
     findings: list[FindingPayload]
     suppressed_findings: list[FindingPayload]

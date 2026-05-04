@@ -101,6 +101,26 @@ API_REPORT_EXAMPLE: TFSReportPayload = {
         "suppressions_path": None,
         "baseline_path": None,
     },
+    "analysis_coverage": {
+        "resources": {
+            "total_resources": 0,
+            "provider_resources": 0,
+            "normalized_resources": 0,
+            "unsupported_resources": 0,
+            "unsupported_resource_types": {},
+        },
+        "rules": {
+            "registered_rule_count": 0,
+            "enabled_rules": [],
+            "disabled_rules": [],
+            "severity_overrides": {},
+            "finding_counts_by_rule": {},
+        },
+        "references": {
+            "unresolved_reference_count": 0,
+            "unresolved_references": [],
+        },
+    },
     "inventory": {"provider": "aws", "unsupported_resources": [], "metadata": {}, "resources": []},
     "trust_boundaries": [],
     "findings": [],

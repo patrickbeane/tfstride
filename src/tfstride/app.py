@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.filtering import apply_finding_filters
@@ -51,6 +52,10 @@ class TfStride:
             trust_boundaries=trust_boundaries,
             findings=findings,
             observations=observations,
+            analysis_coverage=build_analysis_coverage(
+                inventory,
+                rule_policy=self.rule_policy,
+            ),
             limitations=list(DEFAULT_LIMITATIONS),
         )
 

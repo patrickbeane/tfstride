@@ -703,6 +703,42 @@ class Observation:
 
 
 @dataclass(slots=True)
+class ResourceCoverage:
+    total_resources: int = 0
+    provider_resources: int = 0
+    normalized_resources: int = 0
+    unsupported_resources: int = 0
+    unsupported_resource_types: dict[str, int] = field(default_factory=dict)
+	
+	
+@dataclass(slots=True)
+class RuleCoverage:
+    registered_rule_count: int = 0
+    enabled_rules: list[str] = field(default_factory=list)
+    disabled_rules: list[str] = field(default_factory=list)
+    severity_overrides: dict[str, Severity] = field(default_factory=dict)
+	
+	
+@dataclass(slots=True)
+class UnresolvedReference:
+    resource: str
+    references: dict[str, list[str]] = field(default_factory=dict)
+	
+	
+@dataclass(slots=True)
+class ReferenceCoverage:
+    unresolved_reference_count: int = 0
+    unresolved_references: list[UnresolvedReference] = field(default_factory=list)
+
+	
+@dataclass(slots=True)
+class AnalysisCoverage:
+    resources: ResourceCoverage = field(default_factory=ResourceCoverage)
+    rules: RuleCoverage = field(default_factory=RuleCoverage)
+    references: ReferenceCoverage = field(default_factory=ReferenceCoverage)
+	
+
+@dataclass(slots=True)
 class AnalysisResult:
     title: str
     analyzed_file: str
@@ -714,4 +750,5 @@ class AnalysisResult:
     suppressed_findings: list[Finding] = field(default_factory=list)
     baselined_findings: list[Finding] = field(default_factory=list)
     filter_summary: dict[str, Any] = field(default_factory=dict)
+    analysis_coverage: AnalysisCoverage = field(default_factory=AnalysisCoverage)
     limitations: list[str] = field(default_factory=list)

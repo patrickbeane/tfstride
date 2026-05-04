@@ -75,10 +75,11 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["kind"], "tfstride-report")
-        self.assertEqual(payload["version"], "1.0")
+        self.assertEqual(payload["version"], "1.1")
         self.assertEqual(payload["title"], "Dashboard Test")
         self.assertEqual(payload["analyzed_file"], FIXTURE_PATH.name)
         self.assertEqual(payload["analyzed_path"], FIXTURE_PATH.name)
+        self.assertIn("analysis_coverage", payload)
         self.assertTrue(payload["findings"])
 
     def test_api_docs_hide_topbar_and_schema_models(self) -> None:

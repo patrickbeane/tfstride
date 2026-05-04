@@ -19,6 +19,7 @@ from tfstride.models import (
     TrustBoundary,
 )
 from tfstride.reporting.report_contract import (
+    AnalysisCoveragePayload,
     EvidenceItemPayload,
 	FindingPayload,
 	InventoryPayload,
@@ -33,7 +34,7 @@ from tfstride.reporting.report_contract import (
 )
 
 REPORT_KIND = "tfstride-report"
-REPORT_FORMAT_VERSION = "1.0"
+REPORT_FORMAT_VERSION = "1.1"
 
 
 class JsonReportRenderer:
@@ -76,6 +77,7 @@ class JsonReportRenderer:
                 },
             },
             "filtering": dict(filter_summary),
+            "analysis_coverage": _serialize_analysis_coverage(result),
             "inventory": _serialize_inventory(result.inventory),
             "trust_boundaries": [
                 _serialize_trust_boundary(boundary)
@@ -93,6 +95,62 @@ class JsonReportRenderer:
             ],
             "limitations": list(result.limitations),
         }
+
+def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayload:
+    coverage = result.analysis_coverage
+    return {
+        "resources": {
+            "total_resources": coverage.resources.total_resources,
+            "provider_resources": coverage.resources.provider_resources,
+            "normalized_resources": coverage.resources.normalized_resources,
+            "unsupported_resources": coverage.resources.unsupported_resources,
+            "unsupported_resource_types": dict(sorted(coverage.resources.unsupported_resource_types.items())),
+        },
+        "rules": {
+            "registered_rule_count": coverage.rules.registered_rule_count,
+            "enabled_rules": list(coverage.rules.enabled_rules),
+            "disabled_rules": list(coverage.rules.disabled_rules),
+            "severity_overrides": {
+                rule_id: severity.value
+                for rule_id, severity in coverage.rules.severity_overrides.items()
+            },
+            "finding_counts_by_rule": _finding_counts_by_rule(result),
+        },
+        "references": {
+            "unresolved_reference_count": coverage.references.unresolved_reference_count,
+            "unresolved_references": [
+                {
+                    "resource": reference.resource,
+                    "references": {
+                        key: list(values)
+                        for key, values in sorted(reference.references.items())
+                    },
+                }
+                for reference in coverage.references.unresolved_references
+            ],
+        },
+    }
+	
+	
+def _finding_counts_by_rule(result: AnalysisResult) -> dict[str, int]:
+    all_findings = [
+        *result.findings,
+        *result.suppressed_findings,
+        *result.baselined_findings,
+    ]
+    counts = Counter(finding.rule_id for finding in all_findings)
+    rule_ids = [
+        *result.analysis_coverage.rules.enabled_rules,
+        *[
+            rule_id
+            for rule_id in sorted(counts)
+            if rule_id not in result.analysis_coverage.rules.enabled_rules
+        ],
+    ]
+    return {
+        rule_id: counts.get(rule_id, 0)
+        for rule_id in rule_ids
+    }
 
 
 def _serialize_inventory(inventory: ResourceInventory) -> InventoryPayload:

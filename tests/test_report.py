@@ -224,6 +224,7 @@ class JsonReportRendererTests(unittest.TestCase):
                 "analyzed_path",
                 "summary",
                 "filtering",
+                "analysis_coverage",
                 "inventory",
                 "trust_boundaries",
                 "findings",
@@ -255,6 +256,10 @@ class JsonReportRendererTests(unittest.TestCase):
             ["provider", "unsupported_resources", "metadata", "resources"],
         )
         self.assertEqual(
+            list(payload["analysis_coverage"]),
+            ["resources", "rules", "references"],
+        )
+        self.assertEqual(
             list(payload["findings"][0]),
             [
                 "fingerprint",
@@ -280,6 +285,28 @@ class JsonReportRendererTests(unittest.TestCase):
 
         self.assertEqual(resource_addresses, sorted(resource_addresses))
         self.assertEqual(boundary_ids, sorted(boundary_ids))
+
+    def test_json_report_includes_analysis_coverage_for_auditing(self) -> None:
+        engine = TfStride()
+        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+
+        coverage = payload["analysis_coverage"]
+	
+        self.assertEqual(coverage["resources"]["total_resources"], 24)
+        self.assertEqual(coverage["resources"]["provider_resources"], 24)
+        self.assertEqual(coverage["resources"]["normalized_resources"], 23)
+        self.assertEqual(coverage["resources"]["unsupported_resources"], 1)
+        self.assertEqual(
+            coverage["resources"]["unsupported_resource_types"],
+            {"aws_cloudwatch_log_group": 1},
+        )
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 13)
+        self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
+        self.assertEqual(coverage["rules"]["disabled_rules"], [])
+        self.assertEqual(coverage["rules"]["severity_overrides"], {})
+        self.assertEqual(coverage["rules"]["finding_counts_by_rule"]["aws-database-permissive-ingress"], 1)
+        self.assertEqual(coverage["references"]["unresolved_reference_count"], 0)
+        self.assertEqual(coverage["references"]["unresolved_references"], [])
 
     def test_json_report_includes_suppressed_and_baselined_findings(self) -> None:
         engine = TfStride()
