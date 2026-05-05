@@ -775,26 +775,46 @@ def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:
         return coverage
 
     summary = payload["summary"]
+    unsupported_resource_types = Counter(
+        _resource_type_from_address(address)
+        for address in payload["inventory"]["unsupported_resources"]
+    )
+    finding_counts_by_rule = Counter(
+        str(finding["rule_id"])
+        for finding in [
+            *payload["findings"],
+            *payload["suppressed_findings"],
+            *payload["baselined_findings"],
+        ]
+        if finding.get("rule_id")
+    )
+    surfaced_rule_ids = sorted(finding_counts_by_rule)
     return {
         "resources": {
             "total_resources": summary["normalized_resources"] + summary["unsupported_resources"],
             "provider_resources": summary["normalized_resources"] + summary["unsupported_resources"],
             "normalized_resources": summary["normalized_resources"],
             "unsupported_resources": summary["unsupported_resources"],
-            "unsupported_resource_types": {},
+            "unsupported_resource_types": dict(sorted(unsupported_resource_types.items())),
         },
         "rules": {
-            "registered_rule_count": 0,
-            "enabled_rules": [],
+            "registered_rule_count": len(surfaced_rule_ids),
+            "enabled_rules": surfaced_rule_ids,
             "disabled_rules": [],
             "severity_overrides": {},
-            "finding_counts_by_rule": {},
+            "finding_counts_by_rule": dict(sorted(finding_counts_by_rule.items())),
         },
         "references": {
             "unresolved_reference_count": 0,
             "unresolved_references": [],
         },
     }
+
+def _resource_type_from_address(address: str) -> str:
+    for segment in reversed(str(address).split(".")):
+        if segment.startswith("aws_"):
+            return segment
+    return str(address)
 
 
 app = create_app()

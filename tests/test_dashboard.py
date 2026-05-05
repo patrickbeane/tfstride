@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import unittest
+from copy import deepcopy
 from unittest import mock
 from pathlib import Path
 from unittest.mock import patch
@@ -81,6 +82,39 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(payload["analyzed_path"], FIXTURE_PATH.name)
         self.assertIn("analysis_coverage", payload)
         self.assertTrue(payload["findings"])
+
+    def test_coverage_context_derives_useful_fallback_from_legacy_payload(self) -> None:
+        payload = deepcopy(dashboard_main.API_REPORT_EXAMPLE)
+        payload.pop("analysis_coverage")
+        payload["summary"]["normalized_resources"] = 23
+        payload["summary"]["unsupported_resources"] = 1
+        payload["inventory"]["unsupported_resources"] = ["aws_cloudwatch_log_group.processor"]
+        payload["findings"] = [
+            {
+                "fingerprint": "sha256:test",
+                "title": "Database is reachable from overly permissive sources",
+                "rule_id": "aws-database-permissive-ingress",
+                "category": "Information Disclosure",
+                "severity": "high",
+                "affected_resources": ["aws_db_instance.app"],
+                "trust_boundary_id": None,
+                "rationale": "Test finding.",
+                "recommended_mitigation": "Test mitigation.",
+                "evidence": [],
+                "severity_reasoning": None,
+            }
+        ]
+	
+        context = dashboard_main._coverage_context(payload)
+	
+        self.assertEqual(
+            context["unsupported_resource_types"],
+            [{"resource_type": "aws_cloudwatch_log_group", "count": 1}],
+        )
+        self.assertEqual(
+            context["finding_counts_by_rule"],
+            [{"rule_id": "aws-database-permissive-ingress", "count": 1}],
+        )
 
     def test_api_docs_hide_topbar_and_schema_models(self) -> None:
         response = self.client.get("/api/docs")
