@@ -130,6 +130,11 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn(FIXTURE_PATH.name, response.text)
         self.assertIn("Report sections", response.text)
         self.assertIn('href="#findings"', response.text)
+        self.assertIn('href="#coverage"', response.text)
+        self.assertIn("Analysis coverage", response.text)
+        self.assertIn("Audit trail for this run", response.text)
+        self.assertIn("aws_cloudwatch_log_group", response.text)
+        self.assertIn("aws-database-permissive-ingress", response.text)
 
     def test_html_analyze_renders_nightmare_fixture(self) -> None:
         with NIGHTMARE_FIXTURE_PATH.open("rb") as fixture_file:

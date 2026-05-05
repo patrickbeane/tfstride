@@ -21,6 +21,7 @@
   </section>
 
   <nav class="report-jump-nav" aria-label="Report sections">
+    <a href="#coverage">Coverage</a>
     <a href="#findings">Findings</a>
     <a href="#observations">Observations</a>
     <a href="#boundaries">Boundaries</a>
@@ -43,6 +44,114 @@
         <strong>{{ bucket.value }}</strong>
       </article>
     {% endfor %}
+  </section>
+
+  <section class="panel coverage-panel" id="coverage">
+    <div class="panel-header">
+      <p class="eyebrow">Analysis coverage</p>
+      <h2>Audit trail for this run</h2>
+    </div>
+
+    <div class="coverage-metrics" aria-label="Analysis coverage metrics">
+      {% for card in coverage_cards %}
+        <div class="coverage-metric">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="coverage-detail-grid">
+      <section class="coverage-detail">
+        <h3>Resource coverage</h3>
+        <dl class="coverage-definition-list">
+          <div>
+            <dt>Provider resources considered</dt>
+            <dd>{{ payload.analysis_coverage.resources.provider_resources }}</dd>
+          </div>
+          <div>
+            <dt>Normalized resources</dt>
+            <dd>{{ payload.analysis_coverage.resources.normalized_resources }}</dd>
+          </div>
+        </dl>
+        {% if unsupported_resource_types %}
+          <ul class="coverage-list">
+            {% for item in unsupported_resource_types %}
+              <li><span>{{ item.resource_type }}</span><strong>{{ item.count }}</strong></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="empty-state">No unsupported AWS resource types were encountered.</p>
+        {% endif %}
+      </section>
+
+      <section class="coverage-detail">
+        <h3>Rule coverage</h3>
+        <dl class="coverage-definition-list">
+          <div>
+            <dt>Registered rules</dt>
+            <dd>{{ payload.analysis_coverage.rules.registered_rule_count }}</dd>
+          </div>
+          <div>
+            <dt>Disabled rules</dt>
+            <dd>{{ payload.analysis_coverage.rules.disabled_rules|length }}</dd>
+          </div>
+        </dl>
+        {% if finding_counts_by_rule %}
+          <ul class="coverage-list">
+            {% for item in finding_counts_by_rule %}
+              <li><span>{{ item.rule_id }}</span><strong>{{ item.count }}</strong></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="empty-state">No enabled rules produced findings.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    {% if unresolved_references or payload.analysis_coverage.rules.disabled_rules or severity_overrides %}
+      <div class="coverage-detail-grid coverage-detail-grid-secondary">
+        {% if unresolved_references %}
+          <section class="coverage-detail">
+            <h3>Unresolved references</h3>
+            <ul class="coverage-list">
+              {% for reference in unresolved_references %}
+                <li>
+                  <span>
+                    {{ reference.resource }}
+                    {% for detail in reference.details %}
+                      <small>{{ detail.key }}: {{ detail.values | join(", ") }}</small>
+                    {% endfor %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+
+        {% if payload.analysis_coverage.rules.disabled_rules %}
+          <section class="coverage-detail">
+            <h3>Disabled rules</h3>
+            <ul class="coverage-list">
+              {% for rule_id in payload.analysis_coverage.rules.disabled_rules %}
+                <li><span>{{ rule_id }}</span></li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+
+        {% if severity_overrides %}
+          <section class="coverage-detail">
+            <h3>Severity overrides</h3>
+            <ul class="coverage-list">
+              {% for override in severity_overrides %}
+                <li><span>{{ override.rule_id }}</span><strong>{{ override.severity }}</strong></li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </div>
+    {% endif %}
   </section>
 
   <section class="content-grid">

@@ -515,6 +515,105 @@ h4 {
   background: linear-gradient(180deg, rgba(45, 106, 79, 0.18), rgba(255, 252, 246, 0.85));
 }
 
+.coverage-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.coverage-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  padding: 0.8rem 0;
+  border-block: 1px solid var(--line);
+}
+
+.coverage-metric {
+  min-width: 0;
+}
+
+.coverage-metric span,
+.coverage-definition-list dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coverage-metric strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.45rem;
+}
+
+.coverage-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.coverage-detail-grid-secondary {
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--line);
+}
+
+.coverage-detail {
+  min-width: 0;
+}
+
+.coverage-detail h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.08rem;
+}
+
+.coverage-definition-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0 0 0.85rem;
+}
+
+.coverage-definition-list dd {
+  margin: 0.18rem 0 0;
+  font-weight: 700;
+}
+
+.coverage-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coverage-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  min-width: 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(31, 41, 51, 0.09);
+}
+
+.coverage-list span {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.coverage-list small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.coverage-list strong {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+}
+
 .scenario-section {
   display: grid;
   gap: 1.25rem;
@@ -773,6 +872,11 @@ details + details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .coverage-metrics,
+  .coverage-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .risk-band {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -834,6 +938,9 @@ details + details {
   }
 
   .summary-card-grid,
+  .coverage-metrics,
+  .coverage-detail-grid,
+  .coverage-definition-list,
   .risk-band,
   .scenario-grid {
     grid-template-columns: 1fr;

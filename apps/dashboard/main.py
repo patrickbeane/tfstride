@@ -6,18 +6,14 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import cast
+from typing import Any, cast
 
 from fastapi import FastAPI, File, Form, HTTPException, Path as FastApiPath, Request, UploadFile
-from fastapi.routing import APIRoute
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.datastructures import FormData
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.formparsers import MultiPartException, MultiPartParser
-from starlette.requests import Request as StarletteRequest
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from apps.dashboard.api_models import (
     DashboardApiErrorModel,
@@ -35,11 +31,11 @@ FIXTURES_DIR = REPO_ROOT / "fixtures"
 TEMPLATES = Jinja2Templates(directory=str(APP_ROOT / "templates"))
 TEMPLATE_RESPONSE_ACCEPTS_REQUEST = "request" in inspect.signature(TEMPLATES.TemplateResponse).parameters
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_MULTIPART_FILES = 1
-MAX_MULTIPART_FIELDS = 1
-MAX_MULTIPART_FIELD_BYTES = 64 * 1024
-UPLOAD_COPY_CHUNK_BYTES = 64 * 1024
-DEFAULT_REPORT_TITLE = "tfSTRIDE Threat Model Report"
+MAX_MULTIPART_ENVELOPE_BYTES = 1024 * 1024
+MAX_MULTIPART_REQUEST_BYTES = MAX_UPLOAD_BYTES + MAX_MULTIPART_ENVELOPE_BYTES
+UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
+UPLOAD_ENDPOINT_PATHS = frozenset({"/analyze", "/api/analyze"})
+DEFAULT_REPORT_TITLE = "tfSTRIDE Report"
 DOCS_CHROME_HIDE_STYLE = """
 <style>
   .swagger-ui .topbar {
@@ -150,100 +146,8 @@ class DashboardInputError(ValueError):
     """Raised when an uploaded plan cannot be analyzed by the dashboard."""
 
 
-class DashboardMultipartParser(MultiPartParser):
-    """Enforce the dashboard upload limit while multipart data is still being parsed."""
-
-    def __init__(self, *args, max_file_size: int, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.max_file_size = max_file_size
-        self._current_file_size = 0
-
-    def on_part_begin(self) -> None:
-        super().on_part_begin()
-        self._current_file_size = 0
-
-    def on_part_data(self, data: bytes, start: int, end: int) -> None:
-        if self._current_part.file is not None:
-            self._current_file_size += end - start
-            if self._current_file_size > self.max_file_size:
-                raise MultiPartException(_upload_limit_error_message())
-        super().on_part_data(data, start, end)
-
-
-class DashboardUploadRequest(StarletteRequest):
-    async def _get_form(
-        self,
-        *,
-        max_files: int | float = 1000,
-        max_fields: int | float = 1000,
-        max_part_size: int = 1024 * 1024,
-    ) -> FormData:
-        if self._form is not None:
-            return self._form
-
-        enforced_max_files = min(max_files, MAX_MULTIPART_FILES)
-        enforced_max_fields = min(max_fields, MAX_MULTIPART_FIELDS)
-        enforced_max_part_size = min(max_part_size, MAX_MULTIPART_FIELD_BYTES)
-        content_type = self.headers.get("content-type", "").lower()
-
-        if not content_type.startswith("multipart/form-data"):
-            return await super()._get_form(
-                max_files=enforced_max_files,
-                max_fields=enforced_max_fields,
-                max_part_size=enforced_max_part_size,
-            )
-
-        try:
-            multipart_parser = DashboardMultipartParser(
-                self.headers,
-                self.stream(),
-                max_files=enforced_max_files,
-                max_fields=enforced_max_fields,
-                max_part_size=enforced_max_part_size,
-                max_file_size=MAX_UPLOAD_BYTES,
-            )
-            self._form = await multipart_parser.parse()
-        except MultiPartException as exc:
-            if "app" in self.scope:
-                raise StarletteHTTPException(status_code=400, detail=exc.message) from exc
-            raise
-
-        return self._form
-
-
-class DashboardRoute(APIRoute):
-    def get_route_handler(self):
-        route_handler = super().get_route_handler()
-
-        async def custom_route_handler(request: StarletteRequest):
-            dashboard_request = DashboardUploadRequest(request.scope, request.receive)
-            try:
-                return await route_handler(dashboard_request)
-            except StarletteHTTPException as exc:
-                if exc.status_code != 400 or not isinstance(exc.detail, str):
-                    raise
-                if dashboard_request.url.path == "/api/analyze":
-                    return JSONResponse(
-                        status_code=400,
-                        content={
-                            "kind": "tfstride-error",
-                            "message": exc.detail,
-                        },
-                    )
-                if dashboard_request.url.path == "/analyze":
-                    return _template_response(
-                        dashboard_request,
-                        "index.html",
-                        _base_context(
-                            dashboard_request,
-                            error=exc.detail,
-                            demo_scenarios=getattr(dashboard_request.app.state, "demo_scenarios", ()),
-                        ),
-                        status_code=400,
-                    )
-                raise
-
-        return custom_route_handler
+class _UploadTooLarge(ValueError):
+    """Raised when a dashboard upload exceeds the request body size limit."""
 
 
 @dataclass(slots=True)
@@ -279,6 +183,42 @@ class DemoScenario:
     high_findings: int
     medium_findings: int
     low_findings: int
+
+
+class UploadSizeLimitMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") not in UPLOAD_ENDPOINT_PATHS
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        bytes_seen = 0
+
+        # Enforce a hard ceiling on the multipart body before Starlette finishes
+        # parsing the upload into an UploadFile object.
+        async def limited_receive() -> Message:
+            nonlocal bytes_seen
+            message = await receive()
+            if message["type"] != "http.request":
+                return message
+
+            body = message.get("body", b"")
+            bytes_seen += len(body)
+            if bytes_seen > MAX_MULTIPART_REQUEST_BYTES:
+                raise _UploadTooLarge(_upload_too_large_message())
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except _UploadTooLarge as exc:
+            response = _upload_limit_response(scope, receive, str(exc))
+            await response(scope, receive, send)
 
 
 DEMO_SCENARIO_DEFINITIONS = (
@@ -374,7 +314,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         redoc_url=None,
     )
-    app.router.route_class = DashboardRoute
+    app.add_middleware(UploadSizeLimitMiddleware)
     app.mount("/static", StaticFiles(directory=str(APP_ROOT / "static")), name="static")
     app.state.engine = TfStride()
 
@@ -533,10 +473,10 @@ def create_app() -> FastAPI:
         summary="Analyze Terraform plan JSON",
         description=(
             "Upload a Terraform plan JSON file generated by `terraform show -json tfplan` and receive "
-            "the versioned machine-readable cloud threat model report."
+            "the versioned machine-readable tfSTRIDE report."
         ),
         response_model=TFSReportPayload,
-        response_description="Versioned machine-readable cloud threat model report.",
+        response_description="Versioned machine-readable tfSTRIDE report.",
         responses={
             200: {
                 "description": "JSON report produced from the uploaded Terraform plan.",
@@ -585,40 +525,27 @@ async def _analyze_upload(
     engine: TfStride,
 ) -> DashboardAnalysis:
     filename = Path(upload.filename or "uploaded-plan.json").name or "uploaded-plan.json"
-    await upload.seek(0)
+    bytes_written = 0
 
-    try:
-        with TemporaryDirectory(prefix="tfstride-dashboard-") as tmp_dir:
-            plan_path = Path(tmp_dir) / filename
-            bytes_written = 0
-
+    with TemporaryDirectory(prefix="tfstride-dashboard-") as tmp_dir:
+        plan_path = Path(tmp_dir) / filename
+        try:
             with plan_path.open("wb") as plan_file:
-                while chunk := await upload.read(UPLOAD_COPY_CHUNK_BYTES):
-                    bytes_written += len(chunk)
-                    if bytes_written > MAX_UPLOAD_BYTES:
-                        raise DashboardInputError(_upload_limit_error_message())
+                while True:
+                    chunk = await upload.read(UPLOAD_READ_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    if bytes_written + len(chunk) > MAX_UPLOAD_BYTES:
+                        raise DashboardInputError(_upload_too_large_message())
                     plan_file.write(chunk)
+                    bytes_written += len(chunk)
+        finally:
+            await upload.close()
 
-            if bytes_written == 0:
-                raise DashboardInputError("Upload a non-empty Terraform plan JSON file.")
+        if bytes_written == 0:
+            raise DashboardInputError("Upload a non-empty Terraform plan JSON file.")
 
-            return _analyze_plan_path(plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
-    finally:
-        await upload.close()
-
-
-def _upload_limit_error_message() -> str:
-    return f"Uploaded plan exceeds the {_format_byte_size(MAX_UPLOAD_BYTES)} dashboard limit."
-
-
-def _format_byte_size(num_bytes: int) -> str:
-    for unit, size in (("GiB", 1024**3), ("MiB", 1024**2), ("KiB", 1024), ("B", 1)):
-        if num_bytes >= size:
-            value = num_bytes / size
-            if size == 1 or value.is_integer():
-                return f"{int(value)} {unit}"
-            return f"{value:.1f} {unit}"
-    return "0 B"
+        return _analyze_plan_path(plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
 
 
 def _analyze_plan_path(
@@ -631,14 +558,6 @@ def _analyze_plan_path(
     payload = _sanitize_dashboard_payload(engine.build_json_report_payload(result))
     markdown_report = engine.render_markdown(result)
     return DashboardAnalysis(payload=payload, markdown_report=markdown_report)
-
-
-def _sanitize_dashboard_payload(payload: TFSReportPayload) -> TFSReportPayload:
-    sanitized = dict(payload)
-    analyzed_file = str(sanitized.get("analyzed_file") or "")
-    if analyzed_file:
-        sanitized["analyzed_path"] = analyzed_file
-    return sanitized
 
 
 def _build_demo_scenarios(engine: TfStride) -> tuple[DemoScenario, ...]:
@@ -693,6 +612,14 @@ def _get_demo_scenarios_by_id(app: FastAPI) -> dict[str, DemoScenario]:
     return cast(dict[str, DemoScenario], cached)
 
 
+def _sanitize_dashboard_payload(payload: TFSReportPayload) -> TFSReportPayload:
+    sanitized_payload = dict(payload)
+    analyzed_file = sanitized_payload.get("analyzed_file")
+    if isinstance(analyzed_file, str) and analyzed_file:
+        sanitized_payload["analyzed_path"] = analyzed_file
+    return sanitized_payload
+
+
 def _base_context(
     request: Request,
     *,
@@ -709,6 +636,29 @@ def _base_context(
         "max_upload_mebibytes": MAX_UPLOAD_BYTES // (1024 * 1024),
         "demo_scenarios": demo_scenarios,
     }
+
+
+def _upload_too_large_message() -> str:
+    return f"Uploaded plan exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB dashboard limit."
+
+
+def _upload_limit_response(scope: Scope, receive: Receive, message: str) -> HTMLResponse | JSONResponse:
+    if scope.get("path") == "/api/analyze":
+        return JSONResponse(
+            status_code=413,
+            content={
+                "kind": "tfstride-error",
+                "message": message,
+            },
+        )
+
+    request = Request(scope, receive)
+    return _template_response(
+        request,
+        "index.html",
+        _base_context(request, error=message),
+        status_code=413,
+    )
 
 
 def _template_response(
@@ -762,9 +712,88 @@ def _report_context(
         "top_risks": top_risks,
         "findings_by_severity": findings_by_severity,
         "unsupported_resources": payload["inventory"]["unsupported_resources"],
+        **_coverage_context(payload),
         "raw_json": json.dumps(payload, indent=2),
         "raw_markdown": analysis.markdown_report,
         "scenario": scenario,
+    }
+
+
+def _coverage_context(payload: TFSReportPayload) -> dict[str, object]:
+    analysis_coverage = _analysis_coverage_payload(payload)
+    disabled_rules = list(analysis_coverage["rules"]["disabled_rules"])
+    severity_overrides = [
+        {"rule_id": rule_id, "severity": severity}
+        for rule_id, severity in analysis_coverage["rules"]["severity_overrides"].items()
+    ]
+    unresolved_references = [
+        {
+            "resource": reference["resource"],
+            "details": [
+                {
+                    "key": key,
+                    "value_text": ", ".join(values),
+                }
+                for key, values in sorted(reference["references"].items())
+            ],
+        }
+        for reference in analysis_coverage["references"]["unresolved_references"]
+    ]
+    return {
+        "coverage_cards": [
+            {"label": "Terraform resources", "value": analysis_coverage["resources"]["total_resources"]},
+            {"label": "Unsupported", "value": analysis_coverage["resources"]["unsupported_resources"]},
+            {"label": "Enabled rules", "value": len(analysis_coverage["rules"]["enabled_rules"])},
+            {"label": "Unresolved refs", "value": analysis_coverage["references"]["unresolved_reference_count"]},
+        ],
+        "coverage_resource_stats": [
+            {"label": "Provider resources considered", "value": analysis_coverage["resources"]["provider_resources"]},
+            {"label": "Normalized resources", "value": analysis_coverage["resources"]["normalized_resources"]},
+        ],
+        "coverage_rule_stats": [
+            {"label": "Registered rules", "value": analysis_coverage["rules"]["registered_rule_count"]},
+            {"label": "Disabled rules", "value": len(disabled_rules)},
+        ],
+        "unsupported_resource_types": [
+            {"resource_type": resource_type, "count": count}
+            for resource_type, count in sorted(analysis_coverage["resources"]["unsupported_resource_types"].items())
+        ],
+        "finding_counts_by_rule": [
+            {"rule_id": rule_id, "count": count}
+            for rule_id, count in analysis_coverage["rules"]["finding_counts_by_rule"].items()
+            if count
+        ],
+        "disabled_rule_ids": disabled_rules,
+        "severity_overrides": severity_overrides,
+        "unresolved_references": unresolved_references,
+    }
+
+
+def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:
+    coverage = payload.get("analysis_coverage")
+    if isinstance(coverage, dict):
+        return coverage
+
+    summary = payload["summary"]
+    return {
+        "resources": {
+            "total_resources": summary["normalized_resources"] + summary["unsupported_resources"],
+            "provider_resources": summary["normalized_resources"] + summary["unsupported_resources"],
+            "normalized_resources": summary["normalized_resources"],
+            "unsupported_resources": summary["unsupported_resources"],
+            "unsupported_resource_types": {},
+        },
+        "rules": {
+            "registered_rule_count": 0,
+            "enabled_rules": [],
+            "disabled_rules": [],
+            "severity_overrides": {},
+            "finding_counts_by_rule": {},
+        },
+        "references": {
+            "unresolved_reference_count": 0,
+            "unresolved_references": [],
+        },
     }
 
 
