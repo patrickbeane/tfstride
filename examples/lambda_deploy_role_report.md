@@ -73,8 +73,8 @@ No findings in this severity band.
 - Affected resources: `aws_iam_role.deployer`
 - Trust boundary: `cross-account-or-role-access:arn:aws:iam::777788889999:role/ci-deployer->aws_iam_role.deployer`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 4 => medium
-- Rationale: aws_iam_role.deployer trusts arn:aws:iam::777788889999:role/ci-deployer without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on a broad or external principal match alone.
-- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, or `SourceAccount` when crossing accounts or trusting broad principals.
+- Rationale: aws_iam_role.deployer trusts arn:aws:iam::777788889999:role/ci-deployer without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on the trusted principal match alone.
+- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, `SourceAccount`, `SAML:aud`, or provider-specific OIDC `aud` and `sub` checks when crossing accounts or trusting broad or federated principals.
 - Evidence:
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
   - trust scope: principal belongs to foreign account 777788889999
@@ -87,7 +87,7 @@ No findings in this severity band.
 - Trust boundary: `cross-account-or-role-access:arn:aws:iam::777788889999:role/ci-deployer->aws_iam_role.deployer`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 5 => medium
 - Rationale: aws_iam_role.deployer can be assumed by arn:aws:iam::777788889999:role/ci-deployer. Broad or foreign-account trust relationships increase the chance that compromise in one identity domain spills into another.
-- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId` or source ARN checks.
+- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
   - trust path: trust principal belongs to foreign account 777788889999

@@ -7,6 +7,8 @@ from tfstride.models import IAMPolicyCondition
 
 EFFECTIVE_TRUST_NARROWING_KEYS = frozenset({"sts:ExternalId", "aws:SourceArn", "aws:SourceAccount"})
 EFFECTIVE_RESOURCE_POLICY_NARROWING_KEYS = frozenset({"aws:SourceArn", "aws:SourceAccount"})
+SAML_TRUST_NARROWING_KEYS = frozenset({"SAML:aud"})
+COGNITO_TRUST_NARROWING_KEYS = frozenset({"cognito-identity.amazonaws.com:aud"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,12 @@ def assess_principal(
         scope_description = (
             f"{_federated_provider_description(federated_provider_type)} belongs to foreign account {account_id}"
         )
+    elif is_federated:
+        provider_description = _federated_provider_description(federated_provider_type)
+        if account_id:
+            scope_description = f"{provider_description} belongs to account {account_id}"
+        else:
+            scope_description = f"principal is {provider_description}"
     elif is_foreign_account:
         if is_root_like:
             scope_description = f"principal is foreign account root {account_id}"
@@ -157,6 +165,15 @@ def trust_statement_has_supported_narrowing(trust_statement: Mapping[str, Any]) 
     return bool(trust_statement_narrowing_keys(trust_statement))
 
 
+def trust_statement_has_supported_narrowing_for_principal(
+    trust_statement: Mapping[str, Any],
+    assessment: PrincipalAssessment,
+) -> bool:
+    if not assessment.is_federated:
+        return trust_statement_has_supported_narrowing(trust_statement)
+    return bool(_federated_narrowing_keys(trust_statement, assessment))
+
+
 def trust_statement_has_effective_narrowing(trust_statement: Mapping[str, Any]) -> bool:
     return _has_effective_narrowing(
         trust_statement_narrowing_conditions(trust_statement),
@@ -164,8 +181,49 @@ def trust_statement_has_effective_narrowing(trust_statement: Mapping[str, Any]) 
     )
 
 
+def trust_statement_has_effective_narrowing_for_principal(
+    trust_statement: Mapping[str, Any],
+    assessment: PrincipalAssessment,
+) -> bool:
+    if not assessment.is_federated:
+        return trust_statement_has_effective_narrowing(trust_statement)
+    narrowing_keys = set(_federated_narrowing_keys(trust_statement, assessment))
+    if assessment.federated_provider_type == "saml":
+        return bool(narrowing_keys.intersection(SAML_TRUST_NARROWING_KEYS))
+    if assessment.federated_provider_type == "oidc":
+        provider_prefix = _oidc_provider_condition_key_prefix(assessment.principal)
+        if provider_prefix is None:
+            return False
+        return {
+            f"{provider_prefix}:aud",
+            f"{provider_prefix}:sub",
+        }.issubset(narrowing_keys)
+    if assessment.federated_provider_type == "cognito":
+        return bool(narrowing_keys.intersection(COGNITO_TRUST_NARROWING_KEYS))
+    return False
+
+
 def describe_trust_narrowing(trust_statement: Mapping[str, Any]) -> list[str]:
     keys = trust_statement_narrowing_keys(trust_statement)
+    if keys:
+        return [
+            "supported narrowing conditions present: true",
+            "supported narrowing condition keys: " + ", ".join(keys),
+        ]
+    return [
+        "supported narrowing conditions present: false",
+        "supported narrowing condition keys: none",
+    ]
+
+
+def describe_trust_narrowing_for_principal(
+    trust_statement: Mapping[str, Any],
+    assessment: PrincipalAssessment,
+) -> list[str]:
+    if not assessment.is_federated:
+        return describe_trust_narrowing(trust_statement)
+
+    keys = _federated_narrowing_keys(trust_statement, assessment)
     if keys:
         return [
             "supported narrowing conditions present: true",
@@ -272,6 +330,50 @@ def _federated_provider_description(provider_type: str | None) -> str:
     if provider_type == "cognito":
         return "Cognito identity provider"
     return "federated identity provider"
+
+
+def _federated_narrowing_keys(
+    trust_statement: Mapping[str, Any],
+    assessment: PrincipalAssessment,
+) -> list[str]:
+    relevant_keys = _federated_condition_keys(assessment)
+    if not relevant_keys:
+        return []
+
+    narrowing_keys: list[str] = []
+    for condition in trust_statement_narrowing_conditions(trust_statement):
+        if condition.key not in relevant_keys:
+            continue
+        if condition.key in narrowing_keys:
+            continue
+        narrowing_keys.append(condition.key)
+    return narrowing_keys
+
+
+def _federated_condition_keys(assessment: PrincipalAssessment) -> frozenset[str]:
+    if assessment.federated_provider_type == "saml":
+        return SAML_TRUST_NARROWING_KEYS
+    if assessment.federated_provider_type == "oidc":
+        provider_prefix = _oidc_provider_condition_key_prefix(assessment.principal)
+        if provider_prefix is None:
+            return frozenset()
+        return frozenset(
+            {
+                f"{provider_prefix}:aud",
+                f"{provider_prefix}:sub",
+            }
+        )
+    if assessment.federated_provider_type == "cognito":
+        return COGNITO_TRUST_NARROWING_KEYS
+    return frozenset()
+
+
+def _oidc_provider_condition_key_prefix(principal: str) -> str | None:
+    marker = ":oidc-provider/"
+    if marker not in principal:
+        return None
+    provider = principal.split(marker, 1)[1].strip("/")
+    return provider or None
 
 
 def _is_root_like_principal(principal: str) -> bool:

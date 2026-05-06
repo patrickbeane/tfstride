@@ -1570,7 +1570,7 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.trust_boundaries[0].boundary_type, BoundaryType.CROSS_ACCOUNT_OR_ROLE)
         self.assertEqual(result.findings, [])
 
-    def test_same_account_federated_role_trust_is_classified_without_new_findings(self) -> None:
+    def test_same_account_federated_role_trust_without_audience_narrowing_is_flagged(self) -> None:
         result = self._analyze_payload(
             {
                 "format_version": "1.2",
@@ -1620,7 +1620,73 @@ class TFSAnalysisTests(unittest.TestCase):
             boundary.rationale,
             "A federated identity provider can cross into this role's trust boundary.",
         )
+        self.assertEqual(
+            Counter(finding.rule_id for finding in result.findings),
+            {
+                "aws-role-trust-expansion": 1,
+                "aws-role-trust-missing-narrowing": 1,
+            },
+        )
+
+    def test_saml_audience_narrows_same_account_federated_role_trust(self) -> None:
+        result = self._analyze_payload(
+            {
+                "format_version": "1.2",
+                "terraform_version": "1.8.5",
+                "planned_values": {
+                    "root_module": {
+                        "resources": [
+                            {
+                                "address": "aws_iam_role.federated",
+                                "mode": "managed",
+                                "type": "aws_iam_role",
+                                "name": "federated",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "federated",
+                                    "name": "federated",
+                                    "arn": "arn:aws:iam::111122223333:role/federated",
+                                    "assume_role_policy": {
+                                        "Version": "2012-10-17",
+                                        "Statement": [
+                                            {
+                                                "Effect": "Allow",
+                                                "Action": "sts:AssumeRoleWithSAML",
+                                                "Principal": {
+                                                    "Federated": (
+                                                        "arn:aws:iam::111122223333:saml-provider/CorpSSO"
+                                                    )
+                                                },
+                                                "Condition": {
+                                                    "StringEquals": {
+                                                        "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                                    }
+                                                },
+                                            }
+                                        ],
+                                    },
+                                },
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+
         self.assertEqual(result.findings, [])
+        self.assertEqual(len(result.observations), 1)
+        trust_evidence = {item.key: item.values for item in result.observations[0].evidence}
+        self.assertEqual(
+            trust_evidence["trust_scope"],
+            ["SAML identity provider belongs to account 111122223333"],
+        )
+        self.assertEqual(
+            trust_evidence["trust_narrowing"],
+            [
+                "supported narrowing conditions present: true",
+                "supported narrowing condition keys: SAML:aud",
+            ],
+        )
 
     def test_cross_account_control_plane_path_to_private_secret_and_database_is_detected(self) -> None:
         result = self._analyze_payload(
@@ -1958,6 +2024,98 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                     "narrowing_condition_keys": [],
                     "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
+                },
+            ],
+        )
+
+    def test_normalizer_extracts_federated_trust_narrowing_condition_keys(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="aws_iam_role.federated",
+                    mode="managed",
+                    resource_type="aws_iam_role",
+                    name="federated",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "federated-role",
+                        "name": "federated-role",
+                        "arn": "arn:aws:iam::111122223333:role/federated-role",
+                        "assume_role_policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRoleWithSAML",
+                                    "Principal": {
+                                        "Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"
+                                    },
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "SAML:aud": "https://signin.aws.amazon.com/saml",
+                                            "SAML:sub": "alice@example.com",
+                                        }
+                                    },
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRoleWithWebIdentity",
+                                    "Principal": {
+                                        "Federated": (
+                                            "arn:aws:iam::111122223333:"
+                                            "oidc-provider/token.actions.githubusercontent.com"
+                                        )
+                                    },
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                                            "aws:PrincipalArn": "arn:aws:iam::111122223333:role/ignored",
+                                        },
+                                        "StringLike": {
+                                            "token.actions.githubusercontent.com:sub": "repo:example/app:*"
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                )
+            ]
+        )
+        role = inventory.get_by_address("aws_iam_role.federated")
+
+        self.assertIsNotNone(role)
+        trust_statements = role.metadata.get("trust_statements")
+        self.assertEqual(trust_statements[0]["narrowing_condition_keys"], ["SAML:aud"])
+        self.assertEqual(
+            trust_statements[0]["narrowing_conditions"],
+            [
+                {
+                    "operator": "StringEquals",
+                    "key": "SAML:aud",
+                    "values": ["https://signin.aws.amazon.com/saml"],
+                }
+            ],
+        )
+        self.assertEqual(
+            trust_statements[1]["narrowing_condition_keys"],
+            [
+                "token.actions.githubusercontent.com:aud",
+                "token.actions.githubusercontent.com:sub",
+            ],
+        )
+        self.assertEqual(
+            trust_statements[1]["narrowing_conditions"],
+            [
+                {
+                    "operator": "StringEquals",
+                    "key": "token.actions.githubusercontent.com:aud",
+                    "values": ["sts.amazonaws.com"],
+                },
+                {
+                    "operator": "StringLike",
+                    "key": "token.actions.githubusercontent.com:sub",
+                    "values": ["repo:example/app:*"],
                 },
             ],
         )

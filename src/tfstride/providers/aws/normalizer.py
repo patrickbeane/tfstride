@@ -6,8 +6,8 @@ from typing import Any
 
 from tfstride.models import (
     IAMPolicyCondition,
-    IAMPolicyStatement,
     IAMPrincipal,
+    IAMPolicyStatement,
     NormalizedResource,
     ResourceCategory,
     ResourceInventory,
@@ -73,14 +73,29 @@ SUPPORTED_TRUST_NARROWING_CONDITIONS = {
         "ForAnyValue:StringEquals",
         "ForAnyValue:StringLike",
     },
+    "SAML:aud": {
+        "StringEquals",
+        "StringLike",
+        "ForAnyValue:StringEquals",
+        "ForAnyValue:StringLike",
+    },
 }
+SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_CLAIMS = frozenset({"aud", "sub"})
+SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_OPERATORS = frozenset(
+    {
+        "StringEquals",
+        "StringLike",
+        "ForAnyValue:StringEquals",
+        "ForAnyValue:StringLike",
+    }
+)
 
 
 class AwsNormalizer(ProviderNormalizer):
     provider = "aws"
 
     def __init__(self, resource_decorator: AwsResourceDecorator | None = None) -> None:
-	    self._resource_decorator = resource_decorator or AwsResourceDecorator()
+        self._resource_decorator = resource_decorator or AwsResourceDecorator()
 
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
         aws_resources = [
@@ -746,7 +761,7 @@ def _extract_supported_trust_narrowing_conditions(
 ) -> list[IAMPolicyCondition]:
     supported: list[IAMPolicyCondition] = []
     for condition in conditions:
-        supported_operators = SUPPORTED_TRUST_NARROWING_CONDITIONS.get(condition.key)
+        supported_operators = _supported_trust_narrowing_operators(condition.key)
         if supported_operators is None or condition.operator not in supported_operators:
             continue
         supported.append(
@@ -757,6 +772,26 @@ def _extract_supported_trust_narrowing_conditions(
             )
         )
     return supported
+
+
+def _supported_trust_narrowing_operators(key: str) -> frozenset[str] | set[str] | None:
+    supported_operators = SUPPORTED_TRUST_NARROWING_CONDITIONS.get(key)
+    if supported_operators is not None:
+        return supported_operators
+    if _is_supported_web_identity_trust_narrowing_key(key):
+        return SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_OPERATORS
+    return None
+
+
+def _is_supported_web_identity_trust_narrowing_key(key: str) -> bool:
+    provider_prefix, separator, claim = key.rpartition(":")
+    if not separator:
+        return False
+    if provider_prefix in {"aws", "sts", "SAML"}:
+        return False
+    if claim not in SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_CLAIMS:
+        return False
+    return "." in provider_prefix or "/" in provider_prefix
 
 
 def _extract_principal_entries(raw_principal: Any) -> list[IAMPrincipal]:

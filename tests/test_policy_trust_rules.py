@@ -52,9 +52,9 @@ class PolicyTrustRuleDetectorsTests(unittest.TestCase):
         context = _context([secret], [boundary])
 
         findings = self.detectors.detect_sensitive_resource_policy_exposure(
-	        context,
-	        "aws-sensitive-resource-policy-external-access",
-	    )
+            context,
+            "aws-sensitive-resource-policy-external-access",
+        )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -111,13 +111,13 @@ class PolicyTrustRuleDetectorsTests(unittest.TestCase):
         context = _context([role], [boundary])
 
         expansion_findings = self.detectors.detect_trust_expansion(
-	        context,
-	        "aws-role-trust-expansion",
-	    )
+            context,
+            "aws-role-trust-expansion",
+        )
         narrowing_findings = self.detectors.detect_unconstrained_trust(
-	        context,
-	        "aws-role-trust-missing-narrowing",
-	    )
+            context,
+            "aws-role-trust-missing-narrowing",
+        )
 
         self.assertEqual(len(expansion_findings), 1)
         expansion = expansion_findings[0]
@@ -156,6 +156,70 @@ class PolicyTrustRuleDetectorsTests(unittest.TestCase):
                 "supported narrowing condition keys: none",
             ],
         )
+
+    def test_oidc_audience_requires_subject_to_be_effective_narrowing(self) -> None:
+        principal = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+        audience_only_statement = {
+            "principals": [principal],
+            "principal_entries": [{"kind": "Federated", "value": principal}],
+            "narrowing_condition_keys": ["token.actions.githubusercontent.com:aud"],
+            "narrowing_conditions": [
+                {
+                    "operator": "StringEquals",
+                    "key": "token.actions.githubusercontent.com:aud",
+                    "values": ["sts.amazonaws.com"],
+                }
+            ],
+            "has_narrowing_conditions": True,
+        }
+        complete_statement = {
+            **audience_only_statement,
+            "narrowing_condition_keys": [
+                "token.actions.githubusercontent.com:aud",
+                "token.actions.githubusercontent.com:sub",
+            ],
+            "narrowing_conditions": [
+                *audience_only_statement["narrowing_conditions"],
+                {
+                    "operator": "StringLike",
+                    "key": "token.actions.githubusercontent.com:sub",
+                    "values": ["repo:example/app:*"],
+                },
+            ],
+        }
+
+        for trust_statement, expected_expansion_count in (
+            (audience_only_statement, 1),
+            (complete_statement, 0),
+        ):
+            with self.subTest(expected_expansion_count=expected_expansion_count):
+                role = NormalizedResource(
+                    address="aws_iam_role.web_identity",
+                    provider="aws",
+                    resource_type="aws_iam_role",
+                    name="web_identity",
+                    category=ResourceCategory.IAM,
+                    metadata={"trust_statements": [trust_statement]},
+                )
+                context = _context([role], [])
+
+                expansion_findings = self.detectors.detect_trust_expansion(
+                    context,
+                    "aws-role-trust-expansion",
+                )
+                narrowing_findings = self.detectors.detect_unconstrained_trust(
+                    context,
+                    "aws-role-trust-missing-narrowing",
+                )
+
+                self.assertEqual(len(expansion_findings), expected_expansion_count)
+                self.assertEqual(narrowing_findings, [])
+                if expansion_findings:
+                    evidence = _evidence_by_key(expansion_findings[0])
+                    self.assertEqual(
+                        evidence["trust_path"],
+                        ["trust principal is OIDC identity provider in account 111122223333"],
+                    )
 
 
 def _context(

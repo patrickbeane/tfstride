@@ -207,7 +207,7 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Trust boundary: `cross-account-or-role-access:*->aws_iam_role.app`
 - Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
 - Rationale: aws_iam_role.app can be assumed by *. Broad or foreign-account trust relationships increase the chance that compromise in one identity domain spills into another.
-- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId` or source ARN checks.
+- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: *
   - trust path: trust policy allows any AWS principal
@@ -244,8 +244,8 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Affected resources: `aws_iam_role.app`
 - Trust boundary: `cross-account-or-role-access:*->aws_iam_role.app`
 - Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 5 => medium
-- Rationale: aws_iam_role.app trusts * without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on a broad or external principal match alone.
-- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, or `SourceAccount` when crossing accounts or trusting broad principals.
+- Rationale: aws_iam_role.app trusts * without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on the trusted principal match alone.
+- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, `SourceAccount`, `SAML:aud`, or provider-specific OIDC `aud` and `sub` checks when crossing accounts or trusting broad or federated principals.
 - Evidence:
   - trust principals: *
   - trust scope: principal is wildcard
@@ -257,8 +257,8 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Affected resources: `aws_iam_role.pipeline`
 - Trust boundary: `cross-account-or-role-access:arn:aws:iam::444455556666:root->aws_iam_role.pipeline`
 - Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 5 => medium
-- Rationale: aws_iam_role.pipeline trusts arn:aws:iam::444455556666:root without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on a broad or external principal match alone.
-- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, or `SourceAccount` when crossing accounts or trusting broad principals.
+- Rationale: aws_iam_role.pipeline trusts arn:aws:iam::444455556666:root without supported narrowing conditions such as `sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the assume-role path dependent on the trusted principal match alone.
+- Recommended mitigation: Keep the trusted principal as specific as possible and add supported assume-role conditions such as `ExternalId`, `SourceArn`, `SourceAccount`, `SAML:aud`, or provider-specific OIDC `aud` and `sub` checks when crossing accounts or trusting broad or federated principals.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:root
   - trust scope: principal is foreign account root 444455556666
@@ -369,7 +369,7 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Trust boundary: `cross-account-or-role-access:arn:aws:iam::444455556666:root->aws_iam_role.pipeline`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 5 => medium
 - Rationale: aws_iam_role.pipeline can be assumed by arn:aws:iam::444455556666:root. Broad or foreign-account trust relationships increase the chance that compromise in one identity domain spills into another.
-- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId` or source ARN checks.
+- Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:root
   - trust path: trust principal belongs to foreign account 444455556666

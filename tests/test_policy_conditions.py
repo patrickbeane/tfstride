@@ -5,11 +5,14 @@ import unittest
 from tfstride.analysis.policy_conditions import (
     assess_principal,
     describe_trust_narrowing,
+    describe_trust_narrowing_for_principal,
     policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
     trust_statement_has_supported_narrowing,
     trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing,
+    trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_has_supported_narrowing_for_principal,
     trust_statement_narrowing_conditions,
     trust_statement_narrowing_keys,
 )
@@ -50,7 +53,10 @@ class PolicyConditionsTests(unittest.TestCase):
         self.assertTrue(same_account_saml.is_federated)
         self.assertFalse(same_account_saml.is_service)
         self.assertEqual(same_account_saml.federated_provider_type, "saml")
-        self.assertIsNone(same_account_saml.scope_description)
+        self.assertEqual(
+            same_account_saml.scope_description,
+            "SAML identity provider belongs to account 111122223333",
+        )
         self.assertEqual(
             same_account_saml.trust_path_description,
             "trust principal is SAML identity provider in account 111122223333",
@@ -215,6 +221,104 @@ class PolicyConditionsTests(unittest.TestCase):
 
         self.assertFalse(trust_statement_has_effective_narrowing(trust_statement))
         self.assertFalse(resource_policy_statement_has_effective_narrowing(resource_statement))
+
+    def test_saml_audience_is_effective_for_saml_federated_principal(self) -> None:
+        assessment = assess_principal(
+            "arn:aws:iam::111122223333:saml-provider/CorpSSO",
+            "111122223333",
+        )
+        trust_statement = {
+            "principals": ["arn:aws:iam::111122223333:saml-provider/CorpSSO"],
+            "principal_entries": [
+                {
+                    "kind": "Federated",
+                    "value": "arn:aws:iam::111122223333:saml-provider/CorpSSO",
+                }
+            ],
+            "narrowing_condition_keys": ["SAML:aud"],
+            "narrowing_conditions": [
+                {
+                    "operator": "StringEquals",
+                    "key": "SAML:aud",
+                    "values": ["https://signin.aws.amazon.com/saml"],
+                }
+            ],
+            "has_narrowing_conditions": True,
+        }
+
+        self.assertTrue(trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment))
+        self.assertTrue(trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment))
+        self.assertEqual(
+            describe_trust_narrowing_for_principal(trust_statement, assessment),
+            [
+                "supported narrowing conditions present: true",
+                "supported narrowing condition keys: SAML:aud",
+            ],
+        )
+
+    def test_oidc_principal_requires_matching_audience_and_subject_narrowing(self) -> None:
+        assessment = assess_principal(
+            "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com",
+            "111122223333",
+        )
+        audience_only_statement = {
+            "principals": ["arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"],
+            "principal_entries": [
+                {
+                    "kind": "Federated",
+                    "value": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com",
+                }
+            ],
+            "narrowing_condition_keys": ["token.actions.githubusercontent.com:aud"],
+            "narrowing_conditions": [
+                {
+                    "operator": "StringEquals",
+                    "key": "token.actions.githubusercontent.com:aud",
+                    "values": ["sts.amazonaws.com"],
+                }
+            ],
+            "has_narrowing_conditions": True,
+        }
+        complete_statement = {
+            **audience_only_statement,
+            "narrowing_condition_keys": [
+                "token.actions.githubusercontent.com:aud",
+                "token.actions.githubusercontent.com:sub",
+            ],
+            "narrowing_conditions": [
+                *audience_only_statement["narrowing_conditions"],
+                {
+                    "operator": "StringLike",
+                    "key": "token.actions.githubusercontent.com:sub",
+                    "values": ["repo:example/app:*"],
+                },
+            ],
+        }
+        mismatched_statement = {
+            **complete_statement,
+            "narrowing_condition_keys": [
+                "accounts.google.com:aud",
+                "accounts.google.com:sub",
+            ],
+            "narrowing_conditions": [
+                {
+                    "operator": "StringEquals",
+                    "key": "accounts.google.com:aud",
+                    "values": ["sts.amazonaws.com"],
+                },
+                {
+                    "operator": "StringLike",
+                    "key": "accounts.google.com:sub",
+                    "values": ["repo:example/app:*"],
+                },
+            ],
+        }
+
+        self.assertTrue(trust_statement_has_supported_narrowing_for_principal(audience_only_statement, assessment))
+        self.assertFalse(trust_statement_has_effective_narrowing_for_principal(audience_only_statement, assessment))
+        self.assertTrue(trust_statement_has_effective_narrowing_for_principal(complete_statement, assessment))
+        self.assertFalse(trust_statement_has_supported_narrowing_for_principal(mismatched_statement, assessment))
+        self.assertFalse(trust_statement_has_effective_narrowing_for_principal(mismatched_statement, assessment))
 
     def test_source_arn_is_effective_resource_policy_narrowing(self) -> None:
         statement = IAMPolicyStatement(

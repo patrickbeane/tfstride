@@ -8,12 +8,13 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.policy_conditions import (
-    describe_trust_narrowing,
+    PrincipalAssessment,
+    describe_trust_narrowing_for_principal,
     policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
     trust_statement_principal_assessments,
-    trust_statement_has_effective_narrowing,
-    trust_statement_has_supported_narrowing,
+    trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_has_supported_narrowing_for_principal,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
@@ -164,9 +165,9 @@ class PolicyTrustRuleDetectors:
 
         for role in context.inventory.by_type("aws_iam_role"):
             for trust_statement in role.trust_statements:
-                if trust_statement_has_effective_narrowing(trust_statement):
-                    continue
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
+                        continue
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
@@ -193,11 +194,7 @@ class PolicyTrustRuleDetectors:
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
                             trust_boundary_id=boundary.identifier if boundary else None,
-                            rationale=(
-                                f"{role.display_name} can be assumed by {principal}. Broad or foreign-account trust "
-                                "relationships increase the chance that compromise in one identity domain spills into "
-                                "another."
-                            ),
+                            rationale=_trust_expansion_rationale(role.display_name, principal, assessment),
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item(
@@ -221,9 +218,9 @@ class PolicyTrustRuleDetectors:
 
         for role in context.inventory.by_type("aws_iam_role"):
             for trust_statement in role.trust_statements:
-                if trust_statement_has_supported_narrowing(trust_statement):
-                    continue
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    if trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment):
+                        continue
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
@@ -250,17 +247,52 @@ class PolicyTrustRuleDetectors:
                             severity=severity_reasoning.severity,
                             affected_resources=[role.address],
                             trust_boundary_id=boundary.identifier if boundary else None,
-                            rationale=(
-                                f"{role.display_name} trusts {principal} without supported narrowing conditions such as "
-                                "`sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`. That leaves the "
-                                "assume-role path dependent on a broad or external principal match alone."
-                            ),
+                            rationale=_missing_narrowing_rationale(role.display_name, principal, assessment),
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item("trust_scope", [assessment.scope_description]),
-                                evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
+                                evidence_item(
+                                    "trust_narrowing",
+                                    describe_trust_narrowing_for_principal(trust_statement, assessment),
+                                ),
                             ),
                             severity_reasoning=severity_reasoning,
                         )
                     )
         return findings
+
+
+def _trust_expansion_rationale(
+    role_display_name: str,
+    principal: str,
+    assessment: PrincipalAssessment,
+) -> str:
+    if assessment.is_federated:
+        return (
+            f"{role_display_name} can be assumed through {principal}. Federated trust relationships without "
+            "effective audience or subject conditions increase the chance that assertions or web identity tokens "
+            "from the provider are accepted more broadly than intended."
+        )
+    return (
+        f"{role_display_name} can be assumed by {principal}. Broad or foreign-account trust "
+        "relationships increase the chance that compromise in one identity domain spills into another."
+    )
+
+
+def _missing_narrowing_rationale(
+    role_display_name: str,
+    principal: str,
+    assessment: PrincipalAssessment,
+) -> str:
+    examples = "`sts:ExternalId`, `aws:SourceArn`, or `aws:SourceAccount`"
+    if assessment.federated_provider_type == "saml":
+        examples = "`SAML:aud`"
+    elif assessment.federated_provider_type == "oidc":
+        examples = "provider-specific `:aud` and `:sub` conditions"
+    elif assessment.federated_provider_type == "cognito":
+        examples = "`cognito-identity.amazonaws.com:aud`"
+
+    return (
+        f"{role_display_name} trusts {principal} without supported narrowing conditions such as {examples}. "
+        "That leaves the assume-role path dependent on the trusted principal match alone."
+    )

@@ -8,9 +8,9 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.policy_conditions import (
-    describe_trust_narrowing,
+    describe_trust_narrowing_for_principal,
     trust_statement_principal_assessments,
-    trust_statement_has_effective_narrowing,
+    trust_statement_has_effective_narrowing_for_principal,
 )
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.rule_definitions import BoundaryIndex, ExecutableRule, RuleEvaluationContext
@@ -605,9 +605,9 @@ class StrideRuleEngine:
             if not control_boundaries:
                 continue
             for trust_statement in role.trust_statements:
-                if trust_statement_has_effective_narrowing(trust_statement):
-                    continue
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
+                        continue
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
@@ -698,7 +698,10 @@ class StrideRuleEngine:
                                     "sensitive_data_targets",
                                     list(data_store_addresses),
                                 ),
-                                evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
+                                evidence_item(
+                                    "trust_narrowing",
+                                    describe_trust_narrowing_for_principal(trust_statement, assessment),
+                                ),
                             ),
                             severity_reasoning=severity_reasoning,
                         )
@@ -759,9 +762,9 @@ class StrideRuleEngine:
         seen: set[tuple[str, str]] = set()
         for role in inventory.by_type("aws_iam_role"):
             for trust_statement in role.trust_statements:
-                if not trust_statement_has_effective_narrowing(trust_statement):
-                    continue
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    if not trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
+                        continue
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
@@ -784,7 +787,10 @@ class StrideRuleEngine:
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item("trust_scope", [assessment.scope_description]),
-                                evidence_item("trust_narrowing", describe_trust_narrowing(trust_statement)),
+                                evidence_item(
+                                    "trust_narrowing",
+                                    describe_trust_narrowing_for_principal(trust_statement, assessment),
+                                ),
                             ),
                         )
                     )

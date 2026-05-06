@@ -47,7 +47,7 @@ class RuleRegistry:
         return {rule.rule_id for rule in self._rules_by_id.values() if rule.enabled_by_default}
 
     def rules(self) -> tuple[RuleMetadata, ...]:
-	    return self._rules
+        return self._rules
 
 
 DEFAULT_RULE_REGISTRY = RuleRegistry(
@@ -189,7 +189,8 @@ DEFAULT_RULE_REGISTRY = RuleRegistry(
             category=StrideCategory.ELEVATION_OF_PRIVILEGE,
             recommended_mitigation=(
                 "Limit trust policies to the exact service principals or roles required, prefer role ARNs "
-                "over account root where possible, and add conditions such as `ExternalId` or source ARN checks."
+                "over account root where possible, and add conditions such as `ExternalId`, source ARN, "
+                "SAML audience, or OIDC audience and subject checks."
             ),
             tags=("aws", "iam", "trust"),
             severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
@@ -200,8 +201,9 @@ DEFAULT_RULE_REGISTRY = RuleRegistry(
             category=StrideCategory.ELEVATION_OF_PRIVILEGE,
             recommended_mitigation=(
                 "Keep the trusted principal as specific as possible and add supported assume-role "
-                "conditions such as `ExternalId`, `SourceArn`, or `SourceAccount` when crossing "
-                "accounts or trusting broad principals."
+                "conditions such as `ExternalId`, `SourceArn`, `SourceAccount`, `SAML:aud`, or "
+                "provider-specific OIDC `aud` and `sub` checks when crossing accounts or trusting "
+                "broad or federated principals."
             ),
             tags=("aws", "iam", "trust", "cross-account"),
             severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
