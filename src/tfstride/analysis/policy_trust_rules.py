@@ -8,9 +8,10 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.policy_conditions import (
-    assess_principal,
     describe_trust_narrowing,
+    policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
+    trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing,
     trust_statement_has_supported_narrowing,
 )
@@ -37,7 +38,7 @@ class PolicyTrustRuleDetectors:
             resource_types=SENSITIVE_RESOURCE_POLICY_TYPES,
             sensitive_resource=True,
         )
-	
+
     def detect_service_resource_policy_exposure(
         self,
         context: RuleEvaluationContext,
@@ -57,7 +58,7 @@ class PolicyTrustRuleDetectors:
         rule_id: str,
         resource_types: set[str],
         sensitive_resource: bool,
-	) -> list[Finding]:
+    ) -> list[Finding]:
         findings: list[Finding] = []
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
@@ -66,12 +67,12 @@ class PolicyTrustRuleDetectors:
             if resource.resource_type not in resource_types:
                 continue
             for statement in resource.policy_statements:
-                if statement.effect != "Allow" or not statement.principals:
+                if statement.effect != "Allow":
                     continue
                 if resource_policy_statement_has_effective_narrowing(statement):
                     continue
-                for principal in statement.principals:
-                    assessment = assess_principal(principal, primary_account_id)
+                for assessment in policy_statement_principal_assessments(statement, primary_account_id):
+                    principal = assessment.principal
                     if assessment.is_service:
                         continue
                     if assessment.scope_description is None:
@@ -156,7 +157,7 @@ class PolicyTrustRuleDetectors:
         self,
         context: RuleEvaluationContext,
         rule_id: str,
-	) -> list[Finding]:
+    ) -> list[Finding]:
         findings: list[Finding] = []
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
@@ -165,8 +166,8 @@ class PolicyTrustRuleDetectors:
             for trust_statement in role.trust_statements:
                 if trust_statement_has_effective_narrowing(trust_statement):
                     continue
-                for principal in trust_statement.get("principals", []):
-                    assessment = assess_principal(principal, primary_account_id)
+                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    principal = assessment.principal
                     if assessment.is_service:
                         continue
                     if assessment.scope_description is None:
@@ -222,8 +223,8 @@ class PolicyTrustRuleDetectors:
             for trust_statement in role.trust_statements:
                 if trust_statement_has_supported_narrowing(trust_statement):
                     continue
-                for principal in trust_statement.get("principals", []):
-                    assessment = assess_principal(principal, primary_account_id)
+                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    principal = assessment.principal
                     if assessment.is_service:
                         continue
                     if assessment.scope_description is None:

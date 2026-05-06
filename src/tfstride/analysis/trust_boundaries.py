@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from tfstride.analysis.policy_conditions import PrincipalAssessment, assess_principal
+from tfstride.analysis.policy_conditions import (
+    PrincipalAssessment,
+    policy_statement_principal_assessments,
+    trust_statement_principal_assessments,
+)
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 
 
@@ -97,31 +101,30 @@ class TrustBoundaryDetector:
 
         primary_account_id = inventory.primary_account_id
         for role in inventory.by_type("aws_iam_role"):
-            for principal in role.trust_principals:
-                assessment = assess_principal(principal, primary_account_id)
-                if assessment.is_service:
-                    continue
-                if assessment.is_wildcard:
-                    description = f"{role.display_name} trusts any principal."
-                else:
-                    description = f"{role.display_name} trusts {principal}."
-                if assessment.is_foreign_account:
-                    rationale = "A foreign AWS account can cross into this role's trust boundary."
-                else:
-                    rationale = "An additional role or principal can cross into this role's trust boundary."
-                add_boundary(
-                    BoundaryType.CROSS_ACCOUNT_OR_ROLE,
-                    principal,
-                    role.address,
-                    description,
-                    rationale,
-                )
+            seen_role_principals: set[tuple[str, str]] = set()
+            for trust_statement in role.trust_statements:
+                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    principal_key = (assessment.principal_kind, assessment.principal)
+                    if principal_key in seen_role_principals:
+                        continue
+                    seen_role_principals.add(principal_key)
+                    if assessment.is_service:
+                        continue
+                    add_boundary(
+                        BoundaryType.CROSS_ACCOUNT_OR_ROLE,
+                        assessment.principal,
+                        role.address,
+                        _role_trust_description(role, assessment),
+                        _role_trust_rationale(assessment),
+                    )
 
         for resource in resources:
             if resource.resource_type == "aws_iam_role":
                 continue
             for assessment in _resource_policy_principals(resource, primary_account_id):
                 principal = assessment.principal
+                if assessment.is_service:
+                    continue
                 if assessment.is_wildcard:
                     description = f"{resource.display_name} allows any principal through a resource policy."
                 else:
@@ -278,8 +281,7 @@ def _resource_policy_principals(
     for statement in resource.policy_statements:
         if statement.effect != "Allow":
             continue
-        for principal in statement.principals:
-            assessment = assess_principal(principal, primary_account_id)
+        for assessment in policy_statement_principal_assessments(statement, primary_account_id):
             if assessment.is_service:
                 continue
             if resource.resource_type == "aws_s3_bucket" and assessment.is_wildcard:
@@ -289,6 +291,37 @@ def _resource_policy_principals(
             if all(existing.principal != assessment.principal for existing in principals):
                 principals.append(assessment)
     return principals
+
+
+def _role_trust_description(role: NormalizedResource, assessment: PrincipalAssessment) -> str:
+    if assessment.is_wildcard:
+        return f"{role.display_name} trusts any principal."
+    if assessment.is_federated:
+        return (
+            f"{role.display_name} trusts {assessment.principal} as a "
+            f"{_federated_provider_label(assessment)}."
+        )
+    return f"{role.display_name} trusts {assessment.principal}."
+
+
+def _role_trust_rationale(assessment: PrincipalAssessment) -> str:
+    if assessment.is_federated:
+        if assessment.is_foreign_account:
+            return "A foreign federated identity provider can cross into this role's trust boundary."
+        return "A federated identity provider can cross into this role's trust boundary."
+    if assessment.is_foreign_account:
+        return "A foreign AWS account can cross into this role's trust boundary."
+    return "An additional role or principal can cross into this role's trust boundary."
+
+
+def _federated_provider_label(assessment: PrincipalAssessment) -> str:
+    if assessment.federated_provider_type == "saml":
+        return "SAML identity provider"
+    if assessment.federated_provider_type == "oidc":
+        return "OIDC identity provider"
+    if assessment.federated_provider_type == "cognito":
+        return "Cognito identity provider"
+    return "federated identity provider"
 
 
 def _allows_secret_read(action: str) -> bool:

@@ -44,10 +44,10 @@ CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
 class RuleRegistryIntegrationTests(unittest.TestCase):
     def test_rule_registry_matches_configured_executable_rules(self) -> None:
         self.assertEqual(
-        StrideRuleEngine().configured_rule_ids(),
-	    DEFAULT_RULE_REGISTRY.known_rule_ids(),
-	)
-    
+            StrideRuleEngine().configured_rule_ids(),
+            DEFAULT_RULE_REGISTRY.known_rule_ids(),
+        )
+
     def test_rule_engine_uses_injected_registry_metadata_for_findings(self) -> None:
         registry = RuleRegistry(
             [
@@ -1570,6 +1570,58 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.trust_boundaries[0].boundary_type, BoundaryType.CROSS_ACCOUNT_OR_ROLE)
         self.assertEqual(result.findings, [])
 
+    def test_same_account_federated_role_trust_is_classified_without_new_findings(self) -> None:
+        result = self._analyze_payload(
+            {
+                "format_version": "1.2",
+                "terraform_version": "1.8.5",
+                "planned_values": {
+                    "root_module": {
+                        "resources": [
+                            {
+                                "address": "aws_iam_role.federated",
+                                "mode": "managed",
+                                "type": "aws_iam_role",
+                                "name": "federated",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "federated",
+                                    "name": "federated",
+                                    "arn": "arn:aws:iam::111122223333:role/federated",
+                                    "assume_role_policy": {
+                                        "Version": "2012-10-17",
+                                        "Statement": [
+                                            {
+                                                "Effect": "Allow",
+                                                "Action": "sts:AssumeRoleWithSAML",
+                                                "Principal": {
+                                                    "Federated": (
+                                                        "arn:aws:iam::111122223333:saml-provider/CorpSSO"
+                                                    )
+                                                },
+                                            }
+                                        ],
+                                    },
+                                },
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+
+        boundary = result.trust_boundaries[0]
+
+        self.assertEqual(boundary.boundary_type, BoundaryType.CROSS_ACCOUNT_OR_ROLE)
+        self.assertEqual(boundary.source, "arn:aws:iam::111122223333:saml-provider/CorpSSO")
+        self.assertEqual(boundary.target, "aws_iam_role.federated")
+        self.assertIn("as a SAML identity provider", boundary.description)
+        self.assertEqual(
+            boundary.rationale,
+            "A federated identity provider can cross into this role's trust boundary.",
+        )
+        self.assertEqual(result.findings, [])
+
     def test_cross_account_control_plane_path_to_private_secret_and_database_is_detected(self) -> None:
         result = self._analyze_payload(
             {
@@ -1883,7 +1935,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
             ]
         )
         role = inventory.get_by_address("aws_iam_role.federated")
-	
+
         self.assertIsNotNone(role)
         self.assertEqual(
             role.metadata.get("trust_statements"),

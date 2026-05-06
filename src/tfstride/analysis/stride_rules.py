@@ -4,13 +4,12 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
     collect_evidence,
-    describe_policy_statement,
     evidence_item,
 )
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.policy_conditions import (
-    assess_principal,
     describe_trust_narrowing,
+    trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing,
 )
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
@@ -38,8 +37,8 @@ class StrideRuleEngine:
         self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
         self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
         self._posture_rules = (
-	        ExecutableRule(
-               "aws-public-compute-broad-ingress",
+            ExecutableRule(
+                "aws-public-compute-broad-ingress",
                 self._detect_public_compute_exposure,
             ),
             ExecutableRule(
@@ -52,7 +51,7 @@ class StrideRuleEngine:
             ),
         )
         self._network_data_rules = (
-	        ExecutableRule(
+            ExecutableRule(
                 "aws-database-permissive-ingress",
                 self._detect_database_exposure,
             ),
@@ -69,8 +68,8 @@ class StrideRuleEngine:
             ExecutableRule(
                 "aws-service-resource-policy-external-access",
                 self._policy_trust_rule_detectors.detect_service_resource_policy_exposure,
-	        ),
-	    )
+            ),
+        )
         self._iam_rules = (
             ExecutableRule(
                 "aws-iam-wildcard-permissions",
@@ -92,7 +91,7 @@ class StrideRuleEngine:
             ),
         )
         self._path_chain_rules = (
-	        ExecutableRule(
+            ExecutableRule(
                 "aws-private-data-transitive-exposure",
                 self._detect_transitive_private_data_exposure,
             ),
@@ -103,11 +102,11 @@ class StrideRuleEngine:
         )
 
     def configured_rule_ids(self) -> set[str]:
-	    return {
-	        rule.rule_id
-	        for rule_group in self._rule_groups()
-	        for rule in rule_group
-	    }
+        return {
+            rule.rule_id
+            for rule_group in self._rule_groups()
+            for rule in rule_group
+        }
 
     def evaluate(
         self,
@@ -128,7 +127,7 @@ class StrideRuleEngine:
         )
 
         for rules in self._rule_groups():
-	        findings.extend(self._evaluate_rules(rules, context))
+            findings.extend(self._evaluate_rules(rules, context))
 
         severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
         findings.sort(key=lambda finding: (severity_order[finding.severity], finding.title))
@@ -173,7 +172,7 @@ class StrideRuleEngine:
             self._iam_rules,
             self._path_chain_rules,
             self._trust_rules,
-	    )
+        )
 
     def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
@@ -186,7 +185,7 @@ class StrideRuleEngine:
     def _detect_public_compute_exposure(
         self,
         context: RuleEvaluationContext,
-	    rule_id: str,
+        rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
@@ -212,16 +211,16 @@ class StrideRuleEngine:
                 blast_radius=1,
             )
             boundary = context.boundary_index.get(
-	            (BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address)
-	        )
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address)
+            )
             findings.append(
                 self._build_finding(
                     rule_id=rule_id,
                     severity=severity_reasoning.severity,
- 	                affected_resources=[
-	                    resource.address,
-	                    *[sg.address for sg in attached_security_groups],
-	                ],
+                    affected_resources=[
+                        resource.address,
+                        *[sg.address for sg in attached_security_groups],
+                    ],
                     trust_boundary_id=boundary.identifier if boundary else None,
                     rationale=(
                         f"{resource.display_name} is reachable from the internet and at least one attached "
@@ -231,7 +230,10 @@ class StrideRuleEngine:
                     evidence=collect_evidence(
                         evidence_item(
                             "security_group_rules",
-                            [describe_security_group_rule(security_group, rule) for security_group, rule in risky_rules],
+                            [
+                                describe_security_group_rule(security_group, rule)
+                                for security_group, rule in risky_rules
+                            ],
                         ),
                         evidence_item("public_exposure_reasons", resource.public_exposure_reasons),
                         evidence_item("subnet_posture", _subnet_posture(resource, inventory)),
@@ -244,7 +246,7 @@ class StrideRuleEngine:
     def _detect_database_exposure(
         self,
         context: RuleEvaluationContext,
-	    rule_id: str,
+        rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
@@ -370,10 +372,10 @@ class StrideRuleEngine:
         return findings
 
     def _detect_unencrypted_databases(
-	    self,
-	    context: RuleEvaluationContext,
-	    rule_id: str,
-	) -> list[Finding]:
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
         for database in inventory.by_type("aws_db_instance"):
@@ -421,8 +423,8 @@ class StrideRuleEngine:
             if not bucket.public_exposure:
                 continue
             boundary = context.boundary_index.get(
-	            (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-	        )
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
+            )
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
@@ -533,7 +535,7 @@ class StrideRuleEngine:
     def _detect_transitive_private_data_exposure(
         self,
         context: RuleEvaluationContext,
-	    rule_id: str,
+        rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
@@ -585,7 +587,6 @@ class StrideRuleEngine:
                     )
         return findings
 
-
     def _detect_control_plane_sensitive_workload_chain(
         self,
         context: RuleEvaluationContext,
@@ -606,8 +607,8 @@ class StrideRuleEngine:
             for trust_statement in role.trust_statements:
                 if trust_statement_has_effective_narrowing(trust_statement):
                     continue
-                for principal in trust_statement.get("principals", []):
-                    assessment = assess_principal(principal, primary_account_id)
+                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    principal = assessment.principal
                     if assessment.is_service:
                         continue
                     if not (assessment.is_foreign_account or assessment.is_wildcard):
@@ -663,8 +664,8 @@ class StrideRuleEngine:
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item(
-                                    "trust_scope", 
-                                    [assessment.scope_description] if assessment.scope_description else []
+                                    "trust_scope",
+                                    [assessment.scope_description] if assessment.scope_description else [],
                                 ),
                                 evidence_item(
                                     "control_path",
@@ -703,7 +704,6 @@ class StrideRuleEngine:
                         )
                     )
         return findings
-
 
     def _observe_bucket_public_access_blocks(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []
@@ -761,8 +761,8 @@ class StrideRuleEngine:
             for trust_statement in role.trust_statements:
                 if not trust_statement_has_effective_narrowing(trust_statement):
                     continue
-                for principal in trust_statement.get("principals", []):
-                    assessment = assess_principal(principal, primary_account_id)
+                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                    principal = assessment.principal
                     if assessment.is_service:
                         continue
                     if assessment.scope_description is None:
