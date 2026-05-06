@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCategory, SecurityGroupRule
+from tfstride.models import IAMPolicyStatement, IAMPrincipal, NormalizedResource, ResourceCategory, SecurityGroupRule
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 
 
@@ -80,6 +80,8 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             effect="Allow",
             actions=["secretsmanager:GetSecretValue"],
             resources=["arn:aws:secretsmanager:us-east-1:111122223333:secret:app"],
+            principals=["arn:aws:iam::111122223333:role/app"],
+            principal_entries=[IAMPrincipal(kind="AWS", value="arn:aws:iam::111122223333:role/app")],
         )
         policy = _resource(
             address="aws_iam_policy.read_secret",
@@ -104,6 +106,8 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         self.assertEqual(len(role.policy_statements), 1)
         self.assertIsNot(role.policy_statements[0], statement)
         self.assertEqual(role.policy_statements[0].actions, ["secretsmanager:GetSecretValue"])
+        self.assertEqual(role.policy_statements[0].principals, ["arn:aws:iam::111122223333:role/app"])
+        self.assertEqual(role.policy_statements[0].principal_entries[0].kind, "AWS")
         self.assertEqual(
             role.metadata["attached_policy_arns"],
             ["arn:aws:iam::111122223333:policy/read-secret"],

@@ -83,11 +83,18 @@ class SecurityGroupRule:
 
 
 @dataclass(slots=True)
+class IAMPrincipal:
+    kind: str
+    value: str
+
+
+@dataclass(slots=True)
 class IAMPolicyStatement:
     effect: str
     actions: list[str] = field(default_factory=list)
     resources: list[str] = field(default_factory=list)
     principals: list[str] = field(default_factory=list)
+    principal_entries: list[IAMPrincipal] = field(default_factory=list)
     conditions: list["IAMPolicyCondition"] = field(default_factory=list)
 
     def has_wildcard_action(self) -> bool:

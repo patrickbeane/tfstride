@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, NormalizedResource, SecurityGroupRule
+from tfstride.models import (
+    IAMPolicyCondition,
+    IAMPolicyStatement,
+    IAMPrincipal,
+    NormalizedResource,
+    SecurityGroupRule,
+)
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons, ecs_task_definition_identifier
 from tfstride.resource_helpers import describe_security_group_rule, policy_allows_public_access
 
@@ -639,6 +645,10 @@ def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPo
             actions=list(statement.actions),
             resources=list(statement.resources),
             principals=list(statement.principals),
+            principal_entries=[
+	            IAMPrincipal(kind=principal.kind, value=principal.value)
+	            for principal in statement.principal_entries
+	        ],
             conditions=[
                 IAMPolicyCondition(
                     operator=condition.operator,

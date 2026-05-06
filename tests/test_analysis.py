@@ -863,12 +863,14 @@ class TFSAnalysisTests(unittest.TestCase):
             [
                 {
                     "principals": ["lambda.amazonaws.com"],
+                    "principal_entries": [{"kind": "Service", "value": "lambda.amazonaws.com"}],
                     "narrowing_condition_keys": [],
                     "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
                 },
                 {
                     "principals": ["arn:aws:iam::999988887777:root"],
+                    "principal_entries": [{"kind": "AWS", "value": "arn:aws:iam::999988887777:root"}],
                     "narrowing_condition_keys": [],
                     "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
@@ -1846,6 +1848,68 @@ class TFSAnalysisTests(unittest.TestCase):
 
 
 class AwsNormalizerTrustConditionTests(unittest.TestCase):
+    def test_normalizer_preserves_trust_principal_kinds(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="aws_iam_role.federated",
+                    mode="managed",
+                    resource_type="aws_iam_role",
+                    name="federated",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                    values={
+                        "id": "federated-role",
+                        "name": "federated-role",
+                        "arn": "arn:aws:iam::111122223333:role/federated-role",
+                        "assume_role_policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRoleWithSAML",
+                                    "Principal": {
+                                        "Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"
+                                    },
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "sts:AssumeRole",
+                                    "Principal": {"Service": "lambda.amazonaws.com"},
+                                },
+                            ],
+                        },
+                    },
+                )
+            ]
+        )
+        role = inventory.get_by_address("aws_iam_role.federated")
+	
+        self.assertIsNotNone(role)
+        self.assertEqual(
+            role.metadata.get("trust_statements"),
+            [
+                {
+                    "principals": ["arn:aws:iam::111122223333:saml-provider/CorpSSO"],
+                    "principal_entries": [
+                        {
+                            "kind": "Federated",
+                            "value": "arn:aws:iam::111122223333:saml-provider/CorpSSO",
+                        }
+                    ],
+                    "narrowing_condition_keys": [],
+                    "narrowing_conditions": [],
+                    "has_narrowing_conditions": False,
+                },
+                {
+                    "principals": ["lambda.amazonaws.com"],
+                    "principal_entries": [{"kind": "Service", "value": "lambda.amazonaws.com"}],
+                    "narrowing_condition_keys": [],
+                    "narrowing_conditions": [],
+                    "has_narrowing_conditions": False,
+                },
+            ],
+        )
+
     def test_normalizer_extracts_supported_trust_narrowing_condition_keys(self) -> None:
         inventory = AwsNormalizer().normalize(
             [
@@ -1896,12 +1960,14 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
             [
                 {
                     "principals": ["lambda.amazonaws.com"],
+                    "principal_entries": [{"kind": "Service", "value": "lambda.amazonaws.com"}],
                     "narrowing_condition_keys": [],
                     "narrowing_conditions": [],
                     "has_narrowing_conditions": False,
                 },
                 {
                     "principals": ["arn:aws:iam::444455556666:role/deployer"],
+                    "principal_entries": [{"kind": "AWS", "value": "arn:aws:iam::444455556666:role/deployer"}],
                     "narrowing_condition_keys": [
                         "aws:SourceAccount",
                         "aws:SourceArn",
@@ -1977,6 +2043,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
             [
                 {
                     "principals": ["arn:aws:iam::444455556666:role/deployer"],
+                    "principal_entries": [{"kind": "AWS", "value": "arn:aws:iam::444455556666:role/deployer"}],
                     "narrowing_condition_keys": [
                         "aws:SourceArn",
                         "sts:ExternalId",

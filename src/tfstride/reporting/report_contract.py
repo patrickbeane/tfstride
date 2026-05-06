@@ -88,11 +88,17 @@ class PolicyConditionPayload(TypedDict):
     values: list[str]
 
 
+class PrincipalPayload(TypedDict):
+    kind: str
+    value: str
+
+
 class PolicyStatementPayload(TypedDict):
     effect: str
     actions: list[str]
     resources: list[str]
     principals: list[str]
+    principal_entries: list[PrincipalPayload]
     conditions: list[PolicyConditionPayload]
 
 

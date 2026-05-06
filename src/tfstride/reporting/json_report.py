@@ -11,6 +11,7 @@ from tfstride.models import (
     Finding,
     IAMPolicyCondition,
     IAMPolicyStatement,
+    IAMPrincipal,
     NormalizedResource,
     Observation,
     ResourceInventory,
@@ -27,6 +28,7 @@ from tfstride.reporting.report_contract import (
 	ObservationPayload,
 	PolicyConditionPayload,
 	PolicyStatementPayload,
+    PrincipalPayload,
 	SecurityGroupRulePayload,
 	SeverityReasoningPayload,
 	TFSReportPayload,
@@ -203,7 +205,15 @@ def _serialize_policy_statement(statement: IAMPolicyStatement) -> PolicyStatemen
         "actions": list(statement.actions),
         "resources": list(statement.resources),
         "principals": list(statement.principals),
+        "principal_entries": [_serialize_principal(principal) for principal in statement.principal_entries],
         "conditions": [_serialize_policy_condition(condition) for condition in statement.conditions],
+    }
+
+
+def _serialize_principal(principal: IAMPrincipal) -> PrincipalPayload:
+    return {
+        "kind": principal.kind,
+        "value": principal.value,
     }
 
 

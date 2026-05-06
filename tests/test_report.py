@@ -290,6 +290,23 @@ class JsonReportRendererTests(unittest.TestCase):
             ],
         )
 
+    def test_json_report_serializes_typed_policy_principal_entries(self) -> None:
+        engine = TfStride()
+        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+        resources_with_policies = [
+            resource
+            for resource in payload["inventory"]["resources"]
+            if resource["policy_statements"]
+        ]
+	
+        self.assertTrue(resources_with_policies)
+        policy_statement = resources_with_policies[0]["policy_statements"][0]
+        self.assertEqual(
+            list(policy_statement),
+            ["effect", "actions", "resources", "principals", "principal_entries", "conditions"],
+        )
+        self.assertIn("principal_entries", policy_statement)
+
     def test_json_report_sorts_inventory_resources_and_trust_boundaries_for_stable_consumers(self) -> None:
         engine = TfStride()
         payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))

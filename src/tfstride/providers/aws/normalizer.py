@@ -7,6 +7,7 @@ from typing import Any
 from tfstride.models import (
     IAMPolicyCondition,
     IAMPolicyStatement,
+    IAMPrincipal,
     NormalizedResource,
     ResourceCategory,
     ResourceInventory,
@@ -536,6 +537,7 @@ class AwsNormalizer(ProviderNormalizer):
                         actions=_compact([values.get("action")]),
                         resources=_compact([function_name]),
                         principals=_compact([values.get("principal")]),
+                        principal_entries=_lambda_permission_principal_entries(values.get("principal")),
                         conditions=_compact_condition_entries(
                             [
                                 _condition_entry(
@@ -685,12 +687,13 @@ def _parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyS
 
 def _parse_policy_statement(statement: Any) -> IAMPolicyStatement:
     statement_dict = statement if isinstance(statement, dict) else {}
-    principals = _extract_principal_values(statement_dict.get("Principal"))
+    principal_entries = _extract_principal_entries(statement_dict.get("Principal"))
     return IAMPolicyStatement(
         effect=str(statement_dict.get("Effect", "Allow")),
         actions=_as_list(statement_dict.get("Action")),
         resources=_as_list(statement_dict.get("Resource")),
-        principals=principals,
+        principals=[entry.value for entry in principal_entries],
+        principal_entries=principal_entries,
         conditions=_parse_condition_entries(statement_dict.get("Condition")),
     )
 
@@ -711,10 +714,18 @@ def _extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str,
         principals = sorted(set(statement.principals))
         if not principals:
             continue
+        principal_entries = sorted(
+            (
+                {"kind": entry.kind, "value": entry.value}
+                for entry in statement.principal_entries
+            ),
+            key=lambda entry: (entry["kind"], entry["value"]),
+        )
         narrowing_conditions = _extract_supported_trust_narrowing_conditions(statement.conditions)
         trust_statements.append(
             {
                 "principals": principals,
+                "principal_entries": principal_entries,
                 "narrowing_condition_keys": sorted({condition.key for condition in narrowing_conditions}),
                 "narrowing_conditions": [
                     {
@@ -748,19 +759,32 @@ def _extract_supported_trust_narrowing_conditions(
     return supported
 
 
-def _extract_principal_values(raw_principal: Any) -> list[str]:
+def _extract_principal_entries(raw_principal: Any) -> list[IAMPrincipal]:
     if raw_principal is None:
         return []
     if isinstance(raw_principal, str):
-        return [raw_principal]
+        return [IAMPrincipal(kind="unknown", value=raw_principal)]
     if isinstance(raw_principal, dict):
-        values: list[str] = []
-        for principal_value in raw_principal.values():
-            values.extend(_as_list(principal_value))
-        return values
+        entries: list[IAMPrincipal] = []
+        for principal_kind, principal_value in raw_principal.items():
+            entries.extend(
+                IAMPrincipal(kind=str(principal_kind), value=str(value))
+                for value in _as_list(principal_value)
+                if value not in (None, "")
+            )
+        return entries
     if isinstance(raw_principal, list):
-        return [str(item) for item in raw_principal]
+        return [IAMPrincipal(kind="unknown", value=str(item)) for item in raw_principal]
     return []
+
+
+def _lambda_permission_principal_entries(raw_principal: Any) -> list[IAMPrincipal]:
+    principals = _compact([raw_principal])
+    entries: list[IAMPrincipal] = []
+    for principal in principals:
+        kind = "Service" if principal.endswith(".amazonaws.com") else "AWS"
+        entries.append(IAMPrincipal(kind=kind, value=principal))
+    return entries
 
 
 def _load_json_document(raw_document: Any) -> dict[str, Any]:
