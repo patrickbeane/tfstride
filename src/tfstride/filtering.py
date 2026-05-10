@@ -116,6 +116,7 @@ def build_baseline_payload(findings: list[Finding]) -> dict[str, Any]:
 
 def load_baseline_fingerprints(path: str | Path) -> set[str]:
     payload = _load_json_object(path, label="baseline")
+    _validate_format_version(payload, expected=BASELINE_FORMAT_VERSION, label="baseline", path=path)
     findings = payload.get("findings")
     if not isinstance(findings, list):
         raise FindingFilterLoadError(f"Baseline file must contain a `findings` array: {path}")
@@ -132,6 +133,7 @@ def load_baseline_fingerprints(path: str | Path) -> set[str]:
 
 def load_suppressions(path: str | Path) -> list[SuppressionRule]:
     payload = _load_json_object(path, label="suppressions")
+    _validate_format_version(payload, expected=SUPPRESSIONS_FORMAT_VERSION, label="suppressions", path=path)
     suppressions = payload.get("suppressions")
     if not isinstance(suppressions, list):
         raise FindingFilterLoadError(f"Suppressions file must contain a `suppressions` array: {path}")
@@ -209,6 +211,22 @@ def _load_json_object(path: str | Path, *, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise FindingFilterLoadError(f"{label.title()} file must contain a JSON object: {file_path}")
     return payload
+
+ 
+def _validate_format_version(
+    payload: dict[str, Any],
+    *,
+    expected: str,
+    label: str,
+    path: str | Path,
+) -> None:
+    version = payload.get("version")
+    if version is None:
+        return
+    if version != expected:
+        raise FindingFilterLoadError(
+            f"Unsupported {label} version `{version}` in {path}; expected `{expected}`."
+        )	   
 
 
 def _as_optional_string(value: Any) -> str | None:

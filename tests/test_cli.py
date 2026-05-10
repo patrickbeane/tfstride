@@ -16,7 +16,11 @@ from tfstride.cli import (
     main,
 )
 from tfstride.config import CONFIG_FILENAME
-
+from tfstride.filtering import (
+    FindingFilterLoadError,
+    load_baseline_fingerprints,
+    load_suppressions,
+)
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
 BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_baseline_plan.json"
@@ -295,6 +299,54 @@ class CliTests(unittest.TestCase):
         self.assertEqual("", stdout_buffer.getvalue())
         self.assertIn("Input error:", stderr_buffer.getvalue())
         self.assertIn("must define at least one selector", stderr_buffer.getvalue())
+
+    def test_filter_loaders_accept_missing_or_current_format_versions(self) -> None:
+        baseline_payloads = [
+            {"findings": [{"fingerprint": "sha256:one"}]},
+            {"version": "1.0", "findings": [{"fingerprint": "sha256:one"}]},
+        ]
+        suppression_payloads = [
+            {"suppressions": [{"id": "s1", "rule_id": "aws-iam-wildcard-permissions", "reason": "accepted"}]},
+            {
+                "version": "1.0",
+                "suppressions": [{"id": "s1", "rule_id": "aws-iam-wildcard-permissions", "reason": "accepted"}],
+            },
+        ]
+	
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for index, payload in enumerate(baseline_payloads):
+                with self.subTest(kind="baseline", index=index):
+                    baseline_path = Path(tmp_dir) / f"baseline-{index}.json"
+                    baseline_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    self.assertEqual(load_baseline_fingerprints(baseline_path), {"sha256:one"})
+	
+            for index, payload in enumerate(suppression_payloads):
+                with self.subTest(kind="suppressions", index=index):
+                    suppressions_path = Path(tmp_dir) / f"suppressions-{index}.json"
+                    suppressions_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    suppressions = load_suppressions(suppressions_path)
+	
+                    self.assertEqual(len(suppressions), 1)
+                    self.assertEqual(suppressions[0].rule_id, "aws-iam-wildcard-permissions")
+	
+    def test_filter_loaders_reject_unsupported_format_versions(self) -> None:
+        payloads = [
+            ("baseline", {"version": "2.0", "findings": []}, load_baseline_fingerprints),
+            ("suppressions", {"version": "2.0", "suppressions": []}, load_suppressions),
+        ]
+	
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for label, payload, loader in payloads:
+                with self.subTest(label=label):
+                    path = Path(tmp_dir) / f"{label}.json"
+                    path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with self.assertRaises(FindingFilterLoadError) as context:
+                        loader(path)
+
+                    self.assertIn(f"Unsupported {label} version `2.0`", str(context.exception))
 
     def test_cli_auto_discovers_config_and_applies_fail_on_and_severity_overrides(self) -> None:
         stderr_buffer = io.StringIO()
