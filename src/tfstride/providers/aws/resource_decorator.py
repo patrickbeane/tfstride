@@ -325,6 +325,11 @@ class AwsResourceDecorator:
                 continue
             bucket = buckets.get(bucket_policy_resource.bucket_name)
             if bucket is None:
+                _append_unique(
+                    bucket_policy_resource.metadata,
+                    "unresolved_bucket_references",
+                    bucket_policy_resource.bucket_name,
+                ) 
                 continue
             _merge_resource_policy(
                 bucket,
@@ -338,6 +343,11 @@ class AwsResourceDecorator:
                 continue
             secret = secrets.get(secret_policy_resource.secret_arn)
             if secret is None:
+                _append_unique(
+                    secret_policy_resource.metadata,
+                    "unresolved_secret_arns",
+                    secret_policy_resource.secret_arn,
+                )
                 continue
             _merge_resource_policy(
                 secret,
@@ -352,6 +362,11 @@ class AwsResourceDecorator:
             function_name = lambda_permission_resource.function_name
             target_function = lambda_functions.get(function_name)
             if target_function is None:
+                _append_unique(
+                    lambda_permission_resource.metadata,
+                    "unresolved_function_references",
+                    function_name,
+                )
                 continue
             _merge_resource_policy(
                 target_function,

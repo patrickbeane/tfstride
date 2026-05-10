@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.models import IAMPolicyStatement, IAMPrincipal, NormalizedResource, ResourceCategory, SecurityGroupRule
+from tfstride.analysis.coverage import build_analysis_coverage
+from tfstride.models import (
+    IAMPolicyStatement,
+    IAMPrincipal,
+    NormalizedResource,
+    ResourceCategory,
+    ResourceInventory,
+    SecurityGroupRule,
+)
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 
 
@@ -265,6 +273,56 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         self.assertEqual(service.metadata["resolved_task_definition_addresses"], ["aws_ecs_task_definition.app"])
         self.assertEqual(service.metadata["resolved_task_role_addresses"], ["aws_iam_role.task"])
         self.assertEqual(service.metadata["resolved_execution_role_addresses"], ["aws_iam_role.execution"])
+
+    def test_unresolved_resource_policy_targets_are_reported_in_coverage(self) -> None:
+        bucket_policy = _resource(
+            address="aws_s3_bucket_policy.logs",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            metadata={"bucket": "missing-logs"},
+        )
+        secret_policy = _resource(
+            address="aws_secretsmanager_secret_policy.app",
+            resource_type="aws_secretsmanager_secret_policy",
+            category=ResourceCategory.DATA,
+            metadata={"secret_arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:missing"},
+        )
+        lambda_permission = _resource(
+            address="aws_lambda_permission.invoke",
+            resource_type="aws_lambda_permission",
+            category=ResourceCategory.COMPUTE,
+            metadata={"function_name": "missing-worker"},
+        )
+        resources = [bucket_policy, secret_policy, lambda_permission]
+
+        AwsResourceDecorator().decorate(resources)
+        coverage = build_analysis_coverage(ResourceInventory(provider="aws", resources=resources))
+        unresolved_by_resource = {
+            reference.resource: reference.references
+            for reference in coverage.references.unresolved_references
+        }
+	
+        self.assertEqual(bucket_policy.metadata["unresolved_bucket_references"], ["missing-logs"])
+        self.assertEqual(
+            secret_policy.metadata["unresolved_secret_arns"],
+            ["arn:aws:secretsmanager:us-east-1:111122223333:secret:missing"],
+        )
+        self.assertEqual(lambda_permission.metadata["unresolved_function_references"], ["missing-worker"])
+        self.assertEqual(coverage.references.unresolved_reference_count, 3)
+        self.assertEqual(
+            unresolved_by_resource,
+            {
+                "aws_s3_bucket_policy.logs": {
+                    "unresolved_bucket_references": ["missing-logs"],
+                },
+                "aws_secretsmanager_secret_policy.app": {
+                    "unresolved_secret_arns": ["arn:aws:secretsmanager:us-east-1:111122223333:secret:missing"],
+                },
+                "aws_lambda_permission.invoke": {
+                    "unresolved_function_references": ["missing-worker"],
+                },
+            },
+        )
 
 
 if __name__ == "__main__":
