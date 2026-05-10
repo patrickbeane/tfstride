@@ -22,6 +22,7 @@ from apps.dashboard.api_models import (
 )
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
+from tfstride.reporting.json_report import REPORT_FORMAT_VERSION
 from tfstride.reporting.report_contract import TFSReportPayload
 
 
@@ -74,7 +75,7 @@ HTML_LANDING_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE dashboard land
 HTML_REPORT_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE report page</main></body></html>"
 API_REPORT_EXAMPLE: TFSReportPayload = {
     "kind": "tfstride-report",
-    "version": "1.0",
+    "version": REPORT_FORMAT_VERSION,
     "tool": {"name": "tfstride", "version": "0.2.4"},
     "title": "tfSTRIDE Report",
     "analyzed_file": "tfplan.json",
