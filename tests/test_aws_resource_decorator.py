@@ -84,9 +84,9 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
             category=ResourceCategory.NETWORK,
             identifier="nat-private",
         )
-	
+
         index = AwsResourceIndexBuilder().build([bucket, secret, route_table, nat_gateway])
-	
+
         self.assertIs(index.buckets["logs"], bucket)
         self.assertIs(index.buckets["aws_s3_bucket.logs"], bucket)
         self.assertIs(index.buckets["arn:aws:s3:::logs"], bucket)
@@ -94,29 +94,62 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         self.assertEqual(index.vpcs_with_public_routes, {"vpc-app"})
         self.assertEqual(index.nat_gateway_ids, {"nat-private"})
 
+    def test_index_preserves_existing_alias_overwrite_and_none_identifier_behavior(self) -> None:
+        first_bucket = _resource(
+            address="aws_s3_bucket.first",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="logs",
+            arn="arn:aws:s3:::logs",
+        )
+        second_bucket = _resource(
+            address="aws_s3_bucket.second",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="logs",
+            arn="arn:aws:s3:::logs",
+        )
+        first_subnet = _resource(
+            address="aws_subnet.first",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+        )
+        second_subnet = _resource(
+            address="aws_subnet.second",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+        )
+
+        index = AwsResourceIndexBuilder().build([first_bucket, first_subnet, second_bucket, second_subnet])
+
+        self.assertIs(index.buckets["logs"], second_bucket)
+        self.assertIs(index.buckets["arn:aws:s3:::logs"], second_bucket)
+        self.assertIs(index.buckets["aws_s3_bucket.first"], first_bucket)
+        self.assertIs(index.subnets[None], second_subnet)
+
 
 class AwsResourceDecoratorTests(unittest.TestCase):
     def test_decorator_runs_configured_stages_in_order_with_shared_context(self) -> None:
         calls: list[str] = []
-	
+
         class RecordingStage:
             name = "recording"
-	
+
             def __init__(self, call_name: str) -> None:
                 self._call_name = call_name
-	
+
             def apply(self, resources: list[NormalizedResource], context) -> None:
                 calls.append(f"{self._call_name}:{bool(context.index.subnets)}")
-	
+
         subnet = _resource(
             address="aws_subnet.app",
             resource_type="aws_subnet",
             category=ResourceCategory.NETWORK,
             identifier="subnet-app",
         )
-	
+
         AwsResourceDecorator(stages=[RecordingStage("first"), RecordingStage("second")]).decorate([subnet])
-	
+
         self.assertEqual(calls, ["first:True", "second:True"])
 
     def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
@@ -376,7 +409,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             reference.resource: reference.references
             for reference in coverage.references.unresolved_references
         }
-	
+
         self.assertEqual(bucket_policy.metadata["unresolved_bucket_references"], ["missing-logs"])
         self.assertEqual(
             secret_policy.metadata["unresolved_secret_arns"],
