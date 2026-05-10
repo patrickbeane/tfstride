@@ -22,7 +22,7 @@ from tfstride.models import (
     TerraformResource,
     TrustBoundary,
 )
-from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -39,6 +39,14 @@ CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
 CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "sample_aws_cross_account_trust_constrained_plan.json"
 )
+
+
+class AwsNormalizerRegistrationTests(unittest.TestCase):
+    def test_supported_resource_types_match_dispatch_registry(self) -> None:
+        normalizer = AwsNormalizer()
+
+        self.assertEqual(set(normalizer._resource_normalizers), set(SUPPORTED_AWS_TYPES))
+        self.assertTrue(all(callable(handler) for handler in normalizer._resource_normalizers.values()))
 
 
 class RuleRegistryIntegrationTests(unittest.TestCase):
