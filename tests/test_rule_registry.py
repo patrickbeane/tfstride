@@ -20,13 +20,23 @@ class RuleRegistryTests(unittest.TestCase):
             category=StrideCategory.TAMPERING,
             recommended_mitigation="Fix the second issue.",
         )
-	
+
         registry = RuleRegistry([first, second])
 
         self.assertEqual(registry.rules(), (first, second))
-	
-	
+
+
 class SeverityOverridePolicyTests(unittest.TestCase):
+    def test_rule_policy_defensively_freezes_severity_overrides(self) -> None:
+        overrides = {"aws-test-rule": Severity.LOW}
+
+        policy = RulePolicy(severity_overrides=overrides)
+        overrides["aws-test-rule"] = Severity.HIGH
+
+        self.assertEqual(policy.severity_overrides["aws-test-rule"], Severity.LOW)
+        with self.assertRaises(TypeError):
+            policy.severity_overrides["aws-other-rule"] = Severity.MEDIUM
+
     def test_apply_severity_overrides_updates_finding_and_preserves_computed_severity(self) -> None:
         finding = _finding(
             rule_id="aws-test-rule",

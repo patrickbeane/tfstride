@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from types import MappingProxyType
 
 from tfstride.models import Finding, Severity, StrideCategory
 
@@ -19,7 +21,14 @@ class RuleMetadata:
 @dataclass(frozen=True, slots=True)
 class RulePolicy:
     enabled_rule_ids: frozenset[str] | None = None
-    severity_overrides: dict[str, Severity] = field(default_factory=dict)
+    severity_overrides: Mapping[str, Severity] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "severity_overrides",
+            MappingProxyType(dict(self.severity_overrides)),
+        )
 
     def is_enabled(self, rule_id: str, registry: "RuleRegistry") -> bool:
         if self.enabled_rule_ids is None:
