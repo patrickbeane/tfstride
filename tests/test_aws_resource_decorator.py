@@ -44,6 +44,29 @@ def _resource(
 
 
 class AwsResourceDecoratorTests(unittest.TestCase):
+    def test_decorator_runs_configured_stages_in_order_with_shared_context(self) -> None:
+        calls: list[str] = []
+	
+        class RecordingStage:
+            name = "recording"
+	
+            def __init__(self, call_name: str) -> None:
+                self._call_name = call_name
+	
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"{self._call_name}:{bool(context.subnets)}")
+	
+        subnet = _resource(
+            address="aws_subnet.app",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            identifier="subnet-app",
+        )
+	
+        AwsResourceDecorator(stages=[RecordingStage("first"), RecordingStage("second")]).decorate([subnet])
+	
+        self.assertEqual(calls, ["first:True", "second:True"])
+
     def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
         security_group = _resource(
             address="aws_security_group.app",
