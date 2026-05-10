@@ -11,139 +11,37 @@ from tfstride.models import (
     NormalizedResource,
     SecurityGroupRule,
 )
-from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons, ecs_task_definition_identifier
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
+from tfstride.providers.aws.resource_utils import (
+    bucket_public_exposure_reasons,
+    route_table_has_internet_route,
+    route_table_has_nat_gateway_route,
+)
 from tfstride.resource_helpers import describe_security_group_rule, policy_allows_public_access
-
-
-@dataclass(slots=True)
-class _DecorationContext:
-    subnets: dict[str | None, NormalizedResource]
-    security_groups: dict[str | None, NormalizedResource]
-    route_tables: dict[str | None, NormalizedResource]
-    buckets: dict[str, NormalizedResource]
-    secrets: dict[str, NormalizedResource]
-    lambda_functions: dict[str, NormalizedResource]
-    ecs_clusters: dict[str, NormalizedResource]
-    ecs_task_definitions: dict[str, NormalizedResource]
-    role_index: dict[str, NormalizedResource]
-    instance_profile_index: dict[str, NormalizedResource]
-    policy_index: dict[str, NormalizedResource]
-    vpcs_with_igw: set[str]
-    vpcs_with_public_routes: set[str]
-    nat_gateway_ids: set[str]
-    public_subnet_ids: set[str]
 
 
 class _DecorationStage(Protocol):
     name: str
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
-     """Apply one ordered resource decoration step."""
-     ...
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        """Apply one ordered resource decoration step."""
+        ...
 
 
 class AwsResourceDecorator:
-    def __init__(self, stages: Sequence[_DecorationStage] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        index_builder: AwsResourceIndexBuilder | None = None,
+        stages: Sequence[_DecorationStage] | None = None,
+    ) -> None:
+        self._index_builder = index_builder or AwsResourceIndexBuilder()
         self._stages = tuple(stages) if stages is not None else _default_decoration_stages(self)
 
     def decorate(self, resources: list[NormalizedResource]) -> None:
-        context = self._build_decoration_context(resources)
+        context = AwsDecorationContext(index=self._index_builder.build(resources))
         for stage in self._stages:
             stage.apply(resources, context)
-
-    def _build_decoration_context(self, resources: list[NormalizedResource]) -> _DecorationContext:
-        return _DecorationContext(
-            subnets={resource.identifier: resource for resource in resources if resource.resource_type == "aws_subnet"},
-            security_groups={
-                resource.identifier: resource for resource in resources if resource.resource_type == "aws_security_group"
-            },
-            route_tables={
-                resource.identifier: resource for resource in resources if resource.resource_type == "aws_route_table"
-            },
-            buckets={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_s3_bucket"
-                for key in (resource.identifier, resource.address, resource.arn)
-                if key
-            },
-            secrets={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_secretsmanager_secret"
-                for key in (resource.identifier, resource.address, resource.arn, resource.secret_name)
-                if key
-            },
-            lambda_functions={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_lambda_function"
-                for key in (resource.identifier, resource.address, resource.arn)
-                if key
-            },
-            ecs_clusters={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_ecs_cluster"
-                for key in (resource.identifier, resource.address, resource.arn, resource.cluster_name)
-                if key
-            },
-            ecs_task_definitions={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_ecs_task_definition"
-                for key in (
-                    resource.identifier,
-                    resource.address,
-                    resource.arn,
-                    resource.task_definition_family,
-                    ecs_task_definition_identifier(
-                        resource.task_definition_family,
-                        resource.task_definition_revision,
-                    ),
-                )
-                if key
-            },
-            role_index={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_iam_role"
-                for key in (resource.identifier, resource.address, resource.arn)
-                if key
-            },
-            instance_profile_index={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_iam_instance_profile"
-                for key in (resource.identifier, resource.address, resource.arn)
-                if key
-            },
-            policy_index={
-                key: resource
-                for resource in resources
-                if resource.resource_type == "aws_iam_policy"
-                for key in (resource.identifier, resource.address, resource.arn)
-                if key
-            },
-            vpcs_with_igw={
-                resource.vpc_id
-                for resource in resources
-                if resource.resource_type == "aws_internet_gateway" and resource.vpc_id
-            },
-            vpcs_with_public_routes={
-                resource.vpc_id
-                for resource in resources
-                if resource.resource_type == "aws_route_table"
-                and resource.vpc_id
-                and _has_internet_route(resource.routes)
-            },
-            nat_gateway_ids={
-                resource.identifier
-                for resource in resources
-                if resource.resource_type == "aws_nat_gateway" and resource.identifier
-            },
-            public_subnet_ids=set(),
-        )
 
     def _merge_standalone_security_group_rules(
         self,
@@ -318,7 +216,7 @@ class AwsResourceDecorator:
                     bucket_policy_resource.metadata,
                     "unresolved_bucket_references",
                     bucket_policy_resource.bucket_name,
-                ) 
+                )
                 continue
             _merge_resource_policy(
                 bucket,
@@ -425,12 +323,12 @@ class AwsResourceDecorator:
         for subnet in subnets.values():
             associated_route_table_ids = subnet_route_table_ids.get(subnet.identifier or "", [])
             has_public_route = any(
-                route_table_id in route_tables and _has_internet_route(route_tables[route_table_id].routes)
+                route_table_id in route_tables and route_table_has_internet_route(route_tables[route_table_id].routes)
                 for route_table_id in associated_route_table_ids
             )
             has_nat_route = any(
                 route_table_id in route_tables
-                and _has_nat_gateway_route(route_tables[route_table_id].routes, nat_gateway_ids)
+                and route_table_has_nat_gateway_route(route_tables[route_table_id].routes, nat_gateway_ids)
                 for route_table_id in associated_route_table_ids
             )
             if associated_route_table_ids:
@@ -607,121 +505,121 @@ class AwsResourceDecorator:
 class _StandaloneSecurityGroupRuleStage:
     decorator: AwsResourceDecorator
     name: str = "merge_standalone_security_group_rules"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
-        self.decorator._merge_standalone_security_group_rules(resources, context.security_groups)
-	
-	
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        self.decorator._merge_standalone_security_group_rules(resources, context.index.security_groups)
+
+
 @dataclass(frozen=True, slots=True)
 class _RolePolicyResourceStage:
     decorator: AwsResourceDecorator
     name: str = "merge_role_policy_resources"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
-        self.decorator._merge_role_policy_resources(resources, context.role_index, context.policy_index)
-	
-	
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        self.decorator._merge_role_policy_resources(resources, context.index.role_index, context.index.policy_index)
+
+
 @dataclass(frozen=True, slots=True)
 class _InstanceProfileRoleStage:
     decorator: AwsResourceDecorator
     name: str = "resolve_instance_profile_roles"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         self.decorator._resolve_instance_profile_roles(
             resources,
-            context.role_index,
-            context.instance_profile_index,
+            context.index.role_index,
+            context.index.instance_profile_index,
         )
-	
-	
+
+
 @dataclass(frozen=True, slots=True)
 class _EcsServiceRelationshipStage:
     decorator: AwsResourceDecorator
     name: str = "resolve_ecs_service_relationships"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         self.decorator._resolve_ecs_service_relationships(
             resources,
-            context.ecs_clusters,
-            context.ecs_task_definitions,
-            context.role_index,
+            context.index.ecs_clusters,
+            context.index.ecs_task_definitions,
+            context.index.role_index,
         )
-	
-	
+
+
 @dataclass(frozen=True, slots=True)
 class _ResourcePolicyStage:
     decorator: AwsResourceDecorator
     name: str = "merge_resource_policy_resources"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         self.decorator._merge_resource_policy_resources(
             resources,
-            context.buckets,
-            context.secrets,
-            context.lambda_functions,
+            context.index.buckets,
+            context.index.secrets,
+            context.index.lambda_functions,
         )
-	
-	
+
+
 @dataclass(frozen=True, slots=True)
 class _S3PublicAccessBlockStage:
     decorator: AwsResourceDecorator
     name: str = "apply_s3_public_access_blocks"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
-        self.decorator._apply_s3_public_access_blocks(resources, context.buckets)
-	
-	
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        self.decorator._apply_s3_public_access_blocks(resources, context.index.buckets)
+
+
 @dataclass(frozen=True, slots=True)
 class _SubnetPostureStage:
     decorator: AwsResourceDecorator
     name: str = "derive_subnet_posture"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         context.public_subnet_ids = self.decorator._derive_subnet_posture(
             resources,
-            context.subnets,
-            context.route_tables,
-            context.vpcs_with_igw,
-            context.vpcs_with_public_routes,
-            context.nat_gateway_ids,
+            context.index.subnets,
+            context.index.route_tables,
+            context.index.vpcs_with_igw,
+            context.index.vpcs_with_public_routes,
+            context.index.nat_gateway_ids,
         )
-	
-	
+
+
 @dataclass(frozen=True, slots=True)
 class _VpcInferenceStage:
     decorator: AwsResourceDecorator
     name: str = "infer_vpc_ids"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
-        self.decorator._infer_vpc_ids(resources, context.subnets, context.security_groups)
-	
-	
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        self.decorator._infer_vpc_ids(resources, context.index.subnets, context.index.security_groups)
+
+
 @dataclass(frozen=True, slots=True)
 class _PublicExposureStage:
     decorator: AwsResourceDecorator
     name: str = "derive_public_exposure"
-	
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         self.decorator._derive_public_exposure(
             resources,
-            context.security_groups,
-            context.subnets,
+            context.index.security_groups,
+            context.index.subnets,
             context.public_subnet_ids,
         )
-	
-	
+
+
 @dataclass(frozen=True, slots=True)
 class _EcsLoadBalancerExposureStage:
     decorator: AwsResourceDecorator
     name: str = "mark_ecs_services_fronted_by_internet_facing_load_balancers"
 
-    def apply(self, resources: list[NormalizedResource], context: _DecorationContext) -> None:
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         self.decorator._mark_ecs_services_fronted_by_internet_facing_load_balancers(
             resources,
-            context.security_groups,
+            context.index.security_groups,
         )
-	
-	
+
+
 def _default_decoration_stages(decorator: AwsResourceDecorator) -> tuple[_DecorationStage, ...]:
     return (
         _StandaloneSecurityGroupRuleStage(decorator),
@@ -735,29 +633,6 @@ def _default_decoration_stages(decorator: AwsResourceDecorator) -> tuple[_Decora
         _PublicExposureStage(decorator),
         _EcsLoadBalancerExposureStage(decorator),
     )
-
-
-def _has_internet_route(routes: list[dict[str, Any]]) -> bool:
-    for route in routes:
-        destination = route.get("cidr_block") or route.get("destination_cidr_block")
-        gateway_id = route.get("gateway_id")
-        if destination == "0.0.0.0/0" and isinstance(gateway_id, str) and gateway_id.startswith("igw-"):
-            return True
-    return False
-
-
-def _has_nat_gateway_route(routes: list[dict[str, Any]], nat_gateway_ids: set[str]) -> bool:
-    for route in routes:
-        destination = route.get("cidr_block") or route.get("destination_cidr_block")
-        nat_gateway_id = route.get("nat_gateway_id")
-        gateway_id = route.get("gateway_id")
-        if destination != "0.0.0.0/0":
-            continue
-        if isinstance(nat_gateway_id, str) and nat_gateway_id in nat_gateway_ids:
-            return True
-        if isinstance(gateway_id, str) and gateway_id in nat_gateway_ids:
-            return True
-    return False
 
 
 def _clone_security_group_rules(rules: list[SecurityGroupRule]) -> list[SecurityGroupRule]:
@@ -784,9 +659,9 @@ def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPo
             resources=list(statement.resources),
             principals=list(statement.principals),
             principal_entries=[
-	            IAMPrincipal(kind=principal.kind, value=principal.value)
-	            for principal in statement.principal_entries
-	        ],
+                IAMPrincipal(kind=principal.kind, value=principal.value)
+                for principal in statement.principal_entries
+            ],
             conditions=[
                 IAMPolicyCondition(
                     operator=condition.operator,

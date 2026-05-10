@@ -12,6 +12,7 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
+from tfstride.providers.aws.resource_index import AwsResourceIndexBuilder
 
 
 def _resource(
@@ -26,6 +27,7 @@ def _resource(
     network_rules: list[SecurityGroupRule] | None = None,
     public_access_configured: bool = False,
     public_exposure: bool = False,
+    vpc_id: str | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
         address=address,
@@ -40,7 +42,57 @@ def _resource(
         network_rules=network_rules or [],
         public_access_configured=public_access_configured,
         public_exposure=public_exposure,
+        vpc_id=vpc_id,
     )
+
+
+class AwsResourceIndexBuilderTests(unittest.TestCase):
+    def test_indexes_resources_by_provider_specific_references(self) -> None:
+        bucket = _resource(
+            address="aws_s3_bucket.logs",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="logs",
+            arn="arn:aws:s3:::logs",
+        )
+        secret = _resource(
+            address="aws_secretsmanager_secret.app",
+            resource_type="aws_secretsmanager_secret",
+            category=ResourceCategory.DATA,
+            identifier="app-secret-id",
+            arn="arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
+            metadata={"name": "app"},
+        )
+        route_table = _resource(
+            address="aws_route_table.public",
+            resource_type="aws_route_table",
+            category=ResourceCategory.NETWORK,
+            identifier="rtb-public",
+            vpc_id="vpc-app",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "gateway_id": "igw-app",
+                    }
+                ]
+            },
+        )
+        nat_gateway = _resource(
+            address="aws_nat_gateway.private",
+            resource_type="aws_nat_gateway",
+            category=ResourceCategory.NETWORK,
+            identifier="nat-private",
+        )
+	
+        index = AwsResourceIndexBuilder().build([bucket, secret, route_table, nat_gateway])
+	
+        self.assertIs(index.buckets["logs"], bucket)
+        self.assertIs(index.buckets["aws_s3_bucket.logs"], bucket)
+        self.assertIs(index.buckets["arn:aws:s3:::logs"], bucket)
+        self.assertIs(index.secrets["app"], secret)
+        self.assertEqual(index.vpcs_with_public_routes, {"vpc-app"})
+        self.assertEqual(index.nat_gateway_ids, {"nat-private"})
 
 
 class AwsResourceDecoratorTests(unittest.TestCase):
@@ -54,7 +106,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 self._call_name = call_name
 	
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"{self._call_name}:{bool(context.subnets)}")
+                calls.append(f"{self._call_name}:{bool(context.index.subnets)}")
 	
         subnet = _resource(
             address="aws_subnet.app",
