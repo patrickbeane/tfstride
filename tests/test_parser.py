@@ -71,6 +71,107 @@ class TerraformPlanParserTests(unittest.TestCase):
 
         self.assertIn("missing `terraform_version`", str(context.exception))
 
+    def test_parser_rejects_malformed_resource_entries(self) -> None:
+        malformed_payloads = [
+            (
+                {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {
+                        "root_module": {
+                            "resources": [
+                                {
+                                    "mode": "managed",
+                                    "type": "aws_vpc",
+                                    "name": "main",
+                                    "values": {},
+                                }
+                            ]
+                        }
+                    },
+                },
+                "`planned_values.root_module.resources[0].address` must be a non-empty string",
+            ),
+            (
+                {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {
+                        "root_module": {
+                            "resources": [
+                                {
+                                    "address": "aws_vpc.main",
+                                    "mode": "managed",
+                                    "type": "aws_vpc",
+                                    "name": "main",
+                                    "values": [],
+                                }
+                            ]
+                        }
+                    },
+                },
+                "`planned_values.root_module.resources[0].values` must be an object",
+            ),
+            (
+                {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {
+                        "root_module": {
+                            "resources": [
+                                {
+                                    "address": "aws_vpc.main",
+                                    "mode": "managed",
+                                    "type": "aws_vpc",
+                                    "name": "main",
+                                    "provider_name": [],
+                                    "values": {},
+                                }
+                            ]
+                        }
+                    },
+                },
+                "`planned_values.root_module.resources[0].provider_name` must be a string",
+            ),
+        ]
+
+        for payload, expected_message in malformed_payloads:
+            with self.subTest(expected_message=expected_message):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with self.assertRaises(TerraformPlanLoadError) as context:
+                        load_terraform_plan(plan_path)
+
+                self.assertIn(expected_message, str(context.exception))
+
+    def test_parser_rejects_malformed_module_collections(self) -> None:
+        malformed_payloads = [
+            (
+                {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {"root_module": {"resources": {}}},
+                },
+                "`planned_values.root_module.resources` must be an array",
+            ),
+            (
+                {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {"root_module": {"child_modules": ["not-an-object"]}},
+                },
+                "`planned_values.root_module.child_modules[0]` must be an object",
+            ),
+        ]
+
+        for payload, expected_message in malformed_payloads:
+            with self.subTest(expected_message=expected_message):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with self.assertRaises(TerraformPlanLoadError) as context:
+                        load_terraform_plan(plan_path)
+
+                self.assertIn(expected_message, str(context.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
