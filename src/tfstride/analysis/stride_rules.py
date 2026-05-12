@@ -20,7 +20,7 @@ from tfstride.analysis.rule_definitions import (
     RuleDetector,
     RuleEvaluationContext,
 )
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy, RuleRegistry
+from tfstride.analysis.rule_registry import RulePolicy, RuleRegistry, default_rule_metadata
 from tfstride.models import (
     BoundaryType,
     EvidenceItem,
@@ -37,7 +37,7 @@ from tfstride.resource_helpers import describe_security_group_rule, policy_allow
 
 
 def _rule_definition(rule_id: str, detector: RuleDetector) -> RuleDefinition:
-    return RuleDefinition(metadata=DEFAULT_RULE_REGISTRY.get(rule_id), detector=detector)
+    return RuleDefinition(metadata=default_rule_metadata(rule_id), detector=detector)
 
 
 def _registry_from_rule_groups(rule_groups: tuple[tuple[RuleDefinition, ...], ...]) -> RuleRegistry:
