@@ -9,7 +9,7 @@ from tfstride.filtering import apply_finding_filters
 from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
-from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.catalog import DEFAULT_PROVIDER, default_provider_registry
 from tfstride.providers.registry import ProviderRegistry
 from tfstride.reporting.json_report import JsonReportRenderer
 from tfstride.reporting.markdown import MarkdownReportRenderer
@@ -25,9 +25,6 @@ DEFAULT_LIMITATIONS = [
     "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.",
 ]
 
-DEFAULT_PROVIDER = "aws"
-
-
 class TfStride:
     def __init__(
         self,
@@ -35,8 +32,7 @@ class TfStride:
         rule_policy: RulePolicy | None = None,
         provider_registry: ProviderRegistry | None = None,
     ) -> None:
-        self.aws_normalizer = AwsNormalizer()
-        self.provider_registry = provider_registry or ProviderRegistry([self.aws_normalizer])
+        self.provider_registry = provider_registry or default_provider_registry()
         self.boundary_detector = TrustBoundaryDetector()
         self.rule_engine = StrideRuleEngine()
         self._json_renderer = JsonReportRenderer()
