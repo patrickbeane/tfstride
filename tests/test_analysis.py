@@ -24,7 +24,7 @@ from tfstride.models import (
     TrustBoundary,
 )
 from tfstride.providers.base import ProviderNormalizer
-from tfstride.providers.registry import ProviderRegistry
+from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 
 
@@ -653,6 +653,12 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.inventory.provider, "aws")
         self.assertEqual(result.inventory.resources, ())
         self.assertEqual(result.findings, [])
+
+    def test_analysis_raises_when_default_provider_is_not_registered(self) -> None:
+        engine = TfStride(provider_registry=ProviderRegistry())
+	
+        with self.assertRaises(ProviderNotRegisteredError):
+            engine.analyze_plan(FIXTURE_PATH)	
 
     def test_analysis_normalizes_supported_resources_and_tracks_unsupported(self) -> None:
         self.assertEqual(len(self.result.inventory.resources), 23)
