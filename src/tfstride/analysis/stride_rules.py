@@ -13,7 +13,13 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
 )
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
-from tfstride.analysis.rule_definitions import BoundaryIndex, ExecutableRule, RuleEvaluationContext
+from tfstride.analysis.rule_definitions import (
+    BoundaryIndex,
+    ExecutableRule,
+    RuleDefinition,
+    RuleDetector,
+    RuleEvaluationContext,
+)
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy, RuleRegistry
 from tfstride.models import (
     BoundaryType,
@@ -30,6 +36,10 @@ from tfstride.models import (
 from tfstride.resource_helpers import describe_security_group_rule, policy_allows_public_access
 
 
+def _rule_definition(rule_id: str, detector: RuleDetector) -> RuleDefinition:
+    return RuleDefinition(metadata=DEFAULT_RULE_REGISTRY.get(rule_id), detector=detector)
+
+
 class StrideRuleEngine:
     def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
         self._rule_registry = rule_registry
@@ -37,65 +47,65 @@ class StrideRuleEngine:
         self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
         self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
         self._posture_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-public-compute-broad-ingress",
                 self._detect_public_compute_exposure,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-rds-storage-encryption-disabled",
                 self._detect_unencrypted_databases,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-s3-public-access",
                 self._detect_public_object_storage,
             ),
         )
         self._network_data_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-database-permissive-ingress",
                 self._detect_database_exposure,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-missing-tier-segmentation",
                 self._detect_missing_segmentation,
             ),
         )
         self._resource_policy_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-sensitive-resource-policy-external-access",
                 self._policy_trust_rule_detectors.detect_sensitive_resource_policy_exposure,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-service-resource-policy-external-access",
                 self._policy_trust_rule_detectors.detect_service_resource_policy_exposure,
             ),
         )
         self._iam_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-iam-wildcard-permissions",
                 self._iam_rule_detectors.detect_wildcard_permissions,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-workload-role-sensitive-permissions",
                 self._iam_rule_detectors.detect_workload_role_sensitive_permissions,
             ),
         )
         self._trust_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-role-trust-expansion",
                 self._policy_trust_rule_detectors.detect_trust_expansion,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-role-trust-missing-narrowing",
                 self._policy_trust_rule_detectors.detect_unconstrained_trust,
             ),
         )
         self._path_chain_rules = (
-            ExecutableRule(
+            _rule_definition(
                 "aws-private-data-transitive-exposure",
                 self._detect_transitive_private_data_exposure,
             ),
-            ExecutableRule(
+            _rule_definition(
                 "aws-control-plane-sensitive-workload-chain",
                 self._detect_control_plane_sensitive_workload_chain,
             ),
@@ -103,7 +113,7 @@ class StrideRuleEngine:
 
     def configured_rule_ids(self) -> set[str]:
         return {
-            rule.rule_id
+            rule.metadata.rule_id
             for rule_group in self._rule_groups()
             for rule in rule_group
         }
@@ -156,15 +166,16 @@ class StrideRuleEngine:
 
     def _evaluate_rules(
         self,
-        rules: tuple[ExecutableRule, ...],
+        rules: tuple[RuleDefinition, ...],
         context: RuleEvaluationContext,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        for rule in rules:
-            findings.extend(rule.evaluate(context))
+        for definition in rules:
+            executable_rule = ExecutableRule(definition.metadata.rule_id, definition.detector)
+            findings.extend(executable_rule.evaluate(context))
         return findings
 
-    def _rule_groups(self) -> tuple[tuple[ExecutableRule, ...], ...]:
+    def _rule_groups(self) -> tuple[tuple[RuleDefinition, ...], ...]:
         return (
             self._posture_rules,
             self._network_data_rules,

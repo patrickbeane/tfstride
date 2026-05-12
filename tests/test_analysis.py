@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tfstride.analysis.rule_definitions import RuleDefinition
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.app import TfStride
@@ -50,6 +51,17 @@ class AwsNormalizerRegistrationTests(unittest.TestCase):
 
 
 class RuleRegistryIntegrationTests(unittest.TestCase):
+    def test_rule_engine_rule_groups_are_built_from_rule_definitions(self) -> None:
+        engine = StrideRuleEngine()
+
+        self.assertTrue(
+            all(
+                isinstance(rule, RuleDefinition)
+                for rule_group in engine._rule_groups()
+                for rule in rule_group
+            )
+        )
+
     def test_rule_registry_matches_configured_executable_rules(self) -> None:
         self.assertEqual(
             StrideRuleEngine().configured_rule_ids(),
