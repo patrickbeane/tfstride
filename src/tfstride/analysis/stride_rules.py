@@ -40,12 +40,12 @@ def _rule_definition(rule_id: str, detector: RuleDetector) -> RuleDefinition:
     return RuleDefinition(metadata=DEFAULT_RULE_REGISTRY.get(rule_id), detector=detector)
 
 
+def _registry_from_rule_groups(rule_groups: tuple[tuple[RuleDefinition, ...], ...]) -> RuleRegistry:
+    return RuleRegistry([definition.metadata for group in rule_groups for definition in group])
+
+
 class StrideRuleEngine:
-    def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
-        self._rule_registry = rule_registry
-        self._finding_factory = FindingFactory(rule_registry)
-        self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
-        self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
+    def __init__(self, rule_registry: RuleRegistry | None = None) -> None:
         self._posture_rules = (
             _rule_definition(
                 "aws-public-compute-broad-ingress",
@@ -73,31 +73,31 @@ class StrideRuleEngine:
         self._resource_policy_rules = (
             _rule_definition(
                 "aws-sensitive-resource-policy-external-access",
-                self._policy_trust_rule_detectors.detect_sensitive_resource_policy_exposure,
+                self._policy_trust_detector("detect_sensitive_resource_policy_exposure"),
             ),
             _rule_definition(
                 "aws-service-resource-policy-external-access",
-                self._policy_trust_rule_detectors.detect_service_resource_policy_exposure,
+                self._policy_trust_detector("detect_service_resource_policy_exposure"),
             ),
         )
         self._iam_rules = (
             _rule_definition(
                 "aws-iam-wildcard-permissions",
-                self._iam_rule_detectors.detect_wildcard_permissions,
+                self._iam_detector("detect_wildcard_permissions"),
             ),
             _rule_definition(
                 "aws-workload-role-sensitive-permissions",
-                self._iam_rule_detectors.detect_workload_role_sensitive_permissions,
+                self._iam_detector("detect_workload_role_sensitive_permissions"),
             ),
         )
         self._trust_rules = (
             _rule_definition(
                 "aws-role-trust-expansion",
-                self._policy_trust_rule_detectors.detect_trust_expansion,
+                self._policy_trust_detector("detect_trust_expansion"),
             ),
             _rule_definition(
                 "aws-role-trust-missing-narrowing",
-                self._policy_trust_rule_detectors.detect_unconstrained_trust,
+                self._policy_trust_detector("detect_unconstrained_trust"),
             ),
         )
         self._path_chain_rules = (
@@ -110,6 +110,14 @@ class StrideRuleEngine:
                 self._detect_control_plane_sensitive_workload_chain,
             ),
         )
+        self._rule_registry = (
+            rule_registry
+            if rule_registry is not None
+            else _registry_from_rule_groups(self._rule_groups())
+        )
+        self._finding_factory = FindingFactory(self._rule_registry)
+        self._iam_rule_detectors = IAMRuleDetectors(self._finding_factory)
+        self._policy_trust_rule_detectors = PolicyTrustRuleDetectors(self._finding_factory)
 
     def configured_rule_ids(self) -> set[str]:
         return {
@@ -184,6 +192,18 @@ class StrideRuleEngine:
             self._path_chain_rules,
             self._trust_rules,
         )
+
+    def _iam_detector(self, method_name: str) -> RuleDetector:
+        def detector(context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
+            return getattr(self._iam_rule_detectors, method_name)(context, rule_id)
+
+        return detector
+
+    def _policy_trust_detector(self, method_name: str) -> RuleDetector:
+        def detector(context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
+            return getattr(self._policy_trust_rule_detectors, method_name)(context, rule_id)
+
+        return detector
 
     def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
         observations: list[Observation] = []

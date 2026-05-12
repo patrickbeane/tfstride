@@ -62,6 +62,17 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             )
         )
 
+    def test_rule_engine_derives_default_registry_from_rule_definitions(self) -> None:
+        engine = StrideRuleEngine()
+        definition_metadata = tuple(
+            rule.metadata
+            for rule_group in engine._rule_groups()
+            for rule in rule_group
+        )
+
+        self.assertIsNot(engine._rule_registry, DEFAULT_RULE_REGISTRY)
+        self.assertEqual(engine._rule_registry.rules(), definition_metadata)
+
     def test_rule_registry_matches_configured_executable_rules(self) -> None:
         self.assertEqual(
             StrideRuleEngine().configured_rule_ids(),
