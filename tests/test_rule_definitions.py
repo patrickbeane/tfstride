@@ -2,12 +2,28 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.rule_registry import RulePolicy
-from tfstride.analysis.rule_definitions import ExecutableRule, RuleEvaluationContext
-from tfstride.models import Finding, ResourceInventory
+from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy
+from tfstride.analysis.rule_definitions import ExecutableRule, RuleDefinition, RuleEvaluationContext
+from tfstride.models import Finding, ResourceInventory, StrideCategory
 
 
 class ExecutableRuleTests(unittest.TestCase):
+    def test_rule_definition_keeps_metadata_with_detector(self) -> None:
+        metadata = RuleMetadata(
+            rule_id="aws-test-rule",
+            title="Test rule",
+            category=StrideCategory.SPOOFING,
+            recommended_mitigation="Fix the test issue.",
+        )
+
+        def detector(received_context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
+            return []
+
+        definition = RuleDefinition(metadata=metadata, detector=detector)
+
+        self.assertIs(definition.metadata, metadata)
+        self.assertIs(definition.detector, detector)
+
     def test_evaluate_passes_context_and_rule_id_to_detector(self) -> None:
         calls: list[tuple[RuleEvaluationContext, str]] = []
         context = RuleEvaluationContext(

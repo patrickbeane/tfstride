@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy, RuleRegistry
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.models import BoundaryType, Finding, ResourceInventory, TrustBoundary
 
 
@@ -20,6 +20,13 @@ class RuleEvaluationContext:
 class RuleDetector(Protocol):
     def __call__(self, context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
         ...
+
+
+
+@dataclass(frozen=True, slots=True)
+class RuleDefinition:
+    metadata: RuleMetadata
+    detector: RuleDetector
 
 
 @dataclass(frozen=True, slots=True)
