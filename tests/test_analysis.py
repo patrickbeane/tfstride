@@ -23,6 +23,8 @@ from tfstride.models import (
     TerraformResource,
     TrustBoundary,
 )
+from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.registry import ProviderRegistry
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 
 
@@ -629,6 +631,28 @@ class TFSAnalysisTests(unittest.TestCase):
             plan_path = Path(tmp_dir) / "plan.json"
             plan_path.write_text(json.dumps(payload), encoding="utf-8")
             return self.engine.analyze_plan(plan_path)
+
+    def test_analysis_resolves_normalizer_through_provider_registry(self) -> None:
+        class RecordingNormalizer(ProviderNormalizer):
+            provider = "aws"
+	
+            def __init__(self) -> None:
+                self.calls: list[list[TerraformResource]] = []
+	
+            def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
+                self.calls.append(resources)
+                return ResourceInventory(provider="aws", resources=[])
+	
+        normalizer = RecordingNormalizer()
+        engine = TfStride(provider_registry=ProviderRegistry([normalizer]))
+	
+        result = engine.analyze_plan(FIXTURE_PATH)
+	
+        self.assertEqual(len(normalizer.calls), 1)
+        self.assertGreater(len(normalizer.calls[0]), 0)
+        self.assertEqual(result.inventory.provider, "aws")
+        self.assertEqual(result.inventory.resources, ())
+        self.assertEqual(result.findings, [])
 
     def test_analysis_normalizes_supported_resources_and_tracks_unsupported(self) -> None:
         self.assertEqual(len(self.result.inventory.resources), 23)

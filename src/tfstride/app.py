@@ -10,6 +10,7 @@ from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.registry import ProviderRegistry
 from tfstride.reporting.json_report import JsonReportRenderer
 from tfstride.reporting.markdown import MarkdownReportRenderer
 from tfstride.reporting.report_contract import TFSReportPayload
@@ -24,10 +25,18 @@ DEFAULT_LIMITATIONS = [
     "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.",
 ]
 
+DEFAULT_PROVIDER = "aws"
+
 
 class TfStride:
-    def __init__(self, *, rule_policy: RulePolicy | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        rule_policy: RulePolicy | None = None,
+        provider_registry: ProviderRegistry | None = None,
+    ) -> None:
         self.aws_normalizer = AwsNormalizer()
+        self.provider_registry = provider_registry or ProviderRegistry([self.aws_normalizer])
         self.boundary_detector = TrustBoundaryDetector()
         self.rule_engine = StrideRuleEngine()
         self._json_renderer = JsonReportRenderer()
@@ -37,7 +46,7 @@ class TfStride:
 
     def analyze_plan(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> AnalysisResult:
         terraform_plan = load_terraform_plan(plan_path)
-        inventory = self.aws_normalizer.normalize(terraform_plan.resources)
+        inventory = self.provider_registry.normalize(DEFAULT_PROVIDER, terraform_plan.resources)
         trust_boundaries = self.boundary_detector.detect(inventory)
         findings = apply_severity_overrides(
 	        self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
