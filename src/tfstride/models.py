@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
@@ -153,53 +154,53 @@ class NormalizedResource:
         self.metadata[key] = [str(value) for value in values if value not in (None, "")]
 
     def _metadata_optional_string(self, key: str) -> str | None:
-	    value = self.metadata.get(key)
-	    if value is None:
-	        return None
-	    text = str(value).strip()
-	    return text or None
-	
+        value = self.metadata.get(key)
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
     def _set_metadata_optional_string(self, key: str, value: str | None) -> None:
-	    if value is None or not str(value).strip():
-	        self.metadata.pop(key, None)
-	        return
-	    self.metadata[key] = str(value).strip()
+        if value is None or not str(value).strip():
+            self.metadata.pop(key, None)
+            return
+        self.metadata[key] = str(value).strip()
 
     def _metadata_optional_int(self, key: str) -> int | None:
-	    value = self.metadata.get(key)
-	    if value is None or value == "":
-	        return None
-	    try:
-	        return int(value)
-	    except (TypeError, ValueError):
-	        return None
-	
+        value = self.metadata.get(key)
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
     def _set_metadata_optional_int(self, key: str, value: int | None) -> None:
-	    if value is None:
-	        self.metadata.pop(key, None)
-	        return
-	    self.metadata[key] = int(value)
-	
+        if value is None:
+            self.metadata.pop(key, None)
+            return
+        self.metadata[key] = int(value)
+
     def _metadata_dict(self, key: str) -> dict[str, Any]:
-	    value = self.metadata.get(key)
-	    if not isinstance(value, dict):
-	        return {}
-	    return deepcopy(value)
-	
+        value = self.metadata.get(key)
+        if not isinstance(value, dict):
+            return {}
+        return deepcopy(value)
+
     def _set_metadata_dict(self, key: str, value: dict[str, Any] | None) -> None:
-	    if value is None:
-	        self.metadata.pop(key, None)
-	        return
-	    self.metadata[key] = deepcopy(value)
-	
+        if value is None:
+            self.metadata.pop(key, None)
+            return
+        self.metadata[key] = deepcopy(value)
+
     def _metadata_dict_list(self, key: str) -> list[dict[str, Any]]:
-	    values = self.metadata.get(key)
-	    if not isinstance(values, list):
-	        return []
-	    return [deepcopy(value) for value in values if isinstance(value, dict)]
-	
+        values = self.metadata.get(key)
+        if not isinstance(values, list):
+            return []
+        return [deepcopy(value) for value in values if isinstance(value, dict)]
+
     def _set_metadata_dict_list(self, key: str, values: list[dict[str, Any]]) -> None:
-	    self.metadata[key] = [deepcopy(value) for value in values if isinstance(value, dict)]
+        self.metadata[key] = [deepcopy(value) for value in values if isinstance(value, dict)]
 
     @property
     def direct_internet_reachable(self) -> bool:
@@ -299,286 +300,286 @@ class NormalizedResource:
 
     @property
     def security_group_id(self) -> str | None:
-	    return self._metadata_optional_string("security_group_id")
-	
+        return self._metadata_optional_string("security_group_id")
+
     @security_group_id.setter
     def security_group_id(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("security_group_id", value)
+        self._set_metadata_optional_string("security_group_id", value)
 
     @property
     def role_reference(self) -> str | None:
-	    return self._metadata_optional_string("role")
-	
+        return self._metadata_optional_string("role")
+
     @role_reference.setter
     def role_reference(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("role", value)
-	
+        self._set_metadata_optional_string("role", value)
+
     @property
     def role_references(self) -> list[str]:
-	    return self._metadata_string_list("role_references")
-	
+        return self._metadata_string_list("role_references")
+
     @role_references.setter
     def role_references(self, values: list[str]) -> None:
-	    self._set_metadata_string_list("role_references", values)
-	
+        self._set_metadata_string_list("role_references", values)
+
     @property
     def resolved_role_references(self) -> list[str]:
-	    return self._metadata_string_list("resolved_role_references")
-	
+        return self._metadata_string_list("resolved_role_references")
+
     @resolved_role_references.setter
     def resolved_role_references(self, values: list[str]) -> None:
-	    self._set_metadata_string_list("resolved_role_references", values)
-	
+        self._set_metadata_string_list("resolved_role_references", values)
+
     @property
     def iam_instance_profile(self) -> str | None:
-	    return self._metadata_optional_string("iam_instance_profile")
-	
+        return self._metadata_optional_string("iam_instance_profile")
+
     @iam_instance_profile.setter
     def iam_instance_profile(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("iam_instance_profile", value)
-	
+        self._set_metadata_optional_string("iam_instance_profile", value)
+
     @property
     def policy_arn(self) -> str | None:
-	    return self._metadata_optional_string("policy_arn")
-	
+        return self._metadata_optional_string("policy_arn")
+
     @policy_arn.setter
     def policy_arn(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("policy_arn", value)
-	
+        self._set_metadata_optional_string("policy_arn", value)
+
     @property
     def policy_name(self) -> str | None:
-	    return self._metadata_optional_string("policy_name")
-	
+        return self._metadata_optional_string("policy_name")
+
     @policy_name.setter
     def policy_name(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("policy_name", value)
-	
+        self._set_metadata_optional_string("policy_name", value)
+
     @property
     def cluster_reference(self) -> str | None:
-	        return self._metadata_optional_string("cluster")
-	
+        return self._metadata_optional_string("cluster")
+
     @cluster_reference.setter
     def cluster_reference(self, value: str | None) -> None:
         self._set_metadata_optional_string("cluster", value)
-	
+
     @property
     def cluster_name(self) -> str | None:
         return self._metadata_optional_string("name")
-	
+
     @cluster_name.setter
     def cluster_name(self, value: str | None) -> None:
         self._set_metadata_optional_string("name", value)
-	
+
     @property
     def task_definition_reference(self) -> str | None:
         return self._metadata_optional_string("task_definition")
-	
+
     @task_definition_reference.setter
     def task_definition_reference(self, value: str | None) -> None:
         self._set_metadata_optional_string("task_definition", value)
-	
+
     @property
     def task_definition_family(self) -> str | None:
         return self._metadata_optional_string("family")
-	
+
     @task_definition_family.setter
     def task_definition_family(self, value: str | None) -> None:
         self._set_metadata_optional_string("family", value)
-	
+
     @property
     def task_definition_revision(self) -> int | None:
         return self._metadata_optional_int("revision")
-	
+
     @task_definition_revision.setter
     def task_definition_revision(self, value: int | None) -> None:
         self._set_metadata_optional_int("revision", value)
-	
+
     @property
     def network_mode(self) -> str | None:
         return self._metadata_optional_string("network_mode")
-	
+
     @network_mode.setter
     def network_mode(self, value: str | None) -> None:
         self._set_metadata_optional_string("network_mode", value)
-	
+
     @property
     def requires_compatibilities(self) -> list[str]:
         return self._metadata_string_list("requires_compatibilities")
-	
+
     @requires_compatibilities.setter
     def requires_compatibilities(self, values: list[str]) -> None:
-	    self._set_metadata_string_list("requires_compatibilities", values)
-	
+        self._set_metadata_string_list("requires_compatibilities", values)
+
     @property
     def task_role_arn(self) -> str | None:
-	    return self._metadata_optional_string("task_role_arn")
-	
+        return self._metadata_optional_string("task_role_arn")
+
     @task_role_arn.setter
     def task_role_arn(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("task_role_arn", value)
-	
+        self._set_metadata_optional_string("task_role_arn", value)
+
     @property
     def execution_role_arn(self) -> str | None:
-	    return self._metadata_optional_string("execution_role_arn")
-	
+        return self._metadata_optional_string("execution_role_arn")
+
     @execution_role_arn.setter
     def execution_role_arn(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("execution_role_arn", value)
-	
+        self._set_metadata_optional_string("execution_role_arn", value)
+
     @property
     def secret_arn(self) -> str | None:
-	    return self._metadata_optional_string("secret_arn")
-	
+        return self._metadata_optional_string("secret_arn")
+
     @secret_arn.setter
     def secret_arn(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("secret_arn", value)
-	
+        self._set_metadata_optional_string("secret_arn", value)
+
     @property
     def function_name(self) -> str | None:
-	    return self._metadata_optional_string("function_name")
-	
+        return self._metadata_optional_string("function_name")
+
     @function_name.setter
     def function_name(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("function_name", value)
-	
+        self._set_metadata_optional_string("function_name", value)
+
     @property
     def secret_name(self) -> str | None:
-	    return self._metadata_optional_string("name")
-	
+        return self._metadata_optional_string("name")
+
     @secret_name.setter
     def secret_name(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("name", value)
-	
+        self._set_metadata_optional_string("name", value)
+
     @property
     def route_table_id(self) -> str | None:
-	    return self._metadata_optional_string("route_table_id")
-	
+        return self._metadata_optional_string("route_table_id")
+
     @route_table_id.setter
     def route_table_id(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("route_table_id", value)
-	
+        self._set_metadata_optional_string("route_table_id", value)
+
     @property
     def subnet_id(self) -> str | None:
-	    return self._metadata_optional_string("subnet_id")
-	
+        return self._metadata_optional_string("subnet_id")
+
     @subnet_id.setter
     def subnet_id(self, value: str | None) -> None:
-	    self._set_metadata_optional_string("subnet_id", value)
-	
+        self._set_metadata_optional_string("subnet_id", value)
+
     @property
     def routes(self) -> list[dict[str, Any]]:
-	    return self._metadata_dict_list("routes")
-	
+        return self._metadata_dict_list("routes")
+
     @routes.setter
     def routes(self, values: list[dict[str, Any]]) -> None:
-	    self._set_metadata_dict_list("routes", values)
-	
+        self._set_metadata_dict_list("routes", values)
+
     @property
     def map_public_ip_on_launch(self) -> bool:
-	    return self._metadata_bool("map_public_ip_on_launch")
-	
+        return self._metadata_bool("map_public_ip_on_launch")
+
     @map_public_ip_on_launch.setter
     def map_public_ip_on_launch(self, value: bool) -> None:
-	    self._set_metadata_bool("map_public_ip_on_launch", value)
-	
+        self._set_metadata_bool("map_public_ip_on_launch", value)
+
     @property
     def block_public_acls(self) -> bool:
-	    return self._metadata_bool("block_public_acls")
-	
+        return self._metadata_bool("block_public_acls")
+
     @block_public_acls.setter
     def block_public_acls(self, value: bool) -> None:
-	    self._set_metadata_bool("block_public_acls", value)
-	
+        self._set_metadata_bool("block_public_acls", value)
+
     @property
     def block_public_policy(self) -> bool:
         return self._metadata_bool("block_public_policy")
-	
+
     @block_public_policy.setter
     def block_public_policy(self, value: bool) -> None:
-	    self._set_metadata_bool("block_public_policy", value)
-	
+        self._set_metadata_bool("block_public_policy", value)
+
     @property
     def ignore_public_acls(self) -> bool:
-	    return self._metadata_bool("ignore_public_acls")
-	
+        return self._metadata_bool("ignore_public_acls")
+
     @ignore_public_acls.setter
     def ignore_public_acls(self, value: bool) -> None:
         self._set_metadata_bool("ignore_public_acls", value)
-	
+
     @property
     def restrict_public_buckets(self) -> bool:
-	    return self._metadata_bool("restrict_public_buckets")
-	
+        return self._metadata_bool("restrict_public_buckets")
+
     @restrict_public_buckets.setter
     def restrict_public_buckets(self, value: bool) -> None:
-	    self._set_metadata_bool("restrict_public_buckets", value)
+        self._set_metadata_bool("restrict_public_buckets", value)
 
     @property
     def trust_principals(self) -> list[str]:
-	    return self._metadata_string_list("trust_principals")
-	
+        return self._metadata_string_list("trust_principals")
+
     @trust_principals.setter
     def trust_principals(self, values: list[str]) -> None:
-	    self._set_metadata_string_list("trust_principals", values)
-	
+        self._set_metadata_string_list("trust_principals", values)
+
     @property
     def trust_statements(self) -> list[dict[str, Any]]:
-	    return self._metadata_dict_list("trust_statements")
-	
+        return self._metadata_dict_list("trust_statements")
+
     @trust_statements.setter
     def trust_statements(self, values: list[dict[str, Any]]) -> None:
-	    self._set_metadata_dict_list("trust_statements", values)
-	
+        self._set_metadata_dict_list("trust_statements", values)
+
     @property
     def resource_policy_source_addresses(self) -> list[str]:
         return self._metadata_string_list("resource_policy_source_addresses")
-	
+
     @resource_policy_source_addresses.setter
     def resource_policy_source_addresses(self, values: list[str]) -> None:
         self._set_metadata_string_list("resource_policy_source_addresses", values)
-	
+
     @property
     def policy_document(self) -> dict[str, Any]:
         return self._metadata_dict("policy_document")
-	
+
     @policy_document.setter
     def policy_document(self, value: dict[str, Any] | None) -> None:
         self._set_metadata_dict("policy_document", value)
-	
+
     @property
     def public_access_block(self) -> dict[str, bool] | None:
         value = self.metadata.get("public_access_block")
         if not isinstance(value, dict):
             return None
         return {str(key): bool(item) for key, item in value.items()}
-	
+
     @public_access_block.setter
     def public_access_block(self, value: dict[str, bool] | None) -> None:
         if value is None:
             self.metadata.pop("public_access_block", None)
             return
         self.metadata["public_access_block"] = {str(key): bool(item) for key, item in value.items()}
-	
+
     @property
     def bucket_name(self) -> str | None:
         return self._metadata_optional_string("bucket")
-	
+
     @bucket_name.setter
     def bucket_name(self, value: str | None) -> None:
         self._set_metadata_optional_string("bucket", value)
-	
+
     @property
     def bucket_acl(self) -> str:
         return self._metadata_optional_string("acl") or ""
-	
+
     @bucket_acl.setter
     def bucket_acl(self, value: str | None) -> None:
         self._set_metadata_optional_string("acl", value)
-	
+
     @property
     def engine(self) -> str | None:
         return self._metadata_optional_string("engine")
-	
+
     @engine.setter
     def engine(self, value: str | None) -> None:
         self._set_metadata_optional_string("engine", value)
@@ -587,36 +588,38 @@ class NormalizedResource:
 @dataclass(slots=True)
 class ResourceInventory:
     provider: str
-    resources: list[NormalizedResource]
+    resources: Sequence[NormalizedResource]
     unsupported_resources: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resources_by_identifier: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resource_positions: dict[int, int] = field(init=False, repr=False, default_factory=dict)
-	
+
     def __post_init__(self) -> None:
-	    resources_by_type: dict[str, list[NormalizedResource]] = {}
-	    resources_by_address: dict[str, NormalizedResource] = {}
-	    resources_by_identifier: dict[str, NormalizedResource] = {}
-	    resource_positions: dict[int, int] = {}
-	
-	    for index, resource in enumerate(self.resources):
-	        resource_positions[id(resource)] = index
-	        resources_by_type.setdefault(resource.resource_type, []).append(resource)
-	        resources_by_address.setdefault(resource.address, resource)
-	        for key in (resource.identifier, resource.arn, resource.address):
-	            if key is None:
-	                continue
-	            resources_by_identifier.setdefault(key, resource)
-	
-	    self._resources_by_type = {
-	        resource_type: tuple(group)
-	        for resource_type, group in resources_by_type.items()
-	    }
-	    self._resources_by_address = resources_by_address
-	    self._resources_by_identifier = resources_by_identifier
-	    self._resource_positions = resource_positions
+        resources = tuple(self.resources)
+        self.resources = resources
+        resources_by_type: dict[str, list[NormalizedResource]] = {}
+        resources_by_address: dict[str, NormalizedResource] = {}
+        resources_by_identifier: dict[str, NormalizedResource] = {}
+        resource_positions: dict[int, int] = {}
+
+        for index, resource in enumerate(resources):
+            resource_positions[id(resource)] = index
+            resources_by_type.setdefault(resource.resource_type, []).append(resource)
+            resources_by_address.setdefault(resource.address, resource)
+            for key in (resource.identifier, resource.arn, resource.address):
+                if key is None:
+                    continue
+                resources_by_identifier.setdefault(key, resource)
+
+        self._resources_by_type = {
+            resource_type: tuple(group)
+            for resource_type, group in resources_by_type.items()
+        }
+        self._resources_by_address = resources_by_address
+        self._resources_by_identifier = resources_by_identifier
+        self._resource_positions = resource_positions
 
     @property
     def primary_account_id(self) -> str | None:
@@ -625,7 +628,7 @@ class ResourceInventory:
             return None
         text = str(value).strip()
         return text or None
-	
+
     @primary_account_id.setter
     def primary_account_id(self, value: str | None) -> None:
         if value is None or not str(value).strip():
@@ -635,20 +638,20 @@ class ResourceInventory:
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:
-	        return []
+            return []
 
         allowed = set(resource_types)
         if len(allowed) == 1:
-	            resource_type = next(iter(allowed))
-	            return list(self._resources_by_type.get(resource_type, ()))
-	
+            resource_type = next(iter(allowed))
+            return list(self._resources_by_type.get(resource_type, ()))
+
         matches = [
-	        resource
-	        for resource_type in allowed
-	        for resource in self._resources_by_type.get(resource_type, ())
-	    ]
+            resource
+            for resource_type in allowed
+            for resource in self._resources_by_type.get(resource_type, ())
+        ]
         matches.sort(key=lambda resource: self._resource_positions[id(resource)])
-        return matches        
+        return matches
 
     def get_by_address(self, address: str) -> NormalizedResource | None:
         return self._resources_by_address.get(address)
@@ -716,34 +719,34 @@ class ResourceCoverage:
     normalized_resources: int = 0
     unsupported_resources: int = 0
     unsupported_resource_types: dict[str, int] = field(default_factory=dict)
-	
-	
+
+
 @dataclass(slots=True)
 class RuleCoverage:
     registered_rule_count: int = 0
     enabled_rules: list[str] = field(default_factory=list)
     disabled_rules: list[str] = field(default_factory=list)
     severity_overrides: dict[str, Severity] = field(default_factory=dict)
-	
-	
+
+
 @dataclass(slots=True)
 class UnresolvedReference:
     resource: str
     references: dict[str, list[str]] = field(default_factory=dict)
-	
-	
+
+
 @dataclass(slots=True)
 class ReferenceCoverage:
     unresolved_reference_count: int = 0
     unresolved_references: list[UnresolvedReference] = field(default_factory=list)
 
-	
+
 @dataclass(slots=True)
 class AnalysisCoverage:
     resources: ResourceCoverage = field(default_factory=ResourceCoverage)
     rules: RuleCoverage = field(default_factory=RuleCoverage)
     references: ReferenceCoverage = field(default_factory=ReferenceCoverage)
-	
+
 
 @dataclass(slots=True)
 class AnalysisResult:
