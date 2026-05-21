@@ -109,6 +109,22 @@ class ResourceInventoryTests(unittest.TestCase):
         self.assertIsNone(inventory.primary_account_id)
         self.assertNotIn("primary_account_id", inventory.metadata)
 
+    def test_metadata_snapshot_returns_detached_copy(self) -> None:
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[],
+            metadata={"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
+        )
+
+        snapshot = inventory.metadata_snapshot()
+        snapshot["unsupported_resource_types"]["aws_cloudwatch_log_group"] = 2
+        snapshot["new_key"] = "new-value"
+
+        self.assertEqual(
+            inventory.metadata,
+            {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
+        )
+
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
     def test_posture_property_defaults_do_not_require_metadata_keys(self) -> None:
@@ -125,6 +141,24 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertEqual(resource.public_exposure_reasons, [])
         self.assertEqual(resource.internet_ingress_reasons, [])
         self.assertEqual(resource.metadata, {})
+
+    def test_metadata_snapshot_returns_detached_copy(self) -> None:
+        resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")
+        resource.metadata["policy_document"] = {"Statement": [{"Effect": "Allow"}]}
+        resource.metadata["tags"] = {"env": "prod"}
+
+        snapshot = resource.metadata_snapshot()
+        snapshot["policy_document"]["Statement"][0]["Effect"] = "Deny"
+        snapshot["tags"]["env"] = "dev"
+        snapshot["new_key"] = "new-value"
+
+        self.assertEqual(
+            resource.metadata,
+            {
+                "policy_document": {"Statement": [{"Effect": "Allow"}]},
+                "tags": {"env": "prod"},
+            },
+        )
 
     def test_posture_property_setters_update_metadata(self) -> None:
         resource = _resource(address="aws_db_instance.app", resource_type="aws_db_instance")

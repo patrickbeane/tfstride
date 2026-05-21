@@ -10,8 +10,8 @@ from tfstride.models import (
     EvidenceItem,
     Finding,
     IAMPolicyCondition,
-    IAMPolicyStatement,
     IAMPrincipal,
+    IAMPolicyStatement,
     NormalizedResource,
     Observation,
     ResourceInventory,
@@ -22,17 +22,17 @@ from tfstride.models import (
 from tfstride.reporting.report_contract import (
     AnalysisCoveragePayload,
     EvidenceItemPayload,
-	FindingPayload,
-	InventoryPayload,
-	NormalizedResourcePayload,
-	ObservationPayload,
-	PolicyConditionPayload,
-	PolicyStatementPayload,
+    FindingPayload,
+    InventoryPayload,
+    NormalizedResourcePayload,
+    ObservationPayload,
+    PolicyConditionPayload,
     PrincipalPayload,
-	SecurityGroupRulePayload,
-	SeverityReasoningPayload,
-	TFSReportPayload,
-	TrustBoundaryPayload,
+    PolicyStatementPayload,
+    SecurityGroupRulePayload,
+    SeverityReasoningPayload,
+    TFSReportPayload,
+    TrustBoundaryPayload,
 )
 
 REPORT_KIND = "tfstride-report"
@@ -98,6 +98,7 @@ class JsonReportRenderer:
             "limitations": list(result.limitations),
         }
 
+
 def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayload:
     coverage = result.analysis_coverage
     return {
@@ -132,8 +133,8 @@ def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayl
             ],
         },
     }
-	
-	
+
+
 def _finding_counts_by_rule(result: AnalysisResult) -> dict[str, int]:
     all_findings = [
         *result.findings,
@@ -159,7 +160,7 @@ def _serialize_inventory(inventory: ResourceInventory) -> InventoryPayload:
     return {
         "provider": inventory.provider,
         "unsupported_resources": list(inventory.unsupported_resources),
-        "metadata": dict(inventory.metadata),
+        "metadata": inventory.metadata_snapshot(),
         "resources": [_serialize_resource(resource) for resource in sorted(inventory.resources, key=lambda resource: resource.address)],
     }
 
@@ -182,7 +183,7 @@ def _serialize_resource(resource: NormalizedResource) -> NormalizedResourcePaylo
         "public_access_configured": resource.public_access_configured,
         "public_exposure": resource.public_exposure,
         "data_sensitivity": resource.data_sensitivity,
-        "metadata": dict(resource.metadata),
+        "metadata": resource.metadata_snapshot(),
     }
 
 

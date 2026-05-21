@@ -8,7 +8,13 @@ from pathlib import Path
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.filtering import apply_finding_filters, render_baseline
-from tfstride.models import Severity
+from tfstride.models import (
+    AnalysisResult,
+    NormalizedResource,
+    ResourceCategory,
+    ResourceInventory,
+    Severity,
+)
 from tfstride.reporting.json_report import JsonReportRenderer, REPORT_FORMAT_VERSION, REPORT_KIND
 from tfstride.reporting.markdown import MarkdownReportRenderer
 from tfstride.reporting.sarif import SarifReportRenderer
@@ -201,12 +207,12 @@ class SarifReportRendererTests(unittest.TestCase):
 
 class JsonReportRendererTests(unittest.TestCase):
     def test_app_can_render_reports_from_an_analysis_result(self) -> None:
-	        engine = TfStride()
-	        result = engine.analyze_plan(FIXTURE_PATH)
-	
-	        self.assertEqual(engine.render_markdown(result), MarkdownReportRenderer().render(result))
-	        self.assertEqual(engine.build_json_report_payload(result), json.loads(engine.render_json(result)))
-	        self.assertEqual(json.loads(engine.render_sarif(result)), json.loads(SarifReportRenderer().render(result)))
+        engine = TfStride()
+        result = engine.analyze_plan(FIXTURE_PATH)
+
+        self.assertEqual(engine.render_markdown(result), MarkdownReportRenderer().render(result))
+        self.assertEqual(engine.build_json_report_payload(result), json.loads(engine.render_json(result)))
+        self.assertEqual(json.loads(engine.render_sarif(result)), json.loads(SarifReportRenderer().render(result)))
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()
@@ -222,6 +228,39 @@ class JsonReportRendererTests(unittest.TestCase):
         self.assertEqual(payload["inventory"]["provider"], "aws")
         self.assertEqual(len(payload["findings"]), 9)
         self.assertTrue(payload["findings"][0]["fingerprint"].startswith("sha256:"))
+
+    def test_json_report_uses_metadata_snapshots(self) -> None:
+        resource = NormalizedResource(
+            address="aws_s3_bucket.logs",
+            provider="aws",
+            resource_type="aws_s3_bucket",
+            name="logs",
+            category=ResourceCategory.DATA,
+            metadata={"nested": {"values": ["resource-original"]}},
+        )
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[resource],
+            metadata={"nested": {"values": ["inventory-original"]}},
+        )
+        result = AnalysisResult(
+            title="Snapshot test",
+            analyzed_file="plan.json",
+            analyzed_path="plan.json",
+            inventory=inventory,
+            trust_boundaries=[],
+            findings=[],
+        )
+
+        payload = JsonReportRenderer().build_payload(result)
+        resource.metadata["nested"]["values"].append("resource-mutated")
+        inventory.metadata["nested"]["values"].append("inventory-mutated")
+
+        self.assertEqual(payload["inventory"]["metadata"]["nested"]["values"], ["inventory-original"])
+        self.assertEqual(
+            payload["inventory"]["resources"][0]["metadata"]["nested"]["values"],
+            ["resource-original"],
+        )
 
     def test_json_report_contract_exposes_stable_ui_sections(self) -> None:
         engine = TfStride()
@@ -298,7 +337,7 @@ class JsonReportRendererTests(unittest.TestCase):
             for resource in payload["inventory"]["resources"]
             if resource["policy_statements"]
         ]
-	
+
         self.assertTrue(resources_with_policies)
         policy_statement = resources_with_policies[0]["policy_statements"][0]
         self.assertEqual(
@@ -322,7 +361,7 @@ class JsonReportRendererTests(unittest.TestCase):
         payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
 
         coverage = payload["analysis_coverage"]
-	
+
         self.assertEqual(coverage["resources"]["total_resources"], 24)
         self.assertEqual(coverage["resources"]["provider_resources"], 24)
         self.assertEqual(coverage["resources"]["normalized_resources"], 23)

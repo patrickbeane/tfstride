@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -146,6 +147,10 @@ class NormalizedResource:
     @property
     def display_name(self) -> str:
         return f"{self.resource_type}.{self.name}"
+
+    def metadata_snapshot(self) -> dict[str, Any]:
+        """Return a detached metadata copy for serialization boundaries."""
+        return deepcopy(self.metadata)
 
     # Keep high-traffic posture fields metadata-backed for report compatibility,
     # but route access through typed schema fields instead of raw keys.
@@ -611,6 +616,10 @@ class ResourceInventory:
     @primary_account_id.setter
     def primary_account_id(self, value: str | None) -> None:
         InventoryMetadata.PRIMARY_ACCOUNT_ID.set(self.metadata, value)
+
+    def metadata_snapshot(self) -> dict[str, Any]:
+        """Return a detached metadata copy for serialization boundaries."""
+        return deepcopy(self.metadata)
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:
