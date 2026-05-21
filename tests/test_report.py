@@ -241,7 +241,7 @@ class JsonReportRendererTests(unittest.TestCase):
         inventory = ResourceInventory(
             provider="aws",
             resources=[resource],
-            metadata={"nested": {"values": ["inventory-original"]}},
+            metadata={"primary_account_id": "111122223333"},
         )
         result = AnalysisResult(
             title="Snapshot test",
@@ -254,9 +254,9 @@ class JsonReportRendererTests(unittest.TestCase):
 
         payload = JsonReportRenderer().build_payload(result)
         resource.policy_document = {"Statement": [{"Effect": "Deny"}]}
-        inventory.metadata["nested"]["values"].append("inventory-mutated")
+        inventory.primary_account_id = "444455556666"
 
-        self.assertEqual(payload["inventory"]["metadata"]["nested"]["values"], ["inventory-original"])
+        self.assertEqual(payload["inventory"]["metadata"]["primary_account_id"], "111122223333")
         self.assertEqual(
             payload["inventory"]["resources"][0]["metadata"]["policy_document"],
             {"Statement": [{"Effect": "Allow"}]},

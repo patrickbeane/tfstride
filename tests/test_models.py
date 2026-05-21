@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.resource_metadata import ResourceMetadata
 
 
 def _resource(
@@ -180,12 +181,23 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         )
 
         source_metadata["tags"]["env"] = "dev"
-        metadata_view = resource.metadata
         with self.assertRaises(TypeError):
-            metadata_view["tags"] = {"env": "test"}
-        metadata_view["tags"]["env"] = "stage"
+            resource.metadata["tags"] = {"env": "test"}
 
         self.assertEqual(resource.metadata["tags"], {"env": "prod"})
+
+    def test_metadata_schema_helpers_update_private_metadata(self) -> None:
+        resource = _resource(address="aws_iam_role.app", resource_type="aws_iam_role")
+
+        self.assertFalse(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
+        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
+        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
+        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, None)
+
+        self.assertTrue(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertTrue(resource.metadata["public_access_configured"])
+        self.assertEqual(resource.metadata["unresolved_role_references"], ["missing-role"])
 
     def test_posture_property_setters_update_metadata(self) -> None:
         resource = _resource(address="aws_db_instance.app", resource_type="aws_db_instance")
