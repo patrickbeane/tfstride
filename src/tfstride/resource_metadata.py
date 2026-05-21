@@ -41,6 +41,15 @@ class StringListMetadataField(MetadataField[list[str]]):
     def set(self, metadata: dict[str, Any], value: list[str]) -> None:
         metadata[self.key] = [str(item) for item in value if item not in (None, "")]
 
+    def append_unique(self, metadata: dict[str, Any], value: str | None) -> None:
+        if not value:
+            return
+        item = str(value)
+        values = self.get(metadata)
+        if item not in values:
+            values.append(item)
+        self.set(metadata, values)
+
 
 @dataclass(frozen=True, slots=True)
 class OptionalStringMetadataField(MetadataField[str | None]):

@@ -44,6 +44,18 @@ class ResourceMetadataFieldTests(unittest.TestCase):
         self.assertEqual(ResourceMetadata.PUBLIC_ACCESS_REASONS.get(metadata), ["public IP", "443"])
         self.assertEqual(metadata["public_access_reasons"], ["public IP", "443"])
 
+    def test_list_fields_append_unique_values(self) -> None:
+        metadata = {"public_access_reasons": ["existing", None]}
+
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.append_unique(metadata, "existing")
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.append_unique(metadata, "new")
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.append_unique(metadata, "new")
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.append_unique(metadata, None)
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.append_unique(metadata, "")
+
+        self.assertEqual(ResourceMetadata.PUBLIC_ACCESS_REASONS.get(metadata), ["existing", "new"])
+        self.assertEqual(metadata["public_access_reasons"], ["existing", "new"])
+
     def test_dict_fields_are_copied_on_get_and_set(self) -> None:
         metadata = {}
         policy = {"Statement": [{"Effect": "Allow"}]}
