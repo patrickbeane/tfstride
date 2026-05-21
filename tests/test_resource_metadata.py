@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.resource_metadata import InventoryMetadata, ResourceMetadata
+from tfstride.resource_metadata import (
+    BoolMetadataField,
+    InventoryMetadata,
+    ResourceMetadata,
+    StringListMetadataField,
+)
 
 
 class ResourceMetadataFieldTests(unittest.TestCase):
@@ -78,6 +83,68 @@ class ResourceMetadataFieldTests(unittest.TestCase):
         ResourceMetadata.PUBLIC_ACCESS_BLOCK.set(metadata, None)
         self.assertIsNone(ResourceMetadata.PUBLIC_ACCESS_BLOCK.get(metadata))
         self.assertNotIn("public_access_block", metadata)
+
+    def test_decoration_bool_fields_are_declared(self) -> None:
+        fields = [
+            (ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, "public_access_configured"),
+            (ResourceMetadata.INTERNET_INGRESS, "internet_ingress"),
+            (
+                ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER,
+                "fronted_by_internet_facing_load_balancer",
+            ),
+        ]
+
+        for field, key in fields:
+            with self.subTest(key=key):
+                self.assertIsInstance(field, BoolMetadataField)
+                self.assertEqual(field.key, key)
+
+    def test_decoration_string_list_fields_are_declared(self) -> None:
+        fields = [
+            (ResourceMetadata.ROUTE_TABLE_IDS, "route_table_ids"),
+            (
+                ResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
+                "internet_facing_load_balancer_addresses",
+            ),
+            (ResourceMetadata.STANDALONE_RULE_ADDRESSES, "standalone_rule_addresses"),
+            (ResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES, "inline_policy_resource_addresses"),
+            (ResourceMetadata.INLINE_POLICY_NAMES, "inline_policy_names"),
+            (ResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS, "unresolved_attached_policy_arns"),
+            (ResourceMetadata.ATTACHED_POLICY_ARNS, "attached_policy_arns"),
+            (ResourceMetadata.ATTACHED_POLICY_ADDRESSES, "attached_policy_addresses"),
+            (ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "unresolved_role_references"),
+            (ResourceMetadata.RESOLVED_ROLE_ADDRESSES, "resolved_role_addresses"),
+            (ResourceMetadata.UNRESOLVED_INSTANCE_PROFILES, "unresolved_instance_profiles"),
+            (
+                ResourceMetadata.RESOLVED_INSTANCE_PROFILE_ADDRESSES,
+                "resolved_instance_profile_addresses",
+            ),
+            (ResourceMetadata.UNRESOLVED_CLUSTER_REFERENCES, "unresolved_cluster_references"),
+            (ResourceMetadata.RESOLVED_CLUSTER_ADDRESSES, "resolved_cluster_addresses"),
+            (
+                ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES,
+                "unresolved_task_definition_references",
+            ),
+            (
+                ResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES,
+                "resolved_task_definition_addresses",
+            ),
+            (ResourceMetadata.RESOLVED_TASK_ROLE_ADDRESSES, "resolved_task_role_addresses"),
+            (ResourceMetadata.UNRESOLVED_TASK_ROLE_ARNS, "unresolved_task_role_arns"),
+            (
+                ResourceMetadata.RESOLVED_EXECUTION_ROLE_ADDRESSES,
+                "resolved_execution_role_addresses",
+            ),
+            (ResourceMetadata.UNRESOLVED_EXECUTION_ROLE_ARNS, "unresolved_execution_role_arns"),
+            (ResourceMetadata.UNRESOLVED_BUCKET_REFERENCES, "unresolved_bucket_references"),
+            (ResourceMetadata.UNRESOLVED_SECRET_ARNS, "unresolved_secret_arns"),
+            (ResourceMetadata.UNRESOLVED_FUNCTION_REFERENCES, "unresolved_function_references"),
+        ]
+
+        for field, key in fields:
+            with self.subTest(key=key):
+                self.assertIsInstance(field, StringListMetadataField)
+                self.assertEqual(field.key, key)
 
     def test_inventory_primary_account_id_uses_same_optional_string_semantics(self) -> None:
         metadata = {}
