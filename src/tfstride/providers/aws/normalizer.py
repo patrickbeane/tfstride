@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
 from collections import Counter
 from collections.abc import Callable
 from typing import Any
 
 from tfstride.models import (
-    IAMPolicyCondition,
-    IAMPrincipal,
     IAMPolicyStatement,
     NormalizedResource,
     ResourceCategory,
@@ -16,6 +13,16 @@ from tfstride.models import (
     TerraformResource,
 )
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.aws.coercion import as_bool, as_list, as_optional_int, compact, first_item
+from tfstride.providers.aws.policy_documents import (
+    compact_condition_entries,
+    condition_entry,
+    extract_principals,
+    extract_trust_statements,
+    lambda_permission_principal_entries,
+    load_json_document,
+    parse_policy_statements,
+)
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons, ecs_task_definition_identifier
 from tfstride.resource_helpers import policy_allows_public_access
@@ -53,44 +60,6 @@ _AWS_RESOURCE_NORMALIZER_METHODS = {
     "aws_vpc": "_normalize_vpc",
 }
 SUPPORTED_AWS_TYPES = set(_AWS_RESOURCE_NORMALIZER_METHODS)
-
-SUPPORTED_TRUST_NARROWING_CONDITIONS = {
-    "sts:ExternalId": {
-        "StringEquals",
-        "StringLike",
-        "ForAnyValue:StringEquals",
-        "ForAnyValue:StringLike",
-    },
-    "aws:SourceArn": {
-        "ArnEquals",
-        "ArnLike",
-        "StringEquals",
-        "StringLike",
-        "ForAnyValue:ArnEquals",
-        "ForAnyValue:ArnLike",
-    },
-    "aws:SourceAccount": {
-        "StringEquals",
-        "StringLike",
-        "ForAnyValue:StringEquals",
-        "ForAnyValue:StringLike",
-    },
-    "SAML:aud": {
-        "StringEquals",
-        "StringLike",
-        "ForAnyValue:StringEquals",
-        "ForAnyValue:StringLike",
-    },
-}
-SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_CLAIMS = frozenset({"aud", "sub"})
-SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_OPERATORS = frozenset(
-    {
-        "StringEquals",
-        "StringLike",
-        "ForAnyValue:StringEquals",
-        "ForAnyValue:StringLike",
-    }
-)
 
 
 class AwsNormalizer(ProviderNormalizer):
@@ -197,7 +166,7 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.NETWORK,
             identifier=values.get("id"),
             vpc_id=values.get("vpc_id"),
-            metadata={"routes": _as_list(values.get("route") or values.get("routes"))},
+            metadata={"routes": as_list(values.get("route") or values.get("routes"))},
         )
 
     def _normalize_route_table_association(self, resource: TerraformResource) -> NormalizedResource:
@@ -255,7 +224,7 @@ class AwsNormalizer(ProviderNormalizer):
             name=resource.name,
             category=ResourceCategory.NETWORK,
             identifier=values.get("id"),
-            subnet_ids=_compact([values.get("subnet_id")]),
+            subnet_ids=compact([values.get("subnet_id")]),
             metadata={
                 "allocation_id": values.get("allocation_id"),
                 "connectivity_type": values.get("connectivity_type", "public"),
@@ -273,8 +242,8 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.COMPUTE,
             identifier=values.get("id"),
             arn=values.get("arn"),
-            subnet_ids=_compact([values.get("subnet_id")]),
-            security_group_ids=_as_list(values.get("vpc_security_group_ids")),
+            subnet_ids=compact([values.get("subnet_id")]),
+            security_group_ids=as_list(values.get("vpc_security_group_ids")),
             public_access_configured=public_ip_requested,
             metadata={
                 "ami": values.get("ami"),
@@ -303,14 +272,14 @@ class AwsNormalizer(ProviderNormalizer):
             arn=values.get("arn"),
             metadata={
                 "name": values.get("name"),
-                "capacity_providers": _as_list(values.get("capacity_providers")),
+                "capacity_providers": as_list(values.get("capacity_providers")),
             },
         )
 
     def _normalize_ecs_task_definition(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
         family = values.get("family")
-        revision = _as_optional_int(values.get("revision"))
+        revision = as_optional_int(values.get("revision"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -323,7 +292,7 @@ class AwsNormalizer(ProviderNormalizer):
                 "family": family,
                 "revision": revision,
                 "network_mode": values.get("network_mode"),
-                "requires_compatibilities": _compact(_as_list(values.get("requires_compatibilities"))),
+                "requires_compatibilities": compact(as_list(values.get("requires_compatibilities"))),
                 "task_role_arn": values.get("task_role_arn"),
                 "execution_role_arn": values.get("execution_role_arn"),
             },
@@ -331,8 +300,8 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_ecs_service(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        network_configuration = _first_item(values.get("network_configuration"))
-        assign_public_ip = _as_bool(network_configuration.get("assign_public_ip")) if network_configuration else False
+        network_configuration = first_item(values.get("network_configuration"))
+        assign_public_ip = as_bool(network_configuration.get("assign_public_ip")) if network_configuration else False
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -341,17 +310,17 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.COMPUTE,
             identifier=values.get("name") or values.get("id"),
             arn=values.get("arn"),
-            subnet_ids=_compact(network_configuration.get("subnets", []) if network_configuration else []),
-            security_group_ids=_compact(network_configuration.get("security_groups", []) if network_configuration else []),
+            subnet_ids=compact(network_configuration.get("subnets", []) if network_configuration else []),
+            security_group_ids=compact(network_configuration.get("security_groups", []) if network_configuration else []),
             public_access_configured=assign_public_ip,
             metadata={
                 "cluster": values.get("cluster"),
                 "task_definition": values.get("task_definition"),
-                "desired_count": _as_optional_int(values.get("desired_count")),
+                "desired_count": as_optional_int(values.get("desired_count")),
                 "launch_type": values.get("launch_type"),
                 "platform_version": values.get("platform_version"),
                 "assign_public_ip": assign_public_ip,
-                "load_balancers": _as_list(values.get("load_balancer")),
+                "load_balancers": as_list(values.get("load_balancer")),
                 "public_access_reasons": (
                     ["ECS service assigns public IPs to tasks"]
                     if assign_public_ip
@@ -372,8 +341,8 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.EDGE,
             identifier=values.get("id"),
             arn=values.get("arn"),
-            subnet_ids=_as_list(values.get("subnets")),
-            security_group_ids=_as_list(values.get("security_groups")),
+            subnet_ids=as_list(values.get("subnets")),
+            security_group_ids=as_list(values.get("security_groups")),
             public_access_configured=internet_facing,
             metadata={
                 "internal": not internet_facing,
@@ -398,7 +367,7 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.DATA,
             identifier=values.get("id") or values.get("identifier"),
             arn=values.get("arn"),
-            security_group_ids=_as_list(values.get("vpc_security_group_ids")),
+            security_group_ids=as_list(values.get("vpc_security_group_ids")),
             public_access_configured=publicly_accessible,
             data_sensitivity="sensitive",
             metadata={
@@ -417,7 +386,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_s3_bucket(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         bucket_acl = values.get("acl", "")
         public_policy = policy_allows_public_access(policy_document)
         public_access_configured = bucket_acl in {"public-read", "public-read-write", "website"} or public_policy
@@ -432,7 +401,7 @@ class AwsNormalizer(ProviderNormalizer):
             public_access_configured=public_access_configured,
             public_exposure=public_access_configured,
             data_sensitivity="sensitive",
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "bucket": values.get("bucket"),
                 "acl": bucket_acl,
@@ -450,7 +419,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_s3_bucket_policy(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -458,7 +427,7 @@ class AwsNormalizer(ProviderNormalizer):
             name=resource.name,
             category=ResourceCategory.DATA,
             identifier=values.get("id") or resource.address,
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "bucket": values.get("bucket"),
                 "policy_document": policy_document,
@@ -485,11 +454,11 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_iam_role(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        assume_role_policy = _load_json_document(values.get("assume_role_policy"))
-        inline_policies = _as_list(values.get("inline_policy"))
+        assume_role_policy = load_json_document(values.get("assume_role_policy"))
+        inline_policies = as_list(values.get("inline_policy"))
         statements = []
         for inline_policy in inline_policies:
-            statements.extend(_parse_policy_statements(_load_json_document(inline_policy.get("policy"))))
+            statements.extend(parse_policy_statements(load_json_document(inline_policy.get("policy"))))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -501,15 +470,15 @@ class AwsNormalizer(ProviderNormalizer):
             policy_statements=statements,
             metadata={
                 "assume_role_policy": assume_role_policy,
-                "trust_principals": _extract_principals(assume_role_policy),
-                "trust_statements": _extract_trust_statements(assume_role_policy),
+                "trust_principals": extract_principals(assume_role_policy),
+                "trust_statements": extract_trust_statements(assume_role_policy),
                 "inline_policy_names": [policy.get("name") for policy in inline_policies],
             },
         )
 
     def _normalize_iam_policy(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -518,13 +487,13 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.IAM,
             identifier=values.get("name") or values.get("id"),
             arn=values.get("arn"),
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={"policy_document": policy_document},
         )
 
     def _normalize_iam_role_policy(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -532,7 +501,7 @@ class AwsNormalizer(ProviderNormalizer):
             name=resource.name,
             category=ResourceCategory.IAM,
             identifier=values.get("id") or resource.address,
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "role": values.get("role"),
                 "policy_document": policy_document,
@@ -557,7 +526,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_iam_instance_profile(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        role_references = _compact(_as_list(values.get("roles")) + [values.get("role")])
+        role_references = compact(as_list(values.get("roles")) + [values.get("role")])
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -573,7 +542,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_lambda_function(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        vpc_config = _first_item(values.get("vpc_config"))
+        vpc_config = first_item(values.get("vpc_config"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -582,9 +551,9 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.COMPUTE,
             identifier=values.get("function_name") or values.get("id"),
             arn=values.get("arn"),
-            subnet_ids=_as_list(vpc_config.get("subnet_ids") if vpc_config else []),
-            security_group_ids=_as_list(vpc_config.get("security_group_ids") if vpc_config else []),
-            attached_role_arns=_compact([values.get("role")]),
+            subnet_ids=as_list(vpc_config.get("subnet_ids") if vpc_config else []),
+            security_group_ids=as_list(vpc_config.get("security_group_ids") if vpc_config else []),
+            attached_role_arns=compact([values.get("role")]),
             metadata={
                 "runtime": values.get("runtime"),
                 "handler": values.get("handler"),
@@ -607,21 +576,21 @@ class AwsNormalizer(ProviderNormalizer):
             policy_statements=[
                 IAMPolicyStatement(
                     effect="Allow",
-                    actions=_compact([values.get("action")]),
-                    resources=_compact([function_name]),
-                    principals=_compact([values.get("principal")]),
-                    principal_entries=_lambda_permission_principal_entries(values.get("principal")),
-                    conditions=_compact_condition_entries(
+                    actions=compact([values.get("action")]),
+                    resources=compact([function_name]),
+                    principals=compact([values.get("principal")]),
+                    principal_entries=lambda_permission_principal_entries(values.get("principal")),
+                    conditions=compact_condition_entries(
                         [
-                            _condition_entry(
+                            condition_entry(
                                 operator="ArnLike",
                                 key="aws:SourceArn",
-                                values=_compact([source_arn]),
+                                values=compact([source_arn]),
                             ),
-                            _condition_entry(
+                            condition_entry(
                                 operator="StringEquals",
                                 key="aws:SourceAccount",
-                                values=_compact([source_account]),
+                                values=compact([source_account]),
                             ),
                         ]
                     ),
@@ -636,7 +605,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_kms_key(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -645,7 +614,7 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.DATA,
             identifier=values.get("key_id") or values.get("id"),
             arn=values.get("arn"),
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             data_sensitivity="sensitive",
             metadata={
                 "policy_document": policy_document,
@@ -656,7 +625,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_sns_topic(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -665,7 +634,7 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.EDGE,
             identifier=values.get("name") or values.get("id"),
             arn=values.get("arn"),
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "policy_document": policy_document,
                 "display_name": values.get("display_name"),
@@ -674,7 +643,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_sqs_queue(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -683,7 +652,7 @@ class AwsNormalizer(ProviderNormalizer):
             category=ResourceCategory.DATA,
             identifier=values.get("name") or values.get("id"),
             arn=values.get("arn"),
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "policy_document": policy_document,
                 "queue_url": values.get("url"),
@@ -709,7 +678,7 @@ class AwsNormalizer(ProviderNormalizer):
 
     def _normalize_secretsmanager_secret_policy(self, resource: TerraformResource) -> NormalizedResource:
         values = resource.values
-        policy_document = _load_json_document(values.get("policy"))
+        policy_document = load_json_document(values.get("policy"))
         return NormalizedResource(
             address=resource.address,
             provider=self.provider,
@@ -717,7 +686,7 @@ class AwsNormalizer(ProviderNormalizer):
             name=resource.name,
             category=ResourceCategory.DATA,
             identifier=values.get("id") or resource.address,
-            policy_statements=_parse_policy_statements(policy_document),
+            policy_statements=parse_policy_statements(policy_document),
             metadata={
                 "secret_arn": values.get("secret_arn"),
                 "policy_document": policy_document,
@@ -728,16 +697,16 @@ class AwsNormalizer(ProviderNormalizer):
 def _parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
     rules: list[SecurityGroupRule] = []
     for direction in ("ingress", "egress"):
-        for rule in _as_list(values.get(direction)):
+        for rule in as_list(values.get(direction)):
             rules.append(
                 SecurityGroupRule(
                     direction=direction,
                     protocol=str(rule.get("protocol", "-1")),
-                    from_port=_as_optional_int(rule.get("from_port")),
-                    to_port=_as_optional_int(rule.get("to_port")),
-                    cidr_blocks=_as_list(rule.get("cidr_blocks")),
-                    ipv6_cidr_blocks=_as_list(rule.get("ipv6_cidr_blocks")),
-                    referenced_security_group_ids=_as_list(rule.get("security_groups")),
+                    from_port=as_optional_int(rule.get("from_port")),
+                    to_port=as_optional_int(rule.get("to_port")),
+                    cidr_blocks=as_list(rule.get("cidr_blocks")),
+                    ipv6_cidr_blocks=as_list(rule.get("ipv6_cidr_blocks")),
+                    referenced_security_group_ids=as_list(rule.get("security_groups")),
                     description=rule.get("description"),
                 )
             )
@@ -745,161 +714,19 @@ def _parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRul
 
 
 def _parse_standalone_security_group_rule(values: dict[str, Any]) -> SecurityGroupRule:
-    referenced_security_group_ids = _compact([values.get("source_security_group_id")])
+    referenced_security_group_ids = compact([values.get("source_security_group_id")])
     if values.get("self") and values.get("security_group_id"):
         referenced_security_group_ids.append(str(values["security_group_id"]))
     return SecurityGroupRule(
         direction=str(values.get("type", "ingress")),
         protocol=str(values.get("protocol", "-1")),
-        from_port=_as_optional_int(values.get("from_port")),
-        to_port=_as_optional_int(values.get("to_port")),
-        cidr_blocks=_as_list(values.get("cidr_blocks")),
-        ipv6_cidr_blocks=_as_list(values.get("ipv6_cidr_blocks")),
+        from_port=as_optional_int(values.get("from_port")),
+        to_port=as_optional_int(values.get("to_port")),
+        cidr_blocks=as_list(values.get("cidr_blocks")),
+        ipv6_cidr_blocks=as_list(values.get("ipv6_cidr_blocks")),
         referenced_security_group_ids=referenced_security_group_ids,
         description=values.get("description"),
     )
-
-
-def _parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyStatement]:
-    statements: list[IAMPolicyStatement] = []
-    for statement in _as_list(policy_document.get("Statement")):
-        statements.append(_parse_policy_statement(statement))
-    return statements
-
-
-def _parse_policy_statement(statement: Any) -> IAMPolicyStatement:
-    statement_dict = statement if isinstance(statement, dict) else {}
-    principal_entries = _extract_principal_entries(statement_dict.get("Principal"))
-    return IAMPolicyStatement(
-        effect=str(statement_dict.get("Effect", "Allow")),
-        actions=_as_list(statement_dict.get("Action")),
-        resources=_as_list(statement_dict.get("Resource")),
-        principals=[entry.value for entry in principal_entries],
-        principal_entries=principal_entries,
-        conditions=_parse_condition_entries(statement_dict.get("Condition")),
-    )
-
-
-def _extract_principals(policy_document: dict[str, Any]) -> list[str]:
-    principals: list[str] = []
-    for statement in _parse_policy_statements(policy_document):
-        principals.extend(statement.principals)
-    return sorted(set(principals))
-
-
-def _extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, Any]]:
-    trust_statements: list[dict[str, Any]] = []
-    for raw_statement in _as_list(policy_document.get("Statement")):
-        statement = _parse_policy_statement(raw_statement)
-        if statement.effect != "Allow":
-            continue
-        principals = sorted(set(statement.principals))
-        if not principals:
-            continue
-        principal_entries = sorted(
-            (
-                {"kind": entry.kind, "value": entry.value}
-                for entry in statement.principal_entries
-            ),
-            key=lambda entry: (entry["kind"], entry["value"]),
-        )
-        narrowing_conditions = _extract_supported_trust_narrowing_conditions(statement.conditions)
-        trust_statements.append(
-            {
-                "principals": principals,
-                "principal_entries": principal_entries,
-                "narrowing_condition_keys": sorted({condition.key for condition in narrowing_conditions}),
-                "narrowing_conditions": [
-                    {
-                        "operator": condition.operator,
-                        "key": condition.key,
-                        "values": list(condition.values),
-                    }
-                    for condition in narrowing_conditions
-                ],
-                "has_narrowing_conditions": bool(narrowing_conditions),
-            }
-        )
-    return trust_statements
-
-
-def _extract_supported_trust_narrowing_conditions(
-    conditions: list[IAMPolicyCondition],
-) -> list[IAMPolicyCondition]:
-    supported: list[IAMPolicyCondition] = []
-    for condition in conditions:
-        supported_operators = _supported_trust_narrowing_operators(condition.key)
-        if supported_operators is None or condition.operator not in supported_operators:
-            continue
-        supported.append(
-            IAMPolicyCondition(
-                operator=condition.operator,
-                key=condition.key,
-                values=list(condition.values),
-            )
-        )
-    return supported
-
-
-def _supported_trust_narrowing_operators(key: str) -> frozenset[str] | set[str] | None:
-    supported_operators = SUPPORTED_TRUST_NARROWING_CONDITIONS.get(key)
-    if supported_operators is not None:
-        return supported_operators
-    if _is_supported_web_identity_trust_narrowing_key(key):
-        return SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_OPERATORS
-    return None
-
-
-def _is_supported_web_identity_trust_narrowing_key(key: str) -> bool:
-    provider_prefix, separator, claim = key.rpartition(":")
-    if not separator:
-        return False
-    if provider_prefix in {"aws", "sts", "SAML"}:
-        return False
-    if claim not in SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_CLAIMS:
-        return False
-    return "." in provider_prefix or "/" in provider_prefix
-
-
-def _extract_principal_entries(raw_principal: Any) -> list[IAMPrincipal]:
-    if raw_principal is None:
-        return []
-    if isinstance(raw_principal, str):
-        return [IAMPrincipal(kind="unknown", value=raw_principal)]
-    if isinstance(raw_principal, dict):
-        entries: list[IAMPrincipal] = []
-        for principal_kind, principal_value in raw_principal.items():
-            entries.extend(
-                IAMPrincipal(kind=str(principal_kind), value=str(value))
-                for value in _as_list(principal_value)
-                if value not in (None, "")
-            )
-        return entries
-    if isinstance(raw_principal, list):
-        return [IAMPrincipal(kind="unknown", value=str(item)) for item in raw_principal]
-    return []
-
-
-def _lambda_permission_principal_entries(raw_principal: Any) -> list[IAMPrincipal]:
-    principals = _compact([raw_principal])
-    entries: list[IAMPrincipal] = []
-    for principal in principals:
-        kind = "Service" if principal.endswith(".amazonaws.com") else "AWS"
-        entries.append(IAMPrincipal(kind=kind, value=principal))
-    return entries
-
-
-def _load_json_document(raw_document: Any) -> dict[str, Any]:
-    if isinstance(raw_document, dict):
-        return raw_document
-    if isinstance(raw_document, str) and raw_document.strip():
-        try:
-            loaded = json.loads(raw_document)
-        except json.JSONDecodeError:
-            return {}
-        if isinstance(loaded, dict):
-            return loaded
-    return {}
 
 
 def _infer_primary_account_id(resources: list[NormalizedResource]) -> str | None:
@@ -918,93 +745,3 @@ def _parse_account_id(arn: str | None) -> str | None:
     if len(parts) < 5:
         return None
     return parts[4] or None
-
-
-def _compact(values: list[Any]) -> list[str]:
-    return [str(value) for value in values if value not in (None, "", [])]
-
-
-def _as_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "enabled", "yes"}:
-            return True
-        if normalized in {"false", "disabled", "no"}:
-            return False
-    return bool(value)
-
-
-def _as_list(value: Any) -> list[Any]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
-
-
-def _first_item(value: Any) -> dict[str, Any] | None:
-    items = _as_list(value)
-    if not items:
-        return None
-    first = items[0]
-    if isinstance(first, dict):
-        return first
-    return None
-
-
-def _as_optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _parse_condition_entries(raw_condition: Any) -> list[IAMPolicyCondition]:
-    if not isinstance(raw_condition, dict):
-        return []
-
-    entries: list[IAMPolicyCondition] = []
-    for operator in sorted(raw_condition):
-        keyed_values = raw_condition.get(operator)
-        if not isinstance(keyed_values, dict):
-            continue
-        for key in sorted(keyed_values):
-            entry = _condition_entry(
-                operator=str(operator),
-                key=str(key),
-                values=_normalize_condition_values(keyed_values.get(key)),
-            )
-            if entry is not None:
-                entries.append(entry)
-    return entries
-
-
-def _condition_entry(*, operator: str, key: str, values: list[str]) -> IAMPolicyCondition | None:
-    if not operator or not key or not values:
-        return None
-    return IAMPolicyCondition(operator=operator, key=key, values=values)
-
-
-def _compact_condition_entries(
-    entries: list[IAMPolicyCondition | None],
-) -> list[IAMPolicyCondition]:
-    return [entry for entry in entries if entry is not None]
-
-
-def _normalize_condition_values(value: Any) -> list[str]:
-    raw_values = _as_list(value)
-    normalized: list[str] = []
-    for raw_value in raw_values:
-        if raw_value in (None, "", []):
-            continue
-        if isinstance(raw_value, dict):
-            text = json.dumps(raw_value, sort_keys=True)
-        else:
-            text = str(raw_value)
-        if text not in normalized:
-            normalized.append(text)
-    return normalized
