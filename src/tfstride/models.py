@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 from tfstride.resource_metadata import (
@@ -12,6 +13,7 @@ from tfstride.resource_metadata import (
     DictListMetadataField,
     DictMetadataField,
     InventoryMetadata,
+    MetadataField,
     OptionalIntMetadataField,
     OptionalStringMetadataField,
     ResourceMetadata,
@@ -142,7 +144,11 @@ class NormalizedResource:
     public_access_configured: bool = False
     public_exposure: bool = False
     data_sensitivity: str = "standard"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    metadata: InitVar[dict[str, Any] | None] = None
+
+    def __post_init__(self, metadata: dict[str, Any] | None) -> None:
+        self._metadata = deepcopy(metadata) if metadata is not None else {}
 
     @property
     def display_name(self) -> str:
@@ -150,51 +156,63 @@ class NormalizedResource:
 
     def metadata_snapshot(self) -> dict[str, Any]:
         """Return a detached metadata copy for serialization boundaries."""
-        return deepcopy(self.metadata)
+        return deepcopy(self._metadata)
+
+    def has_metadata_field(self, field: MetadataField[Any]) -> bool:
+        return field.key in self._metadata
+
+    def set_metadata_field(self, field: MetadataField[Any], value: Any) -> None:
+        field.set(self._metadata, value)
+
+    def append_metadata_field(self, field: StringListMetadataField, value: str | None) -> None:
+        field.append_unique(self._metadata, value)
+
+    def _metadata_view(self) -> Mapping[str, Any]:
+        return MappingProxyType(deepcopy(self._metadata))
 
     # Keep high-traffic posture fields metadata-backed for report compatibility,
     # but route access through typed schema fields instead of raw keys.
     def _metadata_bool(self, field: BoolMetadataField) -> bool:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_bool(self, field: BoolMetadataField, value: bool) -> None:
-        field.set(self.metadata, value)
+        field.set(self._metadata, value)
 
     def _metadata_string_list(self, field: StringListMetadataField) -> list[str]:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_string_list(self, field: StringListMetadataField, values: list[str]) -> None:
-        field.set(self.metadata, values)
+        field.set(self._metadata, values)
 
     def _metadata_optional_string(self, field: OptionalStringMetadataField) -> str | None:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_optional_string(self, field: OptionalStringMetadataField, value: str | None) -> None:
-        field.set(self.metadata, value)
+        field.set(self._metadata, value)
 
     def _metadata_optional_int(self, field: OptionalIntMetadataField) -> int | None:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_optional_int(self, field: OptionalIntMetadataField, value: int | None) -> None:
-        field.set(self.metadata, value)
+        field.set(self._metadata, value)
 
     def _metadata_dict(self, field: DictMetadataField) -> dict[str, Any]:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_dict(self, field: DictMetadataField, value: dict[str, Any] | None) -> None:
-        field.set(self.metadata, value)
+        field.set(self._metadata, value)
 
     def _metadata_dict_list(self, field: DictListMetadataField) -> list[dict[str, Any]]:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_dict_list(self, field: DictListMetadataField, values: list[dict[str, Any]]) -> None:
-        field.set(self.metadata, values)
+        field.set(self._metadata, values)
 
     def _metadata_bool_dict(self, field: BoolDictMetadataField) -> dict[str, bool] | None:
-        return field.get(self.metadata)
+        return field.get(self._metadata)
 
     def _set_metadata_bool_dict(self, field: BoolDictMetadataField, value: dict[str, bool] | None) -> None:
-        field.set(self.metadata, value)
+        field.set(self._metadata, value)
 
     @property
     def direct_internet_reachable(self) -> bool:
@@ -571,6 +589,13 @@ class NormalizedResource:
     @engine.setter
     def engine(self, value: str | None) -> None:
         self._set_metadata_optional_string(ResourceMetadata.ENGINE, value)
+
+
+# Assign after dataclass generation so InitVar keeps a clean metadata=None default.
+NormalizedResource.metadata = property(
+    NormalizedResource._metadata_view,
+    doc="Read-only metadata view. Use typed properties or metadata field helpers to mutate.",
+)
 
 
 @dataclass(slots=True)

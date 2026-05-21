@@ -40,8 +40,8 @@ class MergeStandaloneSecurityGroupRulesStage:
             if target_group is None:
                 continue
             target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
-            ResourceMetadata.STANDALONE_RULE_ADDRESSES.append_unique(
-                target_group.metadata,
+            target_group.append_metadata_field(
+                ResourceMetadata.STANDALONE_RULE_ADDRESSES,
                 rule_resource.address,
             )
 
@@ -59,12 +59,12 @@ class MergeRolePolicyResourcesStage:
             if role is None:
                 continue
             role.policy_statements.extend(_clone_policy_statements(role_policy_resource.policy_statements))
-            ResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES.append_unique(
-                role.metadata,
+            role.append_metadata_field(
+                ResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES,
                 role_policy_resource.address,
             )
-            ResourceMetadata.INLINE_POLICY_NAMES.append_unique(
-                role.metadata,
+            role.append_metadata_field(
+                ResourceMetadata.INLINE_POLICY_NAMES,
                 role_policy_resource.policy_name,
             )
 
@@ -78,18 +78,18 @@ class MergeRolePolicyResourcesStage:
             if role is None:
                 continue
             if policy is None:
-                ResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS.append_unique(
-                    role.metadata,
+                role.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS,
                     str(attachment_resource.policy_arn),
                 )
                 continue
             role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
-            ResourceMetadata.ATTACHED_POLICY_ARNS.append_unique(
-                role.metadata,
+            role.append_metadata_field(
+                ResourceMetadata.ATTACHED_POLICY_ARNS,
                 policy.arn or policy.identifier or policy.address,
             )
-            ResourceMetadata.ATTACHED_POLICY_ADDRESSES.append_unique(
-                role.metadata,
+            role.append_metadata_field(
+                ResourceMetadata.ATTACHED_POLICY_ADDRESSES,
                 policy.address,
             )
 
@@ -107,16 +107,16 @@ class ResolveInstanceProfileRolesStage:
             for role_ref in instance_profile_resource.role_references:
                 role = context.index.role_index.get(role_ref)
                 if role is None:
-                    ResourceMetadata.UNRESOLVED_ROLE_REFERENCES.append_unique(
-                        instance_profile_resource.metadata,
+                    instance_profile_resource.append_metadata_field(
+                        ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
                         role_ref,
                     )
                     continue
                 resolved_role_ref = role.arn or role.identifier or role.address
                 if resolved_role_ref:
                     resolved_role_refs.append(resolved_role_ref)
-                ResourceMetadata.RESOLVED_ROLE_ADDRESSES.append_unique(
-                    instance_profile_resource.metadata,
+                instance_profile_resource.append_metadata_field(
+                    ResourceMetadata.RESOLVED_ROLE_ADDRESSES,
                     role.address,
                 )
             instance_profile_resource.resolved_role_references = resolved_role_refs
@@ -129,13 +129,13 @@ class ResolveInstanceProfileRolesStage:
                 continue
             instance_profile = context.index.instance_profile_index.get(instance_profile_ref)
             if instance_profile is None:
-                ResourceMetadata.UNRESOLVED_INSTANCE_PROFILES.append_unique(
-                    workload_resource.metadata,
+                workload_resource.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_INSTANCE_PROFILES,
                     str(instance_profile_ref),
                 )
                 continue
-            ResourceMetadata.RESOLVED_INSTANCE_PROFILE_ADDRESSES.append_unique(
-                workload_resource.metadata,
+            workload_resource.append_metadata_field(
+                ResourceMetadata.RESOLVED_INSTANCE_PROFILE_ADDRESSES,
                 instance_profile.address,
             )
             for resolved_role_ref in instance_profile.resolved_role_references:
@@ -154,13 +154,13 @@ class ResolveEcsServiceRelationshipsStage:
             if cluster_ref:
                 cluster = context.index.ecs_clusters.get(cluster_ref)
                 if cluster is None:
-                    ResourceMetadata.UNRESOLVED_CLUSTER_REFERENCES.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.UNRESOLVED_CLUSTER_REFERENCES,
                         str(cluster_ref),
                     )
                 else:
-                    ResourceMetadata.RESOLVED_CLUSTER_ADDRESSES.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.RESOLVED_CLUSTER_ADDRESSES,
                         cluster.address,
                     )
 
@@ -169,13 +169,13 @@ class ResolveEcsServiceRelationshipsStage:
                 continue
             task_definition = context.index.ecs_task_definitions.get(task_definition_ref)
             if task_definition is None:
-                ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES.append_unique(
-                    ecs_service_resource.metadata,
+                ecs_service_resource.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES,
                     str(task_definition_ref),
                 )
                 continue
-            ResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES.append_unique(
-                ecs_service_resource.metadata,
+            ecs_service_resource.append_metadata_field(
+                ResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES,
                 task_definition.address,
             )
             ecs_service_resource.network_mode = task_definition.network_mode
@@ -188,26 +188,26 @@ class ResolveEcsServiceRelationshipsStage:
                     ecs_service_resource.attached_role_arns.append(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
                 if task_role is not None:
-                    ResourceMetadata.RESOLVED_TASK_ROLE_ADDRESSES.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.RESOLVED_TASK_ROLE_ADDRESSES,
                         task_role.address,
                     )
                 else:
-                    ResourceMetadata.UNRESOLVED_TASK_ROLE_ARNS.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.UNRESOLVED_TASK_ROLE_ARNS,
                         str(task_role_arn),
                     )
             if execution_role_arn:
                 ecs_service_resource.execution_role_arn = execution_role_arn
                 execution_role = context.index.role_index.get(execution_role_arn)
                 if execution_role is not None:
-                    ResourceMetadata.RESOLVED_EXECUTION_ROLE_ADDRESSES.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.RESOLVED_EXECUTION_ROLE_ADDRESSES,
                         execution_role.address,
                     )
                 else:
-                    ResourceMetadata.UNRESOLVED_EXECUTION_ROLE_ARNS.append_unique(
-                        ecs_service_resource.metadata,
+                    ecs_service_resource.append_metadata_field(
+                        ResourceMetadata.UNRESOLVED_EXECUTION_ROLE_ARNS,
                         str(execution_role_arn),
                     )
 
@@ -223,8 +223,8 @@ class MergeResourcePolicyResourcesStage:
                 continue
             bucket = context.index.buckets.get(bucket_policy_resource.bucket_name)
             if bucket is None:
-                ResourceMetadata.UNRESOLVED_BUCKET_REFERENCES.append_unique(
-                    bucket_policy_resource.metadata,
+                bucket_policy_resource.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_BUCKET_REFERENCES,
                     bucket_policy_resource.bucket_name,
                 )
                 continue
@@ -240,8 +240,8 @@ class MergeResourcePolicyResourcesStage:
                 continue
             secret = context.index.secrets.get(secret_policy_resource.secret_arn)
             if secret is None:
-                ResourceMetadata.UNRESOLVED_SECRET_ARNS.append_unique(
-                    secret_policy_resource.metadata,
+                secret_policy_resource.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_SECRET_ARNS,
                     secret_policy_resource.secret_arn,
                 )
                 continue
@@ -258,8 +258,8 @@ class MergeResourcePolicyResourcesStage:
             function_name = lambda_permission_resource.function_name
             target_function = context.index.lambda_functions.get(function_name)
             if target_function is None:
-                ResourceMetadata.UNRESOLVED_FUNCTION_REFERENCES.append_unique(
-                    lambda_permission_resource.metadata,
+                lambda_permission_resource.append_metadata_field(
+                    ResourceMetadata.UNRESOLVED_FUNCTION_REFERENCES,
                     function_name,
                 )
                 continue
@@ -353,7 +353,7 @@ class DeriveSubnetPostureStage:
                 )
                 has_nat_route = False
             subnet.is_public_subnet = is_public
-            ResourceMetadata.ROUTE_TABLE_IDS.set(subnet.metadata, associated_route_table_ids)
+            subnet.set_metadata_field(ResourceMetadata.ROUTE_TABLE_IDS, associated_route_table_ids)
             subnet.has_public_route = has_public_route
             subnet.has_nat_gateway_egress = has_nat_route
             if is_public and subnet.identifier:
@@ -399,15 +399,15 @@ class DerivePublicExposureStage:
                 for security_group in attached_security_groups
                 for rule in security_group.network_rules
             )
-            if ResourceMetadata.PUBLIC_ACCESS_REASONS.key not in resource.metadata:
+            if not resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_REASONS):
                 resource.public_access_reasons = []
-            if ResourceMetadata.PUBLIC_EXPOSURE_REASONS.key not in resource.metadata:
+            if not resource.has_metadata_field(ResourceMetadata.PUBLIC_EXPOSURE_REASONS):
                 resource.public_exposure_reasons = []
-            ResourceMetadata.PUBLIC_ACCESS_CONFIGURED.set(
-                resource.metadata,
+            resource.set_metadata_field(
+                ResourceMetadata.PUBLIC_ACCESS_CONFIGURED,
                 resource.public_access_configured,
             )
-            ResourceMetadata.INTERNET_INGRESS.set(resource.metadata, internet_ingress)
+            resource.set_metadata_field(ResourceMetadata.INTERNET_INGRESS, internet_ingress)
             resource.internet_ingress_capable = internet_ingress
             resource.internet_ingress_reasons = _internet_ingress_reasons(attached_security_groups)
             if resource.resource_type != "aws_subnet":
@@ -435,8 +435,8 @@ class DerivePublicExposureStage:
                     and internet_ingress
                 )
                 if resource.public_exposure:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         "instance has a public IP path and attached security groups allow internet ingress",
                     )
             elif resource.resource_type == "aws_ecs_service":
@@ -446,8 +446,8 @@ class DerivePublicExposureStage:
                     and internet_ingress
                 )
                 if resource.public_exposure:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         (
                             "ECS service assigns public IPs in a public subnet and attached "
                             "security groups allow internet ingress"
@@ -458,13 +458,13 @@ class DerivePublicExposureStage:
                     resource.public_access_configured and (internet_ingress or not attached_security_groups)
                 )
                 if resource.public_exposure and internet_ingress:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         "database is marked publicly_accessible and attached security groups allow internet ingress",
                     )
                 elif resource.public_exposure and not attached_security_groups:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         (
                             "database is marked publicly_accessible and no attached security "
                             "groups provide ingress evidence"
@@ -475,13 +475,13 @@ class DerivePublicExposureStage:
                     resource.public_access_configured and (internet_ingress or not attached_security_groups)
                 )
                 if resource.public_exposure and internet_ingress:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         "load balancer is internet-facing and attached security groups allow internet ingress",
                     )
                 elif resource.public_exposure:
-                    ResourceMetadata.PUBLIC_EXPOSURE_REASONS.append_unique(
-                        resource.metadata,
+                    resource.append_metadata_field(
+                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
                         "load balancer is configured as internet-facing",
                     )
             resource.direct_internet_reachable = resource.public_exposure
@@ -518,13 +518,13 @@ class MarkEcsLoadBalancerExposureStage:
                         ):
                             if load_balancer.address not in fronting_load_balancers:
                                 fronting_load_balancers.append(load_balancer.address)
-            ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER.set(
-                resource.metadata,
+            resource.set_metadata_field(
+                ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER,
                 bool(fronting_load_balancers),
             )
             if fronting_load_balancers:
-                ResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES.set(
-                    resource.metadata,
+                resource.set_metadata_field(
+                    ResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
                     fronting_load_balancers,
                 )
 

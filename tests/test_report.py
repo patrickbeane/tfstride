@@ -236,7 +236,7 @@ class JsonReportRendererTests(unittest.TestCase):
             resource_type="aws_s3_bucket",
             name="logs",
             category=ResourceCategory.DATA,
-            metadata={"nested": {"values": ["resource-original"]}},
+            metadata={"policy_document": {"Statement": [{"Effect": "Allow"}]}},
         )
         inventory = ResourceInventory(
             provider="aws",
@@ -253,13 +253,13 @@ class JsonReportRendererTests(unittest.TestCase):
         )
 
         payload = JsonReportRenderer().build_payload(result)
-        resource.metadata["nested"]["values"].append("resource-mutated")
+        resource.policy_document = {"Statement": [{"Effect": "Deny"}]}
         inventory.metadata["nested"]["values"].append("inventory-mutated")
 
         self.assertEqual(payload["inventory"]["metadata"]["nested"]["values"], ["inventory-original"])
         self.assertEqual(
-            payload["inventory"]["resources"][0]["metadata"]["nested"]["values"],
-            ["resource-original"],
+            payload["inventory"]["resources"][0]["metadata"]["policy_document"],
+            {"Statement": [{"Effect": "Allow"}]},
         )
 
     def test_json_report_contract_exposes_stable_ui_sections(self) -> None:

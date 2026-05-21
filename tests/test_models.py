@@ -143,9 +143,17 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertEqual(resource.metadata, {})
 
     def test_metadata_snapshot_returns_detached_copy(self) -> None:
-        resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")
-        resource.metadata["policy_document"] = {"Statement": [{"Effect": "Allow"}]}
-        resource.metadata["tags"] = {"env": "prod"}
+        resource = NormalizedResource(
+            address="aws_s3_bucket.logs",
+            provider="aws",
+            resource_type="aws_s3_bucket",
+            name="logs",
+            category=ResourceCategory.DATA,
+            metadata={
+                "policy_document": {"Statement": [{"Effect": "Allow"}]},
+                "tags": {"env": "prod"},
+            },
+        )
 
         snapshot = resource.metadata_snapshot()
         snapshot["policy_document"]["Statement"][0]["Effect"] = "Deny"
@@ -159,6 +167,25 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
                 "tags": {"env": "prod"},
             },
         )
+
+    def test_metadata_view_is_read_only_and_detached(self) -> None:
+        source_metadata = {"tags": {"env": "prod"}}
+        resource = NormalizedResource(
+            address="aws_s3_bucket.logs",
+            provider="aws",
+            resource_type="aws_s3_bucket",
+            name="logs",
+            category=ResourceCategory.DATA,
+            metadata=source_metadata,
+        )
+
+        source_metadata["tags"]["env"] = "dev"
+        metadata_view = resource.metadata
+        with self.assertRaises(TypeError):
+            metadata_view["tags"] = {"env": "test"}
+        metadata_view["tags"]["env"] = "stage"
+
+        self.assertEqual(resource.metadata["tags"], {"env": "prod"})
 
     def test_posture_property_setters_update_metadata(self) -> None:
         resource = _resource(address="aws_db_instance.app", resource_type="aws_db_instance")
