@@ -353,7 +353,7 @@ class DeriveSubnetPostureStage:
                 )
                 has_nat_route = False
             subnet.is_public_subnet = is_public
-            subnet.metadata["route_table_ids"] = associated_route_table_ids
+            ResourceMetadata.ROUTE_TABLE_IDS.set(subnet.metadata, associated_route_table_ids)
             subnet.has_public_route = has_public_route
             subnet.has_nat_gateway_egress = has_nat_route
             if is_public and subnet.identifier:
@@ -399,12 +399,15 @@ class DerivePublicExposureStage:
                 for security_group in attached_security_groups
                 for rule in security_group.network_rules
             )
-            if "public_access_reasons" not in resource.metadata:
+            if ResourceMetadata.PUBLIC_ACCESS_REASONS.key not in resource.metadata:
                 resource.public_access_reasons = []
-            if "public_exposure_reasons" not in resource.metadata:
+            if ResourceMetadata.PUBLIC_EXPOSURE_REASONS.key not in resource.metadata:
                 resource.public_exposure_reasons = []
-            resource.metadata["public_access_configured"] = resource.public_access_configured
-            resource.metadata["internet_ingress"] = internet_ingress
+            ResourceMetadata.PUBLIC_ACCESS_CONFIGURED.set(
+                resource.metadata,
+                resource.public_access_configured,
+            )
+            ResourceMetadata.INTERNET_INGRESS.set(resource.metadata, internet_ingress)
             resource.internet_ingress_capable = internet_ingress
             resource.internet_ingress_reasons = _internet_ingress_reasons(attached_security_groups)
             if resource.resource_type != "aws_subnet":
@@ -515,9 +518,15 @@ class MarkEcsLoadBalancerExposureStage:
                         ):
                             if load_balancer.address not in fronting_load_balancers:
                                 fronting_load_balancers.append(load_balancer.address)
-            resource.metadata["fronted_by_internet_facing_load_balancer"] = bool(fronting_load_balancers)
+            ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER.set(
+                resource.metadata,
+                bool(fronting_load_balancers),
+            )
             if fronting_load_balancers:
-                resource.metadata["internet_facing_load_balancer_addresses"] = fronting_load_balancers
+                ResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES.set(
+                    resource.metadata,
+                    fronting_load_balancers,
+                )
 
 
 def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
