@@ -7,13 +7,12 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
+from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
     BoundaryType,
     Finding,
     IAMPolicyStatement,
-    NormalizedResource,
-    ResourceInventory,
 )
 
 
@@ -104,13 +103,13 @@ class IAMRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        role_index = _role_index(context.inventory)
+        role_index = build_role_index(context.inventory)
         for workload in context.inventory.by_type(
             "aws_instance",
             "aws_lambda_function",
             "aws_ecs_service",
         ):
-            role = _resolve_role(workload, role_index)
+            role = resolve_workload_role(workload, role_index)
             if role is None:
                 continue
             sensitive_actions = _sensitive_actions(role.policy_statements)
@@ -154,28 +153,6 @@ class IAMRuleDetectors:
                 )
             )
         return findings
-
-
-def _role_index(inventory: ResourceInventory) -> dict[str, NormalizedResource]:
-    index: dict[str, NormalizedResource] = {}
-    for role in inventory.by_type("aws_iam_role"):
-        if role.arn:
-            index[role.arn] = role
-        index[role.address] = role
-        if role.identifier:
-            index[role.identifier] = role
-    return index
-
-
-def _resolve_role(
-    workload: NormalizedResource,
-    role_index: dict[str, NormalizedResource],
-) -> NormalizedResource | None:
-    for role_arn in workload.attached_role_arns:
-        role = role_index.get(role_arn)
-        if role:
-            return role
-    return None
 
 
 def _sensitive_actions(statements: list[IAMPolicyStatement]) -> set[str]:

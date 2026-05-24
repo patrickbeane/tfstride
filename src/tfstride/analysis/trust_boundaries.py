@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
 from tfstride.analysis.policy_conditions import (
     PrincipalAssessment,
     policy_statement_principal_assessments,
@@ -42,7 +43,7 @@ class TrustBoundaryDetector:
             )
 
         resources = inventory.resources
-        role_index = _role_index(resources)
+        role_index = build_role_index(inventory)
 
         for resource in resources:
             if resource.direct_internet_reachable and resource.resource_type in {
@@ -79,7 +80,7 @@ class TrustBoundaryDetector:
         workloads = [resource for resource in resources if resource.resource_type in WORKLOAD_TYPES]
         data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_TYPES]
         for workload in workloads:
-            attached_role = _resolve_role_for_workload(workload, role_index)
+            attached_role = resolve_workload_role(workload, role_index)
             for data_store in data_stores:
                 reachability_rationale = _workload_reaches_data_store(workload, data_store, attached_role, inventory)
                 if reachability_rationale:
@@ -142,29 +143,6 @@ class TrustBoundaryDetector:
                 )
 
         return boundaries
-
-
-def _role_index(resources: list[NormalizedResource]) -> dict[str, NormalizedResource]:
-    index: dict[str, NormalizedResource] = {}
-    for resource in resources:
-        if resource.resource_type != "aws_iam_role":
-            continue
-        if resource.arn:
-            index[resource.arn] = resource
-        index[resource.address] = resource
-        if resource.identifier:
-            index[resource.identifier] = resource
-    return index
-
-
-def _resolve_role_for_workload(
-    workload: NormalizedResource,
-    role_index: dict[str, NormalizedResource],
-) -> NormalizedResource | None:
-    for role_arn in workload.attached_role_arns:
-        if role_arn in role_index:
-            return role_index[role_arn]
-    return None
 
 
 def _workload_reaches_data_store(
