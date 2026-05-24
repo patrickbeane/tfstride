@@ -54,10 +54,11 @@ def apply_finding_filters(
 ) -> AnalysisResult:
     suppressions = load_suppressions(suppressions_path) if suppressions_path else []
     baseline_fingerprints = load_baseline_fingerprints(baseline_path) if baseline_path else set()
+    existing_summary = result.filter_summary or {}
 
     active_findings: list[Finding] = []
-    suppressed_findings: list[Finding] = []
-    baselined_findings: list[Finding] = []
+    suppressed_findings = list(result.suppressed_findings)
+    baselined_findings = list(result.baselined_findings)
 
     for finding in result.findings:
         fingerprint = finding_fingerprint(finding)
@@ -75,14 +76,28 @@ def apply_finding_filters(
         suppressed_findings=suppressed_findings,
         baselined_findings=baselined_findings,
         filter_summary={
-            "total_findings": len(result.findings),
+            "total_findings": _total_findings(result),
             "active_findings": len(active_findings),
             "suppressed_findings": len(suppressed_findings),
             "baselined_findings": len(baselined_findings),
-            "suppressions_path": str(suppressions_path) if suppressions_path else None,
-            "baseline_path": str(baseline_path) if baseline_path else None,
+            "suppressions_path": _filter_path(existing_summary, "suppressions_path", suppressions_path),
+            "baseline_path": _filter_path(existing_summary, "baseline_path", baseline_path),
         },
     )
+
+
+def _total_findings(result: AnalysisResult) -> int:
+    total_findings = result.filter_summary.get("total_findings")
+    if isinstance(total_findings, int):
+        return total_findings
+    return len(result.findings) + len(result.suppressed_findings) + len(result.baselined_findings)
+
+
+def _filter_path(summary: dict[str, Any], key: str, path: str | Path | None) -> str | None:
+    if path is not None:
+        return str(path)
+    value = summary.get(key)
+    return str(value) if value else None
 
 
 def render_baseline(findings: list[Finding]) -> str:
@@ -212,7 +227,7 @@ def _load_json_object(path: str | Path, *, label: str) -> dict[str, Any]:
         raise FindingFilterLoadError(f"{label.title()} file must contain a JSON object: {file_path}")
     return payload
 
- 
+
 def _validate_format_version(
     payload: dict[str, Any],
     *,
@@ -226,7 +241,7 @@ def _validate_format_version(
     if version != expected:
         raise FindingFilterLoadError(
             f"Unsupported {label} version `{version}` in {path}; expected `{expected}`."
-        )	   
+        )
 
 
 def _as_optional_string(value: Any) -> str | None:

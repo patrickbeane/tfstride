@@ -22,6 +22,7 @@ from tfstride.filtering import (
     load_suppressions,
 )
 
+
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
 BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_baseline_plan.json"
 SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_safe_plan.json"
@@ -39,7 +40,7 @@ class CliTests(unittest.TestCase):
             exit_code = main(["--list-rules"])
 
         output = stdout_buffer.getvalue()
-	
+
         self.assertEqual(exit_code, 0)
         self.assertEqual("", stderr_buffer.getvalue())
         self.assertIn("tfSTRIDE Rules", output)
@@ -60,7 +61,7 @@ class CliTests(unittest.TestCase):
 
         payload = json.loads(stdout_buffer.getvalue())
         first_rule = payload["rules"][0]
-	
+
         self.assertEqual(exit_code, 0)
         self.assertEqual("", stderr_buffer.getvalue())
         self.assertEqual(payload["kind"], RULE_CATALOG_KIND)
@@ -73,7 +74,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(first_rule["tags"], ["aws", "network", "compute", "internet"])
         self.assertEqual(first_rule["severity_factors"], ["internet_exposure", "lateral_movement", "blast_radius"])
         self.assertIn("Restrict ingress to expected client ports", first_rule["recommended_mitigation"])
-	
+
     def test_cli_rejects_json_without_list_rules(self) -> None:
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()
@@ -81,7 +82,7 @@ class CliTests(unittest.TestCase):
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             with self.assertRaises(SystemExit) as raised:
                 main([str(SAFE_FIXTURE_PATH), "--json"])
-	
+
         self.assertEqual(raised.exception.code, 2)
         self.assertEqual("", stdout_buffer.getvalue())
         self.assertIn("argument --json: only valid with --list-rules", stderr_buffer.getvalue())
@@ -228,6 +229,61 @@ class CliTests(unittest.TestCase):
         self.assertEqual(second_exit_code, 0)
         self.assertEqual("", stderr_buffer.getvalue())
 
+    def test_cli_applies_suppressions_once_before_baseline_filtering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            suppressions_path = Path(tmp_dir) / "suppressions.json"
+            baseline_path = Path(tmp_dir) / "baseline.json"
+            json_output_path = Path(tmp_dir) / "report.json"
+            suppressions_path.write_text(
+                json.dumps(
+                    {
+                        "version": "1.0",
+                        "suppressions": [
+                            {
+                                "id": "accept-database-ingress",
+                                "rule_id": "aws-database-permissive-ingress",
+                                "reason": "Accepted for test coverage.",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            first_exit_code = main(
+                [
+                    str(FIXTURE_PATH),
+                    "--quiet",
+                    "--suppressions",
+                    str(suppressions_path),
+                    "--baseline-output",
+                    str(baseline_path),
+                ]
+            )
+            second_exit_code = main(
+                [
+                    str(FIXTURE_PATH),
+                    "--quiet",
+                    "--suppressions",
+                    str(suppressions_path),
+                    "--baseline",
+                    str(baseline_path),
+                    "--json-output",
+                    str(json_output_path),
+                ]
+            )
+
+            payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(first_exit_code, 0)
+        self.assertEqual(second_exit_code, 0)
+        self.assertEqual(payload["summary"]["total_findings"], 9)
+        self.assertEqual(payload["summary"]["active_findings"], 0)
+        self.assertEqual(payload["summary"]["suppressed_findings"], 1)
+        self.assertEqual(payload["summary"]["baselined_findings"], 8)
+        self.assertEqual(len(payload["suppressed_findings"]), 1)
+        self.assertEqual(len(payload["baselined_findings"]), 8)
+
     def test_cli_suppressions_can_filter_findings_before_policy_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             suppressions_path = Path(tmp_dir) / "suppressions.json"
@@ -312,7 +368,7 @@ class CliTests(unittest.TestCase):
                 "suppressions": [{"id": "s1", "rule_id": "aws-iam-wildcard-permissions", "reason": "accepted"}],
             },
         ]
-	
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             for index, payload in enumerate(baseline_payloads):
                 with self.subTest(kind="baseline", index=index):
@@ -320,23 +376,23 @@ class CliTests(unittest.TestCase):
                     baseline_path.write_text(json.dumps(payload), encoding="utf-8")
 
                     self.assertEqual(load_baseline_fingerprints(baseline_path), {"sha256:one"})
-	
+
             for index, payload in enumerate(suppression_payloads):
                 with self.subTest(kind="suppressions", index=index):
                     suppressions_path = Path(tmp_dir) / f"suppressions-{index}.json"
                     suppressions_path.write_text(json.dumps(payload), encoding="utf-8")
 
                     suppressions = load_suppressions(suppressions_path)
-	
+
                     self.assertEqual(len(suppressions), 1)
                     self.assertEqual(suppressions[0].rule_id, "aws-iam-wildcard-permissions")
-	
+
     def test_filter_loaders_reject_unsupported_format_versions(self) -> None:
         payloads = [
             ("baseline", {"version": "2.0", "findings": []}, load_baseline_fingerprints),
             ("suppressions", {"version": "2.0", "suppressions": []}, load_suppressions),
         ]
-	
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             for label, payload, loader in payloads:
                 with self.subTest(label=label):

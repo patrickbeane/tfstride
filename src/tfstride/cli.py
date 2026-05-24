@@ -8,7 +8,7 @@ from pathlib import Path
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RuleRegistry
 from tfstride.app import TfStride
 from tfstride.config import ProjectConfigLoadError, load_project_config
-from tfstride.filtering import FindingFilterLoadError, render_baseline
+from tfstride.filtering import FindingFilterLoadError, apply_finding_filters, render_baseline
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.models import Severity
 
@@ -113,14 +113,13 @@ def main(argv: list[str] | None = None) -> int:
         fail_on = args.fail_on or (project_config.fail_on.value if project_config.fail_on else None)
 
         raw_result = engine.analyze_plan(plan_path, title=title)
-        unsuppressed_result = engine.filter_findings(raw_result, suppressions_path=suppressions_path)
+        result = raw_result
+        if suppressions_path:
+            result = apply_finding_filters(result, suppressions_path=suppressions_path)
         if args.baseline_output:
-            Path(args.baseline_output).write_text(render_baseline(unsuppressed_result.findings), encoding="utf-8")
-        result = engine.filter_findings(
-            raw_result,
-            suppressions_path=suppressions_path,
-            baseline_path=baseline_path,
-        )
+            Path(args.baseline_output).write_text(render_baseline(result.findings), encoding="utf-8")
+        if baseline_path:
+            result = apply_finding_filters(result, baseline_path=baseline_path)
     except (TerraformPlanLoadError, FindingFilterLoadError, ProjectConfigLoadError) as exc:
         sys.stderr.write(f"Input error: {exc}\n")
         return INPUT_ERROR_EXIT_CODE
