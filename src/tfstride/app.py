@@ -88,15 +88,3 @@ class TfStride:
 	
     def render_sarif(self, result: AnalysisResult) -> str:
 	    return self._sarif_renderer.render(result)
-
-    def render_markdown_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
-        result = self.analyze_plan(plan_path, title=title)
-        return self.render_markdown(result)
-
-    def render_json_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
-        result = self.analyze_plan(plan_path, title=title)
-        return self.render_json(result)
-
-    def render_sarif_report(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> str:
-        result = self.analyze_plan(plan_path, title=title)
-        return self.render_sarif(result)

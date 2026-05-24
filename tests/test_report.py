@@ -108,7 +108,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
 
         for fixture_path, report_path in scenarios.items():
             with self.subTest(fixture=fixture_path.name):
-                expected = engine.render_markdown_report(fixture_path)
+                expected = engine.render_markdown(engine.analyze_plan(fixture_path))
                 actual = report_path.read_text(encoding="utf-8")
                 self.assertEqual(actual, expected)
 
@@ -196,9 +196,9 @@ class SarifReportRendererTests(unittest.TestCase):
         )
         self.assertTrue(trust_result["properties"]["evidence"])
 
-    def test_app_can_render_sarif_report(self) -> None:
+    def test_app_can_render_sarif_from_analysis_result(self) -> None:
         engine = TfStride()
-        report = engine.render_sarif_report(FIXTURE_PATH)
+        report = engine.render_sarif(engine.analyze_plan(FIXTURE_PATH))
         payload = json.loads(report)
 
         self.assertEqual(payload["version"], "2.1.0")
