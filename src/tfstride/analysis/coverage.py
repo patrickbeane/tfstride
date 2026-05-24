@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from collections.abc import Mapping
 import json
 from typing import Any
 
@@ -97,14 +97,14 @@ def _build_reference_coverage(resources: list[NormalizedResource]) -> ReferenceC
     )
 
 
-def _metadata_int(metadata: dict[str, Any], key: str, default: int) -> int:
+def _metadata_int(metadata: Mapping[str, Any], key: str, default: int) -> int:
     try:
         return int(metadata.get(key, default))
     except (TypeError, ValueError):
         return default
 
 
-def _metadata_int_map(metadata: dict[str, Any], key: str) -> dict[str, int]:
+def _metadata_int_map(metadata: Mapping[str, Any], key: str) -> dict[str, int]:
     value = metadata.get(key)
     if not isinstance(value, dict):
         return {}

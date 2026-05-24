@@ -140,6 +140,19 @@ class ResourceInventoryTests(unittest.TestCase):
             {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
         )
 
+    def test_metadata_view_is_read_only_and_detached(self) -> None:
+        source_metadata = {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}}
+        inventory = ResourceInventory(provider="aws", resources=[], metadata=source_metadata)
+
+        source_metadata["unsupported_resource_types"]["aws_cloudwatch_log_group"] = 2
+        with self.assertRaises(TypeError):
+            inventory.metadata["unsupported_resource_types"] = {"aws_cloudwatch_log_group": 3}
+
+        self.assertEqual(
+            inventory.metadata,
+            {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
+        )
+
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
     def test_posture_property_defaults_do_not_require_metadata_keys(self) -> None:

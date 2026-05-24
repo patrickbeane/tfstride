@@ -564,13 +564,15 @@ class ResourceInventory:
     provider: str
     resources: Sequence[NormalizedResource]
     unsupported_resources: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    metadata: InitVar[dict[str, Any] | None] = None
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resources_by_identifier: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resource_positions: dict[int, int] = field(init=False, repr=False, default_factory=dict)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, metadata: dict[str, Any] | None) -> None:
+        self._metadata = deepcopy(metadata) if metadata is not None else {}
         resources = tuple(self.resources)
         self.resources = resources
         resources_by_type: dict[str, list[NormalizedResource]] = {}
@@ -597,15 +599,18 @@ class ResourceInventory:
 
     @property
     def primary_account_id(self) -> str | None:
-        return InventoryMetadata.PRIMARY_ACCOUNT_ID.get(self.metadata)
+        return InventoryMetadata.PRIMARY_ACCOUNT_ID.get(self._metadata)
 
     @primary_account_id.setter
     def primary_account_id(self, value: str | None) -> None:
-        InventoryMetadata.PRIMARY_ACCOUNT_ID.set(self.metadata, value)
+        InventoryMetadata.PRIMARY_ACCOUNT_ID.set(self._metadata, value)
 
     def metadata_snapshot(self) -> dict[str, Any]:
         """Return a detached metadata copy for serialization boundaries."""
-        return deepcopy(self.metadata)
+        return deepcopy(self._metadata)
+
+    def _metadata_view(self) -> Mapping[str, Any]:
+        return MappingProxyType(deepcopy(self._metadata))
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:
@@ -629,6 +634,13 @@ class ResourceInventory:
 
     def get_by_identifier(self, identifier: str) -> NormalizedResource | None:
         return self._resources_by_identifier.get(identifier)
+
+
+# Assign after dataclass generation so InitVar keeps a clean metadata=None default.
+ResourceInventory.metadata = property(
+    ResourceInventory._metadata_view,
+    doc="Read-only metadata view. Use typed properties or metadata_snapshot() for serialization.",
+)
 
 
 @dataclass(slots=True)
