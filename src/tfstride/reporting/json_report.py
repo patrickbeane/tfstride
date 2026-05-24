@@ -39,64 +39,64 @@ REPORT_KIND = "tfstride-report"
 REPORT_FORMAT_VERSION = "1.1"
 
 
-class JsonReportRenderer:
-    def render(self, result: AnalysisResult) -> str:
-        payload = self.build_payload(result)
-        return json.dumps(payload, indent=2) + "\n"
+def render_json(result: AnalysisResult) -> str:
+    payload = build_json_report_payload(result)
+    return json.dumps(payload, indent=2) + "\n"
 
-    def build_payload(self, result: AnalysisResult) -> TFSReportPayload:
-        filter_summary = result.filter_summary or {
-            "total_findings": len(result.findings),
+
+def build_json_report_payload(result: AnalysisResult) -> TFSReportPayload:
+    filter_summary = result.filter_summary or {
+        "total_findings": len(result.findings),
+        "active_findings": len(result.findings),
+        "suppressed_findings": 0,
+        "baselined_findings": 0,
+        "suppressions_path": None,
+        "baseline_path": None,
+    }
+    severity_counts = Counter(finding.severity.value for finding in result.findings)
+    return {
+        "kind": REPORT_KIND,
+        "version": REPORT_FORMAT_VERSION,
+        "tool": {
+            "name": "tfstride",
+            "version": __version__,
+        },
+        "title": result.title,
+        "analyzed_file": result.analyzed_file,
+        "analyzed_path": result.analyzed_path,
+        "summary": {
+            "normalized_resources": len(result.inventory.resources),
+            "unsupported_resources": len(result.inventory.unsupported_resources),
+            "trust_boundaries": len(result.trust_boundaries),
             "active_findings": len(result.findings),
-            "suppressed_findings": 0,
-            "baselined_findings": 0,
-            "suppressions_path": None,
-            "baseline_path": None,
-        }
-        severity_counts = Counter(finding.severity.value for finding in result.findings)
-        return {
-            "kind": REPORT_KIND,
-            "version": REPORT_FORMAT_VERSION,
-            "tool": {
-                "name": "tfstride",
-                "version": __version__,
+            "total_findings": filter_summary.get("total_findings", len(result.findings)),
+            "suppressed_findings": filter_summary.get("suppressed_findings", 0),
+            "baselined_findings": filter_summary.get("baselined_findings", 0),
+            "severity_counts": {
+                "high": severity_counts.get(Severity.HIGH.value, 0),
+                "medium": severity_counts.get(Severity.MEDIUM.value, 0),
+                "low": severity_counts.get(Severity.LOW.value, 0),
             },
-            "title": result.title,
-            "analyzed_file": result.analyzed_file,
-            "analyzed_path": result.analyzed_path,
-            "summary": {
-                "normalized_resources": len(result.inventory.resources),
-                "unsupported_resources": len(result.inventory.unsupported_resources),
-                "trust_boundaries": len(result.trust_boundaries),
-                "active_findings": len(result.findings),
-                "total_findings": filter_summary.get("total_findings", len(result.findings)),
-                "suppressed_findings": filter_summary.get("suppressed_findings", 0),
-                "baselined_findings": filter_summary.get("baselined_findings", 0),
-                "severity_counts": {
-                    "high": severity_counts.get(Severity.HIGH.value, 0),
-                    "medium": severity_counts.get(Severity.MEDIUM.value, 0),
-                    "low": severity_counts.get(Severity.LOW.value, 0),
-                },
-            },
-            "filtering": dict(filter_summary),
-            "analysis_coverage": _serialize_analysis_coverage(result),
-            "inventory": _serialize_inventory(result.inventory),
-            "trust_boundaries": [
-                _serialize_trust_boundary(boundary)
-                for boundary in sorted(result.trust_boundaries, key=lambda boundary: boundary.identifier)
-            ],
-            "findings": [_serialize_finding(finding) for finding in result.findings],
-            "suppressed_findings": [_serialize_finding(finding) for finding in result.suppressed_findings],
-            "baselined_findings": [_serialize_finding(finding) for finding in result.baselined_findings],
-            "observations": [
-                _serialize_observation(observation)
-                for observation in sorted(
-                    result.observations,
-                    key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id),
-                )
-            ],
-            "limitations": list(result.limitations),
-        }
+        },
+        "filtering": dict(filter_summary),
+        "analysis_coverage": _serialize_analysis_coverage(result),
+        "inventory": _serialize_inventory(result.inventory),
+        "trust_boundaries": [
+            _serialize_trust_boundary(boundary)
+            for boundary in sorted(result.trust_boundaries, key=lambda boundary: boundary.identifier)
+        ],
+        "findings": [_serialize_finding(finding) for finding in result.findings],
+        "suppressed_findings": [_serialize_finding(finding) for finding in result.suppressed_findings],
+        "baselined_findings": [_serialize_finding(finding) for finding in result.baselined_findings],
+        "observations": [
+            _serialize_observation(observation)
+            for observation in sorted(
+                result.observations,
+                key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id),
+            )
+        ],
+        "limitations": list(result.limitations),
+    }
 
 
 def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayload:

@@ -11,10 +11,10 @@ from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
 from tfstride.providers.catalog import DEFAULT_PROVIDER, default_provider_registry
 from tfstride.providers.registry import ProviderRegistry
-from tfstride.reporting.json_report import JsonReportRenderer
-from tfstride.reporting.markdown import MarkdownReportRenderer
+from tfstride.reporting.json_report import build_json_report_payload, render_json
+from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.report_contract import TFSReportPayload
-from tfstride.reporting.sarif import SarifReportRenderer
+from tfstride.reporting.sarif import render_sarif
 
 
 DEFAULT_LIMITATIONS = [
@@ -35,9 +35,6 @@ class TfStride:
         self.provider_registry = provider_registry or default_provider_registry()
         self.boundary_detector = TrustBoundaryDetector()
         self.rule_engine = StrideRuleEngine()
-        self._json_renderer = JsonReportRenderer()
-        self._markdown_renderer = MarkdownReportRenderer()
-        self._sarif_renderer = SarifReportRenderer()
         self.rule_policy = rule_policy
 
     def analyze_plan(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> AnalysisResult:
@@ -45,9 +42,9 @@ class TfStride:
         inventory = self.provider_registry.normalize(DEFAULT_PROVIDER, terraform_plan.resources)
         trust_boundaries = self.boundary_detector.detect(inventory)
         findings = apply_severity_overrides(
-	        self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
-	        self.rule_policy,
-	    )
+            self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
+            self.rule_policy,
+        )
         observations = self.rule_engine.observe_controls(inventory)
         return AnalysisResult(
             title=title,
@@ -78,13 +75,13 @@ class TfStride:
         )
 
     def build_json_report_payload(self, result: AnalysisResult) -> TFSReportPayload:
-	        return self._json_renderer.build_payload(result)
-	
+        return build_json_report_payload(result)
+
     def render_markdown(self, result: AnalysisResult) -> str:
-	    return self._markdown_renderer.render(result)
-	
+        return render_markdown(result)
+
     def render_json(self, result: AnalysisResult) -> str:
-	    return self._json_renderer.render(result)
-	
+        return render_json(result)
+
     def render_sarif(self, result: AnalysisResult) -> str:
-	    return self._sarif_renderer.render(result)
+        return render_sarif(result)

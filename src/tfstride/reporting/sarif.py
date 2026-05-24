@@ -18,98 +18,99 @@ SARIF_LEVELS = {
 SARIF_TAGS = ["terraform", "cloud", "threat-modeling"]
 
 
-class SarifReportRenderer:
-    def render(self, result: AnalysisResult) -> str:
-        payload = self._build_sarif_log(result)
-        return json.dumps(payload, indent=2) + "\n"
+def render_sarif(result: AnalysisResult) -> str:
+    payload = _build_sarif_log(result)
+    return json.dumps(payload, indent=2) + "\n"
 
-    def _build_sarif_log(self, result: AnalysisResult) -> dict[str, object]:
-        rules = self._build_rules(result.findings)
-        rule_indexes = {rule["id"]: index for index, rule in enumerate(rules)}
-        return {
-            "$schema": SARIF_SCHEMA_URI,
-            "version": SARIF_VERSION,
-            "runs": [
-                {
-                    "tool": {
-                        "driver": {
-                            "name": "tfstride",
-                            "semanticVersion": __version__,
-                            "rules": rules,
-                        }
-                    },
-                    "results": [
-                        self._build_result(finding, rule_indexes, result)
-                        for finding in result.findings
+
+def _build_sarif_log(result: AnalysisResult) -> dict[str, object]:
+    rules = _build_rules(result.findings)
+    rule_indexes = {rule["id"]: index for index, rule in enumerate(rules)}
+    return {
+        "$schema": SARIF_SCHEMA_URI,
+        "version": SARIF_VERSION,
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "tfstride",
+                        "semanticVersion": __version__,
+                        "rules": rules,
+                    }
+                },
+                "results": [
+                    _build_result(finding, rule_indexes, result)
+                    for finding in result.findings
+                ],
+            }
+        ],
+    }
+
+
+def _build_rules(findings: list[Finding]) -> list[dict[str, object]]:
+    findings_by_rule: dict[str, list[Finding]] = {}
+    for finding in findings:
+        findings_by_rule.setdefault(finding.rule_id, []).append(finding)
+
+    rules: list[dict[str, object]] = []
+    for rule_id in sorted(findings_by_rule):
+        rule_findings = findings_by_rule[rule_id]
+        representative = rule_findings[0]
+        metadata = default_rule_metadata(rule_id)
+        default_level = SARIF_LEVELS[_highest_severity(rule_findings)]
+        rules.append(
+            {
+                "id": rule_id,
+                "name": metadata.title,
+                "shortDescription": {"text": metadata.title},
+                "fullDescription": {"text": representative.rationale},
+                "help": {"text": metadata.recommended_mitigation},
+                "defaultConfiguration": {"level": default_level},
+                "properties": {
+                    "tags": [
+                        representative.category.value,
+                        representative.severity.value,
+                        *metadata.tags,
+                        *SARIF_TAGS,
                     ],
-                }
-            ],
-        }
+                },
+            }
+        )
+    return rules
 
-    def _build_rules(self, findings: list[Finding]) -> list[dict[str, object]]:
-        findings_by_rule: dict[str, list[Finding]] = {}
-        for finding in findings:
-            findings_by_rule.setdefault(finding.rule_id, []).append(finding)
 
-        rules: list[dict[str, object]] = []
-        for rule_id in sorted(findings_by_rule):
-            rule_findings = findings_by_rule[rule_id]
-            representative = rule_findings[0]
-            metadata = default_rule_metadata(rule_id)
-            default_level = SARIF_LEVELS[_highest_severity(rule_findings)]
-            rules.append(
-                {
-                    "id": rule_id,
-                    "name": metadata.title,
-                    "shortDescription": {"text": metadata.title},
-                    "fullDescription": {"text": representative.rationale},
-                    "help": {"text": metadata.recommended_mitigation},
-                    "defaultConfiguration": {"level": default_level},
-                    "properties": {
-                        "tags": [
-                            representative.category.value,
-                            representative.severity.value,
-                            *metadata.tags,
-                            *SARIF_TAGS,
-                        ],
-                    },
-                }
-            )
-        return rules
-
-    def _build_result(
-        self,
-        finding: Finding,
-        rule_indexes: dict[str, int],
-        analysis: AnalysisResult,
-    ) -> dict[str, object]:
-        result: dict[str, object] = {
-            "ruleId": finding.rule_id,
-            "ruleIndex": rule_indexes[finding.rule_id],
-            "level": SARIF_LEVELS[finding.severity],
-            "message": {"text": finding.title},
-            "locations": [
-                {
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": _artifact_uri(analysis.analyzed_path),
-                        }
+def _build_result(
+    finding: Finding,
+    rule_indexes: dict[str, int],
+    analysis: AnalysisResult,
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ruleId": finding.rule_id,
+        "ruleIndex": rule_indexes[finding.rule_id],
+        "level": SARIF_LEVELS[finding.severity],
+        "message": {"text": finding.title},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {
+                        "uri": _artifact_uri(analysis.analyzed_path),
                     }
                 }
-            ],
-            "properties": {
-                "title": finding.title,
-                "severity": finding.severity.value,
-                "stride_category": finding.category.value,
-                "affected_resources": finding.affected_resources,
-                "trust_boundary_id": finding.trust_boundary_id,
-                "rationale": finding.rationale,
-                "recommended_mitigation": finding.recommended_mitigation,
-                "evidence": _serialize_evidence(finding.evidence),
-                "severity_reasoning": _serialize_severity_reasoning(finding),
-            },
-        }
-        return result
+            }
+        ],
+        "properties": {
+            "title": finding.title,
+            "severity": finding.severity.value,
+            "stride_category": finding.category.value,
+            "affected_resources": finding.affected_resources,
+            "trust_boundary_id": finding.trust_boundary_id,
+            "rationale": finding.rationale,
+            "recommended_mitigation": finding.recommended_mitigation,
+            "evidence": _serialize_evidence(finding.evidence),
+            "severity_reasoning": _serialize_severity_reasoning(finding),
+        },
+    }
+    return result
 
 
 def _artifact_uri(path: str) -> str:

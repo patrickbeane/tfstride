@@ -15,9 +15,14 @@ from tfstride.models import (
     ResourceInventory,
     Severity,
 )
-from tfstride.reporting.json_report import JsonReportRenderer, REPORT_FORMAT_VERSION, REPORT_KIND
-from tfstride.reporting.markdown import MarkdownReportRenderer
-from tfstride.reporting.sarif import SarifReportRenderer
+from tfstride.reporting.json_report import (
+    REPORT_FORMAT_VERSION,
+    REPORT_KIND,
+    build_json_report_payload,
+    render_json,
+)
+from tfstride.reporting.markdown import render_markdown
+from tfstride.reporting.sarif import render_sarif
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,11 +37,11 @@ CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_c
 EXAMPLES_DIR = ROOT / "examples"
 
 
-class MarkdownReportRendererTests(unittest.TestCase):
+class MarkdownReportTests(unittest.TestCase):
     def test_report_contains_summary_findings_and_limitations(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
-        report = MarkdownReportRenderer().render(result)
+        report = render_markdown(result)
 
         self.assertIn("# tfSTRIDE Threat Model Report", report)
         self.assertIn("## Summary", report)
@@ -55,7 +60,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
 
     def test_report_renders_analysis_coverage_for_auditing(self) -> None:
         engine = TfStride()
-        report = MarkdownReportRenderer().render(engine.analyze_plan(FIXTURE_PATH))
+        report = render_markdown(engine.analyze_plan(FIXTURE_PATH))
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
@@ -69,7 +74,7 @@ class MarkdownReportRendererTests(unittest.TestCase):
     def test_report_renders_unconstrained_trust_evidence(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)
-        report = MarkdownReportRenderer().render(result)
+        report = render_markdown(result)
 
         self.assertIn("Cross-account or broad role trust lacks narrowing conditions", report)
         self.assertIn("supported narrowing conditions present: false", report)
@@ -77,8 +82,8 @@ class MarkdownReportRendererTests(unittest.TestCase):
 
     def test_report_renders_controls_observed_section(self) -> None:
         engine = TfStride()
-        safe_report = MarkdownReportRenderer().render(engine.analyze_plan(SAFE_FIXTURE_PATH))
-        constrained_trust_report = MarkdownReportRenderer().render(
+        safe_report = render_markdown(engine.analyze_plan(SAFE_FIXTURE_PATH))
+        constrained_trust_report = render_markdown(
             engine.analyze_plan(CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH)
         )
 
@@ -135,13 +140,9 @@ class MarkdownReportRendererTests(unittest.TestCase):
             )
             unsuppressed_result = apply_finding_filters(raw_result, suppressions_path=suppressions_path)
             baseline_path.write_text(render_baseline(unsuppressed_result.findings[:2]), encoding="utf-8")
-            filtered_result = apply_finding_filters(
-                raw_result,
-                suppressions_path=suppressions_path,
-                baseline_path=baseline_path,
-            )
+            filtered_result = apply_finding_filters(unsuppressed_result, baseline_path=baseline_path)
 
-        report = MarkdownReportRenderer().render(filtered_result)
+        report = render_markdown(filtered_result)
         self.assertIn("- Active findings after filters:", report)
         self.assertIn("- Suppressed findings: `1`", report)
         self.assertIn("- Baselined findings: `2`", report)
@@ -151,16 +152,16 @@ class MarkdownReportRendererTests(unittest.TestCase):
             rule_policy=RulePolicy(severity_overrides={"aws-iam-wildcard-permissions": Severity.LOW})
         )
         result = engine.analyze_plan(BASELINE_FIXTURE_PATH)
-        report = MarkdownReportRenderer().render(result)
+        report = render_markdown(result)
 
         self.assertIn("overridden by config", report)
 
 
-class SarifReportRendererTests(unittest.TestCase):
+class SarifReportTests(unittest.TestCase):
     def test_sarif_report_contains_rules_results_and_finding_metadata(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
-        report = SarifReportRenderer().render(result)
+        report = render_sarif(result)
         payload = json.loads(report)
 
         self.assertEqual(payload["version"], "2.1.0")
@@ -205,19 +206,19 @@ class SarifReportRendererTests(unittest.TestCase):
         self.assertEqual(payload["runs"][0]["tool"]["driver"]["name"], "tfstride")
 
 
-class JsonReportRendererTests(unittest.TestCase):
+class JsonReportTests(unittest.TestCase):
     def test_app_can_render_reports_from_an_analysis_result(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
 
-        self.assertEqual(engine.render_markdown(result), MarkdownReportRenderer().render(result))
+        self.assertEqual(engine.render_markdown(result), render_markdown(result))
         self.assertEqual(engine.build_json_report_payload(result), json.loads(engine.render_json(result)))
-        self.assertEqual(json.loads(engine.render_sarif(result)), json.loads(SarifReportRenderer().render(result)))
+        self.assertEqual(json.loads(engine.render_sarif(result)), json.loads(render_sarif(result)))
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
-        report = JsonReportRenderer().render(result)
+        report = render_json(result)
         payload = json.loads(report)
 
         self.assertEqual(payload["kind"], REPORT_KIND)
@@ -252,7 +253,7 @@ class JsonReportRendererTests(unittest.TestCase):
             findings=[],
         )
 
-        payload = JsonReportRenderer().build_payload(result)
+        payload = build_json_report_payload(result)
         resource.policy_document = {"Statement": [{"Effect": "Deny"}]}
         inventory.primary_account_id = "444455556666"
 
@@ -264,7 +265,7 @@ class JsonReportRendererTests(unittest.TestCase):
 
     def test_json_report_contract_exposes_stable_ui_sections(self) -> None:
         engine = TfStride()
-        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+        payload = json.loads(render_json(engine.analyze_plan(FIXTURE_PATH)))
 
         self.assertEqual(
             list(payload),
@@ -331,7 +332,7 @@ class JsonReportRendererTests(unittest.TestCase):
 
     def test_json_report_serializes_typed_policy_principal_entries(self) -> None:
         engine = TfStride()
-        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+        payload = json.loads(render_json(engine.analyze_plan(FIXTURE_PATH)))
         resources_with_policies = [
             resource
             for resource in payload["inventory"]["resources"]
@@ -348,7 +349,7 @@ class JsonReportRendererTests(unittest.TestCase):
 
     def test_json_report_sorts_inventory_resources_and_trust_boundaries_for_stable_consumers(self) -> None:
         engine = TfStride()
-        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+        payload = json.loads(render_json(engine.analyze_plan(FIXTURE_PATH)))
 
         resource_addresses = [resource["address"] for resource in payload["inventory"]["resources"]]
         boundary_ids = [boundary["identifier"] for boundary in payload["trust_boundaries"]]
@@ -358,7 +359,7 @@ class JsonReportRendererTests(unittest.TestCase):
 
     def test_json_report_includes_analysis_coverage_for_auditing(self) -> None:
         engine = TfStride()
-        payload = json.loads(JsonReportRenderer().render(engine.analyze_plan(FIXTURE_PATH)))
+        payload = json.loads(render_json(engine.analyze_plan(FIXTURE_PATH)))
 
         coverage = payload["analysis_coverage"]
 
@@ -401,13 +402,9 @@ class JsonReportRendererTests(unittest.TestCase):
             )
             unsuppressed_result = apply_finding_filters(raw_result, suppressions_path=suppressions_path)
             baseline_path.write_text(render_baseline(unsuppressed_result.findings[:2]), encoding="utf-8")
-            filtered_result = apply_finding_filters(
-                raw_result,
-                suppressions_path=suppressions_path,
-                baseline_path=baseline_path,
-            )
+            filtered_result = apply_finding_filters(unsuppressed_result, baseline_path=baseline_path)
 
-        payload = json.loads(JsonReportRenderer().render(filtered_result))
+        payload = json.loads(render_json(filtered_result))
         self.assertEqual(payload["summary"]["total_findings"], 9)
         self.assertEqual(payload["summary"]["suppressed_findings"], 1)
         self.assertEqual(payload["summary"]["baselined_findings"], 2)
@@ -448,7 +445,7 @@ class JsonReportRendererTests(unittest.TestCase):
             plan_path.write_text(json.dumps(payload), encoding="utf-8")
             result = engine.analyze_plan(plan_path)
 
-        rendered = json.loads(JsonReportRenderer().render(result))
+        rendered = json.loads(render_json(result))
         lambda_permission = next(
             resource
             for resource in rendered["inventory"]["resources"]
