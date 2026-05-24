@@ -7,7 +7,6 @@ from tfstride import __version__
 from tfstride.filtering import finding_fingerprint
 from tfstride.models import (
     AnalysisResult,
-    EvidenceItem,
     Finding,
     IAMPolicyCondition,
     IAMPrincipal,
@@ -19,9 +18,9 @@ from tfstride.models import (
     Severity,
     TrustBoundary,
 )
+from tfstride.reporting.finding_serialization import serialize_evidence, serialize_severity_reasoning
 from tfstride.reporting.report_contract import (
     AnalysisCoveragePayload,
-    EvidenceItemPayload,
     FindingPayload,
     InventoryPayload,
     NormalizedResourcePayload,
@@ -30,7 +29,6 @@ from tfstride.reporting.report_contract import (
     PrincipalPayload,
     PolicyStatementPayload,
     SecurityGroupRulePayload,
-    SeverityReasoningPayload,
     TFSReportPayload,
     TrustBoundaryPayload,
 )
@@ -248,8 +246,8 @@ def _serialize_finding(finding: Finding) -> FindingPayload:
         "trust_boundary_id": finding.trust_boundary_id,
         "rationale": finding.rationale,
         "recommended_mitigation": finding.recommended_mitigation,
-        "evidence": _serialize_evidence(finding.evidence),
-        "severity_reasoning": _serialize_severity_reasoning(finding),
+        "evidence": serialize_evidence(finding.evidence),
+        "severity_reasoning": serialize_severity_reasoning(finding),
     }
 
 
@@ -260,28 +258,5 @@ def _serialize_observation(observation: Observation) -> ObservationPayload:
         "affected_resources": list(observation.affected_resources),
         "rationale": observation.rationale,
         "category": observation.category,
-        "evidence": _serialize_evidence(observation.evidence),
-    }
-
-
-def _serialize_evidence(evidence: list[EvidenceItem]) -> list[EvidenceItemPayload]:
-    return [{"key": item.key, "values": list(item.values)} for item in evidence]
-
-
-def _serialize_severity_reasoning(finding: Finding) -> SeverityReasoningPayload | None:
-    if finding.severity_reasoning is None:
-        return None
-    return {
-        "internet_exposure": finding.severity_reasoning.internet_exposure,
-        "privilege_breadth": finding.severity_reasoning.privilege_breadth,
-        "data_sensitivity": finding.severity_reasoning.data_sensitivity,
-        "lateral_movement": finding.severity_reasoning.lateral_movement,
-        "blast_radius": finding.severity_reasoning.blast_radius,
-        "final_score": finding.severity_reasoning.final_score,
-        "severity": finding.severity_reasoning.severity.value,
-        "computed_severity": (
-            finding.severity_reasoning.computed_severity.value
-            if finding.severity_reasoning.computed_severity is not None
-            else None
-        ),
+        "evidence": serialize_evidence(observation.evidence),
     }

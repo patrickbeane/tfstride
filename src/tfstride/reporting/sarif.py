@@ -5,7 +5,8 @@ from pathlib import Path
 
 from tfstride import __version__
 from tfstride.analysis.rule_registry import default_rule_metadata
-from tfstride.models import AnalysisResult, EvidenceItem, Finding, Severity
+from tfstride.models import AnalysisResult, Finding, Severity
+from tfstride.reporting.finding_serialization import serialize_evidence, serialize_severity_reasoning
 
 
 SARIF_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
@@ -106,8 +107,8 @@ def _build_result(
             "trust_boundary_id": finding.trust_boundary_id,
             "rationale": finding.rationale,
             "recommended_mitigation": finding.recommended_mitigation,
-            "evidence": _serialize_evidence(finding.evidence),
-            "severity_reasoning": _serialize_severity_reasoning(finding),
+            "evidence": serialize_evidence(finding.evidence),
+            "severity_reasoning": serialize_severity_reasoning(finding),
         },
     }
     return result
@@ -115,29 +116,6 @@ def _build_result(
 
 def _artifact_uri(path: str) -> str:
     return Path(path).as_posix()
-
-
-def _serialize_evidence(evidence: list[EvidenceItem]) -> list[dict[str, object]]:
-    return [{"key": item.key, "values": list(item.values)} for item in evidence]
-
-
-def _serialize_severity_reasoning(finding: Finding) -> dict[str, object] | None:
-    if finding.severity_reasoning is None:
-        return None
-    return {
-        "internet_exposure": finding.severity_reasoning.internet_exposure,
-        "privilege_breadth": finding.severity_reasoning.privilege_breadth,
-        "data_sensitivity": finding.severity_reasoning.data_sensitivity,
-        "lateral_movement": finding.severity_reasoning.lateral_movement,
-        "blast_radius": finding.severity_reasoning.blast_radius,
-        "final_score": finding.severity_reasoning.final_score,
-        "severity": finding.severity_reasoning.severity.value,
-        "computed_severity": (
-            finding.severity_reasoning.computed_severity.value
-            if finding.severity_reasoning.computed_severity is not None
-            else None
-        ),
-    }
 
 
 def _highest_severity(findings: list[Finding]) -> Severity:
