@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from tfstride.analysis.control_observations import ControlObservationCollector
+from tfstride.analysis.control_observations import observe_controls as collect_control_observations
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.network_data_rules import NetworkDataRuleDetectors
@@ -120,7 +120,6 @@ class StrideRuleEngine:
             self._path_chain_rules,
             self._trust_rules,
         ) = self._rule_groups_by_stage
-        self._control_observations = ControlObservationCollector()
 
     def configured_rule_ids(self) -> set[str]:
         return {
@@ -167,4 +166,4 @@ class StrideRuleEngine:
         return self._rule_groups_by_stage
 
     def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
-        return self._control_observations.observe(inventory)
+        return collect_control_observations(inventory)
