@@ -9,6 +9,7 @@ from tfstride.models import (
     NormalizedResource,
     SecurityGroupRule,
 )
+from tfstride.providers.aws.coercion import as_list
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.resource_utils import (
     bucket_public_exposure_reasons,
@@ -602,8 +603,8 @@ def _merge_resource_policy(
 def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str, Any]:
     base = base_document if isinstance(base_document, dict) else {}
     extra = extra_document if isinstance(extra_document, dict) else {}
-    base_statements = _as_list(base.get("Statement"))
-    extra_statements = _as_list(extra.get("Statement"))
+    base_statements = as_list(base.get("Statement"))
+    extra_statements = as_list(extra.get("Statement"))
     merged_statements = [
         statement
         for statement in [*base_statements, *extra_statements]
@@ -624,11 +625,3 @@ def _internet_ingress_reasons(attached_security_groups: list[NormalizedResource]
                 continue
             reasons.append(describe_security_group_rule(security_group, rule))
     return reasons
-
-
-def _as_list(value: Any) -> list[Any]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
