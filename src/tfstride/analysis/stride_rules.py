@@ -20,7 +20,6 @@ from tfstride.analysis.rule_registry import (
     RulePolicy,
     RuleRegistry,
     default_rule_metadata,
-    sort_findings,
 )
 from tfstride.models import Finding, Observation, ResourceInventory, TrustBoundary
 
@@ -151,7 +150,7 @@ class StrideRuleEngine:
         for rules in self._rule_groups():
             findings.extend(self._evaluate_rules(rules, context))
 
-        return sort_findings(findings)
+        return findings
 
     def _evaluate_rules(
         self,
