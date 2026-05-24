@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from tfstride.models import IAMPolicyCondition
+from tfstride.resource_helpers import parse_aws_account_id
 
 EFFECTIVE_TRUST_NARROWING_KEYS = frozenset({"sts:ExternalId", "aws:SourceArn", "aws:SourceAccount"})
 EFFECTIVE_RESOURCE_POLICY_NARROWING_KEYS = frozenset({"aws:SourceArn", "aws:SourceAccount"})
@@ -37,7 +38,7 @@ def assess_principal(
     is_federated = principal_kind == "Federated"
     federated_provider_type = _federated_provider_type(principal) if is_federated else None
     is_wildcard = principal == "*"
-    account_id = _parse_account_id(principal)
+    account_id = parse_aws_account_id(principal, allow_bare=True)
     is_root_like = _is_root_like_principal(principal)
     is_foreign_account = bool(account_id and primary_account_id and account_id != primary_account_id)
 
@@ -261,17 +262,6 @@ def resource_policy_statement_has_effective_narrowing(statement: Any) -> bool:
         resource_policy_statement_narrowing_conditions(statement),
         EFFECTIVE_RESOURCE_POLICY_NARROWING_KEYS,
     )
-
-
-def _parse_account_id(principal: str) -> str | None:
-    if principal.isdigit() and len(principal) == 12:
-        return principal
-    if not principal.startswith("arn:"):
-        return None
-    parts = principal.split(":")
-    if len(parts) < 5:
-        return None
-    return parts[4] or None
 
 
 def _classify_principal_kind(principal: str, explicit_kind: str | None) -> str:

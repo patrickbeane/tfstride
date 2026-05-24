@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.resource_helpers import parse_aws_account_id
 from tfstride.providers.aws.compute_normalizers import (
     normalize_ecs_cluster,
     normalize_ecs_service,
@@ -133,17 +134,8 @@ class AwsNormalizer(ProviderNormalizer):
 
 def _infer_primary_account_id(resources: list[NormalizedResource]) -> str | None:
     accounts = Counter(
-        account_id for account_id in (_parse_account_id(resource.arn) for resource in resources) if account_id
+        account_id for account_id in (parse_aws_account_id(resource.arn) for resource in resources) if account_id
     )
     if not accounts:
         return None
     return accounts.most_common(1)[0][0]
-
-
-def _parse_account_id(arn: str | None) -> str | None:
-    if not arn:
-        return None
-    parts = arn.split(":")
-    if len(parts) < 5:
-        return None
-    return parts[4] or None

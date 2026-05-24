@@ -47,6 +47,20 @@ def format_port_range(rule: SecurityGroupRule) -> str:
     return f"{rule.from_port}-{rule.to_port}"
 
 
+def parse_aws_account_id(value: str | None, *, allow_bare: bool = False) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    if allow_bare and text.isdigit() and len(text) == 12:
+        return text
+    if not text.startswith("arn:"):
+        return None
+    parts = text.split(":")
+    if len(parts) < 5:
+        return None
+    return parts[4] or None
+
+
 def _principal_allows_public_access(principal: Any) -> bool:
     if principal == "*":
         return True
