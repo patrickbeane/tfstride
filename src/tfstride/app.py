@@ -10,10 +10,6 @@ from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
 from tfstride.providers.catalog import DEFAULT_PROVIDER, default_provider_registry
 from tfstride.providers.registry import ProviderRegistry
-from tfstride.reporting.json_report import build_json_report_payload, render_json
-from tfstride.reporting.markdown import render_markdown
-from tfstride.reporting.report_contract import TFSReportPayload
-from tfstride.reporting.sarif import render_sarif
 
 
 DEFAULT_LIMITATIONS = [
@@ -58,15 +54,3 @@ class TfStride:
             ),
             limitations=list(DEFAULT_LIMITATIONS),
         )
-
-    def build_json_report_payload(self, result: AnalysisResult) -> TFSReportPayload:
-        return build_json_report_payload(result)
-
-    def render_markdown(self, result: AnalysisResult) -> str:
-        return render_markdown(result)
-
-    def render_json(self, result: AnalysisResult) -> str:
-        return render_json(result)
-
-    def render_sarif(self, result: AnalysisResult) -> str:
-        return render_sarif(result)

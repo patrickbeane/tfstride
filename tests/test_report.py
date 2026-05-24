@@ -113,7 +113,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         for fixture_path, report_path in scenarios.items():
             with self.subTest(fixture=fixture_path.name):
-                expected = engine.render_markdown(engine.analyze_plan(fixture_path))
+                expected = render_markdown(engine.analyze_plan(fixture_path))
                 actual = report_path.read_text(encoding="utf-8")
                 self.assertEqual(actual, expected)
 
@@ -197,9 +197,9 @@ class SarifReportTests(unittest.TestCase):
         )
         self.assertTrue(trust_result["properties"]["evidence"])
 
-    def test_app_can_render_sarif_from_analysis_result(self) -> None:
+    def test_sarif_function_renders_from_analysis_result(self) -> None:
         engine = TfStride()
-        report = engine.render_sarif(engine.analyze_plan(FIXTURE_PATH))
+        report = render_sarif(engine.analyze_plan(FIXTURE_PATH))
         payload = json.loads(report)
 
         self.assertEqual(payload["version"], "2.1.0")
@@ -207,13 +207,13 @@ class SarifReportTests(unittest.TestCase):
 
 
 class JsonReportTests(unittest.TestCase):
-    def test_app_can_render_reports_from_an_analysis_result(self) -> None:
+    def test_report_functions_render_from_an_analysis_result(self) -> None:
         engine = TfStride()
         result = engine.analyze_plan(FIXTURE_PATH)
 
-        self.assertEqual(engine.render_markdown(result), render_markdown(result))
-        self.assertEqual(engine.build_json_report_payload(result), json.loads(engine.render_json(result)))
-        self.assertEqual(json.loads(engine.render_sarif(result)), json.loads(render_sarif(result)))
+        self.assertEqual(json.loads(render_json(result)), build_json_report_payload(result))
+        self.assertEqual(json.loads(render_sarif(result))["version"], "2.1.0")
+        self.assertIn("# tfSTRIDE Threat Model Report", render_markdown(result))
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()

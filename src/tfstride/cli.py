@@ -11,6 +11,9 @@ from tfstride.config import ProjectConfigLoadError, load_project_config
 from tfstride.filtering import FindingFilterLoadError, apply_finding_filters, render_baseline
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.models import Severity
+from tfstride.reporting.json_report import render_json
+from tfstride.reporting.markdown import render_markdown
+from tfstride.reporting.sarif import render_sarif
 
 
 INPUT_ERROR_EXIT_CODE = 2
@@ -124,9 +127,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"Input error: {exc}\n")
         return INPUT_ERROR_EXIT_CODE
 
-    report = engine.render_markdown(result)
-    json_report = engine.render_json(result) if args.json_output else None
-    sarif_report = engine.render_sarif(result) if args.sarif_output else None
+    report = render_markdown(result)
+    json_report = render_json(result) if args.json_output else None
+    sarif_report = render_sarif(result) if args.sarif_output else None
 
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
