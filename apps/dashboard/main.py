@@ -22,7 +22,8 @@ from apps.dashboard.api_models import (
 )
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
-from tfstride.reporting.json_report import REPORT_FORMAT_VERSION
+from tfstride.reporting.json_report import REPORT_FORMAT_VERSION, build_json_report_payload, render_json
+from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.report_contract import TFSReportPayload
 
 
@@ -556,8 +557,8 @@ def _analyze_plan_path(
     engine: TfStride,
 ) -> DashboardAnalysis:
     result = engine.analyze_plan(plan_path, title=title)
-    payload = _sanitize_dashboard_payload(engine.build_json_report_payload(result))
-    markdown_report = engine.render_markdown(result)
+    payload = _sanitize_dashboard_payload(build_json_report_payload(result))
+    markdown_report = render_markdown(result)
     return DashboardAnalysis(payload=payload, markdown_report=markdown_report)
 
 
