@@ -140,9 +140,4 @@ def _serialize_severity_reasoning(finding: Finding) -> dict[str, object] | None:
 
 
 def _highest_severity(findings: list[Finding]) -> Severity:
-    order = {
-        Severity.HIGH: 2,
-        Severity.MEDIUM: 1,
-        Severity.LOW: 0,
-    }
-    return max((finding.severity for finding in findings), key=lambda severity: order[severity])
+    return max((finding.severity for finding in findings), key=lambda severity: severity.rank)

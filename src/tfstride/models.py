@@ -34,6 +34,17 @@ class Severity(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
 
+    @property
+    def rank(self) -> int:
+        return self.RANK_ORDER.index(self)
+
+    @classmethod
+    def sort_key(cls, severity: "Severity") -> int:
+        return len(cls.RANK_ORDER) - severity.rank - 1
+
+
+Severity.RANK_ORDER = (Severity.LOW, Severity.MEDIUM, Severity.HIGH)
+
 
 class StrideCategory(str, Enum):
     SPOOFING = "Spoofing"

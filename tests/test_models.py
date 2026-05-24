@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, Severity
 from tfstride.resource_metadata import ResourceMetadata
 
 
@@ -23,6 +23,20 @@ def _resource(
         identifier=identifier,
         arn=arn,
     )
+
+
+class SeverityTests(unittest.TestCase):
+    def test_rank_orders_severities_for_threshold_comparison(self) -> None:
+        self.assertLess(Severity.LOW.rank, Severity.MEDIUM.rank)
+        self.assertLess(Severity.MEDIUM.rank, Severity.HIGH.rank)
+
+    def test_sort_key_orders_highest_severity_first(self) -> None:
+        severities = [Severity.LOW, Severity.HIGH, Severity.MEDIUM]
+
+        self.assertEqual(
+            sorted(severities, key=Severity.sort_key),
+            [Severity.HIGH, Severity.MEDIUM, Severity.LOW],
+        )
 
 
 class ResourceInventoryTests(unittest.TestCase):

@@ -263,5 +263,4 @@ def apply_severity_overrides(
 
 
 def sort_findings(findings: list[Finding]) -> list[Finding]:
-    severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
-    return sorted(findings, key=lambda finding: (severity_order[finding.severity], finding.title))
+    return sorted(findings, key=lambda finding: (Severity.sort_key(finding.severity), finding.title))
