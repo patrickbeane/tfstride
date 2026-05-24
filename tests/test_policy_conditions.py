@@ -4,6 +4,7 @@ import unittest
 
 from tfstride.analysis.policy_conditions import (
     assess_principal,
+    federated_provider_description,
     describe_trust_narrowing,
     describe_trust_narrowing_for_principal,
     policy_statement_principal_assessments,
@@ -20,6 +21,13 @@ from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
 
 
 class PolicyConditionsTests(unittest.TestCase):
+    def test_federated_provider_description_labels_known_provider_types(self) -> None:
+        self.assertEqual(federated_provider_description("saml"), "SAML identity provider")
+        self.assertEqual(federated_provider_description("oidc"), "OIDC identity provider")
+        self.assertEqual(federated_provider_description("cognito"), "Cognito identity provider")
+        self.assertEqual(federated_provider_description("unknown"), "federated identity provider")
+        self.assertEqual(federated_provider_description(None), "federated identity provider")
+
     def test_assess_principal_classifies_foreign_root_and_same_account_role(self) -> None:
         foreign_root = assess_principal("arn:aws:iam::444455556666:root", "111122223333")
         same_account_root = assess_principal("arn:aws:iam::111122223333:root", "111122223333")

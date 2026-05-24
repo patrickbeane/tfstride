@@ -46,10 +46,10 @@ def assess_principal(
         scope_description = "principal is wildcard"
     elif is_federated and is_foreign_account:
         scope_description = (
-            f"{_federated_provider_description(federated_provider_type)} belongs to foreign account {account_id}"
+            f"{federated_provider_description(federated_provider_type)} belongs to foreign account {account_id}"
         )
     elif is_federated:
-        provider_description = _federated_provider_description(federated_provider_type)
+        provider_description = federated_provider_description(federated_provider_type)
         if account_id:
             scope_description = f"{provider_description} belongs to account {account_id}"
         else:
@@ -68,7 +68,7 @@ def assess_principal(
     if is_wildcard:
         trust_path_description = "trust policy allows any AWS principal"
     elif is_federated:
-        provider_description = _federated_provider_description(federated_provider_type)
+        provider_description = federated_provider_description(federated_provider_type)
         if is_foreign_account:
             trust_path_description = f"trust principal is {provider_description} in foreign account {account_id}"
         elif account_id:
@@ -322,7 +322,7 @@ def _federated_provider_type(principal: str) -> str:
     return "unknown"
 
 
-def _federated_provider_description(provider_type: str | None) -> str:
+def federated_provider_description(provider_type: str | None) -> str:
     if provider_type == "saml":
         return "SAML identity provider"
     if provider_type == "oidc":

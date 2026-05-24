@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
 from tfstride.analysis.policy_conditions import (
     PrincipalAssessment,
+    federated_provider_description,
     policy_statement_principal_assessments,
     trust_statement_principal_assessments,
 )
@@ -277,7 +278,7 @@ def _role_trust_description(role: NormalizedResource, assessment: PrincipalAsses
     if assessment.is_federated:
         return (
             f"{role.display_name} trusts {assessment.principal} as a "
-            f"{_federated_provider_label(assessment)}."
+            f"{federated_provider_description(assessment.federated_provider_type)}."
         )
     return f"{role.display_name} trusts {assessment.principal}."
 
@@ -290,16 +291,6 @@ def _role_trust_rationale(assessment: PrincipalAssessment) -> str:
     if assessment.is_foreign_account:
         return "A foreign AWS account can cross into this role's trust boundary."
     return "An additional role or principal can cross into this role's trust boundary."
-
-
-def _federated_provider_label(assessment: PrincipalAssessment) -> str:
-    if assessment.federated_provider_type == "saml":
-        return "SAML identity provider"
-    if assessment.federated_provider_type == "oidc":
-        return "OIDC identity provider"
-    if assessment.federated_provider_type == "cognito":
-        return "Cognito identity provider"
-    return "federated identity provider"
 
 
 def _allows_secret_read(action: str) -> bool:
