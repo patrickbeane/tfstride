@@ -230,10 +230,6 @@ def default_rule_metadata(rule_id: str) -> RuleMetadata:
         raise KeyError(f"Unknown rule ID `{rule_id}`.") from exc
 
 
-def get_rule(rule_id: str) -> RuleMetadata:
-    return default_rule_metadata(rule_id)
-
-
 def apply_severity_overrides(
     findings: list[Finding],
     policy: RulePolicy | None,

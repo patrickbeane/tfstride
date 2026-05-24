@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from tfstride import __version__
-from tfstride.analysis.rule_registry import get_rule
+from tfstride.analysis.rule_registry import default_rule_metadata
 from tfstride.models import AnalysisResult, EvidenceItem, Finding, Severity
 
 
@@ -55,7 +55,7 @@ class SarifReportRenderer:
         for rule_id in sorted(findings_by_rule):
             rule_findings = findings_by_rule[rule_id]
             representative = rule_findings[0]
-            metadata = get_rule(rule_id)
+            metadata = default_rule_metadata(rule_id)
             default_level = SARIF_LEVELS[_highest_severity(rule_findings)]
             rules.append(
                 {
