@@ -8,14 +8,8 @@ from types import MappingProxyType
 from typing import Any
 
 from tfstride.resource_metadata import (
-    BoolDictMetadataField,
-    BoolMetadataField,
-    DictListMetadataField,
-    DictMetadataField,
     InventoryMetadata,
     MetadataField,
-    OptionalIntMetadataField,
-    OptionalStringMetadataField,
     ResourceMetadata,
     StringListMetadataField,
 )
@@ -181,425 +175,381 @@ class NormalizedResource:
     def _metadata_view(self) -> Mapping[str, Any]:
         return MappingProxyType(deepcopy(self._metadata))
 
-    # Keep high-traffic posture fields metadata-backed for report compatibility,
-    # but route access through typed schema fields instead of raw keys.
-    def _metadata_bool(self, field: BoolMetadataField) -> bool:
-        return field.get(self._metadata)
-
-    def _set_metadata_bool(self, field: BoolMetadataField, value: bool) -> None:
-        field.set(self._metadata, value)
-
-    def _metadata_string_list(self, field: StringListMetadataField) -> list[str]:
-        return field.get(self._metadata)
-
-    def _set_metadata_string_list(self, field: StringListMetadataField, values: list[str]) -> None:
-        field.set(self._metadata, values)
-
-    def _metadata_optional_string(self, field: OptionalStringMetadataField) -> str | None:
-        return field.get(self._metadata)
-
-    def _set_metadata_optional_string(self, field: OptionalStringMetadataField, value: str | None) -> None:
-        field.set(self._metadata, value)
-
-    def _metadata_optional_int(self, field: OptionalIntMetadataField) -> int | None:
-        return field.get(self._metadata)
-
-    def _set_metadata_optional_int(self, field: OptionalIntMetadataField, value: int | None) -> None:
-        field.set(self._metadata, value)
-
-    def _metadata_dict(self, field: DictMetadataField) -> dict[str, Any]:
-        return field.get(self._metadata)
-
-    def _set_metadata_dict(self, field: DictMetadataField, value: dict[str, Any] | None) -> None:
-        field.set(self._metadata, value)
-
-    def _metadata_dict_list(self, field: DictListMetadataField) -> list[dict[str, Any]]:
-        return field.get(self._metadata)
-
-    def _set_metadata_dict_list(self, field: DictListMetadataField, values: list[dict[str, Any]]) -> None:
-        field.set(self._metadata, values)
-
-    def _metadata_bool_dict(self, field: BoolDictMetadataField) -> dict[str, bool] | None:
-        return field.get(self._metadata)
-
-    def _set_metadata_bool_dict(self, field: BoolDictMetadataField, value: dict[str, bool] | None) -> None:
-        field.set(self._metadata, value)
-
     @property
     def direct_internet_reachable(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.DIRECT_INTERNET_REACHABLE)
+        return ResourceMetadata.DIRECT_INTERNET_REACHABLE.get(self._metadata)
 
     @direct_internet_reachable.setter
     def direct_internet_reachable(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.DIRECT_INTERNET_REACHABLE, value)
+        ResourceMetadata.DIRECT_INTERNET_REACHABLE.set(self._metadata, value)
 
     @property
     def internet_ingress_capable(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.INTERNET_INGRESS_CAPABLE)
+        return ResourceMetadata.INTERNET_INGRESS_CAPABLE.get(self._metadata)
 
     @internet_ingress_capable.setter
     def internet_ingress_capable(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.INTERNET_INGRESS_CAPABLE, value)
+        ResourceMetadata.INTERNET_INGRESS_CAPABLE.set(self._metadata, value)
 
     @property
     def in_public_subnet(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.IN_PUBLIC_SUBNET)
+        return ResourceMetadata.IN_PUBLIC_SUBNET.get(self._metadata)
 
     @in_public_subnet.setter
     def in_public_subnet(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.IN_PUBLIC_SUBNET, value)
+        ResourceMetadata.IN_PUBLIC_SUBNET.set(self._metadata, value)
 
     @property
     def has_nat_gateway_egress(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.HAS_NAT_GATEWAY_EGRESS)
+        return ResourceMetadata.HAS_NAT_GATEWAY_EGRESS.get(self._metadata)
 
     @has_nat_gateway_egress.setter
     def has_nat_gateway_egress(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.HAS_NAT_GATEWAY_EGRESS, value)
+        ResourceMetadata.HAS_NAT_GATEWAY_EGRESS.set(self._metadata, value)
 
     @property
     def is_public_subnet(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.IS_PUBLIC_SUBNET)
+        return ResourceMetadata.IS_PUBLIC_SUBNET.get(self._metadata)
 
     @is_public_subnet.setter
     def is_public_subnet(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.IS_PUBLIC_SUBNET, value)
+        ResourceMetadata.IS_PUBLIC_SUBNET.set(self._metadata, value)
 
     @property
     def has_public_route(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.HAS_PUBLIC_ROUTE)
+        return ResourceMetadata.HAS_PUBLIC_ROUTE.get(self._metadata)
 
     @has_public_route.setter
     def has_public_route(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.HAS_PUBLIC_ROUTE, value)
+        ResourceMetadata.HAS_PUBLIC_ROUTE.set(self._metadata, value)
 
     @property
     def vpc_enabled(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.VPC_ENABLED)
+        return ResourceMetadata.VPC_ENABLED.get(self._metadata)
 
     @vpc_enabled.setter
     def vpc_enabled(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.VPC_ENABLED, value)
+        ResourceMetadata.VPC_ENABLED.set(self._metadata, value)
 
     @property
     def storage_encrypted(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.STORAGE_ENCRYPTED)
+        return ResourceMetadata.STORAGE_ENCRYPTED.get(self._metadata)
 
     @storage_encrypted.setter
     def storage_encrypted(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.STORAGE_ENCRYPTED, value)
+        ResourceMetadata.STORAGE_ENCRYPTED.set(self._metadata, value)
 
     @property
     def publicly_accessible(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.PUBLICLY_ACCESSIBLE)
+        return ResourceMetadata.PUBLICLY_ACCESSIBLE.get(self._metadata)
 
     @publicly_accessible.setter
     def publicly_accessible(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.PUBLICLY_ACCESSIBLE, value)
+        ResourceMetadata.PUBLICLY_ACCESSIBLE.set(self._metadata, value)
 
     @property
     def public_access_reasons(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.PUBLIC_ACCESS_REASONS)
+        return ResourceMetadata.PUBLIC_ACCESS_REASONS.get(self._metadata)
 
     @public_access_reasons.setter
     def public_access_reasons(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.PUBLIC_ACCESS_REASONS, values)
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.set(self._metadata, values)
 
     @property
     def public_exposure_reasons(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.PUBLIC_EXPOSURE_REASONS)
+        return ResourceMetadata.PUBLIC_EXPOSURE_REASONS.get(self._metadata)
 
     @public_exposure_reasons.setter
     def public_exposure_reasons(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.PUBLIC_EXPOSURE_REASONS, values)
+        ResourceMetadata.PUBLIC_EXPOSURE_REASONS.set(self._metadata, values)
 
     @property
     def internet_ingress_reasons(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.INTERNET_INGRESS_REASONS)
+        return ResourceMetadata.INTERNET_INGRESS_REASONS.get(self._metadata)
 
     @internet_ingress_reasons.setter
     def internet_ingress_reasons(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.INTERNET_INGRESS_REASONS, values)
+        ResourceMetadata.INTERNET_INGRESS_REASONS.set(self._metadata, values)
 
     @property
     def security_group_id(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.SECURITY_GROUP_ID)
+        return ResourceMetadata.SECURITY_GROUP_ID.get(self._metadata)
 
     @security_group_id.setter
     def security_group_id(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.SECURITY_GROUP_ID, value)
+        ResourceMetadata.SECURITY_GROUP_ID.set(self._metadata, value)
 
     @property
     def role_reference(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.ROLE_REFERENCE)
+        return ResourceMetadata.ROLE_REFERENCE.get(self._metadata)
 
     @role_reference.setter
     def role_reference(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.ROLE_REFERENCE, value)
+        ResourceMetadata.ROLE_REFERENCE.set(self._metadata, value)
 
     @property
     def role_references(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.ROLE_REFERENCES)
+        return ResourceMetadata.ROLE_REFERENCES.get(self._metadata)
 
     @role_references.setter
     def role_references(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.ROLE_REFERENCES, values)
+        ResourceMetadata.ROLE_REFERENCES.set(self._metadata, values)
 
     @property
     def resolved_role_references(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.RESOLVED_ROLE_REFERENCES)
+        return ResourceMetadata.RESOLVED_ROLE_REFERENCES.get(self._metadata)
 
     @resolved_role_references.setter
     def resolved_role_references(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.RESOLVED_ROLE_REFERENCES, values)
+        ResourceMetadata.RESOLVED_ROLE_REFERENCES.set(self._metadata, values)
 
     @property
     def iam_instance_profile(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.IAM_INSTANCE_PROFILE)
+        return ResourceMetadata.IAM_INSTANCE_PROFILE.get(self._metadata)
 
     @iam_instance_profile.setter
     def iam_instance_profile(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.IAM_INSTANCE_PROFILE, value)
+        ResourceMetadata.IAM_INSTANCE_PROFILE.set(self._metadata, value)
 
     @property
     def policy_arn(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.POLICY_ARN)
+        return ResourceMetadata.POLICY_ARN.get(self._metadata)
 
     @policy_arn.setter
     def policy_arn(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.POLICY_ARN, value)
+        ResourceMetadata.POLICY_ARN.set(self._metadata, value)
 
     @property
     def policy_name(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.POLICY_NAME)
+        return ResourceMetadata.POLICY_NAME.get(self._metadata)
 
     @policy_name.setter
     def policy_name(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.POLICY_NAME, value)
+        ResourceMetadata.POLICY_NAME.set(self._metadata, value)
 
     @property
     def cluster_reference(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.CLUSTER_REFERENCE)
+        return ResourceMetadata.CLUSTER_REFERENCE.get(self._metadata)
 
     @cluster_reference.setter
     def cluster_reference(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.CLUSTER_REFERENCE, value)
+        ResourceMetadata.CLUSTER_REFERENCE.set(self._metadata, value)
 
     @property
     def cluster_name(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.NAME)
+        return ResourceMetadata.NAME.get(self._metadata)
 
     @cluster_name.setter
     def cluster_name(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.NAME, value)
+        ResourceMetadata.NAME.set(self._metadata, value)
 
     @property
     def task_definition_reference(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.TASK_DEFINITION_REFERENCE)
+        return ResourceMetadata.TASK_DEFINITION_REFERENCE.get(self._metadata)
 
     @task_definition_reference.setter
     def task_definition_reference(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.TASK_DEFINITION_REFERENCE, value)
+        ResourceMetadata.TASK_DEFINITION_REFERENCE.set(self._metadata, value)
 
     @property
     def task_definition_family(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.TASK_DEFINITION_FAMILY)
+        return ResourceMetadata.TASK_DEFINITION_FAMILY.get(self._metadata)
 
     @task_definition_family.setter
     def task_definition_family(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.TASK_DEFINITION_FAMILY, value)
+        ResourceMetadata.TASK_DEFINITION_FAMILY.set(self._metadata, value)
 
     @property
     def task_definition_revision(self) -> int | None:
-        return self._metadata_optional_int(ResourceMetadata.TASK_DEFINITION_REVISION)
+        return ResourceMetadata.TASK_DEFINITION_REVISION.get(self._metadata)
 
     @task_definition_revision.setter
     def task_definition_revision(self, value: int | None) -> None:
-        self._set_metadata_optional_int(ResourceMetadata.TASK_DEFINITION_REVISION, value)
+        ResourceMetadata.TASK_DEFINITION_REVISION.set(self._metadata, value)
 
     @property
     def network_mode(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.NETWORK_MODE)
+        return ResourceMetadata.NETWORK_MODE.get(self._metadata)
 
     @network_mode.setter
     def network_mode(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.NETWORK_MODE, value)
+        ResourceMetadata.NETWORK_MODE.set(self._metadata, value)
 
     @property
     def requires_compatibilities(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.REQUIRES_COMPATIBILITIES)
+        return ResourceMetadata.REQUIRES_COMPATIBILITIES.get(self._metadata)
 
     @requires_compatibilities.setter
     def requires_compatibilities(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.REQUIRES_COMPATIBILITIES, values)
+        ResourceMetadata.REQUIRES_COMPATIBILITIES.set(self._metadata, values)
 
     @property
     def task_role_arn(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.TASK_ROLE_ARN)
+        return ResourceMetadata.TASK_ROLE_ARN.get(self._metadata)
 
     @task_role_arn.setter
     def task_role_arn(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.TASK_ROLE_ARN, value)
+        ResourceMetadata.TASK_ROLE_ARN.set(self._metadata, value)
 
     @property
     def execution_role_arn(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.EXECUTION_ROLE_ARN)
+        return ResourceMetadata.EXECUTION_ROLE_ARN.get(self._metadata)
 
     @execution_role_arn.setter
     def execution_role_arn(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.EXECUTION_ROLE_ARN, value)
+        ResourceMetadata.EXECUTION_ROLE_ARN.set(self._metadata, value)
 
     @property
     def secret_arn(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.SECRET_ARN)
+        return ResourceMetadata.SECRET_ARN.get(self._metadata)
 
     @secret_arn.setter
     def secret_arn(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.SECRET_ARN, value)
+        ResourceMetadata.SECRET_ARN.set(self._metadata, value)
 
     @property
     def function_name(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.FUNCTION_NAME)
+        return ResourceMetadata.FUNCTION_NAME.get(self._metadata)
 
     @function_name.setter
     def function_name(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.FUNCTION_NAME, value)
+        ResourceMetadata.FUNCTION_NAME.set(self._metadata, value)
 
     @property
     def secret_name(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.NAME)
+        return ResourceMetadata.NAME.get(self._metadata)
 
     @secret_name.setter
     def secret_name(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.NAME, value)
+        ResourceMetadata.NAME.set(self._metadata, value)
 
     @property
     def route_table_id(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.ROUTE_TABLE_ID)
+        return ResourceMetadata.ROUTE_TABLE_ID.get(self._metadata)
 
     @route_table_id.setter
     def route_table_id(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.ROUTE_TABLE_ID, value)
+        ResourceMetadata.ROUTE_TABLE_ID.set(self._metadata, value)
 
     @property
     def subnet_id(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.SUBNET_ID)
+        return ResourceMetadata.SUBNET_ID.get(self._metadata)
 
     @subnet_id.setter
     def subnet_id(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.SUBNET_ID, value)
+        ResourceMetadata.SUBNET_ID.set(self._metadata, value)
 
     @property
     def routes(self) -> list[dict[str, Any]]:
-        return self._metadata_dict_list(ResourceMetadata.ROUTES)
+        return ResourceMetadata.ROUTES.get(self._metadata)
 
     @routes.setter
     def routes(self, values: list[dict[str, Any]]) -> None:
-        self._set_metadata_dict_list(ResourceMetadata.ROUTES, values)
+        ResourceMetadata.ROUTES.set(self._metadata, values)
 
     @property
     def map_public_ip_on_launch(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH)
+        return ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH.get(self._metadata)
 
     @map_public_ip_on_launch.setter
     def map_public_ip_on_launch(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH, value)
+        ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH.set(self._metadata, value)
 
     @property
     def block_public_acls(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.BLOCK_PUBLIC_ACLS)
+        return ResourceMetadata.BLOCK_PUBLIC_ACLS.get(self._metadata)
 
     @block_public_acls.setter
     def block_public_acls(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.BLOCK_PUBLIC_ACLS, value)
+        ResourceMetadata.BLOCK_PUBLIC_ACLS.set(self._metadata, value)
 
     @property
     def block_public_policy(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.BLOCK_PUBLIC_POLICY)
+        return ResourceMetadata.BLOCK_PUBLIC_POLICY.get(self._metadata)
 
     @block_public_policy.setter
     def block_public_policy(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.BLOCK_PUBLIC_POLICY, value)
+        ResourceMetadata.BLOCK_PUBLIC_POLICY.set(self._metadata, value)
 
     @property
     def ignore_public_acls(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.IGNORE_PUBLIC_ACLS)
+        return ResourceMetadata.IGNORE_PUBLIC_ACLS.get(self._metadata)
 
     @ignore_public_acls.setter
     def ignore_public_acls(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.IGNORE_PUBLIC_ACLS, value)
+        ResourceMetadata.IGNORE_PUBLIC_ACLS.set(self._metadata, value)
 
     @property
     def restrict_public_buckets(self) -> bool:
-        return self._metadata_bool(ResourceMetadata.RESTRICT_PUBLIC_BUCKETS)
+        return ResourceMetadata.RESTRICT_PUBLIC_BUCKETS.get(self._metadata)
 
     @restrict_public_buckets.setter
     def restrict_public_buckets(self, value: bool) -> None:
-        self._set_metadata_bool(ResourceMetadata.RESTRICT_PUBLIC_BUCKETS, value)
+        ResourceMetadata.RESTRICT_PUBLIC_BUCKETS.set(self._metadata, value)
 
     @property
     def trust_principals(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.TRUST_PRINCIPALS)
+        return ResourceMetadata.TRUST_PRINCIPALS.get(self._metadata)
 
     @trust_principals.setter
     def trust_principals(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.TRUST_PRINCIPALS, values)
+        ResourceMetadata.TRUST_PRINCIPALS.set(self._metadata, values)
 
     @property
     def trust_statements(self) -> list[dict[str, Any]]:
-        return self._metadata_dict_list(ResourceMetadata.TRUST_STATEMENTS)
+        return ResourceMetadata.TRUST_STATEMENTS.get(self._metadata)
 
     @trust_statements.setter
     def trust_statements(self, values: list[dict[str, Any]]) -> None:
-        self._set_metadata_dict_list(ResourceMetadata.TRUST_STATEMENTS, values)
+        ResourceMetadata.TRUST_STATEMENTS.set(self._metadata, values)
 
     @property
     def resource_policy_source_addresses(self) -> list[str]:
-        return self._metadata_string_list(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
+        return ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES.get(self._metadata)
 
     @resource_policy_source_addresses.setter
     def resource_policy_source_addresses(self, values: list[str]) -> None:
-        self._set_metadata_string_list(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES, values)
+        ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES.set(self._metadata, values)
 
     @property
     def policy_document(self) -> dict[str, Any]:
-        return self._metadata_dict(ResourceMetadata.POLICY_DOCUMENT)
+        return ResourceMetadata.POLICY_DOCUMENT.get(self._metadata)
 
     @policy_document.setter
     def policy_document(self, value: dict[str, Any] | None) -> None:
-        self._set_metadata_dict(ResourceMetadata.POLICY_DOCUMENT, value)
+        ResourceMetadata.POLICY_DOCUMENT.set(self._metadata, value)
 
     @property
     def public_access_block(self) -> dict[str, bool] | None:
-        return self._metadata_bool_dict(ResourceMetadata.PUBLIC_ACCESS_BLOCK)
+        return ResourceMetadata.PUBLIC_ACCESS_BLOCK.get(self._metadata)
 
     @public_access_block.setter
     def public_access_block(self, value: dict[str, bool] | None) -> None:
-        self._set_metadata_bool_dict(ResourceMetadata.PUBLIC_ACCESS_BLOCK, value)
+        ResourceMetadata.PUBLIC_ACCESS_BLOCK.set(self._metadata, value)
 
     @property
     def bucket_name(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.BUCKET_NAME)
+        return ResourceMetadata.BUCKET_NAME.get(self._metadata)
 
     @bucket_name.setter
     def bucket_name(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.BUCKET_NAME, value)
+        ResourceMetadata.BUCKET_NAME.set(self._metadata, value)
 
     @property
     def bucket_acl(self) -> str:
-        return self._metadata_optional_string(ResourceMetadata.BUCKET_ACL) or ""
+        return ResourceMetadata.BUCKET_ACL.get(self._metadata) or ""
 
     @bucket_acl.setter
     def bucket_acl(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.BUCKET_ACL, value)
+        ResourceMetadata.BUCKET_ACL.set(self._metadata, value)
 
     @property
     def engine(self) -> str | None:
-        return self._metadata_optional_string(ResourceMetadata.ENGINE)
+        return ResourceMetadata.ENGINE.get(self._metadata)
 
     @engine.setter
     def engine(self, value: str | None) -> None:
-        self._set_metadata_optional_string(ResourceMetadata.ENGINE, value)
+        ResourceMetadata.ENGINE.set(self._metadata, value)
 
 
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
