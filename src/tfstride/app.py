@@ -5,7 +5,7 @@ from pathlib import Path
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
-from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
+from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
 from tfstride.providers.catalog import DEFAULT_PROVIDER, default_provider_registry
@@ -32,14 +32,13 @@ class TfStride:
         provider_registry: ProviderRegistry | None = None,
     ) -> None:
         self.provider_registry = provider_registry or default_provider_registry()
-        self.boundary_detector = TrustBoundaryDetector()
         self.rule_engine = StrideRuleEngine()
         self.rule_policy = rule_policy
 
     def analyze_plan(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> AnalysisResult:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self.provider_registry.normalize(DEFAULT_PROVIDER, terraform_plan.resources)
-        trust_boundaries = self.boundary_detector.detect(inventory)
+        trust_boundaries = detect_trust_boundaries(inventory)
         findings = apply_severity_overrides(
             self.rule_engine.evaluate(inventory, trust_boundaries, rule_policy=self.rule_policy),
             self.rule_policy,

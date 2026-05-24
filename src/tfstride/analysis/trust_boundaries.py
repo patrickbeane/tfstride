@@ -14,136 +14,135 @@ WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function", "aws_ecs_service"}
 DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}
 
 
-class TrustBoundaryDetector:
-    def detect(self, inventory: ResourceInventory) -> list[TrustBoundary]:
-        boundaries: list[TrustBoundary] = []
-        seen: set[tuple[str, str, str]] = set()
+def detect_trust_boundaries(inventory: ResourceInventory) -> list[TrustBoundary]:
+    boundaries: list[TrustBoundary] = []
+    seen: set[tuple[str, str, str]] = set()
 
-        def add_boundary(
-            boundary_type: BoundaryType,
-            source: str,
-            target: str,
-            description: str,
-            rationale: str,
-        ) -> None:
-            # Multiple heuristics can arrive at the same crossing; dedupe by logical edge so
-            # the report stays readable and stable across rule changes.
-            key = (boundary_type.value, source, target)
-            if key in seen:
-                return
-            seen.add(key)
-            boundaries.append(
-                TrustBoundary(
-                    identifier=f"{boundary_type.value}:{source}->{target}",
-                    boundary_type=boundary_type,
-                    source=source,
-                    target=target,
-                    description=description,
-                    rationale=rationale,
-                )
+    def add_boundary(
+        boundary_type: BoundaryType,
+        source: str,
+        target: str,
+        description: str,
+        rationale: str,
+    ) -> None:
+        # Multiple heuristics can arrive at the same crossing; dedupe by logical edge so
+        # the report stays readable and stable across rule changes.
+        key = (boundary_type.value, source, target)
+        if key in seen:
+            return
+        seen.add(key)
+        boundaries.append(
+            TrustBoundary(
+                identifier=f"{boundary_type.value}:{source}->{target}",
+                boundary_type=boundary_type,
+                source=source,
+                target=target,
+                description=description,
+                rationale=rationale,
+            )
+        )
+
+    resources = inventory.resources
+    role_index = build_role_index(inventory)
+
+    for resource in resources:
+        if resource.direct_internet_reachable and resource.resource_type in {
+            "aws_instance",
+            "aws_lb",
+            "aws_db_instance",
+            "aws_s3_bucket",
+        }:
+            add_boundary(
+                BoundaryType.INTERNET_TO_SERVICE,
+                "internet",
+                resource.address,
+                f"Traffic can cross from the public internet to {resource.display_name}.",
+                "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
             )
 
-        resources = inventory.resources
-        role_index = build_role_index(inventory)
-
-        for resource in resources:
-            if resource.direct_internet_reachable and resource.resource_type in {
-                "aws_instance",
-                "aws_lb",
-                "aws_db_instance",
-                "aws_s3_bucket",
-            }:
+    public_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and resource.is_public_subnet]
+    private_subnets = [
+        resource for resource in resources if resource.resource_type == "aws_subnet" and not resource.is_public_subnet
+    ]
+    for public_subnet in public_subnets:
+        for private_subnet in private_subnets:
+            # Model segmentation at the trust-zone level rather than every possible route;
+            # for review purposes, "public subnet can reach private subnet" is the key edge.
+            if public_subnet.vpc_id and public_subnet.vpc_id == private_subnet.vpc_id:
                 add_boundary(
-                    BoundaryType.INTERNET_TO_SERVICE,
-                    "internet",
-                    resource.address,
-                    f"Traffic can cross from the public internet to {resource.display_name}.",
-                    "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
+                    BoundaryType.PUBLIC_TO_PRIVATE,
+                    public_subnet.address,
+                    private_subnet.address,
+                    f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
+                    "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
                 )
 
-        public_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and resource.is_public_subnet]
-        private_subnets = [
-            resource for resource in resources if resource.resource_type == "aws_subnet" and not resource.is_public_subnet
-        ]
-        for public_subnet in public_subnets:
-            for private_subnet in private_subnets:
-                # Model segmentation at the trust-zone level rather than every possible route;
-                # for review purposes, "public subnet can reach private subnet" is the key edge.
-                if public_subnet.vpc_id and public_subnet.vpc_id == private_subnet.vpc_id:
-                    add_boundary(
-                        BoundaryType.PUBLIC_TO_PRIVATE,
-                        public_subnet.address,
-                        private_subnet.address,
-                        f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
-                        "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
-                    )
-
-        workloads = [resource for resource in resources if resource.resource_type in WORKLOAD_TYPES]
-        data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_TYPES]
-        for workload in workloads:
-            attached_role = resolve_workload_role(workload, role_index)
-            for data_store in data_stores:
-                reachability_rationale = _workload_reaches_data_store(workload, data_store, attached_role, inventory)
-                if reachability_rationale:
-                    add_boundary(
-                        BoundaryType.WORKLOAD_TO_DATA_STORE,
-                        workload.address,
-                        data_store.address,
-                        f"{workload.display_name} can interact with {data_store.display_name}.",
-                        reachability_rationale,
-                    )
-            if attached_role is not None:
+    workloads = [resource for resource in resources if resource.resource_type in WORKLOAD_TYPES]
+    data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_TYPES]
+    for workload in workloads:
+        attached_role = resolve_workload_role(workload, role_index)
+        for data_store in data_stores:
+            reachability_rationale = _workload_reaches_data_store(workload, data_store, attached_role, inventory)
+            if reachability_rationale:
                 add_boundary(
-                    BoundaryType.CONTROL_TO_WORKLOAD,
-                    attached_role.address,
+                    BoundaryType.WORKLOAD_TO_DATA_STORE,
                     workload.address,
-                    f"{attached_role.display_name} governs actions performed by {workload.display_name}.",
-                    "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
+                    data_store.address,
+                    f"{workload.display_name} can interact with {data_store.display_name}.",
+                    reachability_rationale,
                 )
+        if attached_role is not None:
+            add_boundary(
+                BoundaryType.CONTROL_TO_WORKLOAD,
+                attached_role.address,
+                workload.address,
+                f"{attached_role.display_name} governs actions performed by {workload.display_name}.",
+                "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
+            )
 
-        primary_account_id = inventory.primary_account_id
-        for role in inventory.by_type("aws_iam_role"):
-            seen_role_principals: set[tuple[str, str]] = set()
-            for trust_statement in role.trust_statements:
-                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
-                    principal_key = (assessment.principal_kind, assessment.principal)
-                    if principal_key in seen_role_principals:
-                        continue
-                    seen_role_principals.add(principal_key)
-                    if assessment.is_service:
-                        continue
-                    add_boundary(
-                        BoundaryType.CROSS_ACCOUNT_OR_ROLE,
-                        assessment.principal,
-                        role.address,
-                        _role_trust_description(role, assessment),
-                        _role_trust_rationale(assessment),
-                    )
-
-        for resource in resources:
-            if resource.resource_type == "aws_iam_role":
-                continue
-            for assessment in _resource_policy_principals(resource, primary_account_id):
-                principal = assessment.principal
+    primary_account_id = inventory.primary_account_id
+    for role in inventory.by_type("aws_iam_role"):
+        seen_role_principals: set[tuple[str, str]] = set()
+        for trust_statement in role.trust_statements:
+            for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                principal_key = (assessment.principal_kind, assessment.principal)
+                if principal_key in seen_role_principals:
+                    continue
+                seen_role_principals.add(principal_key)
                 if assessment.is_service:
                     continue
-                if assessment.is_wildcard:
-                    description = f"{resource.display_name} allows any principal through a resource policy."
-                else:
-                    description = f"{resource.display_name} allows {principal} through a resource policy."
-                if assessment.is_wildcard or assessment.is_foreign_account:
-                    rationale = "A broad or foreign AWS principal can cross into this resource's policy boundary."
-                else:
-                    rationale = "An additional account-level principal can cross into this resource's policy boundary."
                 add_boundary(
                     BoundaryType.CROSS_ACCOUNT_OR_ROLE,
-                    principal,
-                    resource.address,
-                    description,
-                    rationale,
+                    assessment.principal,
+                    role.address,
+                    _role_trust_description(role, assessment),
+                    _role_trust_rationale(assessment),
                 )
 
-        return boundaries
+    for resource in resources:
+        if resource.resource_type == "aws_iam_role":
+            continue
+        for assessment in _resource_policy_principals(resource, primary_account_id):
+            principal = assessment.principal
+            if assessment.is_service:
+                continue
+            if assessment.is_wildcard:
+                description = f"{resource.display_name} allows any principal through a resource policy."
+            else:
+                description = f"{resource.display_name} allows {principal} through a resource policy."
+            if assessment.is_wildcard or assessment.is_foreign_account:
+                rationale = "A broad or foreign AWS principal can cross into this resource's policy boundary."
+            else:
+                rationale = "An additional account-level principal can cross into this resource's policy boundary."
+            add_boundary(
+                BoundaryType.CROSS_ACCOUNT_OR_ROLE,
+                principal,
+                resource.address,
+                description,
+                rationale,
+            )
+
+    return boundaries
 
 
 def _workload_reaches_data_store(
