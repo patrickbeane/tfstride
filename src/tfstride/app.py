@@ -5,7 +5,6 @@ from pathlib import Path
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
-from tfstride.filtering import apply_finding_filters
 from tfstride.analysis.trust_boundaries import TrustBoundaryDetector
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult
@@ -59,19 +58,6 @@ class TfStride:
                 rule_policy=self.rule_policy,
             ),
             limitations=list(DEFAULT_LIMITATIONS),
-        )
-
-    def filter_findings(
-        self,
-        result: AnalysisResult,
-        *,
-        suppressions_path: str | Path | None = None,
-        baseline_path: str | Path | None = None,
-    ) -> AnalysisResult:
-        return apply_finding_filters(
-            result,
-            suppressions_path=suppressions_path,
-            baseline_path=baseline_path,
         )
 
     def build_json_report_payload(self, result: AnalysisResult) -> TFSReportPayload:
