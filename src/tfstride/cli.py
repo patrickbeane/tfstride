@@ -202,15 +202,12 @@ def _render_rule(rule: RuleMetadata) -> list[str]:
         f"- {rule.rule_id}",
         f"  Title: {rule.title}",
         f"  STRIDE: {rule.category.value}",
-        f"  Enabled by default: {_format_yes_no(rule.enabled_by_default)}",
+        f"  Enabled by default: {'yes' if rule.enabled_by_default else 'no'}",
         f"  Tags: {_format_values(rule.tags)}",
         f"  Severity factors: {_format_values(rule.severity_factors)}",
         f"  Mitigation: {rule.recommended_mitigation}",
     ]
 
-
-def _format_yes_no(value: bool) -> str:
-    return "yes" if value else "no"
 
 
 def _format_values(values: tuple[str, ...]) -> str:

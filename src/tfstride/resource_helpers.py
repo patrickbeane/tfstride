@@ -62,8 +62,6 @@ def parse_aws_account_id(value: str | None, *, allow_bare: bool = False) -> str 
 
 
 def _principal_allows_public_access(principal: Any) -> bool:
-    if principal == "*":
-        return True
     if isinstance(principal, str):
         return principal == "*"
     if isinstance(principal, Mapping):

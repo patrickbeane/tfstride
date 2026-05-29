@@ -108,14 +108,6 @@ class StrideRuleEngine:
             "aws-role-trust-missing-narrowing": policy_trust_detectors.detect_unconstrained_trust,
         }
         self._rule_groups_by_stage = _build_rule_groups(detectors_by_rule_id)
-        (
-            self._posture_rules,
-            self._network_data_rules,
-            self._resource_policy_rules,
-            self._iam_rules,
-            self._path_chain_rules,
-            self._trust_rules,
-        ) = self._rule_groups_by_stage
 
     def configured_rule_ids(self) -> set[str]:
         return {

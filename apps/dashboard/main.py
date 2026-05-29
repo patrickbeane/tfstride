@@ -22,7 +22,7 @@ from apps.dashboard.api_models import (
 )
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
-from tfstride.reporting.json_report import REPORT_FORMAT_VERSION, build_json_report_payload, render_json
+from tfstride.reporting.json_report import REPORT_FORMAT_VERSION, build_json_report_payload
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.report_contract import TFSReportPayload
 
