@@ -11,6 +11,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
 from tfstride.resource_helpers import describe_security_group_rule
+from tfstride.resource_metadata import ResourceMetadata
 
 
 class PostureRuleDetectors:
@@ -112,7 +113,7 @@ class PostureRuleDetectors:
                             "encryption_posture",
                             [
                                 "storage_encrypted is false",
-                                f"engine is {database.engine or 'unknown'}",
+                                f"engine is {database.get_metadata_field(ResourceMetadata.ENGINE) or 'unknown'}",
                             ],
                         ),
                     ),

@@ -28,6 +28,7 @@ from tfstride.models import (
     TrustBoundary,
 )
 from tfstride.resource_helpers import describe_security_group_rule
+from tfstride.resource_metadata import ResourceMetadata
 
 
 class PathChainRuleDetectors:
@@ -108,7 +109,7 @@ class PathChainRuleDetectors:
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
-            for trust_statement in role.trust_statements:
+            for trust_statement in role.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS):
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue

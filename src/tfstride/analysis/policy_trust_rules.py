@@ -19,6 +19,7 @@ from tfstride.analysis.policy_conditions import (
 from tfstride.analysis.resource_concepts import IDENTITY_ROLE_RESOURCE_TYPES, is_object_storage_resource
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
+from tfstride.resource_metadata import ResourceMetadata
 
 
 SENSITIVE_RESOURCE_POLICY_TYPES = {"aws_s3_bucket", "aws_kms_key", "aws_secretsmanager_secret"}
@@ -127,13 +128,16 @@ class PolicyTrustRuleDetectors:
                     boundary = context.boundary_index.get(
                         (BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, resource.address)
                     )
+                    resource_policy_sources = resource.get_metadata_field(
+                        ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES
+                    )
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
                             severity=severity_reasoning.severity,
                             affected_resources=[
                                 resource.address,
-                                *resource.resource_policy_source_addresses,
+                                *resource_policy_sources,
                             ],
                             trust_boundary_id=boundary.identifier if boundary else None,
                             rationale=rationale,
@@ -147,7 +151,7 @@ class PolicyTrustRuleDetectors:
                                 ),
                                 evidence_item(
                                     "resource_policy_sources",
-                                    resource.resource_policy_source_addresses,
+                                    resource_policy_sources,
                                 ),
                             ),
                             severity_reasoning=severity_reasoning,
@@ -165,7 +169,7 @@ class PolicyTrustRuleDetectors:
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-            for trust_statement in role.trust_statements:
+            for trust_statement in role.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS):
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue
@@ -218,7 +222,7 @@ class PolicyTrustRuleDetectors:
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-            for trust_statement in role.trust_statements:
+            for trust_statement in role.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS):
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment):
                         continue

@@ -7,6 +7,7 @@ from tfstride.providers.aws.resource_utils import (
     ecs_task_definition_identifier,
     route_table_has_internet_route,
 )
+from tfstride.resource_metadata import ResourceMetadata
 
 
 @dataclass(slots=True)
@@ -58,7 +59,9 @@ class AwsResourceIndexBuilder:
                 security_groups[resource.identifier] = resource
             elif resource_type == "aws_route_table":
                 route_tables[resource.identifier] = resource
-                if resource.vpc_id and route_table_has_internet_route(resource.routes):
+                if resource.vpc_id and route_table_has_internet_route(
+                    resource.get_metadata_field(ResourceMetadata.ROUTES)
+                ):
                     vpcs_with_public_routes.add(resource.vpc_id)
             elif resource_type == "aws_s3_bucket":
                 _index_resource_aliases(
@@ -70,7 +73,12 @@ class AwsResourceIndexBuilder:
                 _index_resource_aliases(
                     secrets,
                     resource,
-                    (resource.identifier, resource.address, resource.arn, resource.secret_name),
+                    (
+                        resource.identifier,
+                        resource.address,
+                        resource.arn,
+                        resource.get_metadata_field(ResourceMetadata.NAME),
+                    ),
                 )
             elif resource_type == "aws_lambda_function":
                 _index_resource_aliases(
@@ -82,7 +90,12 @@ class AwsResourceIndexBuilder:
                 _index_resource_aliases(
                     ecs_clusters,
                     resource,
-                    (resource.identifier, resource.address, resource.arn, resource.cluster_name),
+                    (
+                        resource.identifier,
+                        resource.address,
+                        resource.arn,
+                        resource.get_metadata_field(ResourceMetadata.NAME),
+                    ),
                 )
             elif resource_type == "aws_ecs_task_definition":
                 _index_resource_aliases(
@@ -92,10 +105,10 @@ class AwsResourceIndexBuilder:
                         resource.identifier,
                         resource.address,
                         resource.arn,
-                        resource.task_definition_family,
+                        resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_FAMILY),
                         ecs_task_definition_identifier(
-                            resource.task_definition_family,
-                            resource.task_definition_revision,
+                            resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_FAMILY),
+                            resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_REVISION),
                         ),
                     ),
                 )

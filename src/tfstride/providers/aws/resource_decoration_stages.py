@@ -37,7 +37,8 @@ class MergeStandaloneSecurityGroupRulesStage:
         for rule_resource in resources:
             if rule_resource.resource_type != "aws_security_group_rule":
                 continue
-            target_group = context.index.security_groups.get(rule_resource.security_group_id)
+            security_group_id = rule_resource.get_metadata_field(ResourceMetadata.SECURITY_GROUP_ID)
+            target_group = context.index.security_groups.get(security_group_id)
             if target_group is None:
                 continue
             target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
@@ -56,7 +57,8 @@ class MergeRolePolicyResourcesStage:
         for role_policy_resource in resources:
             if role_policy_resource.resource_type != "aws_iam_role_policy":
                 continue
-            role = context.index.role_index.get(role_policy_resource.role_reference)
+            role_reference = role_policy_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCE)
+            role = context.index.role_index.get(role_reference)
             if role is None:
                 continue
             role.policy_statements.extend(_clone_policy_statements(role_policy_resource.policy_statements))
@@ -66,7 +68,7 @@ class MergeRolePolicyResourcesStage:
             )
             role.append_metadata_field(
                 ResourceMetadata.INLINE_POLICY_NAMES,
-                role_policy_resource.policy_name,
+                role_policy_resource.get_metadata_field(ResourceMetadata.POLICY_NAME),
             )
 
         # Role-policy attachments change the workload's effective privileges, so merge any
@@ -74,14 +76,16 @@ class MergeRolePolicyResourcesStage:
         for attachment_resource in resources:
             if attachment_resource.resource_type != "aws_iam_role_policy_attachment":
                 continue
-            role = context.index.role_index.get(attachment_resource.role_reference)
-            policy = context.index.policy_index.get(attachment_resource.policy_arn)
+            role_reference = attachment_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCE)
+            policy_arn = attachment_resource.get_metadata_field(ResourceMetadata.POLICY_ARN)
+            role = context.index.role_index.get(role_reference)
+            policy = context.index.policy_index.get(policy_arn)
             if role is None:
                 continue
             if policy is None:
                 role.append_metadata_field(
                     ResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS,
-                    str(attachment_resource.policy_arn),
+                    str(policy_arn),
                 )
                 continue
             role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
@@ -105,7 +109,7 @@ class ResolveInstanceProfileRolesStage:
             if instance_profile_resource.resource_type != "aws_iam_instance_profile":
                 continue
             resolved_role_refs: list[str] = []
-            for role_ref in instance_profile_resource.role_references:
+            for role_ref in instance_profile_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCES):
                 role = context.index.role_index.get(role_ref)
                 if role is None:
                     instance_profile_resource.append_metadata_field(
@@ -120,12 +124,12 @@ class ResolveInstanceProfileRolesStage:
                     ResourceMetadata.RESOLVED_ROLE_ADDRESSES,
                     role.address,
                 )
-            instance_profile_resource.resolved_role_references = resolved_role_refs
+            instance_profile_resource.set_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES, resolved_role_refs)
 
         for workload_resource in resources:
             if workload_resource.resource_type != "aws_instance":
                 continue
-            instance_profile_ref = workload_resource.iam_instance_profile
+            instance_profile_ref = workload_resource.get_metadata_field(ResourceMetadata.IAM_INSTANCE_PROFILE)
             if not instance_profile_ref:
                 continue
             instance_profile = context.index.instance_profile_index.get(instance_profile_ref)
@@ -139,7 +143,7 @@ class ResolveInstanceProfileRolesStage:
                 ResourceMetadata.RESOLVED_INSTANCE_PROFILE_ADDRESSES,
                 instance_profile.address,
             )
-            for resolved_role_ref in instance_profile.resolved_role_references:
+            for resolved_role_ref in instance_profile.get_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES):
                 if resolved_role_ref not in workload_resource.attached_role_arns:
                     workload_resource.attached_role_arns.append(resolved_role_ref)
 
@@ -151,7 +155,7 @@ class ResolveEcsServiceRelationshipsStage:
         for ecs_service_resource in resources:
             if ecs_service_resource.resource_type != "aws_ecs_service":
                 continue
-            cluster_ref = ecs_service_resource.cluster_reference
+            cluster_ref = ecs_service_resource.get_metadata_field(ResourceMetadata.CLUSTER_REFERENCE)
             if cluster_ref:
                 cluster = context.index.ecs_clusters.get(cluster_ref)
                 if cluster is None:
@@ -165,7 +169,7 @@ class ResolveEcsServiceRelationshipsStage:
                         cluster.address,
                     )
 
-            task_definition_ref = ecs_service_resource.task_definition_reference
+            task_definition_ref = ecs_service_resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_REFERENCE)
             if not task_definition_ref:
                 continue
             task_definition = context.index.ecs_task_definitions.get(task_definition_ref)
@@ -179,12 +183,18 @@ class ResolveEcsServiceRelationshipsStage:
                 ResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES,
                 task_definition.address,
             )
-            ecs_service_resource.network_mode = task_definition.network_mode
-            ecs_service_resource.requires_compatibilities = task_definition.requires_compatibilities
-            task_role_arn = task_definition.task_role_arn
-            execution_role_arn = task_definition.execution_role_arn
+            ecs_service_resource.set_metadata_field(
+                ResourceMetadata.NETWORK_MODE,
+                task_definition.get_metadata_field(ResourceMetadata.NETWORK_MODE),
+            )
+            ecs_service_resource.set_metadata_field(
+                ResourceMetadata.REQUIRES_COMPATIBILITIES,
+                task_definition.get_metadata_field(ResourceMetadata.REQUIRES_COMPATIBILITIES),
+            )
+            task_role_arn = task_definition.get_metadata_field(ResourceMetadata.TASK_ROLE_ARN)
+            execution_role_arn = task_definition.get_metadata_field(ResourceMetadata.EXECUTION_ROLE_ARN)
             if task_role_arn:
-                ecs_service_resource.task_role_arn = task_role_arn
+                ecs_service_resource.set_metadata_field(ResourceMetadata.TASK_ROLE_ARN, task_role_arn)
                 if task_role_arn not in ecs_service_resource.attached_role_arns:
                     ecs_service_resource.attached_role_arns.append(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
@@ -199,7 +209,7 @@ class ResolveEcsServiceRelationshipsStage:
                         str(task_role_arn),
                     )
             if execution_role_arn:
-                ecs_service_resource.execution_role_arn = execution_role_arn
+                ecs_service_resource.set_metadata_field(ResourceMetadata.EXECUTION_ROLE_ARN, execution_role_arn)
                 execution_role = context.index.role_index.get(execution_role_arn)
                 if execution_role is not None:
                     ecs_service_resource.append_metadata_field(
@@ -222,41 +232,43 @@ class MergeResourcePolicyResourcesStage:
         for bucket_policy_resource in resources:
             if bucket_policy_resource.resource_type != "aws_s3_bucket_policy":
                 continue
-            bucket = context.index.buckets.get(bucket_policy_resource.bucket_name)
+            bucket_name = bucket_policy_resource.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+            bucket = context.index.buckets.get(bucket_name)
             if bucket is None:
                 bucket_policy_resource.append_metadata_field(
                     ResourceMetadata.UNRESOLVED_BUCKET_REFERENCES,
-                    bucket_policy_resource.bucket_name,
+                    bucket_name,
                 )
                 continue
             _merge_resource_policy(
                 bucket,
                 bucket_policy_resource.policy_statements,
-                bucket_policy_resource.policy_document,
+                bucket_policy_resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
                 bucket_policy_resource.address,
             )
 
         for secret_policy_resource in resources:
             if secret_policy_resource.resource_type != "aws_secretsmanager_secret_policy":
                 continue
-            secret = context.index.secrets.get(secret_policy_resource.secret_arn)
+            secret_arn = secret_policy_resource.get_metadata_field(ResourceMetadata.SECRET_ARN)
+            secret = context.index.secrets.get(secret_arn)
             if secret is None:
                 secret_policy_resource.append_metadata_field(
                     ResourceMetadata.UNRESOLVED_SECRET_ARNS,
-                    secret_policy_resource.secret_arn,
+                    secret_arn,
                 )
                 continue
             _merge_resource_policy(
                 secret,
                 secret_policy_resource.policy_statements,
-                secret_policy_resource.policy_document,
+                secret_policy_resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
                 secret_policy_resource.address,
             )
 
         for lambda_permission_resource in resources:
             if lambda_permission_resource.resource_type != "aws_lambda_permission":
                 continue
-            function_name = lambda_permission_resource.function_name
+            function_name = lambda_permission_resource.get_metadata_field(ResourceMetadata.FUNCTION_NAME)
             target_function = context.index.lambda_functions.get(function_name)
             if target_function is None:
                 lambda_permission_resource.append_metadata_field(
@@ -281,20 +293,25 @@ class ApplyS3PublicAccessBlocksStage:
         for access_block_resource in resources:
             if access_block_resource.resource_type != "aws_s3_bucket_public_access_block":
                 continue
-            bucket = context.index.buckets.get(access_block_resource.bucket_name)
+            bucket_name = access_block_resource.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+            bucket = context.index.buckets.get(bucket_name)
             if bucket is None:
                 continue
             public_access_block = {
-                "block_public_acls": access_block_resource.block_public_acls,
-                "block_public_policy": access_block_resource.block_public_policy,
-                "ignore_public_acls": access_block_resource.ignore_public_acls,
-                "restrict_public_buckets": access_block_resource.restrict_public_buckets,
+                "block_public_acls": access_block_resource.get_metadata_field(ResourceMetadata.BLOCK_PUBLIC_ACLS),
+                "block_public_policy": access_block_resource.get_metadata_field(ResourceMetadata.BLOCK_PUBLIC_POLICY),
+                "ignore_public_acls": access_block_resource.get_metadata_field(ResourceMetadata.IGNORE_PUBLIC_ACLS),
+                "restrict_public_buckets": access_block_resource.get_metadata_field(
+                    ResourceMetadata.RESTRICT_PUBLIC_BUCKETS
+                ),
             }
-            bucket.public_access_block = public_access_block
-            public_via_acl = bucket.bucket_acl in {"public-read", "public-read-write", "website"}
-            public_via_policy = policy_allows_public_access(bucket.policy_document)
+            bucket.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_BLOCK, public_access_block)
+            bucket_acl = bucket.get_metadata_field(ResourceMetadata.BUCKET_ACL) or ""
+            bucket_policy_document = bucket.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)
+            public_via_acl = bucket_acl in {"public-read", "public-read-write", "website"}
+            public_via_policy = policy_allows_public_access(bucket_policy_document)
             bucket.public_access_reasons = bucket_public_exposure_reasons(
-                bucket.bucket_acl,
+                bucket_acl,
                 public_policy=public_via_policy,
             )
             bucket.public_exposure = (
@@ -305,7 +322,7 @@ class ApplyS3PublicAccessBlocksStage:
                 and not (public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"])
             )
             bucket.public_exposure_reasons = bucket_public_exposure_reasons(
-                bucket.bucket_acl,
+                bucket_acl,
                 public_policy=public_via_policy,
                 public_access_block=public_access_block,
             )
@@ -319,8 +336,8 @@ class DeriveSubnetPostureStage:
         for association_resource in resources:
             if association_resource.resource_type != "aws_route_table_association":
                 continue
-            subnet_id = association_resource.subnet_id
-            route_table_id = association_resource.route_table_id
+            subnet_id = association_resource.get_metadata_field(ResourceMetadata.SUBNET_ID)
+            route_table_id = association_resource.get_metadata_field(ResourceMetadata.ROUTE_TABLE_ID)
             if not subnet_id or not route_table_id:
                 continue
             subnet_route_table_ids.setdefault(str(subnet_id), []).append(str(route_table_id))
@@ -330,13 +347,15 @@ class DeriveSubnetPostureStage:
             associated_route_table_ids = subnet_route_table_ids.get(subnet.identifier or "", [])
             has_public_route = any(
                 route_table_id in context.index.route_tables
-                and route_table_has_internet_route(context.index.route_tables[route_table_id].routes)
+                and route_table_has_internet_route(
+                    context.index.route_tables[route_table_id].get_metadata_field(ResourceMetadata.ROUTES)
+                )
                 for route_table_id in associated_route_table_ids
             )
             has_nat_route = any(
                 route_table_id in context.index.route_tables
                 and route_table_has_nat_gateway_route(
-                    context.index.route_tables[route_table_id].routes,
+                    context.index.route_tables[route_table_id].get_metadata_field(ResourceMetadata.ROUTES),
                     context.index.nat_gateway_ids,
                 )
                 for route_table_id in associated_route_table_ids
@@ -348,7 +367,7 @@ class DeriveSubnetPostureStage:
             else:
                 # Fall back to the original heuristic when route table associations are absent.
                 is_public = (
-                    subnet.map_public_ip_on_launch
+                    subnet.get_metadata_field(ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH)
                     and subnet.vpc_id
                     in context.index.vpcs_with_igw.intersection(context.index.vpcs_with_public_routes)
                 )
@@ -595,12 +614,18 @@ def _merge_resource_policy(
     source_address: str,
 ) -> None:
     resource.policy_statements.extend(_clone_policy_statements(policy_statements))
-    resource_policy_source_addresses = resource.resource_policy_source_addresses
+    resource_policy_source_addresses = resource.get_metadata_field(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
     if source_address not in resource_policy_source_addresses:
-        resource.resource_policy_source_addresses = [*resource_policy_source_addresses, source_address]
-    merged_document = _merge_policy_documents(resource.policy_document, policy_document)
+        resource.set_metadata_field(
+            ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES,
+            [*resource_policy_source_addresses, source_address],
+        )
+    merged_document = _merge_policy_documents(
+        resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+        policy_document,
+    )
     if merged_document:
-        resource.policy_document = merged_document
+        resource.set_metadata_field(ResourceMetadata.POLICY_DOCUMENT, merged_document)
 
 
 def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str, Any]:
