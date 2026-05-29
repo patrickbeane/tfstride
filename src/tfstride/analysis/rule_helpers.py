@@ -3,15 +3,6 @@ from __future__ import annotations
 from tfstride.models import NormalizedResource, ResourceInventory
 
 
-def attached_security_groups(resource: NormalizedResource, inventory: ResourceInventory) -> list[NormalizedResource]:
-    security_groups = []
-    for security_group_id in resource.security_group_ids:
-        security_group = inventory.get_by_identifier(security_group_id)
-        if security_group and security_group.resource_type == "aws_security_group":
-            security_groups.append(security_group)
-    return security_groups
-
-
 def subnet_posture(resource: NormalizedResource | None, inventory: ResourceInventory) -> list[str]:
     if resource is None:
         return []

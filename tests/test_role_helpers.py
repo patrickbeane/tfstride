@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
+from tfstride.analysis.indexes import build_analysis_indexes
+from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 
 
@@ -28,28 +29,6 @@ def _resource(
 
 
 class RoleHelperTests(unittest.TestCase):
-    def test_build_role_index_maps_supported_role_aliases(self) -> None:
-        role = _resource(
-            address="aws_iam_role.app",
-            resource_type="aws_iam_role",
-            category=ResourceCategory.IAM,
-            identifier="app-role",
-            arn="arn:aws:iam::111122223333:role/app",
-        )
-        non_role = _resource(
-            address="aws_instance.web",
-            resource_type="aws_instance",
-            category=ResourceCategory.COMPUTE,
-        )
-        inventory = ResourceInventory(provider="aws", resources=[role, non_role])
-
-        role_index = build_role_index(inventory)
-
-        self.assertIs(role_index["aws_iam_role.app"], role)
-        self.assertIs(role_index["app-role"], role)
-        self.assertIs(role_index["arn:aws:iam::111122223333:role/app"], role)
-        self.assertNotIn("aws_instance.web", role_index)
-
     def test_resolve_workload_role_returns_first_matching_attached_role(self) -> None:
         first_role = _resource(
             address="aws_iam_role.first",
@@ -73,9 +52,9 @@ class RoleHelperTests(unittest.TestCase):
                 "arn:aws:iam::111122223333:role/first",
             ],
         )
-        role_index = build_role_index(
+        role_index = build_analysis_indexes(
             ResourceInventory(provider="aws", resources=[first_role, second_role, workload])
-        )
+        ).role_index
 
         self.assertIs(resolve_workload_role(workload, role_index), second_role)
 
