@@ -2029,8 +2029,8 @@ class TFSAnalysisTests(unittest.TestCase):
         ecs_service = result.inventory.get_by_address("aws_ecs_service.app")
 
         self.assertIsNotNone(ecs_service)
-        self.assertEqual(ecs_service.subnet_ids, [])
-        self.assertEqual(ecs_service.security_group_ids, [])
+        self.assertEqual(ecs_service.subnet_ids, ())
+        self.assertEqual(ecs_service.security_group_ids, ())
         self.assertEqual(ecs_service.attached_role_arns, [])
         self.assertFalse(ecs_service.public_exposure)
         self.assertFalse(ecs_service.metadata.get("fronted_by_internet_facing_load_balancer", False))

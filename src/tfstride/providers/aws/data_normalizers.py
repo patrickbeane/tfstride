@@ -19,7 +19,7 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
         category=ResourceCategory.DATA,
         identifier=values.get("id") or values.get("identifier"),
         arn=values.get("arn"),
-        security_group_ids=as_list(values.get("vpc_security_group_ids")),
+        security_group_ids=tuple(as_list(values.get("vpc_security_group_ids"))),
         public_access_configured=publicly_accessible,
         data_sensitivity="sensitive",
         metadata={

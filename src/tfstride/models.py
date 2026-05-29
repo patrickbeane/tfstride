@@ -141,8 +141,8 @@ class NormalizedResource:
     identifier: str | None = None
     arn: str | None = None
     vpc_id: str | None = None
-    subnet_ids: list[str] = field(default_factory=list)
-    security_group_ids: list[str] = field(default_factory=list)
+    subnet_ids: tuple[str, ...] = field(default_factory=tuple)
+    security_group_ids: tuple[str, ...] = field(default_factory=tuple)
     attached_role_arns: list[str] = field(default_factory=list)
     network_rules: list[SecurityGroupRule] = field(default_factory=list)
     policy_statements: list[IAMPolicyStatement] = field(default_factory=list)
@@ -153,6 +153,8 @@ class NormalizedResource:
     metadata: InitVar[dict[str, Any] | None] = None
 
     def __post_init__(self, metadata: dict[str, Any] | None) -> None:
+        self.subnet_ids = tuple(self.subnet_ids)
+        self.security_group_ids = tuple(self.security_group_ids)
         self._metadata = deepcopy(metadata) if metadata is not None else {}
 
     @property

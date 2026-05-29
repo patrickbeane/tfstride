@@ -126,7 +126,7 @@ def normalize_nat_gateway(resource: TerraformResource) -> NormalizedResource:
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=values.get("id"),
-        subnet_ids=compact([values.get("subnet_id")]),
+        subnet_ids=tuple(compact([values.get("subnet_id")])),
         metadata={
             "allocation_id": values.get("allocation_id"),
             "connectivity_type": values.get("connectivity_type", "public"),
@@ -145,8 +145,8 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         category=ResourceCategory.EDGE,
         identifier=values.get("id"),
         arn=values.get("arn"),
-        subnet_ids=as_list(values.get("subnets")),
-        security_group_ids=as_list(values.get("security_groups")),
+        subnet_ids=tuple(as_list(values.get("subnets"))),
+        security_group_ids=tuple(as_list(values.get("security_groups"))),
         public_access_configured=internet_facing,
         metadata={
             "internal": not internet_facing,

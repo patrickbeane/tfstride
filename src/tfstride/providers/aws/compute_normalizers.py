@@ -22,8 +22,8 @@ def normalize_instance(resource: TerraformResource) -> NormalizedResource:
         category=ResourceCategory.COMPUTE,
         identifier=values.get("id"),
         arn=values.get("arn"),
-        subnet_ids=compact([values.get("subnet_id")]),
-        security_group_ids=as_list(values.get("vpc_security_group_ids")),
+        subnet_ids=tuple(compact([values.get("subnet_id")])),
+        security_group_ids=tuple(as_list(values.get("vpc_security_group_ids"))),
         public_access_configured=public_ip_requested,
         metadata={
             "ami": values.get("ami"),
@@ -93,8 +93,8 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
         category=ResourceCategory.COMPUTE,
         identifier=values.get("name") or values.get("id"),
         arn=values.get("arn"),
-        subnet_ids=compact(network_configuration.get("subnets", []) if network_configuration else []),
-        security_group_ids=compact(network_configuration.get("security_groups", []) if network_configuration else []),
+        subnet_ids=tuple(compact(network_configuration.get("subnets", []) if network_configuration else [])),
+        security_group_ids=tuple(compact(network_configuration.get("security_groups", []) if network_configuration else [])),
         public_access_configured=assign_public_ip,
         metadata={
             "cluster": values.get("cluster"),
@@ -125,8 +125,8 @@ def normalize_lambda_function(resource: TerraformResource) -> NormalizedResource
         category=ResourceCategory.COMPUTE,
         identifier=values.get("function_name") or values.get("id"),
         arn=values.get("arn"),
-        subnet_ids=as_list(vpc_config.get("subnet_ids") if vpc_config else []),
-        security_group_ids=as_list(vpc_config.get("security_group_ids") if vpc_config else []),
+        subnet_ids=tuple(as_list(vpc_config.get("subnet_ids") if vpc_config else [])),
+        security_group_ids=tuple(as_list(vpc_config.get("security_group_ids") if vpc_config else [])),
         attached_role_arns=compact([values.get("role")]),
         metadata={
             "runtime": values.get("runtime"),

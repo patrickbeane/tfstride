@@ -156,6 +156,29 @@ class ResourceInventoryTests(unittest.TestCase):
 
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
+    def test_resource_placement_ids_are_tuple_backed(self) -> None:
+        subnet_ids = ["subnet-1"]
+        security_group_ids = ["sg-1"]
+        resource = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            subnet_ids=subnet_ids,
+            security_group_ids=security_group_ids,
+        )
+
+        subnet_ids.append("subnet-2")
+        security_group_ids.append("sg-2")
+
+        self.assertEqual(resource.subnet_ids, ("subnet-1",))
+        self.assertEqual(resource.security_group_ids, ("sg-1",))
+        with self.assertRaises(AttributeError):
+            resource.subnet_ids.append("subnet-3")
+        with self.assertRaises(AttributeError):
+            resource.security_group_ids.append("sg-3")
+
     def test_posture_property_defaults_do_not_require_metadata_keys(self) -> None:
         resource = _resource(address="aws_instance.web", resource_type="aws_instance")
 
