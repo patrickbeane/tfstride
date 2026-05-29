@@ -41,7 +41,7 @@ class MergeStandaloneSecurityGroupRulesStage:
             target_group = context.index.security_groups.get(security_group_id)
             if target_group is None:
                 continue
-            target_group.network_rules.extend(_clone_security_group_rules(rule_resource.network_rules))
+            target_group.extend_network_rules(_clone_security_group_rules(rule_resource.network_rules))
             target_group.append_metadata_field(
                 ResourceMetadata.STANDALONE_RULE_ADDRESSES,
                 rule_resource.address,
@@ -61,7 +61,7 @@ class MergeRolePolicyResourcesStage:
             role = context.index.role_index.get(role_reference)
             if role is None:
                 continue
-            role.policy_statements.extend(_clone_policy_statements(role_policy_resource.policy_statements))
+            role.extend_policy_statements(_clone_policy_statements(role_policy_resource.policy_statements))
             role.append_metadata_field(
                 ResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES,
                 role_policy_resource.address,
@@ -88,7 +88,7 @@ class MergeRolePolicyResourcesStage:
                     str(policy_arn),
                 )
                 continue
-            role.policy_statements.extend(_clone_policy_statements(policy.policy_statements))
+            role.extend_policy_statements(_clone_policy_statements(policy.policy_statements))
             role.append_metadata_field(
                 ResourceMetadata.ATTACHED_POLICY_ARNS,
                 policy.arn or policy.identifier or policy.address,
@@ -144,8 +144,7 @@ class ResolveInstanceProfileRolesStage:
                 instance_profile.address,
             )
             for resolved_role_ref in instance_profile.get_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES):
-                if resolved_role_ref not in workload_resource.attached_role_arns:
-                    workload_resource.attached_role_arns.append(resolved_role_ref)
+                workload_resource.add_attached_role_arn(resolved_role_ref)
 
 
 class ResolveEcsServiceRelationshipsStage:
@@ -195,8 +194,7 @@ class ResolveEcsServiceRelationshipsStage:
             execution_role_arn = task_definition.get_metadata_field(ResourceMetadata.EXECUTION_ROLE_ARN)
             if task_role_arn:
                 ecs_service_resource.set_metadata_field(ResourceMetadata.TASK_ROLE_ARN, task_role_arn)
-                if task_role_arn not in ecs_service_resource.attached_role_arns:
-                    ecs_service_resource.attached_role_arns.append(task_role_arn)
+                ecs_service_resource.add_attached_role_arn(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
                 if task_role is not None:
                     ecs_service_resource.append_metadata_field(
@@ -613,7 +611,7 @@ def _merge_resource_policy(
     policy_document: dict[str, Any],
     source_address: str,
 ) -> None:
-    resource.policy_statements.extend(_clone_policy_statements(policy_statements))
+    resource.extend_policy_statements(_clone_policy_statements(policy_statements))
     resource_policy_source_addresses = resource.get_metadata_field(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
     if source_address not in resource_policy_source_addresses:
         resource.set_metadata_field(

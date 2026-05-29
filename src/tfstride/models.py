@@ -177,6 +177,17 @@ class NormalizedResource:
     def append_metadata_field(self, field: StringListMetadataField, value: str | None) -> None:
         field.append_unique(self._metadata, value)
 
+    def add_attached_role_arn(self, role_arn: str | None) -> None:
+        if not role_arn or role_arn in self.attached_role_arns:
+            return
+        self.attached_role_arns.append(role_arn)
+
+    def extend_network_rules(self, rules: Sequence[SecurityGroupRule]) -> None:
+        self.network_rules.extend(rules)
+
+    def extend_policy_statements(self, statements: Sequence[IAMPolicyStatement]) -> None:
+        self.policy_statements.extend(statements)
+
     def _metadata_view(self) -> Mapping[str, Any]:
         return MappingProxyType(deepcopy(self._metadata))
 
