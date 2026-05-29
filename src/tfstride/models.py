@@ -33,14 +33,11 @@ class Severity(str, Enum):
 
     @property
     def rank(self) -> int:
-        return self.RANK_ORDER.index(self)
+        return tuple(type(self)).index(self)
 
     @classmethod
     def sort_key(cls, severity: "Severity") -> int:
-        return len(cls.RANK_ORDER) - severity.rank - 1
-
-
-Severity.RANK_ORDER = (Severity.LOW, Severity.MEDIUM, Severity.HIGH)
+        return len(tuple(cls)) - severity.rank - 1
 
 
 class StrideCategory(str, Enum):

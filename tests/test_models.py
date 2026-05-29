@@ -29,6 +29,7 @@ class SeverityTests(unittest.TestCase):
     def test_rank_orders_severities_for_threshold_comparison(self) -> None:
         self.assertLess(Severity.LOW.rank, Severity.MEDIUM.rank)
         self.assertLess(Severity.MEDIUM.rank, Severity.HIGH.rank)
+        self.assertFalse(hasattr(Severity, "RANK_ORDER"))
 
     def test_sort_key_orders_highest_severity_first(self) -> None:
         severities = [Severity.LOW, Severity.HIGH, Severity.MEDIUM]
