@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from tfstride.analysis.control_observations import observe_controls as collect_control_observations
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.iam_rules import IAMRuleDetectors
+from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.network_data_rules import NetworkDataRuleDetectors
 from tfstride.analysis.path_chain_rules import PathChainRuleDetectors
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
@@ -121,9 +122,15 @@ class StrideRuleEngine:
         inventory: ResourceInventory,
         boundaries: list[TrustBoundary],
         *,
+        analysis_indexes: AnalysisIndexes | None = None,
         rule_policy: RulePolicy | None = None,
     ) -> list[Finding]:
         findings: list[Finding] = []
+        resolved_indexes = (
+            analysis_indexes
+            if analysis_indexes is not None
+            else build_analysis_indexes(inventory)
+        )
         boundary_index: BoundaryIndex = {
             (boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries
         }
@@ -131,6 +138,7 @@ class StrideRuleEngine:
             inventory=inventory,
             boundary_index=boundary_index,
             rule_registry=self._rule_registry,
+            analysis_indexes=resolved_indexes,
             rule_policy=rule_policy,
         )
 
