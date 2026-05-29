@@ -8,11 +8,17 @@ from tfstride.analysis.policy_conditions import (
     policy_statement_principal_assessments,
     trust_statement_principal_assessments,
 )
+from tfstride.analysis.resource_concepts import (
+    DATA_STORE_RESOURCE_TYPES,
+    IDENTITY_ROLE_RESOURCE_TYPES,
+    WORKLOAD_RESOURCE_TYPES,
+    is_database_resource,
+    is_identity_role_resource,
+    is_object_storage_resource,
+    is_public_edge_resource,
+    is_secret_store_resource,
+)
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
-
-
-WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function", "aws_ecs_service"}
-DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}
 
 
 def detect_trust_boundaries(
@@ -50,12 +56,7 @@ def detect_trust_boundaries(
     analysis_indexes = indexes if indexes is not None else build_analysis_indexes(inventory)
 
     for resource in resources:
-        if resource.direct_internet_reachable and resource.resource_type in {
-            "aws_instance",
-            "aws_lb",
-            "aws_db_instance",
-            "aws_s3_bucket",
-        }:
+        if resource.direct_internet_reachable and is_public_edge_resource(resource):
             add_boundary(
                 BoundaryType.INTERNET_TO_SERVICE,
                 "internet",
@@ -81,8 +82,8 @@ def detect_trust_boundaries(
                     "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
                 )
 
-    workloads = [resource for resource in resources if resource.resource_type in WORKLOAD_TYPES]
-    data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_TYPES]
+    workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
+    data_stores = inventory.by_type(*DATA_STORE_RESOURCE_TYPES)
     for workload in workloads:
         attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
         for data_store in data_stores:
@@ -110,7 +111,7 @@ def detect_trust_boundaries(
             )
 
     primary_account_id = inventory.primary_account_id
-    for role in inventory.by_type("aws_iam_role"):
+    for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
         seen_role_principals: set[tuple[str, str]] = set()
         for trust_statement in role.trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
@@ -129,7 +130,7 @@ def detect_trust_boundaries(
                 )
 
     for resource in resources:
-        if resource.resource_type == "aws_iam_role":
+        if is_identity_role_resource(resource):
             continue
         for assessment in _resource_policy_principals(resource, primary_account_id):
             principal = assessment.principal
@@ -160,9 +161,9 @@ def _workload_reaches_data_store(
     attached_role: NormalizedResource | None,
     indexes: AnalysisIndexes,
 ) -> str | None:
-    if data_store.resource_type == "aws_db_instance":
+    if is_database_resource(data_store):
         return _database_reachability_rationale(workload, data_store, indexes)
-    if data_store.resource_type == "aws_s3_bucket":
+    if is_object_storage_resource(data_store):
         if attached_role is None:
             return None
         allowed_actions = sorted(
@@ -181,7 +182,7 @@ def _workload_reaches_data_store(
             "Application or function workloads cross into a higher-sensitivity data plane when their "
             f"attached role allows S3 actions such as {action_text}."
         )
-    if data_store.resource_type == "aws_secretsmanager_secret":
+    if is_secret_store_resource(data_store):
         if attached_role is None:
             return None
         allowed_actions = sorted(
@@ -272,7 +273,7 @@ def _resource_policy_principals(
         for assessment in policy_statement_principal_assessments(statement, primary_account_id):
             if assessment.is_service:
                 continue
-            if resource.resource_type == "aws_s3_bucket" and assessment.is_wildcard:
+            if is_object_storage_resource(resource) and assessment.is_wildcard:
                 continue
             if assessment.scope_description is None:
                 continue

@@ -6,6 +6,7 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
+from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES, OBJECT_STORAGE_RESOURCE_TYPES
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
@@ -86,7 +87,7 @@ class PostureRuleDetectors:
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
-        for database in inventory.by_type("aws_db_instance"):
+        for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
             if database.storage_encrypted:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -127,7 +128,7 @@ class PostureRuleDetectors:
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
-        for bucket in inventory.by_type("aws_s3_bucket"):
+        for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
             if not bucket.public_exposure:
                 continue
             boundary = context.boundary_index.get(

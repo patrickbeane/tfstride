@@ -7,6 +7,7 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
+from tfstride.analysis.resource_concepts import WORKLOAD_RESOURCE_TYPES
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
@@ -105,11 +106,7 @@ class IAMRuleDetectors:
         findings: list[Finding] = []
         indexes = context.analysis_indexes
         assert indexes is not None
-        for workload in context.inventory.by_type(
-            "aws_instance",
-            "aws_lambda_function",
-            "aws_ecs_service",
-        ):
+        for workload in context.inventory.by_type(*WORKLOAD_RESOURCE_TYPES):
             role = resolve_workload_role(workload, indexes.role_index)
             if role is None:
                 continue

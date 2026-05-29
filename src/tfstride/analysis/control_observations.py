@@ -6,6 +6,11 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing_for_principal,
 )
+from tfstride.analysis.resource_concepts import (
+    DATABASE_RESOURCE_TYPES,
+    IDENTITY_ROLE_RESOURCE_TYPES,
+    OBJECT_STORAGE_RESOURCE_TYPES,
+)
 from tfstride.models import Observation, ResourceInventory
 from tfstride.resource_helpers import policy_allows_public_access
 
@@ -26,7 +31,7 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
         for access_block in inventory.by_type("aws_s3_bucket_public_access_block")
         if access_block.bucket_name
     }
-    for bucket in inventory.by_type("aws_s3_bucket"):
+    for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
         access_block = bucket.public_access_block
         if not access_block or bucket.public_exposure:
             continue
@@ -72,7 +77,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
     primary_account_id = inventory.primary_account_id
     seen: set[tuple[str, str]] = set()
-    for role in inventory.by_type("aws_iam_role"):
+    for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
         for trust_statement in role.trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                 if not trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
@@ -111,7 +116,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
 
 def _observe_private_encrypted_databases(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
-    for database in inventory.by_type("aws_db_instance"):
+    for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
         if not database.storage_encrypted:
             continue
         if database.publicly_accessible:

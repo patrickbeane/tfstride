@@ -4,6 +4,10 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from tfstride.analysis.resource_concepts import (
+    IDENTITY_ROLE_RESOURCE_TYPES,
+    is_network_security_group_resource,
+)
 from tfstride.models import NormalizedResource, ResourceInventory
 
 
@@ -27,7 +31,7 @@ def build_analysis_indexes(inventory: ResourceInventory) -> AnalysisIndexes:
     security_groups_by_reference = {
         reference: resource
         for reference, resource in resources_by_reference.items()
-        if resource.resource_type == "aws_security_group"
+        if is_network_security_group_resource(resource)
     }
 
     return AnalysisIndexes(
@@ -46,7 +50,7 @@ def build_analysis_indexes(inventory: ResourceInventory) -> AnalysisIndexes:
 
 def _build_role_index(inventory: ResourceInventory) -> dict[str, NormalizedResource]:
     index: dict[str, NormalizedResource] = {}
-    for role in inventory.by_type("aws_iam_role"):
+    for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
         if role.arn:
             index[role.arn] = role
         index[role.address] = role

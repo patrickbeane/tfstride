@@ -12,6 +12,11 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing_for_principal,
 )
+from tfstride.analysis.resource_concepts import (
+    IDENTITY_ROLE_RESOURCE_TYPES,
+    is_control_plane_sensitive_data_store,
+    is_database_resource,
+)
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import (
@@ -99,7 +104,7 @@ class PathChainRuleDetectors:
         sensitive_data_paths = _private_sensitive_controlled_data_paths(boundary_index, inventory)
         seen: set[tuple[str, str, tuple[str, ...], tuple[str, ...]]] = set()
 
-        for role in inventory.by_type("aws_iam_role"):
+        for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
@@ -311,7 +316,7 @@ def _is_hidden_data_store(resource: NormalizedResource) -> bool:
 
 
 def _is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool:
-    return resource.resource_type in {"aws_db_instance", "aws_secretsmanager_secret"} and _is_hidden_data_store(resource)
+    return is_control_plane_sensitive_data_store(resource) and _is_hidden_data_store(resource)
 
 
 def _build_transitive_private_data_finding(
@@ -334,7 +339,7 @@ def _build_transitive_private_data_finding(
     data_posture = [
         f"{data_store.address} is not directly public",
     ]
-    if data_store.resource_type == "aws_db_instance":
+    if is_database_resource(data_store):
         data_posture.append("database has no direct internet ingress path")
     severity_reasoning = build_severity_reasoning(
         internet_exposure=False,

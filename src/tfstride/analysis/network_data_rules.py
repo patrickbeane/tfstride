@@ -6,6 +6,7 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
+from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityGroupRule
@@ -27,7 +28,7 @@ class NetworkDataRuleDetectors:
         indexes = context.analysis_indexes
         assert indexes is not None
         public_workloads_by_security_group = indexes.public_workloads_by_security_group
-        for database in inventory.by_type("aws_db_instance"):
+        for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
             attached_groups = indexes.attached_security_groups(database)
             internet_rules = [
                 (security_group, rule)
@@ -154,7 +155,7 @@ class NetworkDataRuleDetectors:
             (boundary for boundary in boundary_index.values() if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE),
             None,
         )
-        for database in inventory.by_type("aws_db_instance"):
+        for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
             for security_group in indexes.attached_security_groups(database):
                 risky_rules = [
                     rule

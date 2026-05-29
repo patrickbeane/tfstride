@@ -16,6 +16,7 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
     trust_statement_has_supported_narrowing_for_principal,
 )
+from tfstride.analysis.resource_concepts import IDENTITY_ROLE_RESOURCE_TYPES, is_object_storage_resource
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
 
@@ -78,7 +79,7 @@ class PolicyTrustRuleDetectors:
                         continue
                     if assessment.scope_description is None:
                         continue
-                    if resource.resource_type == "aws_s3_bucket":
+                    if is_object_storage_resource(resource):
                         if assessment.is_wildcard and not resource.public_exposure:
                             continue
                         if assessment.is_wildcard and resource.public_exposure:
@@ -163,7 +164,7 @@ class PolicyTrustRuleDetectors:
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
 
-        for role in context.inventory.by_type("aws_iam_role"):
+        for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
             for trust_statement in role.trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
@@ -216,7 +217,7 @@ class PolicyTrustRuleDetectors:
         primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
 
-        for role in context.inventory.by_type("aws_iam_role"):
+        for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
             for trust_statement in role.trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment):
