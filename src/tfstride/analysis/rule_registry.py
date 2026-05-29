@@ -220,7 +220,13 @@ DEFAULT_RULE_METADATA = (
 
 
 DEFAULT_RULE_METADATA_BY_ID = {rule.rule_id: rule for rule in DEFAULT_RULE_METADATA}
-DEFAULT_RULE_REGISTRY = RuleRegistry(list(DEFAULT_RULE_METADATA))
+
+
+def default_rule_registry() -> RuleRegistry:
+    return RuleRegistry(list(DEFAULT_RULE_METADATA))
+
+
+DEFAULT_RULE_REGISTRY = default_rule_registry()
 
 
 def default_rule_metadata(rule_id: str) -> RuleMetadata:

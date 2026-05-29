@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy
+from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.rule_definitions import ExecutableRule, RuleDefinition, RuleEvaluationContext
 from tfstride.models import Finding, ResourceInventory, StrideCategory
 
@@ -29,6 +29,7 @@ class ExecutableRuleTests(unittest.TestCase):
         context = RuleEvaluationContext(
             inventory=ResourceInventory(provider="aws", resources=[]),
             boundary_index={},
+            rule_registry=RuleRegistry([]),
         )
 
         def detector(received_context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
@@ -45,6 +46,7 @@ class ExecutableRuleTests(unittest.TestCase):
         context = RuleEvaluationContext(
             inventory=ResourceInventory(provider="aws", resources=[]),
             boundary_index={},
+            rule_registry=RuleRegistry([]),
             rule_policy=RulePolicy(enabled_rule_ids=frozenset()),
         )
 

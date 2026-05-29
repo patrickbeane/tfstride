@@ -79,11 +79,7 @@ def _build_rule_groups(
 
 class StrideRuleEngine:
     def __init__(self, rule_registry: RuleRegistry | None = None) -> None:
-        self._rule_registry = (
-            rule_registry
-            if rule_registry is not None
-            else _default_rule_registry()
-        )
+        self._rule_registry = rule_registry if rule_registry is not None else _default_rule_registry()
         self._finding_factory = FindingFactory(self._rule_registry)
         posture_detectors = PostureRuleDetectors(self._finding_factory)
         network_data_detectors = NetworkDataRuleDetectors(self._finding_factory)

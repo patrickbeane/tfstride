@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.analysis.rule_registry import RuleRegistry
 from tfstride.models import (
     BoundaryType,
     Finding,
@@ -236,6 +237,7 @@ def _context(
             (boundary.boundary_type, boundary.source, boundary.target): boundary
             for boundary in boundaries
         },
+        rule_registry=RuleRegistry([]),
     )
 
 

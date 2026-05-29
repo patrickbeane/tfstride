@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RuleRegistry
+from tfstride.analysis.rule_registry import RuleMetadata, RuleRegistry, default_rule_registry
 from tfstride.app import TfStride
 from tfstride.config import ProjectConfigLoadError, load_project_config
 from tfstride.filtering import FindingFilterLoadError, apply_finding_filters, render_baseline
@@ -96,9 +96,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_rules:
         if args.json:
-            sys.stdout.write(render_rule_catalog_json(DEFAULT_RULE_REGISTRY))
+            sys.stdout.write(render_rule_catalog_json())
         else:
-            sys.stdout.write(render_rule_list(DEFAULT_RULE_REGISTRY))
+            sys.stdout.write(render_rule_list())
         return 0
     if args.json:
         parser.error("argument --json: only valid with --list-rules")
@@ -166,19 +166,21 @@ def _meets_or_exceeds(severity: Severity, threshold: Severity) -> bool:
     return severity.rank >= threshold.rank
 
 
-def render_rule_list(registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> str:
+def render_rule_list(registry: RuleRegistry | None = None) -> str:
+    resolved_registry = registry if registry is not None else default_rule_registry()
     lines = ["tfSTRIDE Rules", ""]
-    for rule in registry.rules():
+    for rule in resolved_registry.rules():
         lines.extend(_render_rule(rule))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_rule_catalog_json(registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> str:
+def render_rule_catalog_json(registry: RuleRegistry | None = None) -> str:
+    resolved_registry = registry if registry is not None else default_rule_registry()
     payload = {
         "kind": RULE_CATALOG_KIND,
         "version": RULE_CATALOG_VERSION,
-        "rules": [_rule_catalog_entry(rule) for rule in registry.rules()],
+        "rules": [_rule_catalog_entry(rule) for rule in resolved_registry.rules()],
     }
     return json.dumps(payload, indent=2) + "\n"
 

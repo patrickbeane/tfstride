@@ -10,19 +10,26 @@ from tfstride.analysis.rule_registry import (
     RuleRegistry,
     apply_severity_overrides,
     default_rule_metadata,
+    default_rule_registry,
 )
 from tfstride.models import Finding, Severity, SeverityReasoning, StrideCategory
 
 
 class RuleRegistryTests(unittest.TestCase):
     def test_default_registry_is_derived_from_shared_metadata(self) -> None:
-	    self.assertEqual(DEFAULT_RULE_REGISTRY.rules(), DEFAULT_RULE_METADATA)
-	
+        self.assertEqual(DEFAULT_RULE_REGISTRY.rules(), DEFAULT_RULE_METADATA)
+
+    def test_default_registry_factory_returns_distinct_registry_from_same_metadata(self) -> None:
+        registry = default_rule_registry()
+
+        self.assertIsNot(registry, DEFAULT_RULE_REGISTRY)
+        self.assertEqual(registry.rules(), DEFAULT_RULE_METADATA)
+
     def test_default_rule_metadata_uses_shared_metadata_lookup(self) -> None:
         metadata = default_rule_metadata("aws-s3-public-access")
 
         self.assertIs(metadata, DEFAULT_RULE_REGISTRY.get("aws-s3-public-access"))
-	
+
     def test_rules_preserves_registry_order(self) -> None:
         first = RuleMetadata(
             rule_id="aws-first-rule",

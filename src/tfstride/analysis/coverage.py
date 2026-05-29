@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy, RuleRegistry
+from tfstride.analysis.rule_registry import RulePolicy, RuleRegistry, default_rule_registry
 from tfstride.models import (
     AnalysisCoverage,
     NormalizedResource,
@@ -22,12 +22,13 @@ UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
 def build_analysis_coverage(
     inventory: ResourceInventory,
     *,
-    rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY,
+    rule_registry: RuleRegistry | None = None,
     rule_policy: RulePolicy | None = None,
 ) -> AnalysisCoverage:
+    resolved_rule_registry = rule_registry if rule_registry is not None else default_rule_registry()
     return AnalysisCoverage(
         resources=_build_resource_coverage(inventory),
-        rules=_build_rule_coverage(rule_registry, rule_policy),
+        rules=_build_rule_coverage(resolved_rule_registry, rule_policy),
         references=_build_reference_coverage(inventory.resources),
     )
 

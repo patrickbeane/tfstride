@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.analysis.rule_registry import RuleRegistry
 from tfstride.models import (
     BoundaryType,
     Finding,
@@ -39,6 +40,7 @@ class IAMRuleDetectorsTests(unittest.TestCase):
         context = RuleEvaluationContext(
             inventory=ResourceInventory(provider="aws", resources=[policy]),
             boundary_index={},
+            rule_registry=RuleRegistry([]),
         )
 
         findings = self.detectors.detect_wildcard_permissions(
@@ -99,6 +101,7 @@ class IAMRuleDetectorsTests(unittest.TestCase):
         context = RuleEvaluationContext(
             inventory=ResourceInventory(provider="aws", resources=[role, workload]),
             boundary_index={(boundary.boundary_type, boundary.source, boundary.target): boundary},
+            rule_registry=RuleRegistry([]),
         )
 
         findings = self.detectors.detect_workload_role_sensitive_permissions(

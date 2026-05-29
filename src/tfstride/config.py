@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
+from tfstride.analysis.rule_registry import RulePolicy, default_rule_registry
 from tfstride.models import Severity
 
 
@@ -110,7 +110,8 @@ def _load_rule_policy(payload: Any, config_path: Path) -> RulePolicy:
     enabled = _optional_string_list(payload, "enable", config_path)
     disabled = _optional_string_list(payload, "disable", config_path) or []
     severity_overrides = _severity_override_map(payload.get("severity_overrides"), config_path)
-    known_rule_ids = DEFAULT_RULE_REGISTRY.known_rule_ids()
+    rule_registry = default_rule_registry()
+    known_rule_ids = rule_registry.known_rule_ids()
 
     enabled_ids = set(enabled) if enabled is not None else None
     disabled_ids = set(disabled)
@@ -123,7 +124,7 @@ def _load_rule_policy(payload: Any, config_path: Path) -> RulePolicy:
         overlap = ", ".join(sorted(enabled_ids.intersection(disabled_ids)))
         raise ProjectConfigLoadError(f"`rules.enable` and `rules.disable` overlap in {config_path}: {overlap}")
 
-    active_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids() if enabled_ids is None else enabled_ids
+    active_rule_ids = rule_registry.default_enabled_rule_ids() if enabled_ids is None else enabled_ids
     active_rule_ids.difference_update(disabled_ids)
     return RulePolicy(
         enabled_rule_ids=frozenset(active_rule_ids),
