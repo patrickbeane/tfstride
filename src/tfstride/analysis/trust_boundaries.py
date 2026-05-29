@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
+from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
+from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.policy_conditions import (
     PrincipalAssessment,
     federated_provider_description,
@@ -14,7 +15,10 @@ WORKLOAD_TYPES = {"aws_instance", "aws_lambda_function", "aws_ecs_service"}
 DATA_STORE_TYPES = {"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}
 
 
-def detect_trust_boundaries(inventory: ResourceInventory) -> list[TrustBoundary]:
+def detect_trust_boundaries(
+    inventory: ResourceInventory,
+    indexes: AnalysisIndexes | None = None,
+) -> list[TrustBoundary]:
     boundaries: list[TrustBoundary] = []
     seen: set[tuple[str, str, str]] = set()
 
@@ -43,7 +47,7 @@ def detect_trust_boundaries(inventory: ResourceInventory) -> list[TrustBoundary]
         )
 
     resources = inventory.resources
-    role_index = build_role_index(inventory)
+    analysis_indexes = indexes if indexes is not None else build_analysis_indexes(inventory)
 
     for resource in resources:
         if resource.direct_internet_reachable and resource.resource_type in {
@@ -80,9 +84,14 @@ def detect_trust_boundaries(inventory: ResourceInventory) -> list[TrustBoundary]
     workloads = [resource for resource in resources if resource.resource_type in WORKLOAD_TYPES]
     data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_TYPES]
     for workload in workloads:
-        attached_role = resolve_workload_role(workload, role_index)
+        attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
         for data_store in data_stores:
-            reachability_rationale = _workload_reaches_data_store(workload, data_store, attached_role, inventory)
+            reachability_rationale = _workload_reaches_data_store(
+                workload,
+                data_store,
+                attached_role,
+                analysis_indexes,
+            )
             if reachability_rationale:
                 add_boundary(
                     BoundaryType.WORKLOAD_TO_DATA_STORE,
@@ -149,10 +158,10 @@ def _workload_reaches_data_store(
     workload: NormalizedResource,
     data_store: NormalizedResource,
     attached_role: NormalizedResource | None,
-    inventory: ResourceInventory,
+    indexes: AnalysisIndexes,
 ) -> str | None:
     if data_store.resource_type == "aws_db_instance":
-        return _database_reachability_rationale(workload, data_store, inventory)
+        return _database_reachability_rationale(workload, data_store, indexes)
     if data_store.resource_type == "aws_s3_bucket":
         if attached_role is None:
             return None
@@ -197,13 +206,13 @@ def _workload_reaches_data_store(
 def _database_reachability_rationale(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    inventory: ResourceInventory,
+    indexes: AnalysisIndexes,
 ) -> str | None:
     if workload.vpc_id and data_store.vpc_id and workload.vpc_id != data_store.vpc_id:
         if not data_store.direct_internet_reachable:
             return None
 
-    if _database_allows_workload_security_group(workload, data_store, inventory):
+    if _database_allows_workload_security_group(workload, data_store, indexes):
         return (
             "Application or function workloads cross into a higher-sensitivity data plane when "
             "database ingress security groups explicitly trust the workload security group."
@@ -228,14 +237,14 @@ def _database_reachability_rationale(
 def _database_allows_workload_security_group(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    inventory: ResourceInventory,
+    indexes: AnalysisIndexes,
 ) -> bool:
     if not workload.security_group_ids or not data_store.security_group_ids:
         return False
     workload_group_ids = set(workload.security_group_ids)
     for security_group_id in data_store.security_group_ids:
-        security_group = inventory.get_by_identifier(security_group_id)
-        if security_group is None or security_group.resource_type != "aws_security_group":
+        security_group = indexes.security_groups_by_reference.get(security_group_id)
+        if security_group is None:
             continue
         for rule in security_group.network_rules:
             if rule.direction != "ingress":

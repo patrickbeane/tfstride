@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from tfstride.models import NormalizedResource, ResourceInventory
 
 
@@ -16,7 +18,7 @@ def build_role_index(inventory: ResourceInventory) -> dict[str, NormalizedResour
 
 def resolve_workload_role(
     workload: NormalizedResource,
-    role_index: dict[str, NormalizedResource],
+    role_index: Mapping[str, NormalizedResource],
 ) -> NormalizedResource | None:
     for role_arn in workload.attached_role_arns:
         role = role_index.get(role_arn)
