@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
     collect_evidence,
@@ -12,7 +13,7 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.analysis.rule_helpers import attached_security_groups, join_clauses, subnet_posture
+from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import (
     BoundaryType,
     Finding,
@@ -36,7 +37,9 @@ class PathChainRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index
-        trusted_workload_hops = _trusted_workload_hops(inventory)
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        trusted_workload_hops = _trusted_workload_hops(inventory, indexes)
         private_data_paths = _private_workload_data_paths(boundary_index, inventory)
         seen: set[tuple[str, ...]] = set()
 
@@ -207,15 +210,11 @@ class PathChainRuleDetectors:
 
 def _trusted_workload_hops(
     inventory: ResourceInventory,
+    indexes: AnalysisIndexes,
 ) -> dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]]:
-    resources_by_security_group: dict[str, list[NormalizedResource]] = {}
-    for resource in inventory.resources:
-        for security_group_id in resource.security_group_ids:
-            resources_by_security_group.setdefault(security_group_id, []).append(resource)
-
     trusted_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]] = {}
     for workload in inventory.by_type("aws_instance", "aws_ecs_service"):
-        for security_group in attached_security_groups(workload, inventory):
+        for security_group in indexes.attached_security_groups(workload):
             for rule in security_group.network_rules:
                 if rule.direction != "ingress" or not rule.referenced_security_group_ids:
                     continue
@@ -223,7 +222,7 @@ def _trusted_workload_hops(
                     {
                         source.address: source
                         for security_group_id in rule.referenced_security_group_ids
-                        for source in resources_by_security_group.get(security_group_id, [])
+                        for source in indexes.resources_by_security_group.get(security_group_id, ())
                         if source.address != workload.address
                     }.values(),
                     key=lambda source: source.address,

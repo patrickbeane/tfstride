@@ -7,7 +7,7 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
-from tfstride.analysis.role_helpers import build_role_index, resolve_workload_role
+from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
     BoundaryType,
@@ -103,13 +103,14 @@ class IAMRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        role_index = build_role_index(context.inventory)
+        indexes = context.analysis_indexes
+        assert indexes is not None
         for workload in context.inventory.by_type(
             "aws_instance",
             "aws_lambda_function",
             "aws_ecs_service",
         ):
-            role = resolve_workload_role(workload, role_index)
+            role = resolve_workload_role(workload, indexes.role_index)
             if role is None:
                 continue
             sensitive_actions = _sensitive_actions(role.policy_statements)

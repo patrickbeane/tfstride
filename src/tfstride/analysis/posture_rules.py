@@ -7,7 +7,7 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.analysis.rule_helpers import attached_security_groups, subnet_posture
+from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
 from tfstride.resource_helpers import describe_security_group_rule
 
@@ -23,10 +23,12 @@ class PostureRuleDetectors:
     ) -> list[Finding]:
         findings: list[Finding] = []
         inventory = context.inventory
+        indexes = context.analysis_indexes
+        assert indexes is not None
         for resource in inventory.by_type("aws_instance"):
             if not resource.public_exposure:
                 continue
-            attached_groups = attached_security_groups(resource, inventory)
+            attached_groups = indexes.attached_security_groups(resource)
             risky_rules = [
                 (security_group, rule)
                 for security_group in attached_groups

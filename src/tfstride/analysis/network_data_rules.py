@@ -7,7 +7,7 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.analysis.rule_helpers import attached_security_groups, join_clauses, subnet_posture
+from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityGroupRule
 from tfstride.resource_helpers import describe_security_group_rule
 
@@ -24,16 +24,11 @@ class NetworkDataRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index
-        # Treat security groups attached to internet-reachable workloads as the "public tier"
-        # so database rules can reason about indirect exposure, not just raw 0.0.0.0/0 ingress.
-        public_workloads_by_security_group: dict[str, list[NormalizedResource]] = {}
-        for resource in inventory.resources:
-            if not resource.public_exposure:
-                continue
-            for security_group_id in resource.security_group_ids:
-                public_workloads_by_security_group.setdefault(security_group_id, []).append(resource)
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        public_workloads_by_security_group = indexes.public_workloads_by_security_group
         for database in inventory.by_type("aws_db_instance"):
-            attached_groups = attached_security_groups(database, inventory)
+            attached_groups = indexes.attached_security_groups(database)
             internet_rules = [
                 (security_group, rule)
                 for security_group in attached_groups
@@ -49,7 +44,7 @@ class NetworkDataRuleDetectors:
                         {
                             workload.address: workload
                             for security_group_id in rule.referenced_security_group_ids
-                            for workload in public_workloads_by_security_group.get(security_group_id, [])
+                            for workload in public_workloads_by_security_group.get(security_group_id, ())
                         }.values(),
                         key=lambda workload: workload.address,
                     )
@@ -152,18 +147,15 @@ class NetworkDataRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index
-        public_security_group_map: dict[str, list[NormalizedResource]] = {}
-        for resource in inventory.resources:
-            if not resource.public_exposure:
-                continue
-            for security_group_id in resource.security_group_ids:
-                public_security_group_map.setdefault(security_group_id, []).append(resource)
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        public_security_group_map = indexes.public_workloads_by_security_group
         public_private_boundary = next(
             (boundary for boundary in boundary_index.values() if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE),
             None,
         )
         for database in inventory.by_type("aws_db_instance"):
-            for security_group in attached_security_groups(database, inventory):
+            for security_group in indexes.attached_security_groups(database):
                 risky_rules = [
                     rule
                     for rule in security_group.network_rules
@@ -177,7 +169,7 @@ class NetworkDataRuleDetectors:
                         workload.address
                         for rule in risky_rules
                         for security_group_id in rule.referenced_security_group_ids
-                        for workload in public_security_group_map.get(security_group_id, [])
+                        for workload in public_security_group_map.get(security_group_id, ())
                     }
                 )
                 severity_reasoning = build_severity_reasoning(
@@ -205,7 +197,7 @@ class NetworkDataRuleDetectors:
                             evidence_item(
                                 "network_path",
                                 [
-                                    f"{security_group.address} allows {', '.join(rule.referenced_security_group_ids)} attached to {', '.join(sorted({workload.address for security_group_id in rule.referenced_security_group_ids for workload in public_security_group_map.get(security_group_id, [])}))}"
+                                    f"{security_group.address} allows {', '.join(rule.referenced_security_group_ids)} attached to {', '.join(sorted({workload.address for security_group_id in rule.referenced_security_group_ids for workload in public_security_group_map.get(security_group_id, ())}))}"
                                     for rule in risky_rules
                                 ],
                             ),
