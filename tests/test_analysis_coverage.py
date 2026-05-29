@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, Severity
+from tfstride.resource_metadata import InventoryMetadata
 
 
 class AnalysisCoverageTests(unittest.TestCase):
@@ -20,15 +21,18 @@ class AnalysisCoverageTests(unittest.TestCase):
                 "unresolved_role_references": ["missing-role"],
             },
         )
+        metadata = {}
+        InventoryMetadata.TOTAL_INPUT_RESOURCES.set(metadata, 2)
+        InventoryMetadata.PROVIDER_RESOURCE_COUNT.set(metadata, 2)
+        InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.set(
+            metadata,
+            {"aws_cloudwatch_log_group": 1},
+        )
         inventory = ResourceInventory(
             provider="aws",
             resources=[resource],
             unsupported_resources=["aws_cloudwatch_log_group.app"],
-            metadata={
-                "total_input_resources": 2,
-                "provider_resource_count": 2,
-                "unsupported_resource_types": {"aws_cloudwatch_log_group": 1},
-            },
+            metadata=metadata,
         )
         coverage = build_analysis_coverage(
             inventory,

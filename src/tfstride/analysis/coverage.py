@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Mapping
+
 import json
 from typing import Any
 
@@ -13,6 +13,7 @@ from tfstride.models import (
     RuleCoverage,
     UnresolvedReference,
 )
+from tfstride.resource_metadata import InventoryMetadata
 
 
 UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
@@ -32,12 +33,16 @@ def build_analysis_coverage(
 
 
 def _build_resource_coverage(inventory: ResourceInventory) -> ResourceCoverage:
+    metadata = inventory.metadata
+    total_resources = InventoryMetadata.TOTAL_INPUT_RESOURCES.get(metadata)
+    provider_resources = InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(metadata)
+
     return ResourceCoverage(
-        total_resources=_metadata_int(inventory.metadata, "total_input_resources", len(inventory.resources)),
-        provider_resources=_metadata_int(inventory.metadata, "provider_resource_count", len(inventory.resources)),
+        total_resources=total_resources if total_resources is not None else len(inventory.resources),
+        provider_resources=provider_resources if provider_resources is not None else len(inventory.resources),
         normalized_resources=len(inventory.resources),
         unsupported_resources=len(inventory.unsupported_resources),
-        unsupported_resource_types=_metadata_int_map(inventory.metadata, "unsupported_resource_types"),
+        unsupported_resource_types=InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(metadata),
     )
 
 
@@ -95,28 +100,6 @@ def _build_reference_coverage(resources: list[NormalizedResource]) -> ReferenceC
         unresolved_reference_count=unresolved_count,
         unresolved_references=unresolved_references,
     )
-
-
-def _metadata_int(metadata: Mapping[str, Any], key: str, default: int) -> int:
-    try:
-        return int(metadata.get(key, default))
-    except (TypeError, ValueError):
-        return default
-
-
-def _metadata_int_map(metadata: Mapping[str, Any], key: str) -> dict[str, int]:
-    value = metadata.get(key)
-    if not isinstance(value, dict):
-        return {}
-
-    parsed: dict[str, int] = {}
-    for item_key, item_value in value.items():
-        try:
-            count = int(item_value)
-        except (TypeError, ValueError):
-            continue
-        parsed[str(item_key)] = count
-    return dict(sorted(parsed.items()))
 
 
 def _coerce_reference_values(value: Any) -> list[str]:

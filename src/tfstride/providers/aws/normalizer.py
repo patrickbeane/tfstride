@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.resource_helpers import parse_aws_account_id
+from tfstride.resource_metadata import InventoryMetadata
 from tfstride.providers.aws.compute_normalizers import (
     normalize_ecs_cluster,
     normalize_ecs_service,
@@ -110,18 +112,21 @@ class AwsNormalizer(ProviderNormalizer):
         ]
         self._resource_decorator.decorate(normalized)
         primary_account_id = _infer_primary_account_id(normalized)
+        metadata: dict[str, Any] = {}
+        InventoryMetadata.PRIMARY_ACCOUNT_ID.set(metadata, primary_account_id)
+        InventoryMetadata.SUPPORTED_RESOURCE_TYPES.set(metadata, sorted(SUPPORTED_AWS_TYPES))
+        InventoryMetadata.TOTAL_INPUT_RESOURCES.set(metadata, len(resources))
+        InventoryMetadata.PROVIDER_RESOURCE_COUNT.set(metadata, len(aws_resources))
+        InventoryMetadata.NORMALIZED_RESOURCE_COUNT.set(metadata, len(normalized))
+        InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.set(
+            metadata,
+            dict(sorted(unsupported_resource_types.items())),
+        )
         return ResourceInventory(
             provider=self.provider,
             resources=normalized,
             unsupported_resources=unsupported,
-            metadata={
-                "primary_account_id": primary_account_id,
-                "supported_resource_types": sorted(SUPPORTED_AWS_TYPES),
-                "total_input_resources": len(resources),
-                "provider_resource_count": len(aws_resources),
-                "normalized_resource_count": len(normalized),
-                "unsupported_resource_types": dict(sorted(unsupported_resource_types.items())),
-            },
+            metadata=metadata,
         )
 
     def _normalize_resource(self, resource: TerraformResource) -> NormalizedResource:

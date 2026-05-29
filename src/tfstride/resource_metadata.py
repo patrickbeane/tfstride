@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
@@ -12,7 +13,7 @@ T = TypeVar("T")
 class MetadataField(Generic[T]):
     key: str
 
-    def get(self, metadata: dict[str, Any]) -> T:
+    def get(self, metadata: Mapping[str, Any]) -> T:
         raise NotImplementedError
 
     def set(self, metadata: dict[str, Any], value: T) -> None:
@@ -23,7 +24,7 @@ class MetadataField(Generic[T]):
 class BoolMetadataField(MetadataField[bool]):
     default: bool = False
 
-    def get(self, metadata: dict[str, Any]) -> bool:
+    def get(self, metadata: Mapping[str, Any]) -> bool:
         return bool(metadata.get(self.key, self.default))
 
     def set(self, metadata: dict[str, Any], value: bool) -> None:
@@ -32,7 +33,7 @@ class BoolMetadataField(MetadataField[bool]):
 
 @dataclass(frozen=True, slots=True)
 class StringListMetadataField(MetadataField[list[str]]):
-    def get(self, metadata: dict[str, Any]) -> list[str]:
+    def get(self, metadata: Mapping[str, Any]) -> list[str]:
         values = metadata.get(self.key)
         if not isinstance(values, list):
             return []
@@ -53,7 +54,7 @@ class StringListMetadataField(MetadataField[list[str]]):
 
 @dataclass(frozen=True, slots=True)
 class OptionalStringMetadataField(MetadataField[str | None]):
-    def get(self, metadata: dict[str, Any]) -> str | None:
+    def get(self, metadata: Mapping[str, Any]) -> str | None:
         value = metadata.get(self.key)
         if value is None:
             return None
@@ -69,7 +70,7 @@ class OptionalStringMetadataField(MetadataField[str | None]):
 
 @dataclass(frozen=True, slots=True)
 class OptionalIntMetadataField(MetadataField[int | None]):
-    def get(self, metadata: dict[str, Any]) -> int | None:
+    def get(self, metadata: Mapping[str, Any]) -> int | None:
         value = metadata.get(self.key)
         if value is None or value == "":
             return None
@@ -87,7 +88,7 @@ class OptionalIntMetadataField(MetadataField[int | None]):
 
 @dataclass(frozen=True, slots=True)
 class DictMetadataField(MetadataField[dict[str, Any]]):
-    def get(self, metadata: dict[str, Any]) -> dict[str, Any]:
+    def get(self, metadata: Mapping[str, Any]) -> dict[str, Any]:
         value = metadata.get(self.key)
         if not isinstance(value, dict):
             return {}
@@ -102,7 +103,7 @@ class DictMetadataField(MetadataField[dict[str, Any]]):
 
 @dataclass(frozen=True, slots=True)
 class DictListMetadataField(MetadataField[list[dict[str, Any]]]):
-    def get(self, metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    def get(self, metadata: Mapping[str, Any]) -> list[dict[str, Any]]:
         values = metadata.get(self.key)
         if not isinstance(values, list):
             return []
@@ -114,7 +115,7 @@ class DictListMetadataField(MetadataField[list[dict[str, Any]]]):
 
 @dataclass(frozen=True, slots=True)
 class BoolDictMetadataField(MetadataField[dict[str, bool] | None]):
-    def get(self, metadata: dict[str, Any]) -> dict[str, bool] | None:
+    def get(self, metadata: Mapping[str, Any]) -> dict[str, bool] | None:
         value = metadata.get(self.key)
         if not isinstance(value, dict):
             return None
@@ -125,6 +126,28 @@ class BoolDictMetadataField(MetadataField[dict[str, bool] | None]):
             metadata.pop(self.key, None)
             return
         metadata[self.key] = {str(item_key): bool(item) for item_key, item in value.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class IntMapMetadataField(MetadataField[dict[str, int]]):
+    def get(self, metadata: Mapping[str, Any]) -> dict[str, int]:
+        value = metadata.get(self.key)
+        if not isinstance(value, dict):
+            return {}
+
+        parsed: dict[str, int] = {}
+        for item_key, item_value in value.items():
+            try:
+                parsed[str(item_key)] = int(item_value)
+            except (TypeError, ValueError):
+                continue
+        return dict(sorted(parsed.items()))
+
+    def set(self, metadata: dict[str, Any], value: dict[str, int] | None) -> None:
+        if value is None:
+            metadata.pop(self.key, None)
+            return
+        metadata[self.key] = self.get({self.key: value})
 
 
 class ResourceMetadata:
@@ -220,3 +243,8 @@ class ResourceMetadata:
 
 class InventoryMetadata:
     PRIMARY_ACCOUNT_ID = OptionalStringMetadataField("primary_account_id")
+    SUPPORTED_RESOURCE_TYPES = StringListMetadataField("supported_resource_types")
+    TOTAL_INPUT_RESOURCES = OptionalIntMetadataField("total_input_resources")
+    PROVIDER_RESOURCE_COUNT = OptionalIntMetadataField("provider_resource_count")
+    NORMALIZED_RESOURCE_COUNT = OptionalIntMetadataField("normalized_resource_count")
+    UNSUPPORTED_RESOURCE_TYPES = IntMapMetadataField("unsupported_resource_types")

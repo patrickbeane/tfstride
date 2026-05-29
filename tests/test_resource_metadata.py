@@ -4,7 +4,9 @@ import unittest
 
 from tfstride.resource_metadata import (
     BoolMetadataField,
+    IntMapMetadataField,
     InventoryMetadata,
+    OptionalIntMetadataField,
     ResourceMetadata,
     StringListMetadataField,
 )
@@ -168,6 +170,58 @@ class ResourceMetadataFieldTests(unittest.TestCase):
         InventoryMetadata.PRIMARY_ACCOUNT_ID.set(metadata, None)
         self.assertIsNone(InventoryMetadata.PRIMARY_ACCOUNT_ID.get(metadata))
         self.assertNotIn("primary_account_id", metadata)
+
+    def test_inventory_count_fields_use_optional_int_semantics(self) -> None:
+        metadata = {}
+
+        InventoryMetadata.TOTAL_INPUT_RESOURCES.set(metadata, 3)
+        InventoryMetadata.PROVIDER_RESOURCE_COUNT.set(metadata, "2")
+        InventoryMetadata.NORMALIZED_RESOURCE_COUNT.set(metadata, 1)
+
+        self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(metadata), 3)
+        self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(metadata), 2)
+        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(metadata), 1)
+
+        metadata["total_input_resources"] = "unknown"
+        self.assertIsNone(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(metadata))
+
+        InventoryMetadata.NORMALIZED_RESOURCE_COUNT.set(metadata, None)
+        self.assertNotIn("normalized_resource_count", metadata)
+
+    def test_inventory_collection_fields_are_declared_and_coerce_values(self) -> None:
+        metadata = {}
+
+        InventoryMetadata.SUPPORTED_RESOURCE_TYPES.set(metadata, ["aws_vpc", "", None, 42])
+        InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.set(
+            metadata,
+            {"aws_cloudwatch_log_group": "2", "invalid": "unknown", 3: 4},
+        )
+
+        self.assertIsInstance(InventoryMetadata.SUPPORTED_RESOURCE_TYPES, StringListMetadataField)
+        self.assertIsInstance(InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES, IntMapMetadataField)
+        self.assertEqual(
+            InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(metadata),
+            ["aws_vpc", "42"],
+        )
+        self.assertEqual(
+            InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(metadata),
+            {"3": 4, "aws_cloudwatch_log_group": 2},
+        )
+
+        InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.set(metadata, None)
+        self.assertNotIn("unsupported_resource_types", metadata)
+
+    def test_inventory_count_fields_are_declared(self) -> None:
+        fields = [
+            (InventoryMetadata.TOTAL_INPUT_RESOURCES, "total_input_resources"),
+            (InventoryMetadata.PROVIDER_RESOURCE_COUNT, "provider_resource_count"),
+            (InventoryMetadata.NORMALIZED_RESOURCE_COUNT, "normalized_resource_count"),
+        ]
+
+        for field, key in fields:
+            with self.subTest(key=key):
+                self.assertIsInstance(field, OptionalIntMetadataField)
+                self.assertEqual(field.key, key)
 
 
 if __name__ == "__main__":
