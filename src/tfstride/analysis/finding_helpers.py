@@ -44,12 +44,15 @@ def collect_evidence(*items: EvidenceItem | None) -> list[EvidenceItem]:
 
 def evidence_item(key: str, values: list[str]) -> EvidenceItem | None:
     deduped_values: list[str] = []
+    seen_values: set[str] = set()
     for value in values:
         if not value:
             continue
         text = str(value)
-        if text not in deduped_values:
-            deduped_values.append(text)
+        if text in seen_values:
+            continue
+        seen_values.add(text)
+        deduped_values.append(text)
     if not deduped_values:
         return None
     return EvidenceItem(key=key, values=deduped_values)

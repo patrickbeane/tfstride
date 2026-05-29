@@ -256,6 +256,7 @@ def _resource_policy_principals(
     primary_account_id: str | None,
 ) -> list[PrincipalAssessment]:
     principals: list[PrincipalAssessment] = []
+    seen_principals: set[str] = set()
     for statement in resource.policy_statements:
         if statement.effect != "Allow":
             continue
@@ -266,8 +267,10 @@ def _resource_policy_principals(
                 continue
             if assessment.scope_description is None:
                 continue
-            if all(existing.principal != assessment.principal for existing in principals):
-                principals.append(assessment)
+            if assessment.principal in seen_principals:
+                continue
+            seen_principals.add(assessment.principal)
+            principals.append(assessment)
     return principals
 
 

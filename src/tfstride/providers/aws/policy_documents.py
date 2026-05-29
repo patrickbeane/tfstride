@@ -223,6 +223,7 @@ def compact_condition_entries(
 def normalize_condition_values(value: Any) -> list[str]:
     raw_values = as_list(value)
     normalized: list[str] = []
+    seen_values: set[str] = set()
     for raw_value in raw_values:
         if raw_value in (None, "", []):
             continue
@@ -230,6 +231,8 @@ def normalize_condition_values(value: Any) -> list[str]:
             text = json.dumps(raw_value, sort_keys=True)
         else:
             text = str(raw_value)
-        if text not in normalized:
-            normalized.append(text)
+        if text in seen_values:
+            continue
+        seen_values.add(text)
+        normalized.append(text)
     return normalized

@@ -153,10 +153,13 @@ def trust_statement_narrowing_keys(trust_statement: Mapping[str, Any]) -> list[s
     if not isinstance(raw_keys, list):
         return []
     parsed_keys: list[str] = []
+    seen_keys: set[str] = set()
     for raw_key in raw_keys:
         key = str(raw_key).strip()
-        if key and key not in parsed_keys:
-            parsed_keys.append(key)
+        if not key or key in seen_keys:
+            continue
+        seen_keys.add(key)
+        parsed_keys.append(key)
     return parsed_keys
 
 
@@ -331,11 +334,11 @@ def _federated_narrowing_keys(
         return []
 
     narrowing_keys: list[str] = []
+    seen_keys: set[str] = set()
     for condition in trust_statement_narrowing_conditions(trust_statement):
-        if condition.key not in relevant_keys:
+        if condition.key not in relevant_keys or condition.key in seen_keys:
             continue
-        if condition.key in narrowing_keys:
-            continue
+        seen_keys.add(condition.key)
         narrowing_keys.append(condition.key)
     return narrowing_keys
 
@@ -433,10 +436,13 @@ def _coerce_string_list(value: Any) -> list[str]:
         raw_values = [value]
 
     parsed_values: list[str] = []
+    seen_values: set[str] = set()
     for raw_value in raw_values:
         text = str(raw_value).strip()
-        if text and text not in parsed_values:
-            parsed_values.append(text)
+        if not text or text in seen_values:
+            continue
+        seen_values.add(text)
+        parsed_values.append(text)
     return parsed_values
 
 

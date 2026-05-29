@@ -503,6 +503,7 @@ class MarkEcsLoadBalancerExposureStage:
             if resource.resource_type != "aws_ecs_service":
                 continue
             fronting_load_balancers: list[str] = []
+            seen_load_balancers: set[str] = set()
             attached_security_groups = [
                 context.index.security_groups[sg_id]
                 for sg_id in resource.security_group_ids
@@ -517,8 +518,10 @@ class MarkEcsLoadBalancerExposureStage:
                             security_group_id,
                             [],
                         ):
-                            if load_balancer.address not in fronting_load_balancers:
-                                fronting_load_balancers.append(load_balancer.address)
+                            if load_balancer.address in seen_load_balancers:
+                                continue
+                            seen_load_balancers.add(load_balancer.address)
+                            fronting_load_balancers.append(load_balancer.address)
             resource.set_metadata_field(
                 ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER,
                 bool(fronting_load_balancers),
