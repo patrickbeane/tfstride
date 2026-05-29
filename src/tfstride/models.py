@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeVar
 
 from tfstride.resource_metadata import (
     InventoryMetadata,
@@ -13,6 +13,9 @@ from tfstride.resource_metadata import (
     ResourceMetadata,
     StringListMetadataField,
 )
+
+
+_MetadataValue = TypeVar("_MetadataValue")
 
 
 class ResourceCategory(str, Enum):
@@ -163,10 +166,13 @@ class NormalizedResource:
         """Return a detached metadata copy for serialization boundaries."""
         return deepcopy(self._metadata)
 
+    def get_metadata_field(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
+        return field.get(self._metadata)
+
     def has_metadata_field(self, field: MetadataField[Any]) -> bool:
         return field.key in self._metadata
 
-    def set_metadata_field(self, field: MetadataField[Any], value: Any) -> None:
+    def set_metadata_field(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
         field.set(self._metadata, value)
 
     def append_metadata_field(self, field: StringListMetadataField, value: str | None) -> None:

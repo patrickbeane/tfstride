@@ -217,14 +217,35 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         resource = _resource(address="aws_iam_role.app", resource_type="aws_iam_role")
 
         self.assertFalse(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertFalse(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, None)
 
         self.assertTrue(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertTrue(resource.metadata["public_access_configured"])
+        self.assertEqual(
+            resource.get_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES),
+            ["missing-role"],
+        )
         self.assertEqual(resource.metadata["unresolved_role_references"], ["missing-role"])
+
+    def test_metadata_field_getter_uses_field_copy_semantics(self) -> None:
+        resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")
+        resource.set_metadata_field(
+            ResourceMetadata.POLICY_DOCUMENT,
+            {"Statement": [{"Effect": "Allow"}]},
+        )
+
+        policy_document = resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)
+        policy_document["Statement"][0]["Effect"] = "Deny"
+
+        self.assertEqual(
+            resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+            {"Statement": [{"Effect": "Allow"}]},
+        )
 
     def test_posture_property_setters_update_metadata(self) -> None:
         resource = _resource(address="aws_db_instance.app", resource_type="aws_db_instance")
