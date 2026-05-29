@@ -658,7 +658,20 @@ class TFSAnalysisTests(unittest.TestCase):
         engine = TfStride(provider_registry=ProviderRegistry())
 	
         with self.assertRaises(ProviderNotRegisteredError):
-            engine.analyze_plan(FIXTURE_PATH)	
+            engine.analyze_plan(FIXTURE_PATH)
+
+    def test_tfs_exposes_read_only_configuration_without_public_rule_engine(self) -> None:
+	    registry = ProviderRegistry()
+	    rule_policy = RulePolicy(enabled_rule_ids=frozenset())
+	    engine = TfStride(provider_registry=registry, rule_policy=rule_policy)
+			
+	    self.assertIs(engine.provider_registry, registry)
+	    self.assertIs(engine.rule_policy, rule_policy)
+	    self.assertFalse(hasattr(engine, "rule_engine"))
+	    with self.assertRaises(AttributeError):
+	        engine.provider_registry = ProviderRegistry()
+	    with self.assertRaises(AttributeError):
+	        engine.rule_policy = None	
 
     def test_analysis_normalizes_supported_resources_and_tracks_unsupported(self) -> None:
         self.assertEqual(len(self.result.inventory.resources), 23)
