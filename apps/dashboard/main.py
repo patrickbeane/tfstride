@@ -152,7 +152,7 @@ class _UploadTooLarge(ValueError):
     """Raised when a dashboard upload exceeds the request body size limit."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class DashboardAnalysis:
     payload: TFSReportPayload
     markdown_report: str

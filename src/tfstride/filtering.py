@@ -19,7 +19,7 @@ class FindingFilterLoadError(ValueError):
     """Raised when a suppressions or baseline file cannot be parsed."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class SuppressionRule:
     suppression_id: str
     reason: str
