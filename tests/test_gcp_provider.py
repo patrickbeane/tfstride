@@ -58,8 +58,24 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(plugin.create_resource_decorator())
         self.assertFalse(plugin.supports_resource_type("google_storage_bucket"))
 
-    def test_metadata_namespace_starts_empty(self) -> None:
-        self.assertEqual(_metadata_field_names(GcpResourceMetadata), set())
+    def test_metadata_namespace_exposes_gcp_owned_fields(self) -> None:
+        self.assertGreaterEqual(
+            _metadata_field_names(GcpResourceMetadata),
+            {
+                "NAME",
+                "SELF_LINK",
+                "PROJECT",
+                "REGION",
+                "ZONE",
+                "NETWORK",
+                "NETWORK_TAGS",
+                "FIREWALL_ALLOW",
+                "NETWORK_INTERFACES",
+                "SERVICE_ACCOUNTS",
+                "IAM_ROLE",
+                "IAM_MEMBER",
+            },
+        )
 
     def test_resource_facts_start_with_neutral_analysis_defaults(self) -> None:
         facts = gcp_facts(_normalized_resource())
