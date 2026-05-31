@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.providers.aws.plugin import aws_provider_plugin
+from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.plugin import (
     ProviderPlugin,
     provider_registry_from_plugins,
@@ -14,7 +15,7 @@ DEFAULT_PROVIDER = "aws"
 
 
 def default_provider_plugins() -> tuple[ProviderPlugin, ...]:
-    return (aws_provider_plugin(),)
+    return (aws_provider_plugin(), gcp_provider_plugin())
 
 
 def default_provider_registry() -> ProviderRegistry:
