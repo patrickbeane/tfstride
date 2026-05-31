@@ -7,6 +7,7 @@ from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import (
     BoundaryType,
+    IAMPolicyStatement,
     NormalizedResource,
     ResourceCategory,
     ResourceInventory,
@@ -106,6 +107,104 @@ class TrustBoundaryIndexTests(unittest.TestCase):
         self.assertIn(
             (BoundaryType.WORKLOAD_TO_DATA_STORE, "aws_instance.app", "aws_db_instance.app"),
             boundary_pairs,
+        )
+
+    def test_workload_data_store_candidates_preserve_reachable_store_order(self) -> None:
+        role = _resource(
+            address="aws_iam_role.app",
+            resource_type="aws_iam_role",
+            category=ResourceCategory.IAM,
+            arn="arn:aws:iam::111122223333:role/app",
+        )
+        role.extend_policy_statements(
+            [
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["s3:GetObject", "secretsmanager:GetSecretValue"],
+                )
+            ]
+        )
+        database_security_group = _resource(
+            address="aws_security_group.db",
+            resource_type="aws_security_group",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-db",
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=5432,
+                    to_port=5432,
+                    referenced_security_group_ids=["sg-app"],
+                )
+            ],
+        )
+        workload = _resource(
+            address="aws_instance.app",
+            resource_type="aws_instance",
+            category=ResourceCategory.COMPUTE,
+            vpc_id="vpc-a",
+            security_group_ids=["sg-app"],
+            attached_role_arns=["arn:aws:iam::111122223333:role/app"],
+        )
+        bucket = _resource(
+            address="aws_s3_bucket.assets",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+        )
+        database_by_security_group = _resource(
+            address="aws_db_instance.by_sg",
+            resource_type="aws_db_instance",
+            category=ResourceCategory.DATA,
+            vpc_id="vpc-a",
+            security_group_ids=["sg-db"],
+        )
+        secret = _resource(
+            address="aws_secretsmanager_secret.app",
+            resource_type="aws_secretsmanager_secret",
+            category=ResourceCategory.DATA,
+        )
+        database_missing_security_group = _resource(
+            address="aws_db_instance.missing_sg",
+            resource_type="aws_db_instance",
+            category=ResourceCategory.DATA,
+            vpc_id="vpc-a",
+        )
+        unrelated_database = _resource(
+            address="aws_db_instance.unrelated",
+            resource_type="aws_db_instance",
+            category=ResourceCategory.DATA,
+            vpc_id="vpc-b",
+        )
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[
+                role,
+                database_security_group,
+                workload,
+                bucket,
+                database_by_security_group,
+                secret,
+                database_missing_security_group,
+                unrelated_database,
+            ],
+        )
+
+        boundaries = detect_trust_boundaries(inventory)
+
+        workload_data_store_pairs = [
+            (boundary.source, boundary.target)
+            for boundary in boundaries
+            if boundary.boundary_type == BoundaryType.WORKLOAD_TO_DATA_STORE
+        ]
+        self.assertEqual(
+            workload_data_store_pairs,
+            [
+                ("aws_instance.app", "aws_s3_bucket.assets"),
+                ("aws_instance.app", "aws_db_instance.by_sg"),
+                ("aws_instance.app", "aws_secretsmanager_secret.app"),
+                ("aws_instance.app", "aws_db_instance.missing_sg"),
+            ],
         )
 
     def test_public_private_subnet_boundaries_are_indexed_by_vpc(self) -> None:

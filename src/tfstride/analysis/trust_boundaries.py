@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.role_helpers import resolve_workload_role
@@ -22,6 +23,17 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 from tfstride.resource_metadata import ResourceMetadata
+
+
+@dataclass(frozen=True, slots=True)
+class _DataStoreCandidateIndex:
+    data_store_positions: Mapping[int, int]
+    object_storage: tuple[NormalizedResource, ...]
+    secret_stores: tuple[NormalizedResource, ...]
+    direct_internet_databases: tuple[NormalizedResource, ...]
+    databases_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
+    databases_missing_security_groups_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
+    databases_by_trusted_workload_security_group: Mapping[str, tuple[NormalizedResource, ...]]
 
 
 def detect_trust_boundaries(
@@ -89,10 +101,17 @@ def detect_trust_boundaries(
             )
 
     workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
-    data_stores = inventory.by_type(*DATA_STORE_RESOURCE_TYPES)
+    data_store_candidates = _build_data_store_candidate_index(
+        inventory.by_type(*DATA_STORE_RESOURCE_TYPES),
+        analysis_indexes,
+    )
     for workload in workloads:
         attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
-        for data_store in data_stores:
+        for data_store in _candidate_data_stores_for_workload(
+            workload,
+            attached_role,
+            data_store_candidates,
+        ):
             reachability_rationale = _workload_reaches_data_store(
                 workload,
                 data_store,
@@ -168,6 +187,124 @@ def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str
             continue
         grouped.setdefault(resource.vpc_id, []).append(resource)
     return {vpc_id: tuple(subnets) for vpc_id, subnets in grouped.items()}
+
+
+def _build_data_store_candidate_index(
+    data_stores: Sequence[NormalizedResource],
+    indexes: AnalysisIndexes,
+) -> _DataStoreCandidateIndex:
+    direct_internet_databases: list[NormalizedResource] = []
+    object_storage: list[NormalizedResource] = []
+    secret_stores: list[NormalizedResource] = []
+    databases_by_vpc: dict[str, list[NormalizedResource]] = {}
+    databases_missing_security_groups_by_vpc: dict[str, list[NormalizedResource]] = {}
+    databases_by_trusted_workload_security_group: dict[str, list[NormalizedResource]] = {}
+
+    for data_store in data_stores:
+        if is_database_resource(data_store):
+            if data_store.direct_internet_reachable:
+                direct_internet_databases.append(data_store)
+            if data_store.vpc_id:
+                databases_by_vpc.setdefault(data_store.vpc_id, []).append(data_store)
+                if not data_store.security_group_ids:
+                    databases_missing_security_groups_by_vpc.setdefault(
+                        data_store.vpc_id,
+                        [],
+                    ).append(data_store)
+            for trusted_group_id in _trusted_workload_security_group_ids(data_store, indexes):
+                databases_by_trusted_workload_security_group.setdefault(
+                    trusted_group_id,
+                    [],
+                ).append(data_store)
+        elif is_object_storage_resource(data_store):
+            object_storage.append(data_store)
+        elif is_secret_store_resource(data_store):
+            secret_stores.append(data_store)
+
+    return _DataStoreCandidateIndex(
+        data_store_positions={id(resource): index for index, resource in enumerate(data_stores)},
+        object_storage=tuple(object_storage),
+        secret_stores=tuple(secret_stores),
+        direct_internet_databases=tuple(direct_internet_databases),
+        databases_by_vpc=_freeze_resource_groups_by_key(databases_by_vpc),
+        databases_missing_security_groups_by_vpc=_freeze_resource_groups_by_key(
+            databases_missing_security_groups_by_vpc
+        ),
+        databases_by_trusted_workload_security_group=_freeze_resource_groups_by_key(
+            databases_by_trusted_workload_security_group
+        ),
+    )
+
+
+def _candidate_data_stores_for_workload(
+    workload: NormalizedResource,
+    attached_role: NormalizedResource | None,
+    index: _DataStoreCandidateIndex,
+) -> tuple[NormalizedResource, ...]:
+    candidates: dict[int, NormalizedResource] = {}
+
+    def add_many(data_stores: Sequence[NormalizedResource]) -> None:
+        for data_store in data_stores:
+            candidates.setdefault(id(data_store), data_store)
+
+    for security_group_id in workload.security_group_ids:
+        add_many(index.databases_by_trusted_workload_security_group.get(security_group_id, ()))
+    if _workload_has_general_egress_path(workload):
+        add_many(index.direct_internet_databases)
+    if workload.vpc_id:
+        if workload.security_group_ids:
+            add_many(index.databases_missing_security_groups_by_vpc.get(workload.vpc_id, ()))
+        else:
+            add_many(index.databases_by_vpc.get(workload.vpc_id, ()))
+    if attached_role is not None:
+        if _role_allows_object_storage_access(attached_role):
+            add_many(index.object_storage)
+        if _role_allows_secret_read(attached_role):
+            add_many(index.secret_stores)
+
+    return tuple(
+        sorted(
+            candidates.values(),
+            key=lambda resource: index.data_store_positions[id(resource)],
+        )
+    )
+
+
+def _trusted_workload_security_group_ids(
+    data_store: NormalizedResource,
+    indexes: AnalysisIndexes,
+) -> set[str]:
+    trusted_group_ids: set[str] = set()
+    for security_group_id in data_store.security_group_ids:
+        security_group = indexes.security_groups_by_reference.get(security_group_id)
+        if security_group is None:
+            continue
+        for rule in security_group.network_rules:
+            if rule.direction == "ingress":
+                trusted_group_ids.update(rule.referenced_security_group_ids)
+    return trusted_group_ids
+
+
+def _freeze_resource_groups_by_key(
+    grouped: dict[str, list[NormalizedResource]],
+) -> Mapping[str, tuple[NormalizedResource, ...]]:
+    return {key: tuple(resources) for key, resources in grouped.items()}
+
+
+def _role_allows_object_storage_access(role: NormalizedResource) -> bool:
+    return any(
+        statement.effect == "Allow"
+        and any(action == "*" or action.startswith("s3:") for action in statement.actions)
+        for statement in role.policy_statements
+    )
+
+
+def _role_allows_secret_read(role: NormalizedResource) -> bool:
+    return any(
+        statement.effect == "Allow"
+        and any(_allows_secret_read(action) for action in statement.actions)
+        for statement in role.policy_statements
+    )
 
 
 def _workload_reaches_data_store(
