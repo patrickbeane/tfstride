@@ -48,16 +48,14 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertEqual(provider_neutral - actual_accessors, set())
         self.assertEqual(legacy_provider_owned - actual_accessors, set())
 
-    def test_resource_metadata_fields_are_classified_by_ownership_contract(self) -> None:
+    def test_resource_metadata_fields_are_limited_to_shared_core_fields(self) -> None:
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
         provider_owned = frozenset().union(*contract.provider_owned_fields.values())
-        classified_fields = (
-            contract.shared_core_fields
-            | provider_owned
-            | contract.transitional_fields
-        )
+        actual_fields = _resource_metadata_field_names()
 
-        self.assertEqual(_resource_metadata_field_names(), classified_fields)
+        self.assertEqual(actual_fields, contract.shared_core_fields)
+        self.assertFalse(actual_fields & provider_owned)
+        self.assertFalse(actual_fields & contract.transitional_fields)
         self.assertFalse(contract.shared_core_fields & provider_owned)
         self.assertFalse(contract.shared_core_fields & contract.transitional_fields)
         self.assertFalse(provider_owned & contract.transitional_fields)

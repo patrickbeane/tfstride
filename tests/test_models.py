@@ -10,6 +10,7 @@ from tfstride.models import (
     SecurityGroupRule,
     Severity,
 )
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.resource_metadata import ResourceMetadata
 
 
@@ -271,11 +272,20 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertFalse(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertFalse(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
-        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
-        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
-        resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, None)
+        resource.append_metadata_field(
+            AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+            "missing-role",
+        )
+        resource.append_metadata_field(
+            AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+            "missing-role",
+        )
+        resource.append_metadata_field(
+            AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+            None,
+        )
         resource.extend_metadata_field(
-            ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+            AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
             ["missing-role", "another-missing-role", "another-missing-role", None],
         )
 
@@ -283,7 +293,7 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertTrue(resource.metadata["public_access_configured"])
         self.assertEqual(
-            resource.get_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES),
+            resource.get_metadata_field(AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES),
             ["missing-role", "another-missing-role"],
         )
         self.assertEqual(
@@ -294,15 +304,15 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
     def test_metadata_field_getter_uses_field_copy_semantics(self) -> None:
         resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")
         resource.set_metadata_field(
-            ResourceMetadata.POLICY_DOCUMENT,
+            AwsResourceMetadata.POLICY_DOCUMENT,
             {"Statement": [{"Effect": "Allow"}]},
         )
 
-        policy_document = resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)
+        policy_document = resource.get_metadata_field(AwsResourceMetadata.POLICY_DOCUMENT)
         policy_document["Statement"][0]["Effect"] = "Deny"
 
         self.assertEqual(
-            resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+            resource.get_metadata_field(AwsResourceMetadata.POLICY_DOCUMENT),
             {"Statement": [{"Effect": "Allow"}]},
         )
 

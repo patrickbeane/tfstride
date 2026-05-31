@@ -17,7 +17,7 @@ class ProviderEncapsulationContract:
 
 @dataclass(frozen=True, slots=True)
 class ResourceMetadataOwnershipContract:
-    """Ownership map for metadata keys that still live in the shared metadata class."""
+    """Ownership map for shared and provider-owned metadata namespaces."""
 
     shared_core_fields: frozenset[str]
     provider_owned_fields: Mapping[str, frozenset[str]]
@@ -34,8 +34,8 @@ PROVIDER_ENCAPSULATION_GUIDELINES = (
 
 RESOURCE_METADATA_OWNERSHIP_GUIDELINES = (
     "Shared-core metadata backs provider-neutral NormalizedResource posture and reporting fields.",
-    "Provider-owned metadata belongs behind provider facts or mutation facades until it moves to a provider namespace.",
-    "Transitional metadata is provider-shaped data still read through shared analysis facades; migrate it before adding another provider.",
+    "Provider-owned metadata belongs behind provider facts, mutation facades, or provider metadata namespaces.",
+    "Transitional metadata is provider-shaped data still exposed through shared analysis facades; migrate it before adding another provider.",
     "Do not add new ResourceMetadata fields without classifying their ownership here.",
 )
 
