@@ -216,6 +216,28 @@ DEFAULT_RULE_METADATA = (
         tags=("aws", "iam", "trust", "cross-account"),
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="gcp-public-compute-broad-ingress",
+        title="Internet-exposed GCP compute instance permits broad ingress",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Restrict GCP firewall source ranges and exposed ports, remove external IP access where possible, "
+            "and use Identity-Aware Proxy, VPN, or a controlled bastion for administration."
+        ),
+        tags=("gcp", "network", "compute", "internet"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-project-iam-broad-principal",
+        title="GCP project IAM binding grants access to public principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from project-level IAM bindings, grant access to "
+            "specific groups or service accounts, and scope permissions to the smallest project or resource needed."
+        ),
+        tags=("gcp", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
 )
 
 

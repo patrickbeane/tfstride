@@ -54,15 +54,24 @@ def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceInde
 
 
 def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
-    internet_ingress_reasons = [
-        reason
+    matching_firewalls = [
+        firewall
         for firewall in index.firewalls
         if _firewall_applies_to_instance(firewall, resource)
+        and _internet_ingress_reasons(firewall)
+    ]
+    internet_ingress_reasons = [
+        reason
+        for firewall in matching_firewalls
         for reason in _internet_ingress_reasons(firewall)
     ]
     internet_ingress = bool(internet_ingress_reasons)
     resource.internet_ingress_capable = internet_ingress
     resource.internet_ingress_reasons = internet_ingress_reasons
+    resource.set_metadata_field(
+        GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS,
+        [firewall.address for firewall in matching_firewalls],
+    )
 
     public_exposure = bool(resource.public_access_configured and internet_ingress)
     resource.public_exposure = public_exposure

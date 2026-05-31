@@ -200,6 +200,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("GCP Inventory Demo", response.text)
         self.assertIn(GCP_FIXTURE_PATH.name, response.text)
         self.assertIn("google_compute_instance.web", response.text)
+        self.assertIn("Internet-exposed GCP compute instance permits broad ingress", response.text)
         self.assertIn("GCP support currently provides initial inventory normalization", response.text)
 
     def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:

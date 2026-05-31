@@ -292,7 +292,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         title="GCP Inventory",
         report_title="GCP Inventory Demo",
         fixture_name="sample_gcp_plan.json",
-        description="Terraform Google provider resources normalized for initial inventory coverage with basic internet-to-compute boundary detection.",
+        description="Terraform Google provider resources normalized with basic internet-to-compute boundary detection and first-pass GCP findings.",
         emphasis="Provider expansion",
         theme="balanced",
     ),

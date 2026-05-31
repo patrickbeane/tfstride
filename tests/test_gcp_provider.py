@@ -80,6 +80,7 @@ class GcpProviderTests(unittest.TestCase):
                 "FIREWALL_ALLOW",
                 "NETWORK_INTERFACES",
                 "SERVICE_ACCOUNTS",
+                "INTERNET_INGRESS_FIREWALLS",
                 "IAM_ROLE",
                 "IAM_MEMBER",
             },
@@ -96,6 +97,10 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertEqual(facts.network_tags, [])
+        self.assertEqual(facts.internet_ingress_firewalls, [])
+        self.assertIsNone(facts.iam_role)
+        self.assertIsNone(facts.iam_member)
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()

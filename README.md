@@ -253,6 +253,7 @@ Current rules include:
 - broad or cross-account control-plane paths that reach workloads with private database or secret access
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
+- public GCP project IAM principals
 
 Outputs include:
 
@@ -400,7 +401,7 @@ Unsupported resources are skipped and called out in the report.
 
 The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, and `google_storage_bucket`.
 
-GCP trust-boundary detection currently covers basic internet-to-compute exposure. GCP controls observed and STRIDE rule coverage are not implemented yet, so GCP reports expose normalized inventory and boundary context without findings.
+GCP trust-boundary detection currently covers basic internet-to-compute exposure. GCP STRIDE rule coverage currently includes public compute broad ingress and broad project IAM principals; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 
@@ -487,7 +488,7 @@ GCP trust-boundary detection currently covers basic internet-to-compute exposure
 ## Limitations
 
 - AWS remains the only provider with trust-boundary, rule, and control-observation coverage today
-- GCP support is limited to initial inventory normalization and basic internet-to-compute trust-boundary detection for selected core resource types
+- GCP support is limited to initial inventory normalization, basic internet-to-compute trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource types
 - Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case

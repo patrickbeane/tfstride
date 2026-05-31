@@ -30,6 +30,7 @@ class GcpResourceMetadata:
     UNIFORM_BUCKET_LEVEL_ACCESS = BoolMetadataField("uniform_bucket_level_access")
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
+    INTERNET_INGRESS_FIREWALLS = StringListMetadataField("internet_ingress_firewalls")
     FIREWALL_SOURCE_RANGES = StringListMetadataField("source_ranges")
     FIREWALL_DESTINATION_RANGES = StringListMetadataField("destination_ranges")
     FIREWALL_TARGET_TAGS = StringListMetadataField("target_tags")

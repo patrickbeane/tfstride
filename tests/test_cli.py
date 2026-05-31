@@ -51,6 +51,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("  Severity factors: internet_exposure, lateral_movement, blast_radius", output)
         self.assertIn("  Mitigation: Restrict ingress to expected client ports", output)
         self.assertIn("- aws-role-trust-missing-narrowing", output)
+        self.assertIn("- gcp-public-compute-broad-ingress", output)
+        self.assertIn("- gcp-project-iam-broad-principal", output)
         self.assertTrue(output.endswith("\n"))
 
     def test_cli_lists_rules_as_json_without_plan(self) -> None:
@@ -202,7 +204,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["provider"], "gcp")
         self.assertEqual(len(report["inventory"]["resources"]), 6)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
-        self.assertEqual(report["summary"]["active_findings"], 0)
+        self.assertEqual(report["summary"]["active_findings"], 1)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

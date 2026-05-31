@@ -273,6 +273,22 @@ class AwsResourceFacts:
     def resource_policy_source_addresses(self) -> list[str]:
         return self.get(AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 
+    @property
+    def network_tags(self) -> list[str]:
+        return []
+
+    @property
+    def internet_ingress_firewalls(self) -> list[str]:
+        return []
+
+    @property
+    def iam_role(self) -> str | None:
+        return None
+
+    @property
+    def iam_member(self) -> str | None:
+        return None
+
 
 def aws_facts(resource: NormalizedResource) -> AwsResourceFacts:
     return AwsResourceFacts(resource)

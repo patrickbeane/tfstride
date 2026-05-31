@@ -4,6 +4,7 @@ from collections.abc import Mapping
 
 from tfstride.analysis.control_observations import observe_controls as collect_control_observations
 from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.analysis.gcp_rules import GcpRuleDetectors
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.network_data_rules import NetworkDataRuleDetectors
@@ -30,6 +31,7 @@ _RULE_GROUP_IDS = (
         "aws-public-compute-broad-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
+        "gcp-public-compute-broad-ingress",
     ),
     (
         "aws-database-permissive-ingress",
@@ -42,6 +44,7 @@ _RULE_GROUP_IDS = (
     (
         "aws-iam-wildcard-permissions",
         "aws-workload-role-sensitive-permissions",
+        "gcp-project-iam-broad-principal",
     ),
     (
         "aws-private-data-transitive-exposure",
@@ -83,6 +86,7 @@ class StrideRuleEngine:
         self._rule_registry = rule_registry if rule_registry is not None else _default_rule_registry()
         self._finding_factory = FindingFactory(self._rule_registry)
         posture_detectors = PostureRuleDetectors(self._finding_factory)
+        gcp_detectors = GcpRuleDetectors(self._finding_factory)
         network_data_detectors = NetworkDataRuleDetectors(self._finding_factory)
         path_chain_detectors = PathChainRuleDetectors(self._finding_factory)
         iam_detectors = IAMRuleDetectors(self._finding_factory)
@@ -91,6 +95,7 @@ class StrideRuleEngine:
             "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
             "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
             "aws-s3-public-access": posture_detectors.detect_public_object_storage,
+            "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
             "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
             "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,
             "aws-sensitive-resource-policy-external-access": (
@@ -101,6 +106,7 @@ class StrideRuleEngine:
             ),
             "aws-iam-wildcard-permissions": iam_detectors.detect_wildcard_permissions,
             "aws-workload-role-sensitive-permissions": iam_detectors.detect_workload_role_sensitive_permissions,
+            "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
             "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,
             "aws-control-plane-sensitive-workload-chain": (
                 path_chain_detectors.detect_control_plane_sensitive_workload_chain

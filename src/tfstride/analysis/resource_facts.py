@@ -63,6 +63,22 @@ class AnalysisResourceFacts:
     def resource_policy_source_addresses(self) -> list[str]:
         return self._facts.resource_policy_source_addresses
 
+    @property
+    def network_tags(self) -> list[str]:
+        return self._facts.network_tags
+
+    @property
+    def internet_ingress_firewalls(self) -> list[str]:
+        return self._facts.internet_ingress_firewalls
+
+    @property
+    def iam_role(self) -> str | None:
+        return self._facts.iam_role
+
+    @property
+    def iam_member(self) -> str | None:
+        return self._facts.iam_member
+
 
 def analysis_facts(
     resource: NormalizedResource,

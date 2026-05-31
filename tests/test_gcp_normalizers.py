@@ -139,6 +139,10 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ["google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0"],
         )
         self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.public_ssh"],
+        )
         self.assertTrue(instance.direct_internet_reachable)
         self.assertEqual(
             instance.public_exposure_reasons,
