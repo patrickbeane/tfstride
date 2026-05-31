@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.policy_conditions import (
@@ -66,22 +68,25 @@ def detect_trust_boundaries(
                 "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
             )
 
-    public_subnets = [resource for resource in resources if resource.resource_type == "aws_subnet" and resource.is_public_subnet]
-    private_subnets = [
-        resource for resource in resources if resource.resource_type == "aws_subnet" and not resource.is_public_subnet
+    public_subnets = [
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_subnet" and resource.is_public_subnet
     ]
+    private_subnets_by_vpc = _private_subnets_by_vpc(resources)
     for public_subnet in public_subnets:
-        for private_subnet in private_subnets:
+        if not public_subnet.vpc_id:
+            continue
+        for private_subnet in private_subnets_by_vpc.get(public_subnet.vpc_id, ()):
             # Model segmentation at the trust-zone level rather than every possible route;
             # for review purposes, "public subnet can reach private subnet" is the key edge.
-            if public_subnet.vpc_id and public_subnet.vpc_id == private_subnet.vpc_id:
-                add_boundary(
-                    BoundaryType.PUBLIC_TO_PRIVATE,
-                    public_subnet.address,
-                    private_subnet.address,
-                    f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
-                    "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
-                )
+            add_boundary(
+                BoundaryType.PUBLIC_TO_PRIVATE,
+                public_subnet.address,
+                private_subnet.address,
+                f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
+                "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
+            )
 
     workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
     data_stores = inventory.by_type(*DATA_STORE_RESOURCE_TYPES)
@@ -154,6 +159,15 @@ def detect_trust_boundaries(
             )
 
     return boundaries
+
+
+def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str, tuple[NormalizedResource, ...]]:
+    grouped: dict[str, list[NormalizedResource]] = {}
+    for resource in resources:
+        if resource.resource_type != "aws_subnet" or resource.is_public_subnet or not resource.vpc_id:
+            continue
+        grouped.setdefault(resource.vpc_id, []).append(resource)
+    return {vpc_id: tuple(subnets) for vpc_id, subnets in grouped.items()}
 
 
 def _workload_reaches_data_store(

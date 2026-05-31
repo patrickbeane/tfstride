@@ -108,6 +108,73 @@ class TrustBoundaryIndexTests(unittest.TestCase):
             boundary_pairs,
         )
 
+    def test_public_private_subnet_boundaries_are_indexed_by_vpc(self) -> None:
+        public_a = _resource(
+            address="aws_subnet.public_a",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            vpc_id="vpc-a",
+        )
+        private_a = _resource(
+            address="aws_subnet.private_a",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            vpc_id="vpc-a",
+        )
+        private_b = _resource(
+            address="aws_subnet.private_b",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            vpc_id="vpc-b",
+        )
+        public_b = _resource(
+            address="aws_subnet.public_b",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            vpc_id="vpc-b",
+        )
+        private_a_late = _resource(
+            address="aws_subnet.private_a_late",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            vpc_id="vpc-a",
+        )
+        public_without_vpc = _resource(
+            address="aws_subnet.public_without_vpc",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+        )
+        public_a.is_public_subnet = True
+        public_b.is_public_subnet = True
+        public_without_vpc.is_public_subnet = True
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[
+                public_a,
+                private_a,
+                private_b,
+                public_b,
+                private_a_late,
+                public_without_vpc,
+            ],
+        )
+
+        boundaries = detect_trust_boundaries(inventory)
+
+        public_to_private_pairs = [
+            (boundary.source, boundary.target)
+            for boundary in boundaries
+            if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE
+        ]
+        self.assertEqual(
+            public_to_private_pairs,
+            [
+                ("aws_subnet.public_a", "aws_subnet.private_a"),
+                ("aws_subnet.public_a", "aws_subnet.private_a_late"),
+                ("aws_subnet.public_b", "aws_subnet.private_b"),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
