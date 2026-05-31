@@ -16,6 +16,7 @@ from tfstride.models import (
     Severity,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES
 from tfstride.reporting.json_report import (
     REPORT_FORMAT_VERSION,
     REPORT_KIND,
@@ -111,7 +112,7 @@ class MarkdownReportTests(unittest.TestCase):
             NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "nightmare_report.md",
             ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "alb_ec2_rds_report.md",
             LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "lambda_deploy_role_report.md",
-            GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp_scaffold_report.md",
+            GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp_inventory_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():
@@ -218,7 +219,7 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(json.loads(render_sarif(result))["version"], "2.1.0")
         self.assertIn("# tfSTRIDE Threat Model Report", render_markdown(result))
 
-    def test_json_report_auto_selects_gcp_scaffold_fixture(self) -> None:
+    def test_json_report_auto_selects_gcp_inventory_fixture(self) -> None:
         engine = TfStride()
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
@@ -226,6 +227,13 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["normalized_resources"], 6)
         self.assertEqual(payload["summary"]["unsupported_resources"], 0)
         self.assertEqual(payload["summary"]["active_findings"], 0)
+        self.assertEqual(payload["inventory"]["unsupported_resources"], [])
+        self.assertEqual(
+            payload["inventory"]["metadata"]["supported_resource_types"],
+            sorted(SUPPORTED_GCP_TYPES),
+        )
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 6)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
             [

@@ -420,7 +420,7 @@ GCP trust-boundary detection, controls observed, and STRIDE rule coverage are no
 ├── examples/
 │   ├── alb_ec2_rds_report.md
 │   ├── baseline_report.md
-│   ├── gcp_scaffold_report.md
+│   ├── gcp_inventory_report.md
 │   ├── lambda_deploy_role_report.md
 │   ├── nightmare_report.md
 │   ├── sample_report.md
@@ -518,7 +518,7 @@ GCP trust-boundary detection, controls observed, and STRIDE rule coverage are no
   [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
 - GCP initial inventory:
   [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
-  [`examples/gcp_scaffold_report.md`](examples/gcp_scaffold_report.md)
+  [`examples/gcp_inventory_report.md`](examples/gcp_inventory_report.md)
 - Mixed:
   [`fixtures/sample_aws_plan.json`](fixtures/sample_aws_plan.json),
   [`examples/sample_report.md`](examples/sample_report.md)

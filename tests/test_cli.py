@@ -181,7 +181,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(len(payload["findings"]), 9)
             self.assertEqual(payload["findings"][0]["fingerprint"].split(":")[0], "sha256")
 
-    def test_cli_provider_option_can_select_gcp_scaffold(self) -> None:
+    def test_cli_provider_option_can_select_gcp_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             json_output_path = Path(tmp_dir) / "report.json"
 

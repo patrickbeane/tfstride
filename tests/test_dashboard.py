@@ -193,7 +193,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn(BASELINE_FIXTURE_PATH.name, response.text)
         self.assertIn("IAM policy grants wildcard privileges", response.text)
 
-    def test_demo_route_renders_gcp_scaffold_fixture_report(self) -> None:
+    def test_demo_route_renders_gcp_inventory_fixture_report(self) -> None:
         response = self.client.get("/demo/gcp-scaffold")
 
         self.assertEqual(response.status_code, 200)

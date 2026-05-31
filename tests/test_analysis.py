@@ -801,7 +801,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-scaffold": (GCP_FIXTURE_PATH, 0, {}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 0, {}),
         }
 
         expected_titles = {
@@ -831,7 +831,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Internet-exposed compute service permits overly broad ingress": 2,
                 "Object storage is publicly accessible": 2,
             },
-            "gcp-scaffold": {},
+            "gcp-inventory": {},
         }
 
         for name, (fixture_path, expected_count, expected_severities) in scenarios.items():
