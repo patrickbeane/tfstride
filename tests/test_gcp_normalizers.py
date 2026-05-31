@@ -10,6 +10,7 @@ from tfstride.providers.gcp.compute_normalizers import normalize_compute_instanc
 from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
 from tfstride.providers.gcp.iam_normalizers import normalize_project_iam_member
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_firewall,
     normalize_compute_network,
@@ -124,6 +125,27 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.data_sensitivity, "sensitive")
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
+
+    def test_normalizer_derives_public_compute_exposure_from_matching_firewall(self) -> None:
+        inventory = GcpNormalizer().normalize(list(self.resources.values()))
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertEqual(instance.vpc_id, "google_compute_network.main.id")
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertEqual(
+            instance.internet_ingress_reasons,
+            ["google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0"],
+        )
+        self.assertTrue(instance.public_exposure)
+        self.assertTrue(instance.direct_internet_reachable)
+        self.assertEqual(
+            instance.public_exposure_reasons,
+            [
+                "compute instance has an external access config and matching firewall rules allow internet ingress"
+            ],
+        )
 
     def test_project_iam_member_normalizer_preserves_binding_parts(self) -> None:
         normalized = normalize_project_iam_member(self.resources["google_project_iam_member.web_viewer"])

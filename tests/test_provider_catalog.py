@@ -13,6 +13,8 @@ from tfstride.providers.aws.resource_facts import AwsResourceFacts
 from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
+from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
+from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.catalog import (
@@ -51,9 +53,10 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(aws_plugin.create_resource_decorator(), AwsResourceDecorator)
         self.assertIs(gcp_plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(gcp_plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
+        self.assertEqual(dict(gcp_plugin.resource_capabilities), dict(GCP_RESOURCE_CAPABILITIES))
         self.assertEqual(gcp_plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(gcp_plugin.create_normalizer(), GcpNormalizer)
-        self.assertIsNone(gcp_plugin.create_resource_decorator())
+        self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
 
     def test_default_provider_limitations_register_builtin_provider_caveats(self) -> None:
         limitations = default_provider_limitations()
@@ -92,10 +95,19 @@ class ProviderCatalogTests(unittest.TestCase):
             name="web",
             category=ResourceCategory.COMPUTE,
         )
+        gcp_bucket = NormalizedResource(
+            address="google_storage_bucket.logs",
+            provider="gcp",
+            resource_type="google_storage_bucket",
+            name="logs",
+            category=ResourceCategory.DATA,
+        )
 
         self.assertEqual(registry.providers(), ("aws", "gcp"))
         self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
-        self.assertFalse(registry.has_capability(gcp_resource, ResourceCapability.WORKLOAD))
+        self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.WORKLOAD))
+        self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.PUBLIC_COMPUTE))
+        self.assertTrue(registry.has_capability(gcp_bucket, ResourceCapability.OBJECT_STORAGE))
 
     def test_app_uses_catalog_default_provider(self) -> None:
         result = TfStride().analyze_plan(FIXTURE_PATH)

@@ -15,6 +15,7 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_network,
     normalize_compute_subnetwork,
 )
+from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.resource_metadata import InventoryMetadata
 
 
@@ -36,7 +37,8 @@ class GcpNormalizer(ProviderNormalizer):
 
     provider = GCP_PROVIDER
 
-    def __init__(self) -> None:
+    def __init__(self, resource_decorator: GcpResourceDecorator | None = None) -> None:
+        self._resource_decorator = resource_decorator or GcpResourceDecorator()
         self._resource_normalizers = dict(_GCP_RESOURCE_NORMALIZERS)
 
     def owns_resource(self, resource: TerraformResource) -> bool:
@@ -57,6 +59,7 @@ class GcpNormalizer(ProviderNormalizer):
             for resource in gcp_resources
             if resource.resource_type in SUPPORTED_GCP_TYPES
         ]
+        self._resource_decorator.decorate(normalized)
 
         metadata: dict[str, Any] = {}
         InventoryMetadata.SUPPORTED_RESOURCE_TYPES.set(metadata, sorted(SUPPORTED_GCP_TYPES))

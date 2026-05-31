@@ -226,6 +226,7 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(payload["inventory"]["provider"], "gcp")
         self.assertEqual(payload["summary"]["normalized_resources"], 6)
         self.assertEqual(payload["summary"]["unsupported_resources"], 0)
+        self.assertEqual(payload["summary"]["trust_boundaries"], 1)
         self.assertEqual(payload["summary"]["active_findings"], 0)
         self.assertEqual(payload["inventory"]["unsupported_resources"], [])
         self.assertEqual(
@@ -246,6 +247,11 @@ class JsonReportTests(unittest.TestCase):
             ],
         )
         self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resource_types"], {})
+        self.assertEqual(
+            payload["trust_boundaries"][0]["identifier"],
+            "internet-to-service:internet->google_compute_instance.web",
+        )
+        self.assertEqual(payload["trust_boundaries"][0]["boundary_type"], "internet-to-service")
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()

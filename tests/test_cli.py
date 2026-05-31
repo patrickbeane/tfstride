@@ -203,7 +203,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(report["inventory"]["resources"]), 6)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 0)
-        self.assertIn("GCP support currently provides initial resource inventory normalization", report["limitations"][0])
+        self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:
         payload = {

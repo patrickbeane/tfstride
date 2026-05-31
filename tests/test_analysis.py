@@ -687,7 +687,7 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.inventory.resources[0].address, "google_storage_bucket.logs")
         self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.findings, [])
-        self.assertIn("GCP support currently provides initial resource inventory normalization", result.limitations[0])
+        self.assertIn("GCP support currently provides initial inventory normalization", result.limitations[0])
 
     def test_analysis_rejects_mixed_provider_plans_without_explicit_provider(self) -> None:
         payload = {
@@ -844,7 +844,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
 
-    def test_gcp_fixture_auto_selects_provider_and_normalizes_inventory(self) -> None:
+    def test_gcp_fixture_auto_selects_provider_and_detects_public_compute_boundary(self) -> None:
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
@@ -854,7 +854,11 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 6)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.findings, [])
-        self.assertEqual(result.trust_boundaries, [])
+        self.assertEqual(len(result.trust_boundaries), 1)
+        boundary = result.trust_boundaries[0]
+        self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
+        self.assertEqual(boundary.source, "internet")
+        self.assertEqual(boundary.target, "google_compute_instance.web")
 
     def test_unconstrained_cross_account_trust_without_narrowing_conditions_is_detected(self) -> None:
         result = self.engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)

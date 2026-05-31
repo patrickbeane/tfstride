@@ -40,10 +40,15 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.models import NormalizedResource, ResourceCategory
 
 
-def _resource(resource_type: str, *, metadata: dict[str, object] | None = None) -> NormalizedResource:
+def _resource(
+    resource_type: str,
+    *,
+    provider: str = "aws",
+    metadata: dict[str, object] | None = None,
+) -> NormalizedResource:
     return NormalizedResource(
         address=f"{resource_type}.example",
-        provider="aws",
+        provider=provider,
         resource_type=resource_type,
         name="example",
         category=ResourceCategory.COMPUTE,
@@ -52,28 +57,34 @@ def _resource(resource_type: str, *, metadata: dict[str, object] | None = None) 
 
 
 class ResourceConceptTests(unittest.TestCase):
-    def test_concept_sets_match_current_aws_analysis_categories(self) -> None:
+    def test_concept_sets_match_registered_provider_analysis_categories(self) -> None:
         self.assertEqual(
             WORKLOAD_RESOURCE_TYPES,
-            frozenset({"aws_instance", "aws_lambda_function", "aws_ecs_service"}),
+            frozenset({"aws_instance", "aws_lambda_function", "aws_ecs_service", "google_compute_instance"}),
         )
         self.assertEqual(
             SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
             frozenset({"aws_instance", "aws_ecs_service"}),
         )
-        self.assertEqual(PUBLIC_COMPUTE_RESOURCE_TYPES, frozenset({"aws_instance"}))
+        self.assertEqual(PUBLIC_COMPUTE_RESOURCE_TYPES, frozenset({"aws_instance", "google_compute_instance"}))
         self.assertEqual(
             DATA_STORE_RESOURCE_TYPES,
-            frozenset({"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret"}),
+            frozenset({"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret", "google_storage_bucket"}),
         )
         self.assertEqual(
             PUBLIC_EDGE_RESOURCE_TYPES,
-            frozenset({"aws_instance", "aws_lb", "aws_db_instance", "aws_s3_bucket"}),
+            frozenset({"aws_instance", "aws_lb", "aws_db_instance", "aws_s3_bucket", "google_compute_instance", "google_storage_bucket"}),
         )
         self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role"}))
-        self.assertEqual(IAM_POLICY_RESOURCE_TYPES, frozenset({"aws_iam_policy", "aws_iam_role"}))
-        self.assertEqual(NETWORK_SECURITY_GROUP_RESOURCE_TYPES, frozenset({"aws_security_group"}))
-        self.assertEqual(SUBNET_RESOURCE_TYPES, frozenset({"aws_subnet"}))
+        self.assertEqual(
+            IAM_POLICY_RESOURCE_TYPES,
+            frozenset({"aws_iam_policy", "aws_iam_role", "google_project_iam_member"}),
+        )
+        self.assertEqual(
+            NETWORK_SECURITY_GROUP_RESOURCE_TYPES,
+            frozenset({"aws_security_group", "google_compute_firewall"}),
+        )
+        self.assertEqual(SUBNET_RESOURCE_TYPES, frozenset({"aws_subnet", "google_compute_subnetwork"}))
         self.assertEqual(
             CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
             frozenset({"aws_db_instance", "aws_secretsmanager_secret"}),
@@ -100,20 +111,28 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_workload_resource(_resource("aws_lambda_function")))
         self.assertTrue(is_workload_resource(_resource("aws_ecs_service")))
+        self.assertTrue(is_workload_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_ecs_service")))
         self.assertTrue(is_public_compute_resource(_resource("aws_instance")))
+        self.assertTrue(is_public_compute_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
+        self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
+        self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
+        self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall", provider="gcp")))
         self.assertTrue(is_subnet_resource(_resource("aws_subnet")))
+        self.assertTrue(is_subnet_resource(_resource("google_compute_subnetwork", provider="gcp")))
         self.assertTrue(is_database_resource(_resource("aws_db_instance")))
         self.assertTrue(is_object_storage_resource(_resource("aws_s3_bucket")))
+        self.assertTrue(is_object_storage_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_db_instance")))
         self.assertTrue(
@@ -135,6 +154,7 @@ class ResourceConceptTests(unittest.TestCase):
         subnet = _resource("aws_subnet")
 
         self.assertFalse(is_workload_resource(subnet))
+        self.assertFalse(is_workload_resource(_resource("google_compute_instance")))
         self.assertFalse(is_security_group_backed_workload_resource(_resource("aws_lambda_function")))
         self.assertFalse(is_public_compute_resource(_resource("aws_ecs_service")))
         self.assertFalse(is_data_store_resource(subnet))

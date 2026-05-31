@@ -7,7 +7,10 @@ from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
+from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
+from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
+from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.resource_metadata import InventoryMetadata, MetadataField
 
 
@@ -52,10 +55,14 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(plugin.provider, "gcp")
         self.assertIs(plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
-        self.assertEqual(dict(plugin.resource_capabilities), {})
+        self.assertEqual(dict(plugin.resource_capabilities), dict(GCP_RESOURCE_CAPABILITIES))
         self.assertEqual(plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), GcpNormalizer)
-        self.assertIsNone(plugin.create_resource_decorator())
+        self.assertIsInstance(plugin.create_resource_decorator(), GcpResourceDecorator)
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
+            frozenset({"google_compute_instance"}),
+        )
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
 

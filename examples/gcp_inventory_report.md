@@ -7,7 +7,7 @@
 
 ## Summary
 
-This run identified **0 trust boundaries** and **0 findings** across **6 normalized resources**.
+This run identified **1 trust boundaries** and **0 findings** across **6 normalized resources**.
 
 - High severity findings: `0`
 - Medium severity findings: `0`
@@ -27,7 +27,12 @@ This run identified **0 trust boundaries** and **0 findings** across **6 normali
 
 ## Discovered Trust Boundaries
 
-No trust boundaries were discovered.
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_compute_instance.web`
+- Description: Traffic can cross from the public internet to google_compute_instance.web.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
 
 ## Findings
 
@@ -45,5 +50,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- GCP support currently provides initial resource inventory normalization only; GCP trust-boundary and rule coverage are not implemented yet.
+- GCP support currently provides initial inventory normalization and internet-to-service trust-boundary detection only; GCP STRIDE rule and control coverage are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
