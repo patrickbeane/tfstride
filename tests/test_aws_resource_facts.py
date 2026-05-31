@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
-from tfstride.resource_metadata import ResourceMetadata
 
 
 def _resource(metadata: dict[str, object] | None = None) -> NormalizedResource:
@@ -51,7 +52,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.network_mode, "awsvpc")
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(
-            resource.get_metadata_field(ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES),
+            resource.get_metadata_field(AwsResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES),
             ["app:7"],
         )
         self.assertEqual(resource.public_exposure_reasons, ["service is internet-facing"])
@@ -67,15 +68,26 @@ class AwsResourceFactsTests(unittest.TestCase):
 
         self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
 
-    def test_aws_provider_metadata_access_is_centralized_in_facts_facade(self) -> None:
+    def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "providers" / "aws"
+        resource_metadata_reference = re.compile(r"\bResourceMetadata\b")
         offenders: list[str] = []
 
         for path in sorted(aws_provider_root.glob("*.py")):
-            if path.name == "resource_facts.py":
-                continue
             text = path.read_text(encoding="utf-8")
-            if "ResourceMetadata" in text or "get_metadata_field(" in text or "set_metadata_field(" in text:
+            if path.name == "metadata.py":
+                if "get_metadata_field(" in text or "set_metadata_field(" in text:
+                    offenders.append(path.name)
+                continue
+            if path.name == "resource_facts.py":
+                if resource_metadata_reference.search(text):
+                    offenders.append(path.name)
+                continue
+            if (
+                resource_metadata_reference.search(text)
+                or "get_metadata_field(" in text
+                or "set_metadata_field(" in text
+            ):
                 offenders.append(path.name)
 
         self.assertEqual(offenders, [])
