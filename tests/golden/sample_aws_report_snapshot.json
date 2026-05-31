@@ -1,0 +1,337 @@
+{
+  "kind": "tfstride-report",
+  "report_version": "1.1",
+  "tool_name": "tfstride",
+  "title": "tfSTRIDE Threat Model Report",
+  "analyzed_file": "sample_aws_plan.json",
+  "summary": {
+    "normalized_resources": 23,
+    "unsupported_resources": 1,
+    "trust_boundaries": 9,
+    "active_findings": 9,
+    "total_findings": 9,
+    "suppressed_findings": 0,
+    "baselined_findings": 0,
+    "severity_counts": {
+      "high": 3,
+      "medium": 6,
+      "low": 0
+    }
+  },
+  "filtering": {
+    "total_findings": 9,
+    "active_findings": 9,
+    "suppressed_findings": 0,
+    "baselined_findings": 0,
+    "suppressions_path": null,
+    "baseline_path": null
+  },
+  "analysis_coverage": {
+    "resources": {
+      "total_resources": 24,
+      "provider_resources": 24,
+      "normalized_resources": 23,
+      "unsupported_resources": 1,
+      "unsupported_resource_types": {
+        "aws_cloudwatch_log_group": 1
+      }
+    },
+    "rules": {
+      "registered_rule_count": 13,
+      "enabled_rules": [
+        "aws-public-compute-broad-ingress",
+        "aws-database-permissive-ingress",
+        "aws-rds-storage-encryption-disabled",
+        "aws-s3-public-access",
+        "aws-sensitive-resource-policy-external-access",
+        "aws-service-resource-policy-external-access",
+        "aws-iam-wildcard-permissions",
+        "aws-workload-role-sensitive-permissions",
+        "aws-missing-tier-segmentation",
+        "aws-private-data-transitive-exposure",
+        "aws-control-plane-sensitive-workload-chain",
+        "aws-role-trust-expansion",
+        "aws-role-trust-missing-narrowing"
+      ],
+      "disabled_rules": [],
+      "severity_overrides": {},
+      "finding_counts_by_rule": {
+        "aws-public-compute-broad-ingress": 1,
+        "aws-database-permissive-ingress": 1,
+        "aws-rds-storage-encryption-disabled": 0,
+        "aws-s3-public-access": 1,
+        "aws-sensitive-resource-policy-external-access": 0,
+        "aws-service-resource-policy-external-access": 0,
+        "aws-iam-wildcard-permissions": 2,
+        "aws-workload-role-sensitive-permissions": 1,
+        "aws-missing-tier-segmentation": 1,
+        "aws-private-data-transitive-exposure": 0,
+        "aws-control-plane-sensitive-workload-chain": 0,
+        "aws-role-trust-expansion": 1,
+        "aws-role-trust-missing-narrowing": 1
+      }
+    },
+    "references": {
+      "unresolved_reference_count": 0,
+      "unresolved_references": []
+    }
+  },
+  "inventory": {
+    "provider": "aws",
+    "unsupported_resources": [
+      "aws_cloudwatch_log_group.processor"
+    ],
+    "metadata": {
+      "primary_account_id": "111122223333",
+      "supported_resource_types": [
+        "aws_db_instance",
+        "aws_ecs_cluster",
+        "aws_ecs_service",
+        "aws_ecs_task_definition",
+        "aws_iam_instance_profile",
+        "aws_iam_policy",
+        "aws_iam_role",
+        "aws_iam_role_policy",
+        "aws_iam_role_policy_attachment",
+        "aws_instance",
+        "aws_internet_gateway",
+        "aws_kms_key",
+        "aws_lambda_function",
+        "aws_lambda_permission",
+        "aws_lb",
+        "aws_nat_gateway",
+        "aws_route_table",
+        "aws_route_table_association",
+        "aws_s3_bucket",
+        "aws_s3_bucket_policy",
+        "aws_s3_bucket_public_access_block",
+        "aws_secretsmanager_secret",
+        "aws_secretsmanager_secret_policy",
+        "aws_security_group",
+        "aws_security_group_rule",
+        "aws_sns_topic",
+        "aws_sqs_queue",
+        "aws_subnet",
+        "aws_vpc"
+      ],
+      "total_input_resources": 24,
+      "provider_resource_count": 24,
+      "normalized_resource_count": 23,
+      "unsupported_resource_types": {
+        "aws_cloudwatch_log_group": 1
+      }
+    },
+    "resource_addresses": [
+      "aws_db_instance.app",
+      "aws_iam_policy.admin_like",
+      "aws_iam_role.workload",
+      "aws_iam_role_policy_attachment.workload_admin_like",
+      "aws_instance.app",
+      "aws_internet_gateway.main",
+      "aws_lambda_function.processor",
+      "aws_lb.web",
+      "aws_nat_gateway.main",
+      "aws_route_table.private",
+      "aws_route_table.public",
+      "aws_route_table_association.private_data",
+      "aws_route_table_association.public_app",
+      "aws_s3_bucket.assets",
+      "aws_security_group.app",
+      "aws_security_group.db",
+      "aws_security_group_rule.app_http_from_internet",
+      "aws_security_group_rule.app_ssh_from_internet",
+      "aws_security_group_rule.db_from_internet",
+      "aws_security_group_rule.db_from_public_app",
+      "aws_subnet.private_data",
+      "aws_subnet.public_app",
+      "aws_vpc.main"
+    ],
+    "resource_types_by_address": {
+      "aws_db_instance.app": "aws_db_instance",
+      "aws_iam_policy.admin_like": "aws_iam_policy",
+      "aws_iam_role.workload": "aws_iam_role",
+      "aws_iam_role_policy_attachment.workload_admin_like": "aws_iam_role_policy_attachment",
+      "aws_instance.app": "aws_instance",
+      "aws_internet_gateway.main": "aws_internet_gateway",
+      "aws_lambda_function.processor": "aws_lambda_function",
+      "aws_lb.web": "aws_lb",
+      "aws_nat_gateway.main": "aws_nat_gateway",
+      "aws_route_table.private": "aws_route_table",
+      "aws_route_table.public": "aws_route_table",
+      "aws_route_table_association.private_data": "aws_route_table_association",
+      "aws_route_table_association.public_app": "aws_route_table_association",
+      "aws_s3_bucket.assets": "aws_s3_bucket",
+      "aws_security_group.app": "aws_security_group",
+      "aws_security_group.db": "aws_security_group",
+      "aws_security_group_rule.app_http_from_internet": "aws_security_group_rule",
+      "aws_security_group_rule.app_ssh_from_internet": "aws_security_group_rule",
+      "aws_security_group_rule.db_from_internet": "aws_security_group_rule",
+      "aws_security_group_rule.db_from_public_app": "aws_security_group_rule",
+      "aws_subnet.private_data": "aws_subnet",
+      "aws_subnet.public_app": "aws_subnet",
+      "aws_vpc.main": "aws_vpc"
+    }
+  },
+  "trust_boundaries": [
+    {
+      "identifier": "admin-to-workload-plane:aws_iam_role.workload->aws_lambda_function.processor",
+      "boundary_type": "admin-to-workload-plane",
+      "source": "aws_iam_role.workload",
+      "target": "aws_lambda_function.processor"
+    },
+    {
+      "identifier": "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload",
+      "boundary_type": "cross-account-or-role-access",
+      "source": "arn:aws:iam::999988887777:root",
+      "target": "aws_iam_role.workload"
+    },
+    {
+      "identifier": "internet-to-service:internet->aws_instance.app",
+      "boundary_type": "internet-to-service",
+      "source": "internet",
+      "target": "aws_instance.app"
+    },
+    {
+      "identifier": "internet-to-service:internet->aws_lb.web",
+      "boundary_type": "internet-to-service",
+      "source": "internet",
+      "target": "aws_lb.web"
+    },
+    {
+      "identifier": "internet-to-service:internet->aws_s3_bucket.assets",
+      "boundary_type": "internet-to-service",
+      "source": "internet",
+      "target": "aws_s3_bucket.assets"
+    },
+    {
+      "identifier": "public-subnet-to-private-subnet:aws_subnet.public_app->aws_subnet.private_data",
+      "boundary_type": "public-subnet-to-private-subnet",
+      "source": "aws_subnet.public_app",
+      "target": "aws_subnet.private_data"
+    },
+    {
+      "identifier": "workload-to-data-store:aws_instance.app->aws_db_instance.app",
+      "boundary_type": "workload-to-data-store",
+      "source": "aws_instance.app",
+      "target": "aws_db_instance.app"
+    },
+    {
+      "identifier": "workload-to-data-store:aws_lambda_function.processor->aws_db_instance.app",
+      "boundary_type": "workload-to-data-store",
+      "source": "aws_lambda_function.processor",
+      "target": "aws_db_instance.app"
+    },
+    {
+      "identifier": "workload-to-data-store:aws_lambda_function.processor->aws_s3_bucket.assets",
+      "boundary_type": "workload-to-data-store",
+      "source": "aws_lambda_function.processor",
+      "target": "aws_s3_bucket.assets"
+    }
+  ],
+  "findings": [
+    {
+      "rule_id": "aws-database-permissive-ingress",
+      "title": "Database is reachable from overly permissive sources",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "aws_db_instance.app",
+        "aws_security_group.db"
+      ],
+      "trust_boundary_id": "workload-to-data-store:aws_instance.app->aws_db_instance.app"
+    },
+    {
+      "rule_id": "aws-missing-tier-segmentation",
+      "title": "Private data tier directly trusts the public application tier",
+      "category": "Tampering",
+      "severity": "high",
+      "affected_resources": [
+        "aws_db_instance.app",
+        "aws_instance.app",
+        "aws_lb.web",
+        "aws_security_group.db"
+      ],
+      "trust_boundary_id": "public-subnet-to-private-subnet:aws_subnet.public_app->aws_subnet.private_data"
+    },
+    {
+      "rule_id": "aws-workload-role-sensitive-permissions",
+      "title": "Workload role carries sensitive permissions",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lambda_function.processor",
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": "admin-to-workload-plane:aws_iam_role.workload->aws_lambda_function.processor"
+    },
+    {
+      "rule_id": "aws-role-trust-missing-narrowing",
+      "title": "Cross-account or broad role trust lacks narrowing conditions",
+      "category": "Elevation of Privilege",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload"
+    },
+    {
+      "rule_id": "aws-iam-wildcard-permissions",
+      "title": "IAM policy grants wildcard privileges",
+      "category": "Elevation of Privilege",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": null
+    },
+    {
+      "rule_id": "aws-iam-wildcard-permissions",
+      "title": "IAM policy grants wildcard privileges",
+      "category": "Elevation of Privilege",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_iam_policy.admin_like"
+      ],
+      "trust_boundary_id": null
+    },
+    {
+      "rule_id": "aws-public-compute-broad-ingress",
+      "title": "Internet-exposed compute service permits overly broad ingress",
+      "category": "Spoofing",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_instance.app",
+        "aws_security_group.app"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_instance.app"
+    },
+    {
+      "rule_id": "aws-s3-public-access",
+      "title": "Object storage is publicly accessible",
+      "category": "Information Disclosure",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_s3_bucket.assets"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_s3_bucket.assets"
+    },
+    {
+      "rule_id": "aws-role-trust-expansion",
+      "title": "Role trust relationship expands blast radius",
+      "category": "Elevation of Privilege",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload"
+    }
+  ],
+  "observations": [],
+  "limitations": [
+    "AWS support is intentionally limited to a curated v1 resource set rather than the full Terraform AWS provider.",
+    "Subnet public/private classification prefers explicit route table associations and NAT or internet routes when present, but it does not model main-route-table inheritance or every routing edge case.",
+    "IAM analysis resolves inline role policies, customer-managed role-policy attachments, and EC2 instance profiles present in the plan, but it does not expand AWS-managed policy documents that are not materialized in Terraform state.",
+    "Resource-policy analysis focuses on explicit policy documents and Lambda permission resources present in the plan; it does not model every service-specific condition key or every downstream runtime authorization path.",
+    "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity."
+  ]
+}

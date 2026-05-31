@@ -1,0 +1,199 @@
+{
+  "root": [
+    "kind",
+    "version",
+    "tool",
+    "title",
+    "analyzed_file",
+    "analyzed_path",
+    "summary",
+    "filtering",
+    "analysis_coverage",
+    "inventory",
+    "trust_boundaries",
+    "findings",
+    "suppressed_findings",
+    "baselined_findings",
+    "observations",
+    "limitations"
+  ],
+  "tool": [
+    "name",
+    "version"
+  ],
+  "summary": [
+    "normalized_resources",
+    "unsupported_resources",
+    "trust_boundaries",
+    "active_findings",
+    "total_findings",
+    "suppressed_findings",
+    "baselined_findings",
+    "severity_counts"
+  ],
+  "summary.severity_counts": [
+    "high",
+    "medium",
+    "low"
+  ],
+  "filtering": [
+    "total_findings",
+    "active_findings",
+    "suppressed_findings",
+    "baselined_findings",
+    "suppressions_path",
+    "baseline_path"
+  ],
+  "analysis_coverage": [
+    "resources",
+    "rules",
+    "references"
+  ],
+  "analysis_coverage.resources": [
+    "total_resources",
+    "provider_resources",
+    "normalized_resources",
+    "unsupported_resources",
+    "unsupported_resource_types"
+  ],
+  "analysis_coverage.rules": [
+    "registered_rule_count",
+    "enabled_rules",
+    "disabled_rules",
+    "severity_overrides",
+    "finding_counts_by_rule"
+  ],
+  "analysis_coverage.references": [
+    "unresolved_reference_count",
+    "unresolved_references"
+  ],
+  "analysis_coverage.references.unresolved_references[]": [
+    "resource",
+    "references"
+  ],
+  "inventory": [
+    "provider",
+    "unsupported_resources",
+    "metadata",
+    "resources"
+  ],
+  "inventory.resources[]": [
+    "address",
+    "provider",
+    "resource_type",
+    "name",
+    "category",
+    "identifier",
+    "arn",
+    "vpc_id",
+    "subnet_ids",
+    "security_group_ids",
+    "attached_role_arns",
+    "network_rules",
+    "policy_statements",
+    "public_access_configured",
+    "public_exposure",
+    "data_sensitivity",
+    "metadata"
+  ],
+  "inventory.resources[].network_rules[]": [
+    "direction",
+    "protocol",
+    "from_port",
+    "to_port",
+    "cidr_blocks",
+    "ipv6_cidr_blocks",
+    "referenced_security_group_ids",
+    "description"
+  ],
+  "inventory.resources[].policy_statements[]": [
+    "effect",
+    "actions",
+    "resources",
+    "principals",
+    "principal_entries",
+    "conditions"
+  ],
+  "inventory.resources[].policy_statements[].principal_entries[]": [
+    "kind",
+    "value"
+  ],
+  "inventory.resources[].policy_statements[].conditions[]": [
+    "operator",
+    "key",
+    "values"
+  ],
+  "trust_boundaries[]": [
+    "identifier",
+    "boundary_type",
+    "source",
+    "target",
+    "description",
+    "rationale"
+  ],
+  "findings[]": [
+    "fingerprint",
+    "title",
+    "rule_id",
+    "category",
+    "severity",
+    "affected_resources",
+    "trust_boundary_id",
+    "rationale",
+    "recommended_mitigation",
+    "evidence",
+    "severity_reasoning"
+  ],
+  "findings[].evidence[]": [
+    "key",
+    "values"
+  ],
+  "findings[].severity_reasoning": [
+    "internet_exposure",
+    "privilege_breadth",
+    "data_sensitivity",
+    "lateral_movement",
+    "blast_radius",
+    "final_score",
+    "severity",
+    "computed_severity"
+  ],
+  "suppressed_findings[]": [
+    "fingerprint",
+    "title",
+    "rule_id",
+    "category",
+    "severity",
+    "affected_resources",
+    "trust_boundary_id",
+    "rationale",
+    "recommended_mitigation",
+    "evidence",
+    "severity_reasoning"
+  ],
+  "baselined_findings[]": [
+    "fingerprint",
+    "title",
+    "rule_id",
+    "category",
+    "severity",
+    "affected_resources",
+    "trust_boundary_id",
+    "rationale",
+    "recommended_mitigation",
+    "evidence",
+    "severity_reasoning"
+  ],
+  "observations[]": [
+    "title",
+    "observation_id",
+    "affected_resources",
+    "rationale",
+    "category",
+    "evidence"
+  ],
+  "observations[].evidence[]": [
+    "key",
+    "values"
+  ]
+}
