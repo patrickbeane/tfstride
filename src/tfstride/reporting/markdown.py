@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections import Counter
 
-from tfstride.models import AnalysisResult, Severity
+from tfstride.models import AnalysisResult, Finding, Severity
 
 
 def render_markdown(result: AnalysisResult) -> str:
-    severity_counts = Counter(finding.severity.value for finding in result.findings)
+    findings_by_severity = _group_findings_by_severity(result)
     lines = [
         f"# {result.title}",
         "",
@@ -29,9 +29,9 @@ def render_markdown(result: AnalysisResult) -> str:
     baselined_count = int(filter_summary.get("baselined_findings", 0) or 0)
     lines.extend(
         [
-            f"- High severity findings: `{severity_counts.get('high', 0)}`",
-            f"- Medium severity findings: `{severity_counts.get('medium', 0)}`",
-            f"- Low severity findings: `{severity_counts.get('low', 0)}`",
+            f"- High severity findings: `{len(findings_by_severity[Severity.HIGH])}`",
+            f"- Medium severity findings: `{len(findings_by_severity[Severity.MEDIUM])}`",
+            f"- Low severity findings: `{len(findings_by_severity[Severity.LOW])}`",
         ]
     )
     if suppressed_count or baselined_count:
@@ -66,11 +66,6 @@ def render_markdown(result: AnalysisResult) -> str:
     else:
         lines.extend(["No trust boundaries were discovered.", ""])
 
-    findings_by_severity = {
-        Severity.HIGH: [finding for finding in result.findings if finding.severity == Severity.HIGH],
-        Severity.MEDIUM: [finding for finding in result.findings if finding.severity == Severity.MEDIUM],
-        Severity.LOW: [finding for finding in result.findings if finding.severity == Severity.LOW],
-    }
     lines.append("## Findings")
     lines.append("")
     for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW):
@@ -137,6 +132,17 @@ def render_markdown(result: AnalysisResult) -> str:
         lines.append("- No additional limitations were recorded.")
     lines.append("")
     return "\n".join(lines)
+
+
+def _group_findings_by_severity(result: AnalysisResult) -> dict[Severity, list[Finding]]:
+    findings_by_severity: dict[Severity, list[Finding]] = {
+        Severity.HIGH: [],
+        Severity.MEDIUM: [],
+        Severity.LOW: [],
+    }
+    for finding in result.findings:
+        findings_by_severity[finding.severity].append(finding)
+    return findings_by_severity
 
 
 def _render_analysis_coverage(result: AnalysisResult) -> list[str]:
