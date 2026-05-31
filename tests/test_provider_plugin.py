@@ -6,10 +6,12 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
     provider_registry_from_plugins,
+    resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
 )
 
@@ -90,6 +92,9 @@ def _plugin(*, provider: str = " AWS ", normalizer_provider: str = "aws") -> Pro
         resource_facts_factory=_facts,
         metadata_namespace=FakeMetadata,
         supported_resource_types=frozenset({" example_resource "}),
+        resource_capabilities={
+            ResourceCapability.WORKLOAD: frozenset({" example_resource "}),
+        },
         resource_decorator_factory=RecordingDecorator,
     )
 
@@ -100,6 +105,10 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertEqual(plugin.provider, "aws")
         self.assertEqual(plugin.supported_resource_types, frozenset({"example_resource"}))
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
+            frozenset({"example_resource"}),
+        )
         self.assertIs(plugin.metadata_namespace, FakeMetadata)
         self.assertIs(plugin.facts_registry_entry()[1], _facts)
 
@@ -129,6 +138,15 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(facts_registry.providers(), ("aws",))
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
         self.assertEqual(facts_registry.facts_for(resource).bucket_name, "aws-bucket")
+
+    def test_plugin_helper_builds_resource_capability_registry(self) -> None:
+        plugin = _plugin()
+        registry = resource_capability_registry_from_plugins([plugin])
+
+        self.assertEqual(registry.providers(), ("aws",))
+        self.assertTrue(
+            registry.has_capability(_resource("aws"), ResourceCapability.WORKLOAD)
+        )
 
     def test_plugin_rejects_normalizer_provider_mismatch(self) -> None:
         plugin = _plugin(provider="aws", normalizer_provider="gcp")
@@ -178,6 +196,17 @@ class ProviderPluginTests(unittest.TestCase):
                 resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset({" "}),
+            )
+
+    def test_plugin_rejects_empty_capability_resource_type_names(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            ProviderPlugin(
+                provider="aws",
+                normalizer_factory=lambda: RecordingNormalizer(),
+                resource_facts_factory=_facts,
+                metadata_namespace=FakeMetadata,
+                supported_resource_types=frozenset(),
+                resource_capabilities={ResourceCapability.WORKLOAD: frozenset({" "})},
             )
 
 

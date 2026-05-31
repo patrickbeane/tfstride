@@ -12,10 +12,12 @@ from tfstride.providers.aws.resource_facts import AwsResourceFacts
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts
+from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_plugins,
     default_provider_registry,
+    default_resource_capability_registry,
     default_resource_facts_registry,
 )
 
@@ -62,6 +64,27 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(registry.providers(), ("aws", "gcp"))
         self.assertIsInstance(registry.facts_for(aws_resource), AwsResourceFacts)
         self.assertIsInstance(registry.facts_for(gcp_resource), GcpResourceFacts)
+
+    def test_default_resource_capability_registry_registers_builtin_providers(self) -> None:
+        registry = default_resource_capability_registry()
+        aws_resource = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+        )
+        gcp_resource = NormalizedResource(
+            address="google_compute_instance.web",
+            provider="gcp",
+            resource_type="google_compute_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+        )
+
+        self.assertEqual(registry.providers(), ("aws", "gcp"))
+        self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
+        self.assertFalse(registry.has_capability(gcp_resource, ResourceCapability.WORKLOAD))
 
     def test_app_uses_catalog_default_provider(self) -> None:
         result = TfStride().analyze_plan(FIXTURE_PATH)

@@ -51,6 +51,7 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(plugin.provider, "gcp")
         self.assertIs(plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
+        self.assertEqual(dict(plugin.resource_capabilities), {})
         self.assertIsInstance(plugin.create_normalizer(), GcpNormalizer)
         self.assertIsNone(plugin.create_resource_decorator())
         self.assertFalse(plugin.supports_resource_type("google_storage_bucket"))

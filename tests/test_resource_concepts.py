@@ -174,6 +174,19 @@ class ResourceConceptTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_analysis_resource_concepts_do_not_embed_provider_type_literals(self) -> None:
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "tfstride"
+            / "analysis"
+            / "resource_concepts.py"
+        )
+        text = path.read_text(encoding="utf-8")
+
+        self.assertNotIn("aws_", text)
+        self.assertNotIn("google_", text)
+
 
 if __name__ == "__main__":
     unittest.main()

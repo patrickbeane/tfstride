@@ -5,9 +5,11 @@ from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.plugin import (
     ProviderPlugin,
     provider_registry_from_plugins,
+    resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
 )
 from tfstride.providers.registry import ProviderRegistry
+from tfstride.providers.resource_capabilities import ProviderResourceCapabilityRegistry
 from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 
 
@@ -24,3 +26,7 @@ def default_provider_registry() -> ProviderRegistry:
 
 def default_resource_facts_registry() -> ProviderResourceFactsRegistry:
     return resource_facts_registry_from_plugins(default_provider_plugins())
+
+
+def default_resource_capability_registry() -> ProviderResourceCapabilityRegistry:
+    return resource_capability_registry_from_plugins(default_provider_plugins())
