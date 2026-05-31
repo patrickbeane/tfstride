@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from tfstride.models import NormalizedResource
-from tfstride.resource_metadata import ResourceMetadata
+from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,33 +13,45 @@ class AnalysisResourceFacts:
 
     resource: NormalizedResource
 
+    def _aws_facts(self) -> AwsResourceFacts | None:
+        if self.resource.provider != "aws":
+            return None
+        return aws_facts(self.resource)
+
     @property
     def bucket_name(self) -> str | None:
-        return self.resource.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+        facts = self._aws_facts()
+        return facts.bucket_name if facts is not None else None
 
     @property
     def bucket_acl(self) -> str:
-        return self.resource.get_metadata_field(ResourceMetadata.BUCKET_ACL) or ""
+        facts = self._aws_facts()
+        return facts.bucket_acl if facts is not None else ""
 
     @property
     def public_access_block(self) -> dict[str, bool] | None:
-        return self.resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_BLOCK)
+        facts = self._aws_facts()
+        return facts.public_access_block if facts is not None else None
 
     @property
     def policy_document(self) -> dict[str, Any]:
-        return self.resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)
+        facts = self._aws_facts()
+        return facts.policy_document if facts is not None else {}
 
     @property
     def trust_statements(self) -> list[dict[str, Any]]:
-        return self.resource.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS)
+        facts = self._aws_facts()
+        return facts.trust_statements if facts is not None else []
 
     @property
     def database_engine(self) -> str | None:
-        return self.resource.get_metadata_field(ResourceMetadata.ENGINE)
+        facts = self._aws_facts()
+        return facts.engine if facts is not None else None
 
     @property
     def resource_policy_source_addresses(self) -> list[str]:
-        return self.resource.get_metadata_field(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
+        facts = self._aws_facts()
+        return facts.resource_policy_source_addresses if facts is not None else []
 
 
 def analysis_facts(resource: NormalizedResource) -> AnalysisResourceFacts:

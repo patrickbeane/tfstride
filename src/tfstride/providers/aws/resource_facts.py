@@ -150,6 +150,14 @@ class AwsResourceFacts:
     def bucket_acl(self) -> str:
         return self.get(AwsResourceMetadata.BUCKET_ACL) or ""
 
+    @property
+    def engine(self) -> str | None:
+        return self.get(AwsResourceMetadata.ENGINE)
+
+    @property
+    def trust_statements(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.TRUST_STATEMENTS)
+
     def set_resolved_role_references(self, values: list[str]) -> None:
         self.set(AwsResourceMetadata.RESOLVED_ROLE_REFERENCES, values)
 

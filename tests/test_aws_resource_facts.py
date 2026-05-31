@@ -28,6 +28,8 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "task_definition": "app:7",
                 "task_role_arn": "arn:aws:iam::111122223333:role/task",
                 "requires_compatibilities": ["FARGATE"],
+                "engine": "postgres",
+                "trust_statements": [{"Effect": "Allow"}],
             }
         )
 
@@ -38,6 +40,8 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.task_definition_reference, "app:7")
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(facts.requires_compatibilities, ["FARGATE"])
+        self.assertEqual(facts.engine, "postgres")
+        self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
 
     def test_writes_aws_provider_metadata_through_resource_fields(self) -> None:
         resource = _resource()
