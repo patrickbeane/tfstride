@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 
 from tfstride.analysis.rule_registry import RuleMetadata, RuleRegistry, default_rule_registry
-from tfstride.app import TfStride
+from tfstride.app import AUTO_PROVIDER, TfStride
 from tfstride.config import ProjectConfigLoadError, load_project_config
 from tfstride.filtering import FindingFilterLoadError, apply_finding_filters, render_baseline
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.models import Severity
+from tfstride.providers.registry import ProviderRegistryError
 from tfstride.reporting.json_report import render_json
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.sarif import render_sarif
@@ -43,6 +44,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Optional path to a `tfstride.toml` config file. If omitted, the CLI "
             "auto-discovers one from the current working directory or the plan directory."
+        ),
+    )
+    parser.add_argument(
+        "--provider",
+        default=None,
+        help=(
+            f"Provider to analyze. Defaults to `{AUTO_PROVIDER}` detection; pass an explicit "
+            "provider such as `aws` or `gcp` for mixed plans."
         ),
     )
     parser.add_argument(
@@ -109,8 +118,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         project_config = load_project_config(path=args.config, plan_path=plan_path)
-        engine = TfStride(rule_policy=project_config.rule_policy)
-        title = args.title or project_config.title or "tfSTRIDE Report"
+        provider = args.provider or project_config.provider
+        engine = TfStride(rule_policy=project_config.rule_policy, provider=provider)
+        title = args.title or project_config.title or "tfSTRIDE Threat Model Report"
         suppressions_path = args.suppressions or project_config.suppressions_path
         baseline_path = args.baseline or project_config.baseline_path
         fail_on = args.fail_on or (project_config.fail_on.value if project_config.fail_on else None)
@@ -123,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.baseline_output).write_text(render_baseline(result.findings), encoding="utf-8")
         if baseline_path:
             result = apply_finding_filters(result, baseline_path=baseline_path)
-    except (TerraformPlanLoadError, FindingFilterLoadError, ProjectConfigLoadError) as exc:
+    except (TerraformPlanLoadError, FindingFilterLoadError, ProjectConfigLoadError, ProviderRegistryError) as exc:
         sys.stderr.write(f"Input error: {exc}\n")
         return INPUT_ERROR_EXIT_CODE
 
@@ -207,7 +217,6 @@ def _render_rule(rule: RuleMetadata) -> list[str]:
         f"  Severity factors: {_format_values(rule.severity_factors)}",
         f"  Mitigation: {rule.recommended_mitigation}",
     ]
-
 
 
 def _format_values(values: tuple[str, ...]) -> str:

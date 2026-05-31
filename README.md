@@ -22,10 +22,10 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - CLI rule registry listing in text and JSON for reviewable rule IDs, STRIDE categories, tags, and mitigations
 - CI policy gating with `--fail-on low|medium|high`
 - suppressions and baselines to focus gating on active new findings
-- repo-level TOML config for default gating, rule selection, and severity overrides
+- repo-level TOML config for provider selection, default gating, rule selection, and severity overrides
 - automation-friendly `--quiet` mode and non-zero exit behavior
 - zero runtime dependencies for the core CLI engine, with optional dashboard dependencies
-- AWS-first normalization behind a provider registry for future expansion
+- AWS-first normalization behind a provider registry with GCP scaffold detection
 
 ## Quickstart
 
@@ -59,6 +59,13 @@ Emit a machine-readable JSON report:
 
 ```bash
 tfstride tfplan.json --quiet --json-output threat-model.json
+```
+
+Provider detection defaults to `auto`. For mixed-provider plans, select one provider explicitly:
+
+```bash
+tfstride tfplan.json --provider aws --quiet
+tfstride tfplan.json --provider gcp --quiet --json-output threat-model.json
 ```
 
 List the registered rules and their metadata without analyzing a plan:
@@ -329,6 +336,7 @@ Example:
 ```toml
 version = "1.0"
 title = "Platform Threat Model"
+provider = "auto"
 fail_on = "high"
 baseline = ".tfstride/baseline.json"
 suppressions = ".tfstride/suppressions.json"
@@ -343,6 +351,7 @@ aws-iam-wildcard-permissions = "low"
 Supported config keys:
 
 - `title`
+- `provider`
 - `fail_on`
 - `baseline`
 - `suppressions`

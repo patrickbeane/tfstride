@@ -5,16 +5,19 @@ from pathlib import Path
 
 from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import AwsResourceFacts
+from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
+    default_provider_limitations,
     default_provider_plugins,
     default_provider_registry,
     default_resource_capability_registry,
@@ -43,12 +46,20 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(tuple(plugins), ("aws", "gcp"))
         self.assertIs(aws_plugin.metadata_namespace, AwsResourceMetadata)
         self.assertEqual(aws_plugin.supported_resource_types, frozenset(SUPPORTED_AWS_TYPES))
+        self.assertEqual(aws_plugin.limitations, AWS_LIMITATIONS)
         self.assertIsInstance(aws_plugin.create_normalizer(), AwsNormalizer)
         self.assertIsInstance(aws_plugin.create_resource_decorator(), AwsResourceDecorator)
         self.assertIs(gcp_plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(gcp_plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
+        self.assertEqual(gcp_plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(gcp_plugin.create_normalizer(), GcpNormalizer)
         self.assertIsNone(gcp_plugin.create_resource_decorator())
+
+    def test_default_provider_limitations_register_builtin_provider_caveats(self) -> None:
+        limitations = default_provider_limitations()
+
+        self.assertEqual(limitations["aws"], AWS_LIMITATIONS)
+        self.assertEqual(limitations["gcp"], GCP_LIMITATIONS)
 
     def test_default_resource_facts_registry_registers_builtin_providers(self) -> None:
         registry = default_resource_facts_registry()

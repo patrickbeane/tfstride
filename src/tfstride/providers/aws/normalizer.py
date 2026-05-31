@@ -91,12 +91,11 @@ class AwsNormalizer(ProviderNormalizer):
         self._resource_decorator = resource_decorator or AwsResourceDecorator()
         self._resource_normalizers = dict(_AWS_RESOURCE_NORMALIZERS)
 
+    def owns_resource(self, resource: TerraformResource) -> bool:
+        return _is_aws_resource(resource)
+
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
-        aws_resources = [
-            resource
-            for resource in resources
-            if resource.provider_name.endswith("/aws") or resource.resource_type.startswith("aws_")
-        ]
+        aws_resources = [resource for resource in resources if self.owns_resource(resource)]
         unsupported_resource_types = Counter(
             resource.resource_type
             for resource in aws_resources
@@ -135,6 +134,11 @@ class AwsNormalizer(ProviderNormalizer):
         except KeyError as exc:
             raise ValueError(f"Unsupported resource type reached normalizer: {resource.resource_type}") from exc
         return normalizer(resource)
+
+
+def _is_aws_resource(resource: TerraformResource) -> bool:
+    provider_name = str(resource.provider_name).strip().lower()
+    return provider_name.endswith("/aws") or resource.resource_type.startswith("aws_")
 
 
 def _infer_primary_account_id(resources: list[NormalizedResource]) -> str | None:

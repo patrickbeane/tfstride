@@ -18,6 +18,7 @@ class ProjectConfigTests(unittest.TestCase):
                     """
                     version = "1.0"
                     title = "Team Threat Model"
+                    provider = "gcp"
                     fail_on = "medium"
                     baseline = "baseline.json"
                     suppressions = "suppressions.json"
@@ -36,6 +37,7 @@ class ProjectConfigTests(unittest.TestCase):
             config = load_project_config(path=config_path)
 
         self.assertEqual(config.title, "Team Threat Model")
+        self.assertEqual(config.provider, "gcp")
         self.assertEqual(config.fail_on, Severity.MEDIUM)
         self.assertEqual(config.baseline_path, str((Path(tmp_dir) / "baseline.json").resolve()))
         self.assertEqual(config.suppressions_path, str((Path(tmp_dir) / "suppressions.json").resolve()))

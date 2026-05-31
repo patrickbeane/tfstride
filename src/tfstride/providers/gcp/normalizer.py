@@ -17,8 +17,11 @@ class GcpNormalizer(ProviderNormalizer):
 
     provider = GCP_PROVIDER
 
+    def owns_resource(self, resource: TerraformResource) -> bool:
+        return _is_gcp_resource(resource)
+
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
-        gcp_resources = [resource for resource in resources if _is_gcp_resource(resource)]
+        gcp_resources = [resource for resource in resources if self.owns_resource(resource)]
         unsupported_resource_types = Counter(resource.resource_type for resource in gcp_resources)
         unsupported = sorted(resource.address for resource in gcp_resources)
 

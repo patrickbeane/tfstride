@@ -180,6 +180,89 @@ class CliTests(unittest.TestCase):
             self.assertEqual(len(payload["findings"]), 9)
             self.assertEqual(payload["findings"][0]["fingerprint"].split(":")[0], "sha256")
 
+    def test_cli_provider_option_can_select_gcp_scaffold(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "google_storage_bucket.logs",
+                            "mode": "managed",
+                            "type": "google_storage_bucket",
+                            "name": "logs",
+                            "provider_name": "registry.terraform.io/hashicorp/google",
+                            "values": {},
+                        }
+                    ]
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            json_output_path = Path(tmp_dir) / "report.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            exit_code = main(
+                [
+                    str(plan_path),
+                    "--provider",
+                    "gcp",
+                    "--quiet",
+                    "--json-output",
+                    str(json_output_path),
+                ]
+            )
+
+            report = json.loads(json_output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["inventory"]["provider"], "gcp")
+        self.assertEqual(report["inventory"]["unsupported_resources"], ["google_storage_bucket.logs"])
+        self.assertEqual(report["summary"]["active_findings"], 0)
+        self.assertIn("GCP support currently recognizes", report["limitations"][0])
+
+    def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "aws_instance.web",
+                            "mode": "managed",
+                            "type": "aws_instance",
+                            "name": "web",
+                            "provider_name": "registry.terraform.io/hashicorp/aws",
+                            "values": {},
+                        },
+                        {
+                            "address": "google_storage_bucket.logs",
+                            "mode": "managed",
+                            "type": "google_storage_bucket",
+                            "name": "logs",
+                            "provider_name": "registry.terraform.io/hashicorp/google",
+                            "values": {},
+                        },
+                    ]
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            stdout_buffer = io.StringIO()
+            stderr_buffer = io.StringIO()
+
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                exit_code = main([str(plan_path), "--quiet"])
+
+        self.assertEqual(exit_code, INPUT_ERROR_EXIT_CODE)
+        self.assertEqual("", stdout_buffer.getvalue())
+        self.assertIn("multiple registered providers", stderr_buffer.getvalue())
+
     def test_cli_quiet_suppresses_stdout_but_preserves_success_exit_code(self) -> None:
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()

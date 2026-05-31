@@ -10,6 +10,7 @@ from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
+    provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
@@ -85,7 +86,12 @@ def _resource(provider: str = "aws") -> NormalizedResource:
     )
 
 
-def _plugin(*, provider: str = " AWS ", normalizer_provider: str = "aws") -> ProviderPlugin:
+def _plugin(
+    *,
+    provider: str = " AWS ",
+    normalizer_provider: str = "aws",
+    limitations: tuple[str, ...] = (" limitation ",),
+) -> ProviderPlugin:
     return ProviderPlugin(
         provider=provider,
         normalizer_factory=lambda: RecordingNormalizer(normalizer_provider),
@@ -95,6 +101,7 @@ def _plugin(*, provider: str = " AWS ", normalizer_provider: str = "aws") -> Pro
         resource_capabilities={
             ResourceCapability.WORKLOAD: frozenset({" example_resource "}),
         },
+        limitations=limitations,
         resource_decorator_factory=RecordingDecorator,
     )
 
@@ -110,6 +117,7 @@ class ProviderPluginTests(unittest.TestCase):
             frozenset({"example_resource"}),
         )
         self.assertIs(plugin.metadata_namespace, FakeMetadata)
+        self.assertEqual(plugin.limitations, ("limitation",))
         self.assertIs(plugin.facts_registry_entry()[1], _facts)
 
     def test_plugin_creates_normalizer_and_resource_decorator(self) -> None:
@@ -133,9 +141,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         provider_registry = provider_registry_from_plugins([plugin])
         facts_registry = resource_facts_registry_from_plugins([plugin])
+        limitation_registry = provider_limitations_from_plugins([plugin])
 
         self.assertEqual(provider_registry.providers(), ("aws",))
         self.assertEqual(facts_registry.providers(), ("aws",))
+        self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
         self.assertEqual(facts_registry.facts_for(resource).bucket_name, "aws-bucket")
 
@@ -208,6 +218,10 @@ class ProviderPluginTests(unittest.TestCase):
                 supported_resource_types=frozenset(),
                 resource_capabilities={ResourceCapability.WORKLOAD: frozenset({" "})},
             )
+
+    def test_plugin_rejects_empty_limitations(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            _plugin(limitations=(" ",))
 
 
 if __name__ == "__main__":

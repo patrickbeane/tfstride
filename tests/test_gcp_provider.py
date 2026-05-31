@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
@@ -52,6 +53,7 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIs(plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
         self.assertEqual(dict(plugin.resource_capabilities), {})
+        self.assertEqual(plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), GcpNormalizer)
         self.assertIsNone(plugin.create_resource_decorator())
         self.assertFalse(plugin.supports_resource_type("google_storage_bucket"))
@@ -70,6 +72,36 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+
+    def test_normalizer_reports_resource_ownership(self) -> None:
+        normalizer = GcpNormalizer()
+
+        self.assertTrue(
+            normalizer.owns_resource(
+                _terraform_resource(
+                    address="google_storage_bucket.logs",
+                    resource_type="google_storage_bucket",
+                )
+            )
+        )
+        self.assertTrue(
+            normalizer.owns_resource(
+                _terraform_resource(
+                    address="google_compute_instance.web",
+                    resource_type="google_compute_instance",
+                    provider_name="registry.terraform.io/hashicorp/google-beta",
+                )
+            )
+        )
+        self.assertFalse(
+            normalizer.owns_resource(
+                _terraform_resource(
+                    address="aws_s3_bucket.logs",
+                    resource_type="aws_s3_bucket",
+                    provider_name="registry.terraform.io/hashicorp/aws",
+                )
+            )
+        )
 
     def test_normalizer_tracks_recognized_gcp_resources_as_unsupported(self) -> None:
         resources = [

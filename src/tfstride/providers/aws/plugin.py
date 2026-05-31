@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_capabilities import AWS_RESOURCE_CAPABILITIES
@@ -16,5 +17,6 @@ def aws_provider_plugin() -> ProviderPlugin:
         metadata_namespace=AwsResourceMetadata,
         supported_resource_types=frozenset(SUPPORTED_AWS_TYPES),
         resource_capabilities=AWS_RESOURCE_CAPABILITIES,
+        limitations=AWS_LIMITATIONS,
         resource_decorator_factory=AwsResourceDecorator,
     )

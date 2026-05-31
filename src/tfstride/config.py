@@ -21,6 +21,7 @@ class ProjectConfigLoadError(ValueError):
 class ProjectConfig:
     path: str | None = None
     title: str | None = None
+    provider: str | None = None
     fail_on: Severity | None = None
     suppressions_path: str | None = None
     baseline_path: str | None = None
@@ -48,7 +49,7 @@ def load_project_config(
 
     _ensure_known_keys(
         payload,
-        allowed={"version", "title", "fail_on", "baseline", "suppressions", "rules"},
+        allowed={"version", "title", "provider", "fail_on", "baseline", "suppressions", "rules"},
         label="config",
         path=config_path,
     )
@@ -59,6 +60,7 @@ def load_project_config(
         )
 
     title = _optional_string(payload.get("title"), key="title", path=config_path)
+    provider = _optional_string(payload.get("provider"), key="provider", path=config_path)
     fail_on = _optional_severity(payload.get("fail_on"), key="fail_on", path=config_path)
     baseline_path = _optional_path(payload.get("baseline"), key="baseline", base_path=config_path)
     suppressions_path = _optional_path(payload.get("suppressions"), key="suppressions", base_path=config_path)
@@ -67,6 +69,7 @@ def load_project_config(
     return ProjectConfig(
         path=str(config_path),
         title=title,
+        provider=provider,
         fail_on=fail_on,
         suppressions_path=suppressions_path,
         baseline_path=baseline_path,

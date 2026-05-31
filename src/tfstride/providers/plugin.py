@@ -41,6 +41,7 @@ class ProviderPlugin:
     metadata_namespace: type
     supported_resource_types: frozenset[str]
     resource_capabilities: ResourceCapabilityMap = field(default_factory=dict)
+    limitations: tuple[str, ...] = ()
     resource_decorator_factory: Callable[[], ProviderResourceDecorator] | None = None
 
     def __post_init__(self) -> None:
@@ -61,10 +62,14 @@ class ProviderPlugin:
             raise ProviderPluginError(
                 f"Provider plugin `{provider}` supported resource types must be non-empty strings."
             )
+        limitations = tuple(str(item).strip() for item in self.limitations)
+        if "" in limitations:
+            raise ProviderPluginError(f"Provider plugin `{provider}` limitations must be non-empty strings.")
         resource_capabilities = _normalize_resource_capabilities(provider, self.resource_capabilities)
 
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "supported_resource_types", supported_resource_types)
+        object.__setattr__(self, "limitations", limitations)
         object.__setattr__(self, "resource_capabilities", MappingProxyType(resource_capabilities))
 
     def create_normalizer(self) -> ProviderNormalizer:
@@ -97,6 +102,9 @@ class ProviderPlugin:
     def capability_registry_entry(self) -> tuple[str, ResourceCapabilityMap]:
         return (self.provider, self.resource_capabilities)
 
+    def limitations_entry(self) -> tuple[str, tuple[str, ...]]:
+        return (self.provider, self.limitations)
+
 
 def provider_registry_from_plugins(plugins: Iterable[ProviderPlugin]) -> ProviderRegistry:
     return ProviderRegistry(plugin.create_normalizer() for plugin in plugins)
@@ -114,6 +122,13 @@ def resource_capability_registry_from_plugins(
     return ProviderResourceCapabilityRegistry(
         plugin.capability_registry_entry() for plugin in plugins
     )
+
+
+def provider_limitations_from_plugins(plugins: Iterable[ProviderPlugin]) -> dict[str, tuple[str, ...]]:
+    return {
+        provider: limitations
+        for provider, limitations in (plugin.limitations_entry() for plugin in plugins)
+    }
 
 
 def _normalize_resource_capabilities(
