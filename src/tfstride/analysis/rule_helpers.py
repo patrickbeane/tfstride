@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tfstride.analysis.resource_concepts import is_subnet_resource
 from tfstride.models import NormalizedResource, ResourceInventory
 
 
@@ -9,7 +10,7 @@ def subnet_posture(resource: NormalizedResource | None, inventory: ResourceInven
     postures: list[str] = []
     for subnet_id in resource.subnet_ids:
         subnet = inventory.get_by_identifier(subnet_id)
-        if subnet is None or subnet.resource_type != "aws_subnet":
+        if subnet is None or not is_subnet_resource(subnet):
             continue
         if subnet.is_public_subnet:
             posture = f"{resource.address} sits in public subnet {subnet.address}"

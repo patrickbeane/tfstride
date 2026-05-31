@@ -9,6 +9,7 @@ from tfstride.analysis.policy_conditions import (
 from tfstride.analysis.resource_concepts import (
     DATABASE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
+    OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES,
     OBJECT_STORAGE_RESOURCE_TYPES,
 )
 from tfstride.analysis.resource_facts import analysis_facts
@@ -28,7 +29,7 @@ def observe_controls(inventory: ResourceInventory) -> list[Observation]:
 def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
     access_block_index: dict[str, NormalizedResource] = {}
-    for access_block in inventory.by_type("aws_s3_bucket_public_access_block"):
+    for access_block in inventory.by_type(*OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES):
         bucket_name = analysis_facts(access_block).bucket_name
         if bucket_name:
             access_block_index[bucket_name] = access_block

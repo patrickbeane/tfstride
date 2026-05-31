@@ -15,11 +15,13 @@ from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
     WORKLOAD_RESOURCE_TYPES,
+    has_provider_managed_egress_without_vpc,
     is_database_resource,
     is_identity_role_resource,
     is_object_storage_resource,
     is_public_edge_resource,
     is_secret_store_resource,
+    is_subnet_resource,
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
@@ -83,7 +85,7 @@ def detect_trust_boundaries(
     public_subnets = [
         resource
         for resource in resources
-        if resource.resource_type == "aws_subnet" and resource.is_public_subnet
+        if is_subnet_resource(resource) and resource.is_public_subnet
     ]
     private_subnets_by_vpc = _private_subnets_by_vpc(resources)
     for public_subnet in public_subnets:
@@ -183,7 +185,7 @@ def detect_trust_boundaries(
 def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str, tuple[NormalizedResource, ...]]:
     grouped: dict[str, list[NormalizedResource]] = {}
     for resource in resources:
-        if resource.resource_type != "aws_subnet" or resource.is_public_subnet or not resource.vpc_id:
+        if not is_subnet_resource(resource) or resource.is_public_subnet or not resource.vpc_id:
             continue
         grouped.setdefault(resource.vpc_id, []).append(resource)
     return {vpc_id: tuple(subnets) for vpc_id, subnets in grouped.items()}
@@ -408,7 +410,7 @@ def _database_allows_workload_security_group(
 
 
 def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
-    if workload.resource_type == "aws_lambda_function" and not workload.vpc_enabled:
+    if has_provider_managed_egress_without_vpc(workload):
         return True
     return workload.in_public_subnet or workload.has_nat_gateway_egress
 

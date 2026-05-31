@@ -6,7 +6,11 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES, OBJECT_STORAGE_RESOURCE_TYPES
+from tfstride.analysis.resource_concepts import (
+    DATABASE_RESOURCE_TYPES,
+    OBJECT_STORAGE_RESOURCE_TYPES,
+    PUBLIC_COMPUTE_RESOURCE_TYPES,
+)
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
@@ -27,7 +31,7 @@ class PostureRuleDetectors:
         inventory = context.inventory
         indexes = context.analysis_indexes
         assert indexes is not None
-        for resource in inventory.by_type("aws_instance"):
+        for resource in inventory.by_type(*PUBLIC_COMPUTE_RESOURCE_TYPES):
             if not resource.public_exposure:
                 continue
             attached_groups = indexes.attached_security_groups(resource)

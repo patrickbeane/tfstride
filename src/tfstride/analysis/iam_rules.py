@@ -7,7 +7,7 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
-from tfstride.analysis.resource_concepts import WORKLOAD_RESOURCE_TYPES
+from tfstride.analysis.resource_concepts import IAM_POLICY_RESOURCE_TYPES, WORKLOAD_RESOURCE_TYPES
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
@@ -39,7 +39,7 @@ class IAMRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        for policy_resource in context.inventory.by_type("aws_iam_policy", "aws_iam_role"):
+        for policy_resource in context.inventory.by_type(*IAM_POLICY_RESOURCE_TYPES):
             wildcard_statements = [
                 statement
                 for statement in policy_resource.policy_statements

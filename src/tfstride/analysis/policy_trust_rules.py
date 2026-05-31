@@ -16,14 +16,16 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
     trust_statement_has_supported_narrowing_for_principal,
 )
-from tfstride.analysis.resource_concepts import IDENTITY_ROLE_RESOURCE_TYPES, is_object_storage_resource
+from tfstride.analysis.resource_concepts import (
+    IDENTITY_ROLE_RESOURCE_TYPES,
+    SENSITIVE_RESOURCE_POLICY_RESOURCE_TYPES,
+    SERVICE_RESOURCE_POLICY_RESOURCE_TYPES,
+    is_key_management_resource,
+    is_object_storage_resource,
+)
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
-
-
-SENSITIVE_RESOURCE_POLICY_TYPES = {"aws_s3_bucket", "aws_kms_key", "aws_secretsmanager_secret"}
-SERVICE_RESOURCE_POLICY_TYPES = {"aws_lambda_function", "aws_sqs_queue", "aws_sns_topic"}
 
 
 class PolicyTrustRuleDetectors:
@@ -38,7 +40,7 @@ class PolicyTrustRuleDetectors:
         return self._detect_resource_policy_exposure(
             context,
             rule_id=rule_id,
-            resource_types=SENSITIVE_RESOURCE_POLICY_TYPES,
+            resource_types=SENSITIVE_RESOURCE_POLICY_RESOURCE_TYPES,
             sensitive_resource=True,
         )
 
@@ -50,7 +52,7 @@ class PolicyTrustRuleDetectors:
         return self._detect_resource_policy_exposure(
             context,
             rule_id=rule_id,
-            resource_types=SERVICE_RESOURCE_POLICY_TYPES,
+            resource_types=SERVICE_RESOURCE_POLICY_RESOURCE_TYPES,
             sensitive_resource=False,
         )
 
@@ -59,7 +61,7 @@ class PolicyTrustRuleDetectors:
         context: RuleEvaluationContext,
         *,
         rule_id: str,
-        resource_types: set[str],
+        resource_types: frozenset[str],
         sensitive_resource: bool,
     ) -> list[Finding]:
         findings: list[Finding] = []
@@ -92,7 +94,7 @@ class PolicyTrustRuleDetectors:
                     seen.add(finding_key)
 
                     same_account_kms_root = (
-                        resource.resource_type == "aws_kms_key"
+                        is_key_management_resource(resource)
                         and assessment.is_root_like
                         and not assessment.is_foreign_account
                         and assessment.account_id is not None

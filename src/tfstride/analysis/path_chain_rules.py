@@ -14,6 +14,7 @@ from tfstride.analysis.policy_conditions import (
 )
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
+    SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
     is_control_plane_sensitive_data_store,
     is_database_resource,
 )
@@ -219,7 +220,7 @@ def _trusted_workload_hops(
     indexes: AnalysisIndexes,
 ) -> dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]]:
     trusted_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]] = {}
-    for workload in inventory.by_type("aws_instance", "aws_ecs_service"):
+    for workload in inventory.by_type(*SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES):
         for security_group in indexes.attached_security_groups(workload):
             for rule in security_group.network_rules:
                 if rule.direction != "ingress" or not rule.referenced_security_group_ids:
