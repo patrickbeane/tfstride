@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Protocol
+
+from tfstride.models import NormalizedResource
+from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.registry import ProviderRegistry
+from tfstride.providers.resource_facts import (
+    ProviderResourceFactsFactory,
+    ProviderResourceFactsRegistry,
+)
+
+
+class ProviderPluginError(ValueError):
+    """Raised when a provider plugin descriptor is incomplete or inconsistent."""
+
+
+class ProviderResourceDecorator(Protocol):
+    """Provider-owned post-normalization resource decoration hook."""
+
+    def decorate(self, resources: list[NormalizedResource]) -> None:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderPlugin:
+    """Contract every provider package exposes to the shared application layer."""
+
+    provider: str
+    normalizer_factory: Callable[[], ProviderNormalizer]
+    resource_facts_factory: ProviderResourceFactsFactory
+    metadata_namespace: type
+    supported_resource_types: frozenset[str]
+    resource_decorator_factory: Callable[[], ProviderResourceDecorator] | None = None
+
+    def __post_init__(self) -> None:
+        provider = _normalize_provider_name(self.provider)
+        if not provider:
+            raise ProviderPluginError("Provider plugins must define a non-empty provider name.")
+        if not callable(self.normalizer_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` normalizer factory must be callable.")
+        if not callable(self.resource_facts_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` facts factory must be callable.")
+        if self.resource_decorator_factory is not None and not callable(self.resource_decorator_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` decorator factory must be callable.")
+        if not isinstance(self.metadata_namespace, type):
+            raise ProviderPluginError(f"Provider plugin `{provider}` metadata namespace must be a type.")
+
+        supported_resource_types = frozenset(str(item).strip() for item in self.supported_resource_types)
+        if "" in supported_resource_types:
+            raise ProviderPluginError(
+                f"Provider plugin `{provider}` supported resource types must be non-empty strings."
+            )
+
+        object.__setattr__(self, "provider", provider)
+        object.__setattr__(self, "supported_resource_types", supported_resource_types)
+
+    def create_normalizer(self) -> ProviderNormalizer:
+        normalizer = self.normalizer_factory()
+        normalizer_provider = _normalize_provider_name(normalizer.provider)
+        if normalizer_provider != self.provider:
+            raise ProviderPluginError(
+                f"Provider plugin `{self.provider}` created normalizer for `{normalizer_provider}`."
+            )
+        return normalizer
+
+    def create_resource_decorator(self) -> ProviderResourceDecorator | None:
+        if self.resource_decorator_factory is None:
+            return None
+        return self.resource_decorator_factory()
+
+    def supports_resource_type(self, resource_type: str) -> bool:
+        return str(resource_type).strip() in self.supported_resource_types
+
+    def facts_registry_entry(self) -> tuple[str, ProviderResourceFactsFactory]:
+        return (self.provider, self.resource_facts_factory)
+
+
+def provider_registry_from_plugins(plugins: Iterable[ProviderPlugin]) -> ProviderRegistry:
+    return ProviderRegistry(plugin.create_normalizer() for plugin in plugins)
+
+
+def resource_facts_registry_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> ProviderResourceFactsRegistry:
+    return ProviderResourceFactsRegistry(plugin.facts_registry_entry() for plugin in plugins)
+
+
+def _normalize_provider_name(provider: str) -> str:
+    return str(provider).strip().lower()
