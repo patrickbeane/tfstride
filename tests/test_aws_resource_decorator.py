@@ -12,6 +12,7 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsResourceIndexBuilder
 
 
@@ -257,7 +258,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
 
         AwsResourceDecorator().decorate([role, instance_profile, instance])
 
-        self.assertEqual(instance_profile.resolved_role_references, ["arn:aws:iam::111122223333:role/web"])
+        self.assertEqual(aws_facts(instance_profile).resolved_role_references, ["arn:aws:iam::111122223333:role/web"])
         self.assertEqual(instance_profile.metadata["resolved_role_addresses"], ["aws_iam_role.web"])
         self.assertEqual(instance.attached_role_arns, ["arn:aws:iam::111122223333:role/web"])
         self.assertEqual(
@@ -321,13 +322,13 @@ class AwsResourceDecoratorTests(unittest.TestCase):
 
         AwsResourceDecorator().decorate([bucket, bucket_policy, access_block])
 
-        self.assertEqual(bucket.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs_public_read"])
+        self.assertEqual(aws_facts(bucket).resource_policy_source_addresses, ["aws_s3_bucket_policy.logs_public_read"])
         self.assertEqual(len(bucket.policy_statements), 1)
-        self.assertEqual(bucket.policy_document, policy_document)
+        self.assertEqual(aws_facts(bucket).policy_document, policy_document)
         self.assertFalse(bucket.public_exposure)
         self.assertEqual(bucket.public_exposure_reasons, [])
         self.assertEqual(
-            bucket.public_access_block,
+            aws_facts(bucket).public_access_block,
             {
                 "block_public_acls": True,
                 "block_public_policy": True,
@@ -373,10 +374,10 @@ class AwsResourceDecoratorTests(unittest.TestCase):
 
         AwsResourceDecorator().decorate([task_role, execution_role, task_definition, service])
 
-        self.assertEqual(service.network_mode, "awsvpc")
-        self.assertEqual(service.requires_compatibilities, ["FARGATE"])
-        self.assertEqual(service.task_role_arn, "arn:aws:iam::111122223333:role/task")
-        self.assertEqual(service.execution_role_arn, "arn:aws:iam::111122223333:role/execution")
+        self.assertEqual(aws_facts(service).network_mode, "awsvpc")
+        self.assertEqual(aws_facts(service).requires_compatibilities, ["FARGATE"])
+        self.assertEqual(aws_facts(service).task_role_arn, "arn:aws:iam::111122223333:role/task")
+        self.assertEqual(aws_facts(service).execution_role_arn, "arn:aws:iam::111122223333:role/execution")
         self.assertEqual(service.attached_role_arns, ["arn:aws:iam::111122223333:role/task"])
         self.assertEqual(service.metadata["resolved_task_definition_addresses"], ["aws_ecs_task_definition.app"])
         self.assertEqual(service.metadata["resolved_task_role_addresses"], ["aws_iam_role.task"])

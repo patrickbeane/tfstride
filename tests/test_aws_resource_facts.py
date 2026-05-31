@@ -48,13 +48,14 @@ class AwsResourceFactsTests(unittest.TestCase):
         facts.add_unresolved_task_definition_reference("app:7")
         facts.add_public_exposure_reason("service is internet-facing")
 
-        self.assertEqual(resource.network_mode, "awsvpc")
-        self.assertEqual(resource.task_role_arn, "arn:aws:iam::111122223333:role/task")
+        self.assertEqual(facts.network_mode, "awsvpc")
+        self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(
             resource.get_metadata_field(ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES),
             ["app:7"],
         )
         self.assertEqual(resource.public_exposure_reasons, ["service is internet-facing"])
+        self.assertFalse(hasattr(resource, "task_role_arn"))
 
     def test_policy_document_is_mutated_only_through_facts_facade(self) -> None:
         resource = _resource()

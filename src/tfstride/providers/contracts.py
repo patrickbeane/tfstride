@@ -60,47 +60,9 @@ PROVIDER_NEUTRAL_NORMALIZED_RESOURCE_ACCESSORS = frozenset(
     }
 )
 
-# These accessors are kept as an explicit legacy surface while AWS facts are moved
-# out of the core model. This list should shrink over time, not grow.
-LEGACY_NORMALIZED_RESOURCE_PROVIDER_METADATA_ACCESSORS = frozenset(
-    {
-        "security_group_id",
-        "role_reference",
-        "role_references",
-        "resolved_role_references",
-        "iam_instance_profile",
-        "policy_arn",
-        "policy_name",
-        "cluster_reference",
-        "cluster_name",
-        "task_definition_reference",
-        "task_definition_family",
-        "task_definition_revision",
-        "network_mode",
-        "requires_compatibilities",
-        "task_role_arn",
-        "execution_role_arn",
-        "secret_arn",
-        "function_name",
-        "secret_name",
-        "route_table_id",
-        "subnet_id",
-        "routes",
-        "map_public_ip_on_launch",
-        "block_public_acls",
-        "block_public_policy",
-        "ignore_public_acls",
-        "restrict_public_buckets",
-        "trust_principals",
-        "trust_statements",
-        "resource_policy_source_addresses",
-        "policy_document",
-        "public_access_block",
-        "bucket_name",
-        "bucket_acl",
-        "engine",
-    }
-)
+# Provider-specific convenience accessors have moved out of the core model.
+LEGACY_NORMALIZED_RESOURCE_PROVIDER_METADATA_ACCESSORS = frozenset()
+
 
 DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT = ProviderEncapsulationContract(
     provider_neutral_resource_fields=PROVIDER_NEUTRAL_NORMALIZED_RESOURCE_FIELDS,

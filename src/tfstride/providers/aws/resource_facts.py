@@ -138,6 +138,10 @@ class AwsResourceFacts:
         return self.get(ResourceMetadata.POLICY_DOCUMENT)
 
     @property
+    def public_access_block(self) -> dict[str, bool] | None:
+        return self.get(ResourceMetadata.PUBLIC_ACCESS_BLOCK)
+
+    @property
     def bucket_name(self) -> str | None:
         return self.get(ResourceMetadata.BUCKET_NAME)
 

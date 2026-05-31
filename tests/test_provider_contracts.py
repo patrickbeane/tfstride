@@ -31,6 +31,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         classified_accessors = provider_neutral | legacy_provider_owned
 
         self.assertFalse(provider_neutral & legacy_provider_owned)
+        self.assertEqual(legacy_provider_owned, frozenset())
         self.assertEqual(actual_accessors - classified_accessors, set())
         self.assertEqual(provider_neutral - actual_accessors, set())
         self.assertEqual(legacy_provider_owned - actual_accessors, set())

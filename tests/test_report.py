@@ -15,6 +15,7 @@ from tfstride.models import (
     ResourceInventory,
     Severity,
 )
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.reporting.json_report import (
     REPORT_FORMAT_VERSION,
     REPORT_KIND,
@@ -254,7 +255,7 @@ class JsonReportTests(unittest.TestCase):
         )
 
         payload = build_json_report_payload(result)
-        resource.policy_document = {"Statement": [{"Effect": "Deny"}]}
+        aws_facts(resource).set_policy_document({"Statement": [{"Effect": "Deny"}]})
         inventory.primary_account_id = "444455556666"
 
         self.assertEqual(payload["inventory"]["metadata"]["primary_account_id"], "111122223333")
