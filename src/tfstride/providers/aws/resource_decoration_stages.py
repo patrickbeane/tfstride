@@ -12,6 +12,7 @@ from tfstride.models import (
 from tfstride.providers.aws.coercion import as_list
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import (
     bucket_public_exposure_reasons,
     route_table_has_internet_route,
@@ -41,7 +42,9 @@ class MergeStandaloneSecurityGroupRulesStage:
             target_group = context.index.security_groups.get(security_group_id)
             if target_group is None:
                 continue
-            target_group.extend_network_rules(_clone_security_group_rules(rule_resource.network_rules))
+            aws_mutations(target_group).merge_security_group_rules(
+                _clone_security_group_rules(rule_resource.network_rules)
+            )
             aws_facts(target_group).add_standalone_rule_address(rule_resource.address)
 
 
@@ -58,7 +61,9 @@ class MergeRolePolicyResourcesStage:
             role = context.index.role_index.get(role_reference)
             if role is None:
                 continue
-            role.extend_policy_statements(_clone_policy_statements(role_policy_resource.policy_statements))
+            aws_mutations(role).merge_policy_statements(
+                _clone_policy_statements(role_policy_resource.policy_statements)
+            )
             aws_facts(role).add_inline_policy_resource_address(role_policy_resource.address)
             aws_facts(role).add_inline_policy_name(aws_facts(role_policy_resource).policy_name)
 
@@ -76,7 +81,7 @@ class MergeRolePolicyResourcesStage:
             if policy is None:
                 aws_facts(role).add_unresolved_attached_policy_arn(str(policy_arn))
                 continue
-            role.extend_policy_statements(_clone_policy_statements(policy.policy_statements))
+            aws_mutations(role).merge_policy_statements(_clone_policy_statements(policy.policy_statements))
             aws_facts(role).add_attached_policy_arn(policy.arn or policy.identifier or policy.address)
             aws_facts(role).add_attached_policy_address(policy.address)
 
@@ -118,7 +123,7 @@ class ResolveInstanceProfileRolesStage:
                 continue
             aws_facts(workload_resource).add_resolved_instance_profile_address(instance_profile.address)
             for resolved_role_ref in aws_facts(instance_profile).resolved_role_references:
-                workload_resource.add_attached_role_arn(resolved_role_ref)
+                aws_mutations(workload_resource).attach_role_arn(resolved_role_ref)
 
 
 class ResolveEcsServiceRelationshipsStage:
@@ -150,7 +155,7 @@ class ResolveEcsServiceRelationshipsStage:
             execution_role_arn = aws_facts(task_definition).execution_role_arn
             if task_role_arn:
                 aws_facts(ecs_service_resource).set_task_role_arn(task_role_arn)
-                ecs_service_resource.add_attached_role_arn(task_role_arn)
+                aws_mutations(ecs_service_resource).attach_role_arn(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
                 if task_role is not None:
                     aws_facts(ecs_service_resource).add_resolved_task_role_address(task_role.address)
@@ -241,21 +246,32 @@ class ApplyS3PublicAccessBlocksStage:
             bucket_policy_document = aws_facts(bucket).policy_document
             public_via_acl = bucket_acl in {"public-read", "public-read-write", "website"}
             public_via_policy = policy_allows_public_access(bucket_policy_document)
-            bucket.public_access_reasons = bucket_public_exposure_reasons(
-                bucket_acl,
-                public_policy=public_via_policy,
+            bucket_mutations = aws_mutations(bucket)
+            bucket_mutations.set_public_access_reasons(
+                bucket_public_exposure_reasons(
+                    bucket_acl,
+                    public_policy=public_via_policy,
+                )
             )
-            bucket.public_exposure = (
-                public_via_acl
-                and not (public_access_block["block_public_acls"] or public_access_block["ignore_public_acls"])
-            ) or (
-                public_via_policy
-                and not (public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"])
+            bucket_mutations.set_public_exposure(
+                (
+                    public_via_acl
+                    and not (public_access_block["block_public_acls"] or public_access_block["ignore_public_acls"])
+                )
+                or (
+                    public_via_policy
+                    and not (
+                        public_access_block["block_public_policy"]
+                        or public_access_block["restrict_public_buckets"]
+                    )
+                )
             )
-            bucket.public_exposure_reasons = bucket_public_exposure_reasons(
-                bucket_acl,
-                public_policy=public_via_policy,
-                public_access_block=public_access_block,
+            bucket_mutations.set_public_exposure_reasons(
+                bucket_public_exposure_reasons(
+                    bucket_acl,
+                    public_policy=public_via_policy,
+                    public_access_block=public_access_block,
+                )
             )
 
 
@@ -303,10 +319,12 @@ class DeriveSubnetPostureStage:
                     in context.index.vpcs_with_igw.intersection(context.index.vpcs_with_public_routes)
                 )
                 has_nat_route = False
-            subnet.is_public_subnet = is_public
-            aws_facts(subnet).set_route_table_ids(associated_route_table_ids)
-            subnet.has_public_route = has_public_route
-            subnet.has_nat_gateway_egress = has_nat_route
+            aws_mutations(subnet).set_subnet_posture(
+                is_public=is_public,
+                route_table_ids=associated_route_table_ids,
+                has_public_route=has_public_route,
+                has_nat_gateway_egress=has_nat_route,
+            )
             if is_public and subnet.identifier:
                 public_subnet_ids.add(subnet.identifier)
         context.public_subnet_ids = public_subnet_ids
@@ -324,14 +342,14 @@ class InferVpcIdsStage:
             for subnet_id in resource.subnet_ids:
                 subnet = context.index.subnets.get(subnet_id)
                 if subnet and subnet.vpc_id:
-                    resource.vpc_id = subnet.vpc_id
+                    aws_mutations(resource).infer_vpc_id(subnet.vpc_id)
                     break
             if resource.vpc_id:
                 continue
             for security_group_id in resource.security_group_ids:
                 security_group = context.index.security_groups.get(security_group_id)
                 if security_group and security_group.vpc_id:
-                    resource.vpc_id = security_group.vpc_id
+                    aws_mutations(resource).infer_vpc_id(security_group.vpc_id)
                     break
 
 
@@ -350,47 +368,54 @@ class DerivePublicExposureStage:
                 for security_group in attached_security_groups
                 for rule in security_group.network_rules
             )
-            if not aws_facts(resource).has_public_access_reasons():
-                resource.public_access_reasons = []
-            if not aws_facts(resource).has_public_exposure_reasons():
-                resource.public_exposure_reasons = []
-            aws_facts(resource).set_public_access_configured(resource.public_access_configured)
-            aws_facts(resource).set_internet_ingress(internet_ingress)
-            resource.internet_ingress_capable = internet_ingress
-            resource.internet_ingress_reasons = _internet_ingress_reasons(attached_security_groups)
+            mutations = aws_mutations(resource)
+            mutations.ensure_public_reason_lists()
+            mutations.sync_public_access_configured()
+            mutations.set_internet_ingress(
+                internet_ingress,
+                _internet_ingress_reasons(attached_security_groups),
+            )
             if resource.resource_type != "aws_subnet":
-                resource.in_public_subnet = (
-                    any(subnet_id in context.public_subnet_ids for subnet_id in resource.subnet_ids)
+                mutations.set_in_public_subnet(
+                    (
+                        any(subnet_id in context.public_subnet_ids for subnet_id in resource.subnet_ids)
+                        if resource.subnet_ids
+                        else resource.in_public_subnet
+                    )
+                )
+            mutations.set_nat_gateway_egress(
+                (
+                    any(
+                        context.index.subnets[subnet_id].has_nat_gateway_egress
+                        for subnet_id in resource.subnet_ids
+                        if subnet_id in context.index.subnets
+                    )
                     if resource.subnet_ids
-                    else resource.in_public_subnet
+                    else resource.has_nat_gateway_egress
                 )
-            resource.has_nat_gateway_egress = (
-                any(
-                    context.index.subnets[subnet_id].has_nat_gateway_egress
-                    for subnet_id in resource.subnet_ids
-                    if subnet_id in context.index.subnets
-                )
-                if resource.subnet_ids
-                else resource.has_nat_gateway_egress
             )
             # Public exposure is inferred conservatively from network placement and ingress
             # rules so later detectors can reason over a normalized signal instead of
             # provider-specific fields.
             if resource.resource_type == "aws_instance":
-                resource.public_exposure = bool(
-                    resource.public_access_configured
-                    and resource.in_public_subnet
-                    and internet_ingress
+                mutations.set_public_exposure(
+                    bool(
+                        resource.public_access_configured
+                        and resource.in_public_subnet
+                        and internet_ingress
+                    )
                 )
                 if resource.public_exposure:
                     aws_facts(resource).add_public_exposure_reason(
                         "instance has a public IP path and attached security groups allow internet ingress"
                     )
             elif resource.resource_type == "aws_ecs_service":
-                resource.public_exposure = bool(
-                    resource.public_access_configured
-                    and resource.in_public_subnet
-                    and internet_ingress
+                mutations.set_public_exposure(
+                    bool(
+                        resource.public_access_configured
+                        and resource.in_public_subnet
+                        and internet_ingress
+                    )
                 )
                 if resource.public_exposure:
                     aws_facts(resource).add_public_exposure_reason(
@@ -398,8 +423,8 @@ class DerivePublicExposureStage:
                         "security groups allow internet ingress"
                     )
             elif resource.resource_type == "aws_db_instance":
-                resource.public_exposure = bool(
-                    resource.public_access_configured and (internet_ingress or not attached_security_groups)
+                mutations.set_public_exposure(
+                    bool(resource.public_access_configured and (internet_ingress or not attached_security_groups))
                 )
                 if resource.public_exposure and internet_ingress:
                     aws_facts(resource).add_public_exposure_reason(
@@ -411,8 +436,8 @@ class DerivePublicExposureStage:
                         "groups provide ingress evidence"
                     )
             elif resource.resource_type == "aws_lb":
-                resource.public_exposure = bool(
-                    resource.public_access_configured and (internet_ingress or not attached_security_groups)
+                mutations.set_public_exposure(
+                    bool(resource.public_access_configured and (internet_ingress or not attached_security_groups))
                 )
                 if resource.public_exposure and internet_ingress:
                     aws_facts(resource).add_public_exposure_reason(
@@ -422,7 +447,7 @@ class DerivePublicExposureStage:
                     aws_facts(resource).add_public_exposure_reason(
                         "load balancer is configured as internet-facing"
                     )
-            resource.direct_internet_reachable = resource.public_exposure
+            mutations.sync_direct_internet_reachable()
 
 
 class MarkEcsLoadBalancerExposureStage:
@@ -525,7 +550,7 @@ def _merge_resource_policy(
     policy_document: dict[str, Any],
     source_address: str,
 ) -> None:
-    resource.extend_policy_statements(_clone_policy_statements(policy_statements))
+    aws_mutations(resource).merge_policy_statements(_clone_policy_statements(policy_statements))
     resource_policy_source_addresses = aws_facts(resource).resource_policy_source_addresses
     if source_address not in resource_policy_source_addresses:
         aws_facts(resource).add_resource_policy_source_address(source_address)
