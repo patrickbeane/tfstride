@@ -10,6 +10,7 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 from tfstride.providers.aws.coercion import as_list
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.resource_utils import (
     bucket_public_exposure_reasons,
@@ -17,7 +18,6 @@ from tfstride.providers.aws.resource_utils import (
     route_table_has_nat_gateway_route,
 )
 from tfstride.resource_helpers import describe_security_group_rule, policy_allows_public_access
-from tfstride.resource_metadata import ResourceMetadata
 
 
 class AwsDecorationStage(Protocol):
@@ -37,15 +37,12 @@ class MergeStandaloneSecurityGroupRulesStage:
         for rule_resource in resources:
             if rule_resource.resource_type != "aws_security_group_rule":
                 continue
-            security_group_id = rule_resource.get_metadata_field(ResourceMetadata.SECURITY_GROUP_ID)
+            security_group_id = aws_facts(rule_resource).security_group_id
             target_group = context.index.security_groups.get(security_group_id)
             if target_group is None:
                 continue
             target_group.extend_network_rules(_clone_security_group_rules(rule_resource.network_rules))
-            target_group.append_metadata_field(
-                ResourceMetadata.STANDALONE_RULE_ADDRESSES,
-                rule_resource.address,
-            )
+            aws_facts(target_group).add_standalone_rule_address(rule_resource.address)
 
 
 class MergeRolePolicyResourcesStage:
@@ -57,46 +54,31 @@ class MergeRolePolicyResourcesStage:
         for role_policy_resource in resources:
             if role_policy_resource.resource_type != "aws_iam_role_policy":
                 continue
-            role_reference = role_policy_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCE)
+            role_reference = aws_facts(role_policy_resource).role_reference
             role = context.index.role_index.get(role_reference)
             if role is None:
                 continue
             role.extend_policy_statements(_clone_policy_statements(role_policy_resource.policy_statements))
-            role.append_metadata_field(
-                ResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES,
-                role_policy_resource.address,
-            )
-            role.append_metadata_field(
-                ResourceMetadata.INLINE_POLICY_NAMES,
-                role_policy_resource.get_metadata_field(ResourceMetadata.POLICY_NAME),
-            )
+            aws_facts(role).add_inline_policy_resource_address(role_policy_resource.address)
+            aws_facts(role).add_inline_policy_name(aws_facts(role_policy_resource).policy_name)
 
         # Role-policy attachments change the workload's effective privileges, so merge any
         # in-plan customer-managed policy statements onto the target role.
         for attachment_resource in resources:
             if attachment_resource.resource_type != "aws_iam_role_policy_attachment":
                 continue
-            role_reference = attachment_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCE)
-            policy_arn = attachment_resource.get_metadata_field(ResourceMetadata.POLICY_ARN)
+            role_reference = aws_facts(attachment_resource).role_reference
+            policy_arn = aws_facts(attachment_resource).policy_arn
             role = context.index.role_index.get(role_reference)
             policy = context.index.policy_index.get(policy_arn)
             if role is None:
                 continue
             if policy is None:
-                role.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS,
-                    str(policy_arn),
-                )
+                aws_facts(role).add_unresolved_attached_policy_arn(str(policy_arn))
                 continue
             role.extend_policy_statements(_clone_policy_statements(policy.policy_statements))
-            role.append_metadata_field(
-                ResourceMetadata.ATTACHED_POLICY_ARNS,
-                policy.arn or policy.identifier or policy.address,
-            )
-            role.append_metadata_field(
-                ResourceMetadata.ATTACHED_POLICY_ADDRESSES,
-                policy.address,
-            )
+            aws_facts(role).add_attached_policy_arn(policy.arn or policy.identifier or policy.address)
+            aws_facts(role).add_attached_policy_address(policy.address)
 
 
 class ResolveInstanceProfileRolesStage:
@@ -111,7 +93,7 @@ class ResolveInstanceProfileRolesStage:
             resolved_role_refs: list[str] = []
             resolved_role_addresses: list[str] = []
             unresolved_role_refs: list[str] = []
-            for role_ref in instance_profile_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCES):
+            for role_ref in aws_facts(instance_profile_resource).role_references:
                 role = context.index.role_index.get(role_ref)
                 if role is None:
                     unresolved_role_refs.append(role_ref)
@@ -120,34 +102,22 @@ class ResolveInstanceProfileRolesStage:
                 if resolved_role_ref:
                     resolved_role_refs.append(resolved_role_ref)
                 resolved_role_addresses.append(role.address)
-            instance_profile_resource.extend_metadata_field(
-                ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
-                unresolved_role_refs,
-            )
-            instance_profile_resource.extend_metadata_field(
-                ResourceMetadata.RESOLVED_ROLE_ADDRESSES,
-                resolved_role_addresses,
-            )
-            instance_profile_resource.set_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES, resolved_role_refs)
+            aws_facts(instance_profile_resource).add_unresolved_role_references(unresolved_role_refs)
+            aws_facts(instance_profile_resource).add_resolved_role_addresses(resolved_role_addresses)
+            aws_facts(instance_profile_resource).set_resolved_role_references(resolved_role_refs)
 
         for workload_resource in resources:
             if workload_resource.resource_type != "aws_instance":
                 continue
-            instance_profile_ref = workload_resource.get_metadata_field(ResourceMetadata.IAM_INSTANCE_PROFILE)
+            instance_profile_ref = aws_facts(workload_resource).iam_instance_profile
             if not instance_profile_ref:
                 continue
             instance_profile = context.index.instance_profile_index.get(instance_profile_ref)
             if instance_profile is None:
-                workload_resource.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_INSTANCE_PROFILES,
-                    str(instance_profile_ref),
-                )
+                aws_facts(workload_resource).add_unresolved_instance_profile(str(instance_profile_ref))
                 continue
-            workload_resource.append_metadata_field(
-                ResourceMetadata.RESOLVED_INSTANCE_PROFILE_ADDRESSES,
-                instance_profile.address,
-            )
-            for resolved_role_ref in instance_profile.get_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES):
+            aws_facts(workload_resource).add_resolved_instance_profile_address(instance_profile.address)
+            for resolved_role_ref in aws_facts(instance_profile).resolved_role_references:
                 workload_resource.add_attached_role_arn(resolved_role_ref)
 
 
@@ -158,71 +128,41 @@ class ResolveEcsServiceRelationshipsStage:
         for ecs_service_resource in resources:
             if ecs_service_resource.resource_type != "aws_ecs_service":
                 continue
-            cluster_ref = ecs_service_resource.get_metadata_field(ResourceMetadata.CLUSTER_REFERENCE)
+            cluster_ref = aws_facts(ecs_service_resource).cluster_reference
             if cluster_ref:
                 cluster = context.index.ecs_clusters.get(cluster_ref)
                 if cluster is None:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.UNRESOLVED_CLUSTER_REFERENCES,
-                        str(cluster_ref),
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_cluster_reference(str(cluster_ref))
                 else:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.RESOLVED_CLUSTER_ADDRESSES,
-                        cluster.address,
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_cluster_address(cluster.address)
 
-            task_definition_ref = ecs_service_resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_REFERENCE)
+            task_definition_ref = aws_facts(ecs_service_resource).task_definition_reference
             if not task_definition_ref:
                 continue
             task_definition = context.index.ecs_task_definitions.get(task_definition_ref)
             if task_definition is None:
-                ecs_service_resource.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES,
-                    str(task_definition_ref),
-                )
+                aws_facts(ecs_service_resource).add_unresolved_task_definition_reference(str(task_definition_ref))
                 continue
-            ecs_service_resource.append_metadata_field(
-                ResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES,
-                task_definition.address,
-            )
-            ecs_service_resource.set_metadata_field(
-                ResourceMetadata.NETWORK_MODE,
-                task_definition.get_metadata_field(ResourceMetadata.NETWORK_MODE),
-            )
-            ecs_service_resource.set_metadata_field(
-                ResourceMetadata.REQUIRES_COMPATIBILITIES,
-                task_definition.get_metadata_field(ResourceMetadata.REQUIRES_COMPATIBILITIES),
-            )
-            task_role_arn = task_definition.get_metadata_field(ResourceMetadata.TASK_ROLE_ARN)
-            execution_role_arn = task_definition.get_metadata_field(ResourceMetadata.EXECUTION_ROLE_ARN)
+            aws_facts(ecs_service_resource).add_resolved_task_definition_address(task_definition.address)
+            aws_facts(ecs_service_resource).set_network_mode(aws_facts(task_definition).network_mode)
+            aws_facts(ecs_service_resource).set_requires_compatibilities(aws_facts(task_definition).requires_compatibilities)
+            task_role_arn = aws_facts(task_definition).task_role_arn
+            execution_role_arn = aws_facts(task_definition).execution_role_arn
             if task_role_arn:
-                ecs_service_resource.set_metadata_field(ResourceMetadata.TASK_ROLE_ARN, task_role_arn)
+                aws_facts(ecs_service_resource).set_task_role_arn(task_role_arn)
                 ecs_service_resource.add_attached_role_arn(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
                 if task_role is not None:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.RESOLVED_TASK_ROLE_ADDRESSES,
-                        task_role.address,
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_task_role_address(task_role.address)
                 else:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.UNRESOLVED_TASK_ROLE_ARNS,
-                        str(task_role_arn),
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_task_role_arn(str(task_role_arn))
             if execution_role_arn:
-                ecs_service_resource.set_metadata_field(ResourceMetadata.EXECUTION_ROLE_ARN, execution_role_arn)
+                aws_facts(ecs_service_resource).set_execution_role_arn(execution_role_arn)
                 execution_role = context.index.role_index.get(execution_role_arn)
                 if execution_role is not None:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.RESOLVED_EXECUTION_ROLE_ADDRESSES,
-                        execution_role.address,
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_execution_role_address(execution_role.address)
                 else:
-                    ecs_service_resource.append_metadata_field(
-                        ResourceMetadata.UNRESOLVED_EXECUTION_ROLE_ARNS,
-                        str(execution_role_arn),
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_execution_role_arn(str(execution_role_arn))
 
 
 class MergeResourcePolicyResourcesStage:
@@ -234,49 +174,40 @@ class MergeResourcePolicyResourcesStage:
         for bucket_policy_resource in resources:
             if bucket_policy_resource.resource_type != "aws_s3_bucket_policy":
                 continue
-            bucket_name = bucket_policy_resource.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+            bucket_name = aws_facts(bucket_policy_resource).bucket_name
             bucket = context.index.buckets.get(bucket_name)
             if bucket is None:
-                bucket_policy_resource.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_BUCKET_REFERENCES,
-                    bucket_name,
-                )
+                aws_facts(bucket_policy_resource).add_unresolved_bucket_reference(bucket_name)
                 continue
             _merge_resource_policy(
                 bucket,
                 bucket_policy_resource.policy_statements,
-                bucket_policy_resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+                aws_facts(bucket_policy_resource).policy_document,
                 bucket_policy_resource.address,
             )
 
         for secret_policy_resource in resources:
             if secret_policy_resource.resource_type != "aws_secretsmanager_secret_policy":
                 continue
-            secret_arn = secret_policy_resource.get_metadata_field(ResourceMetadata.SECRET_ARN)
+            secret_arn = aws_facts(secret_policy_resource).secret_arn
             secret = context.index.secrets.get(secret_arn)
             if secret is None:
-                secret_policy_resource.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_SECRET_ARNS,
-                    secret_arn,
-                )
+                aws_facts(secret_policy_resource).add_unresolved_secret_arn(secret_arn)
                 continue
             _merge_resource_policy(
                 secret,
                 secret_policy_resource.policy_statements,
-                secret_policy_resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+                aws_facts(secret_policy_resource).policy_document,
                 secret_policy_resource.address,
             )
 
         for lambda_permission_resource in resources:
             if lambda_permission_resource.resource_type != "aws_lambda_permission":
                 continue
-            function_name = lambda_permission_resource.get_metadata_field(ResourceMetadata.FUNCTION_NAME)
+            function_name = aws_facts(lambda_permission_resource).function_name
             target_function = context.index.lambda_functions.get(function_name)
             if target_function is None:
-                lambda_permission_resource.append_metadata_field(
-                    ResourceMetadata.UNRESOLVED_FUNCTION_REFERENCES,
-                    function_name,
-                )
+                aws_facts(lambda_permission_resource).add_unresolved_function_reference(function_name)
                 continue
             _merge_resource_policy(
                 target_function,
@@ -295,21 +226,19 @@ class ApplyS3PublicAccessBlocksStage:
         for access_block_resource in resources:
             if access_block_resource.resource_type != "aws_s3_bucket_public_access_block":
                 continue
-            bucket_name = access_block_resource.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+            bucket_name = aws_facts(access_block_resource).bucket_name
             bucket = context.index.buckets.get(bucket_name)
             if bucket is None:
                 continue
             public_access_block = {
-                "block_public_acls": access_block_resource.get_metadata_field(ResourceMetadata.BLOCK_PUBLIC_ACLS),
-                "block_public_policy": access_block_resource.get_metadata_field(ResourceMetadata.BLOCK_PUBLIC_POLICY),
-                "ignore_public_acls": access_block_resource.get_metadata_field(ResourceMetadata.IGNORE_PUBLIC_ACLS),
-                "restrict_public_buckets": access_block_resource.get_metadata_field(
-                    ResourceMetadata.RESTRICT_PUBLIC_BUCKETS
-                ),
+                "block_public_acls": aws_facts(access_block_resource).block_public_acls,
+                "block_public_policy": aws_facts(access_block_resource).block_public_policy,
+                "ignore_public_acls": aws_facts(access_block_resource).ignore_public_acls,
+                "restrict_public_buckets": aws_facts(access_block_resource).restrict_public_buckets,
             }
-            bucket.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_BLOCK, public_access_block)
-            bucket_acl = bucket.get_metadata_field(ResourceMetadata.BUCKET_ACL) or ""
-            bucket_policy_document = bucket.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)
+            aws_facts(bucket).set_public_access_block(public_access_block)
+            bucket_acl = aws_facts(bucket).bucket_acl
+            bucket_policy_document = aws_facts(bucket).policy_document
             public_via_acl = bucket_acl in {"public-read", "public-read-write", "website"}
             public_via_policy = policy_allows_public_access(bucket_policy_document)
             bucket.public_access_reasons = bucket_public_exposure_reasons(
@@ -338,8 +267,8 @@ class DeriveSubnetPostureStage:
         for association_resource in resources:
             if association_resource.resource_type != "aws_route_table_association":
                 continue
-            subnet_id = association_resource.get_metadata_field(ResourceMetadata.SUBNET_ID)
-            route_table_id = association_resource.get_metadata_field(ResourceMetadata.ROUTE_TABLE_ID)
+            subnet_id = aws_facts(association_resource).subnet_id
+            route_table_id = aws_facts(association_resource).route_table_id
             if not subnet_id or not route_table_id:
                 continue
             subnet_route_table_ids.setdefault(str(subnet_id), []).append(str(route_table_id))
@@ -350,14 +279,14 @@ class DeriveSubnetPostureStage:
             has_public_route = any(
                 route_table_id in context.index.route_tables
                 and route_table_has_internet_route(
-                    context.index.route_tables[route_table_id].get_metadata_field(ResourceMetadata.ROUTES)
+                    aws_facts(context.index.route_tables[route_table_id]).routes
                 )
                 for route_table_id in associated_route_table_ids
             )
             has_nat_route = any(
                 route_table_id in context.index.route_tables
                 and route_table_has_nat_gateway_route(
-                    context.index.route_tables[route_table_id].get_metadata_field(ResourceMetadata.ROUTES),
+                    aws_facts(context.index.route_tables[route_table_id]).routes,
                     context.index.nat_gateway_ids,
                 )
                 for route_table_id in associated_route_table_ids
@@ -369,13 +298,13 @@ class DeriveSubnetPostureStage:
             else:
                 # Fall back to the original heuristic when route table associations are absent.
                 is_public = (
-                    subnet.get_metadata_field(ResourceMetadata.MAP_PUBLIC_IP_ON_LAUNCH)
+                    aws_facts(subnet).map_public_ip_on_launch
                     and subnet.vpc_id
                     in context.index.vpcs_with_igw.intersection(context.index.vpcs_with_public_routes)
                 )
                 has_nat_route = False
             subnet.is_public_subnet = is_public
-            subnet.set_metadata_field(ResourceMetadata.ROUTE_TABLE_IDS, associated_route_table_ids)
+            aws_facts(subnet).set_route_table_ids(associated_route_table_ids)
             subnet.has_public_route = has_public_route
             subnet.has_nat_gateway_egress = has_nat_route
             if is_public and subnet.identifier:
@@ -421,15 +350,12 @@ class DerivePublicExposureStage:
                 for security_group in attached_security_groups
                 for rule in security_group.network_rules
             )
-            if not resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_REASONS):
+            if not aws_facts(resource).has_public_access_reasons():
                 resource.public_access_reasons = []
-            if not resource.has_metadata_field(ResourceMetadata.PUBLIC_EXPOSURE_REASONS):
+            if not aws_facts(resource).has_public_exposure_reasons():
                 resource.public_exposure_reasons = []
-            resource.set_metadata_field(
-                ResourceMetadata.PUBLIC_ACCESS_CONFIGURED,
-                resource.public_access_configured,
-            )
-            resource.set_metadata_field(ResourceMetadata.INTERNET_INGRESS, internet_ingress)
+            aws_facts(resource).set_public_access_configured(resource.public_access_configured)
+            aws_facts(resource).set_internet_ingress(internet_ingress)
             resource.internet_ingress_capable = internet_ingress
             resource.internet_ingress_reasons = _internet_ingress_reasons(attached_security_groups)
             if resource.resource_type != "aws_subnet":
@@ -457,9 +383,8 @@ class DerivePublicExposureStage:
                     and internet_ingress
                 )
                 if resource.public_exposure:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        "instance has a public IP path and attached security groups allow internet ingress",
+                    aws_facts(resource).add_public_exposure_reason(
+                        "instance has a public IP path and attached security groups allow internet ingress"
                     )
             elif resource.resource_type == "aws_ecs_service":
                 resource.public_exposure = bool(
@@ -468,43 +393,34 @@ class DerivePublicExposureStage:
                     and internet_ingress
                 )
                 if resource.public_exposure:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        (
-                            "ECS service assigns public IPs in a public subnet and attached "
-                            "security groups allow internet ingress"
-                        ),
+                    aws_facts(resource).add_public_exposure_reason(
+                        "ECS service assigns public IPs in a public subnet and attached "
+                        "security groups allow internet ingress"
                     )
             elif resource.resource_type == "aws_db_instance":
                 resource.public_exposure = bool(
                     resource.public_access_configured and (internet_ingress or not attached_security_groups)
                 )
                 if resource.public_exposure and internet_ingress:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        "database is marked publicly_accessible and attached security groups allow internet ingress",
+                    aws_facts(resource).add_public_exposure_reason(
+                        "database is marked publicly_accessible and attached security groups allow internet ingress"
                     )
                 elif resource.public_exposure and not attached_security_groups:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        (
-                            "database is marked publicly_accessible and no attached security "
-                            "groups provide ingress evidence"
-                        ),
+                    aws_facts(resource).add_public_exposure_reason(
+                        "database is marked publicly_accessible and no attached security "
+                        "groups provide ingress evidence"
                     )
             elif resource.resource_type == "aws_lb":
                 resource.public_exposure = bool(
                     resource.public_access_configured and (internet_ingress or not attached_security_groups)
                 )
                 if resource.public_exposure and internet_ingress:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        "load balancer is internet-facing and attached security groups allow internet ingress",
+                    aws_facts(resource).add_public_exposure_reason(
+                        "load balancer is internet-facing and attached security groups allow internet ingress"
                     )
                 elif resource.public_exposure:
-                    resource.append_metadata_field(
-                        ResourceMetadata.PUBLIC_EXPOSURE_REASONS,
-                        "load balancer is configured as internet-facing",
+                    aws_facts(resource).add_public_exposure_reason(
+                        "load balancer is configured as internet-facing"
                     )
             resource.direct_internet_reachable = resource.public_exposure
 
@@ -543,15 +459,9 @@ class MarkEcsLoadBalancerExposureStage:
                                 continue
                             seen_load_balancers.add(load_balancer.address)
                             fronting_load_balancers.append(load_balancer.address)
-            resource.set_metadata_field(
-                ResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER,
-                bool(fronting_load_balancers),
-            )
+            aws_facts(resource).set_fronted_by_internet_facing_load_balancer(bool(fronting_load_balancers))
             if fronting_load_balancers:
-                resource.set_metadata_field(
-                    ResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
-                    fronting_load_balancers,
-                )
+                aws_facts(resource).set_internet_facing_load_balancer_addresses(fronting_load_balancers)
 
 
 def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
@@ -616,18 +526,15 @@ def _merge_resource_policy(
     source_address: str,
 ) -> None:
     resource.extend_policy_statements(_clone_policy_statements(policy_statements))
-    resource_policy_source_addresses = resource.get_metadata_field(ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
+    resource_policy_source_addresses = aws_facts(resource).resource_policy_source_addresses
     if source_address not in resource_policy_source_addresses:
-        resource.set_metadata_field(
-            ResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES,
-            [*resource_policy_source_addresses, source_address],
-        )
+        aws_facts(resource).add_resource_policy_source_address(source_address)
     merged_document = _merge_policy_documents(
-        resource.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT),
+        aws_facts(resource).policy_document,
         policy_document,
     )
     if merged_document:
-        resource.set_metadata_field(ResourceMetadata.POLICY_DOCUMENT, merged_document)
+        aws_facts(resource).set_policy_document(merged_document)
 
 
 def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str, Any]:

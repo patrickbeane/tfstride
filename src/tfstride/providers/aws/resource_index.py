@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_utils import (
     ecs_task_definition_identifier,
     route_table_has_internet_route,
 )
-from tfstride.resource_metadata import ResourceMetadata
 
 
 @dataclass(slots=True)
@@ -53,15 +53,14 @@ class AwsResourceIndexBuilder:
 
         for resource in resources:
             resource_type = resource.resource_type
+            facts = aws_facts(resource)
             if resource_type == "aws_subnet":
                 subnets[resource.identifier] = resource
             elif resource_type == "aws_security_group":
                 security_groups[resource.identifier] = resource
             elif resource_type == "aws_route_table":
                 route_tables[resource.identifier] = resource
-                if resource.vpc_id and route_table_has_internet_route(
-                    resource.get_metadata_field(ResourceMetadata.ROUTES)
-                ):
+                if resource.vpc_id and route_table_has_internet_route(facts.routes):
                     vpcs_with_public_routes.add(resource.vpc_id)
             elif resource_type == "aws_s3_bucket":
                 _index_resource_aliases(
@@ -77,7 +76,7 @@ class AwsResourceIndexBuilder:
                         resource.identifier,
                         resource.address,
                         resource.arn,
-                        resource.get_metadata_field(ResourceMetadata.NAME),
+                        facts.name,
                     ),
                 )
             elif resource_type == "aws_lambda_function":
@@ -94,7 +93,7 @@ class AwsResourceIndexBuilder:
                         resource.identifier,
                         resource.address,
                         resource.arn,
-                        resource.get_metadata_field(ResourceMetadata.NAME),
+                        facts.name,
                     ),
                 )
             elif resource_type == "aws_ecs_task_definition":
@@ -105,10 +104,10 @@ class AwsResourceIndexBuilder:
                         resource.identifier,
                         resource.address,
                         resource.arn,
-                        resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_FAMILY),
+                        facts.task_definition_family,
                         ecs_task_definition_identifier(
-                            resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_FAMILY),
-                            resource.get_metadata_field(ResourceMetadata.TASK_DEFINITION_REVISION),
+                            facts.task_definition_family,
+                            facts.task_definition_revision,
                         ),
                     ),
                 )
