@@ -274,15 +274,22 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
         resource.append_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES, None)
+        resource.extend_metadata_field(
+            ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+            ["missing-role", "another-missing-role", "another-missing-role", None],
+        )
 
         self.assertTrue(resource.has_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertTrue(resource.metadata["public_access_configured"])
         self.assertEqual(
             resource.get_metadata_field(ResourceMetadata.UNRESOLVED_ROLE_REFERENCES),
-            ["missing-role"],
+            ["missing-role", "another-missing-role"],
         )
-        self.assertEqual(resource.metadata["unresolved_role_references"], ["missing-role"])
+        self.assertEqual(
+            resource.metadata["unresolved_role_references"],
+            ["missing-role", "another-missing-role"],
+        )
 
     def test_metadata_field_getter_uses_field_copy_semantics(self) -> None:
         resource = _resource(address="aws_s3_bucket.logs", resource_type="aws_s3_bucket")

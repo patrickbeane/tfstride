@@ -177,6 +177,9 @@ class NormalizedResource:
     def append_metadata_field(self, field: StringListMetadataField, value: str | None) -> None:
         field.append_unique(self._metadata, value)
 
+    def extend_metadata_field(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
+        field.extend_unique(self._metadata, values)
+
     def add_attached_role_arn(self, role_arn: str | None) -> None:
         if not role_arn or role_arn in self.attached_role_arns:
             return

@@ -109,21 +109,25 @@ class ResolveInstanceProfileRolesStage:
             if instance_profile_resource.resource_type != "aws_iam_instance_profile":
                 continue
             resolved_role_refs: list[str] = []
+            resolved_role_addresses: list[str] = []
+            unresolved_role_refs: list[str] = []
             for role_ref in instance_profile_resource.get_metadata_field(ResourceMetadata.ROLE_REFERENCES):
                 role = context.index.role_index.get(role_ref)
                 if role is None:
-                    instance_profile_resource.append_metadata_field(
-                        ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
-                        role_ref,
-                    )
+                    unresolved_role_refs.append(role_ref)
                     continue
                 resolved_role_ref = role.arn or role.identifier or role.address
                 if resolved_role_ref:
                     resolved_role_refs.append(resolved_role_ref)
-                instance_profile_resource.append_metadata_field(
-                    ResourceMetadata.RESOLVED_ROLE_ADDRESSES,
-                    role.address,
-                )
+                resolved_role_addresses.append(role.address)
+            instance_profile_resource.extend_metadata_field(
+                ResourceMetadata.UNRESOLVED_ROLE_REFERENCES,
+                unresolved_role_refs,
+            )
+            instance_profile_resource.extend_metadata_field(
+                ResourceMetadata.RESOLVED_ROLE_ADDRESSES,
+                resolved_role_addresses,
+            )
             instance_profile_resource.set_metadata_field(ResourceMetadata.RESOLVED_ROLE_REFERENCES, resolved_role_refs)
 
         for workload_resource in resources:

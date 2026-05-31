@@ -58,6 +58,27 @@ class ResourceMetadataFieldTests(unittest.TestCase):
         self.assertEqual(ResourceMetadata.PUBLIC_ACCESS_REASONS.get(metadata), ["existing", "new"])
         self.assertEqual(metadata["public_access_reasons"], ["existing", "new"])
 
+    def test_list_fields_extend_unique_values_in_one_write(self) -> None:
+        metadata = {"public_access_reasons": ["existing", None]}
+
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.extend_unique(
+            metadata,
+            ["existing", "new", "new", None, "", "another"],
+        )
+
+        self.assertEqual(
+            ResourceMetadata.PUBLIC_ACCESS_REASONS.get(metadata),
+            ["existing", "new", "another"],
+        )
+        self.assertEqual(metadata["public_access_reasons"], ["existing", "new", "another"])
+
+    def test_list_fields_extend_unique_noops_without_valid_values(self) -> None:
+        metadata = {}
+
+        ResourceMetadata.PUBLIC_ACCESS_REASONS.extend_unique(metadata, [None, ""])
+
+        self.assertEqual(metadata, {})
+
     def test_dict_fields_are_copied_on_get_and_set(self) -> None:
         metadata = {}
         policy = {"Statement": [{"Effect": "Allow"}]}

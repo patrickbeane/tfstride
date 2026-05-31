@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
@@ -43,13 +43,30 @@ class StringListMetadataField(MetadataField[list[str]]):
         metadata[self.key] = [str(item) for item in value if item not in (None, "")]
 
     def append_unique(self, metadata: dict[str, Any], value: str | None) -> None:
-        if not value:
+        self.extend_unique(metadata, [value])
+
+    def extend_unique(self, metadata: dict[str, Any], values: Iterable[str | None]) -> None:
+        pending_values: list[str] = []
+        pending_seen: set[str] = set()
+        for value in values:
+            if not value:
+                continue
+            item = str(value)
+            if item in pending_seen:
+                continue
+            pending_values.append(item)
+            pending_seen.add(item)
+        if not pending_values:
             return
-        item = str(value)
-        values = self.get(metadata)
-        if item not in values:
-            values.append(item)
-        self.set(metadata, values)
+
+        existing_values = self.get(metadata)
+        existing_seen = set(existing_values)
+        for item in pending_values:
+            if item in existing_seen:
+                continue
+            existing_values.append(item)
+            existing_seen.add(item)
+        self.set(metadata, existing_values)
 
 
 @dataclass(frozen=True, slots=True)
