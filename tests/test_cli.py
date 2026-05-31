@@ -26,6 +26,7 @@ from tfstride.filtering import (
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
 BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_baseline_plan.json"
 SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_safe_plan.json"
+GCP_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_gcp_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
@@ -181,32 +182,12 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["findings"][0]["fingerprint"].split(":")[0], "sha256")
 
     def test_cli_provider_option_can_select_gcp_scaffold(self) -> None:
-        payload = {
-            "terraform_version": "1.8.5",
-            "planned_values": {
-                "root_module": {
-                    "resources": [
-                        {
-                            "address": "google_storage_bucket.logs",
-                            "mode": "managed",
-                            "type": "google_storage_bucket",
-                            "name": "logs",
-                            "provider_name": "registry.terraform.io/hashicorp/google",
-                            "values": {},
-                        }
-                    ]
-                }
-            },
-        }
-
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plan_path = Path(tmp_dir) / "plan.json"
             json_output_path = Path(tmp_dir) / "report.json"
-            plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
             exit_code = main(
                 [
-                    str(plan_path),
+                    str(GCP_FIXTURE_PATH),
                     "--provider",
                     "gcp",
                     "--quiet",
@@ -219,7 +200,7 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(report["inventory"]["unsupported_resources"], ["google_storage_bucket.logs"])
+        self.assertEqual(len(report["inventory"]["unsupported_resources"]), 6)
         self.assertEqual(report["summary"]["active_findings"], 0)
         self.assertIn("GCP support currently recognizes", report["limitations"][0])
 

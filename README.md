@@ -203,6 +203,7 @@ The repo includes several ready-to-run Terraform plan fixtures:
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
+- `sample_gcp_plan.json`: Google provider smoke fixture that is detected as GCP while all resources are reported as unsupported until GCP normalization lands
 - `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
@@ -216,7 +217,7 @@ Input:
 Pipeline:
 
 1. Parse the Terraform plan into raw resource records.
-2. Normalize supported AWS resources into a provider-agnostic internal model and decorate in-plan relationships such as role attachments, resource policies, route-table posture, and public-access blocks.
+2. Auto-select the provider, normalize supported resources into a provider-agnostic internal model, and decorate in-plan AWS relationships such as role attachments, resource policies, route-table posture, and public-access blocks.
 3. Build shared analysis indexes for role lookup, security-group membership, public workloads by security group, and attached security groups.
 4. Detect trust boundaries such as internet-to-service, public-to-private segmentation, workload-to-data-store access, control-plane-to-workload relationships, and cross-account trust.
 5. Evaluate rule-based STRIDE checks through a `RuleEvaluationContext` that carries the inventory, boundary index, rule registry, rule policy, and shared analysis indexes.
@@ -395,6 +396,10 @@ The MVP intentionally supports a focused resource set:
 
 Unsupported resources are skipped and called out in the report.
 
+## GCP Scaffold
+
+The GCP provider scaffold is registered for provider detection and currently recognizes Terraform Google provider resources as unsupported. This makes GCP plans produce honest zero-normalization reports before resource-specific GCP normalization is implemented.
+
 ## Repo Layout (Abridged)
 
 ```text
@@ -408,10 +413,12 @@ Unsupported resources are skipped and called out in the report.
 │   ├── sample_aws_lambda_deploy_role_plan.json
 │   ├── sample_aws_nightmare_plan.json
 │   ├── sample_aws_plan.json
-│   └── sample_aws_safe_plan.json
+│   ├── sample_aws_safe_plan.json
+│   └── sample_gcp_plan.json
 ├── examples/
 │   ├── alb_ec2_rds_report.md
 │   ├── baseline_report.md
+│   ├── gcp_scaffold_report.md
 │   ├── lambda_deploy_role_report.md
 │   ├── nightmare_report.md
 │   ├── sample_report.md
@@ -477,8 +484,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## Limitations
 
-- AWS only in v1
-- no GCP or Azure provider normalizer is registered yet
+- AWS is the only provider with resource-level normalization today
+- GCP provider detection is scaffold-only and reports recognized Google resources as unsupported
+- Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case
 - IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full attachment graph
@@ -506,6 +514,9 @@ Unsupported resources are skipped and called out in the report.
 - Lambda deploy-role:
   [`fixtures/sample_aws_lambda_deploy_role_plan.json`](fixtures/sample_aws_lambda_deploy_role_plan.json),
   [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
+- GCP scaffold:
+  [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
+  [`examples/gcp_scaffold_report.md`](examples/gcp_scaffold_report.md)
 - Mixed:
   [`fixtures/sample_aws_plan.json`](fixtures/sample_aws_plan.json),
   [`examples/sample_report.md`](examples/sample_report.md)

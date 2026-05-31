@@ -1,0 +1,117 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "google_compute_network.main",
+          "mode": "managed",
+          "type": "google_compute_network",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-main",
+            "auto_create_subnetworks": false,
+            "routing_mode": "REGIONAL"
+          }
+        },
+        {
+          "address": "google_compute_subnetwork.app",
+          "mode": "managed",
+          "type": "google_compute_subnetwork",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app",
+            "ip_cidr_range": "10.10.1.0/24",
+            "region": "us-central1",
+            "network": "google_compute_network.main.id"
+          }
+        },
+        {
+          "address": "google_compute_firewall.public_ssh",
+          "mode": "managed",
+          "type": "google_compute_firewall",
+          "name": "public_ssh",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-public-ssh",
+            "network": "google_compute_network.main.name",
+            "source_ranges": [
+              "0.0.0.0/0"
+            ],
+            "allow": [
+              {
+                "protocol": "tcp",
+                "ports": [
+                  "22"
+                ]
+              }
+            ],
+            "target_tags": [
+              "web"
+            ]
+          }
+        },
+        {
+          "address": "google_compute_instance.web",
+          "mode": "managed",
+          "type": "google_compute_instance",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google-beta",
+          "values": {
+            "name": "tfstride-web",
+            "machine_type": "e2-medium",
+            "zone": "us-central1-a",
+            "tags": [
+              "web"
+            ],
+            "network_interface": [
+              {
+                "subnetwork": "google_compute_subnetwork.app.id",
+                "access_config": [
+                  {
+                    "nat_ip": "35.1.2.3"
+                  }
+                ]
+              }
+            ],
+            "service_account": [
+              {
+                "email": "tfstride-web@example.iam.gserviceaccount.com",
+                "scopes": [
+                  "cloud-platform"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "google_storage_bucket.logs",
+          "mode": "managed",
+          "type": "google_storage_bucket",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-logs",
+            "location": "US",
+            "uniform_bucket_level_access": true
+          }
+        },
+        {
+          "address": "google_project_iam_member.web_viewer",
+          "mode": "managed",
+          "type": "google_project_iam_member",
+          "name": "web_viewer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "project": "tfstride-demo",
+            "role": "roles/viewer",
+            "member": "serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
+          }
+        }
+      ]
+    }
+  }
+}

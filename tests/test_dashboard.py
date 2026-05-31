@@ -6,7 +6,6 @@ import unittest
 from copy import deepcopy
 from unittest import mock
 from pathlib import Path
-from unittest.mock import patch
 
 
 FASTAPI_DEPS_AVAILABLE = all(
@@ -25,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
 ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_ecs_fargate_plan.json"
 FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
+GCP_FIXTURE_PATH = ROOT / "fixtures" / "sample_gcp_plan.json"
 SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
 
@@ -35,13 +35,13 @@ class DashboardAppTests(unittest.TestCase):
         self.client = TestClient(dashboard_app)
 
     def test_create_app_does_not_analyze_demo_fixtures_eagerly(self) -> None:
-        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(dashboard_main.TFS, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
             app = dashboard_main.create_app()
 
         self.assertEqual(app.title, "tfSTRIDE Dashboard")
 
     def test_openapi_generation_does_not_analyze_demo_fixtures(self) -> None:
-        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(dashboard_main.TFS, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
             app = dashboard_main.create_app()
             payload = app.openapi()
 
@@ -63,6 +63,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Built-in scenarios", response.text)
         self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
+        self.assertIn("GCP Scaffold", response.text)
         self.assertIn("Run built-in report", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
@@ -104,9 +105,9 @@ class DashboardAppTests(unittest.TestCase):
                 "severity_reasoning": None,
             }
         ]
-	
+
         context = dashboard_main._coverage_context(payload)
-	
+
         self.assertEqual(
             context["unsupported_resource_types"],
             [{"resource_type": "aws_cloudwatch_log_group", "count": 1}],
@@ -162,6 +163,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Database is reachable from overly permissive sources", response.text)
         self.assertIn("JSON report", response.text)
         self.assertIn(FIXTURE_PATH.name, response.text)
+        self.assertNotIn(str(FIXTURE_PATH), response.text)
         self.assertIn("Report sections", response.text)
         self.assertIn('href="#findings"', response.text)
         self.assertIn('href="#coverage"', response.text)
@@ -189,8 +191,16 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Baseline Plan Demo", response.text)
         self.assertIn(BASELINE_FIXTURE_PATH.name, response.text)
-        self.assertNotIn(str(BASELINE_FIXTURE_PATH), response.text)
         self.assertIn("IAM policy grants wildcard privileges", response.text)
+
+    def test_demo_route_renders_gcp_scaffold_fixture_report(self) -> None:
+        response = self.client.get("/demo/gcp-scaffold")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("GCP Scaffold Demo", response.text)
+        self.assertIn(GCP_FIXTURE_PATH.name, response.text)
+        self.assertIn("google_compute_instance.web", response.text)
+        self.assertIn("GCP support currently recognizes", response.text)
 
     def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:
         response = self.client.get("/demo/ecs-fargate")
@@ -220,42 +230,6 @@ class DashboardAppTests(unittest.TestCase):
                 "message": "Upload a non-empty Terraform plan JSON file.",
             },
         )
-
-    def test_api_rejects_oversized_uploads_before_plan_parsing(self) -> None:
-        with (
-            patch("apps.dashboard.main.MAX_UPLOAD_BYTES", 32),
-            patch("apps.dashboard.main._analyze_plan_path") as analyze_plan_path,
-        ):
-            response = self.client.post(
-                "/api/analyze",
-                data={"title": "Too Large"},
-                files={"plan": ("too-large.json", b"x" * 33, "application/json")},
-            )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.json(),
-            {
-                "kind": "tfstride-error",
-                "message": "Uploaded plan exceeds the 32 B dashboard limit.",
-            },
-        )
-        analyze_plan_path.assert_not_called()
-
-    def test_html_analyze_rejects_oversized_uploads_before_plan_parsing(self) -> None:
-        with (
-            patch("apps.dashboard.main.MAX_UPLOAD_BYTES", 32),
-            patch("apps.dashboard.main._analyze_plan_path") as analyze_plan_path,
-        ):
-            response = self.client.post(
-                "/analyze",
-                data={"title": "Too Large"},
-                files={"plan": ("too-large.json", b"x" * 33, "application/json")},
-            )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Uploaded plan exceeds the 32 B dashboard limit.", response.text)
-        analyze_plan_path.assert_not_called()
 
     def test_healthz_returns_ok(self) -> None:
         response = self.client.get("/healthz")

@@ -288,6 +288,15 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="balanced",
     ),
     DemoScenarioDefinition(
+        scenario_id="gcp-scaffold",
+        title="GCP Scaffold",
+        report_title="GCP Scaffold Demo",
+        fixture_name="sample_gcp_plan.json",
+        description="Terraform Google provider resources recognized by provider detection while GCP normalization is still scaffold-only.",
+        emphasis="Provider expansion",
+        theme="balanced",
+    ),
+    DemoScenarioDefinition(
         scenario_id="trust-unconstrained",
         title="Cross-Account Trust",
         report_title="Cross-Account Trust Demo",
@@ -811,6 +820,7 @@ def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:
             "unresolved_references": [],
         },
     }
+
 
 def _resource_type_from_address(address: str) -> str:
     for segment in reversed(str(address).split(".")):

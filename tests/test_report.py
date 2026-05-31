@@ -33,6 +33,7 @@ SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_alb_ec2_rds_plan.json"
 LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_lambda_deploy_role_plan.json"
+GCP_FIXTURE_PATH = ROOT / "fixtures" / "sample_gcp_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_cross_account_trust_constrained_plan.json"
 EXAMPLES_DIR = ROOT / "examples"
@@ -110,6 +111,7 @@ class MarkdownReportTests(unittest.TestCase):
             NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "nightmare_report.md",
             ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "alb_ec2_rds_report.md",
             LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "lambda_deploy_role_report.md",
+            GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp_scaffold_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():
@@ -215,6 +217,27 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(json.loads(render_json(result)), build_json_report_payload(result))
         self.assertEqual(json.loads(render_sarif(result))["version"], "2.1.0")
         self.assertIn("# tfSTRIDE Threat Model Report", render_markdown(result))
+
+    def test_json_report_auto_selects_gcp_scaffold_fixture(self) -> None:
+        engine = TfStride()
+        payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
+
+        self.assertEqual(payload["inventory"]["provider"], "gcp")
+        self.assertEqual(payload["summary"]["normalized_resources"], 0)
+        self.assertEqual(payload["summary"]["unsupported_resources"], 6)
+        self.assertEqual(payload["summary"]["active_findings"], 0)
+        self.assertEqual(payload["inventory"]["resources"], [])
+        self.assertEqual(
+            payload["analysis_coverage"]["resources"]["unsupported_resource_types"],
+            {
+                "google_compute_firewall": 1,
+                "google_compute_instance": 1,
+                "google_compute_network": 1,
+                "google_compute_subnetwork": 1,
+                "google_project_iam_member": 1,
+                "google_storage_bucket": 1,
+            },
+        )
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()

@@ -36,6 +36,7 @@ NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_alb_ec2_rds_plan.json"
 ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_ecs_fargate_plan.json"
 LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_lambda_deploy_role_plan.json"
+GCP_FIXTURE_PATH = FIXTURES_DIR / "sample_gcp_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
@@ -799,6 +800,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
+            "gcp-scaffold": (GCP_FIXTURE_PATH, 0, {}),
         }
 
         expected_titles = {
@@ -828,6 +830,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Internet-exposed compute service permits overly broad ingress": 2,
                 "Object storage is publicly accessible": 2,
             },
+            "gcp-scaffold": {},
         }
 
         for name, (fixture_path, expected_count, expected_severities) in scenarios.items():
@@ -839,6 +842,18 @@ class TFSAnalysisTests(unittest.TestCase):
                 self.assertEqual(len(result.findings), expected_count)
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
+
+    def test_gcp_fixture_auto_selects_provider_and_tracks_unsupported_resources(self) -> None:
+        result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
+
+        self.assertEqual(result.inventory.provider, "gcp")
+        self.assertEqual(result.inventory.resources, ())
+        self.assertEqual(len(result.inventory.unsupported_resources), 6)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 6)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 0)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 6)
+        self.assertEqual(result.findings, [])
+        self.assertEqual(result.trust_boundaries, [])
 
     def test_unconstrained_cross_account_trust_without_narrowing_conditions_is_detected(self) -> None:
         result = self.engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)
