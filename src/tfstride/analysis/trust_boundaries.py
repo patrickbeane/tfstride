@@ -21,8 +21,8 @@ from tfstride.analysis.resource_concepts import (
     is_public_edge_resource,
     is_secret_store_resource,
 )
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
-from tfstride.resource_metadata import ResourceMetadata
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +138,7 @@ def detect_trust_boundaries(
     primary_account_id = inventory.primary_account_id
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
         seen_role_principals: set[tuple[str, str]] = set()
-        for trust_statement in role.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS):
+        for trust_statement in analysis_facts(role).trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                 principal_key = (assessment.principal_kind, assessment.principal)
                 if principal_key in seen_role_principals:

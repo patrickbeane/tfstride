@@ -7,11 +7,11 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES, OBJECT_STORAGE_RESOURCE_TYPES
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
 from tfstride.resource_helpers import describe_security_group_rule
-from tfstride.resource_metadata import ResourceMetadata
 
 
 class PostureRuleDetectors:
@@ -113,7 +113,7 @@ class PostureRuleDetectors:
                             "encryption_posture",
                             [
                                 "storage_encrypted is false",
-                                f"engine is {database.get_metadata_field(ResourceMetadata.ENGINE) or 'unknown'}",
+                                f"engine is {analysis_facts(database).database_engine or 'unknown'}",
                             ],
                         ),
                     ),

@@ -11,9 +11,9 @@ from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     OBJECT_STORAGE_RESOURCE_TYPES,
 )
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource, Observation, ResourceInventory
 from tfstride.resource_helpers import policy_allows_public_access
-from tfstride.resource_metadata import ResourceMetadata
 
 
 def observe_controls(inventory: ResourceInventory) -> list[Observation]:
@@ -29,23 +29,24 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
     observations: list[Observation] = []
     access_block_index: dict[str, NormalizedResource] = {}
     for access_block in inventory.by_type("aws_s3_bucket_public_access_block"):
-        bucket_name = access_block.get_metadata_field(ResourceMetadata.BUCKET_NAME)
+        bucket_name = analysis_facts(access_block).bucket_name
         if bucket_name:
             access_block_index[bucket_name] = access_block
     for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
-        access_block = bucket.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_BLOCK)
+        bucket_facts = analysis_facts(bucket)
+        access_block = bucket_facts.public_access_block
         if not access_block or bucket.public_exposure:
             continue
         mitigation_signals: list[str] = []
-        acl = bucket.get_metadata_field(ResourceMetadata.BUCKET_ACL) or ""
+        acl = bucket_facts.bucket_acl
         if acl in {"public-read", "public-read-write", "website"}:
             mitigation_signals.append(f"bucket ACL `{acl}` would otherwise grant public access")
-        if policy_allows_public_access(bucket.get_metadata_field(ResourceMetadata.POLICY_DOCUMENT)):
+        if policy_allows_public_access(bucket_facts.policy_document):
             mitigation_signals.append("bucket policy would otherwise allow anonymous access")
         if not mitigation_signals:
             continue
         affected_resources = [bucket.address]
-        access_block_resource = access_block_index.get(bucket.get_metadata_field(ResourceMetadata.BUCKET_NAME))
+        access_block_resource = access_block_index.get(bucket_facts.bucket_name)
         if access_block_resource is not None:
             affected_resources.append(access_block_resource.address)
         observations.append(
@@ -79,7 +80,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
     primary_account_id = inventory.primary_account_id
     seen: set[tuple[str, str]] = set()
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-        for trust_statement in role.get_metadata_field(ResourceMetadata.TRUST_STATEMENTS):
+        for trust_statement in analysis_facts(role).trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                 if not trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                     continue
@@ -131,7 +132,7 @@ def _observe_private_encrypted_databases(inventory: ResourceInventory) -> list[O
             "storage_encrypted is true",
             "no attached security group allows internet ingress",
         ]
-        engine = database.get_metadata_field(ResourceMetadata.ENGINE)
+        engine = analysis_facts(database).database_engine
         if engine:
             posture_signals.append(f"engine is {engine}")
         observations.append(
