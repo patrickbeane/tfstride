@@ -5,7 +5,12 @@ from pathlib import Path
 
 from tfstride.app import TfStride
 from tfstride.providers.aws.normalizer import AwsNormalizer
-from tfstride.providers.catalog import DEFAULT_PROVIDER, default_provider_registry
+from tfstride.providers.aws.resource_facts import AwsResourceFacts
+from tfstride.providers.catalog import (
+    DEFAULT_PROVIDER,
+    default_provider_registry,
+    default_resource_facts_registry,
+)
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -19,6 +24,13 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(DEFAULT_PROVIDER, "aws")
         self.assertEqual(registry.providers(), ("aws",))
         self.assertIsInstance(registry.get(DEFAULT_PROVIDER), AwsNormalizer)
+
+    def test_default_resource_facts_registry_registers_aws_provider(self) -> None:
+        registry = default_resource_facts_registry()
+        resource = TfStride().analyze_plan(FIXTURE_PATH).inventory.resources[0]
+
+        self.assertEqual(registry.providers(), ("aws",))
+        self.assertIsInstance(registry.facts_for(resource), AwsResourceFacts)
 
     def test_app_uses_catalog_default_provider(self) -> None:
         result = TfStride().analyze_plan(FIXTURE_PATH)

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_facts
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 
 
 def _resource(
@@ -21,6 +24,39 @@ def _resource(
         category=ResourceCategory.DATA,
         metadata=metadata,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class FakeProviderFacts:
+    resource: NormalizedResource
+
+    @property
+    def bucket_name(self) -> str | None:
+        return f"{self.resource.provider}-logs"
+
+    @property
+    def bucket_acl(self) -> str:
+        return "private"
+
+    @property
+    def public_access_block(self) -> dict[str, bool] | None:
+        return {"block_public_acls": True}
+
+    @property
+    def policy_document(self) -> dict[str, Any]:
+        return {"Statement": [{"Effect": "Allow"}]}
+
+    @property
+    def trust_statements(self) -> list[dict[str, Any]]:
+        return [{"Effect": "Allow"}]
+
+    @property
+    def engine(self) -> str | None:
+        return "spanner"
+
+    @property
+    def resource_policy_source_addresses(self) -> list[str]:
+        return ["google_storage_bucket_iam_binding.logs"]
 
 
 class AnalysisResourceFactsTests(unittest.TestCase):
@@ -73,6 +109,30 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.database_engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
 
+    def test_registered_provider_facts_are_used_without_analysis_branching(self) -> None:
+        calls: list[NormalizedResource] = []
+
+        def gcp_facts(resource: NormalizedResource) -> FakeProviderFacts:
+            calls.append(resource)
+            return FakeProviderFacts(resource)
+
+        resource = _resource(provider="gcp", resource_type="google_storage_bucket")
+        registry = ProviderResourceFactsRegistry([("gcp", gcp_facts)])
+
+        facts = analysis_facts(resource, facts_registry=registry)
+
+        self.assertEqual(calls, [resource])
+        self.assertEqual(facts.bucket_name, "gcp-logs")
+        self.assertEqual(facts.bucket_acl, "private")
+        self.assertEqual(facts.public_access_block, {"block_public_acls": True})
+        self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
+        self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(facts.database_engine, "spanner")
+        self.assertEqual(
+            facts.resource_policy_source_addresses,
+            ["google_storage_bucket_iam_binding.logs"],
+        )
+
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
             {
@@ -100,6 +160,14 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 offenders.append(path.name)
 
         self.assertEqual(offenders, [])
+
+    def test_analysis_resource_facts_does_not_import_aws_directly(self) -> None:
+        analysis_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis"
+        text = (analysis_root / "resource_facts.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("tfstride.providers.aws", text)
+        self.assertNotIn('provider == "aws"', text)
+        self.assertNotIn('provider != "aws"', text)
 
 
 if __name__ == "__main__":
