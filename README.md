@@ -25,7 +25,7 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - repo-level TOML config for provider selection, default gating, rule selection, and severity overrides
 - automation-friendly `--quiet` mode and non-zero exit behavior
 - zero runtime dependencies for the core CLI engine, with optional dashboard dependencies
-- AWS-first normalization behind a provider registry with GCP scaffold detection
+- AWS-first analysis behind a provider registry with initial GCP inventory normalization
 
 ## Quickstart
 
@@ -203,7 +203,7 @@ The repo includes several ready-to-run Terraform plan fixtures:
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_gcp_plan.json`: Google provider smoke fixture that is detected as GCP while all resources are reported as unsupported until GCP normalization lands
+- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the initial compute, network, IAM, and storage inventory set
 - `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
@@ -396,9 +396,11 @@ The MVP intentionally supports a focused resource set:
 
 Unsupported resources are skipped and called out in the report.
 
-## GCP Scaffold
+## GCP Support
 
-The GCP provider scaffold is registered for provider detection and currently recognizes Terraform Google provider resources as unsupported. This makes GCP plans produce honest zero-normalization reports before resource-specific GCP normalization is implemented.
+The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, and `google_storage_bucket`.
+
+GCP trust-boundary detection, controls observed, and STRIDE rule coverage are not implemented yet, so GCP reports currently expose normalized inventory and coverage without findings.
 
 ## Repo Layout (Abridged)
 
@@ -484,8 +486,8 @@ The GCP provider scaffold is registered for provider detection and currently rec
 
 ## Limitations
 
-- AWS is the only provider with resource-level normalization today
-- GCP provider detection is scaffold-only and reports recognized Google resources as unsupported
+- AWS remains the only provider with trust-boundary, rule, and control-observation coverage today
+- GCP support is limited to initial inventory normalization for selected core resource types
 - Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case
@@ -514,7 +516,7 @@ The GCP provider scaffold is registered for provider detection and currently rec
 - Lambda deploy-role:
   [`fixtures/sample_aws_lambda_deploy_role_plan.json`](fixtures/sample_aws_lambda_deploy_role_plan.json),
   [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
-- GCP scaffold:
+- GCP initial inventory:
   [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
   [`examples/gcp_scaffold_report.md`](examples/gcp_scaffold_report.md)
 - Mixed:

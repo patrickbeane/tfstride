@@ -223,21 +223,21 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 0)
-        self.assertEqual(payload["summary"]["unsupported_resources"], 6)
+        self.assertEqual(payload["summary"]["normalized_resources"], 6)
+        self.assertEqual(payload["summary"]["unsupported_resources"], 0)
         self.assertEqual(payload["summary"]["active_findings"], 0)
-        self.assertEqual(payload["inventory"]["resources"], [])
         self.assertEqual(
-            payload["analysis_coverage"]["resources"]["unsupported_resource_types"],
-            {
-                "google_compute_firewall": 1,
-                "google_compute_instance": 1,
-                "google_compute_network": 1,
-                "google_compute_subnetwork": 1,
-                "google_project_iam_member": 1,
-                "google_storage_bucket": 1,
-            },
+            [resource["address"] for resource in payload["inventory"]["resources"]],
+            [
+                "google_compute_firewall.public_ssh",
+                "google_compute_instance.web",
+                "google_compute_network.main",
+                "google_compute_subnetwork.app",
+                "google_project_iam_member.web_viewer",
+                "google_storage_bucket.logs",
+            ],
         )
+        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resource_types"], {})
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
         engine = TfStride()

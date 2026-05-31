@@ -56,7 +56,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), GcpNormalizer)
         self.assertIsNone(plugin.create_resource_decorator())
-        self.assertFalse(plugin.supports_resource_type("google_storage_bucket"))
+        self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
+        self.assertFalse(plugin.supports_resource_type("google_project_service"))
 
     def test_metadata_namespace_exposes_gcp_owned_fields(self) -> None:
         self.assertGreaterEqual(
@@ -119,7 +120,7 @@ class GcpProviderTests(unittest.TestCase):
             )
         )
 
-    def test_normalizer_tracks_recognized_gcp_resources_as_unsupported(self) -> None:
+    def test_normalizer_normalizes_supported_gcp_resources_and_tracks_unsupported(self) -> None:
         resources = [
             _terraform_resource(
                 address="google_storage_bucket.logs",
@@ -131,6 +132,10 @@ class GcpProviderTests(unittest.TestCase):
                 provider_name="registry.terraform.io/hashicorp/google-beta",
             ),
             _terraform_resource(
+                address="google_project_service.compute",
+                resource_type="google_project_service",
+            ),
+            _terraform_resource(
                 address="aws_s3_bucket.logs",
                 resource_type="aws_s3_bucket",
                 provider_name="registry.terraform.io/hashicorp/aws",
@@ -140,18 +145,21 @@ class GcpProviderTests(unittest.TestCase):
         inventory = GcpNormalizer().normalize(resources)
 
         self.assertEqual(inventory.provider, "gcp")
-        self.assertEqual(inventory.resources, ())
         self.assertEqual(
-            inventory.unsupported_resources,
-            ["google_compute_instance.web", "google_storage_bucket.logs"],
+            [resource.address for resource in inventory.resources],
+            ["google_storage_bucket.logs", "google_compute_instance.web"],
         )
-        self.assertEqual(InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(inventory.metadata), [])
-        self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 3)
-        self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 2)
-        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 0)
+        self.assertEqual(inventory.unsupported_resources, ["google_project_service.compute"])
+        self.assertEqual(
+            InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
+            sorted(SUPPORTED_GCP_TYPES),
+        )
+        self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 4)
+        self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 3)
+        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 2)
         self.assertEqual(
             InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
-            {"google_compute_instance": 1, "google_storage_bucket": 1},
+            {"google_project_service": 1},
         )
 
     def test_normalizer_recognizes_google_resource_type_prefix_without_provider_suffix(self) -> None:

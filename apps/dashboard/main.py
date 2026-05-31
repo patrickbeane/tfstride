@@ -289,10 +289,10 @@ DEMO_SCENARIO_DEFINITIONS = (
     ),
     DemoScenarioDefinition(
         scenario_id="gcp-scaffold",
-        title="GCP Scaffold",
-        report_title="GCP Scaffold Demo",
+        title="GCP Inventory",
+        report_title="GCP Inventory Demo",
         fixture_name="sample_gcp_plan.json",
-        description="Terraform Google provider resources recognized by provider detection while GCP normalization is still scaffold-only.",
+        description="Terraform Google provider resources normalized for initial inventory coverage while GCP trust-boundary and rule coverage is still pending.",
         emphasis="Provider expansion",
         theme="balanced",
     ),

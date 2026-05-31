@@ -8,7 +8,7 @@ from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 
 @dataclass(frozen=True, slots=True)
 class GcpResourceFacts(NeutralProviderResourceFacts):
-    """Neutral GCP facts scaffold until provider-specific facts are modeled."""
+    """Neutral GCP facts until provider-specific analysis facts are modeled."""
 
 
 def gcp_facts(resource: NormalizedResource) -> GcpResourceFacts:

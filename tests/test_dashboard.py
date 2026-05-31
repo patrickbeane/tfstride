@@ -63,7 +63,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Built-in scenarios", response.text)
         self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
-        self.assertIn("GCP Scaffold", response.text)
+        self.assertIn("GCP Inventory", response.text)
         self.assertIn("Run built-in report", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
@@ -197,10 +197,10 @@ class DashboardAppTests(unittest.TestCase):
         response = self.client.get("/demo/gcp-scaffold")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("GCP Scaffold Demo", response.text)
+        self.assertIn("GCP Inventory Demo", response.text)
         self.assertIn(GCP_FIXTURE_PATH.name, response.text)
         self.assertIn("google_compute_instance.web", response.text)
-        self.assertIn("GCP support currently recognizes", response.text)
+        self.assertIn("GCP support currently provides initial resource inventory normalization", response.text)
 
     def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:
         response = self.client.get("/demo/ecs-fargate")

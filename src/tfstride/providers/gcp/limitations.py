@@ -2,5 +2,5 @@ from __future__ import annotations
 
 
 GCP_LIMITATIONS = (
-    "GCP support currently recognizes Terraform Google provider resources but does not normalize GCP resource types yet.",
+    "GCP support currently provides initial resource inventory normalization only; GCP trust-boundary and rule coverage are not implemented yet.",
 )

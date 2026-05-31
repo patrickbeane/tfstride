@@ -683,10 +683,11 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self._analyze_payload(payload)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(result.inventory.resources, ())
-        self.assertEqual(result.inventory.unsupported_resources, ["google_storage_bucket.logs"])
+        self.assertEqual(len(result.inventory.resources), 1)
+        self.assertEqual(result.inventory.resources[0].address, "google_storage_bucket.logs")
+        self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.findings, [])
-        self.assertIn("GCP support currently recognizes", result.limitations[0])
+        self.assertIn("GCP support currently provides initial resource inventory normalization", result.limitations[0])
 
     def test_analysis_rejects_mixed_provider_plans_without_explicit_provider(self) -> None:
         payload = {
@@ -843,15 +844,15 @@ class TFSAnalysisTests(unittest.TestCase):
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
 
-    def test_gcp_fixture_auto_selects_provider_and_tracks_unsupported_resources(self) -> None:
+    def test_gcp_fixture_auto_selects_provider_and_normalizes_inventory(self) -> None:
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(result.inventory.resources, ())
-        self.assertEqual(len(result.inventory.unsupported_resources), 6)
+        self.assertEqual(len(result.inventory.resources), 6)
+        self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.analysis_coverage.resources.provider_resources, 6)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 0)
-        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 6)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 6)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.findings, [])
         self.assertEqual(result.trust_boundaries, [])
 

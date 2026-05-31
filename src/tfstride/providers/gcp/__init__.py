@@ -1,1 +1,1 @@
-"""GCP provider scaffold."""
+"""GCP provider integration."""
