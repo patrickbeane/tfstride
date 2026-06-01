@@ -96,6 +96,14 @@ class AnalysisResourceFacts:
         return self._facts.service_account_reference
 
     @property
+    def workload_identity_members(self) -> list[str]:
+        return self._facts.workload_identity_members
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        return self._facts.workload_identity_scopes
+
+    @property
     def network_tags(self) -> list[str]:
         return self._facts.network_tags
 

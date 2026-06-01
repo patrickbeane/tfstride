@@ -79,6 +79,31 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE)
 
     @property
+    def workload_identity_members(self) -> list[str]:
+        members: list[str] = []
+        for account in self.get(GcpResourceMetadata.SERVICE_ACCOUNTS):
+            email = _service_account_email(account)
+            if email is None:
+                continue
+            members.append(_service_account_member(email))
+        return _dedupe(members)
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        scopes: list[str] = []
+        for account in self.get(GcpResourceMetadata.SERVICE_ACCOUNTS):
+            if not isinstance(account, dict):
+                continue
+            account_scopes = account.get("scopes")
+            if isinstance(account_scopes, list):
+                scopes.extend(
+                    str(scope) for scope in account_scopes if scope not in (None, "")
+                )
+            elif account_scopes not in (None, ""):
+                scopes.append(str(account_scopes))
+        return _dedupe(scopes)
+
+    @property
     def network_tags(self) -> list[str]:
         return self.get(GcpResourceMetadata.NETWORK_TAGS)
 
@@ -97,3 +122,35 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
 
 def gcp_facts(resource: NormalizedResource) -> GcpResourceFacts:
     return GcpResourceFacts(resource)
+
+
+def _service_account_email(value: Any) -> str | None:
+    if isinstance(value, dict):
+        email = value.get("email")
+    else:
+        email = value
+    if email in (None, "", "default"):
+        return None
+    text = str(email).strip()
+    if not text or text == "default":
+        return None
+    if text.startswith("serviceAccount:"):
+        return text.removeprefix("serviceAccount:")
+    return text
+
+
+def _service_account_member(email: str) -> str:
+    if email.startswith("serviceAccount:"):
+        return email
+    return f"serviceAccount:{email}"
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        deduped.append(value)
+        seen.add(value)
+    return deduped

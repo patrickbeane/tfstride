@@ -54,6 +54,7 @@ _RULE_GROUP_IDS = (
     (
         "aws-private-data-transitive-exposure",
         "aws-control-plane-sensitive-workload-chain",
+        "gcp-public-workload-sensitive-data-access",
     ),
     (
         "aws-role-trust-expansion",
@@ -120,6 +121,9 @@ class StrideRuleEngine:
             "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,
             "aws-control-plane-sensitive-workload-chain": (
                 path_chain_detectors.detect_control_plane_sensitive_workload_chain
+            ),
+            "gcp-public-workload-sensitive-data-access": (
+                path_chain_detectors.detect_public_workload_sensitive_data_access
             ),
             "aws-role-trust-expansion": policy_trust_detectors.detect_trust_expansion,
             "aws-role-trust-missing-narrowing": policy_trust_detectors.detect_unconstrained_trust,

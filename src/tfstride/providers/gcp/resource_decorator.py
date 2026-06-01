@@ -27,6 +27,7 @@ class GcpResourceDecorator:
             elif resource.resource_type == "google_kms_crypto_key":
                 _derive_sensitive_resource_iam_bindings(resource, index.kms_crypto_key_iam_resources)
             elif resource.resource_type == "google_storage_bucket":
+                _derive_sensitive_resource_iam_bindings(resource, index.bucket_iam_resources)
                 _derive_public_bucket_exposure(resource, index)
 
 
@@ -188,6 +189,9 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourc
 
 
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
+    bucket_name = resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
+    if bucket_name:
+        return bucket_name
     secret_reference = resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE)
     if secret_reference:
         return secret_reference

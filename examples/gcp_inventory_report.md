@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **6 findings** across **14 normal
 - Provider resources considered: `14`
 - Normalized resources: `14`
 - Unsupported resources: `0`
-- Registered rules: `20`
-- Enabled rules: `20`
+- Registered rules: `21`
+- Enabled rules: `21`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -139,5 +139,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- GCP support currently provides initial inventory normalization, internet-to-service trust-boundary detection, and limited GCP STRIDE rule coverage for compute, GCS, Cloud SQL, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
+- GCP support currently provides initial inventory normalization, internet-to-service and workload-to-sensitive-data trust-boundary detection, and limited GCP STRIDE rule coverage for compute, GCS, Cloud SQL, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

@@ -63,6 +63,14 @@ class AwsResourceFacts:
         return None
 
     @property
+    def workload_identity_members(self) -> list[str]:
+        return []
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        return []
+
+    @property
     def security_group_id(self) -> str | None:
         return self.get(AwsResourceMetadata.SECURITY_GROUP_ID)
 

@@ -229,6 +229,24 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-public-workload-sensitive-data-access",
+        title="Internet-exposed GCP workload can access sensitive data services",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, "
+            "Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data "
+            "access through private services where possible."
+        ),
+        tags=("gcp", "compute", "iam", "data", "transitive-path"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-sql-public-authorized-network",
         title="Cloud SQL instance accepts public authorized network access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

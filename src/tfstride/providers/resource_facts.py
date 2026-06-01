@@ -71,6 +71,14 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def workload_identity_members(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
     def network_tags(self) -> list[str]:
         raise NotImplementedError
 
@@ -163,6 +171,14 @@ class NeutralProviderResourceFacts:
     @property
     def service_account_reference(self) -> str | None:
         return None
+
+    @property
+    def workload_identity_members(self) -> list[str]:
+        return []
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        return []
 
     @property
     def network_tags(self) -> list[str]:

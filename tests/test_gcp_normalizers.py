@@ -521,6 +521,16 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                 "roles/storage.objectViewer to allUsers"
             ],
         )
+        self.assertEqual(
+            bucket.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/storage.objectViewer",
+                    "members": ["allUsers"],
+                    "source": "google_storage_bucket_iam_member.public_logs_reader",
+                }
+            ],
+        )
 
     def test_normalizer_attaches_sensitive_resource_iam_bindings_to_targets(self) -> None:
         inventory = GcpNormalizer().normalize(list(self.resources.values()))

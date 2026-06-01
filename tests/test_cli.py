@@ -56,6 +56,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-cloud-sql-backup-disabled", output)
         self.assertIn("- gcp-gcs-public-access", output)
         self.assertIn("- gcp-public-compute-broad-ingress", output)
+        self.assertIn("- gcp-public-workload-sensitive-data-access", output)
         self.assertIn("- gcp-project-iam-broad-principal", output)
         self.assertIn("- gcp-project-iam-privileged-role", output)
         self.assertTrue(output.endswith("\n"))

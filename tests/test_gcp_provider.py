@@ -146,6 +146,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
+        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.workload_identity_scopes, [])
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()

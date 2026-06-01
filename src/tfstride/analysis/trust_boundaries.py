@@ -14,10 +14,12 @@ from tfstride.analysis.policy_conditions import (
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
+    KEY_MANAGEMENT_RESOURCE_TYPES,
     WORKLOAD_RESOURCE_TYPES,
     has_provider_managed_egress_without_vpc,
     is_database_resource,
     is_identity_role_resource,
+    is_key_management_resource,
     is_object_storage_resource,
     is_public_edge_resource,
     is_secret_store_resource,
@@ -32,10 +34,13 @@ class _DataStoreCandidateIndex:
     data_store_positions: Mapping[int, int]
     object_storage: tuple[NormalizedResource, ...]
     secret_stores: tuple[NormalizedResource, ...]
+    key_management: tuple[NormalizedResource, ...]
+    databases: tuple[NormalizedResource, ...]
     direct_internet_databases: tuple[NormalizedResource, ...]
     databases_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
     databases_missing_security_groups_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
     databases_by_trusted_workload_security_group: Mapping[str, tuple[NormalizedResource, ...]]
+    project_iam_resources: tuple[NormalizedResource, ...]
 
 
 def detect_trust_boundaries(
@@ -104,7 +109,7 @@ def detect_trust_boundaries(
 
     workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
     data_store_candidates = _build_data_store_candidate_index(
-        inventory.by_type(*DATA_STORE_RESOURCE_TYPES),
+        resources,
         analysis_indexes,
     )
     for workload in workloads:
@@ -119,6 +124,7 @@ def detect_trust_boundaries(
                 data_store,
                 attached_role,
                 analysis_indexes,
+                data_store_candidates,
             )
             if reachability_rationale:
                 add_boundary(
@@ -192,18 +198,28 @@ def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str
 
 
 def _build_data_store_candidate_index(
-    data_stores: Sequence[NormalizedResource],
+    resources: Sequence[NormalizedResource],
     indexes: AnalysisIndexes,
 ) -> _DataStoreCandidateIndex:
+    candidate_types = set(DATA_STORE_RESOURCE_TYPES) | set(KEY_MANAGEMENT_RESOURCE_TYPES)
+    data_stores = [resource for resource in resources if resource.resource_type in candidate_types]
     direct_internet_databases: list[NormalizedResource] = []
+    databases: list[NormalizedResource] = []
     object_storage: list[NormalizedResource] = []
     secret_stores: list[NormalizedResource] = []
+    key_management: list[NormalizedResource] = []
     databases_by_vpc: dict[str, list[NormalizedResource]] = {}
     databases_missing_security_groups_by_vpc: dict[str, list[NormalizedResource]] = {}
     databases_by_trusted_workload_security_group: dict[str, list[NormalizedResource]] = {}
+    project_iam_resources: list[NormalizedResource] = []
+
+    for resource in resources:
+        if resource.resource_type == "google_project_iam_member":
+            project_iam_resources.append(resource)
 
     for data_store in data_stores:
         if is_database_resource(data_store):
+            databases.append(data_store)
             if data_store.direct_internet_reachable:
                 direct_internet_databases.append(data_store)
             if data_store.vpc_id:
@@ -222,11 +238,15 @@ def _build_data_store_candidate_index(
             object_storage.append(data_store)
         elif is_secret_store_resource(data_store):
             secret_stores.append(data_store)
+        elif is_key_management_resource(data_store):
+            key_management.append(data_store)
 
     return _DataStoreCandidateIndex(
         data_store_positions={id(resource): index for index, resource in enumerate(data_stores)},
         object_storage=tuple(object_storage),
         secret_stores=tuple(secret_stores),
+        key_management=tuple(key_management),
+        databases=tuple(databases),
         direct_internet_databases=tuple(direct_internet_databases),
         databases_by_vpc=_freeze_resource_groups_by_key(databases_by_vpc),
         databases_missing_security_groups_by_vpc=_freeze_resource_groups_by_key(
@@ -235,6 +255,7 @@ def _build_data_store_candidate_index(
         databases_by_trusted_workload_security_group=_freeze_resource_groups_by_key(
             databases_by_trusted_workload_security_group
         ),
+        project_iam_resources=tuple(project_iam_resources),
     )
 
 
@@ -263,6 +284,11 @@ def _candidate_data_stores_for_workload(
             add_many(index.object_storage)
         if _role_allows_secret_read(attached_role):
             add_many(index.secret_stores)
+    if _gcp_workload_identity_members(workload):
+        add_many(index.databases)
+        add_many(index.object_storage)
+        add_many(index.secret_stores)
+        add_many(index.key_management)
 
     return tuple(
         sorted(
@@ -293,6 +319,17 @@ def _freeze_resource_groups_by_key(
     return {key: tuple(resources) for key, resources in grouped.items()}
 
 
+def _dedupe(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        deduped.append(value)
+        seen.add(value)
+    return deduped
+
+
 def _role_allows_object_storage_access(role: NormalizedResource) -> bool:
     return any(
         statement.effect == "Allow"
@@ -314,7 +351,10 @@ def _workload_reaches_data_store(
     data_store: NormalizedResource,
     attached_role: NormalizedResource | None,
     indexes: AnalysisIndexes,
+    candidate_index: _DataStoreCandidateIndex,
 ) -> str | None:
+    if workload.provider == "gcp" and data_store.provider == "gcp":
+        return _gcp_workload_reaches_data_store(workload, data_store, indexes, candidate_index)
     if is_database_resource(data_store):
         return _database_reachability_rationale(workload, data_store, indexes)
     if is_object_storage_resource(data_store):
@@ -356,6 +396,146 @@ def _workload_reaches_data_store(
             f"attached role allows Secrets Manager retrieval actions such as {action_text}."
         )
     return None
+
+
+_GCP_BROAD_DATA_ACCESS_ROLES = frozenset({"roles/owner", "roles/editor"})
+_GCP_OBJECT_STORAGE_ACCESS_ROLES = frozenset(
+    {
+        "roles/storage.admin",
+        "roles/storage.objectAdmin",
+        "roles/storage.objectCreator",
+        "roles/storage.objectUser",
+        "roles/storage.objectViewer",
+    }
+)
+_GCP_SECRET_ACCESS_ROLES = frozenset(
+    {
+        "roles/secretmanager.admin",
+        "roles/secretmanager.secretAccessor",
+    }
+)
+_GCP_KMS_ACCESS_ROLES = frozenset(
+    {
+        "roles/cloudkms.admin",
+        "roles/cloudkms.cryptoKeyDecrypter",
+        "roles/cloudkms.cryptoKeyEncrypterDecrypter",
+    }
+)
+_GCP_CLOUD_SQL_ACCESS_ROLES = frozenset(
+    {
+        "roles/cloudsql.admin",
+        "roles/cloudsql.client",
+    }
+)
+
+
+def _gcp_workload_reaches_data_store(
+    workload: NormalizedResource,
+    data_store: NormalizedResource,
+    indexes: AnalysisIndexes,
+    candidate_index: _DataStoreCandidateIndex,
+) -> str | None:
+    iam_rationale = _gcp_iam_reachability_rationale(workload, data_store, candidate_index)
+    if not is_database_resource(data_store):
+        return iam_rationale
+
+    network_rationale = _database_reachability_rationale(workload, data_store, indexes)
+    if network_rationale and iam_rationale:
+        return f"{network_rationale} {iam_rationale}"
+    return network_rationale or iam_rationale
+
+
+def _gcp_iam_reachability_rationale(
+    workload: NormalizedResource,
+    data_store: NormalizedResource,
+    candidate_index: _DataStoreCandidateIndex,
+) -> str | None:
+    if not _gcp_workload_scopes_allow_access(workload, data_store):
+        return None
+    access_grants = _gcp_matching_iam_access_grants(workload, data_store, candidate_index)
+    if not access_grants:
+        return None
+    grant_text = "; ".join(access_grants[:3])
+    if len(access_grants) > 3:
+        grant_text = f"{grant_text}; and {len(access_grants) - 3} more grants"
+    return (
+        "GCP workloads cross into a higher-sensitivity data plane when their attached "
+        f"service account is granted data access through IAM: {grant_text}."
+    )
+
+
+def _gcp_matching_iam_access_grants(
+    workload: NormalizedResource,
+    data_store: NormalizedResource,
+    candidate_index: _DataStoreCandidateIndex,
+) -> list[str]:
+    workload_members = set(_gcp_workload_identity_members(workload))
+    if not workload_members:
+        return []
+
+    grants: list[str] = []
+    for binding in analysis_facts(data_store).iam_bindings:
+        role = str(binding.get("role") or "")
+        if not _gcp_role_allows_data_store_access(data_store, role):
+            continue
+        for member in sorted(workload_members.intersection(_binding_members(binding))):
+            source = str(binding.get("source") or data_store.address)
+            grants.append(f"{source} grants {role} to {member}")
+
+    data_store_project = analysis_facts(data_store).project
+    for project_iam_resource in candidate_index.project_iam_resources:
+        project_iam_facts = analysis_facts(project_iam_resource)
+        if not data_store_project or project_iam_facts.project != data_store_project:
+            continue
+        role = project_iam_facts.iam_role
+        member = project_iam_facts.iam_member
+        if member not in workload_members or not _gcp_role_allows_data_store_access(data_store, role):
+            continue
+        grants.append(f"{project_iam_resource.address} grants {role} to {member} at project scope")
+    return _dedupe(grants)
+
+
+def _gcp_workload_identity_members(workload: NormalizedResource) -> list[str]:
+    return analysis_facts(workload).workload_identity_members
+
+
+def _gcp_workload_scopes_allow_access(
+    workload: NormalizedResource,
+    data_store: NormalizedResource,
+) -> bool:
+    scopes = {scope.lower() for scope in analysis_facts(workload).workload_identity_scopes}
+    if not scopes:
+        return True
+    if any(scope.endswith("/cloud-platform") or scope == "cloud-platform" for scope in scopes):
+        return True
+    if is_object_storage_resource(data_store):
+        return any("devstorage" in scope for scope in scopes)
+    if is_database_resource(data_store):
+        return any("sqlservice.admin" in scope for scope in scopes)
+    return False
+
+
+def _gcp_role_allows_data_store_access(resource: NormalizedResource, role: str | None) -> bool:
+    if role in _GCP_BROAD_DATA_ACCESS_ROLES:
+        return True
+    if is_object_storage_resource(resource):
+        return role in _GCP_OBJECT_STORAGE_ACCESS_ROLES
+    if is_secret_store_resource(resource):
+        return role in _GCP_SECRET_ACCESS_ROLES
+    if is_key_management_resource(resource):
+        return role in _GCP_KMS_ACCESS_ROLES
+    if is_database_resource(resource):
+        return role in _GCP_CLOUD_SQL_ACCESS_ROLES
+    return False
+
+
+def _binding_members(binding: Mapping[str, object]) -> list[str]:
+    members = binding.get("members")
+    if isinstance(members, list):
+        return [str(member) for member in members if member not in (None, "")]
+    if members in (None, ""):
+        return []
+    return [str(members)]
 
 
 def _database_reachability_rationale(

@@ -2,11 +2,88 @@ from __future__ import annotations
 
 import unittest
 
+from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 
+
+
+def _compute_network() -> TerraformResource:
+    return TerraformResource(
+        address="google_compute_network.main",
+        mode="managed",
+        resource_type="google_compute_network",
+        name="main",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"name": "tfstride-main", "id": "google_compute_network.main"},
+    )
+
+
+def _compute_subnetwork() -> TerraformResource:
+    return TerraformResource(
+        address="google_compute_subnetwork.app",
+        mode="managed",
+        resource_type="google_compute_subnetwork",
+        name="app",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-app",
+            "id": "google_compute_subnetwork.app",
+            "network": "google_compute_network.main.id",
+            "ip_cidr_range": "10.10.0.0/24",
+        },
+    )
+
+
+def _public_compute_firewall() -> TerraformResource:
+    return TerraformResource(
+        address="google_compute_firewall.web",
+        mode="managed",
+        resource_type="google_compute_firewall",
+        name="web",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-web",
+            "network": "google_compute_network.main.id",
+            "direction": "INGRESS",
+            "source_ranges": ["0.0.0.0/0"],
+            "target_tags": ["web"],
+            "allow": [{"protocol": "tcp", "ports": ["443"]}],
+        },
+    )
+
+
+def _compute_instance(
+    *,
+    public: bool = True,
+    service_account_email: str = "tfstride-web@tfstride-demo.iam.gserviceaccount.com",
+    scopes: list[str] | None = None,
+) -> TerraformResource:
+    network_interface: dict[str, object] = {"subnetwork": "google_compute_subnetwork.app.id"}
+    if public:
+        network_interface["access_config"] = [{}]
+    return TerraformResource(
+        address="google_compute_instance.web",
+        mode="managed",
+        resource_type="google_compute_instance",
+        name="web",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-web",
+            "machine_type": "e2-medium",
+            "zone": "us-central1-a",
+            "tags": ["web"],
+            "network_interface": [network_interface],
+            "service_account": [
+                {
+                    "email": service_account_email,
+                    "scopes": scopes or ["https://www.googleapis.com/auth/cloud-platform"],
+                }
+            ],
+        },
+    )
 
 def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com") -> TerraformResource:
     return TerraformResource(
@@ -352,6 +429,136 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(inventory, [])
 
         self.assertEqual(findings, [])
+
+
+    def test_public_compute_service_account_secret_access_path_is_detected(self) -> None:
+        service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _public_compute_firewall(),
+                _compute_instance(),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-public-workload-sensitive-data-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_compute_instance.web",
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret_iam_member.public_accessor",
+            ],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "workload-to-data-store:google_compute_instance.web->google_secret_manager_secret.api_key",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["workload_identity"], [service_account])
+        self.assertEqual(
+            evidence["data_access_path"],
+            ["google_compute_instance.web reaches google_secret_manager_secret.api_key"],
+        )
+        self.assertIn(
+            "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
+            evidence["boundary_rationale"][0],
+        )
+
+    def test_project_iam_kms_access_path_is_detected_for_public_compute(self) -> None:
+        service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _public_compute_firewall(),
+                _compute_instance(),
+                _kms_crypto_key(),
+                _project_iam_member("roles/cloudkms.cryptoKeyDecrypter", member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.affected_resources, ["google_compute_instance.web", "google_kms_crypto_key.customer"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertIn(
+            "google_project_iam_member.binding grants roles/cloudkms.cryptoKeyDecrypter",
+            evidence["boundary_rationale"][0],
+        )
+
+    def test_private_compute_sensitive_data_path_is_not_reported(self) -> None:
+        service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _compute_instance(public=False),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_public_compute_to_private_cloud_sql_path_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _public_compute_firewall(),
+                _compute_instance(),
+                _cloud_sql_instance(
+                    ipv4_enabled=False,
+                    private_network="google_compute_network.main.id",
+                ),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_compute_instance.web", "google_sql_database_instance.app"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "workload-to-data-store:google_compute_instance.web->google_sql_database_instance.app",
+        )
 
     def test_project_iam_broad_principal_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(

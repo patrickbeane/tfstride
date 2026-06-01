@@ -91,6 +91,14 @@ class FakeProviderFacts:
     def service_account_reference(self) -> str | None:
         return "google_service_account.fake.email"
 
+    @property
+    def workload_identity_members(self) -> list[str]:
+        return ["serviceAccount:fake@example.iam.gserviceaccount.com"]
+
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        return ["https://www.googleapis.com/auth/cloud-platform"]
+
 
 class AnalysisResourceFactsTests(unittest.TestCase):
     def test_reads_provider_backed_analysis_facts(self) -> None:
@@ -124,6 +132,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
+        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.workload_identity_scopes, [])
 
     def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
@@ -157,6 +167,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
+        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.workload_identity_scopes, [])
 
     def test_gcp_sensitive_resource_facts_read_provider_owned_iam_metadata(self) -> None:
         resource = _resource(
@@ -216,6 +228,42 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertFalse(facts.cloud_sql_backup_enabled)
         self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
 
+
+    def test_gcp_compute_facts_read_workload_identity_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.SERVICE_ACCOUNTS.key: [
+                    {
+                        "email": "tfstride-web@example.iam.gserviceaccount.com",
+                        "scopes": ["https://www.googleapis.com/auth/cloud-platform"],
+                    },
+                    {
+                        "email": "serviceAccount:worker@example.iam.gserviceaccount.com",
+                        "scopes": ["https://www.googleapis.com/auth/devstorage.read_only"],
+                    },
+                ],
+            },
+            provider="gcp",
+            resource_type="google_compute_instance",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(
+            facts.workload_identity_members,
+            [
+                "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+                "serviceAccount:worker@example.iam.gserviceaccount.com",
+            ],
+        )
+        self.assertEqual(
+            facts.workload_identity_scopes,
+            [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/devstorage.read_only",
+            ],
+        )
+
     def test_gcp_service_account_facts_read_provider_owned_identity_metadata(self) -> None:
         resource = _resource(
             {
@@ -268,6 +316,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.service_account_email, "fake@example.iam.gserviceaccount.com")
         self.assertEqual(facts.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
         self.assertEqual(facts.service_account_reference, "google_service_account.fake.email")
+        self.assertEqual(facts.workload_identity_members, ["serviceAccount:fake@example.iam.gserviceaccount.com"])
+        self.assertEqual(facts.workload_identity_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
 
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
