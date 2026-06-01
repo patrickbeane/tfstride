@@ -84,7 +84,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.database_engine, "postgres")
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
 
-    def test_non_aws_resources_return_neutral_analysis_facts(self) -> None:
+    def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
             {
                 "bucket": "logs",
@@ -101,7 +101,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertIsNone(facts.bucket_name)
+        self.assertEqual(facts.bucket_name, "logs")
         self.assertEqual(facts.bucket_acl, "")
         self.assertIsNone(facts.public_access_block)
         self.assertEqual(facts.policy_document, {})

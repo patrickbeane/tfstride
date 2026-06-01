@@ -78,7 +78,16 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role"}))
         self.assertEqual(
             IAM_POLICY_RESOURCE_TYPES,
-            frozenset({"aws_iam_policy", "aws_iam_role", "google_project_iam_member"}),
+            frozenset(
+                {
+                    "aws_iam_policy",
+                    "aws_iam_role",
+                    "google_project_iam_member",
+                    "google_storage_bucket_iam_binding",
+                    "google_storage_bucket_iam_member",
+                    "google_storage_bucket_iam_policy",
+                }
+            ),
         )
         self.assertEqual(
             NETWORK_SECURITY_GROUP_RESOURCE_TYPES,
@@ -126,6 +135,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_storage_bucket_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
         self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall", provider="gcp")))
         self.assertTrue(is_subnet_resource(_resource("aws_subnet")))

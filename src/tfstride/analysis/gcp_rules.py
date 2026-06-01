@@ -163,6 +163,46 @@ class GcpRuleDetectors:
             )
         return findings
 
+    def detect_gcs_public_access(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            if not bucket.public_exposure:
+                continue
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
+            )
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{bucket.display_name} is publicly reachable through GCS IAM grants. "
+                        "Public bucket access is a common source of unintended object disclosure."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _risky_public_firewall_rules(
     instance: NormalizedResource,

@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
 from tfstride.input.terraform_plan import load_terraform_plan
-from tfstride.models import ResourceCategory
+from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
 from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
-from tfstride.providers.gcp.iam_normalizers import normalize_project_iam_member
+from tfstride.providers.gcp.iam_normalizers import (
+    normalize_project_iam_member,
+    normalize_storage_bucket_iam_binding,
+    normalize_storage_bucket_iam_member,
+    normalize_storage_bucket_iam_policy,
+)
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.network_normalizers import (
@@ -25,6 +31,21 @@ FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_gcp_pl
 
 def _fixture_resources_by_address():
     return {resource.address: resource for resource in load_terraform_plan(FIXTURE_PATH).resources}
+
+
+def _terraform_resource(
+    address: str,
+    resource_type: str,
+    values: dict[str, object],
+) -> TerraformResource:
+    return TerraformResource(
+        address=address,
+        mode="managed",
+        resource_type=resource_type,
+        name=address.rsplit(".", 1)[-1],
+        provider_name="registry.terraform.io/hashicorp/google",
+        values=values,
+    )
 
 
 class GcpCoercionTests(unittest.TestCase):
@@ -126,6 +147,156 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
 
+    def test_storage_bucket_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_storage_bucket_iam_member(
+            _terraform_resource(
+                "google_storage_bucket_iam_member.public_logs_reader",
+                "google_storage_bucket_iam_member",
+                {
+                    "bucket": "google_storage_bucket.logs.name",
+                    "role": "roles/storage.objectViewer",
+                    "member": "allUsers",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(
+            normalized.identifier,
+            "google_storage_bucket.logs.name:roles/storage.objectViewer:allUsers",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.BUCKET_NAME),
+            "google_storage_bucket.logs.name",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/storage.objectViewer")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allUsers")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS), ["allUsers"])
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/storage.objectViewer", "members": ["allUsers"]}],
+        )
+
+    def test_storage_bucket_iam_binding_normalizer_preserves_member_list(self) -> None:
+        normalized = normalize_storage_bucket_iam_binding(
+            _terraform_resource(
+                "google_storage_bucket_iam_binding.logs_readers",
+                "google_storage_bucket_iam_binding",
+                {
+                    "bucket": "tfstride-logs",
+                    "role": "roles/storage.objectViewer",
+                    "members": ["allUsers", "group:ops@example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.BUCKET_NAME), "tfstride-logs")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS),
+            ["allUsers", "group:ops@example.com"],
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/storage.objectViewer",
+                    "members": ["allUsers", "group:ops@example.com"],
+                }
+            ],
+        )
+
+    def test_storage_bucket_iam_policy_normalizer_parses_policy_bindings(self) -> None:
+        normalized = normalize_storage_bucket_iam_policy(
+            _terraform_resource(
+                "google_storage_bucket_iam_policy.logs_policy",
+                "google_storage_bucket_iam_policy",
+                {
+                    "bucket": "tfstride-logs",
+                    "policy_data": json.dumps(
+                        {
+                            "bindings": [
+                                {
+                                    "role": "roles/storage.objectViewer",
+                                    "members": ["allUsers"],
+                                }
+                            ]
+                        }
+                    ),
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/storage.objectViewer", "members": ["allUsers"]}],
+        )
+
+    def test_normalizer_derives_public_bucket_exposure_from_bucket_iam_member(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_storage_bucket.logs",
+                    "google_storage_bucket",
+                    {"name": "tfstride-logs", "location": "US"},
+                ),
+                _terraform_resource(
+                    "google_storage_bucket_iam_member.public_logs_reader",
+                    "google_storage_bucket_iam_member",
+                    {
+                        "bucket": "google_storage_bucket.logs.name",
+                        "role": "roles/storage.objectViewer",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+        bucket = inventory.get_by_address("google_storage_bucket.logs")
+
+        self.assertIsNotNone(bucket)
+        assert bucket is not None
+        self.assertTrue(bucket.public_access_configured)
+        self.assertTrue(bucket.public_exposure)
+        self.assertTrue(bucket.direct_internet_reachable)
+        self.assertEqual(
+            bucket.public_exposure_reasons,
+            [
+                "google_storage_bucket_iam_member.public_logs_reader grants "
+                "roles/storage.objectViewer to allUsers"
+            ],
+        )
+
+    def test_public_access_prevention_suppresses_public_bucket_exposure(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_storage_bucket.logs",
+                    "google_storage_bucket",
+                    {
+                        "name": "tfstride-logs",
+                        "location": "US",
+                        "public_access_prevention": "enforced",
+                    },
+                ),
+                _terraform_resource(
+                    "google_storage_bucket_iam_member.public_logs_reader",
+                    "google_storage_bucket_iam_member",
+                    {
+                        "bucket": "tfstride-logs",
+                        "role": "roles/storage.objectViewer",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+        bucket = inventory.get_by_address("google_storage_bucket.logs")
+
+        self.assertIsNotNone(bucket)
+        assert bucket is not None
+        self.assertTrue(bucket.public_access_configured)
+        self.assertFalse(bucket.public_exposure)
+        self.assertFalse(bucket.direct_internet_reachable)
+        self.assertEqual(bucket.public_exposure_reasons, [])
+
     def test_normalizer_derives_public_compute_exposure_from_matching_firewall(self) -> None:
         inventory = GcpNormalizer().normalize(list(self.resources.values()))
         instance = inventory.get_by_address("google_compute_instance.web")
@@ -138,11 +309,11 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             instance.internet_ingress_reasons,
             ["google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0"],
         )
-        self.assertTrue(instance.public_exposure)
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
             ["google_compute_firewall.public_ssh"],
         )
+        self.assertTrue(instance.public_exposure)
         self.assertTrue(instance.direct_internet_reachable)
         self.assertEqual(
             instance.public_exposure_reasons,

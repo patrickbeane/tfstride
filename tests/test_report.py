@@ -67,7 +67,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `16`", report)
+        self.assertIn("- Registered rules: `17`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -224,17 +224,17 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 6)
+        self.assertEqual(payload["summary"]["normalized_resources"], 7)
         self.assertEqual(payload["summary"]["unsupported_resources"], 0)
-        self.assertEqual(payload["summary"]["trust_boundaries"], 1)
-        self.assertEqual(payload["summary"]["active_findings"], 1)
-        self.assertEqual(payload["summary"]["severity_counts"], {"high": 0, "medium": 1, "low": 0})
+        self.assertEqual(payload["summary"]["trust_boundaries"], 2)
+        self.assertEqual(payload["summary"]["active_findings"], 2)
+        self.assertEqual(payload["summary"]["severity_counts"], {"high": 0, "medium": 2, "low": 0})
         self.assertEqual(payload["inventory"]["unsupported_resources"], [])
         self.assertEqual(
             payload["inventory"]["metadata"]["supported_resource_types"],
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 6)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 7)
         self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
@@ -245,6 +245,7 @@ class JsonReportTests(unittest.TestCase):
                 "google_compute_subnetwork.app",
                 "google_project_iam_member.web_viewer",
                 "google_storage_bucket.logs",
+                "google_storage_bucket_iam_member.public_logs_reader",
             ],
         )
         self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resource_types"], {})
@@ -253,11 +254,20 @@ class JsonReportTests(unittest.TestCase):
             "internet-to-service:internet->google_compute_instance.web",
         )
         self.assertEqual(payload["trust_boundaries"][0]["boundary_type"], "internet-to-service")
-        self.assertEqual(payload["findings"][0]["rule_id"], "gcp-public-compute-broad-ingress")
-        self.assertEqual(payload["findings"][0]["severity"], "medium")
         self.assertEqual(
-            payload["findings"][0]["trust_boundary_id"],
-            "internet-to-service:internet->google_compute_instance.web",
+            {finding["rule_id"] for finding in payload["findings"]},
+            {"gcp-gcs-public-access", "gcp-public-compute-broad-ingress"},
+        )
+        self.assertEqual(
+            {finding["severity"] for finding in payload["findings"]},
+            {"medium"},
+        )
+        self.assertEqual(
+            {finding["trust_boundary_id"] for finding in payload["findings"]},
+            {
+                "internet-to-service:internet->google_compute_instance.web",
+                "internet-to-service:internet->google_storage_bucket.logs",
+            },
         )
 
     def test_json_report_contains_inventory_findings_and_filter_summary(self) -> None:
@@ -416,7 +426,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 16)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 17)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})

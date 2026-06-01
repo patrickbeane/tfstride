@@ -31,6 +31,7 @@ _RULE_GROUP_IDS = (
         "aws-public-compute-broad-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
+        "gcp-gcs-public-access",
         "gcp-public-compute-broad-ingress",
     ),
     (
@@ -96,6 +97,7 @@ class StrideRuleEngine:
             "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
             "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
             "aws-s3-public-access": posture_detectors.detect_public_object_storage,
+            "gcp-gcs-public-access": gcp_detectors.detect_gcs_public_access,
             "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
             "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
             "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,

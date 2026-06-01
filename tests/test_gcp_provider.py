@@ -64,6 +64,7 @@ class GcpProviderTests(unittest.TestCase):
             frozenset({"google_compute_instance"}),
         )
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
+        self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
 
     def test_metadata_namespace_exposes_gcp_owned_fields(self) -> None:
@@ -83,6 +84,9 @@ class GcpProviderTests(unittest.TestCase):
                 "INTERNET_INGRESS_FIREWALLS",
                 "IAM_ROLE",
                 "IAM_MEMBER",
+                "IAM_MEMBERS",
+                "IAM_BINDINGS",
+                "BUCKET_NAME",
             },
         )
 

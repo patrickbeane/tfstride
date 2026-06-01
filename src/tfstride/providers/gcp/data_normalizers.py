@@ -19,6 +19,7 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
+            GcpResourceMetadata.BUCKET_NAME.key: resource_name(resource),
             GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
             GcpResourceMetadata.PROJECT.key: values.get("project"),
             GcpResourceMetadata.LABELS.key: values.get("labels") or {},

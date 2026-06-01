@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Any
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_helpers import describe_security_group_rule
+
+
+_PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 
 
 class GcpResourceDecorator:
@@ -15,31 +19,46 @@ class GcpResourceDecorator:
     def decorate(self, resources: list[NormalizedResource]) -> None:
         index = _GcpResourceIndex.build(resources)
         for resource in resources:
-            if resource.resource_type != "google_compute_instance":
-                continue
-            _infer_instance_vpc_id(resource, index)
-            _derive_public_compute_exposure(resource, index)
+            if resource.resource_type == "google_compute_instance":
+                _infer_instance_vpc_id(resource, index)
+                _derive_public_compute_exposure(resource, index)
+            elif resource.resource_type == "google_storage_bucket":
+                _derive_public_bucket_exposure(resource, index)
 
 
 @dataclass(frozen=True, slots=True)
 class _GcpResourceIndex:
     subnetworks_by_reference: Mapping[str, NormalizedResource]
     firewalls: tuple[NormalizedResource, ...]
+    bucket_iam_resources: tuple[NormalizedResource, ...]
 
     @classmethod
     def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
         subnetworks_by_reference: dict[str, NormalizedResource] = {}
         firewalls: list[NormalizedResource] = []
+        bucket_iam_resources: list[NormalizedResource] = []
         for resource in resources:
             if resource.resource_type == "google_compute_subnetwork":
                 for reference in _resource_references(resource):
                     subnetworks_by_reference.setdefault(reference, resource)
             elif resource.resource_type == "google_compute_firewall":
                 firewalls.append(resource)
+            elif resource.resource_type in _GCS_BUCKET_IAM_RESOURCE_TYPES:
+                bucket_iam_resources.append(resource)
         return cls(
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
             firewalls=tuple(firewalls),
+            bucket_iam_resources=tuple(bucket_iam_resources),
         )
+
+
+_GCS_BUCKET_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_storage_bucket_iam_binding",
+        "google_storage_bucket_iam_member",
+        "google_storage_bucket_iam_policy",
+    }
+)
 
 
 def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -82,6 +101,62 @@ def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpRes
         ]
 
 
+def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResourceIndex) -> None:
+    public_access_reasons = _bucket_public_access_reasons(bucket, index)
+    bucket.public_access_configured = bool(public_access_reasons)
+    bucket.public_access_reasons = public_access_reasons
+
+    public_exposure = bool(public_access_reasons) and not _public_access_prevention_enforced(bucket)
+    bucket.public_exposure = public_exposure
+    bucket.direct_internet_reachable = public_exposure
+    if public_exposure:
+        bucket.public_exposure_reasons = public_access_reasons
+
+
+def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+    reasons: list[str] = []
+    bucket_references = set(_resource_references(bucket))
+    for iam_resource in index.bucket_iam_resources:
+        iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
+        if not iam_bucket or _reference_key(iam_bucket) not in bucket_references:
+            continue
+        for binding in _iam_bindings(iam_resource):
+            role = str(binding.get("role") or "unknown role")
+            public_members = sorted(
+                member
+                for member in _binding_members(binding)
+                if member in _PUBLIC_GCP_IAM_MEMBERS
+            )
+            for member in public_members:
+                reasons.append(f"{iam_resource.address} grants {role} to {member}")
+    return _dedupe(reasons)
+
+
+def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:
+    bindings = resource.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS)
+    if bindings:
+        return bindings
+    role = resource.get_metadata_field(GcpResourceMetadata.IAM_ROLE)
+    member = resource.get_metadata_field(GcpResourceMetadata.IAM_MEMBER)
+    if role and member:
+        return [{"role": role, "members": [member]}]
+    return []
+
+
+def _binding_members(binding: Mapping[str, Any]) -> list[str]:
+    members = binding.get("members")
+    if isinstance(members, list):
+        return [str(member) for member in members if member not in (None, "")]
+    if members in (None, ""):
+        return []
+    return [str(members)]
+
+
+def _public_access_prevention_enforced(bucket: NormalizedResource) -> bool:
+    value = bucket.get_metadata_field(GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION)
+    return value is not None and value.strip().lower() == "enforced"
+
+
 def _firewall_applies_to_instance(firewall: NormalizedResource, instance: NormalizedResource) -> bool:
     if firewall.metadata.get("disabled"):
         return False
@@ -114,6 +189,7 @@ def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
     for reference in (
         resource.identifier,
         resource.get_metadata_field(GcpResourceMetadata.NAME),
+        resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME),
         resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
     ):
         if reference:
@@ -133,3 +209,14 @@ def _reference_key(value: str) -> str:
         if text.endswith(suffix):
             return text[: -len(suffix)]
     return text
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        deduped.append(value)
+        seen.add(value)
+    return deduped

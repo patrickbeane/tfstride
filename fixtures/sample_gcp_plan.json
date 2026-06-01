@@ -100,6 +100,18 @@
           }
         },
         {
+          "address": "google_storage_bucket_iam_member.public_logs_reader",
+          "mode": "managed",
+          "type": "google_storage_bucket_iam_member",
+          "name": "public_logs_reader",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "bucket": "google_storage_bucket.logs.name",
+            "role": "roles/storage.objectViewer",
+            "member": "allUsers"
+          }
+        },
+        {
           "address": "google_project_iam_member.web_viewer",
           "mode": "managed",
           "type": "google_project_iam_member",

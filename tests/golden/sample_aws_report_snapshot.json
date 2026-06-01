@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 16,
+      "registered_rule_count": 17,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -52,6 +52,7 @@
         "aws-control-plane-sensitive-workload-chain",
         "aws-role-trust-expansion",
         "aws-role-trust-missing-narrowing",
+        "gcp-gcs-public-access",
         "gcp-public-compute-broad-ingress",
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role"
@@ -72,6 +73,7 @@
         "aws-control-plane-sensitive-workload-chain": 0,
         "aws-role-trust-expansion": 1,
         "aws-role-trust-missing-narrowing": 1,
+        "gcp-gcs-public-access": 0,
         "gcp-public-compute-broad-ingress": 0,
         "gcp-project-iam-broad-principal": 0,
         "gcp-project-iam-privileged-role": 0

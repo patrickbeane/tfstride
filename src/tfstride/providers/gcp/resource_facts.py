@@ -30,6 +30,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         self.resource.extend_metadata_field(field, values)
 
     @property
+    def bucket_name(self) -> str | None:
+        return self.get(GcpResourceMetadata.BUCKET_NAME)
+
+    @property
     def network_tags(self) -> list[str]:
         return self.get(GcpResourceMetadata.NETWORK_TAGS)
 

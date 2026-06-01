@@ -216,6 +216,19 @@ DEFAULT_RULE_METADATA = (
         tags=("aws", "iam", "trust", "cross-account"),
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
+
+    RuleMetadata(
+        rule_id="gcp-gcs-public-access",
+        title="GCS bucket is publicly accessible",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from bucket-level IAM grants, enforce "
+            "GCS Public Access Prevention, and use signed URLs, CDN origins, or narrow identities when "
+            "objects must be distributed."
+        ),
+        tags=("gcp", "gcs", "storage", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
     RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",

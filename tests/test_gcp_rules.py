@@ -22,7 +22,94 @@ def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.
     )
 
 
+def _storage_bucket(public_access_prevention: str | None = None) -> TerraformResource:
+    values = {
+        "name": "tfstride-logs",
+        "location": "US",
+    }
+    if public_access_prevention is not None:
+        values["public_access_prevention"] = public_access_prevention
+    return TerraformResource(
+        address="google_storage_bucket.logs",
+        mode="managed",
+        resource_type="google_storage_bucket",
+        name="logs",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values=values,
+    )
+
+
+def _storage_bucket_iam_member(
+    member: str = "allUsers",
+    role: str = "roles/storage.objectViewer",
+    *,
+    bucket: str = "google_storage_bucket.logs.name",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_storage_bucket_iam_member.public_logs_reader",
+        mode="managed",
+        resource_type="google_storage_bucket_iam_member",
+        name="public_logs_reader",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "bucket": bucket,
+            "role": role,
+            "member": member,
+        },
+    )
+
+
 class GcpRuleTests(unittest.TestCase):
+    def test_gcs_public_bucket_iam_member_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(), _storage_bucket_iam_member()])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-public-access")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(finding.affected_resources, ["google_storage_bucket.logs"])
+        self.assertIsNone(finding.trust_boundary_id)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            [
+                "google_storage_bucket_iam_member.public_logs_reader grants "
+                "roles/storage.objectViewer to allUsers"
+            ],
+        )
+
+    def test_gcs_all_authenticated_users_bucket_iam_member_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_storage_bucket(), _storage_bucket_iam_member(member="allAuthenticatedUsers")]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual([finding.rule_id for finding in findings], ["gcp-gcs-public-access"])
+
+    def test_gcs_public_access_prevention_suppresses_public_iam_grant(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_storage_bucket(public_access_prevention="enforced"), _storage_bucket_iam_member()]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(findings, [])
+
+    def test_gcs_non_public_member_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _storage_bucket(),
+                _storage_bucket_iam_member(member="serviceAccount:reader@example.iam.gserviceaccount.com"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(findings, [])
+
     def test_project_iam_broad_principal_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

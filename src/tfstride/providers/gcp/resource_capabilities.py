@@ -16,7 +16,14 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_storage_bucket",
             }
         ),
-        ResourceCapability.IAM_POLICY: frozenset({"google_project_iam_member"}),
+        ResourceCapability.IAM_POLICY: frozenset(
+            {
+                "google_project_iam_member",
+                "google_storage_bucket_iam_binding",
+                "google_storage_bucket_iam_member",
+                "google_storage_bucket_iam_policy",
+            }
+        ),
         ResourceCapability.NETWORK_SECURITY_GROUP: frozenset({"google_compute_firewall"}),
         ResourceCapability.SUBNET: frozenset({"google_compute_subnetwork"}),
         ResourceCapability.OBJECT_STORAGE: frozenset({"google_storage_bucket"}),

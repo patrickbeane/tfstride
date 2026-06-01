@@ -27,6 +27,9 @@ class PostureRuleDetectors:
         context: RuleEvaluationContext,
         rule_id: str,
     ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
         findings: list[Finding] = []
         inventory = context.inventory
         indexes = context.analysis_indexes
@@ -90,6 +93,9 @@ class PostureRuleDetectors:
         context: RuleEvaluationContext,
         rule_id: str,
     ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
         findings: list[Finding] = []
         inventory = context.inventory
         for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
@@ -131,6 +137,9 @@ class PostureRuleDetectors:
         context: RuleEvaluationContext,
         rule_id: str,
     ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
         findings: list[Finding] = []
         inventory = context.inventory
         for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):

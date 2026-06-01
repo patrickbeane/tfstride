@@ -8,7 +8,12 @@ from tfstride.models import NormalizedResource, ResourceInventory, TerraformReso
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
 from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
-from tfstride.providers.gcp.iam_normalizers import normalize_project_iam_member
+from tfstride.providers.gcp.iam_normalizers import (
+    normalize_project_iam_member,
+    normalize_storage_bucket_iam_binding,
+    normalize_storage_bucket_iam_member,
+    normalize_storage_bucket_iam_policy,
+)
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
     normalize_compute_firewall,
@@ -28,6 +33,9 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_compute_subnetwork": normalize_compute_subnetwork,
     "google_project_iam_member": normalize_project_iam_member,
     "google_storage_bucket": normalize_storage_bucket,
+    "google_storage_bucket_iam_binding": normalize_storage_bucket_iam_binding,
+    "google_storage_bucket_iam_member": normalize_storage_bucket_iam_member,
+    "google_storage_bucket_iam_policy": normalize_storage_bucket_iam_policy,
 }
 SUPPORTED_GCP_TYPES = frozenset(_GCP_RESOURCE_NORMALIZERS)
 

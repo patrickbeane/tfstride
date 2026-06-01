@@ -801,7 +801,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 1, {"medium": 1}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 2, {"medium": 2}),
         }
 
         expected_titles = {
@@ -831,7 +831,10 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Internet-exposed compute service permits overly broad ingress": 2,
                 "Object storage is publicly accessible": 2,
             },
-            "gcp-inventory": {"Internet-exposed GCP compute instance permits broad ingress": 1},
+            "gcp-inventory": {
+                "GCS bucket is publicly accessible": 1,
+                "Internet-exposed GCP compute instance permits broad ingress": 1,
+            },
         }
 
         for name, (fixture_path, expected_count, expected_severities) in scenarios.items():
@@ -848,25 +851,32 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 6)
+        self.assertEqual(len(result.inventory.resources), 7)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 6)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 6)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 7)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 7)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 1)
-        finding = result.findings[0]
-        self.assertEqual(finding.rule_id, "gcp-public-compute-broad-ingress")
+        self.assertEqual(len(result.findings), 2)
+        findings_by_rule = {finding.rule_id: finding for finding in result.findings}
+        finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
         self.assertEqual(
             finding.affected_resources,
             ["google_compute_instance.web", "google_compute_firewall.public_ssh"]
         )
-        self.assertEqual(len(result.trust_boundaries), 1)
-        boundary = result.trust_boundaries[0]
+        gcs_finding = findings_by_rule["gcp-gcs-public-access"]
+        self.assertEqual(gcs_finding.severity, Severity.MEDIUM)
+        self.assertEqual(gcs_finding.affected_resources, ["google_storage_bucket.logs"])
+        self.assertEqual(len(result.trust_boundaries), 2)
+        boundaries_by_target = {boundary.target: boundary for boundary in result.trust_boundaries}
+        boundary = boundaries_by_target["google_compute_instance.web"]
         self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
         self.assertEqual(boundary.source, "internet")
-        self.assertEqual(boundary.target, "google_compute_instance.web")
         self.assertEqual(finding.trust_boundary_id, boundary.identifier)
+        self.assertEqual(
+            gcs_finding.trust_boundary_id,
+            boundaries_by_target["google_storage_bucket.logs"].identifier,
+        )
 
     def test_unconstrained_cross_account_trust_without_narrowing_conditions_is_detected(self) -> None:
         result = self.engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)

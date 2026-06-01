@@ -399,9 +399,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## GCP Support
 
-The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, and `google_storage_bucket`.
+The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
 
-GCP trust-boundary detection currently covers basic internet-to-compute exposure. GCP STRIDE rule coverage currently includes public compute broad ingress, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers basic internet-to-service exposure for public compute and GCS buckets. GCP STRIDE rule coverage currently includes public compute broad ingress, public GCS bucket access, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 
