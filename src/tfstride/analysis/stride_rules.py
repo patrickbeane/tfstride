@@ -45,6 +45,7 @@ _RULE_GROUP_IDS = (
         "aws-iam-wildcard-permissions",
         "aws-workload-role-sensitive-permissions",
         "gcp-project-iam-broad-principal",
+        "gcp-project-iam-privileged-role",
     ),
     (
         "aws-private-data-transitive-exposure",
@@ -107,6 +108,7 @@ class StrideRuleEngine:
             "aws-iam-wildcard-permissions": iam_detectors.detect_wildcard_permissions,
             "aws-workload-role-sensitive-permissions": iam_detectors.detect_workload_role_sensitive_permissions,
             "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
+            "gcp-project-iam-privileged-role": gcp_detectors.detect_project_iam_privileged_role,
             "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,
             "aws-control-plane-sensitive-workload-chain": (
                 path_chain_detectors.detect_control_plane_sensitive_workload_chain

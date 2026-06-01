@@ -7,6 +7,16 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
 from tfstride.resource_helpers import describe_security_group_rule
 
+_PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
+    "roles/owner": "full project administration",
+    "roles/editor": "broad write access across most project services",
+    "roles/iam.serviceAccountTokenCreator": "service account token minting and impersonation",
+    "roles/iam.serviceAccountUser": "service account attachment and impersonation paths",
+    "roles/iam.serviceAccountAdmin": "service account administration",
+    "roles/iam.securityAdmin": "IAM policy and security-control administration",
+    "roles/resourcemanager.projectIamAdmin": "project IAM policy administration",
+}
+
 
 class GcpRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
@@ -110,6 +120,49 @@ class GcpRuleDetectors:
             )
         return findings
 
+    def detect_project_iam_privileged_role(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for binding in context.inventory.by_type("google_project_iam_member"):
+            binding_facts = analysis_facts(binding)
+            role = binding_facts.iam_role
+            role_risk = _privileged_project_role_risk(role)
+            if role_risk is None:
+                continue
+            member = binding_facts.iam_member or "unknown member"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=2,
+                data_sensitivity=0,
+                lateral_movement=2,
+                blast_radius=2,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[binding.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
+                        f"at project scope. That role enables {role_risk} and can materially expand "
+                        "control-plane blast radius if the principal is compromised or mis-scoped."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                        evidence_item("role_risk", [role_risk]),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _risky_public_firewall_rules(
     instance: NormalizedResource,
@@ -129,6 +182,18 @@ def _risky_public_firewall_rules(
             ):
                 risky_rules.append((firewall, rule))
     return risky_rules
+
+
+def _privileged_project_role_risk(role: str | None) -> str | None:
+    if not role:
+        return None
+    normalized_role = role.strip()
+    if normalized_role in _PRIVILEGED_GCP_PROJECT_ROLES:
+        return _PRIVILEGED_GCP_PROJECT_ROLES[normalized_role]
+    role_name = normalized_role.rsplit("/", 1)[-1].lower()
+    if normalized_role.startswith("roles/") and "admin" in role_name:
+        return "admin-level control over a GCP service or project security surface"
+    return None
 
 
 def _dedupe_addresses(addresses: list[str]) -> list[str]:

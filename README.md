@@ -253,7 +253,7 @@ Current rules include:
 - broad or cross-account control-plane paths that reach workloads with private database or secret access
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
-- public GCP project IAM principals
+- public and high-privilege GCP project IAM principals
 
 Outputs include:
 
@@ -401,7 +401,7 @@ Unsupported resources are skipped and called out in the report.
 
 The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, and `google_storage_bucket`.
 
-GCP trust-boundary detection currently covers basic internet-to-compute exposure. GCP STRIDE rule coverage currently includes public compute broad ingress and broad project IAM principals; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers basic internet-to-compute exposure. GCP STRIDE rule coverage currently includes public compute broad ingress, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 

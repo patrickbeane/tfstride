@@ -238,6 +238,17 @@ DEFAULT_RULE_METADATA = (
         tags=("gcp", "iam", "public-access"),
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="gcp-project-iam-privileged-role",
+        title="GCP project IAM binding grants a high-privilege role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace Owner, Editor, IAM admin, service-account impersonation, and admin-class project roles "
+            "with narrowly scoped predefined or custom roles assigned to specific groups or service accounts."
+        ),
+        tags=("gcp", "iam", "privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
 )
 
 
