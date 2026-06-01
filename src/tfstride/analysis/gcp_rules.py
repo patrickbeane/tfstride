@@ -203,6 +203,96 @@ class GcpRuleDetectors:
             )
         return findings
 
+    def detect_cloud_sql_public_authorized_network(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for database in context.inventory.by_type("google_sql_database_instance"):
+            if not database.public_exposure:
+                continue
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
+            )
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            public_networks = _cloud_sql_public_authorized_networks(database)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{database.display_name} has a public Cloud SQL IPv4 endpoint and an authorized "
+                        "network that allows internet-wide client sources. That weakens the database trust "
+                        "boundary even when database authentication is still required."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("authorized_networks", public_networks),
+                        evidence_item("public_exposure_reasons", database.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloud_sql_backup_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for database in context.inventory.by_type("google_sql_database_instance"):
+            database_facts = analysis_facts(database)
+            if database_facts.cloud_sql_backup_enabled:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            pitr_enabled = database_facts.cloud_sql_point_in_time_recovery_enabled
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{database.display_name} does not have Cloud SQL automated backups enabled. "
+                        "A destructive change, operator error, or data corruption event would have fewer "
+                        "managed recovery points."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "backup_posture",
+                            [
+                                "backup_configuration.enabled is false",
+                                f"point_in_time_recovery_enabled is {str(bool(pitr_enabled)).lower()}",
+                                f"engine is {database_facts.database_engine or 'unknown'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _risky_public_firewall_rules(
     instance: NormalizedResource,
@@ -222,6 +312,17 @@ def _risky_public_firewall_rules(
             ):
                 risky_rules.append((firewall, rule))
     return risky_rules
+
+
+def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[str]:
+    descriptions: list[str] = []
+    for network in analysis_facts(database).cloud_sql_authorized_networks:
+        value = str(network.get("value") or "").strip()
+        if value not in {"0.0.0.0/0", "::/0"}:
+            continue
+        name = str(network.get("name") or "unnamed").strip() or "unnamed"
+        descriptions.append(f"{name} ({value})")
+    return descriptions
 
 
 def _privileged_project_role_risk(role: str | None) -> str | None:

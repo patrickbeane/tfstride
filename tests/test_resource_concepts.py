@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tfstride.analysis.resource_concepts import (
     CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
+    DATABASE_RESOURCE_TYPES,
     DATA_STORE_RESOURCE_TYPES,
     IAM_POLICY_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -69,11 +70,29 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(PUBLIC_COMPUTE_RESOURCE_TYPES, frozenset({"aws_instance", "google_compute_instance"}))
         self.assertEqual(
             DATA_STORE_RESOURCE_TYPES,
-            frozenset({"aws_db_instance", "aws_s3_bucket", "aws_secretsmanager_secret", "google_storage_bucket"}),
+            frozenset(
+                {
+                    "aws_db_instance",
+                    "aws_s3_bucket",
+                    "aws_secretsmanager_secret",
+                    "google_sql_database_instance",
+                    "google_storage_bucket",
+                }
+            ),
         )
         self.assertEqual(
             PUBLIC_EDGE_RESOURCE_TYPES,
-            frozenset({"aws_instance", "aws_lb", "aws_db_instance", "aws_s3_bucket", "google_compute_instance", "google_storage_bucket"}),
+            frozenset(
+                {
+                    "aws_instance",
+                    "aws_lb",
+                    "aws_db_instance",
+                    "aws_s3_bucket",
+                    "google_compute_instance",
+                    "google_sql_database_instance",
+                    "google_storage_bucket",
+                }
+            ),
         )
         self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role", "google_service_account"}))
         self.assertEqual(
@@ -97,6 +116,7 @@ class ResourceConceptTests(unittest.TestCase):
             frozenset({"aws_security_group", "google_compute_firewall"}),
         )
         self.assertEqual(SUBNET_RESOURCE_TYPES, frozenset({"aws_subnet", "google_compute_subnetwork"}))
+        self.assertEqual(DATABASE_RESOURCE_TYPES, frozenset({"aws_db_instance", "google_sql_database_instance"}))
         self.assertEqual(
             CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
             frozenset({"aws_db_instance", "aws_secretsmanager_secret"}),
@@ -131,9 +151,11 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
+        self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
+        self.assertTrue(is_public_edge_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
@@ -146,6 +168,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_subnet_resource(_resource("aws_subnet")))
         self.assertTrue(is_subnet_resource(_resource("google_compute_subnetwork", provider="gcp")))
         self.assertTrue(is_database_resource(_resource("aws_db_instance")))
+        self.assertTrue(is_database_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_object_storage_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_object_storage_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))

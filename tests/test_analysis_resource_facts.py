@@ -60,6 +60,18 @@ class FakeProviderFacts:
         return ["google_storage_bucket_iam_binding.logs"]
 
     @property
+    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+        return [{"name": "anywhere", "value": "0.0.0.0/0"}]
+
+    @property
+    def cloud_sql_backup_enabled(self) -> bool | None:
+        return False
+
+    @property
+    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+        return True
+
+    @property
     def service_account_email(self) -> str | None:
         return "fake@example.iam.gserviceaccount.com"
 
@@ -96,6 +108,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.database_engine, "postgres")
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
+        self.assertEqual(facts.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.cloud_sql_backup_enabled)
+        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
@@ -124,9 +139,33 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.database_engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertEqual(facts.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.cloud_sql_backup_enabled)
+        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
+
+    def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.DATABASE_VERSION.key: "POSTGRES_15",
+                GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS.key: [
+                    {"name": "anywhere", "value": "0.0.0.0/0"}
+                ],
+                GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED.key: False,
+                GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED.key: True,
+            },
+            provider="gcp",
+            resource_type="google_sql_database_instance",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.database_engine, "POSTGRES_15")
+        self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
+        self.assertFalse(facts.cloud_sql_backup_enabled)
+        self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
 
     def test_gcp_service_account_facts_read_provider_owned_identity_metadata(self) -> None:
         resource = _resource(
@@ -172,6 +211,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             facts.resource_policy_source_addresses,
             ["google_storage_bucket_iam_binding.logs"],
         )
+        self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
+        self.assertFalse(facts.cloud_sql_backup_enabled)
+        self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
         self.assertEqual(facts.service_account_email, "fake@example.iam.gserviceaccount.com")
         self.assertEqual(facts.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
         self.assertEqual(facts.service_account_reference, "google_service_account.fake.email")

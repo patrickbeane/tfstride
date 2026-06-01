@@ -8,7 +8,7 @@ from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
-from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
+from tfstride.providers.gcp.data_normalizers import normalize_sql_database_instance, normalize_storage_bucket
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_project_iam_member,
     normalize_service_account,
@@ -151,6 +151,67 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.data_sensitivity, "sensitive")
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
+
+    def test_sql_database_instance_normalizer_preserves_database_posture(self) -> None:
+        normalized = normalize_sql_database_instance(self.resources["google_sql_database_instance.app"])
+
+        self.assertEqual(normalized.category, ResourceCategory.DATA)
+        self.assertEqual(normalized.identifier, "tfstride-app-db")
+        self.assertEqual(normalized.data_sensitivity, "sensitive")
+        self.assertTrue(normalized.public_access_configured)
+        self.assertTrue(normalized.public_exposure)
+        self.assertTrue(normalized.direct_internet_reachable)
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.DATABASE_VERSION), "POSTGRES_15")
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
+        self.assertFalse(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS),
+            [{"name": "anywhere", "value": "0.0.0.0/0"}],
+        )
+        self.assertEqual(
+            normalized.public_exposure_reasons,
+            ["authorized network `anywhere` allows 0.0.0.0/0"],
+        )
+
+    def test_sql_database_instance_normalizer_handles_private_backed_up_instance(self) -> None:
+        normalized = normalize_sql_database_instance(
+            _terraform_resource(
+                "google_sql_database_instance.private",
+                "google_sql_database_instance",
+                {
+                    "name": "private-db",
+                    "database_version": "MYSQL_8_0",
+                    "settings": [
+                        {
+                            "backup_configuration": [
+                                {
+                                    "enabled": True,
+                                    "point_in_time_recovery_enabled": True,
+                                }
+                            ],
+                            "ip_configuration": [
+                                {
+                                    "ipv4_enabled": False,
+                                    "private_network": "google_compute_network.main.id",
+                                    "authorized_networks": [],
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertFalse(normalized.public_access_configured)
+        self.assertFalse(normalized.public_exposure)
+        self.assertFalse(normalized.direct_internet_reachable)
+        self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
+        self.assertTrue(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
+        )
 
     def test_service_account_normalizer_preserves_identity_context(self) -> None:
         normalized = normalize_service_account(self.resources["google_service_account.web"])

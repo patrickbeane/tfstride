@@ -801,7 +801,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 2, {"medium": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 4, {"high": 1, "medium": 3}),
         }
 
         expected_titles = {
@@ -832,6 +832,8 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Object storage is publicly accessible": 2,
             },
             "gcp-inventory": {
+                "Cloud SQL automated backups are disabled": 1,
+                "Cloud SQL instance accepts public authorized network access": 1,
                 "GCS bucket is publicly accessible": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
             },
@@ -851,23 +853,29 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 9)
+        self.assertEqual(len(result.inventory.resources), 10)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 9)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 9)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 10)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 10)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 2)
+        self.assertEqual(len(result.findings), 4)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
         self.assertEqual(
             finding.affected_resources,
-            ["google_compute_instance.web", "google_compute_firewall.public_ssh"]
+            ["google_compute_instance.web", "google_compute_firewall.public_ssh"],
         )
         gcs_finding = findings_by_rule["gcp-gcs-public-access"]
         self.assertEqual(gcs_finding.severity, Severity.MEDIUM)
         self.assertEqual(gcs_finding.affected_resources, ["google_storage_bucket.logs"])
-        self.assertEqual(len(result.trust_boundaries), 2)
+        cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]
+        self.assertEqual(cloud_sql_public_finding.severity, Severity.HIGH)
+        self.assertEqual(cloud_sql_public_finding.affected_resources, ["google_sql_database_instance.app"])
+        cloud_sql_backup_finding = findings_by_rule["gcp-cloud-sql-backup-disabled"]
+        self.assertEqual(cloud_sql_backup_finding.severity, Severity.MEDIUM)
+        self.assertEqual(cloud_sql_backup_finding.affected_resources, ["google_sql_database_instance.app"])
+        self.assertEqual(len(result.trust_boundaries), 3)
         boundaries_by_target = {boundary.target: boundary for boundary in result.trust_boundaries}
         boundary = boundaries_by_target["google_compute_instance.web"]
         self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -877,6 +885,11 @@ class TFSAnalysisTests(unittest.TestCase):
             gcs_finding.trust_boundary_id,
             boundaries_by_target["google_storage_bucket.logs"].identifier,
         )
+        self.assertEqual(
+            cloud_sql_public_finding.trust_boundary_id,
+            boundaries_by_target["google_sql_database_instance.app"].identifier,
+        )
+        self.assertIsNone(cloud_sql_backup_finding.trust_boundary_id)
 
     def test_unconstrained_cross_account_trust_without_narrowing_conditions_is_detected(self) -> None:
         result = self.engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)

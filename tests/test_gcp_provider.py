@@ -65,6 +65,7 @@ class GcpProviderTests(unittest.TestCase):
         )
         self.assertTrue(plugin.supports_resource_type("google_service_account"))
         self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
+        self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
@@ -89,6 +90,17 @@ class GcpProviderTests(unittest.TestCase):
                 "IAM_MEMBERS",
                 "IAM_BINDINGS",
                 "BUCKET_NAME",
+                "DATABASE_VERSION",
+                "CLOUD_SQL_PRIVATE_NETWORK",
+                "CLOUD_SQL_SSL_MODE",
+                "CLOUD_SQL_IPV4_ENABLED",
+                "CLOUD_SQL_BACKUP_ENABLED",
+                "CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED",
+                "CLOUD_SQL_REQUIRE_SSL",
+                "CLOUD_SQL_AUTHORIZED_NETWORKS",
+                "CLOUD_SQL_BACKUP_CONFIGURATION",
+                "CLOUD_SQL_IP_CONFIGURATION",
+                "DELETION_PROTECTION",
                 "SERVICE_ACCOUNT_ACCOUNT_ID",
                 "SERVICE_ACCOUNT_EMAIL",
                 "SERVICE_ACCOUNT_MEMBER",
@@ -111,6 +123,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertEqual(facts.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.cloud_sql_backup_enabled)
+        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
         self.assertEqual(facts.network_tags, [])
         self.assertEqual(facts.internet_ingress_firewalls, [])
         self.assertIsNone(facts.iam_role)

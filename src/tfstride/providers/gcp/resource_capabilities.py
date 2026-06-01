@@ -9,10 +9,11 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
     {
         ResourceCapability.WORKLOAD: frozenset({"google_compute_instance"}),
         ResourceCapability.PUBLIC_COMPUTE: frozenset({"google_compute_instance"}),
-        ResourceCapability.DATA_STORE: frozenset({"google_storage_bucket"}),
+        ResourceCapability.DATA_STORE: frozenset({"google_sql_database_instance", "google_storage_bucket"}),
         ResourceCapability.PUBLIC_EDGE: frozenset(
             {
                 "google_compute_instance",
+                "google_sql_database_instance",
                 "google_storage_bucket",
             }
         ),
@@ -30,6 +31,7 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ),
         ResourceCapability.NETWORK_SECURITY_GROUP: frozenset({"google_compute_firewall"}),
         ResourceCapability.SUBNET: frozenset({"google_compute_subnetwork"}),
+        ResourceCapability.DATABASE: frozenset({"google_sql_database_instance"}),
         ResourceCapability.OBJECT_STORAGE: frozenset({"google_storage_bucket"}),
     }
 )

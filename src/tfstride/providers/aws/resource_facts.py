@@ -31,6 +31,18 @@ class AwsResourceFacts:
         self.resource.extend_metadata_field(field, values)
 
     @property
+    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def cloud_sql_backup_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+        return None
+
+    @property
     def service_account_email(self) -> str | None:
         return None
 

@@ -39,6 +39,18 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @property
+    def cloud_sql_backup_enabled(self) -> bool | None:
+        raise NotImplementedError
+
+    @property
+    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+        raise NotImplementedError
+
+    @property
     def service_account_email(self) -> str | None:
         raise NotImplementedError
 
@@ -111,6 +123,18 @@ class NeutralProviderResourceFacts:
     @property
     def resource_policy_source_addresses(self) -> list[str]:
         return []
+
+    @property
+    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def cloud_sql_backup_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+        return None
 
     @property
     def service_account_email(self) -> str | None:

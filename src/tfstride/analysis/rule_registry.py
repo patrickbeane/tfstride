@@ -218,6 +218,28 @@ DEFAULT_RULE_METADATA = (
     ),
 
     RuleMetadata(
+        rule_id="gcp-cloud-sql-public-authorized-network",
+        title="Cloud SQL instance accepts public authorized network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public IPv4 access where possible, use private IP connectivity or the Cloud SQL Auth Proxy, "
+            "and restrict authorized networks to narrow CIDRs when public client access is required."
+        ),
+        tags=("gcp", "cloud-sql", "database", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-backup-disabled",
+        title="Cloud SQL automated backups are disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable automated backups for Cloud SQL instances, configure retention appropriate to the workload, "
+            "and enable point-in-time recovery where supported."
+        ),
+        tags=("gcp", "cloud-sql", "database", "backup"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gcs-public-access",
         title="GCS bucket is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -22,6 +22,9 @@ class NetworkDataRuleDetectors:
         context: RuleEvaluationContext,
         rule_id: str,
     ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index
@@ -145,6 +148,9 @@ class NetworkDataRuleDetectors:
         context: RuleEvaluationContext,
         rule_id: str,
     ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index

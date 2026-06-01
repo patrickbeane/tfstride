@@ -122,6 +122,46 @@
           }
         },
         {
+          "address": "google_sql_database_instance.app",
+          "mode": "managed",
+          "type": "google_sql_database_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app-db",
+            "database_version": "POSTGRES_15",
+            "region": "us-central1",
+            "project": "tfstride-demo",
+            "settings": [
+              {
+                "tier": "db-f1-micro",
+                "availability_type": "ZONAL",
+                "disk_size": 20,
+                "disk_type": "PD_SSD",
+                "backup_configuration": [
+                  {
+                    "enabled": false,
+                    "point_in_time_recovery_enabled": false
+                  }
+                ],
+                "ip_configuration": [
+                  {
+                    "ipv4_enabled": true,
+                    "require_ssl": false,
+                    "authorized_networks": [
+                      {
+                        "name": "anywhere",
+                        "value": "0.0.0.0/0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "deletion_protection": false
+          }
+        },
+        {
           "address": "google_storage_bucket.logs",
           "mode": "managed",
           "type": "google_storage_bucket",

@@ -7,7 +7,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
-from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
+from tfstride.providers.gcp.data_normalizers import normalize_sql_database_instance, normalize_storage_bucket
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_project_iam_member,
     normalize_service_account,
@@ -42,6 +42,7 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_service_account_iam_member": normalize_service_account_iam_member,
     "google_service_account_iam_policy": normalize_service_account_iam_policy,
     "google_service_account_key": normalize_service_account_key,
+    "google_sql_database_instance": normalize_sql_database_instance,
     "google_storage_bucket": normalize_storage_bucket,
     "google_storage_bucket_iam_binding": normalize_storage_bucket_iam_binding,
     "google_storage_bucket_iam_member": normalize_storage_bucket_iam_member,

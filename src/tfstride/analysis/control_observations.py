@@ -118,6 +118,9 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
 
 
 def _observe_private_encrypted_databases(inventory: ResourceInventory) -> list[Observation]:
+    if inventory.provider != "aws":
+        return []
+
     observations: list[Observation] = []
     for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
         if not database.storage_encrypted:

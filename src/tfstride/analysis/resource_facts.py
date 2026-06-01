@@ -64,6 +64,18 @@ class AnalysisResourceFacts:
         return self._facts.resource_policy_source_addresses
 
     @property
+    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+        return self._facts.cloud_sql_authorized_networks
+
+    @property
+    def cloud_sql_backup_enabled(self) -> bool | None:
+        return self._facts.cloud_sql_backup_enabled
+
+    @property
+    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+        return self._facts.cloud_sql_point_in_time_recovery_enabled
+
+    @property
     def service_account_email(self) -> str | None:
         return self._facts.service_account_email
 
