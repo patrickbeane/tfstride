@@ -34,6 +34,12 @@ class GcpResourceMetadata:
     SERVICE_ACCOUNT_UNIQUE_ID = OptionalStringMetadataField("service_account_unique_id")
     SERVICE_ACCOUNT_KEY_ALGORITHM = OptionalStringMetadataField("service_account_key_algorithm")
     SERVICE_ACCOUNT_PUBLIC_KEY_TYPE = OptionalStringMetadataField("service_account_public_key_type")
+    SECRET_ID = OptionalStringMetadataField("secret_id")
+    SECRET_REFERENCE = OptionalStringMetadataField("secret_reference")
+    KMS_CRYPTO_KEY_REFERENCE = OptionalStringMetadataField("kms_crypto_key_reference")
+    KMS_KEY_RING = OptionalStringMetadataField("kms_key_ring")
+    KMS_PURPOSE = OptionalStringMetadataField("kms_purpose")
+    KMS_ROTATION_PERIOD = OptionalStringMetadataField("kms_rotation_period")
     PUBLIC_ACCESS_PREVENTION = OptionalStringMetadataField("public_access_prevention")
 
     AUTO_CREATE_SUBNETWORKS = BoolMetadataField("auto_create_subnetworks")
@@ -48,6 +54,7 @@ class GcpResourceMetadata:
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
     IAM_MEMBERS = StringListMetadataField("iam_members")
+    RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("gcp_resource_policy_source_addresses")
     INTERNET_INGRESS_FIREWALLS = StringListMetadataField("internet_ingress_firewalls")
     FIREWALL_SOURCE_RANGES = StringListMetadataField("source_ranges")
     FIREWALL_DESTINATION_RANGES = StringListMetadataField("destination_ranges")

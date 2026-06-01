@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 19,
+      "registered_rule_count": 20,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -52,6 +52,7 @@
         "aws-control-plane-sensitive-workload-chain",
         "aws-role-trust-expansion",
         "aws-role-trust-missing-narrowing",
+        "gcp-sensitive-resource-iam-external-access",
         "gcp-cloud-sql-public-authorized-network",
         "gcp-cloud-sql-backup-disabled",
         "gcp-gcs-public-access",
@@ -75,6 +76,7 @@
         "aws-control-plane-sensitive-workload-chain": 0,
         "aws-role-trust-expansion": 1,
         "aws-role-trust-missing-narrowing": 1,
+        "gcp-sensitive-resource-iam-external-access": 0,
         "gcp-cloud-sql-public-authorized-network": 0,
         "gcp-cloud-sql-backup-disabled": 0,
         "gcp-gcs-public-access": 0,

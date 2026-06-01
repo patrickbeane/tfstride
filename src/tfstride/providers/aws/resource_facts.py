@@ -31,6 +31,14 @@ class AwsResourceFacts:
         self.resource.extend_metadata_field(field, values)
 
     @property
+    def project(self) -> str | None:
+        return None
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return []
 

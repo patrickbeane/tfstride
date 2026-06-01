@@ -162,6 +162,71 @@
           }
         },
         {
+          "address": "google_secret_manager_secret.api_key",
+          "mode": "managed",
+          "type": "google_secret_manager_secret",
+          "name": "api_key",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "secret_id": "tfstride-api-key",
+            "name": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "id": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "project": "tfstride-demo",
+            "replication": [
+              {
+                "auto": [
+                  {}
+                ]
+              }
+            ],
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_secret_manager_secret_iam_member.public_accessor",
+          "mode": "managed",
+          "type": "google_secret_manager_secret_iam_member",
+          "name": "public_accessor",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "project": "tfstride-demo",
+            "secret_id": "google_secret_manager_secret.api_key.id",
+            "role": "roles/secretmanager.secretAccessor",
+            "member": "allAuthenticatedUsers"
+          }
+        },
+        {
+          "address": "google_kms_crypto_key.customer",
+          "mode": "managed",
+          "type": "google_kms_crypto_key",
+          "name": "customer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-customer-key",
+            "id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
+            "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+            "purpose": "ENCRYPT_DECRYPT",
+            "rotation_period": "7776000s",
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_kms_crypto_key_iam_member.partner_decrypter",
+          "mode": "managed",
+          "type": "google_kms_crypto_key_iam_member",
+          "name": "partner_decrypter",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "crypto_key_id": "google_kms_crypto_key.customer.id",
+            "role": "roles/cloudkms.cryptoKeyDecrypter",
+            "member": "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"
+          }
+        },
+        {
           "address": "google_storage_bucket.logs",
           "mode": "managed",
           "type": "google_storage_bucket",

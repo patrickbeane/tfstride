@@ -65,6 +65,10 @@ class GcpProviderTests(unittest.TestCase):
         )
         self.assertTrue(plugin.supports_resource_type("google_service_account"))
         self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
+        self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret"))
+        self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret_iam_member"))
+        self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key"))
+        self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key_iam_member"))
         self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
@@ -101,6 +105,13 @@ class GcpProviderTests(unittest.TestCase):
                 "CLOUD_SQL_BACKUP_CONFIGURATION",
                 "CLOUD_SQL_IP_CONFIGURATION",
                 "DELETION_PROTECTION",
+                "SECRET_ID",
+                "SECRET_REFERENCE",
+                "KMS_CRYPTO_KEY_REFERENCE",
+                "KMS_KEY_RING",
+                "KMS_PURPOSE",
+                "KMS_ROTATION_PERIOD",
+                "RESOURCE_POLICY_SOURCE_ADDRESSES",
                 "SERVICE_ACCOUNT_ACCOUNT_ID",
                 "SERVICE_ACCOUNT_EMAIL",
                 "SERVICE_ACCOUNT_MEMBER",
@@ -123,6 +134,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.project)
+        self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)

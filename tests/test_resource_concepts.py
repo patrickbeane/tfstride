@@ -75,6 +75,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "aws_db_instance",
                     "aws_s3_bucket",
                     "aws_secretsmanager_secret",
+                    "google_secret_manager_secret",
                     "google_sql_database_instance",
                     "google_storage_bucket",
                 }
@@ -101,7 +102,13 @@ class ResourceConceptTests(unittest.TestCase):
                 {
                     "aws_iam_policy",
                     "aws_iam_role",
+                    "google_kms_crypto_key_iam_binding",
+                    "google_kms_crypto_key_iam_member",
+                    "google_kms_crypto_key_iam_policy",
                     "google_project_iam_member",
+                    "google_secret_manager_secret_iam_binding",
+                    "google_secret_manager_secret_iam_member",
+                    "google_secret_manager_secret_iam_policy",
                     "google_service_account_iam_binding",
                     "google_service_account_iam_member",
                     "google_service_account_iam_policy",
@@ -119,16 +126,25 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(DATABASE_RESOURCE_TYPES, frozenset({"aws_db_instance", "google_sql_database_instance"}))
         self.assertEqual(
             CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
-            frozenset({"aws_db_instance", "aws_secretsmanager_secret"}),
+            frozenset({"aws_db_instance", "aws_secretsmanager_secret", "google_secret_manager_secret"}),
         )
         self.assertEqual(
             OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES,
             frozenset({"aws_s3_bucket_public_access_block"}),
         )
-        self.assertEqual(KEY_MANAGEMENT_RESOURCE_TYPES, frozenset({"aws_kms_key"}))
+        self.assertEqual(KEY_MANAGEMENT_RESOURCE_TYPES, frozenset({"aws_kms_key", "google_kms_crypto_key"}))
         self.assertEqual(
             SENSITIVE_RESOURCE_POLICY_RESOURCE_TYPES,
-            frozenset({"aws_s3_bucket", "aws_kms_key", "aws_secretsmanager_secret"}),
+            frozenset(
+                {
+                    "aws_s3_bucket",
+                    "aws_kms_key",
+                    "aws_secretsmanager_secret",
+                    "google_kms_crypto_key",
+                    "google_secret_manager_secret",
+                    "google_storage_bucket",
+                }
+            ),
         )
         self.assertEqual(
             SERVICE_RESOURCE_POLICY_RESOURCE_TYPES,
@@ -151,6 +167,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
+        self.assertTrue(is_data_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
@@ -160,7 +177,9 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_kms_crypto_key_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_secret_manager_secret_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_service_account_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_storage_bucket_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
@@ -172,9 +191,13 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_object_storage_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_object_storage_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))
+        self.assertTrue(is_secret_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_db_instance")))
         self.assertTrue(
             is_control_plane_sensitive_data_store(_resource("aws_secretsmanager_secret"))
+        )
+        self.assertTrue(
+            is_control_plane_sensitive_data_store(_resource("google_secret_manager_secret", provider="gcp"))
         )
         self.assertTrue(
             is_object_storage_public_access_control_resource(
@@ -182,6 +205,7 @@ class ResourceConceptTests(unittest.TestCase):
             )
         )
         self.assertTrue(is_key_management_resource(_resource("aws_kms_key")))
+        self.assertTrue(is_key_management_resource(_resource("google_kms_crypto_key", provider="gcp")))
         self.assertTrue(
             has_provider_managed_egress_without_vpc(
                 _resource("aws_lambda_function", metadata={"vpc_enabled": False})

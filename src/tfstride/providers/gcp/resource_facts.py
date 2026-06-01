@@ -39,6 +39,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.BUCKET_NAME)
 
     @property
+    def resource_policy_source_addresses(self) -> list[str]:
+        return self.get(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
+
+    @property
+    def project(self) -> str | None:
+        return self.get(GcpResourceMetadata.PROJECT)
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.IAM_BINDINGS)
+
+    @property
     def engine(self) -> str | None:
         return self.get(GcpResourceMetadata.DATABASE_VERSION)
 

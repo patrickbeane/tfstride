@@ -60,6 +60,14 @@ class FakeProviderFacts:
         return ["google_storage_bucket_iam_binding.logs"]
 
     @property
+    def project(self) -> str | None:
+        return "tfstride-demo"
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
+        return [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return [{"name": "anywhere", "value": "0.0.0.0/0"}]
 
@@ -108,6 +116,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.database_engine, "postgres")
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
+        self.assertIsNone(facts.project)
+        self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
@@ -139,12 +149,51 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.database_engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.project)
+        self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
+
+    def test_gcp_sensitive_resource_facts_read_provider_owned_iam_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.PROJECT.key: "tfstride-demo",
+                GcpResourceMetadata.IAM_BINDINGS.key: [
+                    {
+                        "role": "roles/secretmanager.secretAccessor",
+                        "members": ["allAuthenticatedUsers"],
+                        "source": "google_secret_manager_secret_iam_member.public_accessor",
+                    }
+                ],
+                GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES.key: [
+                    "google_secret_manager_secret_iam_member.public_accessor"
+                ],
+            },
+            provider="gcp",
+            resource_type="google_secret_manager_secret",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.project, "tfstride-demo")
+        self.assertEqual(
+            facts.iam_bindings,
+            [
+                {
+                    "role": "roles/secretmanager.secretAccessor",
+                    "members": ["allAuthenticatedUsers"],
+                    "source": "google_secret_manager_secret_iam_member.public_accessor",
+                }
+            ],
+        )
+        self.assertEqual(
+            facts.resource_policy_source_addresses,
+            ["google_secret_manager_secret_iam_member.public_accessor"],
+        )
 
     def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
         resource = _resource(
@@ -211,6 +260,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             facts.resource_policy_source_addresses,
             ["google_storage_bucket_iam_binding.logs"],
         )
+        self.assertEqual(facts.project, "tfstride-demo")
+        self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
         self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
         self.assertFalse(facts.cloud_sql_backup_enabled)
         self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)

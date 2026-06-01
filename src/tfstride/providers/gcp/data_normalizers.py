@@ -35,6 +35,72 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
     )
 
 
+def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    secret_id = first_non_empty(values.get("secret_id"), values.get("name"), resource.name)
+    project = first_non_empty(
+        values.get("project"),
+        _project_from_resource_path(values.get("name")),
+        _project_from_resource_path(values.get("id")),
+    )
+    name = first_non_empty(values.get("name"), _secret_resource_name(project, secret_id))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=first_non_empty(values.get("id"), name, secret_id, resource.address),
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.SECRET_ID.key: secret_id,
+            GcpResourceMetadata.PROJECT.key: project,
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "annotations": values.get("annotations") or {},
+            "replication": as_list(values.get("replication")),
+            "topics": as_list(values.get("topics")),
+            "expire_time": values.get("expire_time"),
+            "ttl": values.get("ttl"),
+            "version_destroy_ttl": values.get("version_destroy_ttl"),
+            "storage_encrypted": True,
+        },
+    )
+
+
+def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    key_ring = first_non_empty(values.get("key_ring"))
+    name = first_non_empty(values.get("name"), resource.name)
+    identifier = first_non_empty(values.get("id"), values.get("self_link"), name, resource.address)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=identifier,
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+            GcpResourceMetadata.PROJECT.key: first_non_empty(
+                values.get("project"),
+                _project_from_resource_path(key_ring),
+            ),
+            GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE.key: identifier,
+            GcpResourceMetadata.KMS_KEY_RING.key: key_ring,
+            GcpResourceMetadata.KMS_PURPOSE.key: values.get("purpose"),
+            GcpResourceMetadata.KMS_ROTATION_PERIOD.key: values.get("rotation_period"),
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "destroy_scheduled_duration": values.get("destroy_scheduled_duration"),
+            "import_only": as_bool(values.get("import_only", False)),
+            "skip_initial_version_creation": as_bool(values.get("skip_initial_version_creation", False)),
+            "storage_encrypted": True,
+        },
+    )
+
+
 def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     settings = first_item(values.get("settings")) or {}
@@ -96,6 +162,26 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
     normalized.internet_ingress_capable = public_exposure
     normalized.internet_ingress_reasons = public_exposure_reasons
     return normalized
+
+
+def _secret_resource_name(project: object, secret_id: str | None) -> str | None:
+    if not project or not secret_id:
+        return None
+    return f"projects/{project}/secrets/{secret_id}"
+
+
+def _project_from_resource_path(value: object) -> str | None:
+    text = first_non_empty(value)
+    if text is None:
+        return None
+    parts = text.split("/")
+    try:
+        project_index = parts.index("projects") + 1
+    except ValueError:
+        return None
+    if project_index >= len(parts):
+        return None
+    return first_non_empty(parts[project_index])
 
 
 def _authorized_networks(ip_configuration: dict[str, Any]) -> list[dict[str, Any]]:

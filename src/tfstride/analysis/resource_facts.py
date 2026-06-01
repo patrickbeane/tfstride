@@ -64,6 +64,14 @@ class AnalysisResourceFacts:
         return self._facts.resource_policy_source_addresses
 
     @property
+    def project(self) -> str | None:
+        return self._facts.project
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
+        return self._facts.iam_bindings
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return self._facts.cloud_sql_authorized_networks
 

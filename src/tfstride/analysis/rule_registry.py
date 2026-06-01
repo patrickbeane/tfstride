@@ -218,6 +218,17 @@ DEFAULT_RULE_METADATA = (
     ),
 
     RuleMetadata(
+        rule_id="gcp-sensitive-resource-iam-external-access",
+        title="Sensitive GCP resource IAM binding allows broad or external access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant Secret Manager and Cloud KMS IAM roles only to specific in-project service accounts or groups, "
+            "remove public principals, and require explicit cross-project access reviews for partner identities."
+        ),
+        tags=("gcp", "iam", "secret-manager", "kms", "resource-policy"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-sql-public-authorized-network",
         title="Cloud SQL instance accepts public authorized network access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

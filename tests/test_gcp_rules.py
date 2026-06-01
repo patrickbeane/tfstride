@@ -98,6 +98,74 @@ def _cloud_sql_instance(
     )
 
 
+def _secret_manager_secret(project: str = "tfstride-demo") -> TerraformResource:
+    return TerraformResource(
+        address="google_secret_manager_secret.api_key",
+        mode="managed",
+        resource_type="google_secret_manager_secret",
+        name="api_key",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "secret_id": "tfstride-api-key",
+            "id": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "project": project,
+            "replication": [{"auto": [{}]}],
+        },
+    )
+
+
+def _secret_manager_secret_iam_member(
+    member: str = "allAuthenticatedUsers",
+    role: str = "roles/secretmanager.secretAccessor",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_secret_manager_secret_iam_member.public_accessor",
+        mode="managed",
+        resource_type="google_secret_manager_secret_iam_member",
+        name="public_accessor",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "secret_id": "google_secret_manager_secret.api_key.id",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
+def _kms_crypto_key() -> TerraformResource:
+    return TerraformResource(
+        address="google_kms_crypto_key.customer",
+        mode="managed",
+        resource_type="google_kms_crypto_key",
+        name="customer",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-customer-key",
+            "id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
+            "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+            "purpose": "ENCRYPT_DECRYPT",
+        },
+    )
+
+
+def _kms_crypto_key_iam_member(
+    member: str = "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+    role: str = "roles/cloudkms.cryptoKeyDecrypter",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_kms_crypto_key_iam_member.partner_decrypter",
+        mode="managed",
+        resource_type="google_kms_crypto_key_iam_member",
+        name="partner_decrypter",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "crypto_key_id": "google_kms_crypto_key.customer.id",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
 class GcpRuleTests(unittest.TestCase):
     def test_gcs_public_bucket_iam_member_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_storage_bucket(), _storage_bucket_iam_member()])
@@ -215,6 +283,69 @@ class GcpRuleTests(unittest.TestCase):
                     pitr_enabled=True,
                     private_network="google_compute_network.main.id",
                 )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(findings, [])
+
+
+    def test_sensitive_secret_public_iam_binding_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_secret_manager_secret(), _secret_manager_secret_iam_member()]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-sensitive-resource-iam-external-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret_iam_member.public_accessor",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_secret_manager_secret_iam_member.public_accessor",
+                "role=roles/secretmanager.secretAccessor",
+                "member=allAuthenticatedUsers",
+            ],
+        )
+        self.assertEqual(evidence["trust_scope"], ["member is public GCP principal `allAuthenticatedUsers`"])
+
+    def test_sensitive_kms_foreign_service_account_binding_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_kms_crypto_key(), _kms_crypto_key_iam_member()])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-sensitive-resource-iam-external-access")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_kms_crypto_key.customer", "google_kms_crypto_key_iam_member.partner_decrypter"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["trust_scope"],
+            ["service account belongs to project `partner-project`, outside resource project `tfstride-demo`"],
+        )
+
+    def test_sensitive_same_project_service_account_binding_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _kms_crypto_key(),
+                _kms_crypto_key_iam_member(
+                    member="serviceAccount:decryptor@tfstride-demo.iam.gserviceaccount.com"
+                ),
             ]
         )
 

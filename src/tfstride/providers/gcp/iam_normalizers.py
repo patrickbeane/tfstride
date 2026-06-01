@@ -216,6 +216,141 @@ def normalize_storage_bucket_iam_policy(resource: TerraformResource) -> Normaliz
     )
 
 
+def normalize_secret_manager_secret_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.SECRET_REFERENCE,
+        target_keys=("secret_id", "secret"),
+    )
+
+
+def normalize_secret_manager_secret_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.SECRET_REFERENCE,
+        target_keys=("secret_id", "secret"),
+    )
+
+
+def normalize_secret_manager_secret_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.SECRET_REFERENCE,
+        target_keys=("secret_id", "secret"),
+    )
+
+
+def normalize_kms_crypto_key_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE,
+        target_keys=("crypto_key_id", "crypto_key"),
+    )
+
+
+def normalize_kms_crypto_key_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE,
+        target_keys=("crypto_key_id", "crypto_key"),
+    )
+
+
+def normalize_kms_crypto_key_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE,
+        target_keys=("crypto_key_id", "crypto_key"),
+    )
+
+
+def _normalize_target_iam_member(
+    resource: TerraformResource,
+    *,
+    target_field: Any,
+    target_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    target_reference = _target_reference(values, target_keys)
+    role = first_non_empty(values.get("role"))
+    member = first_non_empty(values.get("member"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), _binding_identifier(target_reference, role, [member]), resource.address),
+        metadata={
+            target_field.key: target_reference,
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBER.key: member,
+            GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def _normalize_target_iam_binding(
+    resource: TerraformResource,
+    *,
+    target_field: Any,
+    target_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    target_reference = _target_reference(values, target_keys)
+    role = first_non_empty(values.get("role"))
+    members = compact(as_list(values.get("members")))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), _binding_identifier(target_reference, role, members), resource.address),
+        metadata={
+            target_field.key: target_reference,
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBERS.key: members,
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def _normalize_target_iam_policy(
+    resource: TerraformResource,
+    *,
+    target_field: Any,
+    target_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    target_reference = _target_reference(values, target_keys)
+    policy_document = load_json_document(values.get("policy_data"))
+    bindings = _policy_bindings(policy_document)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), target_reference, resource.address),
+        metadata={
+            target_field.key: target_reference,
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.IAM_BINDINGS.key: bindings,
+            "policy_document": policy_document,
+        },
+    )
+
+
+def _target_reference(values: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    return first_non_empty(*(values.get(key) for key in keys))
+
+
 def _policy_bindings(policy_document: dict[str, Any]) -> list[dict[str, Any]]:
     bindings: list[dict[str, Any]] = []
     for binding in as_list(policy_document.get("bindings")):

@@ -39,6 +39,14 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def project(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -122,6 +130,14 @@ class NeutralProviderResourceFacts:
 
     @property
     def resource_policy_source_addresses(self) -> list[str]:
+        return []
+
+    @property
+    def project(self) -> str | None:
+        return None
+
+    @property
+    def iam_bindings(self) -> list[dict[str, Any]]:
         return []
 
     @property

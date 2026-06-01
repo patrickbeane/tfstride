@@ -203,7 +203,7 @@ The repo includes several ready-to-run Terraform plan fixtures:
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the initial compute, network, IAM, Cloud SQL, and storage inventory set
+- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the initial compute, network, IAM, Cloud SQL, Secret Manager, Cloud KMS, and storage inventory set
 - `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
@@ -255,6 +255,7 @@ Current rules include:
 - cross-account or broad trust without narrowing conditions
 - public and high-privilege GCP project IAM principals
 - public Cloud SQL authorized networks and disabled Cloud SQL backups
+- broad or external GCP IAM access to Secret Manager secrets and Cloud KMS keys
 
 Outputs include:
 
@@ -400,9 +401,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## GCP Support
 
-The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
+The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
 
-GCP trust-boundary detection currently covers basic internet-to-service exposure for public compute, Cloud SQL, and GCS buckets. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks and backup posture, public GCS bucket access, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers basic internet-to-service exposure for public compute, Cloud SQL, and GCS buckets. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks and backup posture, public GCS bucket access, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 

@@ -7,9 +7,20 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
-from tfstride.providers.gcp.data_normalizers import normalize_sql_database_instance, normalize_storage_bucket
+from tfstride.providers.gcp.data_normalizers import (
+    normalize_kms_crypto_key,
+    normalize_secret_manager_secret,
+    normalize_sql_database_instance,
+    normalize_storage_bucket,
+)
 from tfstride.providers.gcp.iam_normalizers import (
+    normalize_kms_crypto_key_iam_binding,
+    normalize_kms_crypto_key_iam_member,
+    normalize_kms_crypto_key_iam_policy,
     normalize_project_iam_member,
+    normalize_secret_manager_secret_iam_binding,
+    normalize_secret_manager_secret_iam_member,
+    normalize_secret_manager_secret_iam_policy,
     normalize_service_account,
     normalize_service_account_iam_binding,
     normalize_service_account_iam_member,
@@ -36,7 +47,15 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_compute_instance": normalize_compute_instance,
     "google_compute_network": normalize_compute_network,
     "google_compute_subnetwork": normalize_compute_subnetwork,
+    "google_kms_crypto_key": normalize_kms_crypto_key,
+    "google_kms_crypto_key_iam_binding": normalize_kms_crypto_key_iam_binding,
+    "google_kms_crypto_key_iam_member": normalize_kms_crypto_key_iam_member,
+    "google_kms_crypto_key_iam_policy": normalize_kms_crypto_key_iam_policy,
     "google_project_iam_member": normalize_project_iam_member,
+    "google_secret_manager_secret": normalize_secret_manager_secret,
+    "google_secret_manager_secret_iam_binding": normalize_secret_manager_secret_iam_binding,
+    "google_secret_manager_secret_iam_member": normalize_secret_manager_secret_iam_member,
+    "google_secret_manager_secret_iam_policy": normalize_secret_manager_secret_iam_policy,
     "google_service_account": normalize_service_account,
     "google_service_account_iam_binding": normalize_service_account_iam_binding,
     "google_service_account_iam_member": normalize_service_account_iam_member,

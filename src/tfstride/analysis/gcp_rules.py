@@ -1,11 +1,42 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
 from tfstride.resource_helpers import describe_security_group_rule
+
+_SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
+_PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
+_SECRET_ACCESS_ROLES = frozenset(
+    {
+        "roles/editor",
+        "roles/owner",
+        "roles/secretmanager.admin",
+        "roles/secretmanager.secretAccessor",
+    }
+)
+_KMS_ACCESS_ROLES = frozenset(
+    {
+        "roles/cloudkms.admin",
+        "roles/cloudkms.cryptoKeyDecrypter",
+        "roles/cloudkms.cryptoKeyEncrypterDecrypter",
+        "roles/editor",
+        "roles/owner",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _GcpIamMemberAssessment:
+    member: str
+    scope_description: str
+    is_public: bool = False
+    is_broad: bool = False
+
 
 _PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
     "roles/owner": "full project administration",
@@ -77,6 +108,72 @@ class GcpRuleDetectors:
                     severity_reasoning=severity_reasoning,
                 )
             )
+        return findings
+
+    def detect_sensitive_iam_external_access(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        seen: set[tuple[str, str, str]] = set()
+        for resource in context.inventory.by_type(*_SENSITIVE_GCP_RESOURCE_TYPES):
+            resource_facts = analysis_facts(resource)
+            for binding in resource_facts.iam_bindings:
+                role = str(binding.get("role") or "unknown role")
+                if not _is_sensitive_gcp_resource_role(resource, role):
+                    continue
+                source = str(binding.get("source") or "").strip()
+                for member in _binding_members(binding):
+                    assessment = _assess_gcp_sensitive_iam_member(member, resource_facts.project)
+                    if assessment is None:
+                        continue
+                    finding_key = (resource.address, role, assessment.member)
+                    if finding_key in seen:
+                        continue
+                    seen.add(finding_key)
+
+                    severity_reasoning = build_severity_reasoning(
+                        internet_exposure=assessment.is_public,
+                        privilege_breadth=2 if assessment.is_public or assessment.is_broad else 1,
+                        data_sensitivity=2,
+                        lateral_movement=1,
+                        blast_radius=2 if assessment.is_public or assessment.is_broad else 1,
+                    )
+                    affected_resources = _dedupe_addresses([resource.address, source])
+                    findings.append(
+                        self._finding_factory.build(
+                            rule_id=rule_id,
+                            severity=severity_reasoning.severity,
+                            affected_resources=affected_resources,
+                            trust_boundary_id=None,
+                            rationale=(
+                                f"{resource.display_name} grants `{role}` to `{assessment.member}` through "
+                                "GCP IAM. Public, broad-domain, or foreign-project principals can access "
+                                "sensitive secrets or cryptographic key operations outside the expected "
+                                "project trust boundary."
+                            ),
+                            evidence=collect_evidence(
+                                evidence_item(
+                                    "iam_binding",
+                                    [
+                                        f"source={source}" if source else "source=unknown",
+                                        f"role={role}",
+                                        f"member={assessment.member}",
+                                    ],
+                                ),
+                                evidence_item("trust_scope", [assessment.scope_description]),
+                                evidence_item(
+                                    "resource_policy_sources",
+                                    resource_facts.resource_policy_source_addresses,
+                                ),
+                            ),
+                            severity_reasoning=severity_reasoning,
+                        )
+                    )
         return findings
 
     def detect_project_iam_broad_principal(
@@ -294,6 +391,66 @@ class GcpRuleDetectors:
         return findings
 
 
+def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> bool:
+    normalized_role = str(role).strip()
+    if resource.resource_type == "google_secret_manager_secret":
+        return normalized_role in _SECRET_ACCESS_ROLES
+    if resource.resource_type == "google_kms_crypto_key":
+        return normalized_role in _KMS_ACCESS_ROLES
+    return False
+
+
+def _assess_gcp_sensitive_iam_member(
+    member: str,
+    resource_project: str | None,
+) -> _GcpIamMemberAssessment | None:
+    normalized_member = str(member).strip()
+    if not normalized_member:
+        return None
+    if normalized_member in _PUBLIC_GCP_IAM_MEMBERS:
+        return _GcpIamMemberAssessment(
+            member=normalized_member,
+            scope_description=f"member is public GCP principal `{normalized_member}`",
+            is_public=True,
+            is_broad=True,
+        )
+    if normalized_member.startswith("domain:"):
+        return _GcpIamMemberAssessment(
+            member=normalized_member,
+            scope_description="member grants a whole Google Workspace domain",
+            is_broad=True,
+        )
+    if normalized_member.startswith("serviceAccount:"):
+        service_account_project = _service_account_project(normalized_member)
+        if resource_project and service_account_project and service_account_project != resource_project:
+            return _GcpIamMemberAssessment(
+                member=normalized_member,
+                scope_description=(
+                    f"service account belongs to project `{service_account_project}`, "
+                    f"outside resource project `{resource_project}`"
+                ),
+            )
+    return None
+
+
+def _service_account_project(member: str) -> str | None:
+    email = member.split(":", 1)[1] if ":" in member else member
+    suffix = ".iam.gserviceaccount.com"
+    if not email.endswith(suffix) or "@" not in email:
+        return None
+    domain = email.split("@", 1)[1]
+    return domain[: -len(suffix)] or None
+
+
+def _binding_members(binding: dict[str, object]) -> list[str]:
+    members = binding.get("members")
+    if isinstance(members, list):
+        return [str(member) for member in members if member not in (None, "")]
+    if members in (None, ""):
+        return []
+    return [str(members)]
+
+
 def _risky_public_firewall_rules(
     instance: NormalizedResource,
     inventory: ResourceInventory,
@@ -341,7 +498,7 @@ def _dedupe_addresses(addresses: list[str]) -> list[str]:
     deduped: list[str] = []
     seen: set[str] = set()
     for address in addresses:
-        if address in seen:
+        if not address or address in seen:
             continue
         deduped.append(address)
         seen.add(address)

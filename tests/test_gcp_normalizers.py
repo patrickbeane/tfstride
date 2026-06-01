@@ -8,9 +8,16 @@ from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
-from tfstride.providers.gcp.data_normalizers import normalize_sql_database_instance, normalize_storage_bucket
+from tfstride.providers.gcp.data_normalizers import (
+    normalize_kms_crypto_key,
+    normalize_secret_manager_secret,
+    normalize_sql_database_instance,
+    normalize_storage_bucket,
+)
 from tfstride.providers.gcp.iam_normalizers import (
+    normalize_kms_crypto_key_iam_member,
     normalize_project_iam_member,
+    normalize_secret_manager_secret_iam_member,
     normalize_service_account,
     normalize_service_account_iam_binding,
     normalize_service_account_iam_member,
@@ -152,6 +159,31 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
 
+    def test_secret_manager_secret_normalizer_preserves_secret_context(self) -> None:
+        normalized = normalize_secret_manager_secret(self.resources["google_secret_manager_secret.api_key"])
+
+        self.assertEqual(normalized.category, ResourceCategory.DATA)
+        self.assertEqual(normalized.identifier, "projects/tfstride-demo/secrets/tfstride-api-key")
+        self.assertEqual(normalized.data_sensitivity, "sensitive")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.SECRET_ID), "tfstride-api-key")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertTrue(normalized.storage_encrypted)
+        self.assertEqual(normalized.metadata_snapshot()["replication"], [{"auto": [{}]}])
+
+    def test_kms_crypto_key_normalizer_preserves_key_context(self) -> None:
+        normalized = normalize_kms_crypto_key(self.resources["google_kms_crypto_key.customer"])
+
+        self.assertEqual(normalized.category, ResourceCategory.DATA)
+        self.assertEqual(
+            normalized.identifier,
+            "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
+        )
+        self.assertEqual(normalized.data_sensitivity, "sensitive")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.KMS_PURPOSE), "ENCRYPT_DECRYPT")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.KMS_ROTATION_PERIOD), "7776000s")
+        self.assertTrue(normalized.storage_encrypted)
+
     def test_sql_database_instance_normalizer_preserves_database_posture(self) -> None:
         normalized = normalize_sql_database_instance(self.resources["google_sql_database_instance.app"])
 
@@ -211,6 +243,39 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
         self.assertTrue(
             normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
+        )
+
+    def test_secret_manager_secret_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_secret_manager_secret_iam_member(
+            self.resources["google_secret_manager_secret_iam_member.public_accessor"]
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(
+            normalized.identifier,
+            "google_secret_manager_secret.api_key.id:roles/secretmanager.secretAccessor:allAuthenticatedUsers",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE),
+            "google_secret_manager_secret.api_key.id",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/secretmanager.secretAccessor")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allAuthenticatedUsers")
+
+    def test_kms_crypto_key_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_kms_crypto_key_iam_member(
+            self.resources["google_kms_crypto_key_iam_member.partner_decrypter"]
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
+            "google_kms_crypto_key.customer.id",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/cloudkms.cryptoKeyDecrypter")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER),
+            "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
         )
 
     def test_service_account_normalizer_preserves_identity_context(self) -> None:
@@ -454,6 +519,40 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             [
                 "google_storage_bucket_iam_member.public_logs_reader grants "
                 "roles/storage.objectViewer to allUsers"
+            ],
+        )
+
+    def test_normalizer_attaches_sensitive_resource_iam_bindings_to_targets(self) -> None:
+        inventory = GcpNormalizer().normalize(list(self.resources.values()))
+        secret = inventory.get_by_address("google_secret_manager_secret.api_key")
+        key = inventory.get_by_address("google_kms_crypto_key.customer")
+
+        self.assertIsNotNone(secret)
+        self.assertIsNotNone(key)
+        assert secret is not None
+        assert key is not None
+        self.assertEqual(
+            secret.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/secretmanager.secretAccessor",
+                    "members": ["allAuthenticatedUsers"],
+                    "source": "google_secret_manager_secret_iam_member.public_accessor",
+                }
+            ],
+        )
+        self.assertEqual(
+            secret.get_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES),
+            ["google_secret_manager_secret_iam_member.public_accessor"],
+        )
+        self.assertEqual(
+            key.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/cloudkms.cryptoKeyDecrypter",
+                    "members": ["serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"],
+                    "source": "google_kms_crypto_key_iam_member.partner_decrypter",
+                }
             ],
         )
 

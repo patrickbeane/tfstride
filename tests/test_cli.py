@@ -51,6 +51,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("  Severity factors: internet_exposure, lateral_movement, blast_radius", output)
         self.assertIn("  Mitigation: Restrict ingress to expected client ports", output)
         self.assertIn("- aws-role-trust-missing-narrowing", output)
+        self.assertIn("- gcp-sensitive-resource-iam-external-access", output)
         self.assertIn("- gcp-cloud-sql-public-authorized-network", output)
         self.assertIn("- gcp-cloud-sql-backup-disabled", output)
         self.assertIn("- gcp-gcs-public-access", output)
@@ -206,9 +207,9 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(len(report["inventory"]["resources"]), 10)
+        self.assertEqual(len(report["inventory"]["resources"]), 14)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
-        self.assertEqual(report["summary"]["active_findings"], 4)
+        self.assertEqual(report["summary"]["active_findings"], 6)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

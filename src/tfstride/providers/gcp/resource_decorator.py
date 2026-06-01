@@ -22,6 +22,10 @@ class GcpResourceDecorator:
             if resource.resource_type == "google_compute_instance":
                 _infer_instance_vpc_id(resource, index)
                 _derive_public_compute_exposure(resource, index)
+            elif resource.resource_type == "google_secret_manager_secret":
+                _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
+            elif resource.resource_type == "google_kms_crypto_key":
+                _derive_sensitive_resource_iam_bindings(resource, index.kms_crypto_key_iam_resources)
             elif resource.resource_type == "google_storage_bucket":
                 _derive_public_bucket_exposure(resource, index)
 
@@ -31,12 +35,16 @@ class _GcpResourceIndex:
     subnetworks_by_reference: Mapping[str, NormalizedResource]
     firewalls: tuple[NormalizedResource, ...]
     bucket_iam_resources: tuple[NormalizedResource, ...]
+    secret_iam_resources: tuple[NormalizedResource, ...]
+    kms_crypto_key_iam_resources: tuple[NormalizedResource, ...]
 
     @classmethod
     def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
         subnetworks_by_reference: dict[str, NormalizedResource] = {}
         firewalls: list[NormalizedResource] = []
         bucket_iam_resources: list[NormalizedResource] = []
+        secret_iam_resources: list[NormalizedResource] = []
+        kms_crypto_key_iam_resources: list[NormalizedResource] = []
         for resource in resources:
             if resource.resource_type == "google_compute_subnetwork":
                 for reference in _resource_references(resource):
@@ -45,10 +53,16 @@ class _GcpResourceIndex:
                 firewalls.append(resource)
             elif resource.resource_type in _GCS_BUCKET_IAM_RESOURCE_TYPES:
                 bucket_iam_resources.append(resource)
+            elif resource.resource_type in _SECRET_IAM_RESOURCE_TYPES:
+                secret_iam_resources.append(resource)
+            elif resource.resource_type in _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
+                kms_crypto_key_iam_resources.append(resource)
         return cls(
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
             firewalls=tuple(firewalls),
             bucket_iam_resources=tuple(bucket_iam_resources),
+            secret_iam_resources=tuple(secret_iam_resources),
+            kms_crypto_key_iam_resources=tuple(kms_crypto_key_iam_resources),
         )
 
 
@@ -57,6 +71,20 @@ _GCS_BUCKET_IAM_RESOURCE_TYPES = frozenset(
         "google_storage_bucket_iam_binding",
         "google_storage_bucket_iam_member",
         "google_storage_bucket_iam_policy",
+    }
+)
+_SECRET_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_secret_manager_secret_iam_binding",
+        "google_secret_manager_secret_iam_member",
+        "google_secret_manager_secret_iam_policy",
+    }
+)
+_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_kms_crypto_key_iam_binding",
+        "google_kms_crypto_key_iam_member",
+        "google_kms_crypto_key_iam_policy",
     }
 )
 
@@ -113,6 +141,33 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResour
         bucket.public_exposure_reasons = public_access_reasons
 
 
+def _derive_sensitive_resource_iam_bindings(
+    resource: NormalizedResource,
+    iam_resources: tuple[NormalizedResource, ...],
+) -> None:
+    resource_references = set(_resource_references(resource))
+    bindings: list[dict[str, Any]] = []
+    source_addresses: list[str] = []
+    for iam_resource in iam_resources:
+        target_reference = _resource_iam_target_reference(iam_resource)
+        if not target_reference or _reference_key(target_reference) not in resource_references:
+            continue
+        for binding in _iam_bindings(iam_resource):
+            bindings.append(
+                {
+                    "role": str(binding.get("role") or "unknown role"),
+                    "members": _binding_members(binding),
+                    "source": iam_resource.address,
+                }
+            )
+            source_addresses.append(iam_resource.address)
+
+    if bindings:
+        resource.set_metadata_field(GcpResourceMetadata.IAM_BINDINGS, bindings)
+    if source_addresses:
+        resource.extend_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES, source_addresses)
+
+
 def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
     reasons: list[str] = []
     bucket_references = set(_resource_references(bucket))
@@ -130,6 +185,13 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourc
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
     return _dedupe(reasons)
+
+
+def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
+    secret_reference = resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE)
+    if secret_reference:
+        return secret_reference
+    return resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE)
 
 
 def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:
@@ -190,6 +252,10 @@ def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.identifier,
         resource.get_metadata_field(GcpResourceMetadata.NAME),
         resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME),
+        resource.get_metadata_field(GcpResourceMetadata.SECRET_ID),
+        resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING),
         resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
     ):
         if reference:
@@ -205,7 +271,7 @@ def _same_network_reference(left: str | None, right: str | None) -> bool:
 
 def _reference_key(value: str) -> str:
     text = str(value).strip()
-    for suffix in (".id", ".name", ".self_link"):
+    for suffix in (".id", ".name", ".secret_id", ".crypto_key_id", ".self_link"):
         if text.endswith(suffix):
             return text[: -len(suffix)]
     return text
