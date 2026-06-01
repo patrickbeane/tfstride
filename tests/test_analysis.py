@@ -847,14 +847,14 @@ class TFSAnalysisTests(unittest.TestCase):
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
 
-    def test_gcp_fixture_auto_selects_provider_and_detects_public_compute_boundary(self) -> None:
+    def test_gcp_fixture_auto_selects_provider_and_detects_public_boundaries(self) -> None:
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 7)
+        self.assertEqual(len(result.inventory.resources), 9)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 7)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 7)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 9)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 9)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(len(result.findings), 2)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}

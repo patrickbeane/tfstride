@@ -64,6 +64,18 @@ class AnalysisResourceFacts:
         return self._facts.resource_policy_source_addresses
 
     @property
+    def service_account_email(self) -> str | None:
+        return self._facts.service_account_email
+
+    @property
+    def service_account_member(self) -> str | None:
+        return self._facts.service_account_member
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return self._facts.service_account_reference
+
+    @property
     def network_tags(self) -> list[str]:
         return self._facts.network_tags
 

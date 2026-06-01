@@ -34,6 +34,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.BUCKET_NAME)
 
     @property
+    def service_account_email(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL)
+
+    @property
+    def service_account_member(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER)
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE)
+
+    @property
     def network_tags(self) -> list[str]:
         return self.get(GcpResourceMetadata.NETWORK_TAGS)
 

@@ -224,7 +224,7 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 7)
+        self.assertEqual(payload["summary"]["normalized_resources"], 9)
         self.assertEqual(payload["summary"]["unsupported_resources"], 0)
         self.assertEqual(payload["summary"]["trust_boundaries"], 2)
         self.assertEqual(payload["summary"]["active_findings"], 2)
@@ -234,7 +234,7 @@ class JsonReportTests(unittest.TestCase):
             payload["inventory"]["metadata"]["supported_resource_types"],
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 7)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 9)
         self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
@@ -244,6 +244,8 @@ class JsonReportTests(unittest.TestCase):
                 "google_compute_network.main",
                 "google_compute_subnetwork.app",
                 "google_project_iam_member.web_viewer",
+                "google_service_account.web",
+                "google_service_account_key.web",
                 "google_storage_bucket.logs",
                 "google_storage_bucket_iam_member.public_logs_reader",
             ],

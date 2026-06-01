@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.gcp.coercion import as_list, compact
+from tfstride.providers.gcp.coercion import as_bool, as_list, compact
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import first_non_empty, load_json_document
@@ -25,6 +25,128 @@ def normalize_project_iam_member(resource: TerraformResource) -> NormalizedResou
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             "condition": values.get("condition"),
+        },
+    )
+
+
+def normalize_service_account(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    account_id = first_non_empty(values.get("account_id"))
+    email = first_non_empty(values.get("email"))
+    member = first_non_empty(values.get("member"), _service_account_member(email))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(email, values.get("name"), values.get("id"), account_id, resource.address),
+        metadata={
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name"), account_id, resource.name),
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_ACCOUNT_ID.key: account_id,
+            GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL.key: email,
+            GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: member,
+            GcpResourceMetadata.SERVICE_ACCOUNT_UNIQUE_ID.key: values.get("unique_id"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_DISABLED.key: as_bool(values.get("disabled", False)),
+            "display_name": values.get("display_name"),
+            "description": values.get("description"),
+        },
+    )
+
+
+def normalize_service_account_key(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    service_account_reference = first_non_empty(values.get("service_account_id"), values.get("service_account"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), values.get("name"), service_account_reference, resource.address),
+        metadata={
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name"), resource.name),
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
+            GcpResourceMetadata.SERVICE_ACCOUNT_KEY_ALGORITHM.key: values.get("key_algorithm"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_PUBLIC_KEY_TYPE.key: values.get("public_key_type"),
+            "valid_after": values.get("valid_after"),
+            "valid_before": values.get("valid_before"),
+            "keepers": values.get("keepers") or {},
+        },
+    )
+
+
+def normalize_service_account_iam_member(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    service_account_reference = first_non_empty(values.get("service_account_id"), values.get("service_account"))
+    role = first_non_empty(values.get("role"))
+    member = first_non_empty(values.get("member"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(
+            values.get("id"),
+            _binding_identifier(service_account_reference, role, [member]),
+            resource.address,
+        ),
+        metadata={
+            GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBER.key: member,
+            GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def normalize_service_account_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    service_account_reference = first_non_empty(values.get("service_account_id"), values.get("service_account"))
+    role = first_non_empty(values.get("role"))
+    members = compact(as_list(values.get("members")))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(
+            values.get("id"),
+            _binding_identifier(service_account_reference, role, members),
+            resource.address,
+        ),
+        metadata={
+            GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBERS.key: members,
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def normalize_service_account_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    service_account_reference = first_non_empty(values.get("service_account_id"), values.get("service_account"))
+    policy_document = load_json_document(values.get("policy_data"))
+    bindings = _policy_bindings(policy_document)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), service_account_reference, resource.address),
+        metadata={
+            GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
+            GcpResourceMetadata.IAM_BINDINGS.key: bindings,
+            "policy_document": policy_document,
         },
     )
 
@@ -111,8 +233,14 @@ def _iam_bindings(role: str | None, members: list[str]) -> list[dict[str, Any]]:
     return [{"role": role, "members": list(members)}]
 
 
-def _binding_identifier(bucket: str | None, role: str | None, members: list[str | None]) -> str | None:
+def _binding_identifier(target: str | None, role: str | None, members: list[str | None]) -> str | None:
     normalized_members = compact(list(members))
-    if not bucket or not role or not normalized_members:
+    if not target or not role or not normalized_members:
         return None
-    return f"{bucket}:{role}:{','.join(normalized_members)}"
+    return f"{target}:{role}:{','.join(normalized_members)}"
+
+
+def _service_account_member(email: str | None) -> str | None:
+    if not email:
+        return None
+    return f"serviceAccount:{email}"

@@ -75,7 +75,7 @@ class ResourceConceptTests(unittest.TestCase):
             PUBLIC_EDGE_RESOURCE_TYPES,
             frozenset({"aws_instance", "aws_lb", "aws_db_instance", "aws_s3_bucket", "google_compute_instance", "google_storage_bucket"}),
         )
-        self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role"}))
+        self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role", "google_service_account"}))
         self.assertEqual(
             IAM_POLICY_RESOURCE_TYPES,
             frozenset(
@@ -83,6 +83,9 @@ class ResourceConceptTests(unittest.TestCase):
                     "aws_iam_policy",
                     "aws_iam_role",
                     "google_project_iam_member",
+                    "google_service_account_iam_binding",
+                    "google_service_account_iam_member",
+                    "google_service_account_iam_policy",
                     "google_storage_bucket_iam_binding",
                     "google_storage_bucket_iam_member",
                     "google_storage_bucket_iam_policy",
@@ -132,9 +135,11 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
+        self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_service_account_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_storage_bucket_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
         self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall", provider="gcp")))

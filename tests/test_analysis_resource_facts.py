@@ -7,6 +7,7 @@ from typing import Any
 
 from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_facts
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 
 
@@ -58,6 +59,18 @@ class FakeProviderFacts:
     def resource_policy_source_addresses(self) -> list[str]:
         return ["google_storage_bucket_iam_binding.logs"]
 
+    @property
+    def service_account_email(self) -> str | None:
+        return "fake@example.iam.gserviceaccount.com"
+
+    @property
+    def service_account_member(self) -> str | None:
+        return "serviceAccount:fake@example.iam.gserviceaccount.com"
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return "google_service_account.fake.email"
+
 
 class AnalysisResourceFactsTests(unittest.TestCase):
     def test_reads_provider_backed_analysis_facts(self) -> None:
@@ -83,6 +96,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.database_engine, "postgres")
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
+        self.assertIsNone(facts.service_account_email)
+        self.assertIsNone(facts.service_account_member)
+        self.assertIsNone(facts.service_account_reference)
 
     def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
@@ -108,6 +124,30 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.database_engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.service_account_email)
+        self.assertIsNone(facts.service_account_member)
+        self.assertIsNone(facts.service_account_reference)
+
+    def test_gcp_service_account_facts_read_provider_owned_identity_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL.key: "tfstride-web@example.iam.gserviceaccount.com",
+                GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: (
+                    "serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
+                ),
+            },
+            provider="gcp",
+            resource_type="google_service_account",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.service_account_email, "tfstride-web@example.iam.gserviceaccount.com")
+        self.assertEqual(
+            facts.service_account_member,
+            "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+        )
+        self.assertIsNone(facts.service_account_reference)
 
     def test_registered_provider_facts_are_used_without_analysis_branching(self) -> None:
         calls: list[NormalizedResource] = []
@@ -132,6 +172,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             facts.resource_policy_source_addresses,
             ["google_storage_bucket_iam_binding.logs"],
         )
+        self.assertEqual(facts.service_account_email, "fake@example.iam.gserviceaccount.com")
+        self.assertEqual(facts.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
+        self.assertEqual(facts.service_account_reference, "google_service_account.fake.email")
 
     def test_returns_detached_collections(self) -> None:
         resource = _resource(

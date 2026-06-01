@@ -63,6 +63,8 @@ class GcpProviderTests(unittest.TestCase):
             plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
             frozenset({"google_compute_instance"}),
         )
+        self.assertTrue(plugin.supports_resource_type("google_service_account"))
+        self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
@@ -87,6 +89,14 @@ class GcpProviderTests(unittest.TestCase):
                 "IAM_MEMBERS",
                 "IAM_BINDINGS",
                 "BUCKET_NAME",
+                "SERVICE_ACCOUNT_ACCOUNT_ID",
+                "SERVICE_ACCOUNT_EMAIL",
+                "SERVICE_ACCOUNT_MEMBER",
+                "SERVICE_ACCOUNT_REFERENCE",
+                "SERVICE_ACCOUNT_UNIQUE_ID",
+                "SERVICE_ACCOUNT_KEY_ALGORITHM",
+                "SERVICE_ACCOUNT_PUBLIC_KEY_TYPE",
+                "SERVICE_ACCOUNT_DISABLED",
             },
         )
 
@@ -105,6 +115,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.internet_ingress_firewalls, [])
         self.assertIsNone(facts.iam_role)
         self.assertIsNone(facts.iam_member)
+        self.assertIsNone(facts.service_account_email)
+        self.assertIsNone(facts.service_account_member)
+        self.assertIsNone(facts.service_account_reference)
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()
@@ -148,6 +161,10 @@ class GcpProviderTests(unittest.TestCase):
                 provider_name="registry.terraform.io/hashicorp/google-beta",
             ),
             _terraform_resource(
+                address="google_service_account.web",
+                resource_type="google_service_account",
+            ),
+            _terraform_resource(
                 address="google_project_service.compute",
                 resource_type="google_project_service",
             ),
@@ -163,16 +180,16 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(inventory.provider, "gcp")
         self.assertEqual(
             [resource.address for resource in inventory.resources],
-            ["google_storage_bucket.logs", "google_compute_instance.web"],
+            ["google_storage_bucket.logs", "google_compute_instance.web", "google_service_account.web"],
         )
         self.assertEqual(inventory.unsupported_resources, ["google_project_service.compute"])
         self.assertEqual(
             InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 4)
-        self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 3)
-        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 2)
+        self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 5)
+        self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 4)
+        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 3)
         self.assertEqual(
             InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
             {"google_project_service": 1},

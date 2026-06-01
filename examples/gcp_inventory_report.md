@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_gcp_plan.json`
 - Provider: `gcp`
-- Normalized resources: `7`
+- Normalized resources: `9`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **2 trust boundaries** and **2 findings** across **7 normalized resources**.
+This run identified **2 trust boundaries** and **2 findings** across **9 normalized resources**.
 
 - High severity findings: `0`
 - Medium severity findings: `2`
@@ -15,9 +15,9 @@ This run identified **2 trust boundaries** and **2 findings** across **7 normali
 
 ## Analysis Coverage
 
-- Terraform resources seen: `7`
-- Provider resources considered: `7`
-- Normalized resources: `7`
+- Terraform resources seen: `9`
+- Provider resources considered: `9`
+- Normalized resources: `9`
 - Unsupported resources: `0`
 - Registered rules: `17`
 - Enabled rules: `17`

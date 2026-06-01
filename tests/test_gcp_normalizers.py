@@ -11,6 +11,11 @@ from tfstride.providers.gcp.compute_normalizers import normalize_compute_instanc
 from tfstride.providers.gcp.data_normalizers import normalize_storage_bucket
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_project_iam_member,
+    normalize_service_account,
+    normalize_service_account_iam_binding,
+    normalize_service_account_iam_member,
+    normalize_service_account_iam_policy,
+    normalize_service_account_key,
     normalize_storage_bucket_iam_binding,
     normalize_storage_bucket_iam_member,
     normalize_storage_bucket_iam_policy,
@@ -146,6 +151,132 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.data_sensitivity, "sensitive")
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
+
+    def test_service_account_normalizer_preserves_identity_context(self) -> None:
+        normalized = normalize_service_account(self.resources["google_service_account.web"])
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.identifier, "tfstride-web@example.iam.gserviceaccount.com")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_ACCOUNT_ID), "tfstride-web")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL),
+            "tfstride-web@example.iam.gserviceaccount.com",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER),
+            "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_UNIQUE_ID),
+            "100000000000000000001",
+        )
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_DISABLED))
+
+    def test_service_account_key_normalizer_preserves_key_context_without_secret_material(self) -> None:
+        normalized = normalize_service_account_key(self.resources["google_service_account_key.web"])
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE),
+            "google_service_account.web.email",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_ALGORITHM),
+            "KEY_ALG_RSA_2048",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_PUBLIC_KEY_TYPE),
+            "TYPE_X509_PEM_FILE",
+        )
+        metadata = normalized.metadata_snapshot()
+        self.assertEqual(metadata["valid_after"], "2026-01-01T00:00:00Z")
+        self.assertEqual(metadata["valid_before"], "2027-01-01T00:00:00Z")
+        self.assertNotIn("private_key", metadata)
+
+    def test_service_account_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_service_account_iam_member(
+            _terraform_resource(
+                "google_service_account_iam_member.web_token_creator",
+                "google_service_account_iam_member",
+                {
+                    "service_account_id": "google_service_account.web.name",
+                    "role": "roles/iam.serviceAccountTokenCreator",
+                    "member": "group:deploy@example.com",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(
+            normalized.identifier,
+            "google_service_account.web.name:roles/iam.serviceAccountTokenCreator:group:deploy@example.com",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE),
+            "google_service_account.web.name",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/iam.serviceAccountTokenCreator", "members": ["group:deploy@example.com"]}],
+        )
+
+    def test_service_account_iam_binding_normalizer_preserves_member_list(self) -> None:
+        normalized = normalize_service_account_iam_binding(
+            _terraform_resource(
+                "google_service_account_iam_binding.web_users",
+                "google_service_account_iam_binding",
+                {
+                    "service_account_id": "google_service_account.web.name",
+                    "role": "roles/iam.serviceAccountUser",
+                    "members": ["group:deploy@example.com", "user:alice@example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS),
+            ["group:deploy@example.com", "user:alice@example.com"],
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/iam.serviceAccountUser",
+                    "members": ["group:deploy@example.com", "user:alice@example.com"],
+                }
+            ],
+        )
+
+    def test_service_account_iam_policy_normalizer_parses_policy_bindings(self) -> None:
+        normalized = normalize_service_account_iam_policy(
+            _terraform_resource(
+                "google_service_account_iam_policy.web_policy",
+                "google_service_account_iam_policy",
+                {
+                    "service_account_id": "google_service_account.web.name",
+                    "policy_data": json.dumps(
+                        {
+                            "bindings": [
+                                {
+                                    "role": "roles/iam.serviceAccountUser",
+                                    "members": ["group:deploy@example.com"],
+                                }
+                            ]
+                        }
+                    ),
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE),
+            "google_service_account.web.name",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/iam.serviceAccountUser", "members": ["group:deploy@example.com"]}],
+        )
 
     def test_storage_bucket_iam_member_normalizer_preserves_binding_parts(self) -> None:
         normalized = normalize_storage_bucket_iam_member(

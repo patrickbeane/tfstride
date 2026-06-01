@@ -16,9 +16,13 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_storage_bucket",
             }
         ),
+        ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
         ResourceCapability.IAM_POLICY: frozenset(
             {
                 "google_project_iam_member",
+                "google_service_account_iam_binding",
+                "google_service_account_iam_member",
+                "google_service_account_iam_policy",
                 "google_storage_bucket_iam_binding",
                 "google_storage_bucket_iam_member",
                 "google_storage_bucket_iam_policy",

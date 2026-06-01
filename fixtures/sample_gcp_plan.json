@@ -55,6 +55,40 @@
           }
         },
         {
+          "address": "google_service_account.web",
+          "mode": "managed",
+          "type": "google_service_account",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "account_id": "tfstride-web",
+            "display_name": "tfSTRIDE web workload",
+            "description": "Service account used by the sample web instance.",
+            "project": "tfstride-demo",
+            "email": "tfstride-web@example.iam.gserviceaccount.com",
+            "member": "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com",
+            "unique_id": "100000000000000000001",
+            "disabled": false
+          }
+        },
+        {
+          "address": "google_service_account_key.web",
+          "mode": "managed",
+          "type": "google_service_account_key",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "service_account_id": "google_service_account.web.email",
+            "key_algorithm": "KEY_ALG_RSA_2048",
+            "public_key_type": "TYPE_X509_PEM_FILE",
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com/keys/sample-key",
+            "id": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com/keys/sample-key",
+            "valid_after": "2026-01-01T00:00:00Z",
+            "valid_before": "2027-01-01T00:00:00Z"
+          }
+        },
+        {
           "address": "google_compute_instance.web",
           "mode": "managed",
           "type": "google_compute_instance",

@@ -39,6 +39,18 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def service_account_email(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def service_account_member(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def service_account_reference(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def network_tags(self) -> list[str]:
         raise NotImplementedError
 
@@ -99,6 +111,18 @@ class NeutralProviderResourceFacts:
     @property
     def resource_policy_source_addresses(self) -> list[str]:
         return []
+
+    @property
+    def service_account_email(self) -> str | None:
+        return None
+
+    @property
+    def service_account_member(self) -> str | None:
+        return None
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return None
 
     @property
     def network_tags(self) -> list[str]:

@@ -204,7 +204,7 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(len(report["inventory"]["resources"]), 7)
+        self.assertEqual(len(report["inventory"]["resources"]), 9)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 2)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])

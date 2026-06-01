@@ -31,6 +31,18 @@ class AwsResourceFacts:
         self.resource.extend_metadata_field(field, values)
 
     @property
+    def service_account_email(self) -> str | None:
+        return None
+
+    @property
+    def service_account_member(self) -> str | None:
+        return None
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return None
+
+    @property
     def security_group_id(self) -> str | None:
         return self.get(AwsResourceMetadata.SECURITY_GROUP_ID)
 
