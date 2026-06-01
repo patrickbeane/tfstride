@@ -63,6 +63,11 @@ class GcpProviderTests(unittest.TestCase):
             plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
             frozenset({"google_compute_instance"}),
         )
+        self.assertTrue(plugin.supports_resource_type("google_compute_route"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_router"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_router_nat"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_forwarding_rule"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_global_forwarding_rule"))
         self.assertTrue(plugin.supports_resource_type("google_service_account"))
         self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
         self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret"))
@@ -86,6 +91,23 @@ class GcpProviderTests(unittest.TestCase):
                 "NETWORK",
                 "NETWORK_TAGS",
                 "FIREWALL_ALLOW",
+                "FIREWALL_TARGET_SERVICE_ACCOUNTS",
+                "FIREWALL_SOURCE_SERVICE_ACCOUNTS",
+                "ROUTE_DEST_RANGE",
+                "ROUTE_NEXT_HOP_GATEWAY",
+                "ROUTE_NEXT_HOP_INSTANCE",
+                "ROUTE_NEXT_HOP_IP",
+                "ROUTE_NEXT_HOP_ILB",
+                "ROUTE_NEXT_HOP_VPN_TUNNEL",
+                "ROUTE_TAGS",
+                "ROUTER_REFERENCE",
+                "NAT_SUBNETWORKS",
+                "FORWARDING_RULE_IP_ADDRESS",
+                "FORWARDING_RULE_LOAD_BALANCING_SCHEME",
+                "FORWARDING_RULE_TARGET",
+                "FORWARDING_RULE_BACKEND_SERVICE",
+                "FORWARDING_RULE_PORTS",
+                "FORWARDING_RULE_SOURCE_IP_RANGES",
                 "NETWORK_INTERFACES",
                 "SERVICE_ACCOUNTS",
                 "INTERNET_INGRESS_FIREWALLS",

@@ -12,6 +12,8 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.DATA_STORE: frozenset({"google_secret_manager_secret", "google_sql_database_instance", "google_storage_bucket"}),
         ResourceCapability.PUBLIC_EDGE: frozenset(
             {
+                "google_compute_forwarding_rule",
+                "google_compute_global_forwarding_rule",
                 "google_compute_instance",
                 "google_sql_database_instance",
                 "google_storage_bucket",

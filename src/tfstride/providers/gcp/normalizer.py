@@ -33,7 +33,12 @@ from tfstride.providers.gcp.iam_normalizers import (
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
     normalize_compute_firewall,
+    normalize_compute_forwarding_rule,
+    normalize_compute_global_forwarding_rule,
     normalize_compute_network,
+    normalize_compute_route,
+    normalize_compute_router,
+    normalize_compute_router_nat,
     normalize_compute_subnetwork,
 )
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
@@ -44,8 +49,13 @@ ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_compute_firewall": normalize_compute_firewall,
+    "google_compute_forwarding_rule": normalize_compute_forwarding_rule,
+    "google_compute_global_forwarding_rule": normalize_compute_global_forwarding_rule,
     "google_compute_instance": normalize_compute_instance,
     "google_compute_network": normalize_compute_network,
+    "google_compute_route": normalize_compute_route,
+    "google_compute_router": normalize_compute_router,
+    "google_compute_router_nat": normalize_compute_router_nat,
     "google_compute_subnetwork": normalize_compute_subnetwork,
     "google_kms_crypto_key": normalize_kms_crypto_key,
     "google_kms_crypto_key_iam_binding": normalize_kms_crypto_key_iam_binding,

@@ -31,7 +31,12 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_firewall,
+    normalize_compute_forwarding_rule,
+    normalize_compute_global_forwarding_rule,
     normalize_compute_network,
+    normalize_compute_route,
+    normalize_compute_router,
+    normalize_compute_router_nat,
     normalize_compute_subnetwork,
     parse_firewall_allow_rules,
 )
@@ -103,6 +108,112 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.REGION), "us-central1")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CIDR_RANGE), "10.10.1.0/24")
 
+
+    def test_compute_route_normalizer_preserves_default_route_context(self) -> None:
+        normalized = normalize_compute_route(
+            _terraform_resource(
+                "google_compute_route.default_internet",
+                "google_compute_route",
+                {
+                    "name": "default-internet",
+                    "network": "google_compute_network.main.id",
+                    "dest_range": "0.0.0.0/0",
+                    "next_hop_gateway": "default-internet-gateway",
+                    "priority": 1000,
+                    "tags": ["web"],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ROUTE_DEST_RANGE), "0.0.0.0/0")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.ROUTE_NEXT_HOP_GATEWAY),
+            "default-internet-gateway",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS), ["web"])
+
+    def test_compute_router_and_nat_normalizers_preserve_egress_context(self) -> None:
+        router = normalize_compute_router(
+            _terraform_resource(
+                "google_compute_router.main",
+                "google_compute_router",
+                {
+                    "name": "tfstride-router",
+                    "network": "google_compute_network.main.id",
+                    "region": "us-central1",
+                    "bgp": [{"asn": 64514}],
+                },
+            )
+        )
+        router_nat = normalize_compute_router_nat(
+            _terraform_resource(
+                "google_compute_router_nat.main",
+                "google_compute_router_nat",
+                {
+                    "name": "tfstride-nat",
+                    "router": "google_compute_router.main.name",
+                    "region": "us-central1",
+                    "source_subnetwork_ip_ranges_to_nat": "LIST_OF_SUBNETWORKS",
+                    "subnetwork": [
+                        {
+                            "name": "google_compute_subnetwork.app.id",
+                            "source_ip_ranges_to_nat": ["ALL_IP_RANGES"],
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(router.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(router.metadata_snapshot()["bgp"], {"asn": 64514})
+        self.assertEqual(
+            router_nat.get_metadata_field(GcpResourceMetadata.ROUTER_REFERENCE),
+            "google_compute_router.main.name",
+        )
+        self.assertEqual(
+            router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS),
+            [{"name": "google_compute_subnetwork.app.id", "source_ip_ranges_to_nat": ["ALL_IP_RANGES"]}],
+        )
+
+    def test_forwarding_rule_normalizers_classify_public_edges(self) -> None:
+        regional = normalize_compute_forwarding_rule(
+            _terraform_resource(
+                "google_compute_forwarding_rule.web",
+                "google_compute_forwarding_rule",
+                {
+                    "name": "web-forwarding",
+                    "load_balancing_scheme": "EXTERNAL",
+                    "ip_address": "35.1.2.3",
+                    "target": "google_compute_target_pool.web.id",
+                    "ports": ["443"],
+                },
+            )
+        )
+        global_rule = normalize_compute_global_forwarding_rule(
+            _terraform_resource(
+                "google_compute_global_forwarding_rule.web",
+                "google_compute_global_forwarding_rule",
+                {
+                    "name": "web-global",
+                    "load_balancing_scheme": "INTERNAL_MANAGED",
+                    "target": "google_compute_target_http_proxy.web.id",
+                },
+            )
+        )
+
+        self.assertEqual(regional.category, ResourceCategory.EDGE)
+        self.assertTrue(regional.public_access_configured)
+        self.assertTrue(regional.public_exposure)
+        self.assertTrue(regional.direct_internet_reachable)
+        self.assertEqual(
+            regional.get_metadata_field(GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS),
+            "35.1.2.3",
+        )
+        self.assertFalse(global_rule.public_access_configured)
+        self.assertFalse(global_rule.direct_internet_reachable)
+
     def test_compute_firewall_normalizer_builds_allow_rules(self) -> None:
         normalized = normalize_compute_firewall(self.resources["google_compute_firewall.public_ssh"])
 
@@ -136,6 +247,19 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         ])
         self.assertEqual(rules[0].direction, "egress")
         self.assertEqual(rules[0].cidr_blocks, ["10.0.0.0/8"])
+
+
+    def test_firewall_rule_parser_does_not_default_source_scoped_rules_to_internet(self) -> None:
+        rules = parse_firewall_allow_rules(
+            {
+                "direction": "INGRESS",
+                "source_tags": ["app"],
+                "allow": [{"protocol": "tcp", "ports": ["443"]}],
+            }
+        )
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].cidr_blocks, [])
 
     def test_compute_instance_normalizer_preserves_network_and_identity_context(self) -> None:
         normalized = normalize_compute_instance(self.resources["google_compute_instance.web"])
@@ -621,6 +745,184 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             [
                 "compute instance has an external access config and matching firewall rules allow internet ingress"
             ],
+        )
+
+
+    def test_normalizer_derives_subnet_public_route_and_nat_egress_posture(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.main",
+                    "google_compute_network",
+                    {"name": "tfstride-main"},
+                ),
+                _terraform_resource(
+                    "google_compute_subnetwork.app",
+                    "google_compute_subnetwork",
+                    {
+                        "name": "tfstride-app",
+                        "network": "google_compute_network.main.id",
+                        "ip_cidr_range": "10.10.1.0/24",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_route.default_internet",
+                    "google_compute_route",
+                    {
+                        "name": "default-internet",
+                        "network": "google_compute_network.main.id",
+                        "dest_range": "0.0.0.0/0",
+                        "next_hop_gateway": "default-internet-gateway",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_router.main",
+                    "google_compute_router",
+                    {
+                        "name": "tfstride-router",
+                        "network": "google_compute_network.main.id",
+                        "region": "us-central1",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_router_nat.main",
+                    "google_compute_router_nat",
+                    {
+                        "name": "tfstride-nat",
+                        "router": "google_compute_router.main.name",
+                        "source_subnetwork_ip_ranges_to_nat": "ALL_SUBNETWORKS_ALL_IP_RANGES",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "network_interface": [{"subnetwork": "google_compute_subnetwork.app.id"}],
+                    },
+                ),
+            ]
+        )
+        subnet = inventory.get_by_address("google_compute_subnetwork.app")
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(subnet)
+        self.assertIsNotNone(instance)
+        assert subnet is not None
+        assert instance is not None
+        self.assertTrue(subnet.has_public_route)
+        self.assertTrue(subnet.is_public_subnet)
+        self.assertTrue(subnet.has_nat_gateway_egress)
+        self.assertTrue(instance.in_public_subnet)
+        self.assertTrue(instance.has_nat_gateway_egress)
+
+    def test_source_scoped_firewall_does_not_create_public_compute_exposure(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.main",
+                    "google_compute_network",
+                    {"name": "tfstride-main"},
+                ),
+                _terraform_resource(
+                    "google_compute_subnetwork.app",
+                    "google_compute_subnetwork",
+                    {
+                        "name": "tfstride-app",
+                        "network": "google_compute_network.main.id",
+                        "ip_cidr_range": "10.10.1.0/24",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_firewall.from_app",
+                    "google_compute_firewall",
+                    {
+                        "network": "google_compute_network.main.id",
+                        "source_tags": ["app"],
+                        "target_tags": ["web"],
+                        "allow": [{"protocol": "tcp", "ports": ["443"]}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "tags": ["web"],
+                        "network_interface": [
+                            {
+                                "subnetwork": "google_compute_subnetwork.app.id",
+                                "access_config": [{}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertEqual(instance.internet_ingress_reasons, [])
+
+    def test_target_service_account_firewall_matches_compute_identity(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.main",
+                    "google_compute_network",
+                    {"name": "tfstride-main"},
+                ),
+                _terraform_resource(
+                    "google_compute_subnetwork.app",
+                    "google_compute_subnetwork",
+                    {
+                        "name": "tfstride-app",
+                        "network": "google_compute_network.main.id",
+                        "ip_cidr_range": "10.10.1.0/24",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_firewall.public_https",
+                    "google_compute_firewall",
+                    {
+                        "network": "google_compute_network.main.id",
+                        "source_ranges": ["0.0.0.0/0"],
+                        "target_service_accounts": ["tfstride-web@tfstride-demo.iam.gserviceaccount.com"],
+                        "allow": [{"protocol": "tcp", "ports": ["443"]}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "network_interface": [
+                            {
+                                "subnetwork": "google_compute_subnetwork.app.id",
+                                "access_config": [{}],
+                            }
+                        ],
+                        "service_account": [
+                            {
+                                "email": "tfstride-web@tfstride-demo.iam.gserviceaccount.com",
+                                "scopes": ["cloud-platform"],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.public_https"],
         )
 
     def test_project_iam_member_normalizer_preserves_binding_parts(self) -> None:

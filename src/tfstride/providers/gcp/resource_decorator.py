@@ -19,9 +19,17 @@ class GcpResourceDecorator:
     def decorate(self, resources: list[NormalizedResource]) -> None:
         index = _GcpResourceIndex.build(resources)
         for resource in resources:
+            if resource.resource_type == "google_compute_subnetwork":
+                _derive_subnetwork_route_posture(resource, index)
+
+        for resource in resources:
             if resource.resource_type == "google_compute_instance":
                 _infer_instance_vpc_id(resource, index)
+                _derive_instance_network_posture(resource, index)
                 _derive_public_compute_exposure(resource, index)
+            elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
+                _infer_instance_vpc_id(resource, index)
+                _derive_instance_network_posture(resource, index)
             elif resource.resource_type == "google_secret_manager_secret":
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
             elif resource.resource_type == "google_kms_crypto_key":
@@ -34,6 +42,9 @@ class GcpResourceDecorator:
 @dataclass(frozen=True, slots=True)
 class _GcpResourceIndex:
     subnetworks_by_reference: Mapping[str, NormalizedResource]
+    routers_by_reference: Mapping[str, NormalizedResource]
+    routes: tuple[NormalizedResource, ...]
+    router_nats: tuple[NormalizedResource, ...]
     firewalls: tuple[NormalizedResource, ...]
     bucket_iam_resources: tuple[NormalizedResource, ...]
     secret_iam_resources: tuple[NormalizedResource, ...]
@@ -42,6 +53,9 @@ class _GcpResourceIndex:
     @classmethod
     def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
         subnetworks_by_reference: dict[str, NormalizedResource] = {}
+        routers_by_reference: dict[str, NormalizedResource] = {}
+        routes: list[NormalizedResource] = []
+        router_nats: list[NormalizedResource] = []
         firewalls: list[NormalizedResource] = []
         bucket_iam_resources: list[NormalizedResource] = []
         secret_iam_resources: list[NormalizedResource] = []
@@ -50,6 +64,13 @@ class _GcpResourceIndex:
             if resource.resource_type == "google_compute_subnetwork":
                 for reference in _resource_references(resource):
                     subnetworks_by_reference.setdefault(reference, resource)
+            elif resource.resource_type == "google_compute_router":
+                for reference in _resource_references(resource):
+                    routers_by_reference.setdefault(reference, resource)
+            elif resource.resource_type == "google_compute_route":
+                routes.append(resource)
+            elif resource.resource_type == "google_compute_router_nat":
+                router_nats.append(resource)
             elif resource.resource_type == "google_compute_firewall":
                 firewalls.append(resource)
             elif resource.resource_type in _GCS_BUCKET_IAM_RESOURCE_TYPES:
@@ -60,6 +81,9 @@ class _GcpResourceIndex:
                 kms_crypto_key_iam_resources.append(resource)
         return cls(
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
+            routers_by_reference=MappingProxyType(routers_by_reference),
+            routes=tuple(routes),
+            router_nats=tuple(router_nats),
             firewalls=tuple(firewalls),
             bucket_iam_resources=tuple(bucket_iam_resources),
             secret_iam_resources=tuple(secret_iam_resources),
@@ -88,6 +112,46 @@ _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES = frozenset(
         "google_kms_crypto_key_iam_policy",
     }
 )
+
+
+def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _GcpResourceIndex) -> None:
+    has_public_route = any(
+        _route_has_internet_gateway(route)
+        and not route.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS)
+        and _same_network_reference(route.vpc_id, subnetwork.vpc_id)
+        for route in index.routes
+    )
+    has_nat_egress = any(
+        _nat_applies_to_subnetwork(router_nat, subnetwork, index)
+        for router_nat in index.router_nats
+    )
+    subnetwork.has_public_route = has_public_route
+    subnetwork.is_public_subnet = has_public_route
+    subnetwork.has_nat_gateway_egress = has_nat_egress
+
+
+def _derive_instance_network_posture(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+    subnetworks = _resource_subnetworks(resource, index)
+    resource.in_public_subnet = any(subnetwork.is_public_subnet for subnetwork in subnetworks)
+    resource.has_nat_gateway_egress = any(subnetwork.has_nat_gateway_egress for subnetwork in subnetworks)
+    resource.has_public_route = resource.in_public_subnet or any(
+        _route_has_internet_gateway(route)
+        and _route_tags_apply_to_instance(route, resource)
+        and _same_network_reference(route.vpc_id, resource.vpc_id)
+        for route in index.routes
+    )
+
+
+def _resource_subnetworks(resource: NormalizedResource, index: _GcpResourceIndex) -> list[NormalizedResource]:
+    subnetworks: list[NormalizedResource] = []
+    seen: set[str] = set()
+    for subnet_reference in resource.subnet_ids:
+        subnetwork = index.subnetworks_by_reference.get(_reference_key(subnet_reference))
+        if subnetwork is None or subnetwork.address in seen:
+            continue
+        subnetworks.append(subnetwork)
+        seen.add(subnetwork.address)
+    return subnetworks
 
 
 def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -232,10 +296,20 @@ def _firewall_applies_to_instance(firewall: NormalizedResource, instance: Normal
         return False
 
     target_tags = set(firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_TAGS))
-    if not target_tags:
-        return True
-    instance_tags = set(instance.get_metadata_field(GcpResourceMetadata.NETWORK_TAGS))
-    return bool(target_tags.intersection(instance_tags))
+    if target_tags:
+        instance_tags = set(instance.get_metadata_field(GcpResourceMetadata.NETWORK_TAGS))
+        if not target_tags.intersection(instance_tags):
+            return False
+
+    target_service_accounts = _service_account_reference_keys(
+        firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_SERVICE_ACCOUNTS)
+    )
+    if target_service_accounts:
+        instance_service_accounts = _instance_service_account_keys(instance)
+        if not target_service_accounts.intersection(instance_service_accounts):
+            return False
+
+    return True
 
 
 def _internet_ingress_reasons(firewall: NormalizedResource) -> list[str]:
@@ -244,6 +318,80 @@ def _internet_ingress_reasons(firewall: NormalizedResource) -> list[str]:
         for rule in firewall.network_rules
         if rule.direction == "ingress" and rule.allows_internet()
     ]
+
+
+def _route_has_internet_gateway(route: NormalizedResource) -> bool:
+    dest_range = route.get_metadata_field(GcpResourceMetadata.ROUTE_DEST_RANGE)
+    next_hop_gateway = route.get_metadata_field(GcpResourceMetadata.ROUTE_NEXT_HOP_GATEWAY)
+    if dest_range not in {"0.0.0.0/0", "::/0"} or not next_hop_gateway:
+        return False
+    return "default-internet-gateway" in next_hop_gateway or "internet" in next_hop_gateway
+
+
+def _route_tags_apply_to_instance(route: NormalizedResource, instance: NormalizedResource) -> bool:
+    route_tags = set(route.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS))
+    if not route_tags:
+        return False
+    instance_tags = set(instance.get_metadata_field(GcpResourceMetadata.NETWORK_TAGS))
+    return bool(route_tags.intersection(instance_tags))
+
+
+def _nat_applies_to_subnetwork(
+    router_nat: NormalizedResource,
+    subnetwork: NormalizedResource,
+    index: _GcpResourceIndex,
+) -> bool:
+    source_mode = str(router_nat.metadata.get("source_subnetwork_ip_ranges_to_nat") or "").upper()
+    if source_mode.startswith("ALL_SUBNETWORKS"):
+        return any(
+            _same_network_reference(network_reference, subnetwork.vpc_id)
+            for network_reference in _router_nat_network_references(router_nat, index)
+        )
+
+    subnetwork_references = set(_resource_references(subnetwork))
+    for nat_subnetwork in router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS):
+        reference = nat_subnetwork.get("name") if isinstance(nat_subnetwork, dict) else None
+        if reference and _reference_key(str(reference)) in subnetwork_references:
+            return True
+    return False
+
+
+def _router_nat_network_references(
+    router_nat: NormalizedResource,
+    index: _GcpResourceIndex,
+) -> tuple[str, ...]:
+    router_reference = router_nat.get_metadata_field(GcpResourceMetadata.ROUTER_REFERENCE)
+    if not router_reference:
+        return ()
+    router = index.routers_by_reference.get(_reference_key(router_reference))
+    if router is None or not router.vpc_id:
+        return ()
+    return (router.vpc_id,)
+
+
+def _instance_service_account_keys(instance: NormalizedResource) -> set[str]:
+    keys: set[str] = set()
+    for account in instance.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNTS):
+        if not isinstance(account, dict):
+            continue
+        keys.update(_service_account_reference_keys([account.get("email")]))
+    return keys
+
+
+def _service_account_reference_keys(values: list[object]) -> set[str]:
+    keys: set[str] = set()
+    for value in values:
+        if value in (None, "", "default"):
+            continue
+        text = str(value).strip()
+        if not text or text == "default":
+            continue
+        keys.add(text)
+        if text.startswith("serviceAccount:"):
+            keys.add(text.removeprefix("serviceAccount:"))
+        else:
+            keys.add(f"serviceAccount:{text}")
+    return keys
 
 
 def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:

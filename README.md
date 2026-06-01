@@ -402,9 +402,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## GCP Support
 
-The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_project_iam_member`, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
+The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_project_iam_member`, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
 
-GCP trust-boundary detection currently covers basic internet-to-service exposure for public compute, Cloud SQL, and GCS buckets, plus workload-to-sensitive-data paths from GCE service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks and backup posture, public GCS bucket access, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers internet-to-service exposure for public compute, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks and backup posture, public GCS bucket access, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 
@@ -491,7 +491,7 @@ GCP trust-boundary detection currently covers basic internet-to-service exposure
 ## Limitations
 
 - AWS remains the deepest provider implementation and the only provider with control-observation coverage today
-- GCP support is limited to initial inventory normalization, basic internet-to-service and workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource types
+- GCP support is limited to initial inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource types
 - Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case
