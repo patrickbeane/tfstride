@@ -45,6 +45,7 @@ _RULE_GROUP_IDS = (
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
         "gcp-compute-os-login-disabled",
+        "gcp-cloud-run-public-invoker",
     ),
     (
         "aws-database-permissive-ingress",
@@ -136,6 +137,7 @@ class StrideRuleEngine:
             ),
             "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
             "gcp-compute-os-login-disabled": gcp_detectors.detect_compute_os_login_disabled,
+            "gcp-cloud-run-public-invoker": gcp_detectors.detect_cloud_run_public_invoker,
             "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
             "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,
             "aws-sensitive-resource-policy-external-access": (

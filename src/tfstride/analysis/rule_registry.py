@@ -391,6 +391,18 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-run-public-invoker",
+        title="Cloud Run service is publicly invokable",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from Cloud Run invoker bindings unless "
+            "anonymous access is intentional, and front public services with authentication, IAP, "
+            "API Gateway, or a controlled edge policy."
+        ),
+        tags=("gcp", "cloud-run", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-project-iam-broad-principal",
         title="GCP project IAM binding grants access to public principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

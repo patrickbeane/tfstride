@@ -10,6 +10,8 @@ from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceI
 from tfstride.resource_helpers import describe_security_group_rule
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
+_CLOUD_RUN_RESOURCE_TYPES = frozenset({"google_cloud_run_service", "google_cloud_run_v2_service"})
+_CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _SECRET_ACCESS_ROLES = frozenset(
     {
@@ -139,6 +141,59 @@ class GcpRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("os_login_posture", ["metadata.enable-oslogin is false"]),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloud_run_public_invoker(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for service in context.inventory.by_type(*_CLOUD_RUN_RESOURCE_TYPES):
+            public_invokers = _cloud_run_public_invoker_bindings(service)
+            if not service.public_exposure or not public_invokers:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", service.address)
+            )
+            affected_resources = _dedupe_addresses(
+                [service.address, *[source for source, _, _ in public_invokers]]
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=affected_resources,
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{service.display_name} allows public ingress and grants Cloud Run invoke "
+                        "permission to public GCP principals. Unauthenticated internet clients can reach "
+                        "the service entry point without an organization-owned identity boundary."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "public_invoker_bindings",
+                            [
+                                f"source={source}; role={role}; member={member}"
+                                for source, role, member in public_invokers
+                            ],
+                        ),
+                        evidence_item("public_access_reasons", service.public_access_reasons),
+                        evidence_item("public_exposure_reasons", service.public_exposure_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -872,6 +927,20 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
         "internet boundary, broad SSH/RDP ingress increases exposure if an external address, peering path, "
         "or forwarding path is later attached."
     )
+
+
+def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
+    bindings: list[tuple[str, str, str]] = []
+    for binding in analysis_facts(resource).iam_bindings:
+        role = str(binding.get("role") or "").strip()
+        if role not in _CLOUD_RUN_PUBLIC_INVOKER_ROLES:
+            continue
+        source = str(binding.get("source") or "").strip()
+        for member in _binding_members(binding):
+            if member in _PUBLIC_GCP_IAM_MEMBERS:
+                bindings.append((source, role, member))
+    return bindings
+
 
 def _binding_members(binding: dict[str, object]) -> list[str]:
     members = binding.get("members")

@@ -1082,6 +1082,71 @@ class GcpRuleTests(unittest.TestCase):
             evidence["boundary_rationale"][0],
         )
 
+    def test_public_cloud_run_invoker_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_run_service(), _cloud_run_service_iam_member()])
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-run-public-invoker")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_cloud_run_v2_service.api", "google_cloud_run_v2_service_iam_member.public_invoker"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "internet-to-service:internet->google_cloud_run_v2_service.api",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_invoker_bindings"],
+            [
+                "source=google_cloud_run_v2_service_iam_member.public_invoker; "
+                "role=roles/run.invoker; member=allUsers"
+            ],
+        )
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+        )
+
+    def test_cloud_run_public_invoker_requires_public_ingress_and_public_member(self) -> None:
+        private_inventory = GcpNormalizer().normalize(
+            [_cloud_run_service(public_ingress=False), _cloud_run_service_iam_member()]
+        )
+        non_public_inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(member="serviceAccount:caller@example.iam.gserviceaccount.com"),
+            ]
+        )
+
+        engine = StrideRuleEngine()
+
+        self.assertEqual(
+            engine.evaluate(
+                private_inventory,
+                detect_trust_boundaries(private_inventory),
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+            ),
+            [],
+        )
+        self.assertEqual(
+            engine.evaluate(
+                non_public_inventory,
+                detect_trust_boundaries(non_public_inventory),
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+            ),
+            [],
+        )
+
     def test_public_cloud_run_service_account_secret_access_path_is_detected(self) -> None:
         service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
         inventory = GcpNormalizer().normalize(
