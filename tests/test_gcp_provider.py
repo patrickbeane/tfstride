@@ -91,6 +91,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key"))
         self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key_iam_member"))
         self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
+        self.assertTrue(plugin.supports_resource_type("google_project_iam_binding"))
+        self.assertTrue(plugin.supports_resource_type("google_project_iam_policy"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))

@@ -11,6 +11,9 @@ from tfstride.resource_helpers import describe_security_group_rule
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
 _CLOUD_RUN_RESOURCE_TYPES = frozenset({"google_cloud_run_service", "google_cloud_run_v2_service"})
+_PROJECT_IAM_RESOURCE_TYPES = frozenset(
+    {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
+)
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _SECRET_ACCESS_ROLES = frozenset(
@@ -275,36 +278,34 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for binding in context.inventory.by_type("google_project_iam_member"):
-            binding_facts = analysis_facts(binding)
-            member = binding_facts.iam_member
-            if member not in {"allUsers", "allAuthenticatedUsers"}:
-                continue
-            role = binding_facts.iam_role or "unknown role"
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=True,
-                privilege_breadth=1,
-                data_sensitivity=0,
-                lateral_movement=1,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[binding.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{binding.display_name} grants `{role}` to `{member}` at project scope. Public "
-                        "or broadly authenticated principals can cross into the control plane without an "
-                        "organization-owned identity boundary."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                    ),
-                    severity_reasoning=severity_reasoning,
+        for binding in context.inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
+            for role, member in _project_iam_binding_members(binding):
+                if member not in _PUBLIC_GCP_IAM_MEMBERS:
+                    continue
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=True,
+                    privilege_breadth=1,
+                    data_sensitivity=0,
+                    lateral_movement=1,
+                    blast_radius=1,
                 )
-            )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[binding.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants `{role}` to `{member}` at project scope. Public "
+                            "or broadly authenticated principals can cross into the control plane without an "
+                            "organization-owned identity boundary."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
         return findings
 
     def detect_project_iam_privileged_role(
@@ -316,38 +317,36 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for binding in context.inventory.by_type("google_project_iam_member"):
-            binding_facts = analysis_facts(binding)
-            role = binding_facts.iam_role
-            role_risk = _privileged_project_role_risk(role)
-            if role_risk is None:
-                continue
-            member = binding_facts.iam_member or "unknown member"
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=2,
-                data_sensitivity=0,
-                lateral_movement=2,
-                blast_radius=2,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[binding.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
-                        f"at project scope. That role enables {role_risk} and can materially expand "
-                        "control-plane blast radius if the principal is compromised or mis-scoped."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                        evidence_item("role_risk", [role_risk]),
-                    ),
-                    severity_reasoning=severity_reasoning,
+        for binding in context.inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
+            for role, member in _project_iam_binding_members(binding):
+                role_risk = _privileged_project_role_risk(role)
+                if role_risk is None:
+                    continue
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=2,
+                    blast_radius=2,
                 )
-            )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[binding.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
+                            f"at project scope. That role enables {role_risk} and can materially expand "
+                            "control-plane blast radius if the principal is compromised or mis-scoped."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                            evidence_item("role_risk", [role_risk]),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
         return findings
 
     def detect_gcs_public_access(
@@ -927,6 +926,24 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
         "internet boundary, broad SSH/RDP ingress increases exposure if an external address, peering path, "
         "or forwarding path is later attached."
     )
+
+
+def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
+    bindings = analysis_facts(resource).iam_bindings
+    if not bindings:
+        facts = analysis_facts(resource)
+        role = facts.iam_role
+        member = facts.iam_member
+        if role and member:
+            return [(role, member)]
+        return []
+
+    members: list[tuple[str, str]] = []
+    for binding in bindings:
+        role = str(binding.get("role") or "unknown role")
+        for member in _binding_members(binding):
+            members.append((role, member))
+    return members
 
 
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:

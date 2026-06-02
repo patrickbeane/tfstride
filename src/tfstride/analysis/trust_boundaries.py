@@ -29,6 +29,11 @@ from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 
 
+_PROJECT_IAM_RESOURCE_TYPES = frozenset(
+    {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
+)
+
+
 @dataclass(frozen=True, slots=True)
 class _DataStoreCandidateIndex:
     data_store_positions: Mapping[int, int]
@@ -214,7 +219,7 @@ def _build_data_store_candidate_index(
     project_iam_resources: list[NormalizedResource] = []
 
     for resource in resources:
-        if resource.resource_type == "google_project_iam_member":
+        if resource.resource_type in _PROJECT_IAM_RESOURCE_TYPES:
             project_iam_resources.append(resource)
 
     for data_store in data_stores:
@@ -487,12 +492,29 @@ def _gcp_matching_iam_access_grants(
         project_iam_facts = analysis_facts(project_iam_resource)
         if not data_store_project or project_iam_facts.project != data_store_project:
             continue
-        role = project_iam_facts.iam_role
-        member = project_iam_facts.iam_member
-        if member not in workload_members or not _gcp_role_allows_data_store_access(data_store, role):
-            continue
-        grants.append(f"{project_iam_resource.address} grants {role} to {member} at project scope")
+        for role, member in _project_iam_binding_members(project_iam_resource):
+            if member not in workload_members or not _gcp_role_allows_data_store_access(data_store, role):
+                continue
+            grants.append(f"{project_iam_resource.address} grants {role} to {member} at project scope")
     return _dedupe(grants)
+
+
+def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
+    bindings = analysis_facts(resource).iam_bindings
+    if not bindings:
+        facts = analysis_facts(resource)
+        role = facts.iam_role
+        member = facts.iam_member
+        if role and member:
+            return [(role, member)]
+        return []
+
+    members: list[tuple[str, str]] = []
+    for binding in bindings:
+        role = str(binding.get("role") or "")
+        for member in _binding_members(binding):
+            members.append((role, member))
+    return members
 
 
 def _gcp_workload_identity_members(workload: NormalizedResource) -> list[str]:

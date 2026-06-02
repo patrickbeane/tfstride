@@ -16,7 +16,9 @@ from tfstride.providers.gcp.data_normalizers import (
 )
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_kms_crypto_key_iam_member,
+    normalize_project_iam_binding,
     normalize_project_iam_member,
+    normalize_project_iam_policy,
     normalize_secret_manager_secret_iam_member,
     normalize_service_account,
     normalize_service_account_iam_binding,
@@ -1275,6 +1277,69 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER),
             "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/viewer",
+                    "members": ["serviceAccount:tfstride-web@example.iam.gserviceaccount.com"],
+                }
+            ],
+        )
+
+    def test_project_iam_binding_normalizer_preserves_member_list(self) -> None:
+        normalized = normalize_project_iam_binding(
+            _terraform_resource(
+                "google_project_iam_binding.viewer",
+                "google_project_iam_binding",
+                {
+                    "project": "tfstride-demo",
+                    "role": "roles/viewer",
+                    "members": ["allUsers", "group:ops@example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/viewer")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS),
+            ["allUsers", "group:ops@example.com"],
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/viewer", "members": ["allUsers", "group:ops@example.com"]}],
+        )
+
+    def test_project_iam_policy_normalizer_parses_policy_bindings(self) -> None:
+        normalized = normalize_project_iam_policy(
+            _terraform_resource(
+                "google_project_iam_policy.policy",
+                "google_project_iam_policy",
+                {
+                    "project": "tfstride-demo",
+                    "policy_data": json.dumps(
+                        {
+                            "bindings": [
+                                {"role": "roles/viewer", "members": ["allUsers"]},
+                                {"role": "roles/owner", "members": ["group:admins@example.com"]},
+                            ]
+                        }
+                    ),
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {"role": "roles/viewer", "members": ["allUsers"]},
+                {"role": "roles/owner", "members": ["group:admins@example.com"]},
+            ],
         )
 
 

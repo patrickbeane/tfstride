@@ -181,6 +181,38 @@ def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.
     )
 
 
+def _project_iam_binding(
+    role: str,
+    members: list[str] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_project_iam_binding.binding",
+        mode="managed",
+        resource_type="google_project_iam_binding",
+        name="binding",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "project": "tfstride-demo",
+            "role": role,
+            "members": members or ["serviceAccount:deploy@example.iam.gserviceaccount.com"],
+        },
+    )
+
+
+def _project_iam_policy(bindings: list[dict[str, object]]) -> TerraformResource:
+    return TerraformResource(
+        address="google_project_iam_policy.policy",
+        mode="managed",
+        resource_type="google_project_iam_policy",
+        name="policy",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "project": "tfstride-demo",
+            "policy_data": {"bindings": bindings},
+        },
+    )
+
+
 def _storage_bucket(
     public_access_prevention: str | None = None,
     *,
@@ -1287,6 +1319,33 @@ class GcpRuleTests(unittest.TestCase):
             evidence["boundary_rationale"][0],
         )
 
+    def test_project_iam_binding_kms_access_path_is_detected_for_public_compute(self) -> None:
+        service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _public_compute_firewall(),
+                _compute_instance(),
+                _kms_crypto_key(),
+                _project_iam_binding("roles/cloudkms.cryptoKeyDecrypter", members=[service_account]),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertIn(
+            "google_project_iam_binding.binding grants roles/cloudkms.cryptoKeyDecrypter",
+            evidence["boundary_rationale"][0],
+        )
+
     def test_private_compute_sensitive_data_path_is_not_reported(self) -> None:
         service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
         inventory = GcpNormalizer().normalize(
@@ -1361,6 +1420,20 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(evidence["iam_binding"], ["member=allUsers", "role=roles/viewer"])
 
+    def test_project_iam_binding_broad_principal_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_project_iam_binding("roles/viewer", members=["allAuthenticatedUsers", "group:ops@example.com"])]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-project-iam-broad-principal")
+        self.assertEqual(finding.affected_resources, ["google_project_iam_binding.binding"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["iam_binding"], ["member=allAuthenticatedUsers", "role=roles/viewer"])
+
     def test_project_iam_privileged_role_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_project_iam_member("roles/owner")])
 
@@ -1377,6 +1450,27 @@ class GcpRuleTests(unittest.TestCase):
             ["member=serviceAccount:deploy@example.iam.gserviceaccount.com", "role=roles/owner"],
         )
         self.assertEqual(evidence["role_risk"], ["full project administration"])
+
+    def test_project_iam_policy_privileged_role_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _project_iam_policy(
+                    [
+                        {"role": "roles/viewer", "members": ["group:ops@example.com"]},
+                        {"role": "roles/owner", "members": ["group:admins@example.com"]},
+                    ]
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-project-iam-privileged-role")
+        self.assertEqual(finding.affected_resources, ["google_project_iam_policy.policy"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["iam_binding"], ["member=group:admins@example.com", "role=roles/owner"])
 
     def test_project_iam_admin_class_role_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_project_iam_member("roles/compute.admin")])

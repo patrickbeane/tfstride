@@ -24,7 +24,53 @@ def normalize_project_iam_member(resource: TerraformResource) -> NormalizedResou
             GcpResourceMetadata.PROJECT.key: values.get("project"),
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
+            GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
             "condition": values.get("condition"),
+        },
+    )
+
+
+def normalize_project_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    role = first_non_empty(values.get("role"))
+    members = compact(as_list(values.get("members")))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(
+            values.get("id"),
+            _binding_identifier(values.get("project"), role, members),
+            resource.address,
+        ),
+        metadata={
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBERS.key: members,
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def normalize_project_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    policy_document = load_json_document(values.get("policy_data"))
+    bindings = _policy_bindings(policy_document)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), values.get("project"), resource.address),
+        metadata={
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.IAM_BINDINGS.key: bindings,
+            "policy_document": policy_document,
         },
     )
 
