@@ -64,8 +64,6 @@ class GcpRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         for instance in inventory.by_type("google_compute_instance"):
-            if not instance.public_exposure:
-                continue
             risky_rules = _risky_public_firewall_rules(instance, inventory)
             if not risky_rules:
                 continue
@@ -89,11 +87,7 @@ class GcpRuleDetectors:
                     severity=severity_reasoning.severity,
                     affected_resources=affected_resources,
                     trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{instance.display_name} has an external access config and matching GCP firewall "
-                        "rules allow administrative access or all ports from the public internet. That broad "
-                        "ingress raises the chance of unauthenticated probing and credential attacks."
-                    ),
+                    rationale=_public_compute_broad_ingress_rationale(instance),
                     evidence=collect_evidence(
                         evidence_item(
                             "firewall_rules",
@@ -103,6 +97,7 @@ class GcpRuleDetectors:
                             ],
                         ),
                         evidence_item("network_tags", analysis_facts(instance).network_tags),
+                        evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -823,6 +818,20 @@ def _service_account_project(member: str) -> str | None:
     domain = email.split("@", 1)[1]
     return domain[: -len(suffix)] or None
 
+
+def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str:
+    if instance.public_exposure:
+        return (
+            f"{instance.display_name} has an external access config and matching GCP firewall "
+            "rules allow administrative access or all ports from the public internet. That broad "
+            "ingress raises the chance of unauthenticated probing and credential attacks."
+        )
+    return (
+        f"{instance.display_name} is targeted by GCP firewall rules that allow administrative access "
+        "or all ports from internet-wide source ranges. Even when the plan does not show a direct "
+        "internet boundary, broad SSH/RDP ingress increases exposure if an external address, peering path, "
+        "or forwarding path is later attached."
+    )
 
 def _binding_members(binding: dict[str, object]) -> list[str]:
     members = binding.get("members")
