@@ -502,6 +502,8 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 
 ## Sample Assets
 
+### AWS
+
 - Safe:
   [`fixtures/sample_aws_safe_plan.json`](fixtures/sample_aws_safe_plan.json),
   [`examples/safe_report.md`](examples/safe_report.md)
@@ -520,15 +522,18 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 - Lambda deploy-role:
   [`fixtures/sample_aws_lambda_deploy_role_plan.json`](fixtures/sample_aws_lambda_deploy_role_plan.json),
   [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
-- GCP initial inventory:
-  [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
-  [`examples/gcp_inventory_report.md`](examples/gcp_inventory_report.md)
 - Mixed:
   [`fixtures/sample_aws_plan.json`](fixtures/sample_aws_plan.json),
   [`examples/sample_report.md`](examples/sample_report.md)
 - Nightmare:
   [`fixtures/sample_aws_nightmare_plan.json`](fixtures/sample_aws_nightmare_plan.json),
   [`examples/nightmare_report.md`](examples/nightmare_report.md)
+
+### GCP
+
+- Initial inventory:
+  [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
+  [`examples/gcp_inventory_report.md`](examples/gcp_inventory_report.md)
 
 ## Testing
 
