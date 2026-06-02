@@ -1015,6 +1015,79 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(instance.public_exposure)
         self.assertTrue(instance.direct_internet_reachable)
 
+    def test_normalizer_matches_firewall_on_later_instance_network_interface(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.primary",
+                    "google_compute_network",
+                    {"name": "tfstride-primary"},
+                ),
+                _terraform_resource(
+                    "google_compute_network.edge",
+                    "google_compute_network",
+                    {"name": "tfstride-edge"},
+                ),
+                _terraform_resource(
+                    "google_compute_firewall.public_ssh",
+                    "google_compute_firewall",
+                    {
+                        "network": "google_compute_network.edge.name",
+                        "source_ranges": ["0.0.0.0/0"],
+                        "target_tags": ["web"],
+                        "allow": [{"protocol": "tcp", "ports": ["22"]}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "tags": ["web"],
+                        "network_interface": [
+                            {"network": "google_compute_network.primary.id"},
+                            {
+                                "network": "google_compute_network.edge.id",
+                                "access_config": [{}],
+                            },
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertIsNone(instance.vpc_id)
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.public_ssh"],
+        )
+        self.assertTrue(instance.public_exposure)
+
+    def test_normalizer_ignores_malformed_instance_network_reference(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "network_interface": [
+                            {"network": {"self_link": "projects/demo/global/networks/tfstride-main"}}
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertIsNone(instance.vpc_id)
+
     def test_normalizer_derives_subnet_public_route_and_nat_egress_posture(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

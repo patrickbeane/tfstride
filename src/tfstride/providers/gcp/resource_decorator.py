@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -11,6 +12,10 @@ from tfstride.resource_helpers import describe_security_group_rule
 
 
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
+_GCP_NETWORK_NAME_PATTERN = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+_TERRAFORM_REFERENCE_TOKEN_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]\"-"
+)
 
 
 class GcpResourceDecorator:
@@ -186,7 +191,7 @@ def _derive_instance_network_posture(resource: NormalizedResource, index: _GcpRe
     resource.has_public_route = resource.in_public_subnet or any(
         _route_has_internet_gateway(route)
         and _route_tags_apply_to_instance(route, resource)
-        and _same_network_reference(route.vpc_id, resource.vpc_id, index)
+        and _resource_has_network_reference(resource, route.vpc_id, index)
         for route in index.routes
     )
 
@@ -206,15 +211,25 @@ def _resource_subnetworks(resource: NormalizedResource, index: _GcpResourceIndex
 def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
     if resource.vpc_id:
         return
+    subnet_network_reference = _unique_network_reference(_subnetwork_vpc_references(resource, index), index)
+    if subnet_network_reference:
+        resource.vpc_id = subnet_network_reference
+        return
+    network_reference = _unique_network_reference(_instance_network_references(resource), index)
+    if network_reference:
+        resource.vpc_id = network_reference
+
+
+def _subnetwork_vpc_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+    references: list[str] = []
     for subnet_reference in resource.subnet_ids:
         subnetwork = index.subnetworks_by_reference.get(_reference_key(subnet_reference))
-        if subnetwork is None or not subnetwork.vpc_id:
+        if subnetwork is None:
             continue
-        resource.vpc_id = subnetwork.vpc_id
-        return
-    for network_reference in _instance_network_references(resource):
-        resource.vpc_id = network_reference
-        return
+        network_reference = _validated_network_reference(subnetwork.vpc_id)
+        if network_reference is not None:
+            references.append(network_reference)
+    return references
 
 
 def _instance_network_references(resource: NormalizedResource) -> list[str]:
@@ -225,8 +240,45 @@ def _instance_network_references(resource: NormalizedResource) -> list[str]:
         network = interface.get("network")
         if network in (None, ""):
             continue
-        references.append(str(network))
-    return references
+        network_reference = _validated_network_reference(network)
+        if network_reference is not None:
+            references.append(network_reference)
+    return _dedupe(references)
+
+
+def _unique_network_reference(references: list[str], index: _GcpResourceIndex) -> str | None:
+    inferred_reference: str | None = None
+    inferred_canonical_reference: str | None = None
+    for reference in references:
+        canonical_reference = _canonical_network_reference(reference, index)
+        if inferred_reference is None:
+            inferred_reference = reference
+            inferred_canonical_reference = canonical_reference
+            continue
+        if canonical_reference != inferred_canonical_reference:
+            return None
+    return inferred_reference
+
+
+def _resource_has_network_reference(
+    resource: NormalizedResource,
+    network_reference: str | None,
+    index: _GcpResourceIndex,
+) -> bool:
+    return any(
+        _same_network_reference(candidate, network_reference, index)
+        for candidate in _resource_network_references(resource, index)
+    )
+
+
+def _resource_network_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+    references: list[str] = []
+    direct_reference = _validated_network_reference(resource.vpc_id)
+    if direct_reference is not None:
+        references.append(direct_reference)
+    references.extend(_subnetwork_vpc_references(resource, index))
+    references.extend(_instance_network_references(resource))
+    return _dedupe(references)
 
 
 def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -408,7 +460,7 @@ def _firewall_applies_to_instance(
         return False
     if str(firewall.metadata.get("direction") or "ingress").strip().lower() != "ingress":
         return False
-    if not _same_network_reference(firewall.vpc_id, instance.vpc_id, index):
+    if not _resource_has_network_reference(instance, firewall.vpc_id, index):
         return False
 
     target_tags = set(firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_TAGS))
@@ -551,6 +603,33 @@ def _canonical_network_reference(value: str, index: _GcpResourceIndex | None) ->
             or network_key
         )
     return network_key
+
+
+def _validated_network_reference(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or any(character.isspace() for character in text):
+        return None
+    network_key = _network_reference_key(text)
+    if _GCP_NETWORK_NAME_PATTERN.fullmatch(network_key):
+        return text
+    reference_key = _reference_key(text)
+    if _is_terraform_network_reference(reference_key):
+        return text
+    return None
+
+
+def _is_terraform_network_reference(value: str) -> bool:
+    parts = value.split(".")
+    for index, part in enumerate(parts[:-1]):
+        if part != "google_compute_network":
+            continue
+        resource_name = parts[index + 1]
+        return bool(resource_name) and all(
+            token and set(token) <= _TERRAFORM_REFERENCE_TOKEN_CHARS for token in parts
+        )
+    return False
 
 
 def _network_reference_key(value: str) -> str:
