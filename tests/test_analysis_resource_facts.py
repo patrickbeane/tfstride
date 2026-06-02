@@ -44,6 +44,22 @@ class FakeProviderFacts:
         return {"block_public_acls": True}
 
     @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        return True
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        return "enforced"
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        return True
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
+        return "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
+
+    @property
     def policy_document(self) -> dict[str, Any]:
         return {"Statement": [{"Effect": "Allow"}]}
 
@@ -140,6 +156,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.bucket_name, "logs")
         self.assertEqual(facts.bucket_acl, "public-read")
         self.assertEqual(facts.public_access_block, {"block_public_acls": True})
+        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
+        self.assertIsNone(facts.gcs_public_access_prevention)
+        self.assertIsNone(facts.gcs_versioning_enabled)
+        self.assertIsNone(facts.gcs_default_kms_key_name)
         self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.database_engine, "postgres")
@@ -180,6 +200,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.bucket_name, "logs")
         self.assertEqual(facts.bucket_acl, "")
         self.assertIsNone(facts.public_access_block)
+        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
+        self.assertIsNone(facts.gcs_public_access_prevention)
+        self.assertIsNone(facts.gcs_versioning_enabled)
+        self.assertIsNone(facts.gcs_default_kms_key_name)
         self.assertEqual(facts.policy_document, {})
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.database_engine)
@@ -199,6 +223,32 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.service_account_reference)
         self.assertEqual(facts.workload_identity_members, [])
         self.assertEqual(facts.workload_identity_scopes, [])
+
+    def test_gcp_storage_bucket_facts_read_provider_owned_posture_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.BUCKET_NAME.key: "tfstride-logs",
+                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS.key: True,
+                GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION.key: "enforced",
+                GcpResourceMetadata.GCS_VERSIONING_ENABLED.key: True,
+                GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME.key: (
+                    "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
+                ),
+            },
+            provider="gcp",
+            resource_type="google_storage_bucket",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.bucket_name, "tfstride-logs")
+        self.assertTrue(facts.gcs_uniform_bucket_level_access)
+        self.assertEqual(facts.gcs_public_access_prevention, "enforced")
+        self.assertTrue(facts.gcs_versioning_enabled)
+        self.assertEqual(
+            facts.gcs_default_kms_key_name,
+            "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
+        )
 
     def test_gcp_sensitive_resource_facts_read_provider_owned_iam_metadata(self) -> None:
         resource = _resource(
@@ -341,6 +391,13 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.bucket_name, "gcp-logs")
         self.assertEqual(facts.bucket_acl, "private")
         self.assertEqual(facts.public_access_block, {"block_public_acls": True})
+        self.assertTrue(facts.gcs_uniform_bucket_level_access)
+        self.assertEqual(facts.gcs_public_access_prevention, "enforced")
+        self.assertTrue(facts.gcs_versioning_enabled)
+        self.assertEqual(
+            facts.gcs_default_kms_key_name,
+            "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
+        )
         self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.database_engine, "spanner")

@@ -281,6 +281,11 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.identifier, "tfstride-logs")
         self.assertEqual(normalized.data_sensitivity, "sensitive")
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS))
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.GCS_VERSIONING_ENABLED))
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION), {})
+        self.assertIsNone(normalized.get_metadata_field(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME))
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION), {})
+        self.assertTrue(normalized.storage_encrypted)
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
 
     def test_secret_manager_secret_normalizer_preserves_secret_context(self) -> None:

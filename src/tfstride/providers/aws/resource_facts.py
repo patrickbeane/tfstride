@@ -31,6 +31,22 @@ class AwsResourceFacts:
         self.resource.extend_metadata_field(field, values)
 
     @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        return None
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        return None
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
+        return None
+
+    @property
     def project(self) -> str | None:
         return None
 

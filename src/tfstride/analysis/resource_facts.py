@@ -48,6 +48,22 @@ class AnalysisResourceFacts:
         return self._facts.public_access_block
 
     @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        return self._facts.gcs_uniform_bucket_level_access
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        return self._facts.gcs_public_access_prevention
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        return self._facts.gcs_versioning_enabled
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
+        return self._facts.gcs_default_kms_key_name
+
+    @property
     def policy_document(self) -> dict[str, Any]:
         return self._facts.policy_document
 

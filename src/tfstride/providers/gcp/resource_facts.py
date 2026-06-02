@@ -39,6 +39,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.BUCKET_NAME)
 
     @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS)
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        return self.get(GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION)
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GCS_VERSIONING_ENABLED)
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
+        return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
+
+    @property
     def resource_policy_source_addresses(self) -> list[str]:
         return self.get(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 

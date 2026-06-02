@@ -325,6 +325,50 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-gcs-uniform-bucket-level-access-disabled",
+        title="GCS bucket does not enforce uniform bucket-level access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable uniform bucket-level access so object ACLs cannot bypass bucket IAM, and migrate "
+            "legacy object ACL permissions into explicit bucket-level IAM bindings."
+        ),
+        tags=("gcp", "gcs", "storage", "iam"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-public-access-prevention-not-enforced",
+        title="GCS bucket does not enforce Public Access Prevention",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set GCS Public Access Prevention to `enforced` on sensitive buckets and rely on explicit "
+            "non-public identities or signed access patterns when objects must be shared."
+        ),
+        tags=("gcp", "gcs", "storage", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-versioning-disabled",
+        title="GCS sensitive bucket versioning is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules "
+            "that match recovery objectives and storage cost constraints."
+        ),
+        tags=("gcp", "gcs", "storage", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-customer-managed-encryption-missing",
+        title="GCS sensitive bucket does not use customer-managed encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure a Cloud KMS customer-managed key for sensitive GCS buckets, assign the GCS service "
+            "agent only the key roles it needs, and manage key rotation separately from bucket IAM."
+        ),
+        tags=("gcp", "gcs", "storage", "kms", "encryption"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,

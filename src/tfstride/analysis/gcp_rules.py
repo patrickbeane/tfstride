@@ -300,6 +300,192 @@ class GcpRuleDetectors:
             )
         return findings
 
+    def detect_gcs_uniform_bucket_level_access_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            bucket_facts = analysis_facts(bucket)
+            if bucket_facts.gcs_uniform_bucket_level_access is True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=1,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{bucket.display_name} does not enforce GCS uniform bucket-level access. "
+                        "Object ACLs can bypass the intended bucket-level IAM model and make access "
+                        "harder to audit consistently."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "access_control_posture",
+                            [
+                                f"uniform_bucket_level_access is {_bool_status(bucket_facts.gcs_uniform_bucket_level_access)}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gcs_public_access_prevention_not_enforced(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            bucket_facts = analysis_facts(bucket)
+            if _gcs_public_access_prevention_enforced(bucket_facts.gcs_public_access_prevention):
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=bucket.public_exposure,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{bucket.display_name} does not enforce GCS Public Access Prevention. "
+                        "Public principals can still be introduced through bucket IAM unless an "
+                        "organization-level policy blocks them."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "access_control_posture",
+                            [
+                                f"public_access_prevention is {bucket_facts.gcs_public_access_prevention or 'unset'}",
+                            ],
+                        ),
+                        evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gcs_versioning_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            bucket_facts = analysis_facts(bucket)
+            if bucket.data_sensitivity != "sensitive":
+                continue
+            if bucket_facts.gcs_versioning_enabled is True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{bucket.display_name} stores sensitive GCS data without bucket versioning. "
+                        "Accidental overwrites, deletes, or destructive changes have fewer object-level "
+                        "recovery options."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "data_protection_posture",
+                            [
+                                f"versioning.enabled is {_bool_status(bucket_facts.gcs_versioning_enabled)}",
+                                f"data_sensitivity is {bucket.data_sensitivity}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gcs_customer_managed_encryption_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            bucket_facts = analysis_facts(bucket)
+            if bucket.data_sensitivity != "sensitive":
+                continue
+            if bucket_facts.gcs_default_kms_key_name:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{bucket.display_name} relies on default GCS encryption rather than a "
+                        "customer-managed KMS key. Sensitive buckets lose key ownership, rotation, and "
+                        "separation-of-duties controls that a CMEK can provide."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "encryption_posture",
+                            [
+                                "default_kms_key_name is unset",
+                                "customer_managed_encryption is false",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_public_authorized_network(
         self,
         context: RuleEvaluationContext,
@@ -575,6 +761,16 @@ class GcpRuleDetectors:
                 )
             )
         return findings
+
+
+def _bool_status(value: bool | None) -> str:
+    if value is None:
+        return "unset"
+    return str(value).lower()
+
+
+def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
+    return str(value or "").strip().lower() == "enforced"
 
 
 def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> bool:

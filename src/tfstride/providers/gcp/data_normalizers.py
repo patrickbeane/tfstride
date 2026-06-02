@@ -12,6 +12,9 @@ from tfstride.providers.gcp.resource_utils import first_non_empty, resource_iden
 
 def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    versioning = first_item(values.get("versioning")) or {}
+    encryption = first_item(values.get("encryption")) or {}
+    default_kms_key_name = first_non_empty(encryption.get("default_kms_key_name"))
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -28,9 +31,15 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
             GcpResourceMetadata.LABELS.key: values.get("labels") or {},
             GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS.key: as_bool(values.get("uniform_bucket_level_access")),
             GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION.key: values.get("public_access_prevention"),
+            GcpResourceMetadata.GCS_VERSIONING_ENABLED.key: as_bool(versioning.get("enabled", False)),
+            GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION.key: versioning,
+            GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
+            GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION.key: encryption,
             "location": values.get("location"),
             "storage_class": values.get("storage_class"),
             "force_destroy": as_bool(values.get("force_destroy")),
+            "customer_managed_encryption": bool(default_kms_key_name),
+            "storage_encrypted": True,
         },
     )
 

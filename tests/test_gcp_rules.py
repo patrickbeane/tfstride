@@ -100,13 +100,23 @@ def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.
     )
 
 
-def _storage_bucket(public_access_prevention: str | None = None) -> TerraformResource:
+def _storage_bucket(
+    public_access_prevention: str | None = None,
+    *,
+    uniform_bucket_level_access: bool = True,
+    versioning_enabled: bool = True,
+    default_kms_key_name: str | None = "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
+) -> TerraformResource:
     values = {
         "name": "tfstride-logs",
         "location": "US",
+        "uniform_bucket_level_access": uniform_bucket_level_access,
+        "versioning": [{"enabled": versioning_enabled}],
     }
     if public_access_prevention is not None:
         values["public_access_prevention"] = public_access_prevention
+    if default_kms_key_name is not None:
+        values["encryption"] = [{"default_kms_key_name": default_kms_key_name}]
     return TerraformResource(
         address="google_storage_bucket.logs",
         mode="managed",
@@ -254,7 +264,11 @@ class GcpRuleTests(unittest.TestCase):
     def test_gcs_public_bucket_iam_member_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_storage_bucket(), _storage_bucket_iam_member()])
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access"})),
+        )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -276,7 +290,11 @@ class GcpRuleTests(unittest.TestCase):
             [_storage_bucket(), _storage_bucket_iam_member(member="allAuthenticatedUsers")]
         )
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access"})),
+        )
 
         self.assertEqual([finding.rule_id for finding in findings], ["gcp-gcs-public-access"])
 
@@ -285,7 +303,11 @@ class GcpRuleTests(unittest.TestCase):
             [_storage_bucket(public_access_prevention="enforced"), _storage_bucket_iam_member()]
         )
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access"})),
+        )
 
         self.assertEqual(findings, [])
 
@@ -297,7 +319,114 @@ class GcpRuleTests(unittest.TestCase):
             ]
         )
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gcs_uniform_bucket_level_access_disabled_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(uniform_bucket_level_access=False)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-uniform-bucket-level-access-disabled"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-uniform-bucket-level-access-disabled")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(finding.affected_resources, ["google_storage_bucket.logs"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["access_control_posture"], ["uniform_bucket_level_access is false"])
+
+    def test_gcs_public_access_prevention_not_enforced_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(public_access_prevention="inherited")])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-public-access-prevention-not-enforced")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["access_control_posture"], ["public_access_prevention is inherited"])
+
+    def test_gcs_public_access_prevention_enforced_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(public_access_prevention="enforced")])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gcs_versioning_disabled_is_detected_for_sensitive_bucket(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(versioning_enabled=False)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-versioning-disabled"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-versioning-disabled")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["data_protection_posture"],
+            ["versioning.enabled is false", "data_sensitivity is sensitive"],
+        )
+
+    def test_gcs_customer_managed_encryption_missing_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket(default_kms_key_name=None)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-customer-managed-encryption-missing")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["encryption_posture"],
+            ["default_kms_key_name is unset", "customer_managed_encryption is false"],
+        )
+
+    def test_gcs_customer_managed_encryption_is_not_flagged_when_kms_key_is_configured(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})
+            ),
+        )
 
         self.assertEqual(findings, [])
 

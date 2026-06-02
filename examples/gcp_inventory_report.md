@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **9 findings** across **14 normalized resources**.
+This run identified **3 trust boundaries** and **12 findings** across **14 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `7`
+- Medium severity findings: `10`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **9 findings** across **14 normal
 - Provider resources considered: `14`
 - Normalized resources: `14`
 - Unsupported resources: `0`
-- Registered rules: `25`
-- Enabled rules: `25`
+- Registered rules: `29`
+- Enabled rules: `29`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -32,6 +32,9 @@ This run identified **3 trust boundaries** and **9 findings** across **14 normal
   - `gcp-cloud-sql-ssl-not-required`: `1`
   - `gcp-cloud-sql-deletion-protection-disabled`: `1`
   - `gcp-gcs-public-access`: `1`
+  - `gcp-gcs-public-access-prevention-not-enforced`: `1`
+  - `gcp-gcs-versioning-disabled`: `1`
+  - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
 
 ## Discovered Trust Boundaries
@@ -133,6 +136,18 @@ This run identified **3 trust boundaries** and **9 findings** across **14 normal
 - Evidence:
   - ssl posture: require_ssl is false; ssl_mode is unset; ipv4_enabled is true
 
+#### GCS bucket does not enforce Public Access Prevention
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `internet-to-service:internet->google_storage_bucket.logs`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: google_storage_bucket.logs does not enforce GCS Public Access Prevention. Public principals can still be introduced through bucket IAM unless an organization-level policy blocks them.
+- Recommended mitigation: Set GCS Public Access Prevention to `enforced` on sensitive buckets and rely on explicit non-public identities or signed access patterns when objects must be shared.
+- Evidence:
+  - access control posture: public_access_prevention is unset
+  - public exposure reasons: google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers
+
 #### GCS bucket is publicly accessible
 
 - STRIDE category: Information Disclosure
@@ -143,6 +158,28 @@ This run identified **3 trust boundaries** and **9 findings** across **14 normal
 - Recommended mitigation: Remove `allUsers` and `allAuthenticatedUsers` from bucket-level IAM grants, enforce GCS Public Access Prevention, and use signed URLs, CDN origins, or narrow identities when objects must be distributed.
 - Evidence:
   - public exposure reasons: google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers
+
+#### GCS sensitive bucket does not use customer-managed encryption
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_storage_bucket.logs relies on default GCS encryption rather than a customer-managed KMS key. Sensitive buckets lose key ownership, rotation, and separation-of-duties controls that a CMEK can provide.
+- Recommended mitigation: Configure a Cloud KMS customer-managed key for sensitive GCS buckets, assign the GCS service agent only the key roles it needs, and manage key rotation separately from bucket IAM.
+- Evidence:
+  - encryption posture: default_kms_key_name is unset; customer_managed_encryption is false
+
+#### GCS sensitive bucket versioning is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_storage_bucket.logs stores sensitive GCS data without bucket versioning. Accidental overwrites, deletes, or destructive changes have fewer object-level recovery options.
+- Recommended mitigation: Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules that match recovery objectives and storage cost constraints.
+- Evidence:
+  - data protection posture: versioning.enabled is false; data_sensitivity is sensitive
 
 #### Internet-exposed GCP compute instance permits broad ingress
 
@@ -176,5 +213,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection, with limited GCP STRIDE rule coverage for compute, GCS, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
+- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection, with limited GCP STRIDE rule coverage for compute, GCS posture, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

@@ -23,6 +23,22 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        raise NotImplementedError
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        raise NotImplementedError
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def policy_document(self) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -142,6 +158,22 @@ class NeutralProviderResourceFacts:
 
     @property
     def public_access_block(self) -> dict[str, bool] | None:
+        return None
+
+    @property
+    def gcs_uniform_bucket_level_access(self) -> bool | None:
+        return None
+
+    @property
+    def gcs_public_access_prevention(self) -> str | None:
+        return None
+
+    @property
+    def gcs_versioning_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gcs_default_kms_key_name(self) -> str | None:
         return None
 
     @property

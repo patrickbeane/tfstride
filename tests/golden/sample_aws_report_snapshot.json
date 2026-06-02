@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 25,
+      "registered_rule_count": 29,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -61,6 +61,10 @@
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-gcs-public-access",
+        "gcp-gcs-uniform-bucket-level-access-disabled",
+        "gcp-gcs-public-access-prevention-not-enforced",
+        "gcp-gcs-versioning-disabled",
+        "gcp-gcs-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role"
@@ -90,6 +94,10 @@
         "gcp-cloud-sql-point-in-time-recovery-disabled": 0,
         "gcp-cloud-sql-deletion-protection-disabled": 0,
         "gcp-gcs-public-access": 0,
+        "gcp-gcs-uniform-bucket-level-access-disabled": 0,
+        "gcp-gcs-public-access-prevention-not-enforced": 0,
+        "gcp-gcs-versioning-disabled": 0,
+        "gcp-gcs-customer-managed-encryption-missing": 0,
         "gcp-public-compute-broad-ingress": 0,
         "gcp-project-iam-broad-principal": 0,
         "gcp-project-iam-privileged-role": 0

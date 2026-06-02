@@ -39,6 +39,10 @@ _RULE_GROUP_IDS = (
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-gcs-public-access",
+        "gcp-gcs-uniform-bucket-level-access-disabled",
+        "gcp-gcs-public-access-prevention-not-enforced",
+        "gcp-gcs-versioning-disabled",
+        "gcp-gcs-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
     ),
     (
@@ -119,6 +123,16 @@ class StrideRuleEngine:
                 gcp_detectors.detect_cloud_sql_deletion_protection_disabled
             ),
             "gcp-gcs-public-access": gcp_detectors.detect_gcs_public_access,
+            "gcp-gcs-uniform-bucket-level-access-disabled": (
+                gcp_detectors.detect_gcs_uniform_bucket_level_access_disabled
+            ),
+            "gcp-gcs-public-access-prevention-not-enforced": (
+                gcp_detectors.detect_gcs_public_access_prevention_not_enforced
+            ),
+            "gcp-gcs-versioning-disabled": gcp_detectors.detect_gcs_versioning_disabled,
+            "gcp-gcs-customer-managed-encryption-missing": (
+                gcp_detectors.detect_gcs_customer_managed_encryption_missing
+            ),
             "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
             "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
             "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,

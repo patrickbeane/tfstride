@@ -673,7 +673,19 @@ class TFSAnalysisTests(unittest.TestCase):
                             "type": "google_storage_bucket",
                             "name": "logs",
                             "provider_name": "registry.terraform.io/hashicorp/google",
-                            "values": {},
+                            "values": {
+                                "name": "logs",
+                                "uniform_bucket_level_access": True,
+                                "public_access_prevention": "enforced",
+                                "versioning": [{"enabled": True}],
+                                "encryption": [
+                                    {
+                                        "default_kms_key_name": (
+                                            "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
+                                        )
+                                    }
+                                ],
+                            },
                         }
                     ]
                 }
@@ -801,7 +813,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 9, {"high": 2, "medium": 7}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 12, {"high": 2, "medium": 10}),
         }
 
         expected_titles = {
@@ -837,7 +849,10 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Cloud SQL instance accepts public authorized network access": 1,
                 "Cloud SQL public IPv4 is enabled without private network access": 1,
                 "Cloud SQL public client access does not require SSL": 1,
+                "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
+                "GCS sensitive bucket does not use customer-managed encryption": 1,
+                "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
@@ -862,7 +877,7 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.analysis_coverage.resources.provider_resources, 14)
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 14)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 9)
+        self.assertEqual(len(result.findings), 12)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -873,6 +888,18 @@ class TFSAnalysisTests(unittest.TestCase):
         gcs_finding = findings_by_rule["gcp-gcs-public-access"]
         self.assertEqual(gcs_finding.severity, Severity.MEDIUM)
         self.assertEqual(gcs_finding.affected_resources, ["google_storage_bucket.logs"])
+        self.assertEqual(
+            findings_by_rule["gcp-gcs-public-access-prevention-not-enforced"].affected_resources,
+            ["google_storage_bucket.logs"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gcs-versioning-disabled"].affected_resources,
+            ["google_storage_bucket.logs"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gcs-customer-managed-encryption-missing"].affected_resources,
+            ["google_storage_bucket.logs"],
+        )
         cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]
         self.assertEqual(cloud_sql_public_finding.severity, Severity.HIGH)
         self.assertEqual(cloud_sql_public_finding.affected_resources, ["google_sql_database_instance.app"])
