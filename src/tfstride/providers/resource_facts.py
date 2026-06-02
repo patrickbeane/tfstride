@@ -95,6 +95,10 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def os_login_enabled(self) -> bool | None:
+        raise NotImplementedError
+
+    @property
     def service_account_email(self) -> str | None:
         raise NotImplementedError
 
@@ -230,6 +234,10 @@ class NeutralProviderResourceFacts:
 
     @property
     def deletion_protection(self) -> bool | None:
+        return None
+
+    @property
+    def os_login_enabled(self) -> bool | None:
         return None
 
     @property

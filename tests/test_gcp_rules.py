@@ -450,6 +450,68 @@ class GcpRuleTests(unittest.TestCase):
         )
         self.assertNotIn("public_exposure_reasons", evidence)
 
+    def test_compute_os_login_disabled_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="google_compute_instance.app",
+                    mode="managed",
+                    resource_type="google_compute_instance",
+                    name="app",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "name": "tfstride-app",
+                        "metadata": {"enable-oslogin": "false"},
+                    },
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-compute-os-login-disabled"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-compute-os-login-disabled")
+        self.assertEqual(finding.severity.value, "low")
+        self.assertEqual(finding.affected_resources, ["google_compute_instance.app"])
+        self.assertIsNone(finding.trust_boundary_id)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["os_login_posture"], ["metadata.enable-oslogin is false"])
+
+    def test_compute_os_login_enabled_or_unset_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                TerraformResource(
+                    address="google_compute_instance.enabled",
+                    mode="managed",
+                    resource_type="google_compute_instance",
+                    name="enabled",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={"name": "enabled", "metadata": {"enable-oslogin": "true"}},
+                ),
+                TerraformResource(
+                    address="google_compute_instance.unset",
+                    mode="managed",
+                    resource_type="google_compute_instance",
+                    name="unset",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={"name": "unset"},
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-compute-os-login-disabled"})),
+        )
+
+        self.assertEqual(findings, [])
+
     def test_gcs_public_bucket_iam_member_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_storage_bucket(), _storage_bucket_iam_member()])
 

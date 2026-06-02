@@ -105,6 +105,46 @@ class GcpRuleDetectors:
             )
         return findings
 
+    def detect_compute_os_login_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for instance in context.inventory.by_type("google_compute_instance"):
+            instance_facts = analysis_facts(instance)
+            if instance_facts.os_login_enabled is not False:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=instance.public_exposure,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1 if instance.public_exposure else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[instance.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{instance.display_name} explicitly disables OS Login. SSH access can therefore "
+                        "fall back to instance or project metadata keys instead of centralized IAM-backed "
+                        "login and audit controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("os_login_posture", ["metadata.enable-oslogin is false"]),
+                        evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_sensitive_iam_external_access(
         self,
         context: RuleEvaluationContext,

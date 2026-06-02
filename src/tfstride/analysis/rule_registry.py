@@ -380,6 +380,17 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-compute-os-login-disabled",
+        title="GCP compute instance disables OS Login",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable OS Login on GCE instances and manage SSH access through IAM roles, "
+            "two-factor enforcement, and centralized audit logs instead of metadata SSH keys."
+        ),
+        tags=("gcp", "compute", "iam", "ssh"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-project-iam-broad-principal",
         title="GCP project IAM binding grants access to public principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -103,6 +103,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.optional_bool(GcpResourceMetadata.DELETION_PROTECTION)
 
     @property
+    def os_login_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.OS_LOGIN_ENABLED)
+
+    @property
     def service_account_email(self) -> str | None:
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL)
 

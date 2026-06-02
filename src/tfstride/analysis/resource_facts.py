@@ -120,6 +120,10 @@ class AnalysisResourceFacts:
         return self._facts.deletion_protection
 
     @property
+    def os_login_enabled(self) -> bool | None:
+        return self._facts.os_login_enabled
+
+    @property
     def service_account_email(self) -> str | None:
         return self._facts.service_account_email
 

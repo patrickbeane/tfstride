@@ -279,6 +279,33 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNTS)[0]["email"],
             "tfstride-web@example.iam.gserviceaccount.com",
         )
+        self.assertFalse(normalized.has_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
+
+    def test_compute_instance_normalizer_preserves_os_login_metadata(self) -> None:
+        disabled = normalize_compute_instance(
+            _terraform_resource(
+                "google_compute_instance.app",
+                "google_compute_instance",
+                {
+                    "name": "tfstride-app",
+                    "metadata": {"enable-oslogin": "FALSE"},
+                },
+            )
+        )
+        enabled = normalize_compute_instance(
+            _terraform_resource(
+                "google_compute_instance.worker",
+                "google_compute_instance",
+                {
+                    "name": "tfstride-worker",
+                    "metadata": {"enable-oslogin": "true"},
+                },
+            )
+        )
+
+        self.assertTrue(disabled.has_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
+        self.assertFalse(disabled.get_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
+        self.assertTrue(enabled.get_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
 
     def test_storage_bucket_normalizer_preserves_bucket_posture(self) -> None:
         normalized = normalize_storage_bucket(self.resources["google_storage_bucket.logs"])

@@ -62,6 +62,7 @@ class GcpResourceMetadata:
     UNIFORM_BUCKET_LEVEL_ACCESS = BoolMetadataField("uniform_bucket_level_access")
     GCS_VERSIONING_ENABLED = BoolMetadataField("gcs_versioning_enabled")
     SERVICE_ACCOUNT_DISABLED = BoolMetadataField("service_account_disabled")
+    OS_LOGIN_ENABLED = BoolMetadataField("os_login_enabled")
     CLOUD_SQL_IPV4_ENABLED = BoolMetadataField("cloud_sql_ipv4_enabled")
     CLOUD_SQL_BACKUP_ENABLED = BoolMetadataField("cloud_sql_backup_enabled")
     CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED = BoolMetadataField("cloud_sql_point_in_time_recovery_enabled")

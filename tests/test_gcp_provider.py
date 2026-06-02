@@ -165,6 +165,7 @@ class GcpProviderTests(unittest.TestCase):
                 "SERVICE_ACCOUNT_KEY_ALGORITHM",
                 "SERVICE_ACCOUNT_PUBLIC_KEY_TYPE",
                 "SERVICE_ACCOUNT_DISABLED",
+                "OS_LOGIN_ENABLED",
             },
         )
 
@@ -188,6 +189,7 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.internet_ingress_firewalls, [])
         self.assertIsNone(facts.iam_role)
         self.assertIsNone(facts.iam_member)
+        self.assertIsNone(facts.os_login_enabled)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
