@@ -84,6 +84,26 @@ class AnalysisResourceFacts:
         return self._facts.cloud_sql_point_in_time_recovery_enabled
 
     @property
+    def cloud_sql_ipv4_enabled(self) -> bool | None:
+        return self._facts.cloud_sql_ipv4_enabled
+
+    @property
+    def cloud_sql_private_network(self) -> str | None:
+        return self._facts.cloud_sql_private_network
+
+    @property
+    def cloud_sql_require_ssl(self) -> bool | None:
+        return self._facts.cloud_sql_require_ssl
+
+    @property
+    def cloud_sql_ssl_mode(self) -> str | None:
+        return self._facts.cloud_sql_ssl_mode
+
+    @property
+    def deletion_protection(self) -> bool | None:
+        return self._facts.deletion_protection
+
+    @property
     def service_account_email(self) -> str | None:
         return self._facts.service_account_email
 

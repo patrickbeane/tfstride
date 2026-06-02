@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 21,
+      "registered_rule_count": 25,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -56,6 +56,10 @@
         "gcp-public-workload-sensitive-data-access",
         "gcp-cloud-sql-public-authorized-network",
         "gcp-cloud-sql-backup-disabled",
+        "gcp-cloud-sql-public-ip-without-private-network",
+        "gcp-cloud-sql-ssl-not-required",
+        "gcp-cloud-sql-point-in-time-recovery-disabled",
+        "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-gcs-public-access",
         "gcp-public-compute-broad-ingress",
         "gcp-project-iam-broad-principal",
@@ -81,6 +85,10 @@
         "gcp-public-workload-sensitive-data-access": 0,
         "gcp-cloud-sql-public-authorized-network": 0,
         "gcp-cloud-sql-backup-disabled": 0,
+        "gcp-cloud-sql-public-ip-without-private-network": 0,
+        "gcp-cloud-sql-ssl-not-required": 0,
+        "gcp-cloud-sql-point-in-time-recovery-disabled": 0,
+        "gcp-cloud-sql-deletion-protection-disabled": 0,
         "gcp-gcs-public-access": 0,
         "gcp-public-compute-broad-ingress": 0,
         "gcp-project-iam-broad-principal": 0,

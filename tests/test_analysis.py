@@ -801,7 +801,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 6, {"high": 2, "medium": 4}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 9, {"high": 2, "medium": 7}),
         }
 
         expected_titles = {
@@ -833,7 +833,10 @@ class TFSAnalysisTests(unittest.TestCase):
             },
             "gcp-inventory": {
                 "Cloud SQL automated backups are disabled": 1,
+                "Cloud SQL deletion protection is disabled": 1,
                 "Cloud SQL instance accepts public authorized network access": 1,
+                "Cloud SQL public IPv4 is enabled without private network access": 1,
+                "Cloud SQL public client access does not require SSL": 1,
                 "GCS bucket is publicly accessible": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
@@ -859,7 +862,7 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.analysis_coverage.resources.provider_resources, 14)
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 14)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 6)
+        self.assertEqual(len(result.findings), 9)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -876,6 +879,18 @@ class TFSAnalysisTests(unittest.TestCase):
         cloud_sql_backup_finding = findings_by_rule["gcp-cloud-sql-backup-disabled"]
         self.assertEqual(cloud_sql_backup_finding.severity, Severity.MEDIUM)
         self.assertEqual(cloud_sql_backup_finding.affected_resources, ["google_sql_database_instance.app"])
+        self.assertEqual(
+            findings_by_rule["gcp-cloud-sql-public-ip-without-private-network"].affected_resources,
+            ["google_sql_database_instance.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-cloud-sql-ssl-not-required"].affected_resources,
+            ["google_sql_database_instance.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-cloud-sql-deletion-protection-disabled"].affected_resources,
+            ["google_sql_database_instance.app"],
+        )
         sensitive_iam_findings = [
             finding
             for finding in result.findings

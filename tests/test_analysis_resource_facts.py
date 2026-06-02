@@ -80,6 +80,26 @@ class FakeProviderFacts:
         return True
 
     @property
+    def cloud_sql_ipv4_enabled(self) -> bool | None:
+        return True
+
+    @property
+    def cloud_sql_private_network(self) -> str | None:
+        return "google_compute_network.main.id"
+
+    @property
+    def cloud_sql_require_ssl(self) -> bool | None:
+        return True
+
+    @property
+    def cloud_sql_ssl_mode(self) -> str | None:
+        return "ENCRYPTED_ONLY"
+
+    @property
+    def deletion_protection(self) -> bool | None:
+        return True
+
+    @property
     def service_account_email(self) -> str | None:
         return "fake@example.iam.gserviceaccount.com"
 
@@ -129,6 +149,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
+        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
+        self.assertIsNone(facts.cloud_sql_private_network)
+        self.assertIsNone(facts.cloud_sql_require_ssl)
+        self.assertIsNone(facts.cloud_sql_ssl_mode)
+        self.assertIsNone(facts.deletion_protection)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
@@ -164,6 +189,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
+        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
+        self.assertIsNone(facts.cloud_sql_private_network)
+        self.assertIsNone(facts.cloud_sql_require_ssl)
+        self.assertIsNone(facts.cloud_sql_ssl_mode)
+        self.assertIsNone(facts.deletion_protection)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)
@@ -216,6 +246,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 ],
                 GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED.key: False,
                 GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED.key: True,
+                GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED.key: True,
+                GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK.key: "google_compute_network.main.id",
+                GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL.key: True,
+                GcpResourceMetadata.CLOUD_SQL_SSL_MODE.key: "ENCRYPTED_ONLY",
+                GcpResourceMetadata.DELETION_PROTECTION.key: True,
             },
             provider="gcp",
             resource_type="google_sql_database_instance",
@@ -227,6 +262,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
         self.assertFalse(facts.cloud_sql_backup_enabled)
         self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
+        self.assertTrue(facts.cloud_sql_ipv4_enabled)
+        self.assertEqual(facts.cloud_sql_private_network, "google_compute_network.main.id")
+        self.assertTrue(facts.cloud_sql_require_ssl)
+        self.assertEqual(facts.cloud_sql_ssl_mode, "ENCRYPTED_ONLY")
+        self.assertTrue(facts.deletion_protection)
 
 
     def test_gcp_compute_facts_read_workload_identity_metadata(self) -> None:

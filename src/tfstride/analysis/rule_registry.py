@@ -269,6 +269,50 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-sql-public-ip-without-private-network",
+        title="Cloud SQL public IPv4 is enabled without private network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public IPv4 where possible, attach the instance to a private network, and route clients "
+            "through private IP, the Cloud SQL Auth Proxy, or tightly controlled connectivity paths."
+        ),
+        tags=("gcp", "cloud-sql", "database", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-ssl-not-required",
+        title="Cloud SQL public client access does not require SSL",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Require encrypted Cloud SQL client connections with `require_ssl` or an enforcing `ssl_mode`, "
+            "and prefer private IP or the Cloud SQL Auth Proxy for application connectivity."
+        ),
+        tags=("gcp", "cloud-sql", "database", "tls"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-point-in-time-recovery-disabled",
+        title="Cloud SQL point-in-time recovery is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable point-in-time recovery for Cloud SQL engines that support it, tune retention to recovery "
+            "objectives, and test restore workflows for destructive-write scenarios."
+        ),
+        tags=("gcp", "cloud-sql", "database", "backup", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-deletion-protection-disabled",
+        title="Cloud SQL deletion protection is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable Cloud SQL deletion protection for persistent environments and require explicit review "
+            "before disabling it during planned database retirement."
+        ),
+        tags=("gcp", "cloud-sql", "database", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gcs-public-access",
         title="GCS bucket is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

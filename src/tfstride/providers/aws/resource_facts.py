@@ -51,6 +51,26 @@ class AwsResourceFacts:
         return None
 
     @property
+    def cloud_sql_ipv4_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def cloud_sql_private_network(self) -> str | None:
+        return None
+
+    @property
+    def cloud_sql_require_ssl(self) -> bool | None:
+        return None
+
+    @property
+    def cloud_sql_ssl_mode(self) -> str | None:
+        return None
+
+    @property
+    def deletion_protection(self) -> bool | None:
+        return None
+
+    @property
     def service_account_email(self) -> str | None:
         return None
 

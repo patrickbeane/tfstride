@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **6 findings** across **14 normalized resources**.
+This run identified **3 trust boundaries** and **9 findings** across **14 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `4`
+- Medium severity findings: `7`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **6 findings** across **14 normal
 - Provider resources considered: `14`
 - Normalized resources: `14`
 - Unsupported resources: `0`
-- Registered rules: `21`
-- Enabled rules: `21`
+- Registered rules: `25`
+- Enabled rules: `25`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -28,6 +28,9 @@ This run identified **3 trust boundaries** and **6 findings** across **14 normal
   - `gcp-sensitive-resource-iam-external-access`: `2`
   - `gcp-cloud-sql-public-authorized-network`: `1`
   - `gcp-cloud-sql-backup-disabled`: `1`
+  - `gcp-cloud-sql-public-ip-without-private-network`: `1`
+  - `gcp-cloud-sql-ssl-not-required`: `1`
+  - `gcp-cloud-sql-deletion-protection-disabled`: `1`
   - `gcp-gcs-public-access`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
 
@@ -96,6 +99,40 @@ This run identified **3 trust boundaries** and **6 findings** across **14 normal
 - Evidence:
   - backup posture: backup_configuration.enabled is false; point_in_time_recovery_enabled is false; engine is POSTGRES_15
 
+#### Cloud SQL deletion protection is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app has Cloud SQL deletion protection disabled. Accidental or unauthorized infrastructure changes could destroy the managed database instance without this provider-level guardrail.
+- Recommended mitigation: Enable Cloud SQL deletion protection for persistent environments and require explicit review before disabling it during planned database retirement.
+- Evidence:
+  - lifecycle posture: deletion_protection is false
+
+#### Cloud SQL public IPv4 is enabled without private network access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `internet-to-service:internet->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +1, blast_radius +0, final_score 5 => medium
+- Rationale: google_sql_database_instance.app has Cloud SQL public IPv4 enabled without a private network attachment. That keeps database client access on a public endpoint instead of an internal VPC path.
+- Recommended mitigation: Disable public IPv4 where possible, attach the instance to a private network, and route clients through private IP, the Cloud SQL Auth Proxy, or tightly controlled connectivity paths.
+- Evidence:
+  - network posture: ipv4_enabled is true; private_network is unset; authorized_networks configured: 1
+  - public access reasons: Cloud SQL public IPv4 access is enabled
+
+#### Cloud SQL public client access does not require SSL
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `internet-to-service:internet->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +1, blast_radius +0, final_score 5 => medium
+- Rationale: google_sql_database_instance.app allows Cloud SQL public IPv4 client access without requiring encrypted client connections. Credentials and database traffic should not depend on client-side optional TLS behavior.
+- Recommended mitigation: Require encrypted Cloud SQL client connections with `require_ssl` or an enforcing `ssl_mode`, and prefer private IP or the Cloud SQL Auth Proxy for application connectivity.
+- Evidence:
+  - ssl posture: require_ssl is false; ssl_mode is unset; ipv4_enabled is true
+
 #### GCS bucket is publicly accessible
 
 - STRIDE category: Information Disclosure
@@ -139,5 +176,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection, with limited GCP STRIDE rule coverage for compute, GCS, Cloud SQL, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
+- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection, with limited GCP STRIDE rule coverage for compute, GCS, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

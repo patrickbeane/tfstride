@@ -144,13 +144,19 @@ def _cloud_sql_instance(
     backup_enabled: bool = True,
     pitr_enabled: bool = True,
     private_network: str | None = None,
+    require_ssl: bool = True,
+    ssl_mode: str | None = None,
+    deletion_protection: bool = True,
 ) -> TerraformResource:
     ip_configuration: dict[str, object] = {
         "ipv4_enabled": ipv4_enabled,
+        "require_ssl": require_ssl,
         "authorized_networks": authorized_networks if authorized_networks is not None else [],
     }
     if private_network is not None:
         ip_configuration["private_network"] = private_network
+    if ssl_mode is not None:
+        ip_configuration["ssl_mode"] = ssl_mode
     return TerraformResource(
         address="google_sql_database_instance.app",
         mode="managed",
@@ -171,6 +177,7 @@ def _cloud_sql_instance(
                     "ip_configuration": [ip_configuration],
                 }
             ],
+            "deletion_protection": deletion_protection,
         },
     )
 
@@ -304,7 +311,13 @@ class GcpRuleTests(unittest.TestCase):
         )
         boundaries = detect_trust_boundaries(inventory)
 
-        findings = StrideRuleEngine().evaluate(inventory, boundaries)
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-authorized-network"})
+            ),
+        )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -366,6 +379,149 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(inventory, [])
 
         self.assertEqual(findings, [])
+
+
+    def test_cloud_sql_public_ip_without_private_network_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(ipv4_enabled=True, private_network=None)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-public-ip-without-private-network")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(finding.affected_resources, ["google_sql_database_instance.app"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["network_posture"],
+            [
+                "ipv4_enabled is true",
+                "private_network is unset",
+                "authorized_networks configured: 0",
+            ],
+        )
+        self.assertEqual(
+            evidence["public_access_reasons"],
+            ["Cloud SQL public IPv4 access is enabled"],
+        )
+
+    def test_cloud_sql_private_network_suppresses_public_ip_without_private_network(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_sql_instance(
+                    ipv4_enabled=True,
+                    private_network="google_compute_network.main.id",
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_cloud_sql_ssl_not_required_is_detected_for_public_ipv4(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(require_ssl=False)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-ssl-not-required"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-ssl-not-required")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["ssl_posture"],
+            ["require_ssl is false", "ssl_mode is unset", "ipv4_enabled is true"],
+        )
+
+    def test_cloud_sql_enforcing_ssl_mode_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_cloud_sql_instance(require_ssl=False, ssl_mode="ENCRYPTED_ONLY")]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-ssl-not-required"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_cloud_sql_point_in_time_recovery_disabled_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_sql_instance(
+                    ipv4_enabled=False,
+                    backup_enabled=True,
+                    pitr_enabled=False,
+                    private_network="google_compute_network.main.id",
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-cloud-sql-point-in-time-recovery-disabled"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-point-in-time-recovery-disabled")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["backup_posture"],
+            [
+                "backup_configuration.enabled is true",
+                "point_in_time_recovery_enabled is false",
+                "engine is POSTGRES_15",
+            ],
+        )
+
+    def test_cloud_sql_deletion_protection_disabled_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_sql_instance(
+                    ipv4_enabled=False,
+                    private_network="google_compute_network.main.id",
+                    deletion_protection=False,
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-cloud-sql-deletion-protection-disabled"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-deletion-protection-disabled")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["lifecycle_posture"], ["deletion_protection is false"])
 
 
     def test_sensitive_secret_public_iam_binding_is_detected(self) -> None:

@@ -34,6 +34,10 @@ _RULE_GROUP_IDS = (
         "gcp-sensitive-resource-iam-external-access",
         "gcp-cloud-sql-public-authorized-network",
         "gcp-cloud-sql-backup-disabled",
+        "gcp-cloud-sql-public-ip-without-private-network",
+        "gcp-cloud-sql-ssl-not-required",
+        "gcp-cloud-sql-point-in-time-recovery-disabled",
+        "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-gcs-public-access",
         "gcp-public-compute-broad-ingress",
     ),
@@ -104,6 +108,16 @@ class StrideRuleEngine:
             "gcp-sensitive-resource-iam-external-access": gcp_detectors.detect_sensitive_iam_external_access,
             "gcp-cloud-sql-public-authorized-network": gcp_detectors.detect_cloud_sql_public_authorized_network,
             "gcp-cloud-sql-backup-disabled": gcp_detectors.detect_cloud_sql_backup_disabled,
+            "gcp-cloud-sql-public-ip-without-private-network": (
+                gcp_detectors.detect_cloud_sql_public_ip_without_private_network
+            ),
+            "gcp-cloud-sql-ssl-not-required": gcp_detectors.detect_cloud_sql_ssl_not_required,
+            "gcp-cloud-sql-point-in-time-recovery-disabled": (
+                gcp_detectors.detect_cloud_sql_point_in_time_recovery_disabled
+            ),
+            "gcp-cloud-sql-deletion-protection-disabled": (
+                gcp_detectors.detect_cloud_sql_deletion_protection_disabled
+            ),
             "gcp-gcs-public-access": gcp_detectors.detect_gcs_public_access,
             "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
             "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,

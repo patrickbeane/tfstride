@@ -54,6 +54,10 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-sensitive-resource-iam-external-access", output)
         self.assertIn("- gcp-cloud-sql-public-authorized-network", output)
         self.assertIn("- gcp-cloud-sql-backup-disabled", output)
+        self.assertIn("- gcp-cloud-sql-public-ip-without-private-network", output)
+        self.assertIn("- gcp-cloud-sql-ssl-not-required", output)
+        self.assertIn("- gcp-cloud-sql-point-in-time-recovery-disabled", output)
+        self.assertIn("- gcp-cloud-sql-deletion-protection-disabled", output)
         self.assertIn("- gcp-gcs-public-access", output)
         self.assertIn("- gcp-public-compute-broad-ingress", output)
         self.assertIn("- gcp-public-workload-sensitive-data-access", output)
@@ -210,7 +214,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["provider"], "gcp")
         self.assertEqual(len(report["inventory"]["resources"]), 14)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
-        self.assertEqual(report["summary"]["active_findings"], 6)
+        self.assertEqual(report["summary"]["active_findings"], 9)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

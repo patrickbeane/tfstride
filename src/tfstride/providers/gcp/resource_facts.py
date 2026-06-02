@@ -67,6 +67,26 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
 
     @property
+    def cloud_sql_ipv4_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED)
+
+    @property
+    def cloud_sql_private_network(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK)
+
+    @property
+    def cloud_sql_require_ssl(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL)
+
+    @property
+    def cloud_sql_ssl_mode(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_SSL_MODE)
+
+    @property
+    def deletion_protection(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.DELETION_PROTECTION)
+
+    @property
     def service_account_email(self) -> str | None:
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL)
 
