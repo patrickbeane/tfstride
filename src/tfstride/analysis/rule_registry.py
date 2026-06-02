@@ -403,6 +403,18 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-functions-public-invoker",
+        title="Cloud Functions function is publicly invokable",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from Cloud Functions invoker bindings unless "
+            "anonymous access is intentional, and require authentication, IAP, API Gateway, or a controlled "
+            "edge policy for public HTTP functions."
+        ),
+        tags=("gcp", "cloud-functions", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-project-iam-broad-principal",
         title="GCP project IAM binding grants access to public principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -11,10 +11,14 @@ from tfstride.resource_helpers import describe_security_group_rule
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
 _CLOUD_RUN_RESOURCE_TYPES = frozenset({"google_cloud_run_service", "google_cloud_run_v2_service"})
+_CLOUD_FUNCTION_RESOURCE_TYPES = frozenset(
+    {"google_cloudfunctions_function", "google_cloudfunctions2_function"}
+)
 _PROJECT_IAM_RESOURCE_TYPES = frozenset(
     {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
 )
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
+_CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _SECRET_ACCESS_ROLES = frozenset(
     {
@@ -197,6 +201,59 @@ class GcpRuleDetectors:
                         ),
                         evidence_item("public_access_reasons", service.public_access_reasons),
                         evidence_item("public_exposure_reasons", service.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloud_function_public_invoker(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for function in context.inventory.by_type(*_CLOUD_FUNCTION_RESOURCE_TYPES):
+            public_invokers = _cloud_function_public_invoker_bindings(function)
+            if not function.public_exposure or not public_invokers:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", function.address)
+            )
+            affected_resources = _dedupe_addresses(
+                [function.address, *[source for source, _, _ in public_invokers]]
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=affected_resources,
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{function.display_name} allows public HTTP access and grants Cloud Functions "
+                        "invoke permission to public GCP principals. Unauthenticated internet clients can "
+                        "reach the function entry point without an organization-owned identity boundary."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "public_invoker_bindings",
+                            [
+                                f"source={source}; role={role}; member={member}"
+                                for source, role, member in public_invokers
+                            ],
+                        ),
+                        evidence_item("public_access_reasons", function.public_access_reasons),
+                        evidence_item("public_exposure_reasons", function.public_exposure_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -947,10 +1004,21 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
 
 
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
+    return _public_invoker_bindings(resource, _CLOUD_RUN_PUBLIC_INVOKER_ROLES)
+
+
+def _cloud_function_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
+    return _public_invoker_bindings(resource, _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES)
+
+
+def _public_invoker_bindings(
+    resource: NormalizedResource,
+    invoker_roles: frozenset[str],
+) -> list[tuple[str, str, str]]:
     bindings: list[tuple[str, str, str]] = []
     for binding in analysis_facts(resource).iam_bindings:
         role = str(binding.get("role") or "").strip()
-        if role not in _CLOUD_RUN_PUBLIC_INVOKER_ROLES:
+        if role not in invoker_roles:
             continue
         source = str(binding.get("source") or "").strip()
         for member in _binding_members(binding):

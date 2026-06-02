@@ -166,6 +166,47 @@ def _cloudfunctions_function_iam_member(
         },
     )
 
+
+def _cloudfunctions2_function(public: bool = True) -> TerraformResource:
+    service_config: dict[str, object] = {
+        "service_account_email": "tfstride-fn2@tfstride-demo.iam.gserviceaccount.com",
+    }
+    if public:
+        service_config["uri"] = "https://tfstride-fn2-uc.a.run.app"
+    return TerraformResource(
+        address="google_cloudfunctions2_function.fn2",
+        mode="managed",
+        resource_type="google_cloudfunctions2_function",
+        name="fn2",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-fn2",
+            "project": "tfstride-demo",
+            "location": "us-central1",
+            "service_config": [service_config],
+        },
+    )
+
+
+def _cloudfunctions2_function_iam_binding(
+    members: list[str] | None = None,
+    role: str = "roles/cloudfunctions.invoker",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_cloudfunctions2_function_iam_binding.public_invokers",
+        mode="managed",
+        resource_type="google_cloudfunctions2_function_iam_binding",
+        name="public_invokers",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "cloud_function": "tfstride-fn2",
+            "location": "us-central1",
+            "role": role,
+            "members": members or ["allAuthenticatedUsers"],
+        },
+    )
+
+
 def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com") -> TerraformResource:
     return TerraformResource(
         address="google_project_iam_member.binding",
@@ -1175,6 +1216,101 @@ class GcpRuleTests(unittest.TestCase):
                 non_public_inventory,
                 detect_trust_boundaries(non_public_inventory),
                 rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+            ),
+            [],
+        )
+
+    def test_public_cloud_function_invoker_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloudfunctions_function(), _cloudfunctions_function_iam_member()])
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-functions-public-invoker"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-functions-public-invoker")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_cloudfunctions_function.fn", "google_cloudfunctions_function_iam_member.public_invoker"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "internet-to-service:internet->google_cloudfunctions_function.fn",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_invoker_bindings"],
+            [
+                "source=google_cloudfunctions_function_iam_member.public_invoker; "
+                "role=roles/cloudfunctions.invoker; member=allUsers"
+            ],
+        )
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            [
+                "google_cloudfunctions_function_iam_member.public_invoker grants "
+                "roles/cloudfunctions.invoker to allUsers"
+            ],
+        )
+
+    def test_public_cloudfunctions2_binding_invoker_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_cloudfunctions2_function(), _cloudfunctions2_function_iam_binding()]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-functions-public-invoker"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_cloudfunctions2_function.fn2", "google_cloudfunctions2_function_iam_binding.public_invokers"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_invoker_bindings"],
+            [
+                "source=google_cloudfunctions2_function_iam_binding.public_invokers; "
+                "role=roles/cloudfunctions.invoker; member=allAuthenticatedUsers"
+            ],
+        )
+
+    def test_cloud_function_public_invoker_requires_public_http_and_public_member(self) -> None:
+        private_inventory = GcpNormalizer().normalize(
+            [_cloudfunctions_function(public=False), _cloudfunctions_function_iam_member()]
+        )
+        non_public_inventory = GcpNormalizer().normalize(
+            [
+                _cloudfunctions_function(),
+                _cloudfunctions_function_iam_member(member="serviceAccount:caller@example.iam.gserviceaccount.com"),
+            ]
+        )
+
+        engine = StrideRuleEngine()
+
+        self.assertEqual(
+            engine.evaluate(
+                private_inventory,
+                detect_trust_boundaries(private_inventory),
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-functions-public-invoker"})),
+            ),
+            [],
+        )
+        self.assertEqual(
+            engine.evaluate(
+                non_public_inventory,
+                detect_trust_boundaries(non_public_inventory),
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-functions-public-invoker"})),
             ),
             [],
         )

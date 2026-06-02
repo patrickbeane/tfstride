@@ -66,6 +66,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-public-compute-broad-ingress", output)
         self.assertIn("- gcp-compute-os-login-disabled", output)
         self.assertIn("- gcp-cloud-run-public-invoker", output)
+        self.assertIn("- gcp-cloud-functions-public-invoker", output)
         self.assertIn("- gcp-public-workload-sensitive-data-access", output)
         self.assertIn("- gcp-project-iam-broad-principal", output)
         self.assertIn("- gcp-project-iam-privileged-role", output)

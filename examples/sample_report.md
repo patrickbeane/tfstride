@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **9 findings** across **23 normal
 - Provider resources considered: `24`
 - Normalized resources: `23`
 - Unsupported resources: `1`
-- Registered rules: `31`
-- Enabled rules: `31`
+- Registered rules: `32`
+- Enabled rules: `32`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
