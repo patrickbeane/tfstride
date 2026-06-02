@@ -29,6 +29,12 @@ from tfstride.providers.gcp.iam_normalizers import (
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.serverless_normalizers import (
+    normalize_cloud_run_service_iam_member,
+    normalize_cloud_run_v2_service,
+    normalize_cloudfunctions_function,
+    normalize_cloudfunctions_function_iam_member,
+)
 from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_firewall,
     normalize_compute_forwarding_rule,
@@ -428,6 +434,116 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         )
         self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_DISABLED))
 
+    def test_cloud_run_v2_service_normalizer_preserves_workload_identity(self) -> None:
+        normalized = normalize_cloud_run_v2_service(
+            _terraform_resource(
+                "google_cloud_run_v2_service.api",
+                "google_cloud_run_v2_service",
+                {
+                    "name": "tfstride-api",
+                    "project": "tfstride-demo",
+                    "location": "us-central1",
+                    "ingress": "INGRESS_TRAFFIC_ALL",
+                    "uri": "https://tfstride-api.run.app",
+                    "template": [
+                        {
+                            "service_account": "tfstride-api@tfstride-demo.iam.gserviceaccount.com",
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.COMPUTE)
+        self.assertTrue(normalized.public_access_configured)
+        self.assertFalse(normalized.vpc_enabled)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
+            "tfstride-api",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL),
+            "tfstride-api@tfstride-demo.iam.gserviceaccount.com",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNTS),
+            [{"email": "tfstride-api@tfstride-demo.iam.gserviceaccount.com"}],
+        )
+
+    def test_cloud_run_service_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_cloud_run_service_iam_member(
+            _terraform_resource(
+                "google_cloud_run_service_iam_member.public_invoker",
+                "google_cloud_run_service_iam_member",
+                {
+                    "service": "tfstride-api",
+                    "location": "us-central1",
+                    "role": "roles/run.invoker",
+                    "member": "allUsers",
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
+            "tfstride-api",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/run.invoker")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allUsers")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/run.invoker", "members": ["allUsers"]}],
+        )
+
+    def test_cloudfunctions_function_normalizer_preserves_workload_identity(self) -> None:
+        normalized = normalize_cloudfunctions_function(
+            _terraform_resource(
+                "google_cloudfunctions_function.worker",
+                "google_cloudfunctions_function",
+                {
+                    "name": "tfstride-worker",
+                    "project": "tfstride-demo",
+                    "region": "us-central1",
+                    "runtime": "python312",
+                    "trigger_http": True,
+                    "service_account_email": "tfstride-worker@tfstride-demo.iam.gserviceaccount.com",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.COMPUTE)
+        self.assertTrue(normalized.public_access_configured)
+        self.assertFalse(normalized.vpc_enabled)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE),
+            "tfstride-worker",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER),
+            "serviceAccount:tfstride-worker@tfstride-demo.iam.gserviceaccount.com",
+        )
+
+    def test_cloudfunctions_function_iam_member_normalizer_preserves_binding_parts(self) -> None:
+        normalized = normalize_cloudfunctions_function_iam_member(
+            _terraform_resource(
+                "google_cloudfunctions_function_iam_member.public_invoker",
+                "google_cloudfunctions_function_iam_member",
+                {
+                    "cloud_function": "tfstride-worker",
+                    "region": "us-central1",
+                    "role": "roles/cloudfunctions.invoker",
+                    "member": "allUsers",
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE),
+            "tfstride-worker",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/cloudfunctions.invoker")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allUsers")
+
     def test_service_account_key_normalizer_preserves_key_context_without_secret_material(self) -> None:
         normalized = normalize_service_account_key(self.resources["google_service_account_key.web"])
 
@@ -616,6 +732,79 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
             [{"role": "roles/storage.objectViewer", "members": ["allUsers"]}],
         )
+
+    def test_normalizer_derives_public_cloud_run_exposure_from_invoker_iam(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_cloud_run_v2_service.api",
+                    "google_cloud_run_v2_service",
+                    {
+                        "name": "tfstride-api",
+                        "location": "us-central1",
+                        "ingress": "INGRESS_TRAFFIC_ALL",
+                        "template": [
+                            {
+                                "service_account": "tfstride-api@tfstride-demo.iam.gserviceaccount.com",
+                            }
+                        ],
+                    },
+                ),
+                _terraform_resource(
+                    "google_cloud_run_v2_service_iam_member.public_invoker",
+                    "google_cloud_run_v2_service_iam_member",
+                    {
+                        "name": "tfstride-api",
+                        "location": "us-central1",
+                        "role": "roles/run.invoker",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+        service = inventory.get_by_address("google_cloud_run_v2_service.api")
+
+        self.assertIsNotNone(service)
+        assert service is not None
+        self.assertTrue(service.public_exposure)
+        self.assertTrue(service.direct_internet_reachable)
+        self.assertEqual(
+            service.public_exposure_reasons,
+            ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+        )
+        self.assertEqual(
+            service.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/run.invoker",
+                    "members": ["allUsers"],
+                    "source": "google_cloud_run_v2_service_iam_member.public_invoker",
+                }
+            ],
+        )
+
+    def test_normalizer_keeps_serverless_private_without_public_invoker(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_cloudfunctions_function.worker",
+                    "google_cloudfunctions_function",
+                    {
+                        "name": "tfstride-worker",
+                        "region": "us-central1",
+                        "trigger_http": True,
+                        "service_account_email": "tfstride-worker@tfstride-demo.iam.gserviceaccount.com",
+                    },
+                )
+            ]
+        )
+        function = inventory.get_by_address("google_cloudfunctions_function.worker")
+
+        self.assertIsNotNone(function)
+        assert function is not None
+        self.assertTrue(function.public_access_configured)
+        self.assertFalse(function.public_exposure)
+        self.assertFalse(function.direct_internet_reachable)
 
     def test_normalizer_derives_public_bucket_exposure_from_bucket_iam_member(self) -> None:
         inventory = GcpNormalizer().normalize(

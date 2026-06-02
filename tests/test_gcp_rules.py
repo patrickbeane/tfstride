@@ -85,6 +85,87 @@ def _compute_instance(
         },
     )
 
+
+def _cloud_run_service(
+    *,
+    public_ingress: bool = True,
+    service_account_email: str = "tfstride-run@tfstride-demo.iam.gserviceaccount.com",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_cloud_run_v2_service.api",
+        mode="managed",
+        resource_type="google_cloud_run_v2_service",
+        name="api",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-api",
+            "project": "tfstride-demo",
+            "location": "us-central1",
+            "ingress": "INGRESS_TRAFFIC_ALL" if public_ingress else "INGRESS_TRAFFIC_INTERNAL_ONLY",
+            "template": [{"service_account": service_account_email}],
+        },
+    )
+
+
+def _cloud_run_service_iam_member(
+    member: str = "allUsers",
+    role: str = "roles/run.invoker",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_cloud_run_v2_service_iam_member.public_invoker",
+        mode="managed",
+        resource_type="google_cloud_run_v2_service_iam_member",
+        name="public_invoker",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-api",
+            "location": "us-central1",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
+def _cloudfunctions_function(
+    *,
+    public: bool = True,
+    service_account_email: str = "tfstride-fn@tfstride-demo.iam.gserviceaccount.com",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_cloudfunctions_function.fn",
+        mode="managed",
+        resource_type="google_cloudfunctions_function",
+        name="fn",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-fn",
+            "project": "tfstride-demo",
+            "region": "us-central1",
+            "runtime": "python312",
+            "trigger_http": public,
+            "service_account_email": service_account_email,
+        },
+    )
+
+
+def _cloudfunctions_function_iam_member(
+    member: str = "allUsers",
+    role: str = "roles/cloudfunctions.invoker",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_cloudfunctions_function_iam_member.public_invoker",
+        mode="managed",
+        resource_type="google_cloudfunctions_function_iam_member",
+        name="public_invoker",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "cloud_function": "tfstride-fn",
+            "region": "us-central1",
+            "role": role,
+            "member": member,
+        },
+    )
+
 def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com") -> TerraformResource:
     return TerraformResource(
         address="google_project_iam_member.binding",
@@ -762,6 +843,117 @@ class GcpRuleTests(unittest.TestCase):
             "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
             evidence["boundary_rationale"][0],
         )
+
+    def test_public_cloud_run_service_account_secret_access_path_is_detected(self) -> None:
+        service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-public-workload-sensitive-data-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_cloud_run_v2_service.api",
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret_iam_member.public_accessor",
+            ],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "workload-to-data-store:google_cloud_run_v2_service.api->google_secret_manager_secret.api_key",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+        )
+        self.assertEqual(evidence["workload_identity"], [service_account])
+        self.assertEqual(
+            evidence["data_access_path"],
+            ["google_cloud_run_v2_service.api reaches google_secret_manager_secret.api_key"],
+        )
+        self.assertIn(
+            "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
+            evidence["boundary_rationale"][0],
+        )
+
+    def test_private_cloud_run_sensitive_data_path_is_not_reported(self) -> None:
+        service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(public_ingress=False),
+                _cloud_run_service_iam_member(),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_public_cloud_function_service_account_secret_access_path_is_detected(self) -> None:
+        service_account = "serviceAccount:tfstride-fn@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloudfunctions_function(),
+                _cloudfunctions_function_iam_member(),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_cloudfunctions_function.fn",
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret_iam_member.public_accessor",
+            ],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "workload-to-data-store:google_cloudfunctions_function.fn->google_secret_manager_secret.api_key",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            [
+                "google_cloudfunctions_function_iam_member.public_invoker grants "
+                "roles/cloudfunctions.invoker to allUsers"
+            ],
+        )
+        self.assertEqual(evidence["workload_identity"], [service_account])
 
     def test_project_iam_kms_access_path_is_detected_for_public_compute(self) -> None:
         service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"

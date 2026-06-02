@@ -61,13 +61,36 @@ class ResourceConceptTests(unittest.TestCase):
     def test_concept_sets_match_registered_provider_analysis_categories(self) -> None:
         self.assertEqual(
             WORKLOAD_RESOURCE_TYPES,
-            frozenset({"aws_instance", "aws_lambda_function", "aws_ecs_service", "google_compute_instance"}),
+            frozenset(
+                {
+                    "aws_instance",
+                    "aws_lambda_function",
+                    "aws_ecs_service",
+                    "google_cloud_run_service",
+                    "google_cloud_run_v2_service",
+                    "google_cloudfunctions_function",
+                    "google_cloudfunctions2_function",
+                    "google_compute_instance",
+                }
+            ),
         )
         self.assertEqual(
             SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
             frozenset({"aws_instance", "aws_ecs_service"}),
         )
-        self.assertEqual(PUBLIC_COMPUTE_RESOURCE_TYPES, frozenset({"aws_instance", "google_compute_instance"}))
+        self.assertEqual(
+            PUBLIC_COMPUTE_RESOURCE_TYPES,
+            frozenset(
+                {
+                    "aws_instance",
+                    "google_cloud_run_service",
+                    "google_cloud_run_v2_service",
+                    "google_cloudfunctions_function",
+                    "google_cloudfunctions2_function",
+                    "google_compute_instance",
+                }
+            ),
+        )
         self.assertEqual(
             DATA_STORE_RESOURCE_TYPES,
             frozenset(
@@ -89,6 +112,10 @@ class ResourceConceptTests(unittest.TestCase):
                     "aws_lb",
                     "aws_db_instance",
                     "aws_s3_bucket",
+                    "google_cloud_run_service",
+                    "google_cloud_run_v2_service",
+                    "google_cloudfunctions_function",
+                    "google_cloudfunctions2_function",
                     "google_compute_forwarding_rule",
                     "google_compute_global_forwarding_rule",
                     "google_compute_instance",
@@ -104,6 +131,18 @@ class ResourceConceptTests(unittest.TestCase):
                 {
                     "aws_iam_policy",
                     "aws_iam_role",
+                    "google_cloud_run_service_iam_binding",
+                    "google_cloud_run_service_iam_member",
+                    "google_cloud_run_service_iam_policy",
+                    "google_cloud_run_v2_service_iam_binding",
+                    "google_cloud_run_v2_service_iam_member",
+                    "google_cloud_run_v2_service_iam_policy",
+                    "google_cloudfunctions_function_iam_binding",
+                    "google_cloudfunctions_function_iam_member",
+                    "google_cloudfunctions_function_iam_policy",
+                    "google_cloudfunctions2_function_iam_binding",
+                    "google_cloudfunctions2_function_iam_member",
+                    "google_cloudfunctions2_function_iam_policy",
                     "google_kms_crypto_key_iam_binding",
                     "google_kms_crypto_key_iam_member",
                     "google_kms_crypto_key_iam_policy",
@@ -154,17 +193,29 @@ class ResourceConceptTests(unittest.TestCase):
         )
         self.assertEqual(
             PROVIDER_MANAGED_EGRESS_WITHOUT_VPC_RESOURCE_TYPES,
-            frozenset({"aws_lambda_function"}),
+            frozenset(
+                {
+                    "aws_lambda_function",
+                    "google_cloud_run_service",
+                    "google_cloud_run_v2_service",
+                    "google_cloudfunctions_function",
+                    "google_cloudfunctions2_function",
+                }
+            ),
         )
 
     def test_resource_concept_predicates_classify_known_resources(self) -> None:
         self.assertTrue(is_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_workload_resource(_resource("aws_lambda_function")))
         self.assertTrue(is_workload_resource(_resource("aws_ecs_service")))
+        self.assertTrue(is_workload_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
+        self.assertTrue(is_workload_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_workload_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_ecs_service")))
         self.assertTrue(is_public_compute_resource(_resource("aws_instance")))
+        self.assertTrue(is_public_compute_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
+        self.assertTrue(is_public_compute_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_public_compute_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
@@ -173,6 +224,8 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
+        self.assertTrue(is_public_edge_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
+        self.assertTrue(is_public_edge_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_forwarding_rule", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_global_forwarding_rule", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
@@ -181,6 +234,8 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_cloud_run_v2_service_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_cloudfunctions_function_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_kms_crypto_key_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_secret_manager_secret_iam_member", provider="gcp")))
@@ -213,6 +268,11 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(
             has_provider_managed_egress_without_vpc(
                 _resource("aws_lambda_function", metadata={"vpc_enabled": False})
+            )
+        )
+        self.assertTrue(
+            has_provider_managed_egress_without_vpc(
+                _resource("google_cloud_run_v2_service", provider="gcp", metadata={"vpc_enabled": False})
             )
         )
 

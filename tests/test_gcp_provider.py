@@ -61,8 +61,24 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsInstance(plugin.create_resource_decorator(), GcpResourceDecorator)
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
-            frozenset({"google_compute_instance"}),
+            frozenset(
+                {
+                    "google_cloud_run_service",
+                    "google_cloud_run_v2_service",
+                    "google_cloudfunctions_function",
+                    "google_cloudfunctions2_function",
+                    "google_compute_instance",
+                }
+            ),
         )
+        self.assertTrue(plugin.supports_resource_type("google_cloud_run_service"))
+        self.assertTrue(plugin.supports_resource_type("google_cloud_run_v2_service"))
+        self.assertTrue(plugin.supports_resource_type("google_cloud_run_service_iam_member"))
+        self.assertTrue(plugin.supports_resource_type("google_cloud_run_v2_service_iam_member"))
+        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions_function"))
+        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions2_function"))
+        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions_function_iam_member"))
+        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions2_function_iam_member"))
         self.assertTrue(plugin.supports_resource_type("google_compute_route"))
         self.assertTrue(plugin.supports_resource_type("google_compute_router"))
         self.assertTrue(plugin.supports_resource_type("google_compute_router_nat"))
@@ -142,6 +158,9 @@ class GcpProviderTests(unittest.TestCase):
                 "SERVICE_ACCOUNT_EMAIL",
                 "SERVICE_ACCOUNT_MEMBER",
                 "SERVICE_ACCOUNT_REFERENCE",
+                "CLOUD_RUN_SERVICE_REFERENCE",
+                "CLOUD_FUNCTION_REFERENCE",
+                "SERVERLESS_INGRESS",
                 "SERVICE_ACCOUNT_UNIQUE_ID",
                 "SERVICE_ACCOUNT_KEY_ALGORITHM",
                 "SERVICE_ACCOUNT_PUBLIC_KEY_TYPE",

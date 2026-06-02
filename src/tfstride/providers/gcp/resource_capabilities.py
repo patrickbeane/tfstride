@@ -7,12 +7,32 @@ from tfstride.providers.resource_capabilities import ResourceCapability
 
 GCP_RESOURCE_CAPABILITIES = MappingProxyType(
     {
-        ResourceCapability.WORKLOAD: frozenset({"google_compute_instance"}),
-        ResourceCapability.PUBLIC_COMPUTE: frozenset({"google_compute_instance"}),
+        ResourceCapability.WORKLOAD: frozenset(
+            {
+                "google_cloud_run_service",
+                "google_cloud_run_v2_service",
+                "google_cloudfunctions_function",
+                "google_cloudfunctions2_function",
+                "google_compute_instance",
+            }
+        ),
+        ResourceCapability.PUBLIC_COMPUTE: frozenset(
+            {
+                "google_cloud_run_service",
+                "google_cloud_run_v2_service",
+                "google_cloudfunctions_function",
+                "google_cloudfunctions2_function",
+                "google_compute_instance",
+            }
+        ),
         ResourceCapability.DATA_STORE: frozenset({"google_secret_manager_secret", "google_sql_database_instance", "google_storage_bucket"}),
         ResourceCapability.PUBLIC_EDGE: frozenset(
             {
                 "google_compute_forwarding_rule",
+                "google_cloud_run_service",
+                "google_cloud_run_v2_service",
+                "google_cloudfunctions_function",
+                "google_cloudfunctions2_function",
                 "google_compute_global_forwarding_rule",
                 "google_compute_instance",
                 "google_sql_database_instance",
@@ -22,6 +42,18 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
         ResourceCapability.IAM_POLICY: frozenset(
             {
+                "google_cloud_run_service_iam_binding",
+                "google_cloud_run_service_iam_member",
+                "google_cloud_run_service_iam_policy",
+                "google_cloud_run_v2_service_iam_binding",
+                "google_cloud_run_v2_service_iam_member",
+                "google_cloud_run_v2_service_iam_policy",
+                "google_cloudfunctions_function_iam_binding",
+                "google_cloudfunctions_function_iam_member",
+                "google_cloudfunctions_function_iam_policy",
+                "google_cloudfunctions2_function_iam_binding",
+                "google_cloudfunctions2_function_iam_member",
+                "google_cloudfunctions2_function_iam_policy",
                 "google_kms_crypto_key_iam_binding",
                 "google_kms_crypto_key_iam_member",
                 "google_kms_crypto_key_iam_policy",
@@ -44,6 +76,14 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.SECRET_STORE: frozenset({"google_secret_manager_secret"}),
         ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset({"google_secret_manager_secret"}),
         ResourceCapability.KEY_MANAGEMENT: frozenset({"google_kms_crypto_key"}),
+        ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: frozenset(
+            {
+                "google_cloud_run_service",
+                "google_cloud_run_v2_service",
+                "google_cloudfunctions_function",
+                "google_cloudfunctions2_function",
+            }
+        ),
         ResourceCapability.SENSITIVE_RESOURCE_POLICY: frozenset(
             {
                 "google_kms_crypto_key",

@@ -30,6 +30,8 @@ class GcpResourceDecorator:
             elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
                 _infer_instance_vpc_id(resource, index)
                 _derive_instance_network_posture(resource, index)
+            elif resource.resource_type in _SERVERLESS_WORKLOAD_RESOURCE_TYPES:
+                _derive_public_serverless_exposure(resource, index)
             elif resource.resource_type == "google_secret_manager_secret":
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
             elif resource.resource_type == "google_kms_crypto_key":
@@ -49,6 +51,8 @@ class _GcpResourceIndex:
     bucket_iam_resources: tuple[NormalizedResource, ...]
     secret_iam_resources: tuple[NormalizedResource, ...]
     kms_crypto_key_iam_resources: tuple[NormalizedResource, ...]
+    cloud_run_iam_resources: tuple[NormalizedResource, ...]
+    cloud_function_iam_resources: tuple[NormalizedResource, ...]
 
     @classmethod
     def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
@@ -60,6 +64,8 @@ class _GcpResourceIndex:
         bucket_iam_resources: list[NormalizedResource] = []
         secret_iam_resources: list[NormalizedResource] = []
         kms_crypto_key_iam_resources: list[NormalizedResource] = []
+        cloud_run_iam_resources: list[NormalizedResource] = []
+        cloud_function_iam_resources: list[NormalizedResource] = []
         for resource in resources:
             if resource.resource_type == "google_compute_subnetwork":
                 for reference in _resource_references(resource):
@@ -79,6 +85,10 @@ class _GcpResourceIndex:
                 secret_iam_resources.append(resource)
             elif resource.resource_type in _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
                 kms_crypto_key_iam_resources.append(resource)
+            elif resource.resource_type in _CLOUD_RUN_IAM_RESOURCE_TYPES:
+                cloud_run_iam_resources.append(resource)
+            elif resource.resource_type in _CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
+                cloud_function_iam_resources.append(resource)
         return cls(
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
             routers_by_reference=MappingProxyType(routers_by_reference),
@@ -88,8 +98,40 @@ class _GcpResourceIndex:
             bucket_iam_resources=tuple(bucket_iam_resources),
             secret_iam_resources=tuple(secret_iam_resources),
             kms_crypto_key_iam_resources=tuple(kms_crypto_key_iam_resources),
+            cloud_run_iam_resources=tuple(cloud_run_iam_resources),
+            cloud_function_iam_resources=tuple(cloud_function_iam_resources),
         )
 
+
+_SERVERLESS_WORKLOAD_RESOURCE_TYPES = frozenset(
+    {
+        "google_cloud_run_service",
+        "google_cloud_run_v2_service",
+        "google_cloudfunctions_function",
+        "google_cloudfunctions2_function",
+    }
+)
+_CLOUD_RUN_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_cloud_run_service_iam_binding",
+        "google_cloud_run_service_iam_member",
+        "google_cloud_run_service_iam_policy",
+        "google_cloud_run_v2_service_iam_binding",
+        "google_cloud_run_v2_service_iam_member",
+        "google_cloud_run_v2_service_iam_policy",
+    }
+)
+_CLOUD_FUNCTION_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_cloudfunctions_function_iam_binding",
+        "google_cloudfunctions_function_iam_member",
+        "google_cloudfunctions_function_iam_policy",
+        "google_cloudfunctions2_function_iam_binding",
+        "google_cloudfunctions2_function_iam_member",
+        "google_cloudfunctions2_function_iam_policy",
+    }
+)
+_SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
 
 _GCS_BUCKET_IAM_RESOURCE_TYPES = frozenset(
     {
@@ -206,6 +248,24 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResour
         bucket.public_exposure_reasons = public_access_reasons
 
 
+def _derive_public_serverless_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+    iam_resources = (
+        index.cloud_run_iam_resources
+        if resource.resource_type in {"google_cloud_run_service", "google_cloud_run_v2_service"}
+        else index.cloud_function_iam_resources
+    )
+    public_access_reasons = _serverless_public_access_reasons(resource, iam_resources)
+    if public_access_reasons:
+        resource.public_access_reasons = public_access_reasons
+    public_exposure = bool(resource.public_access_configured and public_access_reasons)
+    resource.public_exposure = public_exposure
+    resource.direct_internet_reachable = public_exposure
+    if public_exposure:
+        resource.public_exposure_reasons = public_access_reasons
+
+    _derive_sensitive_resource_iam_bindings(resource, iam_resources)
+
+
 def _derive_sensitive_resource_iam_bindings(
     resource: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
@@ -252,6 +312,30 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourc
     return _dedupe(reasons)
 
 
+def _serverless_public_access_reasons(
+    resource: NormalizedResource,
+    iam_resources: tuple[NormalizedResource, ...],
+) -> list[str]:
+    reasons: list[str] = []
+    resource_references = set(_resource_references(resource))
+    for iam_resource in iam_resources:
+        target_reference = _resource_iam_target_reference(iam_resource)
+        if not target_reference or _reference_key(target_reference) not in resource_references:
+            continue
+        for binding in _iam_bindings(iam_resource):
+            role = str(binding.get("role") or "unknown role")
+            if role not in _SERVERLESS_PUBLIC_INVOKER_ROLES:
+                continue
+            public_members = sorted(
+                member
+                for member in _binding_members(binding)
+                if member in _PUBLIC_GCP_IAM_MEMBERS
+            )
+            for member in public_members:
+                reasons.append(f"{iam_resource.address} grants {role} to {member}")
+    return _dedupe(reasons)
+
+
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     bucket_name = resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
     if bucket_name:
@@ -259,6 +343,12 @@ def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     secret_reference = resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE)
     if secret_reference:
         return secret_reference
+    cloud_run_reference = resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE)
+    if cloud_run_reference:
+        return cloud_run_reference
+    cloud_function_reference = resource.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE)
+    if cloud_function_reference:
+        return cloud_function_reference
     return resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE)
 
 
