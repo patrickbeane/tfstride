@@ -407,6 +407,74 @@ class GcpRuleTests(unittest.TestCase):
                 ],
             )
 
+    def test_direct_network_compute_firewall_produces_public_compute_finding(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                TerraformResource(
+                    address="google_compute_firewall.admin",
+                    mode="managed",
+                    resource_type="google_compute_firewall",
+                    name="admin",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "name": "tfstride-admin",
+                        "network": "google_compute_network.main.name",
+                        "direction": "INGRESS",
+                        "source_ranges": ["0.0.0.0/0"],
+                        "target_tags": ["web"],
+                        "allow": [{"protocol": "tcp", "ports": ["22"]}],
+                    },
+                ),
+                TerraformResource(
+                    address="google_compute_instance.web",
+                    mode="managed",
+                    resource_type="google_compute_instance",
+                    name="web",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "name": "tfstride-web",
+                        "tags": ["web"],
+                        "network_interface": [
+                            {
+                                "network": "google_compute_network.main.id",
+                                "access_config": [{}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-compute-broad-ingress"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_compute_instance.web", "google_compute_firewall.admin"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "internet-to-service:internet->google_compute_instance.web",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["internet_ingress_reasons"],
+            ["google_compute_firewall.admin ingress tcp 22 from 0.0.0.0/0"],
+        )
+        self.assertEqual(
+            evidence["public_exposure_reasons"],
+            [
+                "compute instance has an external access config and matching firewall rules allow internet ingress"
+            ],
+        )
+
     def test_private_compute_broad_admin_firewall_is_still_detected(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

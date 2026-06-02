@@ -212,6 +212,21 @@ def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceInde
             continue
         resource.vpc_id = subnetwork.vpc_id
         return
+    for network_reference in _instance_network_references(resource):
+        resource.vpc_id = network_reference
+        return
+
+
+def _instance_network_references(resource: NormalizedResource) -> list[str]:
+    references: list[str] = []
+    for interface in resource.get_metadata_field(GcpResourceMetadata.NETWORK_INTERFACES):
+        if not isinstance(interface, Mapping):
+            continue
+        network = interface.get("network")
+        if network in (None, ""):
+            continue
+        references.append(str(network))
+    return references
 
 
 def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:

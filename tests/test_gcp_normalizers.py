@@ -968,6 +968,52 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ],
         )
 
+    def test_normalizer_derives_public_compute_exposure_from_direct_network_firewall(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.main",
+                    "google_compute_network",
+                    {"name": "tfstride-main"},
+                ),
+                _terraform_resource(
+                    "google_compute_firewall.public_ssh",
+                    "google_compute_firewall",
+                    {
+                        "network": "google_compute_network.main.name",
+                        "source_ranges": ["0.0.0.0/0"],
+                        "target_tags": ["web"],
+                        "allow": [{"protocol": "tcp", "ports": ["22"]}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "tags": ["web"],
+                        "network_interface": [
+                            {
+                                "network": "google_compute_network.main.id",
+                                "access_config": [{}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertEqual(instance.vpc_id, "google_compute_network.main.id")
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.public_ssh"],
+        )
+        self.assertTrue(instance.public_exposure)
+        self.assertTrue(instance.direct_internet_reachable)
 
     def test_normalizer_derives_subnet_public_route_and_nat_egress_posture(self) -> None:
         inventory = GcpNormalizer().normalize(
