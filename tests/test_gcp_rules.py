@@ -207,6 +207,73 @@ def _cloudfunctions2_function_iam_binding(
     )
 
 
+def _service_account() -> TerraformResource:
+    email = "tfstride-deploy@tfstride-demo.iam.gserviceaccount.com"
+    return TerraformResource(
+        address="google_service_account.deploy",
+        mode="managed",
+        resource_type="google_service_account",
+        name="deploy",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "account_id": "tfstride-deploy",
+            "email": email,
+            "name": f"projects/tfstride-demo/serviceAccounts/{email}",
+            "project": "tfstride-demo",
+        },
+    )
+
+
+def _service_account_iam_member(
+    role: str = "roles/iam.serviceAccountTokenCreator",
+    member: str = "group:deploy@example.com",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_service_account_iam_member.deploy_token_creator",
+        mode="managed",
+        resource_type="google_service_account_iam_member",
+        name="deploy_token_creator",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "service_account_id": "google_service_account.deploy.name",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
+def _service_account_iam_binding(
+    role: str = "roles/iam.serviceAccountUser",
+    members: list[str] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_service_account_iam_binding.deploy_users",
+        mode="managed",
+        resource_type="google_service_account_iam_binding",
+        name="deploy_users",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "service_account_id": "google_service_account.deploy.name",
+            "role": role,
+            "members": members or ["allUsers"],
+        },
+    )
+
+
+def _service_account_iam_policy(bindings: list[dict[str, object]]) -> TerraformResource:
+    return TerraformResource(
+        address="google_service_account_iam_policy.deploy_policy",
+        mode="managed",
+        resource_type="google_service_account_iam_policy",
+        name="deploy_policy",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "service_account_id": "google_service_account.deploy.name",
+            "policy_data": {"bindings": bindings},
+        },
+    )
+
+
 def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com") -> TerraformResource:
     return TerraformResource(
         address="google_project_iam_member.binding",
@@ -1533,6 +1600,128 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(
             finding.trust_boundary_id,
             "workload-to-data-store:google_compute_instance.web->google_sql_database_instance.app",
+        )
+
+    def test_service_account_iam_public_principal_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_service_account(), _service_account_iam_binding()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-iam-broad-principal"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-service-account-iam-broad-principal")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_service_account.deploy", "google_service_account_iam_binding.deploy_users"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_service_account_iam_binding.deploy_users",
+                "member=allUsers",
+                "role=roles/iam.serviceAccountUser",
+            ],
+        )
+        self.assertEqual(evidence["trust_scope"], ["member is public GCP principal `allUsers`"])
+        self.assertEqual(evidence["service_account_reference"], ["google_service_account.deploy.name"])
+
+    def test_service_account_iam_domain_principal_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_iam_member(
+                    role="roles/iam.serviceAccountUser",
+                    member="domain:example.com",
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-iam-broad-principal"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["trust_scope"], ["member grants a whole Google Workspace domain"])
+
+    def test_service_account_iam_high_risk_role_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_iam_policy(
+                    [
+                        {"role": "roles/viewer", "members": ["group:ops@example.com"]},
+                        {
+                            "role": "roles/iam.serviceAccountTokenCreator",
+                            "members": ["group:deploy@example.com"],
+                        },
+                    ]
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-iam-privileged-role"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-service-account-iam-privileged-role")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_service_account.deploy", "google_service_account_iam_policy.deploy_policy"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_service_account_iam_policy.deploy_policy",
+                "member=group:deploy@example.com",
+                "role=roles/iam.serviceAccountTokenCreator",
+            ],
+        )
+        self.assertEqual(evidence["role_risk"], ["service account token minting and impersonation"])
+
+    def test_service_account_iam_low_risk_group_binding_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_iam_member(
+                    role="roles/viewer",
+                    member="group:ops@example.com",
+                ),
+            ]
+        )
+
+        engine = StrideRuleEngine()
+
+        self.assertEqual(
+            engine.evaluate(
+                inventory,
+                [],
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-iam-broad-principal"})),
+            ),
+            [],
+        )
+        self.assertEqual(
+            engine.evaluate(
+                inventory,
+                [],
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-iam-privileged-role"})),
+            ),
+            [],
         )
 
     def test_project_iam_broad_principal_is_detected(self) -> None:

@@ -143,6 +143,10 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.NAME)
 
     @property
+    def resource_name(self) -> str | None:
+        return self.name
+
+    @property
     def task_definition_reference(self) -> str | None:
         return self.get(AwsResourceMetadata.TASK_DEFINITION_REFERENCE)
 

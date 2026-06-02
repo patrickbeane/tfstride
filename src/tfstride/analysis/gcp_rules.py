@@ -17,6 +17,13 @@ _CLOUD_FUNCTION_RESOURCE_TYPES = frozenset(
 _PROJECT_IAM_RESOURCE_TYPES = frozenset(
     {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
 )
+_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_service_account_iam_binding",
+        "google_service_account_iam_member",
+        "google_service_account_iam_policy",
+    }
+)
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
@@ -45,6 +52,13 @@ class _GcpIamMemberAssessment:
     scope_description: str
     is_public: bool = False
     is_broad: bool = False
+
+
+_HIGH_RISK_SERVICE_ACCOUNT_ROLES: dict[str, str] = {
+    "roles/iam.serviceAccountAdmin": "service account administration and IAM policy control",
+    "roles/iam.serviceAccountTokenCreator": "service account token minting and impersonation",
+    "roles/iam.serviceAccountUser": "service account attachment and workload impersonation",
+}
 
 
 _PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
@@ -324,6 +338,121 @@ class GcpRuleDetectors:
                             severity_reasoning=severity_reasoning,
                         )
                     )
+        return findings
+
+    def detect_service_account_iam_broad_principal(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        inventory = context.inventory
+        for binding in inventory.by_type(*_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
+            target = _service_account_iam_target(binding, inventory)
+            for role, member in _iam_resource_binding_members(binding):
+                assessment = _assess_gcp_broad_iam_member(member)
+                if assessment is None:
+                    continue
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=assessment.is_public,
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=1,
+                    blast_radius=2 if assessment.is_public else 1,
+                )
+                affected_resources = _dedupe_addresses(
+                    [target.address if target else "", binding.address]
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=affected_resources,
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants `{role}` on a GCP service account to "
+                            f"`{member}`. Public or broad principals can cross the service-account "
+                            "identity boundary and may gain workload impersonation paths."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item(
+                                "iam_binding",
+                                [
+                                    f"source={binding.address}",
+                                    f"member={member}",
+                                    f"role={role}",
+                                ],
+                            ),
+                            evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item(
+                                "service_account_reference",
+                                [analysis_facts(binding).service_account_reference or ""],
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+    def detect_service_account_iam_privileged_role(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        inventory = context.inventory
+        for binding in inventory.by_type(*_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
+            target = _service_account_iam_target(binding, inventory)
+            for role, member in _iam_resource_binding_members(binding):
+                role_risk = _high_risk_service_account_role_risk(role)
+                if role_risk is None:
+                    continue
+                broad_assessment = _assess_gcp_broad_iam_member(member)
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=bool(broad_assessment and broad_assessment.is_public),
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=2,
+                    blast_radius=2,
+                )
+                affected_resources = _dedupe_addresses(
+                    [target.address if target else "", binding.address]
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=affected_resources,
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants the high-impact service account role `{role}` "
+                            f"to `{member}`. That role enables {role_risk}, expanding privilege if the "
+                            "principal is compromised or mis-scoped."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item(
+                                "iam_binding",
+                                [
+                                    f"source={binding.address}",
+                                    f"member={member}",
+                                    f"role={role}",
+                                ],
+                            ),
+                            evidence_item("role_risk", [role_risk]),
+                            evidence_item(
+                                "service_account_reference",
+                                [analysis_facts(binding).service_account_reference or ""],
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
         return findings
 
     def detect_project_iam_broad_principal(
@@ -985,7 +1114,7 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
     )
 
 
-def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
+def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
     bindings = analysis_facts(resource).iam_bindings
     if not bindings:
         facts = analysis_facts(resource)
@@ -1001,6 +1130,86 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
         for member in _binding_members(binding):
             members.append((role, member))
     return members
+
+
+def _assess_gcp_broad_iam_member(member: str) -> _GcpIamMemberAssessment | None:
+    normalized_member = str(member).strip()
+    if not normalized_member:
+        return None
+    if normalized_member in _PUBLIC_GCP_IAM_MEMBERS:
+        return _GcpIamMemberAssessment(
+            member=normalized_member,
+            scope_description=f"member is public GCP principal `{normalized_member}`",
+            is_public=True,
+            is_broad=True,
+        )
+    if normalized_member.startswith("domain:"):
+        return _GcpIamMemberAssessment(
+            member=normalized_member,
+            scope_description="member grants a whole Google Workspace domain",
+            is_broad=True,
+        )
+    return None
+
+
+def _high_risk_service_account_role_risk(role: str | None) -> str | None:
+    if not role:
+        return None
+    normalized_role = role.strip()
+    return _HIGH_RISK_SERVICE_ACCOUNT_ROLES.get(normalized_role)
+
+
+def _service_account_iam_target(
+    iam_resource: NormalizedResource,
+    inventory: ResourceInventory,
+) -> NormalizedResource | None:
+    target_reference = analysis_facts(iam_resource).service_account_reference
+    if not target_reference:
+        return None
+    target_key = _gcp_reference_key(target_reference)
+    for service_account in inventory.by_type("google_service_account"):
+        if target_key in _service_account_reference_keys(service_account):
+            return service_account
+    return None
+
+
+def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
+    facts = analysis_facts(resource)
+    values = [
+        resource.address,
+        f"{resource.address}.id",
+        f"{resource.address}.name",
+        f"{resource.address}.email",
+        resource.identifier,
+        facts.service_account_email,
+        facts.service_account_member,
+        facts.resource_name,
+    ]
+    keys: set[str] = set()
+    for value in values:
+        if value in (None, ""):
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        keys.add(_gcp_reference_key(text))
+        if text.startswith("serviceAccount:"):
+            keys.add(_gcp_reference_key(text.removeprefix("serviceAccount:")))
+        else:
+            keys.add(_gcp_reference_key(f"serviceAccount:{text}"))
+    return keys
+
+
+def _gcp_reference_key(value: str) -> str:
+    text = str(value).strip()
+    for suffix in (".id", ".name", ".email", ".member", ".self_link"):
+        if text.endswith(suffix):
+            return text[: -len(suffix)]
+    return text
+
+
+def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
+    return _iam_resource_binding_members(resource)
 
 
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:

@@ -80,6 +80,10 @@ class FakeProviderFacts:
         return "tfstride-demo"
 
     @property
+    def resource_name(self) -> str | None:
+        return "fake-resource"
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
 
@@ -165,6 +169,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.database_engine, "postgres")
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
         self.assertIsNone(facts.project)
+        self.assertIsNone(facts.resource_name)
         self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
@@ -357,6 +362,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_service_account_facts_read_provider_owned_identity_metadata(self) -> None:
         resource = _resource(
             {
+                GcpResourceMetadata.NAME.key: "projects/tfstride-demo/serviceAccounts/tfstride-web",
                 GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL.key: "tfstride-web@example.iam.gserviceaccount.com",
                 GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: (
                     "serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
@@ -368,6 +374,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
+        self.assertEqual(
+            facts.resource_name,
+            "projects/tfstride-demo/serviceAccounts/tfstride-web",
+        )
         self.assertEqual(facts.service_account_email, "tfstride-web@example.iam.gserviceaccount.com")
         self.assertEqual(
             facts.service_account_member,
@@ -406,6 +416,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             ["google_storage_bucket_iam_binding.logs"],
         )
         self.assertEqual(facts.project, "tfstride-demo")
+        self.assertEqual(facts.resource_name, "fake-resource")
         self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
         self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
         self.assertFalse(facts.cloud_sql_backup_enabled)

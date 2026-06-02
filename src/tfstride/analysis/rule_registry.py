@@ -415,6 +415,28 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-service-account-iam-broad-principal",
+        title="GCP service account IAM grants access to broad principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove `allUsers`, `allAuthenticatedUsers`, and broad domain grants from service-account IAM; "
+            "grant impersonation roles only to narrowly scoped groups, workloads, or automation identities."
+        ),
+        tags=("gcp", "iam", "service-account", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-service-account-iam-privileged-role",
+        title="GCP service account IAM grants a high-risk impersonation role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Restrict service-account user, token creator, and admin roles to narrowly scoped principals, "
+            "prefer workload-specific service accounts, and review impersonation paths before deployment."
+        ),
+        tags=("gcp", "iam", "service-account", "privilege"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-project-iam-broad-principal",
         title="GCP project IAM binding grants access to public principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -84,6 +84,10 @@ class AnalysisResourceFacts:
         return self._facts.project
 
     @property
+    def resource_name(self) -> str | None:
+        return self._facts.resource_name
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return self._facts.iam_bindings
 

@@ -63,6 +63,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.PROJECT)
 
     @property
+    def resource_name(self) -> str | None:
+        return self.get(GcpResourceMetadata.NAME)
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.IAM_BINDINGS)
 
