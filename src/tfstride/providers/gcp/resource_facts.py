@@ -26,6 +26,8 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     def optional_bool(self, field: MetadataField[bool]) -> bool | None:
         if not self.resource.has_metadata_field(field):
             return None
+        if self.resource.metadata_snapshot().get(field.key) is None:
+            return None
         return self.get(field)
 
     def append(self, field: StringListMetadataField, value: str | None) -> None:
@@ -117,6 +119,46 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     @property
     def os_login_enabled(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.OS_LOGIN_ENABLED)
+
+    @property
+    def gke_endpoint(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_ENDPOINT)
+
+    @property
+    def gke_private_endpoint_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED)
+
+    @property
+    def gke_private_nodes_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED)
+
+    @property
+    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS)
+
+    @property
+    def gke_workload_identity_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED)
+
+    @property
+    def gke_workload_identity_pool(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL)
+
+    @property
+    def gke_node_service_account(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT)
+
+    @property
+    def gke_node_oauth_scopes(self) -> list[str]:
+        return self.get(GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES)
+
+    @property
+    def gke_node_metadata_mode(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_NODE_METADATA_MODE)
+
+    @property
+    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED)
 
     @property
     def service_account_email(self) -> str | None:

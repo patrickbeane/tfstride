@@ -35,6 +35,7 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_cloudfunctions2_function",
                 "google_compute_global_forwarding_rule",
                 "google_compute_instance",
+                "google_container_cluster",
                 "google_sql_database_instance",
                 "google_storage_bucket",
             }

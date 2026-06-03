@@ -115,6 +115,46 @@ class AwsResourceFacts:
         return []
 
     @property
+    def gke_endpoint(self) -> str | None:
+        return None
+
+    @property
+    def gke_private_endpoint_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_private_nodes_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def gke_workload_identity_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_workload_identity_pool(self) -> str | None:
+        return None
+
+    @property
+    def gke_node_service_account(self) -> str | None:
+        return None
+
+    @property
+    def gke_node_oauth_scopes(self) -> list[str]:
+        return []
+
+    @property
+    def gke_node_metadata_mode(self) -> str | None:
+        return None
+
+    @property
+    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
+        return None
+
+    @property
     def security_group_id(self) -> str | None:
         return self.get(AwsResourceMetadata.SECURITY_GROUP_ID)
 

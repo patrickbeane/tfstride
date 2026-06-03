@@ -391,6 +391,61 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-gke-public-control-plane",
+        title="GKE cluster exposes a public control plane",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Use private GKE control-plane endpoints where possible, or restrict master authorized networks "
+            "to narrow administrator CIDRs and enforce IAM plus Kubernetes RBAC for cluster administration."
+        ),
+        tags=("gcp", "gke", "kubernetes", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-broad-authorized-networks",
+        title="GKE control plane allows broad authorized networks",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Configure GKE master authorized networks with narrow trusted CIDRs, avoid internet-wide ranges, "
+            "and prefer private control-plane access for administrative paths."
+        ),
+        tags=("gcp", "gke", "kubernetes", "network", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-workload-identity-disabled",
+        title="GKE cluster does not enable Workload Identity",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable GKE Workload Identity, bind Kubernetes service accounts to narrow Google service accounts, "
+            "and avoid relying on node service-account credentials for pod-level cloud API access."
+        ),
+        tags=("gcp", "gke", "kubernetes", "iam"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-legacy-metadata-endpoints-enabled",
+        title="GKE node metadata exposure is not hardened",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, "
+            "and prevent pods from reaching broad node credentials."
+        ),
+        tags=("gcp", "gke", "kubernetes", "metadata", "iam"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-broad-node-service-account",
+        title="GKE node pool uses broad node identity settings",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Attach a dedicated least-privilege node service account, remove cloud-platform or full-control "
+            "OAuth scopes, and shift workload permissions to Workload Identity bindings."
+        ),
+        tags=("gcp", "gke", "kubernetes", "iam", "node-pool"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-run-public-invoker",
         title="Cloud Run service is publicly invokable",
         category=StrideCategory.SPOOFING,

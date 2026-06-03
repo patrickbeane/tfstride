@@ -119,6 +119,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_compute_forwarding_rule",
                     "google_compute_global_forwarding_rule",
                     "google_compute_instance",
+                    "google_container_cluster",
                     "google_sql_database_instance",
                     "google_storage_bucket",
                 }
@@ -236,6 +237,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("google_compute_forwarding_rule", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_global_forwarding_rule", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
+        self.assertTrue(is_public_edge_resource(_resource("google_container_cluster", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))

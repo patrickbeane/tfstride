@@ -7,6 +7,10 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
+from tfstride.providers.gcp.container_normalizers import (
+    normalize_container_cluster,
+    normalize_container_node_pool,
+)
 from tfstride.providers.gcp.data_normalizers import (
     normalize_kms_crypto_key,
     normalize_secret_manager_secret,
@@ -98,6 +102,8 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_cloudfunctions2_function_iam_binding": normalize_cloudfunctions2_function_iam_binding,
     "google_cloudfunctions2_function_iam_member": normalize_cloudfunctions2_function_iam_member,
     "google_cloudfunctions2_function_iam_policy": normalize_cloudfunctions2_function_iam_policy,
+    "google_container_cluster": normalize_container_cluster,
+    "google_container_node_pool": normalize_container_node_pool,
     "google_kms_crypto_key": normalize_kms_crypto_key,
     "google_kms_crypto_key_iam_binding": normalize_kms_crypto_key_iam_binding,
     "google_kms_crypto_key_iam_member": normalize_kms_crypto_key_iam_member,

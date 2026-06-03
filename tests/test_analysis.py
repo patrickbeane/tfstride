@@ -813,7 +813,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 12, {"high": 2, "medium": 10}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 17, {"high": 3, "medium": 14}),
         }
 
         expected_titles = {
@@ -854,6 +854,11 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
+                "GKE cluster exposes a public control plane": 1,
+                "GKE control plane allows broad authorized networks": 1,
+                "GKE cluster does not enable Workload Identity": 1,
+                "GKE node metadata exposure is not hardened": 1,
+                "GKE node pool uses broad node identity settings": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
         }
@@ -872,12 +877,12 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 14)
+        self.assertEqual(len(result.inventory.resources), 16)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 14)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 14)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 16)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 16)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 12)
+        self.assertEqual(len(result.findings), 17)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -899,6 +904,26 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             findings_by_rule["gcp-gcs-customer-managed-encryption-missing"].affected_resources,
             ["google_storage_bucket.logs"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-public-control-plane"].affected_resources,
+            ["google_container_cluster.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-broad-authorized-networks"].affected_resources,
+            ["google_container_cluster.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-workload-identity-disabled"].affected_resources,
+            ["google_container_cluster.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-legacy-metadata-endpoints-enabled"].affected_resources,
+            ["google_container_node_pool.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-broad-node-service-account"].affected_resources,
+            ["google_container_node_pool.app"],
         )
         cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]
         self.assertEqual(cloud_sql_public_finding.severity, Severity.HIGH)
@@ -928,7 +953,7 @@ class TFSAnalysisTests(unittest.TestCase):
             {finding.severity for finding in sensitive_iam_findings},
             {Severity.HIGH, Severity.MEDIUM},
         )
-        self.assertEqual(len(result.trust_boundaries), 3)
+        self.assertEqual(len(result.trust_boundaries), 4)
         boundaries_by_target = {boundary.target: boundary for boundary in result.trust_boundaries}
         boundary = boundaries_by_target["google_compute_instance.web"]
         self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -937,6 +962,10 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             gcs_finding.trust_boundary_id,
             boundaries_by_target["google_storage_bucket.logs"].identifier,
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gke-public-control-plane"].trust_boundary_id,
+            boundaries_by_target["google_container_cluster.app"].identifier,
         )
         self.assertEqual(
             cloud_sql_public_finding.trust_boundary_id,

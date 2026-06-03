@@ -65,6 +65,11 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-gcs-customer-managed-encryption-missing", output)
         self.assertIn("- gcp-public-compute-broad-ingress", output)
         self.assertIn("- gcp-compute-os-login-disabled", output)
+        self.assertIn("- gcp-gke-public-control-plane", output)
+        self.assertIn("- gcp-gke-broad-authorized-networks", output)
+        self.assertIn("- gcp-gke-workload-identity-disabled", output)
+        self.assertIn("- gcp-gke-legacy-metadata-endpoints-enabled", output)
+        self.assertIn("- gcp-gke-broad-node-service-account", output)
         self.assertIn("- gcp-cloud-run-public-invoker", output)
         self.assertIn("- gcp-cloud-functions-public-invoker", output)
         self.assertIn("- gcp-public-workload-sensitive-data-access", output)
@@ -221,9 +226,9 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(len(report["inventory"]["resources"]), 14)
+        self.assertEqual(len(report["inventory"]["resources"]), 16)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
-        self.assertEqual(report["summary"]["active_findings"], 12)
+        self.assertEqual(report["summary"]["active_findings"], 17)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

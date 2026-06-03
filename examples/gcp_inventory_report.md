@@ -2,25 +2,25 @@
 
 - Analyzed file: `sample_gcp_plan.json`
 - Provider: `gcp`
-- Normalized resources: `14`
+- Normalized resources: `16`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **3 trust boundaries** and **12 findings** across **14 normalized resources**.
+This run identified **4 trust boundaries** and **17 findings** across **16 normalized resources**.
 
-- High severity findings: `2`
-- Medium severity findings: `10`
+- High severity findings: `3`
+- Medium severity findings: `14`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
-- Terraform resources seen: `14`
-- Provider resources considered: `14`
-- Normalized resources: `14`
+- Terraform resources seen: `16`
+- Provider resources considered: `16`
+- Normalized resources: `16`
 - Unsupported resources: `0`
-- Registered rules: `34`
-- Enabled rules: `34`
+- Registered rules: `39`
+- Enabled rules: `39`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -36,6 +36,11 @@ This run identified **3 trust boundaries** and **12 findings** across **14 norma
   - `gcp-gcs-versioning-disabled`: `1`
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
+  - `gcp-gke-public-control-plane`: `1`
+  - `gcp-gke-broad-authorized-networks`: `1`
+  - `gcp-gke-workload-identity-disabled`: `1`
+  - `gcp-gke-legacy-metadata-endpoints-enabled`: `1`
+  - `gcp-gke-broad-node-service-account`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -44,6 +49,13 @@ This run identified **3 trust boundaries** and **12 findings** across **14 norma
 - Source: `internet`
 - Target: `google_compute_instance.web`
 - Description: Traffic can cross from the public internet to google_compute_instance.web.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_container_cluster.app`
+- Description: Traffic can cross from the public internet to google_container_cluster.app.
 - Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
 
 ### `internet-to-service`
@@ -75,6 +87,19 @@ This run identified **3 trust boundaries** and **12 findings** across **14 norma
 - Evidence:
   - authorized networks: anywhere (0.0.0.0/0)
   - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GKE node pool uses broad node identity settings
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_node_pool.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_container_node_pool.app uses broad GKE node identity settings. Default or broadly scoped node service accounts can turn a node or pod compromise into wider GCP API access.
+- Recommended mitigation: Attach a dedicated least-privilege node service account, remove cloud-platform or full-control OAuth scopes, and shift workload permissions to Workload Identity bindings.
+- Evidence:
+  - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
+  - node service account: 123456789-compute@developer.gserviceaccount.com
+  - oauth scopes: https://www.googleapis.com/auth/cloud-platform
 
 #### Sensitive GCP resource IAM binding allows broad or external access
 
@@ -180,6 +205,54 @@ This run identified **3 trust boundaries** and **12 findings** across **14 norma
 - Recommended mitigation: Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules that match recovery objectives and storage cost constraints.
 - Evidence:
   - data protection posture: versioning.enabled is false; data_sensitivity is sensitive
+
+#### GKE cluster does not enable Workload Identity
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_container_cluster.app does not enable GKE Workload Identity. Pods are more likely to depend on node service-account credentials, which weakens workload-level identity boundaries and can expand blast radius after pod compromise.
+- Recommended mitigation: Enable GKE Workload Identity, bind Kubernetes service accounts to narrow Google service accounts, and avoid relying on node service-account credentials for pod-level cloud API access.
+- Evidence:
+  - workload identity posture: workload_identity_enabled is false; workload_pool is unset
+
+#### GKE cluster exposes a public control plane
+
+- STRIDE category: Spoofing
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: google_container_cluster.app exposes a public GKE control-plane endpoint. Public API server reachability increases dependence on IAM, Kubernetes RBAC, and authorized network configuration to protect cluster administration.
+- Recommended mitigation: Use private GKE control-plane endpoints where possible, or restrict master authorized networks to narrow administrator CIDRs and enforce IAM plus Kubernetes RBAC for cluster administration.
+- Evidence:
+  - control plane endpoint: 35.4.5.6
+  - public access reasons: GKE control plane endpoint is public
+  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GKE control plane allows broad authorized networks
+
+- STRIDE category: Spoofing
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 5 => medium
+- Rationale: google_container_cluster.app exposes the GKE control plane without narrow master authorized networks. Internet-wide or unset CIDR controls leave the Kubernetes API server reachable from untrusted client networks.
+- Recommended mitigation: Configure GKE master authorized networks with narrow trusted CIDRs, avoid internet-wide ranges, and prefer private control-plane access for administrative paths.
+- Evidence:
+  - authorized networks: anywhere (0.0.0.0/0)
+  - configured authorized network count: 1
+  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GKE node metadata exposure is not hardened
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_node_pool.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 3 => medium
+- Rationale: google_container_node_pool.app allows legacy or broad node metadata exposure. Workloads on the node may be able to reach metadata credentials outside the intended GKE metadata server controls.
+- Recommended mitigation: Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, and prevent pods from reaching broad node credentials.
+- Evidence:
+  - node metadata posture: legacy metadata endpoints are enabled; metadata mode is GCE_METADATA
 
 #### Internet-exposed GCP compute instance permits broad ingress
 

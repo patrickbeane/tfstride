@@ -20,6 +20,7 @@ _CLOUD_RUN_RESOURCE_TYPES = frozenset({"google_cloud_run_service", "google_cloud
 _CLOUD_FUNCTION_RESOURCE_TYPES = frozenset(
     {"google_cloudfunctions_function", "google_cloudfunctions2_function"}
 )
+_GKE_RESOURCE_TYPES = frozenset({"google_container_cluster", "google_container_node_pool"})
 _PROJECT_IAM_RESOURCE_TYPES = frozenset(
     {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
 )
@@ -33,6 +34,13 @@ _SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
+_GKE_BROAD_OAUTH_SCOPES = frozenset(
+    {
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/compute",
+        "https://www.googleapis.com/auth/devstorage.full_control",
+    }
+)
 _SECRET_ACCESS_ROLES = frozenset(
     {
         "roles/editor",
@@ -168,6 +176,229 @@ class GcpRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("os_login_posture", ["metadata.enable-oslogin is false"]),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_public_control_plane(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = analysis_facts(cluster)
+            if not cluster.public_access_configured:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address)
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{cluster.display_name} exposes a public GKE control-plane endpoint. "
+                        "Public API server reachability increases dependence on IAM, Kubernetes RBAC, "
+                        "and authorized network configuration to protect cluster administration."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("control_plane_endpoint", [cluster_facts.gke_endpoint or "public endpoint configured"]),
+                        evidence_item("public_access_reasons", cluster.public_access_reasons),
+                        evidence_item("public_exposure_reasons", cluster.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_broad_authorized_networks(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = analysis_facts(cluster)
+            if not cluster.public_access_configured:
+                continue
+            broad_networks = _gke_broad_authorized_networks(cluster)
+            if not broad_networks:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2,
+                blast_radius=1,
+            )
+            boundary = context.boundary_index.get(
+                (BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address)
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{cluster.display_name} exposes the GKE control plane without narrow master "
+                        "authorized networks. Internet-wide or unset CIDR controls leave the Kubernetes API "
+                        "server reachable from untrusted client networks."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("authorized_networks", broad_networks),
+                        evidence_item("configured_authorized_network_count", [str(len(cluster_facts.gke_master_authorized_networks))]),
+                        evidence_item("public_exposure_reasons", cluster.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_workload_identity_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = analysis_facts(cluster)
+            if cluster_facts.gke_workload_identity_enabled is True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=cluster.public_exposure,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not enable GKE Workload Identity. Pods are more likely "
+                        "to depend on node service-account credentials, which weakens workload-level identity "
+                        "boundaries and can expand blast radius after pod compromise."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "workload_identity_posture",
+                            [
+                                f"workload_identity_enabled is {_bool_status(cluster_facts.gke_workload_identity_enabled)}",
+                                f"workload_pool is {cluster_facts.gke_workload_identity_pool or 'unset'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_legacy_metadata_endpoints_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_GKE_RESOURCE_TYPES):
+            resource_facts = analysis_facts(resource)
+            if resource_facts.gke_legacy_metadata_endpoints_enabled is not True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[resource.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{resource.display_name} allows legacy or broad node metadata exposure. Workloads "
+                        "on the node may be able to reach metadata credentials outside the intended GKE "
+                        "metadata server controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "node_metadata_posture",
+                            [
+                                "legacy metadata endpoints are enabled",
+                                f"metadata mode is {resource_facts.gke_node_metadata_mode or 'unset'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_broad_node_service_account(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_GKE_RESOURCE_TYPES):
+            resource_facts = analysis_facts(resource)
+            risk_descriptions = _gke_node_identity_risks(resource)
+            if not risk_descriptions:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=2,
+                data_sensitivity=0,
+                lateral_movement=2,
+                blast_radius=2,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[resource.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{resource.display_name} uses broad GKE node identity settings. Default or broadly "
+                        "scoped node service accounts can turn a node or pod compromise into wider GCP API "
+                        "access."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("node_identity_risks", risk_descriptions),
+                        evidence_item("node_service_account", [resource_facts.gke_node_service_account or "unset"]),
+                        evidence_item("oauth_scopes", resource_facts.gke_node_oauth_scopes),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -1054,6 +1285,41 @@ def _bool_status(value: bool | None) -> str:
 
 def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
+
+def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
+    facts = analysis_facts(cluster)
+    if not facts.gke_master_authorized_networks:
+        return ["master authorized networks are not configured"]
+    descriptions: list[str] = []
+    for network in facts.gke_master_authorized_networks:
+        cidr = str(network.get("cidr_block") or "").strip()
+        if cidr not in {"0.0.0.0/0", "::/0"}:
+            continue
+        name = str(network.get("display_name") or network.get("name") or "unnamed").strip() or "unnamed"
+        descriptions.append(f"{name} ({cidr})")
+    return descriptions
+
+
+def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:
+    facts = analysis_facts(resource)
+    risks: list[str] = []
+    service_account = str(facts.gke_node_service_account or "").strip()
+    if not service_account and not facts.gke_node_oauth_scopes:
+        if facts.gke_legacy_metadata_endpoints_enabled is None:
+            return []
+    if not service_account or service_account == "default":
+        risks.append("node service account is unset or default")
+    elif service_account.endswith("-compute@developer.gserviceaccount.com"):
+        risks.append(f"node service account uses default Compute Engine identity `{service_account}`")
+    broad_scopes = [scope for scope in facts.gke_node_oauth_scopes if _gke_scope_is_broad(scope)]
+    if broad_scopes:
+        risks.extend(f"node OAuth scope is broad: {scope}" for scope in broad_scopes)
+    return risks
+
+
+def _gke_scope_is_broad(scope: str) -> bool:
+    normalized = str(scope).strip().lower()
+    return normalized in _GKE_BROAD_OAUTH_SCOPES or normalized.endswith("/auth/cloud-platform")
 
 
 def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> bool:

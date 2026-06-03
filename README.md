@@ -203,7 +203,7 @@ The repo includes several ready-to-run Terraform plan fixtures:
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the initial compute, network, IAM, Cloud SQL, Secret Manager, Cloud KMS, and storage inventory set
+- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the compute, GKE, network, IAM, Cloud SQL, Secret Manager, Cloud KMS, and storage inventory set
 - `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
@@ -254,6 +254,7 @@ Current rules include:
 - trust relationships that expand blast radius
 - cross-account or broad trust without narrowing conditions
 - public and high-privilege GCP project IAM principals
+- GKE public control planes, broad master authorized networks, disabled Workload Identity, legacy metadata exposure, and broad node identities
 - public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backups, point-in-time recovery, and deletion protection
 - broad or external GCP IAM access to Secret Manager secrets and Cloud KMS keys
 - internet-exposed GCP compute, Cloud Run, and Cloud Functions workloads whose service accounts can access GCS, Secret Manager, Cloud KMS, or Cloud SQL
@@ -402,9 +403,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## GCP Support
 
-The GCP provider is registered for provider detection and supports inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_cloud_run_service`, `google_cloud_run_v2_service`, Cloud Run IAM member/binding/policy resources, `google_cloudfunctions_function`, `google_cloudfunctions2_function`, Cloud Functions IAM member/binding/policy resources, project IAM member/binding/policy resources, project and organization custom IAM roles, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key and key-ring IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
+The GCP provider is registered for provider detection and supports inventory normalization for `google_compute_instance`, `google_container_cluster`, `google_container_node_pool`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_cloud_run_service`, `google_cloud_run_v2_service`, Cloud Run IAM member/binding/policy resources, `google_cloudfunctions_function`, `google_cloudfunctions2_function`, Cloud Functions IAM member/binding/policy resources, project IAM member/binding/policy resources, project and organization custom IAM roles, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key and key-ring IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
 
-GCP trust-boundary detection currently covers internet-to-service exposure for public compute, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE, Cloud Run, and Cloud Functions service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backup and recovery posture, deletion protection, public GCS bucket access, GCS uniform access, Public Access Prevention, versioning, and customer-managed encryption posture, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, predefined high-privilege project role bindings, and custom-role permission expansion for privileged project IAM and data-access paths; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers internet-to-service exposure for public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE, Cloud Run, and Cloud Functions service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, GKE public control-plane posture, broad master authorized networks, disabled Workload Identity, legacy metadata exposure, broad node service accounts/scopes, public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backup and recovery posture, deletion protection, public GCS bucket access, GCS uniform access, Public Access Prevention, versioning, and customer-managed encryption posture, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, predefined high-privilege project role bindings, and custom-role permission expansion for privileged project IAM and data-access paths; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 
@@ -491,7 +492,7 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 ## Limitations
 
 - AWS remains the deepest provider implementation and the only provider with control-observation coverage today
-- GCP support is limited to inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource and serverless types
+- GCP support is limited to inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core, GKE, and serverless resource types
 - Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case
@@ -531,7 +532,7 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 
 ### GCP
 
-- Initial inventory:
+- Inventory with GKE:
   [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
   [`examples/gcp_inventory_report.md`](examples/gcp_inventory_report.md)
 

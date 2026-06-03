@@ -84,6 +84,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_compute_router_nat"))
         self.assertTrue(plugin.supports_resource_type("google_compute_forwarding_rule"))
         self.assertTrue(plugin.supports_resource_type("google_compute_global_forwarding_rule"))
+        self.assertTrue(plugin.supports_resource_type("google_container_cluster"))
+        self.assertTrue(plugin.supports_resource_type("google_container_node_pool"))
         self.assertTrue(plugin.supports_resource_type("google_service_account"))
         self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
         self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret"))
@@ -177,6 +179,16 @@ class GcpProviderTests(unittest.TestCase):
                 "SERVICE_ACCOUNT_PUBLIC_KEY_TYPE",
                 "SERVICE_ACCOUNT_DISABLED",
                 "OS_LOGIN_ENABLED",
+                "GKE_ENDPOINT",
+                "GKE_PRIVATE_ENDPOINT_ENABLED",
+                "GKE_PRIVATE_NODES_ENABLED",
+                "GKE_MASTER_AUTHORIZED_NETWORKS",
+                "GKE_WORKLOAD_IDENTITY_ENABLED",
+                "GKE_WORKLOAD_IDENTITY_POOL",
+                "GKE_NODE_SERVICE_ACCOUNT",
+                "GKE_NODE_OAUTH_SCOPES",
+                "GKE_NODE_METADATA_MODE",
+                "GKE_LEGACY_METADATA_ENDPOINTS_ENABLED",
             },
         )
 
@@ -208,6 +220,16 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.service_account_reference)
         self.assertEqual(facts.workload_identity_members, [])
         self.assertEqual(facts.workload_identity_scopes, [])
+        self.assertIsNone(facts.gke_endpoint)
+        self.assertIsNone(facts.gke_private_endpoint_enabled)
+        self.assertIsNone(facts.gke_private_nodes_enabled)
+        self.assertEqual(facts.gke_master_authorized_networks, [])
+        self.assertIsNone(facts.gke_workload_identity_enabled)
+        self.assertIsNone(facts.gke_workload_identity_pool)
+        self.assertIsNone(facts.gke_node_service_account)
+        self.assertEqual(facts.gke_node_oauth_scopes, [])
+        self.assertIsNone(facts.gke_node_metadata_mode)
+        self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()

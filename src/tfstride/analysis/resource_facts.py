@@ -136,6 +136,46 @@ class AnalysisResourceFacts:
         return self._facts.os_login_enabled
 
     @property
+    def gke_endpoint(self) -> str | None:
+        return self._facts.gke_endpoint
+
+    @property
+    def gke_private_endpoint_enabled(self) -> bool | None:
+        return self._facts.gke_private_endpoint_enabled
+
+    @property
+    def gke_private_nodes_enabled(self) -> bool | None:
+        return self._facts.gke_private_nodes_enabled
+
+    @property
+    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
+        return self._facts.gke_master_authorized_networks
+
+    @property
+    def gke_workload_identity_enabled(self) -> bool | None:
+        return self._facts.gke_workload_identity_enabled
+
+    @property
+    def gke_workload_identity_pool(self) -> str | None:
+        return self._facts.gke_workload_identity_pool
+
+    @property
+    def gke_node_service_account(self) -> str | None:
+        return self._facts.gke_node_service_account
+
+    @property
+    def gke_node_oauth_scopes(self) -> list[str]:
+        return self._facts.gke_node_oauth_scopes
+
+    @property
+    def gke_node_metadata_mode(self) -> str | None:
+        return self._facts.gke_node_metadata_mode
+
+    @property
+    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
+        return self._facts.gke_legacy_metadata_endpoints_enabled
+
+    @property
     def service_account_email(self) -> str | None:
         return self._facts.service_account_email
 
