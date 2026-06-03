@@ -16,6 +16,9 @@ from tfstride.providers.gcp.data_normalizers import (
 )
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_kms_crypto_key_iam_member,
+    normalize_kms_key_ring_iam_binding,
+    normalize_kms_key_ring_iam_member,
+    normalize_kms_key_ring_iam_policy,
     normalize_project_iam_binding,
     normalize_project_iam_member,
     normalize_project_iam_policy,
@@ -441,6 +444,77 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER),
             "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
         )
+
+    def test_kms_key_ring_iam_normalizers_preserve_binding_parts(self) -> None:
+        key_ring = "projects/tfstride-demo/locations/global/keyRings/tfstride-app"
+        member = normalize_kms_key_ring_iam_member(
+            _terraform_resource(
+                "google_kms_key_ring_iam_member.partner_decrypter",
+                "google_kms_key_ring_iam_member",
+                {
+                    "key_ring_id": key_ring,
+                    "role": "roles/cloudkms.cryptoKeyDecrypter",
+                    "member": "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+                },
+            )
+        )
+        binding = normalize_kms_key_ring_iam_binding(
+            _terraform_resource(
+                "google_kms_key_ring_iam_binding.partner_decrypters",
+                "google_kms_key_ring_iam_binding",
+                {
+                    "key_ring_id": key_ring,
+                    "role": "roles/cloudkms.cryptoKeyDecrypter",
+                    "members": [
+                        "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+                        "group:crypto@example.com",
+                    ],
+                },
+            )
+        )
+        policy = normalize_kms_key_ring_iam_policy(
+            _terraform_resource(
+                "google_kms_key_ring_iam_policy.partner_policy",
+                "google_kms_key_ring_iam_policy",
+                {
+                    "key_ring_id": key_ring,
+                    "policy_data": {
+                        "bindings": [
+                            {
+                                "role": "roles/cloudkms.cryptoKeyDecrypter",
+                                "members": ["serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"],
+                            }
+                        ]
+                    },
+                },
+            )
+        )
+
+        self.assertEqual(member.category, ResourceCategory.IAM)
+        self.assertEqual(member.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING), key_ring)
+        self.assertEqual(
+            member.get_metadata_field(GcpResourceMetadata.IAM_MEMBER),
+            "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+        )
+        self.assertEqual(binding.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING), key_ring)
+        self.assertEqual(
+            binding.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS),
+            [
+                "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+                "group:crypto@example.com",
+            ],
+        )
+        self.assertEqual(policy.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING), key_ring)
+        self.assertEqual(
+            policy.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/cloudkms.cryptoKeyDecrypter",
+                    "members": ["serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"],
+                }
+            ],
+        )
+
 
     def test_service_account_normalizer_preserves_identity_context(self) -> None:
         normalized = normalize_service_account(self.resources["google_service_account.web"])
@@ -911,6 +985,51 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                     "source": "google_kms_crypto_key_iam_member.partner_decrypter",
                 }
             ],
+        )
+
+    def test_normalizer_attaches_kms_key_ring_iam_bindings_to_crypto_keys(self) -> None:
+        key_ring = "projects/tfstride-demo/locations/global/keyRings/tfstride-app"
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_kms_crypto_key.customer",
+                    "google_kms_crypto_key",
+                    {
+                        "name": "tfstride-customer-key",
+                        "id": f"{key_ring}/cryptoKeys/tfstride-customer-key",
+                        "key_ring": key_ring,
+                        "purpose": "ENCRYPT_DECRYPT",
+                    },
+                ),
+                _terraform_resource(
+                    "google_kms_key_ring_iam_binding.partner_decrypters",
+                    "google_kms_key_ring_iam_binding",
+                    {
+                        "key_ring_id": key_ring,
+                        "role": "roles/cloudkms.cryptoKeyDecrypter",
+                        "members": ["serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"],
+                    },
+                ),
+            ]
+        )
+
+        key = inventory.get_by_address("google_kms_crypto_key.customer")
+
+        self.assertIsNotNone(key)
+        assert key is not None
+        self.assertEqual(
+            key.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/cloudkms.cryptoKeyDecrypter",
+                    "members": ["serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"],
+                    "source": "google_kms_key_ring_iam_binding.partner_decrypters",
+                }
+            ],
+        )
+        self.assertEqual(
+            key.get_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES),
+            ["google_kms_key_ring_iam_binding.partner_decrypters"],
         )
 
     def test_public_access_prevention_suppresses_public_bucket_exposure(self) -> None:

@@ -40,7 +40,10 @@ class GcpResourceDecorator:
             elif resource.resource_type == "google_secret_manager_secret":
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
             elif resource.resource_type == "google_kms_crypto_key":
-                _derive_sensitive_resource_iam_bindings(resource, index.kms_crypto_key_iam_resources)
+                _derive_sensitive_resource_iam_bindings(
+                    resource, 
+                    index.kms_crypto_key_iam_resources + index.kms_key_ring_iam_resources,
+                )
             elif resource.resource_type == "google_storage_bucket":
                 _derive_sensitive_resource_iam_bindings(resource, index.bucket_iam_resources)
                 _derive_public_bucket_exposure(resource, index)
@@ -57,6 +60,7 @@ class _GcpResourceIndex:
     bucket_iam_resources: tuple[NormalizedResource, ...]
     secret_iam_resources: tuple[NormalizedResource, ...]
     kms_crypto_key_iam_resources: tuple[NormalizedResource, ...]
+    kms_key_ring_iam_resources: tuple[NormalizedResource, ...]
     cloud_run_iam_resources: tuple[NormalizedResource, ...]
     cloud_function_iam_resources: tuple[NormalizedResource, ...]
 
@@ -71,6 +75,7 @@ class _GcpResourceIndex:
         bucket_iam_resources: list[NormalizedResource] = []
         secret_iam_resources: list[NormalizedResource] = []
         kms_crypto_key_iam_resources: list[NormalizedResource] = []
+        kms_key_ring_iam_resources: list[NormalizedResource] = []
         cloud_run_iam_resources: list[NormalizedResource] = []
         cloud_function_iam_resources: list[NormalizedResource] = []
         for resource in resources:
@@ -96,6 +101,8 @@ class _GcpResourceIndex:
                 secret_iam_resources.append(resource)
             elif resource.resource_type in _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
                 kms_crypto_key_iam_resources.append(resource)
+            elif resource.resource_type in _KMS_KEY_RING_IAM_RESOURCE_TYPES:
+                kms_key_ring_iam_resources.append(resource)
             elif resource.resource_type in _CLOUD_RUN_IAM_RESOURCE_TYPES:
                 cloud_run_iam_resources.append(resource)
             elif resource.resource_type in _CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
@@ -110,6 +117,7 @@ class _GcpResourceIndex:
             bucket_iam_resources=tuple(bucket_iam_resources),
             secret_iam_resources=tuple(secret_iam_resources),
             kms_crypto_key_iam_resources=tuple(kms_crypto_key_iam_resources),
+            kms_key_ring_iam_resources=tuple(kms_key_ring_iam_resources),
             cloud_run_iam_resources=tuple(cloud_run_iam_resources),
             cloud_function_iam_resources=tuple(cloud_function_iam_resources),
         )
@@ -165,6 +173,13 @@ _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES = frozenset(
         "google_kms_crypto_key_iam_member",
         "google_kms_crypto_key_iam_policy",
     }
+)
+_KMS_KEY_RING_IAM_RESOURCE_TYPES = frozenset(
+	{
+	    "google_kms_key_ring_iam_binding",
+	    "google_kms_key_ring_iam_member",
+	    "google_kms_key_ring_iam_policy",
+	}
 )
 
 
@@ -423,7 +438,10 @@ def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     cloud_function_reference = resource.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE)
     if cloud_function_reference:
         return cloud_function_reference
-    return resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE)
+    crypto_key_reference = resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE)
+    if crypto_key_reference:
+	    return crypto_key_reference
+    return resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING)
 
 
 def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:

@@ -310,6 +310,30 @@ def normalize_kms_crypto_key_iam_policy(resource: TerraformResource) -> Normaliz
     )
 
 
+def normalize_kms_key_ring_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.KMS_KEY_RING,
+        target_keys=("key_ring_id", "key_ring"),
+    )
+
+
+def normalize_kms_key_ring_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.KMS_KEY_RING,
+        target_keys=("key_ring_id", "key_ring"),
+    )
+
+
+def normalize_kms_key_ring_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.KMS_KEY_RING,
+        target_keys=("key_ring_id", "key_ring"),
+    )
+
+
 def _normalize_target_iam_member(
     resource: TerraformResource,
     *,

@@ -146,6 +146,9 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_kms_crypto_key_iam_binding",
                     "google_kms_crypto_key_iam_member",
                     "google_kms_crypto_key_iam_policy",
+                    "google_kms_key_ring_iam_binding",
+                    "google_kms_key_ring_iam_member",
+                    "google_kms_key_ring_iam_policy",
                     "google_project_iam_binding",
                     "google_project_iam_member",
                     "google_project_iam_policy",
@@ -239,6 +242,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_iam_policy_resource(_resource("google_cloud_run_v2_service_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_cloudfunctions_function_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_kms_crypto_key_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_kms_key_ring_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_binding", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_policy", provider="gcp")))

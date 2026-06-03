@@ -481,6 +481,24 @@ def _kms_crypto_key_iam_member(
     )
 
 
+def _kms_key_ring_iam_member(
+    member: str = "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+    role: str = "roles/cloudkms.cryptoKeyDecrypter",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_kms_key_ring_iam_member.partner_decrypter",
+        mode="managed",
+        resource_type="google_kms_key_ring_iam_member",
+        name="partner_decrypter",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "key_ring_id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
 class GcpRuleTests(unittest.TestCase):
     def test_public_compute_ssh_and_rdp_broad_ingress_is_detected_for_each_target(self) -> None:
         inventory = GcpNormalizer().normalize(
@@ -1155,6 +1173,33 @@ class GcpRuleTests(unittest.TestCase):
             ["google_kms_crypto_key.customer", "google_kms_crypto_key_iam_member.partner_decrypter"],
         )
         evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["trust_scope"],
+            ["service account belongs to project `partner-project`, outside resource project `tfstride-demo`"],
+        )
+
+    def test_sensitive_kms_key_ring_foreign_service_account_binding_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_kms_crypto_key(), _kms_key_ring_iam_member()])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-sensitive-resource-iam-external-access")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_kms_crypto_key.customer", "google_kms_key_ring_iam_member.partner_decrypter"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_kms_key_ring_iam_member.partner_decrypter",
+                "role=roles/cloudkms.cryptoKeyDecrypter",
+                "member=serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
+            ],
+        )
         self.assertEqual(
             evidence["trust_scope"],
             ["service account belongs to project `partner-project`, outside resource project `tfstride-demo`"],
