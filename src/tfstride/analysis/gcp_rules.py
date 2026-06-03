@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.analysis.gcp_custom_roles import (
+    GcpCustomRoleIndex,
+    build_gcp_custom_role_index,
+    custom_role_permissions,
+    custom_role_privilege_risk,
+)
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
@@ -503,9 +509,10 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
+        custom_roles = build_gcp_custom_role_index(context.inventory.resources)
         for binding in context.inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
             for role, member in _project_iam_binding_members(binding):
-                role_risk = _privileged_project_role_risk(role)
+                role_risk = _privileged_project_role_risk(role, custom_roles)
                 if role_risk is None:
                     continue
                 severity_reasoning = build_severity_reasoning(
@@ -529,6 +536,7 @@ class GcpRuleDetectors:
                         evidence=collect_evidence(
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("role_risk", [role_risk]),
+                            evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
                         ),
                         severity_reasoning=severity_reasoning,
                     )
@@ -1292,7 +1300,10 @@ def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[
     return descriptions
 
 
-def _privileged_project_role_risk(role: str | None) -> str | None:
+def _privileged_project_role_risk(
+    role: str | None,
+    custom_roles: GcpCustomRoleIndex | None = None,
+) -> str | None:
     if not role:
         return None
     normalized_role = role.strip()
@@ -1301,6 +1312,8 @@ def _privileged_project_role_risk(role: str | None) -> str | None:
     role_name = normalized_role.rsplit("/", 1)[-1].lower()
     if normalized_role.startswith("roles/") and "admin" in role_name:
         return "admin-level control over a GCP service or project security surface"
+    if custom_roles is not None:
+        return custom_role_privilege_risk(normalized_role, custom_roles)
     return None
 
 

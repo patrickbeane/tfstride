@@ -321,6 +321,26 @@ def _project_iam_policy(bindings: list[dict[str, object]]) -> TerraformResource:
     )
 
 
+def _project_iam_custom_role(
+    role_id: str = "deployAdmin",
+    permissions: list[str] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_project_iam_custom_role.custom",
+        mode="managed",
+        resource_type="google_project_iam_custom_role",
+        name="custom",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "project": "tfstride-demo",
+            "role_id": role_id,
+            "title": "Custom Role",
+            "permissions": permissions or ["iam.serviceAccounts.actAs"],
+            "stage": "GA",
+        },
+    )
+
+
 def _storage_bucket(
     public_access_prevention: str | None = None,
     *,
@@ -1567,6 +1587,42 @@ class GcpRuleTests(unittest.TestCase):
             evidence["boundary_rationale"][0],
         )
 
+    def test_project_iam_custom_role_secret_access_path_is_detected_for_public_compute(self) -> None:
+        service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                _public_compute_firewall(),
+                _compute_instance(),
+                _secret_manager_secret(),
+                _project_iam_custom_role(
+                    role_id="secretReader",
+                    permissions=["secretmanager.versions.access"],
+                ),
+                _project_iam_member("projects/tfstride-demo/roles/secretReader", member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_compute_instance.web", "google_secret_manager_secret.api_key"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertIn(
+            "google_project_iam_member.binding grants projects/tfstride-demo/roles/secretReader",
+            evidence["boundary_rationale"][0],
+        )
+
     def test_project_iam_binding_kms_access_path_is_detected_for_public_compute(self) -> None:
         service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
         inventory = GcpNormalizer().normalize(
@@ -1852,6 +1908,30 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["role_risk"],
             ["admin-level control over a GCP service or project security surface"],
+        )
+
+    def test_project_iam_custom_role_privileged_permissions_are_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _project_iam_custom_role(
+                    role_id="deployAdmin",
+                    permissions=["iam.serviceAccounts.actAs", "cloudfunctions.functions.update"],
+                ),
+                _project_iam_member("projects/tfstride-demo/roles/deployAdmin"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual([finding.rule_id for finding in findings], ["gcp-project-iam-privileged-role"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["role_risk"],
+            ["custom role includes high-impact permissions: cloudfunctions.functions.update, iam.serviceAccounts.actAs"],
+        )
+        self.assertEqual(
+            evidence["custom_role_permissions"],
+            ["cloudfunctions.functions.update", "iam.serviceAccounts.actAs"],
         )
 
     def test_public_principal_with_privileged_role_reports_both_iam_findings(self) -> None:

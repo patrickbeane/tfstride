@@ -55,6 +55,14 @@ class AwsResourceFacts:
         return []
 
     @property
+    def custom_role_id(self) -> str | None:
+        return None
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
+        return []
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return []
 

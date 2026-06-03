@@ -25,7 +25,7 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - repo-level TOML config for provider selection, default gating, rule selection, and severity overrides
 - automation-friendly `--quiet` mode and non-zero exit behavior
 - zero runtime dependencies for the core CLI engine, with optional dashboard dependencies
-- AWS-first analysis behind a provider registry with initial GCP inventory normalization
+- AWS-first analysis behind a provider registry with GCP inventory normalization, including core compute, storage, database, IAM, and serverless workloads
 
 ## Quickstart
 
@@ -256,7 +256,7 @@ Current rules include:
 - public and high-privilege GCP project IAM principals
 - public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backups, point-in-time recovery, and deletion protection
 - broad or external GCP IAM access to Secret Manager secrets and Cloud KMS keys
-- internet-exposed GCP workloads whose service accounts can access GCS, Secret Manager, Cloud KMS, or Cloud SQL
+- internet-exposed GCP compute, Cloud Run, and Cloud Functions workloads whose service accounts can access GCS, Secret Manager, Cloud KMS, or Cloud SQL
 
 Outputs include:
 
@@ -366,7 +366,7 @@ Supported config keys:
 
 ## Supported AWS Resources
 
-The MVP intentionally supports a focused resource set:
+AWS support is gradually expanding:
 
 - `aws_instance`
 - `aws_ecs_service`
@@ -402,9 +402,9 @@ Unsupported resources are skipped and called out in the report.
 
 ## GCP Support
 
-The GCP provider is registered for provider detection and supports initial inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_project_iam_member`, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
+The GCP provider is registered for provider detection and supports inventory normalization for `google_compute_instance`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_cloud_run_service`, `google_cloud_run_v2_service`, Cloud Run IAM member/binding/policy resources, `google_cloudfunctions_function`, `google_cloudfunctions2_function`, Cloud Functions IAM member/binding/policy resources, project IAM member/binding/policy resources, project and organization custom IAM roles, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key and key-ring IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
 
-GCP trust-boundary detection currently covers internet-to-service exposure for public compute, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backup and recovery posture, deletion protection, public GCS bucket access, GCS uniform access, Public Access Prevention, versioning, and customer-managed encryption posture, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, and high-privilege project role bindings; GCP controls observed are not implemented yet.
+GCP trust-boundary detection currently covers internet-to-service exposure for public compute, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE, Cloud Run, and Cloud Functions service accounts to GCS, Secret Manager, Cloud KMS, and Cloud SQL. GCP STRIDE rule coverage currently includes public compute broad ingress, public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backup and recovery posture, deletion protection, public GCS bucket access, GCS uniform access, Public Access Prevention, versioning, and customer-managed encryption posture, broad or external IAM access to Secret Manager secrets and Cloud KMS keys, internet-exposed workloads with sensitive data access, broad project IAM principals, predefined high-privilege project role bindings, and custom-role permission expansion for privileged project IAM and data-access paths; GCP controls observed are not implemented yet.
 
 ## Repo Layout (Abridged)
 
@@ -491,7 +491,7 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 ## Limitations
 
 - AWS remains the deepest provider implementation and the only provider with control-observation coverage today
-- GCP support is limited to initial inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource types
+- GCP support is limited to inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core resource and serverless types
 - Azure provider support is not registered yet
 - deliberately incomplete Terraform resource coverage
 - subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case

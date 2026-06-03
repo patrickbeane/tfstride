@@ -71,6 +71,14 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.IAM_BINDINGS)
 
     @property
+    def custom_role_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.CUSTOM_ROLE_ID)
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
+        return self.get(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS)
+
+    @property
     def engine(self) -> str | None:
         return self.get(GcpResourceMetadata.DATABASE_VERSION)
 

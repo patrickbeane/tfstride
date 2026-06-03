@@ -26,6 +26,9 @@ class GcpResourceMetadata:
     CLOUD_SQL_SSL_MODE = OptionalStringMetadataField("cloud_sql_ssl_mode")
     IAM_ROLE = OptionalStringMetadataField("iam_role")
     IAM_MEMBER = OptionalStringMetadataField("iam_member")
+    CUSTOM_ROLE_ID = OptionalStringMetadataField("custom_role_id")
+    CUSTOM_ROLE_STAGE = OptionalStringMetadataField("custom_role_stage")
+    ORGANIZATION_ID = OptionalStringMetadataField("organization_id")
     BUCKET_NAME = OptionalStringMetadataField("bucket")
     SERVICE_ACCOUNT_ACCOUNT_ID = OptionalStringMetadataField("service_account_account_id")
     SERVICE_ACCOUNT_EMAIL = OptionalStringMetadataField("service_account_email")
@@ -71,6 +74,7 @@ class GcpResourceMetadata:
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
     IAM_MEMBERS = StringListMetadataField("iam_members")
+    CUSTOM_ROLE_PERMISSIONS = StringListMetadataField("custom_role_permissions")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("gcp_resource_policy_source_addresses")
     INTERNET_INGRESS_FIREWALLS = StringListMetadataField("internet_ingress_firewalls")
     FIREWALL_SOURCE_RANGES = StringListMetadataField("source_ranges")

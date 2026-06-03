@@ -67,6 +67,14 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def custom_role_id(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -210,6 +218,14 @@ class NeutralProviderResourceFacts:
 
     @property
     def iam_bindings(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def custom_role_id(self) -> str | None:
+        return None
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
         return []
 
     @property

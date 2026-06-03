@@ -19,7 +19,9 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_kms_key_ring_iam_binding,
     normalize_kms_key_ring_iam_member,
     normalize_kms_key_ring_iam_policy,
+    normalize_organization_iam_custom_role,
     normalize_project_iam_binding,
+    normalize_project_iam_custom_role,
     normalize_project_iam_member,
     normalize_project_iam_policy,
     normalize_secret_manager_secret_iam_member,
@@ -1384,6 +1386,64 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
             ["google_compute_firewall.public_https"],
+        )
+
+    def test_project_iam_custom_role_normalizer_preserves_permissions(self) -> None:
+        normalized = normalize_project_iam_custom_role(
+            _terraform_resource(
+                "google_project_iam_custom_role.deployer",
+                "google_project_iam_custom_role",
+                {
+                    "project": "tfstride-demo",
+                    "role_id": "deployAdmin",
+                    "title": "Deploy Admin",
+                    "permissions": [
+                        "iam.serviceAccounts.actAs",
+                        "cloudfunctions.functions.update",
+                    ],
+                    "stage": "GA",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.identifier, "projects/tfstride-demo/roles/deployAdmin")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.NAME),
+            "projects/tfstride-demo/roles/deployAdmin",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_ID), "deployAdmin")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS),
+            ["iam.serviceAccounts.actAs", "cloudfunctions.functions.update"],
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_STAGE), "GA")
+
+    def test_organization_iam_custom_role_normalizer_preserves_permissions(self) -> None:
+        normalized = normalize_organization_iam_custom_role(
+            _terraform_resource(
+                "google_organization_iam_custom_role.audit",
+                "google_organization_iam_custom_role",
+                {
+                    "org_id": "1234567890",
+                    "role_id": "secretAudit",
+                    "permissions": ["secretmanager.versions.access"],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.identifier, "organizations/1234567890/roles/secretAudit")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.NAME),
+            "organizations/1234567890/roles/secretAudit",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID), "1234567890")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_ID), "secretAudit")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS),
+            ["secretmanager.versions.access"],
         )
 
     def test_project_iam_member_normalizer_preserves_binding_parts(self) -> None:

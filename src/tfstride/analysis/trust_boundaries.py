@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from tfstride.analysis.gcp_custom_roles import (
+    GcpCustomRoleIndex,
+    build_gcp_custom_role_index,
+    custom_role_allows_data_store_access,
+)
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.policy_conditions import (
@@ -46,6 +51,7 @@ class _DataStoreCandidateIndex:
     databases_missing_security_groups_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
     databases_by_trusted_workload_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     project_iam_resources: tuple[NormalizedResource, ...]
+    gcp_custom_roles: GcpCustomRoleIndex
 
 
 def detect_trust_boundaries(
@@ -261,6 +267,7 @@ def _build_data_store_candidate_index(
             databases_by_trusted_workload_security_group
         ),
         project_iam_resources=tuple(project_iam_resources),
+        gcp_custom_roles=build_gcp_custom_role_index(resources),
     )
 
 
@@ -481,7 +488,7 @@ def _gcp_matching_iam_access_grants(
     grants: list[str] = []
     for binding in analysis_facts(data_store).iam_bindings:
         role = str(binding.get("role") or "")
-        if not _gcp_role_allows_data_store_access(data_store, role):
+        if not _gcp_role_allows_data_store_access(data_store, role, candidate_index.gcp_custom_roles):
             continue
         for member in sorted(workload_members.intersection(_binding_members(binding))):
             source = str(binding.get("source") or data_store.address)
@@ -493,7 +500,9 @@ def _gcp_matching_iam_access_grants(
         if not data_store_project or project_iam_facts.project != data_store_project:
             continue
         for role, member in _project_iam_binding_members(project_iam_resource):
-            if member not in workload_members or not _gcp_role_allows_data_store_access(data_store, role):
+            if member not in workload_members or not _gcp_role_allows_data_store_access(
+                data_store, role, candidate_index.gcp_custom_roles
+            ):
                 continue
             grants.append(f"{project_iam_resource.address} grants {role} to {member} at project scope")
     return _dedupe(grants)
@@ -537,18 +546,22 @@ def _gcp_workload_scopes_allow_access(
     return False
 
 
-def _gcp_role_allows_data_store_access(resource: NormalizedResource, role: str | None) -> bool:
+def _gcp_role_allows_data_store_access(
+    resource: NormalizedResource,
+    role: str | None,
+    custom_roles: GcpCustomRoleIndex,
+) -> bool:
     if role in _GCP_BROAD_DATA_ACCESS_ROLES:
         return True
-    if is_object_storage_resource(resource):
-        return role in _GCP_OBJECT_STORAGE_ACCESS_ROLES
-    if is_secret_store_resource(resource):
-        return role in _GCP_SECRET_ACCESS_ROLES
-    if is_key_management_resource(resource):
-        return role in _GCP_KMS_ACCESS_ROLES
-    if is_database_resource(resource):
-        return role in _GCP_CLOUD_SQL_ACCESS_ROLES
-    return False
+    if is_object_storage_resource(resource) and role in _GCP_OBJECT_STORAGE_ACCESS_ROLES:
+        return True
+    if is_secret_store_resource(resource) and role in _GCP_SECRET_ACCESS_ROLES:
+        return True
+    if is_key_management_resource(resource) and role in _GCP_KMS_ACCESS_ROLES:
+        return True
+    if is_database_resource(resource) and role in _GCP_CLOUD_SQL_ACCESS_ROLES:
+        return True
+    return custom_role_allows_data_store_access(resource, role, custom_roles)
 
 
 def _binding_members(binding: Mapping[str, object]) -> list[str]:

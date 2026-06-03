@@ -75,6 +75,36 @@ def normalize_project_iam_policy(resource: TerraformResource) -> NormalizedResou
     )
 
 
+def normalize_project_iam_custom_role(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    role_id = first_non_empty(values.get("role_id"), resource.name)
+    project = first_non_empty(values.get("project"))
+    name = first_non_empty(values.get("name"), _project_custom_role_name(project, role_id))
+    return _normalize_custom_role(
+        resource,
+        identifier=first_non_empty(values.get("id"), name, role_id, resource.address),
+        role_id=role_id,
+        name=name,
+        project=project,
+        organization_id=None,
+    )
+
+
+def normalize_organization_iam_custom_role(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    role_id = first_non_empty(values.get("role_id"), resource.name)
+    organization_id = first_non_empty(values.get("org_id"), values.get("organization_id"))
+    name = first_non_empty(values.get("name"), _organization_custom_role_name(organization_id, role_id))
+    return _normalize_custom_role(
+        resource,
+        identifier=first_non_empty(values.get("id"), name, role_id, resource.address),
+        role_id=role_id,
+        name=name,
+        project=None,
+        organization_id=organization_id,
+    )
+
+
 def normalize_service_account(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     account_id = first_non_empty(values.get("account_id"))
@@ -332,6 +362,49 @@ def normalize_kms_key_ring_iam_policy(resource: TerraformResource) -> Normalized
         target_field=GcpResourceMetadata.KMS_KEY_RING,
         target_keys=("key_ring_id", "key_ring"),
     )
+
+
+def _normalize_custom_role(
+    resource: TerraformResource,
+    *,
+    identifier: str | None,
+    role_id: str | None,
+    name: str | None,
+    project: str | None,
+    organization_id: str | None,
+) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(identifier, resource.address),
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.PROJECT.key: project,
+            GcpResourceMetadata.ORGANIZATION_ID.key: organization_id,
+            GcpResourceMetadata.CUSTOM_ROLE_ID.key: role_id,
+            GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS.key: compact(as_list(values.get("permissions"))),
+            GcpResourceMetadata.CUSTOM_ROLE_STAGE.key: values.get("stage"),
+            "title": values.get("title"),
+            "description": values.get("description"),
+            "deleted": as_bool(values.get("deleted", False)),
+        },
+    )
+
+
+def _project_custom_role_name(project: str | None, role_id: str | None) -> str | None:
+    if not project or not role_id:
+        return None
+    return f"projects/{project}/roles/{role_id}"
+
+
+def _organization_custom_role_name(organization_id: str | None, role_id: str | None) -> str | None:
+    if not organization_id or not role_id:
+        return None
+    return f"organizations/{organization_id}/roles/{role_id}"
 
 
 def _normalize_target_iam_member(

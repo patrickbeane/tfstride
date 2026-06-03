@@ -92,6 +92,14 @@ class AnalysisResourceFacts:
         return self._facts.iam_bindings
 
     @property
+    def custom_role_id(self) -> str | None:
+        return self._facts.custom_role_id
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
+        return self._facts.custom_role_permissions
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return self._facts.cloud_sql_authorized_networks
 

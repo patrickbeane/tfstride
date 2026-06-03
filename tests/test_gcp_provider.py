@@ -95,7 +95,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_kms_key_ring_iam_policy"))
         self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
         self.assertTrue(plugin.supports_resource_type("google_project_iam_binding"))
+        self.assertTrue(plugin.supports_resource_type("google_project_iam_custom_role"))
         self.assertTrue(plugin.supports_resource_type("google_project_iam_policy"))
+        self.assertTrue(plugin.supports_resource_type("google_organization_iam_custom_role"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
@@ -135,6 +137,10 @@ class GcpProviderTests(unittest.TestCase):
                 "IAM_ROLE",
                 "IAM_MEMBER",
                 "IAM_MEMBERS",
+                "CUSTOM_ROLE_ID",
+                "CUSTOM_ROLE_PERMISSIONS",
+                "CUSTOM_ROLE_STAGE",
+                "ORGANIZATION_ID",
                 "IAM_BINDINGS",
                 "BUCKET_NAME",
                 "GCS_DEFAULT_KMS_KEY_NAME",
@@ -194,6 +200,8 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.internet_ingress_firewalls, [])
         self.assertIsNone(facts.iam_role)
         self.assertIsNone(facts.iam_member)
+        self.assertIsNone(facts.custom_role_id)
+        self.assertEqual(facts.custom_role_permissions, [])
         self.assertIsNone(facts.os_login_enabled)
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)

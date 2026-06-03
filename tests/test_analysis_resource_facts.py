@@ -88,6 +88,14 @@ class FakeProviderFacts:
         return [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
 
     @property
+    def custom_role_id(self) -> str | None:
+        return "deployAdmin"
+
+    @property
+    def custom_role_permissions(self) -> list[str]:
+        return ["iam.serviceAccounts.actAs"]
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return [{"name": "anywhere", "value": "0.0.0.0/0"}]
 
@@ -171,6 +179,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.project)
         self.assertIsNone(facts.resource_name)
         self.assertEqual(facts.iam_bindings, [])
+        self.assertIsNone(facts.custom_role_id)
+        self.assertEqual(facts.custom_role_permissions, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
@@ -418,6 +428,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.project, "tfstride-demo")
         self.assertEqual(facts.resource_name, "fake-resource")
         self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
+        self.assertEqual(facts.custom_role_id, "deployAdmin")
+        self.assertEqual(facts.custom_role_permissions, ["iam.serviceAccounts.actAs"])
         self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
         self.assertFalse(facts.cloud_sql_backup_enabled)
         self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
