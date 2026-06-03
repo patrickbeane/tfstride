@@ -96,6 +96,14 @@ class FakeProviderFacts:
         return ["iam.serviceAccounts.actAs"]
 
     @property
+    def organization_id(self) -> str | None:
+        return "1234567890"
+
+    @property
+    def folder_id(self) -> str | None:
+        return "folders/12345"
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return [{"name": "anywhere", "value": "0.0.0.0/0"}]
 
@@ -221,6 +229,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam_bindings, [])
         self.assertIsNone(facts.custom_role_id)
         self.assertEqual(facts.custom_role_permissions, [])
+        self.assertIsNone(facts.organization_id)
+        self.assertIsNone(facts.folder_id)
+        self.assertIsNone(facts.organization_id)
+        self.assertIsNone(facts.folder_id)
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
         self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
@@ -361,6 +373,21 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             facts.resource_policy_source_addresses,
             ["google_secret_manager_secret_iam_member.public_accessor"],
         )
+
+    def test_gcp_organization_folder_facts_read_provider_owned_scope_metadata(self) -> None:
+        resource = _resource(
+            {
+                GcpResourceMetadata.ORGANIZATION_ID.key: "1234567890",
+                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
+            },
+            provider="gcp",
+            resource_type="google_folder_iam_member",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.organization_id, "1234567890")
+        self.assertEqual(facts.folder_id, "folders/12345")
 
     def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
         resource = _resource(
@@ -526,6 +553,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
         self.assertEqual(facts.custom_role_id, "deployAdmin")
         self.assertEqual(facts.custom_role_permissions, ["iam.serviceAccounts.actAs"])
+        self.assertEqual(facts.organization_id, "1234567890")
+        self.assertEqual(facts.folder_id, "folders/12345")
         self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
         self.assertFalse(facts.cloud_sql_backup_enabled)
         self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)

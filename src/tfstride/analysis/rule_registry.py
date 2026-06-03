@@ -492,6 +492,28 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-org-folder-iam-broad-principal",
+        title="GCP organization or folder IAM grants access to broad principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove public and broad-domain principals from organization and folder IAM, grant high-level "
+            "access only to tightly controlled groups, and prefer project- or resource-scoped bindings where possible."
+        ),
+        tags=("gcp", "iam", "organization", "folder", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-org-folder-iam-privileged-role",
+        title="GCP organization or folder IAM grants a high-privilege role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace high-impact organization and folder roles with narrowly scoped custom or predefined roles, "
+            "assign them only to controlled break-glass or platform groups, and review descendant project blast radius."
+        ),
+        tags=("gcp", "iam", "organization", "folder", "privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-project-iam-broad-principal",
         title="GCP project IAM binding grants access to public principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

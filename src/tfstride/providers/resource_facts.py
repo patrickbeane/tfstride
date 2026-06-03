@@ -75,6 +75,14 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def organization_id(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def folder_id(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -267,6 +275,14 @@ class NeutralProviderResourceFacts:
     @property
     def custom_role_permissions(self) -> list[str]:
         return []
+
+    @property
+    def organization_id(self) -> str | None:
+        return None
+
+    @property
+    def folder_id(self) -> str | None:
+        return None
 
     @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:

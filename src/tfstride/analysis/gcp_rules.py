@@ -24,6 +24,16 @@ _GKE_RESOURCE_TYPES = frozenset({"google_container_cluster", "google_container_n
 _PROJECT_IAM_RESOURCE_TYPES = frozenset(
     {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
 )
+_ORG_FOLDER_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_organization_iam_binding",
+        "google_organization_iam_member",
+        "google_organization_iam_policy",
+        "google_folder_iam_binding",
+        "google_folder_iam_member",
+        "google_folder_iam_policy",
+    }
+)
 _SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
     {
         "google_service_account_iam_binding",
@@ -83,6 +93,19 @@ _PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
     "roles/iam.serviceAccountAdmin": "service account administration",
     "roles/iam.securityAdmin": "IAM policy and security-control administration",
     "roles/resourcemanager.projectIamAdmin": "project IAM policy administration",
+}
+
+
+_PRIVILEGED_GCP_ORG_FOLDER_ROLES: dict[str, str] = {
+    **_PRIVILEGED_GCP_PROJECT_ROLES,
+    "roles/accesscontextmanager.policyAdmin": "access policy administration across protected resources",
+    "roles/billing.admin": "billing account administration and project billing linkage control",
+    "roles/iam.organizationRoleAdmin": "custom role administration at organization scope",
+    "roles/orgpolicy.policyAdmin": "organization policy administration",
+    "roles/resourcemanager.folderAdmin": "folder hierarchy administration",
+    "roles/resourcemanager.organizationAdmin": "organization-level resource administration",
+    "roles/resourcemanager.projectCreator": "project creation under the organization or folder",
+    "roles/resourcemanager.projectDeleter": "project deletion under the organization or folder",
 }
 
 
@@ -766,6 +789,94 @@ class GcpRuleDetectors:
                         ),
                         evidence=collect_evidence(
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                            evidence_item("role_risk", [role_risk]),
+                            evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+    def detect_org_folder_iam_broad_principal(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for binding in context.inventory.by_type(*_ORG_FOLDER_IAM_RESOURCE_TYPES):
+            scope = _org_folder_scope_description(binding)
+            for role, member in _org_folder_iam_binding_members(binding):
+                assessment = _assess_gcp_broad_iam_member(member)
+                if assessment is None:
+                    continue
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=assessment.is_public,
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=2,
+                    blast_radius=2,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[binding.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants `{role}` to `{member}` at {scope}. Public or "
+                            "broad-domain principals at organization or folder scope can expand access across "
+                            "many descendant projects and workloads."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                            evidence_item("scope", [scope]),
+                            evidence_item("trust_scope", [assessment.scope_description]),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+    def detect_org_folder_iam_privileged_role(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        custom_roles = build_gcp_custom_role_index(context.inventory.resources)
+        for binding in context.inventory.by_type(*_ORG_FOLDER_IAM_RESOURCE_TYPES):
+            scope = _org_folder_scope_description(binding)
+            for role, member in _org_folder_iam_binding_members(binding):
+                role_risk = _privileged_org_folder_role_risk(role, custom_roles)
+                if role_risk is None:
+                    continue
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=2,
+                    blast_radius=2,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[binding.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
+                            f"at {scope}. That role enables {role_risk} across a high-level resource "
+                            "boundary and can materially expand blast radius if the principal is compromised."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                            evidence_item("scope", [scope]),
                             evidence_item("role_risk", [role_risk]),
                             evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
                         ),
@@ -1486,6 +1597,21 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
     return _iam_resource_binding_members(resource)
 
 
+def _org_folder_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
+    return _iam_resource_binding_members(resource)
+
+
+def _org_folder_scope_description(resource: NormalizedResource) -> str:
+    facts = analysis_facts(resource)
+    if resource.resource_type.startswith("google_organization_iam_"):
+        if facts.organization_id:
+            return f"organization scope `{facts.organization_id}`"
+        return "organization scope"
+    if facts.folder_id:
+        return f"folder scope `{facts.folder_id}`"
+    return "folder scope"
+
+
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     return _public_invoker_bindings(resource, _CLOUD_RUN_PUBLIC_INVOKER_ROLES)
 
@@ -1570,14 +1696,41 @@ def _privileged_project_role_risk(
     role: str | None,
     custom_roles: GcpCustomRoleIndex | None = None,
 ) -> str | None:
+    return _privileged_gcp_role_risk(
+        role,
+        predefined_roles=_PRIVILEGED_GCP_PROJECT_ROLES,
+        admin_risk="admin-level control over a GCP service or project security surface",
+        custom_roles=custom_roles,
+    )
+
+
+def _privileged_org_folder_role_risk(
+    role: str | None,
+    custom_roles: GcpCustomRoleIndex | None = None,
+) -> str | None:
+    return _privileged_gcp_role_risk(
+        role,
+        predefined_roles=_PRIVILEGED_GCP_ORG_FOLDER_ROLES,
+        admin_risk="admin-level control over a GCP organization, folder, or descendant project surface",
+        custom_roles=custom_roles,
+    )
+
+
+def _privileged_gcp_role_risk(
+    role: str | None,
+    *,
+    predefined_roles: dict[str, str],
+    admin_risk: str,
+    custom_roles: GcpCustomRoleIndex | None = None,
+) -> str | None:
     if not role:
         return None
     normalized_role = role.strip()
-    if normalized_role in _PRIVILEGED_GCP_PROJECT_ROLES:
-        return _PRIVILEGED_GCP_PROJECT_ROLES[normalized_role]
+    if normalized_role in predefined_roles:
+        return predefined_roles[normalized_role]
     role_name = normalized_role.rsplit("/", 1)[-1].lower()
     if normalized_role.startswith("roles/") and "admin" in role_name:
-        return "admin-level control over a GCP service or project security surface"
+        return admin_risk
     if custom_roles is not None:
         return custom_role_privilege_risk(normalized_role, custom_roles)
     return None

@@ -2,25 +2,25 @@
 
 - Analyzed file: `sample_gcp_plan.json`
 - Provider: `gcp`
-- Normalized resources: `16`
+- Normalized resources: `18`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **4 trust boundaries** and **17 findings** across **16 normalized resources**.
+This run identified **4 trust boundaries** and **19 findings** across **18 normalized resources**.
 
-- High severity findings: `3`
+- High severity findings: `5`
 - Medium severity findings: `14`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
-- Terraform resources seen: `16`
-- Provider resources considered: `16`
-- Normalized resources: `16`
+- Terraform resources seen: `18`
+- Provider resources considered: `18`
+- Normalized resources: `18`
 - Unsupported resources: `0`
-- Registered rules: `39`
-- Enabled rules: `39`
+- Registered rules: `41`
+- Enabled rules: `41`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -41,6 +41,8 @@ This run identified **4 trust boundaries** and **17 findings** across **16 norma
   - `gcp-gke-workload-identity-disabled`: `1`
   - `gcp-gke-legacy-metadata-endpoints-enabled`: `1`
   - `gcp-gke-broad-node-service-account`: `1`
+  - `gcp-org-folder-iam-broad-principal`: `1`
+  - `gcp-org-folder-iam-privileged-role`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -87,6 +89,32 @@ This run identified **4 trust boundaries** and **17 findings** across **16 norma
 - Evidence:
   - authorized networks: anywhere (0.0.0.0/0)
   - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GCP organization or folder IAM grants a high-privilege role
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_folder_iam_member.folder_admin`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_folder_iam_member.folder_admin grants the high-impact GCP role `roles/resourcemanager.folderAdmin` to `group:folder-admins@example.com` at folder scope `folders/12345`. That role enables folder hierarchy administration across a high-level resource boundary and can materially expand blast radius if the principal is compromised.
+- Recommended mitigation: Replace high-impact organization and folder roles with narrowly scoped custom or predefined roles, assign them only to controlled break-glass or platform groups, and review descendant project blast radius.
+- Evidence:
+  - iam binding: member=group:folder-admins@example.com; role=roles/resourcemanager.folderAdmin
+  - scope: folder scope `folders/12345`
+  - role risk: folder hierarchy administration
+
+#### GCP organization or folder IAM grants access to broad principals
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_organization_iam_binding.domain_viewer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_organization_iam_binding.domain_viewer grants `roles/viewer` to `domain:example.com` at organization scope `1234567890`. Public or broad-domain principals at organization or folder scope can expand access across many descendant projects and workloads.
+- Recommended mitigation: Remove public and broad-domain principals from organization and folder IAM, grant high-level access only to tightly controlled groups, and prefer project- or resource-scoped bindings where possible.
+- Evidence:
+  - iam binding: member=domain:example.com; role=roles/viewer
+  - scope: organization scope `1234567890`
+  - trust scope: member grants a whole Google Workspace domain
 
 #### GKE node pool uses broad node identity settings
 

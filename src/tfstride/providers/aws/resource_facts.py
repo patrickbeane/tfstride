@@ -63,6 +63,14 @@ class AwsResourceFacts:
         return []
 
     @property
+    def organization_id(self) -> str | None:
+        return None
+
+    @property
+    def folder_id(self) -> str | None:
+        return None
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return []
 

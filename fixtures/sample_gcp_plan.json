@@ -312,6 +312,32 @@
           }
         },
         {
+          "address": "google_organization_iam_binding.domain_viewer",
+          "mode": "managed",
+          "type": "google_organization_iam_binding",
+          "name": "domain_viewer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "org_id": "1234567890",
+            "role": "roles/viewer",
+            "members": [
+              "domain:example.com"
+            ]
+          }
+        },
+        {
+          "address": "google_folder_iam_member.folder_admin",
+          "mode": "managed",
+          "type": "google_folder_iam_member",
+          "name": "folder_admin",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "folder": "folders/12345",
+            "role": "roles/resourcemanager.folderAdmin",
+            "member": "group:folder-admins@example.com"
+          }
+        },
+        {
           "address": "google_project_iam_member.web_viewer",
           "mode": "managed",
           "type": "google_project_iam_member",

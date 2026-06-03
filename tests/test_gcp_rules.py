@@ -399,6 +399,83 @@ def _project_iam_policy(bindings: list[dict[str, object]]) -> TerraformResource:
     )
 
 
+def _organization_iam_member(
+    role: str,
+    member: str = "group:platform-admins@example.com",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_organization_iam_member.binding",
+        mode="managed",
+        resource_type="google_organization_iam_member",
+        name="binding",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"org_id": "1234567890", "role": role, "member": member},
+    )
+
+
+def _organization_iam_binding(
+    role: str,
+    members: list[str] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_organization_iam_binding.binding",
+        mode="managed",
+        resource_type="google_organization_iam_binding",
+        name="binding",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "org_id": "1234567890",
+            "role": role,
+            "members": members or ["group:platform-admins@example.com"],
+        },
+    )
+
+
+def _organization_iam_policy(bindings: list[dict[str, object]]) -> TerraformResource:
+    return TerraformResource(
+        address="google_organization_iam_policy.policy",
+        mode="managed",
+        resource_type="google_organization_iam_policy",
+        name="policy",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"org_id": "1234567890", "policy_data": {"bindings": bindings}},
+    )
+
+
+def _folder_iam_member(
+    role: str,
+    member: str = "group:folder-admins@example.com",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_folder_iam_member.binding",
+        mode="managed",
+        resource_type="google_folder_iam_member",
+        name="binding",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"folder": "folders/12345", "role": role, "member": member},
+    )
+
+
+def _organization_iam_custom_role(
+    role_id: str = "orgAdmin",
+    permissions: list[str] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_organization_iam_custom_role.custom",
+        mode="managed",
+        resource_type="google_organization_iam_custom_role",
+        name="custom",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "org_id": "1234567890",
+            "role_id": role_id,
+            "title": "Org Custom Role",
+            "permissions": permissions or ["resourcemanager.projects.setIamPolicy"],
+            "stage": "GA",
+        },
+    )
+
+
 def _project_iam_custom_role(
     role_id: str = "deployAdmin",
     permissions: list[str] | None = None,
@@ -2041,6 +2118,106 @@ class GcpRuleTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_organization_iam_broad_principal_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_organization_iam_binding("roles/viewer", members=["domain:example.com", "group:ops@example.com"])]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-org-folder-iam-broad-principal")
+        self.assertEqual(finding.affected_resources, ["google_organization_iam_binding.binding"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["iam_binding"], ["member=domain:example.com", "role=roles/viewer"])
+        self.assertEqual(evidence["scope"], ["organization scope `1234567890`"])
+
+    def test_folder_iam_public_principal_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_folder_iam_member("roles/viewer", member="allUsers")])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-org-folder-iam-broad-principal")
+        self.assertEqual(finding.severity.value, "high")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["scope"], ["folder scope `folders/12345`"])
+
+    def test_organization_iam_privileged_role_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_organization_iam_member("roles/resourcemanager.organizationAdmin")])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-org-folder-iam-privileged-role")
+        self.assertEqual(finding.affected_resources, ["google_organization_iam_member.binding"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["role_risk"], ["organization-level resource administration"])
+        self.assertEqual(evidence["scope"], ["organization scope `1234567890`"])
+
+    def test_folder_iam_policy_privileged_role_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _organization_iam_policy(
+                    [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
+                ),
+                TerraformResource(
+                    address="google_folder_iam_policy.policy",
+                    mode="managed",
+                    resource_type="google_folder_iam_policy",
+                    name="policy",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "folder": "folders/12345",
+                        "policy_data": {
+                            "bindings": [
+                                {"role": "roles/resourcemanager.folderAdmin", "members": ["group:admins@example.com"]}
+                            ]
+                        },
+                    },
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual([finding.rule_id for finding in findings], ["gcp-org-folder-iam-privileged-role"])
+        self.assertEqual(findings[0].affected_resources, ["google_folder_iam_policy.policy"])
+
+    def test_organization_iam_custom_role_privileged_permissions_are_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _organization_iam_custom_role(
+                    role_id="orgAdmin",
+                    permissions=["resourcemanager.projects.setIamPolicy", "iam.serviceAccounts.actAs"],
+                ),
+                _organization_iam_member("organizations/1234567890/roles/orgAdmin"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual([finding.rule_id for finding in findings], ["gcp-org-folder-iam-privileged-role"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["role_risk"],
+            ["custom role includes high-impact permissions: iam.serviceAccounts.actAs, resourcemanager.projects.setIamPolicy"],
+        )
+        self.assertEqual(
+            evidence["custom_role_permissions"],
+            ["iam.serviceAccounts.actAs", "resourcemanager.projects.setIamPolicy"],
+        )
+
+    def test_organization_iam_viewer_group_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize([_organization_iam_member("roles/viewer")])
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        self.assertEqual(findings, [])
 
     def test_project_iam_broad_principal_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(

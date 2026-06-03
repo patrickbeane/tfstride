@@ -100,6 +100,14 @@ class AnalysisResourceFacts:
         return self._facts.custom_role_permissions
 
     @property
+    def organization_id(self) -> str | None:
+        return self._facts.organization_id
+
+    @property
+    def folder_id(self) -> str | None:
+        return self._facts.folder_id
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return self._facts.cloud_sql_authorized_networks
 

@@ -29,6 +29,7 @@ class GcpResourceMetadata:
     CUSTOM_ROLE_ID = OptionalStringMetadataField("custom_role_id")
     CUSTOM_ROLE_STAGE = OptionalStringMetadataField("custom_role_stage")
     ORGANIZATION_ID = OptionalStringMetadataField("organization_id")
+    FOLDER_ID = OptionalStringMetadataField("folder_id")
     BUCKET_NAME = OptionalStringMetadataField("bucket")
     SERVICE_ACCOUNT_ACCOUNT_ID = OptionalStringMetadataField("service_account_account_id")
     SERVICE_ACCOUNT_EMAIL = OptionalStringMetadataField("service_account_email")

@@ -66,6 +66,8 @@ _RULE_GROUP_IDS = (
         "aws-workload-role-sensitive-permissions",
         "gcp-service-account-iam-broad-principal",
         "gcp-service-account-iam-privileged-role",
+        "gcp-org-folder-iam-broad-principal",
+        "gcp-org-folder-iam-privileged-role",
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role",
     ),
@@ -170,6 +172,8 @@ class StrideRuleEngine:
             "gcp-service-account-iam-privileged-role": (
                 gcp_detectors.detect_service_account_iam_privileged_role
             ),
+            "gcp-org-folder-iam-broad-principal": gcp_detectors.detect_org_folder_iam_broad_principal,
+            "gcp-org-folder-iam-privileged-role": gcp_detectors.detect_org_folder_iam_privileged_role,
             "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
             "gcp-project-iam-privileged-role": gcp_detectors.detect_project_iam_privileged_role,
             "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,

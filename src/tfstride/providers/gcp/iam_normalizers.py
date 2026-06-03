@@ -105,6 +105,54 @@ def normalize_organization_iam_custom_role(resource: TerraformResource) -> Norma
     )
 
 
+def normalize_organization_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_member(
+        resource,
+        scope_field=GcpResourceMetadata.ORGANIZATION_ID,
+        scope_keys=("org_id", "organization_id", "organization"),
+    )
+
+
+def normalize_organization_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_binding(
+        resource,
+        scope_field=GcpResourceMetadata.ORGANIZATION_ID,
+        scope_keys=("org_id", "organization_id", "organization"),
+    )
+
+
+def normalize_organization_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_policy(
+        resource,
+        scope_field=GcpResourceMetadata.ORGANIZATION_ID,
+        scope_keys=("org_id", "organization_id", "organization"),
+    )
+
+
+def normalize_folder_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_member(
+        resource,
+        scope_field=GcpResourceMetadata.FOLDER_ID,
+        scope_keys=("folder", "folder_id"),
+    )
+
+
+def normalize_folder_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_binding(
+        resource,
+        scope_field=GcpResourceMetadata.FOLDER_ID,
+        scope_keys=("folder", "folder_id"),
+    )
+
+
+def normalize_folder_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_scope_iam_policy(
+        resource,
+        scope_field=GcpResourceMetadata.FOLDER_ID,
+        scope_keys=("folder", "folder_id"),
+    )
+
+
 def normalize_service_account(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     account_id = first_non_empty(values.get("account_id"))
@@ -361,6 +409,86 @@ def normalize_kms_key_ring_iam_policy(resource: TerraformResource) -> Normalized
         resource,
         target_field=GcpResourceMetadata.KMS_KEY_RING,
         target_keys=("key_ring_id", "key_ring"),
+    )
+
+
+def _normalize_scope_iam_member(
+    resource: TerraformResource,
+    *,
+    scope_field: Any,
+    scope_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    scope_reference = _target_reference(values, scope_keys)
+    role = first_non_empty(values.get("role"))
+    member = first_non_empty(values.get("member"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), _binding_identifier(scope_reference, role, [member]), resource.address),
+        metadata={
+            scope_field.key: scope_reference,
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBER.key: member,
+            GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def _normalize_scope_iam_binding(
+    resource: TerraformResource,
+    *,
+    scope_field: Any,
+    scope_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    scope_reference = _target_reference(values, scope_keys)
+    role = first_non_empty(values.get("role"))
+    members = compact(as_list(values.get("members")))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), _binding_identifier(scope_reference, role, members), resource.address),
+        metadata={
+            scope_field.key: scope_reference,
+            GcpResourceMetadata.IAM_ROLE.key: role,
+            GcpResourceMetadata.IAM_MEMBERS.key: members,
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
+            "condition": values.get("condition"),
+        },
+    )
+
+
+def _normalize_scope_iam_policy(
+    resource: TerraformResource,
+    *,
+    scope_field: Any,
+    scope_keys: tuple[str, ...],
+) -> NormalizedResource:
+    values = resource.values
+    scope_reference = _target_reference(values, scope_keys)
+    policy_document = load_json_document(values.get("policy_data"))
+    bindings = _policy_bindings(policy_document)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), scope_reference, resource.address),
+        metadata={
+            scope_field.key: scope_reference,
+            GcpResourceMetadata.IAM_BINDINGS.key: bindings,
+            "policy_document": policy_document,
+        },
     )
 
 

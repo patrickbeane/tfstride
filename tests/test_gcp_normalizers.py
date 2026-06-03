@@ -20,7 +20,13 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_kms_key_ring_iam_binding,
     normalize_kms_key_ring_iam_member,
     normalize_kms_key_ring_iam_policy,
+    normalize_folder_iam_binding,
+    normalize_folder_iam_member,
+    normalize_folder_iam_policy,
+    normalize_organization_iam_binding,
     normalize_organization_iam_custom_role,
+    normalize_organization_iam_member,
+    normalize_organization_iam_policy,
     normalize_project_iam_binding,
     normalize_project_iam_custom_role,
     normalize_project_iam_member,
@@ -1535,6 +1541,104 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS),
             ["secretmanager.versions.access"],
+        )
+
+    def test_organization_iam_member_normalizer_preserves_scope_and_binding(self) -> None:
+        normalized = normalize_organization_iam_member(
+            _terraform_resource(
+                "google_organization_iam_member.owner",
+                "google_organization_iam_member",
+                {
+                    "org_id": "1234567890",
+                    "role": "roles/resourcemanager.organizationAdmin",
+                    "member": "group:platform-admins@example.com",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.IAM)
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID), "1234567890")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/resourcemanager.organizationAdmin",
+                    "members": ["group:platform-admins@example.com"],
+                }
+            ],
+        )
+
+    def test_organization_iam_binding_normalizer_preserves_member_list(self) -> None:
+        normalized = normalize_organization_iam_binding(
+            _terraform_resource(
+                "google_organization_iam_binding.viewer",
+                "google_organization_iam_binding",
+                {
+                    "org_id": "1234567890",
+                    "role": "roles/viewer",
+                    "members": ["allAuthenticatedUsers", "group:ops@example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID), "1234567890")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBERS),
+            ["allAuthenticatedUsers", "group:ops@example.com"],
+        )
+
+    def test_organization_iam_policy_normalizer_parses_policy_bindings(self) -> None:
+        normalized = normalize_organization_iam_policy(
+            _terraform_resource(
+                "google_organization_iam_policy.policy",
+                "google_organization_iam_policy",
+                {
+                    "org_id": "1234567890",
+                    "policy_data": json.dumps(
+                        {"bindings": [{"role": "roles/owner", "members": ["group:admins@example.com"]}]}
+                    ),
+                },
+            )
+        )
+
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID), "1234567890")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/owner", "members": ["group:admins@example.com"]}],
+        )
+
+    def test_folder_iam_normalizers_preserve_scope_and_bindings(self) -> None:
+        member = normalize_folder_iam_member(
+            _terraform_resource(
+                "google_folder_iam_member.owner",
+                "google_folder_iam_member",
+                {
+                    "folder": "folders/12345",
+                    "role": "roles/resourcemanager.folderAdmin",
+                    "member": "group:folder-admins@example.com",
+                },
+            )
+        )
+        binding = normalize_folder_iam_binding(
+            _terraform_resource(
+                "google_folder_iam_binding.viewer",
+                "google_folder_iam_binding",
+                {
+                    "folder": "folders/12345",
+                    "role": "roles/viewer",
+                    "members": ["domain:example.com"],
+                },
+            )
+        )
+        policy = normalize_folder_iam_policy(
+            _terraform_resource(
+                "google_folder_iam_policy.policy",
+                "google_folder_iam_policy",
+                {
+                    "folder": "folders/12345",
+                    "policy_data": {"bindings": [{"role": "roles/editor", "members": ["group:admins@example.com"]}]},
+                },
+            )
         )
 
     def test_project_iam_member_normalizer_preserves_binding_parts(self) -> None:

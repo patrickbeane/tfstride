@@ -813,7 +813,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 17, {"high": 3, "medium": 14}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 19, {"high": 5, "medium": 14}),
         }
 
         expected_titles = {
@@ -854,6 +854,8 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
+                "GCP organization or folder IAM grants access to broad principals": 1,
+                "GCP organization or folder IAM grants a high-privilege role": 1,
                 "GKE cluster exposes a public control plane": 1,
                 "GKE control plane allows broad authorized networks": 1,
                 "GKE cluster does not enable Workload Identity": 1,
@@ -877,12 +879,12 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 16)
+        self.assertEqual(len(result.inventory.resources), 18)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 16)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 16)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 18)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 18)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 17)
+        self.assertEqual(len(result.findings), 19)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -924,6 +926,14 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             findings_by_rule["gcp-gke-broad-node-service-account"].affected_resources,
             ["google_container_node_pool.app"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-org-folder-iam-broad-principal"].affected_resources,
+            ["google_organization_iam_binding.domain_viewer"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-org-folder-iam-privileged-role"].affected_resources,
+            ["google_folder_iam_member.folder_admin"],
         )
         cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]
         self.assertEqual(cloud_sql_public_finding.severity, Severity.HIGH)

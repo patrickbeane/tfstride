@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 39,
+      "registered_rule_count": 41,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -76,6 +76,8 @@
         "gcp-cloud-functions-public-invoker",
         "gcp-service-account-iam-broad-principal",
         "gcp-service-account-iam-privileged-role",
+        "gcp-org-folder-iam-broad-principal",
+        "gcp-org-folder-iam-privileged-role",
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role"
       ],
@@ -119,6 +121,8 @@
         "gcp-cloud-functions-public-invoker": 0,
         "gcp-service-account-iam-broad-principal": 0,
         "gcp-service-account-iam-privileged-role": 0,
+        "gcp-org-folder-iam-broad-principal": 0,
+        "gcp-org-folder-iam-privileged-role": 0,
         "gcp-project-iam-broad-principal": 0,
         "gcp-project-iam-privileged-role": 0
       }

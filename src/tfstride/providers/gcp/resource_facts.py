@@ -81,6 +81,14 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS)
 
     @property
+    def organization_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.ORGANIZATION_ID)
+
+    @property
+    def folder_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.FOLDER_ID)
+
+    @property
     def engine(self) -> str | None:
         return self.get(GcpResourceMetadata.DATABASE_VERSION)
 
