@@ -232,6 +232,36 @@ class DashboardAppTests(unittest.TestCase):
             },
         )
 
+    def test_api_rejects_invalid_plan_without_internal_error_details(self) -> None:
+        response = self.client.post(
+            "/api/analyze",
+            data={"title": "Invalid Upload"},
+            files={"plan": ("invalid.json", b"{", "application/json")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {
+                "kind": "tfstride-error",
+                "message": dashboard_main.INVALID_PLAN_UPLOAD_MESSAGE,
+            },
+        )
+        self.assertNotIn("tfstride-dashboard", response.text)
+        self.assertNotIn("Expecting", response.text)
+
+    def test_html_analyze_rejects_invalid_plan_without_internal_error_details(self) -> None:
+        response = self.client.post(
+            "/analyze",
+            data={"title": "Invalid Upload"},
+            files={"plan": ("invalid.json", b"{", "application/json")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(dashboard_main.INVALID_PLAN_UPLOAD_MESSAGE, response.text)
+        self.assertNotIn("tfstride-dashboard", response.text)
+        self.assertNotIn("Expecting", response.text)
+
     def test_healthz_returns_ok(self) -> None:
         response = self.client.get("/healthz")
 
