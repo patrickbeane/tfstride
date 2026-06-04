@@ -619,15 +619,7 @@ h4 {
   gap: 1.25rem;
 }
 
-.provider-filter-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.scenario-provider-filter {
+.scenario-provider-tabs {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(5.75rem, 1fr));
   gap: 0.25rem;
@@ -639,7 +631,7 @@ h4 {
   box-shadow: 0 10px 24px rgba(25, 32, 37, 0.08);
 }
 
-.provider-filter-label {
+.provider-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -648,13 +640,13 @@ h4 {
   padding: 0.5rem 0.8rem;
   border-radius: 10px;
   color: var(--muted);
-  cursor: pointer;
   font-size: 0.86rem;
   font-weight: 700;
   line-height: 1;
+  text-decoration: none;
 }
 
-.provider-filter-label span:last-child {
+.provider-tab span:last-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -667,28 +659,20 @@ h4 {
   font-size: 0.75rem;
 }
 
-#scenario-provider-aws:checked ~ .scenario-provider-filter label[for="scenario-provider-aws"],
-#scenario-provider-gcp:checked ~ .scenario-provider-filter label[for="scenario-provider-gcp"] {
+.provider-tab-active {
   background: var(--accent);
   color: #fffaf2;
   box-shadow: 0 8px 18px rgba(13, 92, 99, 0.22);
 }
 
-#scenario-provider-aws:checked ~ .scenario-provider-filter label[for="scenario-provider-aws"] span:last-child,
-#scenario-provider-gcp:checked ~ .scenario-provider-filter label[for="scenario-provider-gcp"] span:last-child {
+.provider-tab-active span:last-child {
   background: rgba(255, 250, 242, 0.22);
   color: #fffaf2;
 }
 
-#scenario-provider-aws:focus-visible ~ .scenario-provider-filter label[for="scenario-provider-aws"],
-#scenario-provider-gcp:focus-visible ~ .scenario-provider-filter label[for="scenario-provider-gcp"] {
+.provider-tab:focus-visible {
   outline: 3px solid rgba(214, 159, 58, 0.45);
   outline-offset: 2px;
-}
-
-#scenario-provider-aws:checked ~ .scenario-grid .scenario-card[data-provider="gcp"],
-#scenario-provider-gcp:checked ~ .scenario-grid .scenario-card[data-provider="aws"] {
-  display: none;
 }
 
 .scenario-grid {
@@ -1018,7 +1002,7 @@ details + details {
     grid-template-columns: 1fr;
   }
 
-  .scenario-provider-filter {
+  .scenario-provider-tabs {
     width: 100%;
   }
 

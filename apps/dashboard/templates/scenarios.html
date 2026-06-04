@@ -17,18 +17,24 @@
 
   {% if demo_scenarios %}
     <section class="scenario-section" aria-label="Built-in scenario catalog">
-      <input class="provider-filter-input" type="radio" name="scenario-provider" id="scenario-provider-aws" checked>
-      <input class="provider-filter-input" type="radio" name="scenario-provider" id="scenario-provider-gcp">
-      <div class="scenario-provider-filter" aria-label="Provider filter">
-        <label class="provider-filter-label" for="scenario-provider-aws">
+      <nav class="scenario-provider-tabs" aria-label="Provider scenarios">
+        <a
+          class="provider-tab{% if selected_provider == 'aws' %} provider-tab-active{% endif %}"
+          href="{{ request.url_for('scenarios_page') }}?provider=aws"
+          {% if selected_provider == 'aws' %}aria-current="page"{% endif %}
+        >
           <span>AWS</span>
           <span>{{ provider_counts.aws|default(0) }}</span>
-        </label>
-        <label class="provider-filter-label" for="scenario-provider-gcp">
+        </a>
+        <a
+          class="provider-tab{% if selected_provider == 'gcp' %} provider-tab-active{% endif %}"
+          href="{{ request.url_for('scenarios_page') }}?provider=gcp"
+          {% if selected_provider == 'gcp' %}aria-current="page"{% endif %}
+        >
           <span>GCP</span>
           <span>{{ provider_counts.gcp|default(0) }}</span>
-        </label>
-      </div>
+        </a>
+      </nav>
       <div class="scenario-grid">
         {% for scenario in demo_scenarios %}
           <article class="scenario-card scenario-{{ scenario.theme }}" data-provider="{{ scenario.provider }}">

@@ -425,14 +425,21 @@ def create_app() -> FastAPI:
     async def scenarios_page(request: Request) -> HTMLResponse:
         demo_scenarios = _get_demo_scenarios(request.app)
         provider_counts = Counter(scenario.provider for scenario in demo_scenarios)
+        selected_provider = request.query_params.get("provider", "aws").lower()
+        if selected_provider not in {"aws", "gcp"}:
+            selected_provider = "aws"
+        visible_scenarios = tuple(
+            scenario for scenario in demo_scenarios if scenario.provider == selected_provider
+        )
         return _template_response(
             request,
             "scenarios.html",
             _base_context(
                 request,
                 page_title="tfSTRIDE Scenarios",
-                demo_scenarios=demo_scenarios,
+                demo_scenarios=visible_scenarios,
                 provider_counts=provider_counts,
+                selected_provider=selected_provider,
             ),
         )
 
@@ -703,6 +710,7 @@ def _base_context(
     form_title: str = DEFAULT_REPORT_TITLE,
     demo_scenarios: tuple[DemoScenario, ...] = (),
     provider_counts: Counter[str] | None = None,
+    selected_provider: str = "aws",
 ) -> dict[str, object]:
     return {
         "request": request,
@@ -712,6 +720,7 @@ def _base_context(
         "max_upload_mebibytes": MAX_UPLOAD_BYTES // (1024 * 1024),
         "demo_scenarios": demo_scenarios,
         "provider_counts": provider_counts or Counter(),
+        "selected_provider": selected_provider,
     }
 
 

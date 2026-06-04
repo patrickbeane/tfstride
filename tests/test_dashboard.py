@@ -56,20 +56,33 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn(">Demos<", response.text)
         self.assertNotIn("Built-in scenarios", response.text)
 
-    def test_scenarios_page_renders_demo_gallery(self) -> None:
+    def test_scenarios_page_defaults_to_aws_demo_gallery(self) -> None:
         response = self.client.get("/scenarios")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Built-in scenarios", response.text)
-        self.assertIn('id="scenario-provider-aws" checked', response.text)
-        self.assertIn('for="scenario-provider-gcp"', response.text)
+        self.assertIn('href="http://testserver/scenarios?provider=aws"', response.text)
+        self.assertIn('href="http://testserver/scenarios?provider=gcp"', response.text)
+        self.assertIn('class="provider-tab provider-tab-active"', response.text)
         self.assertIn('data-provider="aws"', response.text)
-        self.assertIn('data-provider="gcp"', response.text)
+        self.assertNotIn('data-provider="gcp"', response.text)
         self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
+        self.assertNotIn("Mixed GCP Inventory", response.text)
+        self.assertNotIn("GCP Serverless", response.text)
+        self.assertIn("Run built-in report", response.text)
+
+    def test_scenarios_page_filters_to_gcp_demo_gallery(self) -> None:
+        response = self.client.get("/scenarios?provider=gcp")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Built-in scenarios", response.text)
+        self.assertIn('data-provider="gcp"', response.text)
+        self.assertNotIn('data-provider="aws"', response.text)
         self.assertIn("Mixed GCP Inventory", response.text)
         self.assertIn("GCP Serverless", response.text)
-        self.assertIn("Run built-in report", response.text)
+        self.assertNotIn("ECS / Fargate", response.text)
+        self.assertNotIn("Mixed AWS Plan", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:
