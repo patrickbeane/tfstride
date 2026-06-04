@@ -23,12 +23,12 @@ from tfstride.filtering import (
 )
 
 
-FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_plan.json"
-BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_baseline_plan.json"
-SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_safe_plan.json"
-GCP_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_gcp_plan.json"
+FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_plan.json"
+BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
+SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_safe_plan.json"
+GCP_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "gcp" / "sample_gcp_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "sample_aws_cross_account_trust_unconstrained_plan.json"
+    Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
 
 
@@ -230,9 +230,9 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(len(report["inventory"]["resources"]), 24)
-        self.assertEqual(report["inventory"]["unsupported_resources"], [])
-        self.assertEqual(report["summary"]["active_findings"], 22)
+        self.assertEqual(len(report["inventory"]["resources"]), 22)
+        self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
+        self.assertEqual(report["summary"]["active_findings"], 16)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

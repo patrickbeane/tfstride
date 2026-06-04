@@ -1,0 +1,496 @@
+# tfSTRIDE Threat Model Report
+
+- Analyzed file: `sample_gcp_nightmare_plan.json`
+- Provider: `gcp`
+- Normalized resources: `30`
+- Unsupported resources: `1`
+
+## Summary
+
+This run identified **9 trust boundaries** and **29 findings** across **30 normalized resources**.
+
+- High severity findings: `11`
+- Medium severity findings: `18`
+- Low severity findings: `0`
+
+## Analysis Coverage
+
+- Terraform resources seen: `31`
+- Provider resources considered: `31`
+- Normalized resources: `30`
+- Unsupported resources: `1`
+- Registered rules: `43`
+- Enabled rules: `43`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Unsupported resource types:
+  - `google_logging_project_sink`: `1`
+- Findings by rule:
+  - `gcp-sensitive-resource-iam-external-access`: `2`
+  - `gcp-pubsub-public-access`: `1`
+  - `gcp-bigquery-public-access`: `1`
+  - `gcp-public-workload-sensitive-data-access`: `3`
+  - `gcp-cloud-sql-public-authorized-network`: `1`
+  - `gcp-cloud-sql-backup-disabled`: `1`
+  - `gcp-cloud-sql-public-ip-without-private-network`: `1`
+  - `gcp-cloud-sql-ssl-not-required`: `1`
+  - `gcp-cloud-sql-deletion-protection-disabled`: `1`
+  - `gcp-gcs-public-access`: `1`
+  - `gcp-gcs-public-access-prevention-not-enforced`: `1`
+  - `gcp-gcs-versioning-disabled`: `1`
+  - `gcp-gcs-customer-managed-encryption-missing`: `1`
+  - `gcp-public-compute-broad-ingress`: `1`
+  - `gcp-compute-os-login-disabled`: `1`
+  - `gcp-gke-public-control-plane`: `1`
+  - `gcp-gke-broad-authorized-networks`: `1`
+  - `gcp-gke-workload-identity-disabled`: `1`
+  - `gcp-gke-legacy-metadata-endpoints-enabled`: `1`
+  - `gcp-gke-broad-node-service-account`: `1`
+  - `gcp-cloud-run-public-invoker`: `1`
+  - `gcp-cloud-functions-public-invoker`: `1`
+  - `gcp-org-folder-iam-broad-principal`: `1`
+  - `gcp-org-folder-iam-privileged-role`: `1`
+  - `gcp-project-iam-broad-principal`: `1`
+  - `gcp-project-iam-privileged-role`: `1`
+
+## Discovered Trust Boundaries
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_compute_instance.web`
+- Description: Traffic can cross from the public internet to google_compute_instance.web.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_container_cluster.app`
+- Description: Traffic can cross from the public internet to google_container_cluster.app.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_sql_database_instance.app`
+- Description: Traffic can cross from the public internet to google_sql_database_instance.app.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_storage_bucket.logs`
+- Description: Traffic can cross from the public internet to google_storage_bucket.logs.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_cloud_run_v2_service.api`
+- Description: Traffic can cross from the public internet to google_cloud_run_v2_service.api.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `google_cloudfunctions_function.worker`
+- Description: Traffic can cross from the public internet to google_cloudfunctions_function.worker.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `workload-to-data-store`
+
+- Source: `google_compute_instance.web`
+- Target: `google_bigquery_dataset.analytics`
+- Description: google_compute_instance.web can interact with google_bigquery_dataset.analytics.
+- Rationale: GCP workloads cross into a higher-sensitivity data plane when their attached service account is granted data access through IAM: google_bigquery_dataset_iam_binding.analytics_viewers grants roles/bigquery.dataViewer to serviceAccount:tfstride-web@example.iam.gserviceaccount.com.
+
+### `workload-to-data-store`
+
+- Source: `google_cloud_run_v2_service.api`
+- Target: `google_sql_database_instance.app`
+- Description: google_cloud_run_v2_service.api can interact with google_sql_database_instance.app.
+- Rationale: Application or function workloads cross into a higher-sensitivity data plane when a directly internet-reachable database is reachable from a workload subnet with general egress.
+
+### `workload-to-data-store`
+
+- Source: `google_cloudfunctions_function.worker`
+- Target: `google_sql_database_instance.app`
+- Description: google_cloudfunctions_function.worker can interact with google_sql_database_instance.app.
+- Rationale: Application or function workloads cross into a higher-sensitivity data plane when a directly internet-reachable database is reachable from a workload subnet with general egress.
+
+## Findings
+
+### High
+
+#### BigQuery IAM binding allows public or broad data access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_bigquery_dataset.analytics`, `google_bigquery_dataset_iam_binding.analytics_viewers`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 9 => high
+- Rationale: google_bigquery_dataset.analytics grants `roles/bigquery.dataViewer` to `allUsers` through BigQuery IAM. Public or broad principals can read or modify analytical data outside the expected project trust boundary.
+- Recommended mitigation: Grant BigQuery dataset and table access only to specific in-project identities or reviewed analytics groups, remove public principals, and prefer least-privilege data roles.
+- Evidence:
+  - iam binding: source=google_bigquery_dataset_iam_binding.analytics_viewers; role=roles/bigquery.dataViewer; member=allUsers
+  - trust scope: member is public GCP principal `allUsers`
+  - resource policy sources: google_bigquery_dataset_iam_binding.analytics_viewers
+
+#### Cloud SQL instance accepts public authorized network access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `internet-to-service:internet->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 6 => high
+- Rationale: google_sql_database_instance.app has a public Cloud SQL IPv4 endpoint and an authorized network that allows internet-wide client sources. That weakens the database trust boundary even when database authentication is still required.
+- Recommended mitigation: Disable public IPv4 access where possible, use private IP connectivity or the Cloud SQL Auth Proxy, and restrict authorized networks to narrow CIDRs when public client access is required.
+- Evidence:
+  - authorized networks: anywhere (0.0.0.0/0)
+  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GCP organization or folder IAM grants a high-privilege role
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_folder_iam_member.folder_admin`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_folder_iam_member.folder_admin grants the high-impact GCP role `roles/resourcemanager.folderAdmin` to `group:folder-admins@example.com` at folder scope `folders/12345`. That role enables folder hierarchy administration across a high-level resource boundary and can materially expand blast radius if the principal is compromised.
+- Recommended mitigation: Replace high-impact organization and folder roles with narrowly scoped custom or predefined roles, assign them only to controlled break-glass or platform groups, and review descendant project blast radius.
+- Evidence:
+  - iam binding: member=group:folder-admins@example.com; role=roles/resourcemanager.folderAdmin
+  - scope: folder scope `folders/12345`
+  - role risk: folder hierarchy administration
+
+#### GCP organization or folder IAM grants access to broad principals
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_organization_iam_binding.domain_viewer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_organization_iam_binding.domain_viewer grants `roles/viewer` to `domain:example.com` at organization scope `1234567890`. Public or broad-domain principals at organization or folder scope can expand access across many descendant projects and workloads.
+- Recommended mitigation: Remove public and broad-domain principals from organization and folder IAM, grant high-level access only to tightly controlled groups, and prefer project- or resource-scoped bindings where possible.
+- Evidence:
+  - iam binding: member=domain:example.com; role=roles/viewer
+  - scope: organization scope `1234567890`
+  - trust scope: member grants a whole Google Workspace domain
+
+#### GCP project IAM binding grants a high-privilege role
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.public_owner`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_project_iam_member.public_owner grants the high-impact GCP role `roles/owner` to `allUsers` at project scope. That role enables full project administration and can materially expand control-plane blast radius if the principal is compromised or mis-scoped.
+- Recommended mitigation: Replace Owner, Editor, IAM admin, service-account impersonation, and admin-class project roles with narrowly scoped predefined or custom roles assigned to specific groups or service accounts.
+- Evidence:
+  - iam binding: member=allUsers; role=roles/owner
+  - role risk: full project administration
+
+#### GKE node pool uses broad node identity settings
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_node_pool.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_container_node_pool.app uses broad GKE node identity settings. Default or broadly scoped node service accounts can turn a node or pod compromise into wider GCP API access.
+- Recommended mitigation: Attach a dedicated least-privilege node service account, remove cloud-platform or full-control OAuth scopes, and shift workload permissions to Workload Identity bindings.
+- Evidence:
+  - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
+  - node service account: 123456789-compute@developer.gserviceaccount.com
+  - oauth scopes: https://www.googleapis.com/auth/cloud-platform
+
+#### Internet-exposed GCP workload can access sensitive data services
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_cloud_run_v2_service.api`, `google_sql_database_instance.app`
+- Trust boundary: `workload-to-data-store:google_cloud_run_v2_service.api->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_cloud_run_v2_service.api is internet-exposed and runs with GCP workload identity serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com. That identity can access google_sql_database_instance.app. A compromise of the public workload can therefore become direct access to sensitive GCP data services.
+- Recommended mitigation: Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data access through private services where possible.
+- Evidence:
+  - public exposure reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
+  - workload identity: serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com
+  - data access path: google_cloud_run_v2_service.api reaches google_sql_database_instance.app
+  - boundary rationale: Application or function workloads cross into a higher-sensitivity data plane when a directly internet-reachable database is reachable from a workload subnet with general egress.
+
+#### Internet-exposed GCP workload can access sensitive data services
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_cloudfunctions_function.worker`, `google_sql_database_instance.app`
+- Trust boundary: `workload-to-data-store:google_cloudfunctions_function.worker->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_cloudfunctions_function.worker is internet-exposed and runs with GCP workload identity serviceAccount:tfstride-fn@tfstride-demo.iam.gserviceaccount.com. That identity can access google_sql_database_instance.app. A compromise of the public workload can therefore become direct access to sensitive GCP data services.
+- Recommended mitigation: Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data access through private services where possible.
+- Evidence:
+  - public exposure reasons: google_cloudfunctions_function_iam_member.public_invoker grants roles/cloudfunctions.invoker to allAuthenticatedUsers
+  - workload identity: serviceAccount:tfstride-fn@tfstride-demo.iam.gserviceaccount.com
+  - data access path: google_cloudfunctions_function.worker reaches google_sql_database_instance.app
+  - boundary rationale: Application or function workloads cross into a higher-sensitivity data plane when a directly internet-reachable database is reachable from a workload subnet with general egress.
+
+#### Internet-exposed GCP workload can access sensitive data services
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_compute_instance.web`, `google_bigquery_dataset.analytics`, `google_bigquery_dataset_iam_binding.analytics_viewers`
+- Trust boundary: `workload-to-data-store:google_compute_instance.web->google_bigquery_dataset.analytics`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_compute_instance.web is internet-exposed and runs with GCP workload identity serviceAccount:tfstride-web@example.iam.gserviceaccount.com. That identity can access google_bigquery_dataset.analytics. A compromise of the public workload can therefore become direct access to sensitive GCP data services.
+- Recommended mitigation: Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data access through private services where possible.
+- Evidence:
+  - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+  - workload identity: serviceAccount:tfstride-web@example.iam.gserviceaccount.com
+  - workload identity scopes: cloud-platform
+  - data access path: google_compute_instance.web reaches google_bigquery_dataset.analytics
+  - boundary rationale: GCP workloads cross into a higher-sensitivity data plane when their attached service account is granted data access through IAM: google_bigquery_dataset_iam_binding.analytics_viewers grants roles/bigquery.dataViewer to serviceAccount:tfstride-web@example.iam.gserviceaccount.com.
+  - resource policy sources: google_bigquery_dataset_iam_binding.analytics_viewers
+
+#### Pub/Sub IAM binding allows public or broad data access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_pubsub_topic.events`, `google_pubsub_topic_iam_member.public_publisher`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_pubsub_topic.events grants `roles/pubsub.publisher` to `allAuthenticatedUsers` through Pub/Sub IAM. Public or broad principals can publish, consume, or administer event streams outside the expected service boundary.
+- Recommended mitigation: Grant Pub/Sub publisher and subscriber roles only to specific service accounts or groups, remove public principals, and separate publish and consume permissions by workload.
+- Evidence:
+  - iam binding: source=google_pubsub_topic_iam_member.public_publisher; role=roles/pubsub.publisher; member=allAuthenticatedUsers
+  - trust scope: member is public GCP principal `allAuthenticatedUsers`
+  - resource policy sources: google_pubsub_topic_iam_member.public_publisher
+
+#### Sensitive GCP resource IAM binding allows broad or external access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_secret_manager_secret.api_key`, `google_secret_manager_secret_iam_member.public_accessor`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 9 => high
+- Rationale: google_secret_manager_secret.api_key grants `roles/secretmanager.secretAccessor` to `allAuthenticatedUsers` through GCP IAM. Public, broad-domain, or foreign-project principals can access sensitive secrets or cryptographic key operations outside the expected project trust boundary.
+- Recommended mitigation: Grant Secret Manager and Cloud KMS IAM roles only to specific in-project service accounts or groups, remove public principals, and require explicit cross-project access reviews for partner identities.
+- Evidence:
+  - iam binding: source=google_secret_manager_secret_iam_member.public_accessor; role=roles/secretmanager.secretAccessor; member=allAuthenticatedUsers
+  - trust scope: member is public GCP principal `allAuthenticatedUsers`
+  - resource policy sources: google_secret_manager_secret_iam_member.public_accessor
+
+### Medium
+
+#### Cloud Functions function is publicly invokable
+
+- STRIDE category: Spoofing
+- Affected resources: `google_cloudfunctions_function.worker`, `google_cloudfunctions_function_iam_member.public_invoker`
+- Trust boundary: `internet-to-service:internet->google_cloudfunctions_function.worker`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_cloudfunctions_function.worker allows public HTTP access and grants Cloud Functions invoke permission to public GCP principals. Unauthenticated internet clients can reach the function entry point without an organization-owned identity boundary.
+- Recommended mitigation: Remove `allUsers` and `allAuthenticatedUsers` from Cloud Functions invoker bindings unless anonymous access is intentional, and require authentication, IAP, API Gateway, or a controlled edge policy for public HTTP functions.
+- Evidence:
+  - public invoker bindings: source=google_cloudfunctions_function_iam_member.public_invoker; role=roles/cloudfunctions.invoker; member=allAuthenticatedUsers
+  - public access reasons: google_cloudfunctions_function_iam_member.public_invoker grants roles/cloudfunctions.invoker to allAuthenticatedUsers
+  - public exposure reasons: google_cloudfunctions_function_iam_member.public_invoker grants roles/cloudfunctions.invoker to allAuthenticatedUsers
+
+#### Cloud Run service is publicly invokable
+
+- STRIDE category: Spoofing
+- Affected resources: `google_cloud_run_v2_service.api`, `google_cloud_run_v2_service_iam_member.public_invoker`
+- Trust boundary: `internet-to-service:internet->google_cloud_run_v2_service.api`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_cloud_run_v2_service.api allows public ingress and grants Cloud Run invoke permission to public GCP principals. Unauthenticated internet clients can reach the service entry point without an organization-owned identity boundary.
+- Recommended mitigation: Remove `allUsers` and `allAuthenticatedUsers` from Cloud Run invoker bindings unless anonymous access is intentional, and front public services with authentication, IAP, API Gateway, or a controlled edge policy.
+- Evidence:
+  - public invoker bindings: source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers
+  - public access reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
+  - public exposure reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
+
+#### Cloud SQL automated backups are disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app does not have Cloud SQL automated backups enabled. A destructive change, operator error, or data corruption event would have fewer managed recovery points.
+- Recommended mitigation: Enable automated backups for Cloud SQL instances, configure retention appropriate to the workload, and enable point-in-time recovery where supported.
+- Evidence:
+  - backup posture: backup_configuration.enabled is false; point_in_time_recovery_enabled is false; engine is POSTGRES_15
+
+#### Cloud SQL deletion protection is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app has Cloud SQL deletion protection disabled. Accidental or unauthorized infrastructure changes could destroy the managed database instance without this provider-level guardrail.
+- Recommended mitigation: Enable Cloud SQL deletion protection for persistent environments and require explicit review before disabling it during planned database retirement.
+- Evidence:
+  - lifecycle posture: deletion_protection is false
+
+#### Cloud SQL public IPv4 is enabled without private network access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `internet-to-service:internet->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +1, blast_radius +0, final_score 5 => medium
+- Rationale: google_sql_database_instance.app has Cloud SQL public IPv4 enabled without a private network attachment. That keeps database client access on a public endpoint instead of an internal VPC path.
+- Recommended mitigation: Disable public IPv4 where possible, attach the instance to a private network, and route clients through private IP, the Cloud SQL Auth Proxy, or tightly controlled connectivity paths.
+- Evidence:
+  - network posture: ipv4_enabled is true; private_network is unset; authorized_networks configured: 1
+  - public access reasons: Cloud SQL public IPv4 access is enabled
+
+#### Cloud SQL public client access does not require SSL
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `internet-to-service:internet->google_sql_database_instance.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +1, blast_radius +0, final_score 5 => medium
+- Rationale: google_sql_database_instance.app allows Cloud SQL public IPv4 client access without requiring encrypted client connections. Credentials and database traffic should not depend on client-side optional TLS behavior.
+- Recommended mitigation: Require encrypted Cloud SQL client connections with `require_ssl` or an enforcing `ssl_mode`, and prefer private IP or the Cloud SQL Auth Proxy for application connectivity.
+- Evidence:
+  - ssl posture: require_ssl is false; ssl_mode is unset; ipv4_enabled is true
+
+#### GCP compute instance disables OS Login
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_compute_instance.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_compute_instance.web explicitly disables OS Login. SSH access can therefore fall back to instance or project metadata keys instead of centralized IAM-backed login and audit controls.
+- Recommended mitigation: Enable OS Login on GCE instances and manage SSH access through IAM roles, two-factor enforcement, and centralized audit logs instead of metadata SSH keys.
+- Evidence:
+  - os login posture: metadata.enable-oslogin is false
+  - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### GCP project IAM binding grants access to public principals
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.public_owner`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_project_iam_member.public_owner grants `roles/owner` to `allUsers` at project scope. Public or broadly authenticated principals can cross into the control plane without an organization-owned identity boundary.
+- Recommended mitigation: Remove `allUsers` and `allAuthenticatedUsers` from project-level IAM bindings, grant access to specific groups or service accounts, and scope permissions to the smallest project or resource needed.
+- Evidence:
+  - iam binding: member=allUsers; role=roles/owner
+
+#### GCS bucket does not enforce Public Access Prevention
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `internet-to-service:internet->google_storage_bucket.logs`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: google_storage_bucket.logs does not enforce GCS Public Access Prevention. Public principals can still be introduced through bucket IAM unless an organization-level policy blocks them.
+- Recommended mitigation: Set GCS Public Access Prevention to `enforced` on sensitive buckets and rely on explicit non-public identities or signed access patterns when objects must be shared.
+- Evidence:
+  - access control posture: public_access_prevention is unset
+  - public exposure reasons: google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers
+
+#### GCS bucket is publicly accessible
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `internet-to-service:internet->google_storage_bucket.logs`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: google_storage_bucket.logs is publicly reachable through GCS IAM grants. Public bucket access is a common source of unintended object disclosure.
+- Recommended mitigation: Remove `allUsers` and `allAuthenticatedUsers` from bucket-level IAM grants, enforce GCS Public Access Prevention, and use signed URLs, CDN origins, or narrow identities when objects must be distributed.
+- Evidence:
+  - public exposure reasons: google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers
+
+#### GCS sensitive bucket does not use customer-managed encryption
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_storage_bucket.logs relies on default GCS encryption rather than a customer-managed KMS key. Sensitive buckets lose key ownership, rotation, and separation-of-duties controls that a CMEK can provide.
+- Recommended mitigation: Configure a Cloud KMS customer-managed key for sensitive GCS buckets, assign the GCS service agent only the key roles it needs, and manage key rotation separately from bucket IAM.
+- Evidence:
+  - encryption posture: default_kms_key_name is unset; customer_managed_encryption is false
+
+#### GCS sensitive bucket versioning is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_storage_bucket.logs stores sensitive GCS data without bucket versioning. Accidental overwrites, deletes, or destructive changes have fewer object-level recovery options.
+- Recommended mitigation: Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules that match recovery objectives and storage cost constraints.
+- Evidence:
+  - data protection posture: versioning.enabled is false; data_sensitivity is sensitive
+
+#### GKE cluster does not enable Workload Identity
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_container_cluster.app does not enable GKE Workload Identity. Pods are more likely to depend on node service-account credentials, which weakens workload-level identity boundaries and can expand blast radius after pod compromise.
+- Recommended mitigation: Enable GKE Workload Identity, bind Kubernetes service accounts to narrow Google service accounts, and avoid relying on node service-account credentials for pod-level cloud API access.
+- Evidence:
+  - workload identity posture: workload_identity_enabled is false; workload_pool is unset
+
+#### GKE cluster exposes a public control plane
+
+- STRIDE category: Spoofing
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: google_container_cluster.app exposes a public GKE control-plane endpoint. Public API server reachability increases dependence on IAM, Kubernetes RBAC, and authorized network configuration to protect cluster administration.
+- Recommended mitigation: Use private GKE control-plane endpoints where possible, or restrict master authorized networks to narrow administrator CIDRs and enforce IAM plus Kubernetes RBAC for cluster administration.
+- Evidence:
+  - control plane endpoint: 35.4.5.6
+  - public access reasons: GKE control plane endpoint is public
+  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GKE control plane allows broad authorized networks
+
+- STRIDE category: Spoofing
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 5 => medium
+- Rationale: google_container_cluster.app exposes the GKE control plane without narrow master authorized networks. Internet-wide or unset CIDR controls leave the Kubernetes API server reachable from untrusted client networks.
+- Recommended mitigation: Configure GKE master authorized networks with narrow trusted CIDRs, avoid internet-wide ranges, and prefer private control-plane access for administrative paths.
+- Evidence:
+  - authorized networks: anywhere (0.0.0.0/0)
+  - configured authorized network count: 1
+  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GKE node metadata exposure is not hardened
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_node_pool.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 3 => medium
+- Rationale: google_container_node_pool.app allows legacy or broad node metadata exposure. Workloads on the node may be able to reach metadata credentials outside the intended GKE metadata server controls.
+- Recommended mitigation: Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, and prevent pods from reaching broad node credentials.
+- Evidence:
+  - node metadata posture: legacy metadata endpoints are enabled; metadata mode is GCE_METADATA
+
+#### Internet-exposed GCP compute instance permits broad ingress
+
+- STRIDE category: Spoofing
+- Affected resources: `google_compute_instance.web`, `google_compute_firewall.public_admin`
+- Trust boundary: `internet-to-service:internet->google_compute_instance.web`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: google_compute_instance.web has an external access config and matching GCP firewall rules allow administrative access or all ports from the public internet. That broad ingress raises the chance of unauthenticated probing and credential attacks.
+- Recommended mitigation: Restrict GCP firewall source ranges and exposed ports, remove external IP access where possible, and use Identity-Aware Proxy, VPN, or a controlled bastion for administration.
+- Evidence:
+  - firewall rules: google_compute_firewall.public_admin ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_admin ingress tcp 3389 from 0.0.0.0/0
+  - network tags: web
+  - internet ingress reasons: google_compute_firewall.public_admin ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_admin ingress tcp 3389 from 0.0.0.0/0; google_compute_firewall.public_all ingress tcp unspecified ports from 0.0.0.0/0
+  - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### Sensitive GCP resource IAM binding allows broad or external access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_kms_crypto_key.customer`, `google_kms_crypto_key_iam_member.partner_decrypter`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_kms_crypto_key.customer grants `roles/cloudkms.cryptoKeyDecrypter` to `serviceAccount:decryptor@partner-project.iam.gserviceaccount.com` through GCP IAM. Public, broad-domain, or foreign-project principals can access sensitive secrets or cryptographic key operations outside the expected project trust boundary.
+- Recommended mitigation: Grant Secret Manager and Cloud KMS IAM roles only to specific in-project service accounts or groups, remove public principals, and require explicit cross-project access reviews for partner identities.
+- Evidence:
+  - iam binding: source=google_kms_crypto_key_iam_member.partner_decrypter; role=roles/cloudkms.cryptoKeyDecrypter; member=serviceAccount:decryptor@partner-project.iam.gserviceaccount.com
+  - trust scope: service account belongs to project `partner-project`, outside resource project `tfstride-demo`
+  - resource policy sources: google_kms_crypto_key_iam_member.partner_decrypter
+
+### Low
+
+No findings in this severity band.
+
+## Limitations / Unsupported Resources
+
+- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection for compute and serverless workloads, with limited GCP STRIDE rule coverage for compute, GCS posture, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
+- The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
+- Unsupported resource skipped: `google_logging_project_sink.processor`

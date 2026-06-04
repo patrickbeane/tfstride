@@ -29,19 +29,25 @@ from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
-BASELINE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_baseline_plan.json"
-FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
-SAFE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_safe_plan.json"
-NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_nightmare_plan.json"
-ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_alb_ec2_rds_plan.json"
-ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_ecs_fargate_plan.json"
-LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "sample_aws_lambda_deploy_role_plan.json"
-GCP_FIXTURE_PATH = FIXTURES_DIR / "sample_gcp_plan.json"
+BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
+FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
+SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
+NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
+ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_alb_ec2_rds_plan.json"
+ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_ecs_fargate_plan.json"
+LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_lambda_deploy_role_plan.json"
+GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
+GCP_SAFE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_safe_plan.json"
+GCP_BASELINE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_baseline_plan.json"
+GCP_LB_COMPUTE_SQL_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_lb_compute_sql_plan.json"
+GCP_SERVERLESS_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_serverless_plan.json"
+GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_project_iam_plan.json"
+GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
-    FIXTURES_DIR / "sample_aws_cross_account_trust_unconstrained_plan.json"
+    FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
 CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
-    FIXTURES_DIR / "sample_aws_cross_account_trust_constrained_plan.json"
+    FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
 )
 
 
@@ -813,7 +819,13 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 22, {"high": 8, "medium": 14}),
+            "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
+            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 2, {"high": 1, "medium": 1}),
+            "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
+            "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
+            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 3, {"high": 1, "medium": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 29, {"high": 11, "medium": 18}),
         }
 
         expected_titles = {
@@ -843,6 +855,21 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Internet-exposed compute service permits overly broad ingress": 2,
                 "Object storage is publicly accessible": 2,
             },
+            "gcp-safe": {},
+            "gcp-baseline": {
+                "Cloud SQL point-in-time recovery is disabled": 1,
+                "GCP project IAM binding grants a high-privilege role": 1,
+            },
+            "gcp-lb-compute-sql": {},
+            "gcp-serverless": {
+                "Cloud Functions function is publicly invokable": 1,
+                "Cloud Run service is publicly invokable": 1,
+                "Internet-exposed GCP workload can access sensitive data services": 2,
+            },
+            "gcp-cross-project-iam": {
+                "GCP project IAM binding grants a high-privilege role": 1,
+                "Sensitive GCP resource IAM binding allows broad or external access": 2,
+            },
             "gcp-inventory": {
                 "BigQuery IAM binding allows public or broad data access": 1,
                 "Cloud SQL automated backups are disabled": 1,
@@ -850,19 +877,41 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Cloud SQL instance accepts public authorized network access": 1,
                 "Cloud SQL public IPv4 is enabled without private network access": 1,
                 "Cloud SQL public client access does not require SSL": 1,
+                "GCP compute instance disables OS Login": 1,
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 1,
-                "GCP organization or folder IAM grants access to broad principals": 1,
+                "Pub/Sub IAM binding allows public or broad data access": 1,
+                "Sensitive GCP resource IAM binding allows broad or external access": 2,
+            },
+            "gcp-nightmare": {
+                "BigQuery IAM binding allows public or broad data access": 1,
+                "Cloud Functions function is publicly invokable": 1,
+                "Cloud Run service is publicly invokable": 1,
+                "Cloud SQL automated backups are disabled": 1,
+                "Cloud SQL deletion protection is disabled": 1,
+                "Cloud SQL instance accepts public authorized network access": 1,
+                "Cloud SQL public IPv4 is enabled without private network access": 1,
+                "Cloud SQL public client access does not require SSL": 1,
+                "GCP compute instance disables OS Login": 1,
                 "GCP organization or folder IAM grants a high-privilege role": 1,
+                "GCP organization or folder IAM grants access to broad principals": 1,
+                "GCP project IAM binding grants a high-privilege role": 1,
+                "GCP project IAM binding grants access to public principals": 1,
+                "GCS bucket does not enforce Public Access Prevention": 1,
+                "GCS bucket is publicly accessible": 1,
+                "GCS sensitive bucket does not use customer-managed encryption": 1,
+                "GCS sensitive bucket versioning is disabled": 1,
+                "GKE cluster does not enable Workload Identity": 1,
                 "GKE cluster exposes a public control plane": 1,
                 "GKE control plane allows broad authorized networks": 1,
-                "GKE cluster does not enable Workload Identity": 1,
                 "GKE node metadata exposure is not hardened": 1,
                 "GKE node pool uses broad node identity settings": 1,
+                "Internet-exposed GCP compute instance permits broad ingress": 1,
+                "Internet-exposed GCP workload can access sensitive data services": 3,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
@@ -882,18 +931,26 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 24)
-        self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 24)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 24)
-        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 22)
+        self.assertEqual(len(result.inventory.resources), 22)
+        self.assertEqual(result.inventory.unsupported_resources, ["google_logging_project_sink.processor"])
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 23)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 22)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 1)
+        self.assertEqual(
+            result.analysis_coverage.resources.unsupported_resource_types,
+            {"google_logging_project_sink": 1},
+        )
+        self.assertEqual(len(result.findings), 16)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
         self.assertEqual(
             finding.affected_resources,
             ["google_compute_instance.web", "google_compute_firewall.public_ssh"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-compute-os-login-disabled"].affected_resources,
+            ["google_compute_instance.web"],
         )
         gcs_finding = findings_by_rule["gcp-gcs-public-access"]
         self.assertEqual(gcs_finding.severity, Severity.MEDIUM)
@@ -909,34 +966,6 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             findings_by_rule["gcp-gcs-customer-managed-encryption-missing"].affected_resources,
             ["google_storage_bucket.logs"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-public-control-plane"].affected_resources,
-            ["google_container_cluster.app"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-broad-authorized-networks"].affected_resources,
-            ["google_container_cluster.app"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-workload-identity-disabled"].affected_resources,
-            ["google_container_cluster.app"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-legacy-metadata-endpoints-enabled"].affected_resources,
-            ["google_container_node_pool.app"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-broad-node-service-account"].affected_resources,
-            ["google_container_node_pool.app"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-org-folder-iam-broad-principal"].affected_resources,
-            ["google_organization_iam_binding.domain_viewer"],
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-org-folder-iam-privileged-role"].affected_resources,
-            ["google_folder_iam_member.folder_admin"],
         )
         cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]
         self.assertEqual(cloud_sql_public_finding.severity, Severity.HIGH)
@@ -966,7 +995,11 @@ class TFSAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(
             findings_by_rule["gcp-public-workload-sensitive-data-access"].affected_resources,
-            ["google_compute_instance.web", "google_bigquery_dataset.analytics", "google_bigquery_dataset_iam_binding.analytics_viewers"],
+            [
+                "google_compute_instance.web",
+                "google_bigquery_dataset.analytics",
+                "google_bigquery_dataset_iam_binding.analytics_viewers",
+            ],
         )
         sensitive_iam_findings = [
             finding
@@ -978,7 +1011,7 @@ class TFSAnalysisTests(unittest.TestCase):
             {finding.severity for finding in sensitive_iam_findings},
             {Severity.HIGH, Severity.MEDIUM},
         )
-        self.assertEqual(len(result.trust_boundaries), 5)
+        self.assertEqual(len(result.trust_boundaries), 4)
         boundaries_by_target = {boundary.target: boundary for boundary in result.trust_boundaries}
         boundary = boundaries_by_target["google_compute_instance.web"]
         self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -987,10 +1020,6 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             gcs_finding.trust_boundary_id,
             boundaries_by_target["google_storage_bucket.logs"].identifier,
-        )
-        self.assertEqual(
-            findings_by_rule["gcp-gke-public-control-plane"].trust_boundary_id,
-            boundaries_by_target["google_container_cluster.app"].identifier,
         )
         self.assertEqual(
             cloud_sql_public_finding.trust_boundary_id,

@@ -71,7 +71,7 @@ from tfstride.providers.gcp.network_normalizers import (
 from tfstride.providers.gcp.resource_utils import last_path_segment
 
 
-FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "sample_gcp_plan.json"
+FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "gcp" / "sample_gcp_plan.json"
 
 
 def _fixture_resources_by_address():
@@ -301,7 +301,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNTS)[0]["email"],
             "tfstride-web@example.iam.gserviceaccount.com",
         )
-        self.assertFalse(normalized.has_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.OS_LOGIN_ENABLED))
 
     def test_compute_instance_normalizer_preserves_os_login_metadata(self) -> None:
         disabled = normalize_compute_instance(
@@ -1422,11 +1422,14 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(instance.internet_ingress_capable)
         self.assertEqual(
             instance.internet_ingress_reasons,
-            ["google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0"],
+            [
+                "google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0",
+                "google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0",
+            ],
         )
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
-            ["google_compute_firewall.public_ssh"],
+            ["google_compute_firewall.public_ssh", "google_compute_firewall.public_app"],
         )
         self.assertTrue(instance.public_exposure)
         self.assertTrue(instance.direct_internet_reachable)

@@ -148,10 +148,10 @@ UPLOAD_VALIDATION_ERROR_EXAMPLE = {
 
 class DashboardInputError(ValueError):
     """Raised when an uploaded plan cannot be analyzed by the dashboard."""
-    
+
     def __init__(self, public_message: str) -> None:
-	    super().__init__("dashboard input error")
-	    self.public_message = public_message
+        super().__init__("dashboard input error")
+        self.public_message = public_message
 
 
 class _UploadTooLarge(ValueError):
@@ -234,7 +234,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="safe",
         title="Safe Plan",
         report_title="Safe Plan Demo",
-        fixture_name="sample_aws_safe_plan.json",
+        fixture_name="aws/sample_aws_safe_plan.json",
         description="Private-by-default AWS infrastructure with guarded storage, private database access, and no active findings.",
         emphasis="Quiet reference architecture",
         theme="safe",
@@ -243,7 +243,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="baseline",
         title="Baseline Plan",
         report_title="Baseline Plan Demo",
-        fixture_name="sample_aws_baseline_plan.json",
+        fixture_name="aws/sample_aws_baseline_plan.json",
         description="Mostly segmented AWS infrastructure with a small IAM hygiene issue and a non-obvious private-data path.",
         emphasis="Calibrated baseline",
         theme="balanced",
@@ -252,7 +252,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="mixed",
         title="Mixed AWS Plan",
         report_title="Mixed AWS Plan Demo",
-        fixture_name="sample_aws_plan.json",
+        fixture_name="aws/sample_aws_plan.json",
         description="Public exposure, permissive database access, risky IAM, and broad trust in one reviewable plan.",
         emphasis="Representative mixed case",
         theme="mixed",
@@ -261,7 +261,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="nightmare",
         title="Nightmare Plan",
         report_title="Nightmare Plan Demo",
-        fixture_name="sample_aws_nightmare_plan.json",
+        fixture_name="aws/sample_aws_nightmare_plan.json",
         description="Stacked public access, wildcard IAM, exposed storage, and high blast radius across the stack.",
         emphasis="Stress-case fixture",
         theme="nightmare",
@@ -270,7 +270,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="alb-ec2-rds",
         title="ALB, EC2, and RDS",
         report_title="ALB / EC2 / RDS Demo",
-        fixture_name="sample_aws_alb_ec2_rds_plan.json",
+        fixture_name="aws/sample_aws_alb_ec2_rds_plan.json",
         description="A common web architecture where an internet-facing load balancer still composes into a private RDS access path.",
         emphasis="Common architecture",
         theme="balanced",
@@ -279,7 +279,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="ecs-fargate",
         title="ECS / Fargate",
         report_title="ECS / Fargate Demo",
-        fixture_name="sample_aws_ecs_fargate_plan.json",
+        fixture_name="aws/sample_aws_ecs_fargate_plan.json",
         description="Internet-facing ALB, private ECS tasks, RDS security-group trust, and Secrets Manager access through the task role.",
         emphasis="Container workload",
         theme="balanced",
@@ -288,7 +288,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="lambda-deploy-role",
         title="Lambda Deploy Role",
         report_title="Lambda Deploy Role Demo",
-        fixture_name="sample_aws_lambda_deploy_role_plan.json",
+        fixture_name="aws/sample_aws_lambda_deploy_role_plan.json",
         description="Private Lambda deployment path with scoped S3 access and deliberate trust-chain review points.",
         emphasis="Control-plane focus",
         theme="balanced",
@@ -297,7 +297,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="gcp-scaffold",
         title="GCP Inventory",
         report_title="GCP Inventory Demo",
-        fixture_name="sample_gcp_plan.json",
+        fixture_name="gcp/sample_gcp_plan.json",
         description="Terraform Google provider resources normalized with basic internet-to-compute boundary detection and first-pass GCP findings.",
         emphasis="Provider expansion",
         theme="balanced",
@@ -306,7 +306,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="trust-unconstrained",
         title="Cross-Account Trust",
         report_title="Cross-Account Trust Demo",
-        fixture_name="sample_aws_cross_account_trust_unconstrained_plan.json",
+        fixture_name="aws/sample_aws_cross_account_trust_unconstrained_plan.json",
         description="Minimal assume-role trust without narrowing conditions to exercise the IAM trust path directly.",
         emphasis="Trust expansion",
         theme="trust",
@@ -315,7 +315,7 @@ DEMO_SCENARIO_DEFINITIONS = (
         scenario_id="trust-constrained",
         title="Constrained Trust",
         report_title="Constrained Trust Demo",
-        fixture_name="sample_aws_cross_account_trust_constrained_plan.json",
+        fixture_name="aws/sample_aws_cross_account_trust_constrained_plan.json",
         description="The same trust edge narrowed by ExternalId, SourceArn, and SourceAccount conditions.",
         emphasis="Narrowed trust",
         theme="safe",
@@ -539,7 +539,7 @@ async def _analyze_upload(
     upload: UploadFile,
     *,
     title: str,
-    engine: TfStride,
+    engine: TFS,
 ) -> DashboardAnalysis:
     filename = Path(upload.filename or "uploaded-plan.json").name or "uploaded-plan.json"
     bytes_written = 0
@@ -659,6 +659,7 @@ def _public_dashboard_error_message(exc: DashboardInputError | TerraformPlanLoad
     if isinstance(exc, DashboardInputError):
         return exc.public_message
     return INVALID_PLAN_UPLOAD_MESSAGE
+
 
 def _upload_too_large_message() -> str:
     return f"Uploaded plan exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB dashboard limit."

@@ -28,15 +28,22 @@ from tfstride.reporting.sarif import render_sarif
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
-FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
-SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
-NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
-ALB_EC2_RDS_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_alb_ec2_rds_plan.json"
-LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_lambda_deploy_role_plan.json"
-GCP_FIXTURE_PATH = ROOT / "fixtures" / "sample_gcp_plan.json"
-CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_cross_account_trust_unconstrained_plan.json"
-CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_cross_account_trust_constrained_plan.json"
+BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
+FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
+SAFE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_safe_plan.json"
+NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_nightmare_plan.json"
+ALB_EC2_RDS_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_alb_ec2_rds_plan.json"
+LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_lambda_deploy_role_plan.json"
+ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_ecs_fargate_plan.json"
+GCP_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_plan.json"
+GCP_SAFE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_safe_plan.json"
+GCP_BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_baseline_plan.json"
+GCP_LB_COMPUTE_SQL_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_lb_compute_sql_plan.json"
+GCP_SERVERLESS_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_serverless_plan.json"
+GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_cross_project_iam_plan.json"
+GCP_NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_nightmare_plan.json"
+CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
+CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
 EXAMPLES_DIR = ROOT / "examples"
 
 
@@ -106,13 +113,22 @@ class MarkdownReportTests(unittest.TestCase):
     def test_checked_in_example_reports_match_renderer_output(self) -> None:
         engine = TfStride()
         scenarios = {
-            BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "baseline_report.md",
-            SAFE_FIXTURE_PATH: EXAMPLES_DIR / "safe_report.md",
-            FIXTURE_PATH: EXAMPLES_DIR / "sample_report.md",
-            NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "nightmare_report.md",
-            ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "alb_ec2_rds_report.md",
-            LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "lambda_deploy_role_report.md",
-            GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp_inventory_report.md",
+            BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_baseline_report.md",
+            SAFE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_safe_report.md",
+            FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_inventory_report.md",
+            NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_nightmare_report.md",
+            ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_alb_ec2_rds_report.md",
+            LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_lambda_deploy_role_report.md",
+            ECS_FARGATE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_ecs_fargate_report.md",
+            CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_cross_account_trust_unconstrained_report.md",
+            CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_cross_account_trust_constrained_report.md",
+            GCP_SAFE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_safe_report.md",
+            GCP_BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_baseline_report.md",
+            GCP_LB_COMPUTE_SQL_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_lb_compute_sql_report.md",
+            GCP_SERVERLESS_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_serverless_report.md",
+            GCP_CROSS_PROJECT_IAM_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_cross_project_iam_report.md",
+            GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_inventory_report.md",
+            GCP_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_nightmare_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():
@@ -224,34 +240,32 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 24)
-        self.assertEqual(payload["summary"]["unsupported_resources"], 0)
-        self.assertEqual(payload["summary"]["trust_boundaries"], 5)
-        self.assertEqual(payload["summary"]["active_findings"], 22)
-        self.assertEqual(payload["summary"]["severity_counts"], {"high": 8, "medium": 14, "low": 0})
-        self.assertEqual(payload["inventory"]["unsupported_resources"], [])
+        self.assertEqual(payload["summary"]["normalized_resources"], 22)
+        self.assertEqual(payload["summary"]["unsupported_resources"], 1)
+        self.assertEqual(payload["summary"]["trust_boundaries"], 4)
+        self.assertEqual(payload["summary"]["active_findings"], 16)
+        self.assertEqual(payload["summary"]["severity_counts"], {"high": 5, "medium": 11, "low": 0})
+        self.assertEqual(payload["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
         self.assertEqual(
             payload["inventory"]["metadata"]["supported_resource_types"],
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 24)
-        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 22)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 1)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
             [
                 "google_bigquery_dataset.analytics",
                 "google_bigquery_dataset_iam_binding.analytics_viewers",
                 "google_bigquery_table.events",
+                "google_compute_firewall.public_app",
                 "google_compute_firewall.public_ssh",
                 "google_compute_instance.web",
                 "google_compute_network.main",
+                "google_compute_route.default_internet",
                 "google_compute_subnetwork.app",
-                "google_container_cluster.app",
-                "google_container_node_pool.app",
-                "google_folder_iam_member.folder_admin",
                 "google_kms_crypto_key.customer",
                 "google_kms_crypto_key_iam_member.partner_decrypter",
-                "google_organization_iam_binding.domain_viewer",
                 "google_project_iam_member.web_viewer",
                 "google_pubsub_subscription.events",
                 "google_pubsub_topic.events",
@@ -265,7 +279,10 @@ class JsonReportTests(unittest.TestCase):
                 "google_storage_bucket_iam_member.public_logs_reader",
             ],
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resource_types"], {})
+        self.assertEqual(
+            payload["analysis_coverage"]["resources"]["unsupported_resource_types"],
+            {"google_logging_project_sink": 1},
+        )
         self.assertEqual(
             payload["trust_boundaries"][0]["identifier"],
             "internet-to-service:internet->google_compute_instance.web",
@@ -284,13 +301,7 @@ class JsonReportTests(unittest.TestCase):
                 "gcp-gcs-public-access",
                 "gcp-gcs-public-access-prevention-not-enforced",
                 "gcp-gcs-versioning-disabled",
-                "gcp-gke-public-control-plane",
-                "gcp-gke-broad-authorized-networks",
-                "gcp-gke-workload-identity-disabled",
-                "gcp-gke-legacy-metadata-endpoints-enabled",
-                "gcp-gke-broad-node-service-account",
-                "gcp-org-folder-iam-broad-principal",
-                "gcp-org-folder-iam-privileged-role",
+                "gcp-compute-os-login-disabled",
                 "gcp-sensitive-resource-iam-external-access",
                 "gcp-public-compute-broad-ingress",
                 "gcp-public-workload-sensitive-data-access",
@@ -306,7 +317,6 @@ class JsonReportTests(unittest.TestCase):
             {
                 None,
                 "internet-to-service:internet->google_compute_instance.web",
-                "internet-to-service:internet->google_container_cluster.app",
                 "internet-to-service:internet->google_sql_database_instance.app",
                 "internet-to-service:internet->google_storage_bucket.logs",
                 "workload-to-data-store:google_compute_instance.web->google_bigquery_dataset.analytics",

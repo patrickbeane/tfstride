@@ -1,0 +1,563 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "google_compute_network.main",
+          "mode": "managed",
+          "type": "google_compute_network",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-main",
+            "project": "tfstride-demo",
+            "auto_create_subnetworks": false,
+            "routing_mode": "REGIONAL"
+          }
+        },
+        {
+          "address": "google_compute_subnetwork.app",
+          "mode": "managed",
+          "type": "google_compute_subnetwork",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app",
+            "project": "tfstride-demo",
+            "region": "us-central1",
+            "network": "google_compute_network.main.id",
+            "ip_cidr_range": "10.10.1.0/24",
+            "private_ip_google_access": true
+          }
+        },
+        {
+          "address": "google_compute_route.default_internet",
+          "mode": "managed",
+          "type": "google_compute_route",
+          "name": "default_internet",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-default-internet",
+            "project": "tfstride-demo",
+            "network": "google_compute_network.main.id",
+            "dest_range": "0.0.0.0/0",
+            "next_hop_gateway": "default-internet-gateway",
+            "priority": 1000,
+            "tags": [
+              "web"
+            ]
+          }
+        },
+        {
+          "address": "google_compute_firewall.public_admin",
+          "mode": "managed",
+          "type": "google_compute_firewall",
+          "name": "public_admin",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-public-admin",
+            "project": "tfstride-demo",
+            "network": "google_compute_network.main.name",
+            "direction": "INGRESS",
+            "source_ranges": [
+              "0.0.0.0/0"
+            ],
+            "allow": [
+              {
+                "protocol": "tcp",
+                "ports": [
+                  "22",
+                  "3389"
+                ]
+              }
+            ],
+            "target_tags": [
+              "web"
+            ]
+          }
+        },
+        {
+          "address": "google_compute_firewall.public_all",
+          "mode": "managed",
+          "type": "google_compute_firewall",
+          "name": "public_all",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-public-all",
+            "project": "tfstride-demo",
+            "network": "google_compute_network.main.name",
+            "direction": "INGRESS",
+            "source_ranges": [
+              "0.0.0.0/0"
+            ],
+            "allow": [
+              {
+                "protocol": "tcp",
+                "ports": []
+              }
+            ],
+            "target_tags": [
+              "web"
+            ]
+          }
+        },
+        {
+          "address": "google_service_account.web",
+          "mode": "managed",
+          "type": "google_service_account",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "account_id": "tfstride-web",
+            "display_name": "tfSTRIDE web workload",
+            "description": "Service account used by the sample web workload.",
+            "project": "tfstride-demo",
+            "email": "tfstride-web@example.iam.gserviceaccount.com",
+            "member": "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com",
+            "unique_id": "100000000000000000001",
+            "disabled": false
+          }
+        },
+        {
+          "address": "google_service_account_key.web",
+          "mode": "managed",
+          "type": "google_service_account_key",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "service_account_id": "google_service_account.web.email",
+            "key_algorithm": "KEY_ALG_RSA_2048",
+            "public_key_type": "TYPE_X509_PEM_FILE",
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com/keys/sample-key",
+            "id": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com/keys/sample-key",
+            "valid_after": "2026-01-01T00:00:00Z",
+            "valid_before": "2027-01-01T00:00:00Z"
+          }
+        },
+        {
+          "address": "google_compute_instance.web",
+          "mode": "managed",
+          "type": "google_compute_instance",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google-beta",
+          "values": {
+            "name": "tfstride-web",
+            "project": "tfstride-demo",
+            "machine_type": "e2-medium",
+            "zone": "us-central1-a",
+            "tags": [
+              "web"
+            ],
+            "network_interface": [
+              {
+                "subnetwork": "google_compute_subnetwork.app.id",
+                "access_config": [
+                  {
+                    "nat_ip": "35.1.2.3"
+                  }
+                ]
+              }
+            ],
+            "service_account": [
+              {
+                "email": "tfstride-web@example.iam.gserviceaccount.com",
+                "scopes": [
+                  "cloud-platform"
+                ]
+              }
+            ],
+            "metadata": {
+              "enable-oslogin": "false"
+            }
+          }
+        },
+        {
+          "address": "google_container_cluster.app",
+          "mode": "managed",
+          "type": "google_container_cluster",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-gke",
+            "project": "tfstride-demo",
+            "location": "us-central1",
+            "network": "google_compute_network.main.id",
+            "subnetwork": "google_compute_subnetwork.app.id",
+            "endpoint": "35.4.5.6",
+            "remove_default_node_pool": true,
+            "private_cluster_config": [
+              {
+                "enable_private_endpoint": false,
+                "enable_private_nodes": false
+              }
+            ],
+            "master_authorized_networks_config": [
+              {
+                "cidr_blocks": [
+                  {
+                    "display_name": "anywhere",
+                    "cidr_block": "0.0.0.0/0"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "google_container_node_pool.app",
+          "mode": "managed",
+          "type": "google_container_node_pool",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-gke-app",
+            "project": "tfstride-demo",
+            "location": "us-central1",
+            "cluster": "google_container_cluster.app.name",
+            "node_config": [
+              {
+                "service_account": "123456789-compute@developer.gserviceaccount.com",
+                "oauth_scopes": [
+                  "https://www.googleapis.com/auth/cloud-platform"
+                ],
+                "metadata": {
+                  "disable-legacy-endpoints": "false"
+                },
+                "workload_metadata_config": [
+                  {
+                    "mode": "GCE_METADATA"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "google_sql_database_instance.app",
+          "mode": "managed",
+          "type": "google_sql_database_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app-db",
+            "database_version": "POSTGRES_15",
+            "region": "us-central1",
+            "project": "tfstride-demo",
+            "settings": [
+              {
+                "tier": "db-f1-micro",
+                "availability_type": "ZONAL",
+                "disk_size": 20,
+                "disk_type": "PD_SSD",
+                "backup_configuration": [
+                  {
+                    "enabled": false,
+                    "point_in_time_recovery_enabled": false
+                  }
+                ],
+                "ip_configuration": [
+                  {
+                    "ipv4_enabled": true,
+                    "require_ssl": false,
+                    "authorized_networks": [
+                      {
+                        "name": "anywhere",
+                        "value": "0.0.0.0/0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "deletion_protection": false
+          }
+        },
+        {
+          "address": "google_storage_bucket.logs",
+          "mode": "managed",
+          "type": "google_storage_bucket",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-logs",
+            "project": "tfstride-demo",
+            "location": "US",
+            "uniform_bucket_level_access": true
+          }
+        },
+        {
+          "address": "google_storage_bucket_iam_member.public_logs_reader",
+          "mode": "managed",
+          "type": "google_storage_bucket_iam_member",
+          "name": "public_logs_reader",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "bucket": "google_storage_bucket.logs.name",
+            "role": "roles/storage.objectViewer",
+            "member": "allUsers"
+          }
+        },
+        {
+          "address": "google_secret_manager_secret.api_key",
+          "mode": "managed",
+          "type": "google_secret_manager_secret",
+          "name": "api_key",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "secret_id": "tfstride-api-key",
+            "name": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "id": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "project": "tfstride-demo",
+            "replication": [
+              {
+                "auto": [
+                  {}
+                ]
+              }
+            ],
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_secret_manager_secret_iam_member.public_accessor",
+          "mode": "managed",
+          "type": "google_secret_manager_secret_iam_member",
+          "name": "public_accessor",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "project": "tfstride-demo",
+            "secret_id": "google_secret_manager_secret.api_key.id",
+            "role": "roles/secretmanager.secretAccessor",
+            "member": "allAuthenticatedUsers"
+          }
+        },
+        {
+          "address": "google_kms_crypto_key.customer",
+          "mode": "managed",
+          "type": "google_kms_crypto_key",
+          "name": "customer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-customer-key",
+            "id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
+            "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+            "purpose": "ENCRYPT_DECRYPT",
+            "rotation_period": "7776000s",
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_kms_crypto_key_iam_member.partner_decrypter",
+          "mode": "managed",
+          "type": "google_kms_crypto_key_iam_member",
+          "name": "partner_decrypter",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "crypto_key_id": "google_kms_crypto_key.customer.id",
+            "role": "roles/cloudkms.cryptoKeyDecrypter",
+            "member": "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com"
+          }
+        },
+        {
+          "address": "google_pubsub_topic.events",
+          "mode": "managed",
+          "type": "google_pubsub_topic",
+          "name": "events",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-events",
+            "project": "tfstride-demo",
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_pubsub_subscription.events",
+          "mode": "managed",
+          "type": "google_pubsub_subscription",
+          "name": "events",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-events-sub",
+            "topic": "google_pubsub_topic.events.id",
+            "project": "tfstride-demo",
+            "ack_deadline_seconds": 20
+          }
+        },
+        {
+          "address": "google_pubsub_topic_iam_member.public_publisher",
+          "mode": "managed",
+          "type": "google_pubsub_topic_iam_member",
+          "name": "public_publisher",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "topic": "google_pubsub_topic.events.name",
+            "role": "roles/pubsub.publisher",
+            "member": "allAuthenticatedUsers"
+          }
+        },
+        {
+          "address": "google_bigquery_dataset.analytics",
+          "mode": "managed",
+          "type": "google_bigquery_dataset",
+          "name": "analytics",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "dataset_id": "tfstride_analytics",
+            "project": "tfstride-demo",
+            "location": "US",
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_bigquery_table.events",
+          "mode": "managed",
+          "type": "google_bigquery_table",
+          "name": "events",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+            "table_id": "events",
+            "project": "tfstride-demo",
+            "deletion_protection": true
+          }
+        },
+        {
+          "address": "google_bigquery_dataset_iam_binding.analytics_viewers",
+          "mode": "managed",
+          "type": "google_bigquery_dataset_iam_binding",
+          "name": "analytics_viewers",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+            "role": "roles/bigquery.dataViewer",
+            "members": [
+              "allUsers",
+              "serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
+            ]
+          }
+        },
+        {
+          "address": "google_organization_iam_binding.domain_viewer",
+          "mode": "managed",
+          "type": "google_organization_iam_binding",
+          "name": "domain_viewer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "org_id": "1234567890",
+            "role": "roles/viewer",
+            "members": [
+              "domain:example.com"
+            ]
+          }
+        },
+        {
+          "address": "google_folder_iam_member.folder_admin",
+          "mode": "managed",
+          "type": "google_folder_iam_member",
+          "name": "folder_admin",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "folder": "folders/12345",
+            "role": "roles/resourcemanager.folderAdmin",
+            "member": "group:folder-admins@example.com"
+          }
+        },
+        {
+          "address": "google_project_iam_member.public_owner",
+          "mode": "managed",
+          "type": "google_project_iam_member",
+          "name": "public_owner",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "project": "tfstride-demo",
+            "role": "roles/owner",
+            "member": "allUsers"
+          }
+        },
+        {
+          "address": "google_cloud_run_v2_service.api",
+          "mode": "managed",
+          "type": "google_cloud_run_v2_service",
+          "name": "api",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-api",
+            "project": "tfstride-demo",
+            "location": "us-central1",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "uri": "https://tfstride-api.run.app",
+            "template": [
+              {
+                "service_account": "tfstride-run@tfstride-demo.iam.gserviceaccount.com"
+              }
+            ]
+          }
+        },
+        {
+          "address": "google_cloud_run_v2_service_iam_member.public_invoker",
+          "mode": "managed",
+          "type": "google_cloud_run_v2_service_iam_member",
+          "name": "public_invoker",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-api",
+            "location": "us-central1",
+            "role": "roles/run.invoker",
+            "member": "allUsers"
+          }
+        },
+        {
+          "address": "google_cloudfunctions_function.worker",
+          "mode": "managed",
+          "type": "google_cloudfunctions_function",
+          "name": "worker",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-worker",
+            "project": "tfstride-demo",
+            "region": "us-central1",
+            "runtime": "python312",
+            "trigger_http": true,
+            "service_account_email": "tfstride-fn@tfstride-demo.iam.gserviceaccount.com"
+          }
+        },
+        {
+          "address": "google_cloudfunctions_function_iam_member.public_invoker",
+          "mode": "managed",
+          "type": "google_cloudfunctions_function_iam_member",
+          "name": "public_invoker",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "cloud_function": "tfstride-worker",
+            "region": "us-central1",
+            "role": "roles/cloudfunctions.invoker",
+            "member": "allAuthenticatedUsers"
+          }
+        },
+        {
+          "address": "google_logging_project_sink.processor",
+          "mode": "managed",
+          "type": "google_logging_project_sink",
+          "name": "processor",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "processor-logs",
+            "project": "tfstride-demo",
+            "destination": "storage.googleapis.com/tfstride-logs"
+          }
+        }
+      ]
+    }
+  }
+}

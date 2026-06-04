@@ -172,16 +172,16 @@
           "values": {
             "id": "sg-safe-lb-001",
             "name": "safe-lb-sg",
-            "description": "Internal load balancer ingress only",
+            "description": "Public load balancer ingress only",
             "vpc_id": "vpc-safe-001",
             "ingress": [
               {
-                "description": "HTTPS from internal clients",
+                "description": "HTTPS from internet",
                 "from_port": 443,
                 "to_port": 443,
                 "protocol": "tcp",
                 "cidr_blocks": [
-                  "10.10.0.0/16"
+                  "0.0.0.0/0"
                 ],
                 "ipv6_cidr_blocks": [],
                 "security_groups": []
@@ -301,13 +301,13 @@
             "id": "alb-safe-001",
             "arn": "arn:aws:elasticloadbalancing:us-east-1:222233334444:loadbalancer/app/safe-web/123456",
             "name": "safe-web",
-            "internal": true,
+            "internal": false,
             "load_balancer_type": "application",
             "security_groups": [
               "sg-safe-lb-001"
             ],
             "subnets": [
-              "subnet-safe-private-app-001"
+              "subnet-safe-public-001"
             ]
           }
         },
@@ -429,7 +429,7 @@
             "id": "safe-observability",
             "name": "safe-observability",
             "arn": "arn:aws:iam::222233334444:policy/safe-observability",
-            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Resource\":[\"arn:aws:logs:us-east-1:222233334444:log-group:/aws/lambda/safe-processor:*\",\"arn:aws:logs:us-east-1:222233334444:log-group:/aws/ec2/safe-app:*\"]}]}"
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"logs:*\"],\"Resource\":\"*\"}]}"
           }
         },
         {

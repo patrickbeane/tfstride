@@ -28,7 +28,7 @@ from tfstride.providers.catalog import (
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
-FIXTURE_PATH = FIXTURES_DIR / "sample_aws_plan.json"
+FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 
 
 class ProviderCatalogTests(unittest.TestCase):

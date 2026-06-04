@@ -2,28 +2,30 @@
 
 - Analyzed file: `sample_gcp_plan.json`
 - Provider: `gcp`
-- Normalized resources: `24`
-- Unsupported resources: `0`
+- Normalized resources: `22`
+- Unsupported resources: `1`
 
 ## Summary
 
-This run identified **5 trust boundaries** and **22 findings** across **24 normalized resources**.
+This run identified **4 trust boundaries** and **16 findings** across **22 normalized resources**.
 
-- High severity findings: `8`
-- Medium severity findings: `14`
+- High severity findings: `5`
+- Medium severity findings: `11`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
-- Terraform resources seen: `24`
-- Provider resources considered: `24`
-- Normalized resources: `24`
-- Unsupported resources: `0`
+- Terraform resources seen: `23`
+- Provider resources considered: `23`
+- Normalized resources: `22`
+- Unsupported resources: `1`
 - Registered rules: `43`
 - Enabled rules: `43`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
+- Unsupported resource types:
+  - `google_logging_project_sink`: `1`
 - Findings by rule:
   - `gcp-sensitive-resource-iam-external-access`: `2`
   - `gcp-pubsub-public-access`: `1`
@@ -39,13 +41,7 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
   - `gcp-gcs-versioning-disabled`: `1`
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
-  - `gcp-gke-public-control-plane`: `1`
-  - `gcp-gke-broad-authorized-networks`: `1`
-  - `gcp-gke-workload-identity-disabled`: `1`
-  - `gcp-gke-legacy-metadata-endpoints-enabled`: `1`
-  - `gcp-gke-broad-node-service-account`: `1`
-  - `gcp-org-folder-iam-broad-principal`: `1`
-  - `gcp-org-folder-iam-privileged-role`: `1`
+  - `gcp-compute-os-login-disabled`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -54,13 +50,6 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
 - Source: `internet`
 - Target: `google_compute_instance.web`
 - Description: Traffic can cross from the public internet to google_compute_instance.web.
-- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
-
-### `internet-to-service`
-
-- Source: `internet`
-- Target: `google_container_cluster.app`
-- Description: Traffic can cross from the public internet to google_container_cluster.app.
 - Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
 
 ### `internet-to-service`
@@ -112,45 +101,6 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
 - Evidence:
   - authorized networks: anywhere (0.0.0.0/0)
   - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
-
-#### GCP organization or folder IAM grants a high-privilege role
-
-- STRIDE category: Elevation of Privilege
-- Affected resources: `google_folder_iam_member.folder_admin`
-- Trust boundary: `not-applicable`
-- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
-- Rationale: google_folder_iam_member.folder_admin grants the high-impact GCP role `roles/resourcemanager.folderAdmin` to `group:folder-admins@example.com` at folder scope `folders/12345`. That role enables folder hierarchy administration across a high-level resource boundary and can materially expand blast radius if the principal is compromised.
-- Recommended mitigation: Replace high-impact organization and folder roles with narrowly scoped custom or predefined roles, assign them only to controlled break-glass or platform groups, and review descendant project blast radius.
-- Evidence:
-  - iam binding: member=group:folder-admins@example.com; role=roles/resourcemanager.folderAdmin
-  - scope: folder scope `folders/12345`
-  - role risk: folder hierarchy administration
-
-#### GCP organization or folder IAM grants access to broad principals
-
-- STRIDE category: Elevation of Privilege
-- Affected resources: `google_organization_iam_binding.domain_viewer`
-- Trust boundary: `not-applicable`
-- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
-- Rationale: google_organization_iam_binding.domain_viewer grants `roles/viewer` to `domain:example.com` at organization scope `1234567890`. Public or broad-domain principals at organization or folder scope can expand access across many descendant projects and workloads.
-- Recommended mitigation: Remove public and broad-domain principals from organization and folder IAM, grant high-level access only to tightly controlled groups, and prefer project- or resource-scoped bindings where possible.
-- Evidence:
-  - iam binding: member=domain:example.com; role=roles/viewer
-  - scope: organization scope `1234567890`
-  - trust scope: member grants a whole Google Workspace domain
-
-#### GKE node pool uses broad node identity settings
-
-- STRIDE category: Elevation of Privilege
-- Affected resources: `google_container_node_pool.app`
-- Trust boundary: `not-applicable`
-- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
-- Rationale: google_container_node_pool.app uses broad GKE node identity settings. Default or broadly scoped node service accounts can turn a node or pod compromise into wider GCP API access.
-- Recommended mitigation: Attach a dedicated least-privilege node service account, remove cloud-platform or full-control OAuth scopes, and shift workload permissions to Workload Identity bindings.
-- Evidence:
-  - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
-  - node service account: 123456789-compute@developer.gserviceaccount.com
-  - oauth scopes: https://www.googleapis.com/auth/cloud-platform
 
 #### Internet-exposed GCP workload can access sensitive data services
 
@@ -241,6 +191,18 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
 - Evidence:
   - ssl posture: require_ssl is false; ssl_mode is unset; ipv4_enabled is true
 
+#### GCP compute instance disables OS Login
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_compute_instance.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: google_compute_instance.web explicitly disables OS Login. SSH access can therefore fall back to instance or project metadata keys instead of centralized IAM-backed login and audit controls.
+- Recommended mitigation: Enable OS Login on GCE instances and manage SSH access through IAM roles, two-factor enforcement, and centralized audit logs instead of metadata SSH keys.
+- Evidence:
+  - os login posture: metadata.enable-oslogin is false
+  - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
 #### GCS bucket does not enforce Public Access Prevention
 
 - STRIDE category: Information Disclosure
@@ -286,54 +248,6 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
 - Evidence:
   - data protection posture: versioning.enabled is false; data_sensitivity is sensitive
 
-#### GKE cluster does not enable Workload Identity
-
-- STRIDE category: Elevation of Privilege
-- Affected resources: `google_container_cluster.app`
-- Trust boundary: `not-applicable`
-- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 5 => medium
-- Rationale: google_container_cluster.app does not enable GKE Workload Identity. Pods are more likely to depend on node service-account credentials, which weakens workload-level identity boundaries and can expand blast radius after pod compromise.
-- Recommended mitigation: Enable GKE Workload Identity, bind Kubernetes service accounts to narrow Google service accounts, and avoid relying on node service-account credentials for pod-level cloud API access.
-- Evidence:
-  - workload identity posture: workload_identity_enabled is false; workload_pool is unset
-
-#### GKE cluster exposes a public control plane
-
-- STRIDE category: Spoofing
-- Affected resources: `google_container_cluster.app`
-- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
-- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
-- Rationale: google_container_cluster.app exposes a public GKE control-plane endpoint. Public API server reachability increases dependence on IAM, Kubernetes RBAC, and authorized network configuration to protect cluster administration.
-- Recommended mitigation: Use private GKE control-plane endpoints where possible, or restrict master authorized networks to narrow administrator CIDRs and enforce IAM plus Kubernetes RBAC for cluster administration.
-- Evidence:
-  - control plane endpoint: 35.4.5.6
-  - public access reasons: GKE control plane endpoint is public
-  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
-
-#### GKE control plane allows broad authorized networks
-
-- STRIDE category: Spoofing
-- Affected resources: `google_container_cluster.app`
-- Trust boundary: `internet-to-service:internet->google_container_cluster.app`
-- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 5 => medium
-- Rationale: google_container_cluster.app exposes the GKE control plane without narrow master authorized networks. Internet-wide or unset CIDR controls leave the Kubernetes API server reachable from untrusted client networks.
-- Recommended mitigation: Configure GKE master authorized networks with narrow trusted CIDRs, avoid internet-wide ranges, and prefer private control-plane access for administrative paths.
-- Evidence:
-  - authorized networks: anywhere (0.0.0.0/0)
-  - configured authorized network count: 1
-  - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
-
-#### GKE node metadata exposure is not hardened
-
-- STRIDE category: Elevation of Privilege
-- Affected resources: `google_container_node_pool.app`
-- Trust boundary: `not-applicable`
-- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 3 => medium
-- Rationale: google_container_node_pool.app allows legacy or broad node metadata exposure. Workloads on the node may be able to reach metadata credentials outside the intended GKE metadata server controls.
-- Recommended mitigation: Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, and prevent pods from reaching broad node credentials.
-- Evidence:
-  - node metadata posture: legacy metadata endpoints are enabled; metadata mode is GCE_METADATA
-
 #### Internet-exposed GCP compute instance permits broad ingress
 
 - STRIDE category: Spoofing
@@ -345,7 +259,7 @@ This run identified **5 trust boundaries** and **22 findings** across **24 norma
 - Evidence:
   - firewall rules: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0
   - network tags: web
-  - internet ingress reasons: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0
+  - internet ingress reasons: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
 
 #### Sensitive GCP resource IAM binding allows broad or external access
@@ -369,3 +283,4 @@ No findings in this severity band.
 
 - GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection for compute and serverless workloads, with limited GCP STRIDE rule coverage for compute, GCS posture, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
+- Unsupported resource skipped: `google_logging_project_sink.processor`

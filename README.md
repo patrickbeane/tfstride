@@ -32,14 +32,14 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 Run directly from source:
 
 ```bash
-PYTHONPATH=src python3 -m tfstride fixtures/sample_aws_plan.json
+PYTHONPATH=src python3 -m tfstride fixtures/aws/sample_aws_plan.json
 ```
 
 Install the CLI locally:
 
 ```bash
 python3 -m pip install -e .
-tfstride fixtures/sample_aws_plan.json --output threat-model.md
+tfstride fixtures/aws/sample_aws_plan.json --output threat-model.md
 ```
 
 Generate a Terraform plan JSON from an infrastructure repo:
@@ -203,10 +203,16 @@ The repo includes several ready-to-run Terraform plan fixtures:
 - `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
 - `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
 - `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_gcp_plan.json`: Google provider smoke fixture that auto-selects GCP and normalizes the compute, GKE, network, IAM, Pub/Sub, BigQuery, Cloud SQL, Secret Manager, Cloud KMS, and storage inventory set
 - `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
 - `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
 - `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
+- `sample_gcp_safe_plan.json`: private-by-default GCP reference with hardened GCS, private Cloud SQL, scoped service account access, Secret Manager, and Cloud KMS
+- `sample_gcp_baseline_plan.json`: mostly segmented GCP baseline with a custom-role IAM concern and Cloud SQL recovery hygiene finding
+- `sample_gcp_lb_compute_sql_plan.json`: external load-balancing edge, private compute, NAT egress posture, and private Cloud SQL without active findings
+- `sample_gcp_serverless_plan.json`: Cloud Run and Cloud Functions public invoker paths with serverless service-account access to Secret Manager
+- `sample_gcp_cross_project_iam_plan.json`: focused cross-project IAM blast-radius fixture for project, Secret Manager, and Cloud KMS grants
+- `sample_gcp_plan.json`: mixed GCP inventory fixture covering compute, network, IAM, Pub/Sub, BigQuery, Cloud SQL, Secret Manager, Cloud KMS, GCS, and one unsupported resource callout
+- `sample_gcp_nightmare_plan.json`: deliberately broken GCP environment with stacked compute, GKE, serverless, data, org/folder/project IAM, and unsupported-resource coverage
 
 ## Architecture
 
@@ -412,24 +418,43 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 ```text
 .
 ├── fixtures/
-│   ├── sample_aws_alb_ec2_rds_plan.json
-│   ├── sample_aws_baseline_plan.json
-│   ├── sample_aws_cross_account_trust_constrained_plan.json
-│   ├── sample_aws_cross_account_trust_unconstrained_plan.json
-│   ├── sample_aws_ecs_fargate_plan.json
-│   ├── sample_aws_lambda_deploy_role_plan.json
-│   ├── sample_aws_nightmare_plan.json
-│   ├── sample_aws_plan.json
-│   ├── sample_aws_safe_plan.json
-│   └── sample_gcp_plan.json
+│   ├── aws/
+│   │   ├── sample_aws_alb_ec2_rds_plan.json
+│   │   ├── sample_aws_baseline_plan.json
+│   │   ├── sample_aws_cross_account_trust_constrained_plan.json
+│   │   ├── sample_aws_cross_account_trust_unconstrained_plan.json
+│   │   ├── sample_aws_ecs_fargate_plan.json
+│   │   ├── sample_aws_lambda_deploy_role_plan.json
+│   │   ├── sample_aws_nightmare_plan.json
+│   │   ├── sample_aws_plan.json
+│   │   └── sample_aws_safe_plan.json
+│   └── gcp/
+│       ├── sample_gcp_baseline_plan.json
+│       ├── sample_gcp_cross_project_iam_plan.json
+│       ├── sample_gcp_lb_compute_sql_plan.json
+│       ├── sample_gcp_nightmare_plan.json
+│       ├── sample_gcp_plan.json
+│       ├── sample_gcp_safe_plan.json
+│       └── sample_gcp_serverless_plan.json
 ├── examples/
-│   ├── alb_ec2_rds_report.md
-│   ├── baseline_report.md
-│   ├── gcp_inventory_report.md
-│   ├── lambda_deploy_role_report.md
-│   ├── nightmare_report.md
-│   ├── sample_report.md
-│   └── safe_report.md
+│   ├── aws/
+│   │   ├── aws_alb_ec2_rds_report.md
+│   │   ├── aws_baseline_report.md
+│   │   ├── aws_cross_account_trust_constrained_report.md
+│   │   ├── aws_cross_account_trust_unconstrained_report.md
+│   │   ├── aws_ecs_fargate_report.md
+│   │   ├── aws_inventory_report.md
+│   │   ├── aws_lambda_deploy_role_report.md
+│   │   ├── aws_nightmare_report.md
+│   │   └── aws_safe_report.md
+│   └── gcp/
+│       ├── gcp_baseline_report.md
+│       ├── gcp_cross_project_iam_report.md
+│       ├── gcp_inventory_report.md
+│       ├── gcp_lb_compute_sql_report.md
+│       ├── gcp_nightmare_report.md
+│       ├── gcp_safe_report.md
+│       └── gcp_serverless_report.md
 ├── apps/
 │   └── dashboard/
 │       ├── api_models.py
@@ -506,35 +531,56 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 ### AWS
 
 - Safe:
-  [`fixtures/sample_aws_safe_plan.json`](fixtures/sample_aws_safe_plan.json),
-  [`examples/safe_report.md`](examples/safe_report.md)
+  [`fixtures/aws/sample_aws_safe_plan.json`](fixtures/aws/sample_aws_safe_plan.json),
+  [`examples/aws/aws_safe_report.md`](examples/aws/aws_safe_report.md)
 - Baseline:
-  [`fixtures/sample_aws_baseline_plan.json`](fixtures/sample_aws_baseline_plan.json),
-  [`examples/baseline_report.md`](examples/baseline_report.md)
+  [`fixtures/aws/sample_aws_baseline_plan.json`](fixtures/aws/sample_aws_baseline_plan.json),
+  [`examples/aws/aws_baseline_report.md`](examples/aws/aws_baseline_report.md)
 - Realistic ALB / EC2 / RDS:
-  [`fixtures/sample_aws_alb_ec2_rds_plan.json`](fixtures/sample_aws_alb_ec2_rds_plan.json),
-  [`examples/alb_ec2_rds_report.md`](examples/alb_ec2_rds_report.md)
+  [`fixtures/aws/sample_aws_alb_ec2_rds_plan.json`](fixtures/aws/sample_aws_alb_ec2_rds_plan.json),
+  [`examples/aws/aws_alb_ec2_rds_report.md`](examples/aws/aws_alb_ec2_rds_report.md)
 - ECS / Fargate:
-  [`fixtures/sample_aws_ecs_fargate_plan.json`](fixtures/sample_aws_ecs_fargate_plan.json)
+  [`fixtures/aws/sample_aws_ecs_fargate_plan.json`](fixtures/aws/sample_aws_ecs_fargate_plan.json),
+  [`examples/aws/aws_ecs_fargate_report.md`](examples/aws/aws_ecs_fargate_report.md)
 - Cross-account trust, unconstrained:
-  [`fixtures/sample_aws_cross_account_trust_unconstrained_plan.json`](fixtures/sample_aws_cross_account_trust_unconstrained_plan.json)
+  [`fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json`](fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json),
+  [`examples/aws/aws_cross_account_trust_unconstrained_report.md`](examples/aws/aws_cross_account_trust_unconstrained_report.md)
 - Cross-account trust, narrowed:
-  [`fixtures/sample_aws_cross_account_trust_constrained_plan.json`](fixtures/sample_aws_cross_account_trust_constrained_plan.json)
+  [`fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json`](fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json),
+  [`examples/aws/aws_cross_account_trust_constrained_report.md`](examples/aws/aws_cross_account_trust_constrained_report.md)
 - Lambda deploy-role:
-  [`fixtures/sample_aws_lambda_deploy_role_plan.json`](fixtures/sample_aws_lambda_deploy_role_plan.json),
-  [`examples/lambda_deploy_role_report.md`](examples/lambda_deploy_role_report.md)
+  [`fixtures/aws/sample_aws_lambda_deploy_role_plan.json`](fixtures/aws/sample_aws_lambda_deploy_role_plan.json),
+  [`examples/aws/aws_lambda_deploy_role_report.md`](examples/aws/aws_lambda_deploy_role_report.md)
 - Mixed:
-  [`fixtures/sample_aws_plan.json`](fixtures/sample_aws_plan.json),
-  [`examples/sample_report.md`](examples/sample_report.md)
+  [`fixtures/aws/sample_aws_plan.json`](fixtures/aws/sample_aws_plan.json),
+  [`examples/aws/aws_inventory_report.md`](examples/aws/aws_inventory_report.md)
 - Nightmare:
-  [`fixtures/sample_aws_nightmare_plan.json`](fixtures/sample_aws_nightmare_plan.json),
-  [`examples/nightmare_report.md`](examples/nightmare_report.md)
+  [`fixtures/aws/sample_aws_nightmare_plan.json`](fixtures/aws/sample_aws_nightmare_plan.json),
+  [`examples/aws/aws_nightmare_report.md`](examples/aws/aws_nightmare_report.md)
 
 ### GCP
 
-- Inventory with GKE:
-  [`fixtures/sample_gcp_plan.json`](fixtures/sample_gcp_plan.json),
-  [`examples/gcp_inventory_report.md`](examples/gcp_inventory_report.md)
+- Safe:
+  [`fixtures/gcp/sample_gcp_safe_plan.json`](fixtures/gcp/sample_gcp_safe_plan.json),
+  [`examples/gcp/gcp_safe_report.md`](examples/gcp/gcp_safe_report.md)
+- Baseline:
+  [`fixtures/gcp/sample_gcp_baseline_plan.json`](fixtures/gcp/sample_gcp_baseline_plan.json),
+  [`examples/gcp/gcp_baseline_report.md`](examples/gcp/gcp_baseline_report.md)
+- Load balancer / compute / Cloud SQL:
+  [`fixtures/gcp/sample_gcp_lb_compute_sql_plan.json`](fixtures/gcp/sample_gcp_lb_compute_sql_plan.json),
+  [`examples/gcp/gcp_lb_compute_sql_report.md`](examples/gcp/gcp_lb_compute_sql_report.md)
+- Serverless:
+  [`fixtures/gcp/sample_gcp_serverless_plan.json`](fixtures/gcp/sample_gcp_serverless_plan.json),
+  [`examples/gcp/gcp_serverless_report.md`](examples/gcp/gcp_serverless_report.md)
+- Cross-project IAM:
+  [`fixtures/gcp/sample_gcp_cross_project_iam_plan.json`](fixtures/gcp/sample_gcp_cross_project_iam_plan.json),
+  [`examples/gcp/gcp_cross_project_iam_report.md`](examples/gcp/gcp_cross_project_iam_report.md)
+- Mixed inventory:
+  [`fixtures/gcp/sample_gcp_plan.json`](fixtures/gcp/sample_gcp_plan.json),
+  [`examples/gcp/gcp_inventory_report.md`](examples/gcp/gcp_inventory_report.md)
+- Nightmare:
+  [`fixtures/gcp/sample_gcp_nightmare_plan.json`](fixtures/gcp/sample_gcp_nightmare_plan.json),
+  [`examples/gcp/gcp_nightmare_report.md`](examples/gcp/gcp_nightmare_report.md)
 
 ## Testing
 

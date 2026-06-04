@@ -18,7 +18,7 @@ from tfstride.reporting.report_contract import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
+FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 REPORT_SCHEMA_PATH = GOLDEN_DIR / "sample_aws_report_schema.json"
 REPORT_SNAPSHOT_PATH = GOLDEN_DIR / "sample_aws_report_snapshot.json"

@@ -1,0 +1,188 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "google_compute_network.main",
+          "mode": "managed",
+          "type": "google_compute_network",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-main",
+            "project": "tfstride-demo",
+            "auto_create_subnetworks": false,
+            "routing_mode": "REGIONAL"
+          }
+        },
+        {
+          "address": "google_compute_subnetwork.app",
+          "mode": "managed",
+          "type": "google_compute_subnetwork",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app",
+            "project": "tfstride-demo",
+            "region": "us-central1",
+            "network": "google_compute_network.main.id",
+            "ip_cidr_range": "10.10.1.0/24",
+            "private_ip_google_access": true
+          }
+        },
+        {
+          "address": "google_service_account.web",
+          "mode": "managed",
+          "type": "google_service_account",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "account_id": "tfstride-web",
+            "display_name": "tfSTRIDE web workload",
+            "description": "Service account used by the sample web workload.",
+            "project": "tfstride-demo",
+            "email": "tfstride-web@example.iam.gserviceaccount.com",
+            "member": "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-web@example.iam.gserviceaccount.com",
+            "unique_id": "100000000000000000001",
+            "disabled": false
+          }
+        },
+        {
+          "address": "google_compute_instance.web",
+          "mode": "managed",
+          "type": "google_compute_instance",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/google-beta",
+          "values": {
+            "name": "tfstride-web",
+            "project": "tfstride-demo",
+            "machine_type": "e2-medium",
+            "zone": "us-central1-a",
+            "tags": [
+              "web"
+            ],
+            "network_interface": [
+              {
+                "subnetwork": "google_compute_subnetwork.app.id"
+              }
+            ],
+            "service_account": [
+              {
+                "email": "tfstride-web@example.iam.gserviceaccount.com",
+                "scopes": [
+                  "https://www.googleapis.com/auth/logging.write"
+                ]
+              }
+            ],
+            "metadata": {
+              "enable-oslogin": "true"
+            }
+          }
+        },
+        {
+          "address": "google_sql_database_instance.app",
+          "mode": "managed",
+          "type": "google_sql_database_instance",
+          "name": "app",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-app-db",
+            "database_version": "POSTGRES_15",
+            "region": "us-central1",
+            "project": "tfstride-demo",
+            "settings": [
+              {
+                "tier": "db-f1-micro",
+                "availability_type": "ZONAL",
+                "disk_size": 20,
+                "disk_type": "PD_SSD",
+                "backup_configuration": [
+                  {
+                    "enabled": true,
+                    "point_in_time_recovery_enabled": true
+                  }
+                ],
+                "ip_configuration": [
+                  {
+                    "ipv4_enabled": false,
+                    "require_ssl": true,
+                    "authorized_networks": [],
+                    "private_network": "google_compute_network.main.id"
+                  }
+                ]
+              }
+            ],
+            "deletion_protection": true
+          }
+        },
+        {
+          "address": "google_storage_bucket.logs",
+          "mode": "managed",
+          "type": "google_storage_bucket",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-logs",
+            "project": "tfstride-demo",
+            "location": "US",
+            "uniform_bucket_level_access": true,
+            "public_access_prevention": "enforced",
+            "versioning": [
+              {
+                "enabled": true
+              }
+            ],
+            "encryption": [
+              {
+                "default_kms_key_name": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-gcs"
+              }
+            ]
+          }
+        },
+        {
+          "address": "google_secret_manager_secret.api_key",
+          "mode": "managed",
+          "type": "google_secret_manager_secret",
+          "name": "api_key",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "secret_id": "tfstride-api-key",
+            "name": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "id": "projects/tfstride-demo/secrets/tfstride-api-key",
+            "project": "tfstride-demo",
+            "replication": [
+              {
+                "auto": [
+                  {}
+                ]
+              }
+            ],
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        },
+        {
+          "address": "google_kms_crypto_key.customer",
+          "mode": "managed",
+          "type": "google_kms_crypto_key",
+          "name": "customer",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "name": "tfstride-customer-key",
+            "id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
+            "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+            "purpose": "ENCRYPT_DECRYPT",
+            "rotation_period": "7776000s",
+            "labels": {
+              "app": "tfstride"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

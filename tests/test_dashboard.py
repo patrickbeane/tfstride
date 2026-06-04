@@ -21,12 +21,12 @@ if FASTAPI_DEPS_AVAILABLE:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_baseline_plan.json"
-ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_ecs_fargate_plan.json"
-FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_plan.json"
-GCP_FIXTURE_PATH = ROOT / "fixtures" / "sample_gcp_plan.json"
-SAFE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_safe_plan.json"
-NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "sample_aws_nightmare_plan.json"
+BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
+ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_ecs_fargate_plan.json"
+FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
+GCP_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_plan.json"
+SAFE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_safe_plan.json"
+NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_nightmare_plan.json"
 
 
 @unittest.skipUnless(FASTAPI_DEPS_AVAILABLE, "dashboard dependencies are not installed")

@@ -1,0 +1,77 @@
+# tfSTRIDE Threat Model Report
+
+- Analyzed file: `sample_gcp_baseline_plan.json`
+- Provider: `gcp`
+- Normalized resources: `8`
+- Unsupported resources: `0`
+
+## Summary
+
+This run identified **1 trust boundaries** and **2 findings** across **8 normalized resources**.
+
+- High severity findings: `1`
+- Medium severity findings: `1`
+- Low severity findings: `0`
+
+## Analysis Coverage
+
+- Terraform resources seen: `8`
+- Provider resources considered: `8`
+- Normalized resources: `8`
+- Unsupported resources: `0`
+- Registered rules: `43`
+- Enabled rules: `43`
+- Disabled rules: `0`
+- Severity overrides: `0`
+- Unresolved in-plan references: `0`
+- Findings by rule:
+  - `gcp-cloud-sql-point-in-time-recovery-disabled`: `1`
+  - `gcp-project-iam-privileged-role`: `1`
+
+## Discovered Trust Boundaries
+
+### `workload-to-data-store`
+
+- Source: `google_compute_instance.web`
+- Target: `google_sql_database_instance.app`
+- Description: google_compute_instance.web can interact with google_sql_database_instance.app.
+- Rationale: Application or function workloads cross into a higher-sensitivity data plane when they share a VPC with the database and the plan does not provide tighter security-group evidence.
+
+## Findings
+
+### High
+
+#### GCP project IAM binding grants a high-privilege role
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.deploy_admin`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +2, final_score 6 => high
+- Rationale: google_project_iam_member.deploy_admin grants the high-impact GCP role `projects/tfstride-demo/roles/deployAdmin` to `group:deploy@example.com` at project scope. That role enables custom role includes high-impact permissions: iam.serviceAccounts.actAs and can materially expand control-plane blast radius if the principal is compromised or mis-scoped.
+- Recommended mitigation: Replace Owner, Editor, IAM admin, service-account impersonation, and admin-class project roles with narrowly scoped predefined or custom roles assigned to specific groups or service accounts.
+- Evidence:
+  - iam binding: member=group:deploy@example.com; role=projects/tfstride-demo/roles/deployAdmin
+  - role risk: custom role includes high-impact permissions: iam.serviceAccounts.actAs
+  - custom role permissions: iam.serviceAccounts.actAs
+
+### Medium
+
+#### Cloud SQL point-in-time recovery is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app has automated backups enabled but point-in-time recovery disabled. That narrows recovery options after accidental writes, destructive migrations, or credential misuse.
+- Recommended mitigation: Enable point-in-time recovery for Cloud SQL engines that support it, tune retention to recovery objectives, and test restore workflows for destructive-write scenarios.
+- Evidence:
+  - backup posture: backup_configuration.enabled is true; point_in_time_recovery_enabled is false; engine is POSTGRES_15
+
+### Low
+
+No findings in this severity band.
+
+## Limitations / Unsupported Resources
+
+- GCP support currently provides initial inventory normalization, internet-to-service, route/NAT posture, and workload-to-sensitive-data trust-boundary detection for compute and serverless workloads, with limited GCP STRIDE rule coverage for compute, GCS posture, Cloud SQL posture, Secret Manager, Cloud KMS, and project IAM only; GCP control coverage is not implemented yet.
+- The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
