@@ -32,6 +32,8 @@ _RULE_GROUP_IDS = (
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
         "gcp-sensitive-resource-iam-external-access",
+        "gcp-pubsub-public-access",
+        "gcp-bigquery-public-access",
         "gcp-cloud-sql-public-authorized-network",
         "gcp-cloud-sql-backup-disabled",
         "gcp-cloud-sql-public-ip-without-private-network",
@@ -122,6 +124,8 @@ class StrideRuleEngine:
             "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
             "aws-s3-public-access": posture_detectors.detect_public_object_storage,
             "gcp-sensitive-resource-iam-external-access": gcp_detectors.detect_sensitive_iam_external_access,
+            "gcp-pubsub-public-access": gcp_detectors.detect_pubsub_public_access,
+            "gcp-bigquery-public-access": gcp_detectors.detect_bigquery_public_access,
             "gcp-cloud-sql-public-authorized-network": gcp_detectors.detect_cloud_sql_public_authorized_network,
             "gcp-cloud-sql-backup-disabled": gcp_detectors.detect_cloud_sql_backup_disabled,
             "gcp-cloud-sql-public-ip-without-private-network": (

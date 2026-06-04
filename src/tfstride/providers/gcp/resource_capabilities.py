@@ -25,7 +25,17 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_compute_instance",
             }
         ),
-        ResourceCapability.DATA_STORE: frozenset({"google_secret_manager_secret", "google_sql_database_instance", "google_storage_bucket"}),
+        ResourceCapability.DATA_STORE: frozenset(
+            {
+                "google_bigquery_dataset",
+                "google_bigquery_table",
+                "google_pubsub_subscription",
+                "google_pubsub_topic",
+                "google_secret_manager_secret",
+                "google_sql_database_instance",
+                "google_storage_bucket",
+            }
+        ),
         ResourceCapability.PUBLIC_EDGE: frozenset(
             {
                 "google_compute_forwarding_rule",
@@ -43,6 +53,12 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
         ResourceCapability.IAM_POLICY: frozenset(
             {
+                "google_bigquery_dataset_iam_binding",
+                "google_bigquery_dataset_iam_member",
+                "google_bigquery_dataset_iam_policy",
+                "google_bigquery_table_iam_binding",
+                "google_bigquery_table_iam_member",
+                "google_bigquery_table_iam_policy",
                 "google_cloud_run_service_iam_binding",
                 "google_cloud_run_service_iam_member",
                 "google_cloud_run_service_iam_policy",
@@ -72,6 +88,12 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_project_iam_custom_role",
                 "google_project_iam_member",
                 "google_project_iam_policy",
+                "google_pubsub_subscription_iam_binding",
+                "google_pubsub_subscription_iam_member",
+                "google_pubsub_subscription_iam_policy",
+                "google_pubsub_topic_iam_binding",
+                "google_pubsub_topic_iam_member",
+                "google_pubsub_topic_iam_policy",
                 "google_secret_manager_secret_iam_binding",
                 "google_secret_manager_secret_iam_member",
                 "google_secret_manager_secret_iam_policy",
@@ -100,7 +122,11 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ),
         ResourceCapability.SENSITIVE_RESOURCE_POLICY: frozenset(
             {
+                "google_bigquery_dataset",
+                "google_bigquery_table",
                 "google_kms_crypto_key",
+                "google_pubsub_subscription",
+                "google_pubsub_topic",
                 "google_secret_manager_secret",
                 "google_storage_bucket",
             }

@@ -67,7 +67,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `41`", report)
+        self.assertIn("- Registered rules: `43`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -224,21 +224,24 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 18)
+        self.assertEqual(payload["summary"]["normalized_resources"], 24)
         self.assertEqual(payload["summary"]["unsupported_resources"], 0)
-        self.assertEqual(payload["summary"]["trust_boundaries"], 4)
-        self.assertEqual(payload["summary"]["active_findings"], 19)
-        self.assertEqual(payload["summary"]["severity_counts"], {"high": 5, "medium": 14, "low": 0})
+        self.assertEqual(payload["summary"]["trust_boundaries"], 5)
+        self.assertEqual(payload["summary"]["active_findings"], 22)
+        self.assertEqual(payload["summary"]["severity_counts"], {"high": 8, "medium": 14, "low": 0})
         self.assertEqual(payload["inventory"]["unsupported_resources"], [])
         self.assertEqual(
             payload["inventory"]["metadata"]["supported_resource_types"],
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 18)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 24)
         self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
             [
+                "google_bigquery_dataset.analytics",
+                "google_bigquery_dataset_iam_binding.analytics_viewers",
+                "google_bigquery_table.events",
                 "google_compute_firewall.public_ssh",
                 "google_compute_instance.web",
                 "google_compute_network.main",
@@ -250,6 +253,9 @@ class JsonReportTests(unittest.TestCase):
                 "google_kms_crypto_key_iam_member.partner_decrypter",
                 "google_organization_iam_binding.domain_viewer",
                 "google_project_iam_member.web_viewer",
+                "google_pubsub_subscription.events",
+                "google_pubsub_topic.events",
+                "google_pubsub_topic_iam_member.public_publisher",
                 "google_secret_manager_secret.api_key",
                 "google_secret_manager_secret_iam_member.public_accessor",
                 "google_service_account.web",
@@ -268,6 +274,7 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(
             {finding["rule_id"] for finding in payload["findings"]},
             {
+                "gcp-bigquery-public-access",
                 "gcp-cloud-sql-backup-disabled",
                 "gcp-cloud-sql-deletion-protection-disabled",
                 "gcp-cloud-sql-public-authorized-network",
@@ -286,6 +293,8 @@ class JsonReportTests(unittest.TestCase):
                 "gcp-org-folder-iam-privileged-role",
                 "gcp-sensitive-resource-iam-external-access",
                 "gcp-public-compute-broad-ingress",
+                "gcp-public-workload-sensitive-data-access",
+                "gcp-pubsub-public-access",
             },
         )
         self.assertEqual(
@@ -300,6 +309,7 @@ class JsonReportTests(unittest.TestCase):
                 "internet-to-service:internet->google_container_cluster.app",
                 "internet-to-service:internet->google_sql_database_instance.app",
                 "internet-to-service:internet->google_storage_bucket.logs",
+                "workload-to-data-store:google_compute_instance.web->google_bigquery_dataset.analytics",
             },
         )
 
@@ -459,7 +469,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 41)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 43)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})

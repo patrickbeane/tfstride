@@ -229,6 +229,28 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-pubsub-public-access",
+        title="Pub/Sub IAM binding allows public or broad data access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant Pub/Sub publisher and subscriber roles only to specific service accounts or groups, "
+            "remove public principals, and separate publish and consume permissions by workload."
+        ),
+        tags=("gcp", "pubsub", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-bigquery-public-access",
+        title="BigQuery IAM binding allows public or broad data access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant BigQuery dataset and table access only to specific in-project identities or reviewed "
+            "analytics groups, remove public principals, and prefer least-privilege data roles."
+        ),
+        tags=("gcp", "bigquery", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-workload-sensitive-data-access",
         title="Internet-exposed GCP workload can access sensitive data services",
         category=StrideCategory.INFORMATION_DISCLOSURE,

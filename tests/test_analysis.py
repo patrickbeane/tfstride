@@ -813,7 +813,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 19, {"high": 5, "medium": 14}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 22, {"high": 8, "medium": 14}),
         }
 
         expected_titles = {
@@ -844,6 +844,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Object storage is publicly accessible": 2,
             },
             "gcp-inventory": {
+                "BigQuery IAM binding allows public or broad data access": 1,
                 "Cloud SQL automated backups are disabled": 1,
                 "Cloud SQL deletion protection is disabled": 1,
                 "Cloud SQL instance accepts public authorized network access": 1,
@@ -854,6 +855,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
+                "Internet-exposed GCP workload can access sensitive data services": 1,
                 "GCP organization or folder IAM grants access to broad principals": 1,
                 "GCP organization or folder IAM grants a high-privilege role": 1,
                 "GKE cluster exposes a public control plane": 1,
@@ -861,6 +863,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GKE cluster does not enable Workload Identity": 1,
                 "GKE node metadata exposure is not hardened": 1,
                 "GKE node pool uses broad node identity settings": 1,
+                "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
         }
@@ -879,12 +882,12 @@ class TFSAnalysisTests(unittest.TestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 18)
+        self.assertEqual(len(result.inventory.resources), 24)
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 18)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 18)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 24)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 24)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
-        self.assertEqual(len(result.findings), 19)
+        self.assertEqual(len(result.findings), 22)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -953,6 +956,18 @@ class TFSAnalysisTests(unittest.TestCase):
             findings_by_rule["gcp-cloud-sql-deletion-protection-disabled"].affected_resources,
             ["google_sql_database_instance.app"],
         )
+        self.assertEqual(
+            findings_by_rule["gcp-pubsub-public-access"].affected_resources,
+            ["google_pubsub_topic.events", "google_pubsub_topic_iam_member.public_publisher"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-bigquery-public-access"].affected_resources,
+            ["google_bigquery_dataset.analytics", "google_bigquery_dataset_iam_binding.analytics_viewers"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-public-workload-sensitive-data-access"].affected_resources,
+            ["google_compute_instance.web", "google_bigquery_dataset.analytics", "google_bigquery_dataset_iam_binding.analytics_viewers"],
+        )
         sensitive_iam_findings = [
             finding
             for finding in result.findings
@@ -963,7 +978,7 @@ class TFSAnalysisTests(unittest.TestCase):
             {finding.severity for finding in sensitive_iam_findings},
             {Severity.HIGH, Severity.MEDIUM},
         )
-        self.assertEqual(len(result.trust_boundaries), 4)
+        self.assertEqual(len(result.trust_boundaries), 5)
         boundaries_by_target = {boundary.target: boundary for boundary in result.trust_boundaries}
         boundary = boundaries_by_target["google_compute_instance.web"]
         self.assertEqual(boundary.boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -982,6 +997,10 @@ class TFSAnalysisTests(unittest.TestCase):
             boundaries_by_target["google_sql_database_instance.app"].identifier,
         )
         self.assertIsNone(cloud_sql_backup_finding.trust_boundary_id)
+        self.assertEqual(
+            findings_by_rule["gcp-public-workload-sensitive-data-access"].trust_boundary_id,
+            boundaries_by_target["google_bigquery_dataset.analytics"].identifier,
+        )
 
     def test_unconstrained_cross_account_trust_without_narrowing_conditions_is_detected(self) -> None:
         result = self.engine.analyze_plan(CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH)

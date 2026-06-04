@@ -674,6 +674,130 @@ def _kms_key_ring_iam_member(
     )
 
 
+def _pubsub_topic() -> TerraformResource:
+    return TerraformResource(
+        address="google_pubsub_topic.events",
+        mode="managed",
+        resource_type="google_pubsub_topic",
+        name="events",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"name": "tfstride-events", "project": "tfstride-demo"},
+    )
+
+
+def _pubsub_subscription() -> TerraformResource:
+    return TerraformResource(
+        address="google_pubsub_subscription.events",
+        mode="managed",
+        resource_type="google_pubsub_subscription",
+        name="events",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "tfstride-events-sub",
+            "topic": "google_pubsub_topic.events.id",
+            "project": "tfstride-demo",
+        },
+    )
+
+
+def _pubsub_topic_iam_member(
+    member: str = "allUsers",
+    role: str = "roles/pubsub.publisher",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_pubsub_topic_iam_member.public_publisher",
+        mode="managed",
+        resource_type="google_pubsub_topic_iam_member",
+        name="public_publisher",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "topic": "google_pubsub_topic.events.name",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
+def _pubsub_subscription_iam_binding(
+    members: list[str] | None = None,
+    role: str = "roles/pubsub.subscriber",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_pubsub_subscription_iam_binding.public_subscribers",
+        mode="managed",
+        resource_type="google_pubsub_subscription_iam_binding",
+        name="public_subscribers",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "subscription": "google_pubsub_subscription.events.name",
+            "role": role,
+            "members": members or ["domain:example.com"],
+        },
+    )
+
+
+def _bigquery_dataset() -> TerraformResource:
+    return TerraformResource(
+        address="google_bigquery_dataset.analytics",
+        mode="managed",
+        resource_type="google_bigquery_dataset",
+        name="analytics",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={"dataset_id": "tfstride_analytics", "project": "tfstride-demo", "location": "US"},
+    )
+
+
+def _bigquery_table() -> TerraformResource:
+    return TerraformResource(
+        address="google_bigquery_table.events",
+        mode="managed",
+        resource_type="google_bigquery_table",
+        name="events",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+            "table_id": "events",
+            "project": "tfstride-demo",
+        },
+    )
+
+
+def _bigquery_dataset_iam_member(
+    member: str = "allUsers",
+    role: str = "roles/bigquery.dataViewer",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_bigquery_dataset_iam_member.public_viewer",
+        mode="managed",
+        resource_type="google_bigquery_dataset_iam_member",
+        name="public_viewer",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+            "role": role,
+            "member": member,
+        },
+    )
+
+
+def _bigquery_table_iam_binding(
+    members: list[str] | None = None,
+    role: str = "roles/bigquery.dataOwner",
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_bigquery_table_iam_binding.domain_owner",
+        mode="managed",
+        resource_type="google_bigquery_table_iam_binding",
+        name="domain_owner",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "table_id": "google_bigquery_table.events.table_id",
+            "role": role,
+            "members": members or ["domain:example.com"],
+        },
+    )
+
+
 class GcpRuleTests(unittest.TestCase):
     def test_public_compute_ssh_and_rdp_broad_ingress_is_detected_for_each_target(self) -> None:
         inventory = GcpNormalizer().normalize(
@@ -1519,6 +1643,111 @@ class GcpRuleTests(unittest.TestCase):
             ["service account belongs to project `partner-project`, outside resource project `tfstride-demo`"],
         )
 
+    def test_pubsub_public_topic_publisher_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_pubsub_topic(), _pubsub_topic_iam_member()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-pubsub-public-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-pubsub-public-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_pubsub_topic.events", "google_pubsub_topic_iam_member.public_publisher"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_pubsub_topic_iam_member.public_publisher",
+                "role=roles/pubsub.publisher",
+                "member=allUsers",
+            ],
+        )
+
+    def test_pubsub_broad_subscription_subscriber_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_pubsub_subscription(), _pubsub_subscription_iam_binding()]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-pubsub-public-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].affected_resources[0], "google_pubsub_subscription.events")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["trust_scope"], ["member grants a whole Google Workspace domain"])
+
+    def test_pubsub_non_broad_member_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_pubsub_topic(), _pubsub_topic_iam_member(member="serviceAccount:publisher@tfstride-demo.iam.gserviceaccount.com")]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-pubsub-public-access"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_bigquery_public_dataset_viewer_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_bigquery_dataset(), _bigquery_dataset_iam_member()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-bigquery-public-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-bigquery-public-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_bigquery_dataset.analytics", "google_bigquery_dataset_iam_member.public_viewer"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["trust_scope"], ["member is public GCP principal `allUsers`"])
+
+    def test_bigquery_table_domain_owner_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_bigquery_table(), _bigquery_table_iam_binding()]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-bigquery-public-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].affected_resources[0], "google_bigquery_table.events")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["trust_scope"], ["member grants a whole Google Workspace domain"])
+
+    def test_bigquery_non_broad_member_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_bigquery_dataset(), _bigquery_dataset_iam_member(member="group:analytics@example.com")]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-bigquery-public-access"})),
+        )
+
+        self.assertEqual(findings, [])
+
     def test_sensitive_same_project_service_account_binding_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
@@ -1578,6 +1807,38 @@ class GcpRuleTests(unittest.TestCase):
         )
         self.assertIn(
             "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
+            evidence["boundary_rationale"][0],
+        )
+
+    def test_public_cloud_run_service_account_bigquery_access_path_is_detected(self) -> None:
+        service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(),
+                _bigquery_dataset(),
+                _bigquery_dataset_iam_member(member=service_account),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-public-workload-sensitive-data-access")
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "workload-to-data-store:google_cloud_run_v2_service.api->google_bigquery_dataset.analytics",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["workload_identity"], [service_account])
+        self.assertIn(
+            "google_bigquery_dataset_iam_member.public_viewer grants roles/bigquery.dataViewer",
             evidence["boundary_rationale"][0],
         )
 

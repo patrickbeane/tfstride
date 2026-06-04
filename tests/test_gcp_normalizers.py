@@ -10,12 +10,18 @@ from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, c
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
 from tfstride.providers.gcp.container_normalizers import normalize_container_cluster, normalize_container_node_pool
 from tfstride.providers.gcp.data_normalizers import (
+    normalize_bigquery_dataset,
+    normalize_bigquery_table,
     normalize_kms_crypto_key,
+    normalize_pubsub_subscription,
+    normalize_pubsub_topic,
     normalize_secret_manager_secret,
     normalize_sql_database_instance,
     normalize_storage_bucket,
 )
 from tfstride.providers.gcp.iam_normalizers import (
+    normalize_bigquery_dataset_iam_member,
+    normalize_bigquery_table_iam_binding,
     normalize_kms_crypto_key_iam_member,
     normalize_kms_key_ring_iam_binding,
     normalize_kms_key_ring_iam_member,
@@ -31,6 +37,8 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_project_iam_custom_role,
     normalize_project_iam_member,
     normalize_project_iam_policy,
+    normalize_pubsub_subscription_iam_binding,
+    normalize_pubsub_topic_iam_member,
     normalize_secret_manager_secret_iam_member,
     normalize_service_account,
     normalize_service_account_iam_binding,
@@ -473,6 +481,98 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ["authorized network `anywhere` allows 0.0.0.0/0"],
         )
 
+    def test_pubsub_topic_normalizer_preserves_event_surface_context(self) -> None:
+        normalized = normalize_pubsub_topic(
+            _terraform_resource(
+                "google_pubsub_topic.events",
+                "google_pubsub_topic",
+                {
+                    "name": "tfstride-events",
+                    "project": "tfstride-demo",
+                    "kms_key_name": "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/pubsub",
+                    "labels": {"data": "customer"},
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.DATA)
+        self.assertEqual(normalized.identifier, "tfstride-events")
+        self.assertEqual(normalized.data_sensitivity, "sensitive")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
+            "tfstride-events",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
+        self.assertTrue(normalized.storage_encrypted)
+        self.assertTrue(normalized.metadata_snapshot()["customer_managed_encryption"])
+
+    def test_pubsub_subscription_normalizer_preserves_topic_reference(self) -> None:
+        normalized = normalize_pubsub_subscription(
+            _terraform_resource(
+                "google_pubsub_subscription.events",
+                "google_pubsub_subscription",
+                {
+                    "name": "tfstride-events-sub",
+                    "topic": "google_pubsub_topic.events.id",
+                    "project": "tfstride-demo",
+                    "ack_deadline_seconds": 20,
+                    "retain_acked_messages": True,
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.DATA)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE),
+            "tfstride-events-sub",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
+            "google_pubsub_topic.events.id",
+        )
+        self.assertTrue(normalized.metadata_snapshot()["retain_acked_messages"])
+
+    def test_bigquery_dataset_and_table_normalizers_preserve_data_context(self) -> None:
+        dataset = normalize_bigquery_dataset(
+            _terraform_resource(
+                "google_bigquery_dataset.analytics",
+                "google_bigquery_dataset",
+                {
+                    "dataset_id": "tfstride_analytics",
+                    "project": "tfstride-demo",
+                    "location": "US",
+                    "default_encryption_configuration": [
+                        {"kms_key_name": "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/bq"}
+                    ],
+                },
+            )
+        )
+        table = normalize_bigquery_table(
+            _terraform_resource(
+                "google_bigquery_table.events",
+                "google_bigquery_table",
+                {
+                    "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+                    "table_id": "events",
+                    "project": "tfstride-demo",
+                    "deletion_protection": True,
+                },
+            )
+        )
+
+        self.assertEqual(dataset.category, ResourceCategory.DATA)
+        self.assertEqual(dataset.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID), "tfstride_analytics")
+        self.assertEqual(
+            dataset.get_metadata_field(GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME),
+            "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/bq",
+        )
+        self.assertEqual(table.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_ID), "events")
+        self.assertEqual(
+            table.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID),
+            "google_bigquery_dataset.analytics.dataset_id",
+        )
+        self.assertTrue(table.metadata_snapshot()["deletion_protection"])
+
     def test_sql_database_instance_normalizer_handles_private_backed_up_instance(self) -> None:
         normalized = normalize_sql_database_instance(
             _terraform_resource(
@@ -851,6 +951,87 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             [{"role": "roles/iam.serviceAccountUser", "members": ["group:deploy@example.com"]}],
         )
 
+    def test_pubsub_iam_normalizers_preserve_binding_parts(self) -> None:
+        topic_member = normalize_pubsub_topic_iam_member(
+            _terraform_resource(
+                "google_pubsub_topic_iam_member.public_publisher",
+                "google_pubsub_topic_iam_member",
+                {
+                    "topic": "google_pubsub_topic.events.name",
+                    "role": "roles/pubsub.publisher",
+                    "member": "allUsers",
+                },
+            )
+        )
+        subscription_binding = normalize_pubsub_subscription_iam_binding(
+            _terraform_resource(
+                "google_pubsub_subscription_iam_binding.public_subscribers",
+                "google_pubsub_subscription_iam_binding",
+                {
+                    "subscription": "google_pubsub_subscription.events.name",
+                    "role": "roles/pubsub.subscriber",
+                    "members": ["allAuthenticatedUsers", "group:ops@example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(
+            topic_member.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
+            "google_pubsub_topic.events.name",
+        )
+        self.assertEqual(topic_member.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allUsers")
+        self.assertEqual(
+            subscription_binding.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE),
+            "google_pubsub_subscription.events.name",
+        )
+        self.assertEqual(
+            subscription_binding.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/pubsub.subscriber",
+                    "members": ["allAuthenticatedUsers", "group:ops@example.com"],
+                }
+            ],
+        )
+
+    def test_bigquery_iam_normalizers_preserve_binding_parts(self) -> None:
+        dataset_member = normalize_bigquery_dataset_iam_member(
+            _terraform_resource(
+                "google_bigquery_dataset_iam_member.public_viewer",
+                "google_bigquery_dataset_iam_member",
+                {
+                    "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+                    "role": "roles/bigquery.dataViewer",
+                    "member": "allUsers",
+                },
+            )
+        )
+        table_binding = normalize_bigquery_table_iam_binding(
+            _terraform_resource(
+                "google_bigquery_table_iam_binding.domain_owner",
+                "google_bigquery_table_iam_binding",
+                {
+                    "table_id": "google_bigquery_table.events.table_id",
+                    "role": "roles/bigquery.dataOwner",
+                    "members": ["domain:example.com"],
+                },
+            )
+        )
+
+        self.assertEqual(
+            dataset_member.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE),
+            "google_bigquery_dataset.analytics.dataset_id",
+        )
+        self.assertEqual(dataset_member.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allUsers")
+        self.assertEqual(
+            table_binding.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE),
+            "google_bigquery_table.events.table_id",
+        )
+        self.assertEqual(
+            table_binding.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/bigquery.dataOwner", "members": ["domain:example.com"]}],
+        )
+
     def test_storage_bucket_iam_member_normalizer_preserves_binding_parts(self) -> None:
         normalized = normalize_storage_bucket_iam_member(
             _terraform_resource(
@@ -1007,6 +1188,74 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(function.public_access_configured)
         self.assertFalse(function.public_exposure)
         self.assertFalse(function.direct_internet_reachable)
+
+    def test_normalizer_attaches_pubsub_and_bigquery_iam_bindings_to_targets(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_pubsub_topic.events",
+                    "google_pubsub_topic",
+                    {"name": "tfstride-events", "project": "tfstride-demo"},
+                ),
+                _terraform_resource(
+                    "google_pubsub_topic_iam_member.public_publisher",
+                    "google_pubsub_topic_iam_member",
+                    {
+                        "topic": "google_pubsub_topic.events.name",
+                        "role": "roles/pubsub.publisher",
+                        "member": "allUsers",
+                    },
+                ),
+                _terraform_resource(
+                    "google_bigquery_dataset.analytics",
+                    "google_bigquery_dataset",
+                    {"dataset_id": "tfstride_analytics", "project": "tfstride-demo"},
+                ),
+                _terraform_resource(
+                    "google_bigquery_table.events",
+                    "google_bigquery_table",
+                    {
+                        "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+                        "table_id": "events",
+                        "project": "tfstride-demo",
+                    },
+                ),
+                _terraform_resource(
+                    "google_bigquery_dataset_iam_member.public_viewer",
+                    "google_bigquery_dataset_iam_member",
+                    {
+                        "dataset_id": "google_bigquery_dataset.analytics.dataset_id",
+                        "role": "roles/bigquery.dataViewer",
+                        "member": "allAuthenticatedUsers",
+                    },
+                ),
+            ]
+        )
+        topic = inventory.get_by_address("google_pubsub_topic.events")
+        dataset = inventory.get_by_address("google_bigquery_dataset.analytics")
+        table = inventory.get_by_address("google_bigquery_table.events")
+
+        self.assertIsNotNone(topic)
+        self.assertIsNotNone(dataset)
+        self.assertIsNotNone(table)
+        assert topic is not None
+        assert dataset is not None
+        assert table is not None
+        self.assertEqual(
+            topic.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [
+                {
+                    "role": "roles/pubsub.publisher",
+                    "members": ["allUsers"],
+                    "source": "google_pubsub_topic_iam_member.public_publisher",
+                }
+            ],
+        )
+        self.assertEqual(
+            dataset.get_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES),
+            ["google_bigquery_dataset_iam_member.public_viewer"],
+        )
+        self.assertEqual(table.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS), [])
 
     def test_normalizer_derives_public_bucket_exposure_from_bucket_iam_member(self) -> None:
         inventory = GcpNormalizer().normalize(

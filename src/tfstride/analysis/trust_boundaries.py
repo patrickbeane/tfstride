@@ -45,6 +45,7 @@ class _DataStoreCandidateIndex:
     object_storage: tuple[NormalizedResource, ...]
     secret_stores: tuple[NormalizedResource, ...]
     key_management: tuple[NormalizedResource, ...]
+    cloud_data_stores: tuple[NormalizedResource, ...]
     databases: tuple[NormalizedResource, ...]
     direct_internet_databases: tuple[NormalizedResource, ...]
     databases_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
@@ -219,6 +220,7 @@ def _build_data_store_candidate_index(
     object_storage: list[NormalizedResource] = []
     secret_stores: list[NormalizedResource] = []
     key_management: list[NormalizedResource] = []
+    cloud_data_stores: list[NormalizedResource] = []
     databases_by_vpc: dict[str, list[NormalizedResource]] = {}
     databases_missing_security_groups_by_vpc: dict[str, list[NormalizedResource]] = {}
     databases_by_trusted_workload_security_group: dict[str, list[NormalizedResource]] = {}
@@ -251,12 +253,15 @@ def _build_data_store_candidate_index(
             secret_stores.append(data_store)
         elif is_key_management_resource(data_store):
             key_management.append(data_store)
+        else:
+            cloud_data_stores.append(data_store)
 
     return _DataStoreCandidateIndex(
         data_store_positions={id(resource): index for index, resource in enumerate(data_stores)},
         object_storage=tuple(object_storage),
         secret_stores=tuple(secret_stores),
         key_management=tuple(key_management),
+        cloud_data_stores=tuple(cloud_data_stores),
         databases=tuple(databases),
         direct_internet_databases=tuple(direct_internet_databases),
         databases_by_vpc=_freeze_resource_groups_by_key(databases_by_vpc),
@@ -301,6 +306,7 @@ def _candidate_data_stores_for_workload(
         add_many(index.object_storage)
         add_many(index.secret_stores)
         add_many(index.key_management)
+        add_many(index.cloud_data_stores)
 
     return tuple(
         sorted(
@@ -439,6 +445,24 @@ _GCP_CLOUD_SQL_ACCESS_ROLES = frozenset(
         "roles/cloudsql.client",
     }
 )
+_GCP_BIGQUERY_ACCESS_ROLES = frozenset(
+    {
+        "roles/bigquery.admin",
+        "roles/bigquery.dataEditor",
+        "roles/bigquery.dataOwner",
+        "roles/bigquery.dataViewer",
+        "roles/bigquery.user",
+    }
+)
+_GCP_PUBSUB_ACCESS_ROLES = frozenset(
+    {
+        "roles/pubsub.admin",
+        "roles/pubsub.editor",
+        "roles/pubsub.publisher",
+        "roles/pubsub.subscriber",
+        "roles/pubsub.viewer",
+    }
+)
 
 
 def _gcp_workload_reaches_data_store(
@@ -543,6 +567,10 @@ def _gcp_workload_scopes_allow_access(
         return any("devstorage" in scope for scope in scopes)
     if is_database_resource(data_store):
         return any("sqlservice.admin" in scope for scope in scopes)
+    if data_store.resource_type in {"google_bigquery_dataset", "google_bigquery_table"}:
+        return any("bigquery" in scope for scope in scopes)
+    if data_store.resource_type in {"google_pubsub_subscription", "google_pubsub_topic"}:
+        return any("pubsub" in scope for scope in scopes)
     return False
 
 
@@ -561,6 +589,14 @@ def _gcp_role_allows_data_store_access(
         return True
     if is_database_resource(resource) and role in _GCP_CLOUD_SQL_ACCESS_ROLES:
         return True
+    if resource.resource_type in {"google_bigquery_dataset", "google_bigquery_table"}:
+        return role in _GCP_BIGQUERY_ACCESS_ROLES or custom_role_allows_data_store_access(
+            resource, role, custom_roles
+        )
+    if resource.resource_type in {"google_pubsub_subscription", "google_pubsub_topic"}:
+        return role in _GCP_PUBSUB_ACCESS_ROLES or custom_role_allows_data_store_access(
+            resource, role, custom_roles
+        )
     return custom_role_allows_data_store_access(resource, role, custom_roles)
 
 

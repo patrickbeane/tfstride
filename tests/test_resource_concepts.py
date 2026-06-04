@@ -98,6 +98,10 @@ class ResourceConceptTests(unittest.TestCase):
                     "aws_db_instance",
                     "aws_s3_bucket",
                     "aws_secretsmanager_secret",
+                    "google_bigquery_dataset",
+                    "google_bigquery_table",
+                    "google_pubsub_subscription",
+                    "google_pubsub_topic",
                     "google_secret_manager_secret",
                     "google_sql_database_instance",
                     "google_storage_bucket",
@@ -132,6 +136,12 @@ class ResourceConceptTests(unittest.TestCase):
                 {
                     "aws_iam_policy",
                     "aws_iam_role",
+                    "google_bigquery_dataset_iam_binding",
+                    "google_bigquery_dataset_iam_member",
+                    "google_bigquery_dataset_iam_policy",
+                    "google_bigquery_table_iam_binding",
+                    "google_bigquery_table_iam_member",
+                    "google_bigquery_table_iam_policy",
                     "google_cloud_run_service_iam_binding",
                     "google_cloud_run_service_iam_member",
                     "google_cloud_run_service_iam_policy",
@@ -161,6 +171,12 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_project_iam_custom_role",
                     "google_project_iam_member",
                     "google_project_iam_policy",
+                    "google_pubsub_subscription_iam_binding",
+                    "google_pubsub_subscription_iam_member",
+                    "google_pubsub_subscription_iam_policy",
+                    "google_pubsub_topic_iam_binding",
+                    "google_pubsub_topic_iam_member",
+                    "google_pubsub_topic_iam_policy",
                     "google_secret_manager_secret_iam_binding",
                     "google_secret_manager_secret_iam_member",
                     "google_secret_manager_secret_iam_policy",
@@ -195,7 +211,11 @@ class ResourceConceptTests(unittest.TestCase):
                     "aws_s3_bucket",
                     "aws_kms_key",
                     "aws_secretsmanager_secret",
+                    "google_bigquery_dataset",
+                    "google_bigquery_table",
                     "google_kms_crypto_key",
+                    "google_pubsub_subscription",
+                    "google_pubsub_topic",
                     "google_secret_manager_secret",
                     "google_storage_bucket",
                 }
@@ -234,6 +254,10 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
+        self.assertTrue(is_data_store_resource(_resource("google_bigquery_dataset", provider="gcp")))
+        self.assertTrue(is_data_store_resource(_resource("google_bigquery_table", provider="gcp")))
+        self.assertTrue(is_data_store_resource(_resource("google_pubsub_topic", provider="gcp")))
+        self.assertTrue(is_data_store_resource(_resource("google_pubsub_subscription", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
@@ -249,6 +273,10 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_bigquery_dataset_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_bigquery_table_iam_binding", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_pubsub_topic_iam_member", provider="gcp")))
+        self.assertTrue(is_iam_policy_resource(_resource("google_pubsub_subscription_iam_binding", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_cloud_run_v2_service_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_cloudfunctions_function_iam_member", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("google_kms_crypto_key_iam_member", provider="gcp")))

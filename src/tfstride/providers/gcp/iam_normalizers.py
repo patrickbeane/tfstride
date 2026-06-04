@@ -364,6 +364,102 @@ def normalize_secret_manager_secret_iam_policy(resource: TerraformResource) -> N
     )
 
 
+def normalize_pubsub_topic_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE,
+        target_keys=("topic", "topic_id"),
+    )
+
+
+def normalize_pubsub_topic_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE,
+        target_keys=("topic", "topic_id"),
+    )
+
+
+def normalize_pubsub_topic_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE,
+        target_keys=("topic", "topic_id"),
+    )
+
+
+def normalize_pubsub_subscription_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE,
+        target_keys=("subscription", "subscription_id"),
+    )
+
+
+def normalize_pubsub_subscription_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE,
+        target_keys=("subscription", "subscription_id"),
+    )
+
+
+def normalize_pubsub_subscription_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE,
+        target_keys=("subscription", "subscription_id"),
+    )
+
+
+def normalize_bigquery_dataset_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE,
+        target_keys=("dataset_id", "dataset"),
+    )
+
+
+def normalize_bigquery_dataset_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE,
+        target_keys=("dataset_id", "dataset"),
+    )
+
+
+def normalize_bigquery_dataset_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE,
+        target_keys=("dataset_id", "dataset"),
+    )
+
+
+def normalize_bigquery_table_iam_member(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_member(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE,
+        target_keys=("table_id", "table"),
+    )
+
+
+def normalize_bigquery_table_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_binding(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE,
+        target_keys=("table_id", "table"),
+    )
+
+
+def normalize_bigquery_table_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_iam_policy(
+        resource,
+        target_field=GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE,
+        target_keys=("table_id", "table"),
+    )
+
+
 def normalize_kms_crypto_key_iam_member(resource: TerraformResource) -> NormalizedResource:
     return _normalize_target_iam_member(
         resource,

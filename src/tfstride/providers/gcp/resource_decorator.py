@@ -39,6 +39,14 @@ class GcpResourceDecorator:
                 _derive_public_serverless_exposure(resource, index)
             elif resource.resource_type == "google_secret_manager_secret":
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
+            elif resource.resource_type == "google_pubsub_topic":
+                _derive_sensitive_resource_iam_bindings(resource, index.pubsub_topic_iam_resources)
+            elif resource.resource_type == "google_pubsub_subscription":
+                _derive_sensitive_resource_iam_bindings(resource, index.pubsub_subscription_iam_resources)
+            elif resource.resource_type == "google_bigquery_dataset":
+                _derive_sensitive_resource_iam_bindings(resource, index.bigquery_dataset_iam_resources)
+            elif resource.resource_type == "google_bigquery_table":
+                _derive_sensitive_resource_iam_bindings(resource, index.bigquery_table_iam_resources)
             elif resource.resource_type == "google_kms_crypto_key":
                 _derive_sensitive_resource_iam_bindings(
                     resource, 
@@ -59,6 +67,10 @@ class _GcpResourceIndex:
     firewalls: tuple[NormalizedResource, ...]
     bucket_iam_resources: tuple[NormalizedResource, ...]
     secret_iam_resources: tuple[NormalizedResource, ...]
+    pubsub_topic_iam_resources: tuple[NormalizedResource, ...]
+    pubsub_subscription_iam_resources: tuple[NormalizedResource, ...]
+    bigquery_dataset_iam_resources: tuple[NormalizedResource, ...]
+    bigquery_table_iam_resources: tuple[NormalizedResource, ...]
     kms_crypto_key_iam_resources: tuple[NormalizedResource, ...]
     kms_key_ring_iam_resources: tuple[NormalizedResource, ...]
     cloud_run_iam_resources: tuple[NormalizedResource, ...]
@@ -74,6 +86,10 @@ class _GcpResourceIndex:
         firewalls: list[NormalizedResource] = []
         bucket_iam_resources: list[NormalizedResource] = []
         secret_iam_resources: list[NormalizedResource] = []
+        pubsub_topic_iam_resources: list[NormalizedResource] = []
+        pubsub_subscription_iam_resources: list[NormalizedResource] = []
+        bigquery_dataset_iam_resources: list[NormalizedResource] = []
+        bigquery_table_iam_resources: list[NormalizedResource] = []
         kms_crypto_key_iam_resources: list[NormalizedResource] = []
         kms_key_ring_iam_resources: list[NormalizedResource] = []
         cloud_run_iam_resources: list[NormalizedResource] = []
@@ -99,6 +115,14 @@ class _GcpResourceIndex:
                 bucket_iam_resources.append(resource)
             elif resource.resource_type in _SECRET_IAM_RESOURCE_TYPES:
                 secret_iam_resources.append(resource)
+            elif resource.resource_type in _PUBSUB_TOPIC_IAM_RESOURCE_TYPES:
+                pubsub_topic_iam_resources.append(resource)
+            elif resource.resource_type in _PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES:
+                pubsub_subscription_iam_resources.append(resource)
+            elif resource.resource_type in _BIGQUERY_DATASET_IAM_RESOURCE_TYPES:
+                bigquery_dataset_iam_resources.append(resource)
+            elif resource.resource_type in _BIGQUERY_TABLE_IAM_RESOURCE_TYPES:
+                bigquery_table_iam_resources.append(resource)
             elif resource.resource_type in _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
                 kms_crypto_key_iam_resources.append(resource)
             elif resource.resource_type in _KMS_KEY_RING_IAM_RESOURCE_TYPES:
@@ -116,6 +140,10 @@ class _GcpResourceIndex:
             firewalls=tuple(firewalls),
             bucket_iam_resources=tuple(bucket_iam_resources),
             secret_iam_resources=tuple(secret_iam_resources),
+            pubsub_topic_iam_resources=tuple(pubsub_topic_iam_resources),
+            pubsub_subscription_iam_resources=tuple(pubsub_subscription_iam_resources),
+            bigquery_dataset_iam_resources=tuple(bigquery_dataset_iam_resources),
+            bigquery_table_iam_resources=tuple(bigquery_table_iam_resources),
             kms_crypto_key_iam_resources=tuple(kms_crypto_key_iam_resources),
             kms_key_ring_iam_resources=tuple(kms_key_ring_iam_resources),
             cloud_run_iam_resources=tuple(cloud_run_iam_resources),
@@ -167,6 +195,35 @@ _SECRET_IAM_RESOURCE_TYPES = frozenset(
         "google_secret_manager_secret_iam_policy",
     }
 )
+_PUBSUB_TOPIC_IAM_RESOURCE_TYPES = frozenset(
+	{
+	    "google_pubsub_topic_iam_binding",
+	    "google_pubsub_topic_iam_member",
+	    "google_pubsub_topic_iam_policy",
+	}
+)
+_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES = frozenset(
+    {
+        "google_pubsub_subscription_iam_binding",
+	    "google_pubsub_subscription_iam_member",
+	    "google_pubsub_subscription_iam_policy",
+	    }
+)
+_BIGQUERY_DATASET_IAM_RESOURCE_TYPES = frozenset(
+	{
+		"google_bigquery_dataset_iam_binding",
+		"google_bigquery_dataset_iam_member",
+		"google_bigquery_dataset_iam_policy",
+	}
+)
+_BIGQUERY_TABLE_IAM_RESOURCE_TYPES = frozenset(
+	{
+	    "google_bigquery_table_iam_binding",
+		"google_bigquery_table_iam_member",
+		"google_bigquery_table_iam_policy",
+	}
+)
+
 _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES = frozenset(
     {
         "google_kms_crypto_key_iam_binding",
@@ -432,6 +489,18 @@ def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     secret_reference = resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE)
     if secret_reference:
         return secret_reference
+    pubsub_topic_reference = resource.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE)
+    if pubsub_topic_reference:
+        return pubsub_topic_reference
+    pubsub_subscription_reference = resource.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE)
+    if pubsub_subscription_reference:
+        return pubsub_subscription_reference
+    bigquery_table_reference = resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE)
+    if bigquery_table_reference:
+	    return bigquery_table_reference
+    bigquery_dataset_reference = resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE)
+    if bigquery_dataset_reference:
+	    return bigquery_dataset_reference
     cloud_run_reference = resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE)
     if cloud_run_reference:
         return cloud_run_reference
@@ -592,6 +661,12 @@ def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME),
         resource.get_metadata_field(GcpResourceMetadata.SECRET_ID),
         resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID),
+        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_ID),
+        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING),
         resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
@@ -660,7 +735,15 @@ def _network_reference_key(value: str) -> str:
 
 def _reference_key(value: str) -> str:
     text = str(value).strip()
-    for suffix in (".id", ".name", ".secret_id", ".crypto_key_id", ".self_link"):
+    for suffix in (
+	    ".id",
+	    ".name",
+	    ".secret_id",
+	    ".crypto_key_id",
+	    ".dataset_id",
+	    ".table_id",
+	    ".self_link",
+	):
         if text.endswith(suffix):
             return text[: -len(suffix)]
     return text

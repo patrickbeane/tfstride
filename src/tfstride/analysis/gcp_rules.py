@@ -43,6 +43,28 @@ _SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
 )
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
+_PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
+_BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
+_PUBSUB_DATA_ACCESS_ROLES = frozenset(
+    {
+        "roles/editor",
+        "roles/owner",
+        "roles/pubsub.admin",
+        "roles/pubsub.editor",
+        "roles/pubsub.publisher",
+        "roles/pubsub.subscriber",
+    }
+)
+_BIGQUERY_DATA_ACCESS_ROLES = frozenset(
+    {
+        "roles/bigquery.admin",
+        "roles/bigquery.dataEditor",
+        "roles/bigquery.dataOwner",
+        "roles/bigquery.dataViewer",
+        "roles/editor",
+        "roles/owner",
+    }
+)
 _PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
     {
@@ -598,6 +620,108 @@ class GcpRuleDetectors:
                             severity_reasoning=severity_reasoning,
                         )
                     )
+        return findings
+
+    def detect_pubsub_public_access(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_PUBSUB_RESOURCE_TYPES):
+            for source, role, member, assessment in _broad_resource_iam_bindings(
+                resource, _PUBSUB_DATA_ACCESS_ROLES
+            ):
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=assessment.is_public,
+                    privilege_breadth=2 if assessment.is_public else 1,
+                    data_sensitivity=1,
+                    lateral_movement=1,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=_dedupe_addresses([resource.address, source]),
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{resource.display_name} grants `{role}` to `{member}` through Pub/Sub "
+                            "IAM. Public or broad principals can publish, consume, or administer event "
+                            "streams outside the expected service boundary."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item(
+                                "iam_binding",
+                                [
+                                    f"source={source}" if source else "source=unknown",
+                                    f"role={role}",
+                                    f"member={member}",
+                                ],
+                            ),
+                            evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item(
+                                "resource_policy_sources",
+                                analysis_facts(resource).resource_policy_source_addresses,
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+    def detect_bigquery_public_access(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_BIGQUERY_RESOURCE_TYPES):
+            for source, role, member, assessment in _broad_resource_iam_bindings(
+                resource, _BIGQUERY_DATA_ACCESS_ROLES
+            ):
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=assessment.is_public,
+                    privilege_breadth=2 if assessment.is_public else 1,
+                    data_sensitivity=2,
+                    lateral_movement=1,
+                    blast_radius=2 if assessment.is_public else 1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=_dedupe_addresses([resource.address, source]),
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{resource.display_name} grants `{role}` to `{member}` through BigQuery "
+                            "IAM. Public or broad principals can read or modify analytical data outside "
+                            "the expected project trust boundary."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item(
+                                "iam_binding",
+                                [
+                                    f"source={source}" if source else "source=unknown",
+                                    f"role={role}",
+                                    f"member={member}",
+                                ],
+                            ),
+                            evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item(
+                                "resource_policy_sources",
+                                analysis_facts(resource).resource_policy_source_addresses,
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
         return findings
 
     def detect_service_account_iam_broad_principal(
@@ -1497,6 +1621,29 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
         "internet boundary, broad SSH/RDP ingress increases exposure if an external address, peering path, "
         "or forwarding path is later attached."
     )
+
+
+def _broad_resource_iam_bindings(
+    resource: NormalizedResource,
+    allowed_roles: frozenset[str],
+) -> list[tuple[str, str, str, _GcpIamMemberAssessment]]:
+    matches: list[tuple[str, str, str, _GcpIamMemberAssessment]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for binding in analysis_facts(resource).iam_bindings:
+        role = str(binding.get("role") or "unknown role").strip()
+        if role not in allowed_roles:
+            continue
+        source = str(binding.get("source") or "").strip()
+        for member in _binding_members(binding):
+            assessment = _assess_gcp_broad_iam_member(member)
+            if assessment is None:
+                continue
+            key = (source, role, assessment.member)
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append((source, role, assessment.member, assessment))
+    return matches
 
 
 def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:

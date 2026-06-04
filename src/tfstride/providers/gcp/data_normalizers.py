@@ -77,6 +77,139 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
     )
 
 
+def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    name = first_non_empty(values.get("name"), resource.name)
+    identifier = first_non_empty(values.get("id"), name, resource.address)
+    kms_key_name = first_non_empty(values.get("kms_key_name"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=identifier,
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE.key: identifier,
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "kms_key_name": kms_key_name,
+            "message_retention_duration": values.get("message_retention_duration"),
+            "message_storage_policy": as_list(values.get("message_storage_policy")),
+            "schema_settings": as_list(values.get("schema_settings")),
+            "customer_managed_encryption": bool(kms_key_name),
+            "storage_encrypted": True,
+        },
+    )
+
+
+def normalize_pubsub_subscription(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    name = first_non_empty(values.get("name"), resource.name)
+    identifier = first_non_empty(values.get("id"), name, resource.address)
+    topic_reference = first_non_empty(values.get("topic"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=identifier,
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE.key: identifier,
+            GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE.key: topic_reference,
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "ack_deadline_seconds": values.get("ack_deadline_seconds"),
+            "dead_letter_policy": as_list(values.get("dead_letter_policy")),
+            "expiration_policy": as_list(values.get("expiration_policy")),
+            "filter": values.get("filter"),
+            "message_retention_duration": values.get("message_retention_duration"),
+            "push_config": as_list(values.get("push_config")),
+            "retain_acked_messages": as_bool(values.get("retain_acked_messages", False)),
+            "retry_policy": as_list(values.get("retry_policy")),
+            "storage_encrypted": True,
+        },
+    )
+
+
+def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    dataset_id = first_non_empty(values.get("dataset_id"), values.get("name"), resource.name)
+    project = first_non_empty(values.get("project"), _project_from_resource_path(values.get("id")))
+    name = first_non_empty(values.get("id"), _bigquery_dataset_resource_name(project, dataset_id), dataset_id)
+    encryption = first_item(values.get("default_encryption_configuration")) or {}
+    default_kms_key_name = first_non_empty(encryption.get("kms_key_name"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=first_non_empty(values.get("id"), name, dataset_id, resource.address),
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.PROJECT.key: project,
+            GcpResourceMetadata.BIGQUERY_DATASET_ID.key: dataset_id,
+            GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE.key: first_non_empty(values.get("id"), name, dataset_id),
+            GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "delete_contents_on_destroy": as_bool(values.get("delete_contents_on_destroy", False)),
+            "default_table_expiration_ms": values.get("default_table_expiration_ms"),
+            "description": values.get("description"),
+            "friendly_name": values.get("friendly_name"),
+            "location": values.get("location"),
+            "max_time_travel_hours": values.get("max_time_travel_hours"),
+            "storage_billing_model": values.get("storage_billing_model"),
+            "customer_managed_encryption": bool(default_kms_key_name),
+            "storage_encrypted": True,
+        },
+    )
+
+
+def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    dataset_id = first_non_empty(values.get("dataset_id"), values.get("dataset"))
+    table_id = first_non_empty(values.get("table_id"), values.get("name"), resource.name)
+    project = first_non_empty(values.get("project"), _project_from_resource_path(values.get("id")))
+    name = first_non_empty(values.get("id"), _bigquery_table_resource_name(project, dataset_id, table_id), table_id)
+    encryption = first_item(values.get("encryption_configuration")) or {}
+    default_kms_key_name = first_non_empty(encryption.get("kms_key_name"))
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=first_non_empty(values.get("id"), name, table_id, resource.address),
+        data_sensitivity="sensitive",
+        metadata={
+            GcpResourceMetadata.NAME.key: name,
+            GcpResourceMetadata.PROJECT.key: project,
+            GcpResourceMetadata.BIGQUERY_DATASET_ID.key: dataset_id,
+            GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE.key: dataset_id,
+            GcpResourceMetadata.BIGQUERY_TABLE_ID.key: table_id,
+            GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE.key: first_non_empty(values.get("id"), name, table_id),
+            GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
+            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+            "clustering": as_list(values.get("clustering")),
+            "deletion_protection": as_bool(values.get("deletion_protection", False)),
+            "description": values.get("description"),
+            "friendly_name": values.get("friendly_name"),
+            "schema": values.get("schema"),
+            "time_partitioning": as_list(values.get("time_partitioning")),
+            "view": as_list(values.get("view")),
+            "customer_managed_encryption": bool(default_kms_key_name),
+            "storage_encrypted": True,
+        },
+    )
+
+
 def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     key_ring = first_non_empty(values.get("key_ring"))
@@ -177,6 +310,18 @@ def _secret_resource_name(project: object, secret_id: str | None) -> str | None:
     if not project or not secret_id:
         return None
     return f"projects/{project}/secrets/{secret_id}"
+
+
+def _bigquery_dataset_resource_name(project: object, dataset_id: str | None) -> str | None:
+    if not project or not dataset_id:
+        return None
+    return f"projects/{project}/datasets/{dataset_id}"
+
+
+def _bigquery_table_resource_name(project: object, dataset_id: str | None, table_id: str | None) -> str | None:
+    if not project or not dataset_id or not table_id:
+        return None
+    return f"projects/{project}/datasets/{dataset_id}/tables/{table_id}"
 
 
 def _project_from_resource_path(value: object) -> str | None:

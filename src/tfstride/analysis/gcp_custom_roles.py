@@ -129,6 +129,34 @@ def custom_role_allows_data_store_access(
                 "cloudsql.instances.get",
             },
         )
+    if resource.resource_type in {"google_bigquery_dataset", "google_bigquery_table"}:
+        return _permission_matches_any(
+            permissions,
+            {
+                "bigquery.*",
+                "bigquery.datasets.*",
+                "bigquery.datasets.get",
+                "bigquery.jobs.create",
+                "bigquery.tables.*",
+                "bigquery.tables.get",
+                "bigquery.tables.getData",
+                "bigquery.tables.list",
+                "bigquery.tables.update",
+            },
+        )
+    if resource.resource_type in {"google_pubsub_subscription", "google_pubsub_topic"}:
+        return _permission_matches_any(
+            permissions,
+            {
+                "pubsub.*",
+                "pubsub.subscriptions.*",
+                "pubsub.subscriptions.consume",
+                "pubsub.subscriptions.get",
+                "pubsub.topics.*",
+                "pubsub.topics.get",
+                "pubsub.topics.publish",
+            },
+        )
     return False
 
 

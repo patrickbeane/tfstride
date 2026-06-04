@@ -2,30 +2,33 @@
 
 - Analyzed file: `sample_gcp_plan.json`
 - Provider: `gcp`
-- Normalized resources: `18`
+- Normalized resources: `24`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **4 trust boundaries** and **19 findings** across **18 normalized resources**.
+This run identified **5 trust boundaries** and **22 findings** across **24 normalized resources**.
 
-- High severity findings: `5`
+- High severity findings: `8`
 - Medium severity findings: `14`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
-- Terraform resources seen: `18`
-- Provider resources considered: `18`
-- Normalized resources: `18`
+- Terraform resources seen: `24`
+- Provider resources considered: `24`
+- Normalized resources: `24`
 - Unsupported resources: `0`
-- Registered rules: `41`
-- Enabled rules: `41`
+- Registered rules: `43`
+- Enabled rules: `43`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-sensitive-resource-iam-external-access`: `2`
+  - `gcp-pubsub-public-access`: `1`
+  - `gcp-bigquery-public-access`: `1`
+  - `gcp-public-workload-sensitive-data-access`: `1`
   - `gcp-cloud-sql-public-authorized-network`: `1`
   - `gcp-cloud-sql-backup-disabled`: `1`
   - `gcp-cloud-sql-public-ip-without-private-network`: `1`
@@ -74,9 +77,29 @@ This run identified **4 trust boundaries** and **19 findings** across **18 norma
 - Description: Traffic can cross from the public internet to google_storage_bucket.logs.
 - Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
 
+### `workload-to-data-store`
+
+- Source: `google_compute_instance.web`
+- Target: `google_bigquery_dataset.analytics`
+- Description: google_compute_instance.web can interact with google_bigquery_dataset.analytics.
+- Rationale: GCP workloads cross into a higher-sensitivity data plane when their attached service account is granted data access through IAM: google_bigquery_dataset_iam_binding.analytics_viewers grants roles/bigquery.dataViewer to serviceAccount:tfstride-web@example.iam.gserviceaccount.com.
+
 ## Findings
 
 ### High
+
+#### BigQuery IAM binding allows public or broad data access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_bigquery_dataset.analytics`, `google_bigquery_dataset_iam_binding.analytics_viewers`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 9 => high
+- Rationale: google_bigquery_dataset.analytics grants `roles/bigquery.dataViewer` to `allUsers` through BigQuery IAM. Public or broad principals can read or modify analytical data outside the expected project trust boundary.
+- Recommended mitigation: Grant BigQuery dataset and table access only to specific in-project identities or reviewed analytics groups, remove public principals, and prefer least-privilege data roles.
+- Evidence:
+  - iam binding: source=google_bigquery_dataset_iam_binding.analytics_viewers; role=roles/bigquery.dataViewer; member=allUsers
+  - trust scope: member is public GCP principal `allUsers`
+  - resource policy sources: google_bigquery_dataset_iam_binding.analytics_viewers
 
 #### Cloud SQL instance accepts public authorized network access
 
@@ -128,6 +151,35 @@ This run identified **4 trust boundaries** and **19 findings** across **18 norma
   - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
   - node service account: 123456789-compute@developer.gserviceaccount.com
   - oauth scopes: https://www.googleapis.com/auth/cloud-platform
+
+#### Internet-exposed GCP workload can access sensitive data services
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_compute_instance.web`, `google_bigquery_dataset.analytics`, `google_bigquery_dataset_iam_binding.analytics_viewers`
+- Trust boundary: `workload-to-data-store:google_compute_instance.web->google_bigquery_dataset.analytics`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_compute_instance.web is internet-exposed and runs with GCP workload identity serviceAccount:tfstride-web@example.iam.gserviceaccount.com. That identity can access google_bigquery_dataset.analytics. A compromise of the public workload can therefore become direct access to sensitive GCP data services.
+- Recommended mitigation: Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data access through private services where possible.
+- Evidence:
+  - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+  - workload identity: serviceAccount:tfstride-web@example.iam.gserviceaccount.com
+  - workload identity scopes: cloud-platform
+  - data access path: google_compute_instance.web reaches google_bigquery_dataset.analytics
+  - boundary rationale: GCP workloads cross into a higher-sensitivity data plane when their attached service account is granted data access through IAM: google_bigquery_dataset_iam_binding.analytics_viewers grants roles/bigquery.dataViewer to serviceAccount:tfstride-web@example.iam.gserviceaccount.com.
+  - resource policy sources: google_bigquery_dataset_iam_binding.analytics_viewers
+
+#### Pub/Sub IAM binding allows public or broad data access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_pubsub_topic.events`, `google_pubsub_topic_iam_member.public_publisher`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: google_pubsub_topic.events grants `roles/pubsub.publisher` to `allAuthenticatedUsers` through Pub/Sub IAM. Public or broad principals can publish, consume, or administer event streams outside the expected service boundary.
+- Recommended mitigation: Grant Pub/Sub publisher and subscriber roles only to specific service accounts or groups, remove public principals, and separate publish and consume permissions by workload.
+- Evidence:
+  - iam binding: source=google_pubsub_topic_iam_member.public_publisher; role=roles/pubsub.publisher; member=allAuthenticatedUsers
+  - trust scope: member is public GCP principal `allAuthenticatedUsers`
+  - resource policy sources: google_pubsub_topic_iam_member.public_publisher
 
 #### Sensitive GCP resource IAM binding allows broad or external access
 
