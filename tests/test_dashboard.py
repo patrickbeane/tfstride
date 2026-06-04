@@ -35,13 +35,13 @@ class DashboardAppTests(unittest.TestCase):
         self.client = TestClient(dashboard_app)
 
     def test_create_app_does_not_analyze_demo_fixtures_eagerly(self) -> None:
-        with mock.patch.object(dashboard_main.TFS, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
             app = dashboard_main.create_app()
 
         self.assertEqual(app.title, "tfSTRIDE Dashboard")
 
     def test_openapi_generation_does_not_analyze_demo_fixtures(self) -> None:
-        with mock.patch.object(dashboard_main.TFS, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
             app = dashboard_main.create_app()
             payload = app.openapi()
 
@@ -63,7 +63,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Built-in scenarios", response.text)
         self.assertIn('href="http://testserver/scenarios?provider=aws"', response.text)
         self.assertIn('href="http://testserver/scenarios?provider=gcp"', response.text)
-        self.assertIn('class="provider-tab provider-tab-active"', response.text)
+        self.assertIn('class="scenario-provider-link scenario-provider-link-active"', response.text)
         self.assertIn('data-provider="aws"', response.text)
         self.assertNotIn('data-provider="gcp"', response.text)
         self.assertIn("ECS / Fargate", response.text)
@@ -77,6 +77,7 @@ class DashboardAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Built-in scenarios", response.text)
+        self.assertIn('class="scenario-provider-link scenario-provider-link-active"', response.text)
         self.assertIn('data-provider="gcp"', response.text)
         self.assertNotIn('data-provider="aws"', response.text)
         self.assertIn("Mixed GCP Inventory", response.text)

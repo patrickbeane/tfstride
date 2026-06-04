@@ -3,7 +3,18 @@
 {% block content %}
   <section class="panel scenario-page-hero">
     <div class="panel-header">
-      <p class="eyebrow">Built-in scenarios</p>
+      <p class="eyebrow scenario-provider-heading">
+        <span>Built-in scenarios</span>
+        <span class="scenario-provider-inline" aria-label="Provider scenarios">(<a
+          class="scenario-provider-link{% if selected_provider == 'aws' %} scenario-provider-link-active{% endif %}"
+          href="{{ request.url_for('scenarios_page') }}?provider=aws"
+          {% if selected_provider == 'aws' %}aria-current="page"{% endif %}
+        >AWS</a>/<a
+          class="scenario-provider-link{% if selected_provider == 'gcp' %} scenario-provider-link-active{% endif %}"
+          href="{{ request.url_for('scenarios_page') }}?provider=gcp"
+          {% if selected_provider == 'gcp' %}aria-current="page"{% endif %}
+        >GCP</a>)</span>
+      </p>
       <h1>Run the curated fixture catalog in one click.</h1>
     </div>
     <p class="lede">
@@ -17,24 +28,6 @@
 
   {% if demo_scenarios %}
     <section class="scenario-section" aria-label="Built-in scenario catalog">
-      <nav class="scenario-provider-tabs" aria-label="Provider scenarios">
-        <a
-          class="provider-tab{% if selected_provider == 'aws' %} provider-tab-active{% endif %}"
-          href="{{ request.url_for('scenarios_page') }}?provider=aws"
-          {% if selected_provider == 'aws' %}aria-current="page"{% endif %}
-        >
-          <span>AWS</span>
-          <span>{{ provider_counts.aws|default(0) }}</span>
-        </a>
-        <a
-          class="provider-tab{% if selected_provider == 'gcp' %} provider-tab-active{% endif %}"
-          href="{{ request.url_for('scenarios_page') }}?provider=gcp"
-          {% if selected_provider == 'gcp' %}aria-current="page"{% endif %}
-        >
-          <span>GCP</span>
-          <span>{{ provider_counts.gcp|default(0) }}</span>
-        </a>
-      </nav>
       <div class="scenario-grid">
         {% for scenario in demo_scenarios %}
           <article class="scenario-card scenario-{{ scenario.theme }}" data-provider="{{ scenario.provider }}">
