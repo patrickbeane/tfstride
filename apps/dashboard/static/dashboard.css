@@ -619,6 +619,78 @@ h4 {
   gap: 1.25rem;
 }
 
+.provider-filter-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scenario-provider-filter {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(5.75rem, 1fr));
+  gap: 0.25rem;
+  justify-self: start;
+  padding: 0.28rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 252, 246, 0.7);
+  box-shadow: 0 10px 24px rgba(25, 32, 37, 0.08);
+}
+
+.provider-filter-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.provider-filter-label span:last-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(31, 41, 51, 0.08);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+#scenario-provider-aws:checked ~ .scenario-provider-filter label[for="scenario-provider-aws"],
+#scenario-provider-gcp:checked ~ .scenario-provider-filter label[for="scenario-provider-gcp"] {
+  background: var(--accent);
+  color: #fffaf2;
+  box-shadow: 0 8px 18px rgba(13, 92, 99, 0.22);
+}
+
+#scenario-provider-aws:checked ~ .scenario-provider-filter label[for="scenario-provider-aws"] span:last-child,
+#scenario-provider-gcp:checked ~ .scenario-provider-filter label[for="scenario-provider-gcp"] span:last-child {
+  background: rgba(255, 250, 242, 0.22);
+  color: #fffaf2;
+}
+
+#scenario-provider-aws:focus-visible ~ .scenario-provider-filter label[for="scenario-provider-aws"],
+#scenario-provider-gcp:focus-visible ~ .scenario-provider-filter label[for="scenario-provider-gcp"] {
+  outline: 3px solid rgba(214, 159, 58, 0.45);
+  outline-offset: 2px;
+}
+
+#scenario-provider-aws:checked ~ .scenario-grid .scenario-card[data-provider="gcp"],
+#scenario-provider-gcp:checked ~ .scenario-grid .scenario-card[data-provider="aws"] {
+  display: none;
+}
+
 .scenario-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -944,6 +1016,10 @@ details + details {
   .risk-band,
   .scenario-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scenario-provider-filter {
+    width: 100%;
   }
 
   .metric-card strong,

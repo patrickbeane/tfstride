@@ -61,9 +61,14 @@ class DashboardAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Built-in scenarios", response.text)
+        self.assertIn('id="scenario-provider-aws" checked', response.text)
+        self.assertIn('for="scenario-provider-gcp"', response.text)
+        self.assertIn('data-provider="aws"', response.text)
+        self.assertIn('data-provider="gcp"', response.text)
         self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
-        self.assertIn("GCP Inventory", response.text)
+        self.assertIn("Mixed GCP Inventory", response.text)
+        self.assertIn("GCP Serverless", response.text)
         self.assertIn("Run built-in report", response.text)
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:

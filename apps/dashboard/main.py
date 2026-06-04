@@ -180,6 +180,7 @@ class DemoScenario:
     scenario_id: str
     title: str
     report_title: str
+    provider: str
     fixture_name: str
     fixture_path: str
     description: str
@@ -294,13 +295,67 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="balanced",
     ),
     DemoScenarioDefinition(
+        scenario_id="gcp-safe",
+        title="Safe GCP Plan",
+        report_title="Safe GCP Plan Demo",
+        fixture_name="gcp/sample_gcp_safe_plan.json",
+        description="Private-by-default GCP reference with hardened storage, private Cloud SQL, scoped identity, Secret Manager, and Cloud KMS.",
+        emphasis="Quiet reference architecture",
+        theme="safe",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="gcp-baseline",
+        title="Baseline GCP Plan",
+        report_title="Baseline GCP Plan Demo",
+        fixture_name="gcp/sample_gcp_baseline_plan.json",
+        description="Mostly segmented GCP infrastructure with custom-role IAM risk and a focused Cloud SQL recovery finding.",
+        emphasis="Calibrated baseline",
+        theme="balanced",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="gcp-lb-compute-sql",
+        title="GCP Load Balancer and SQL",
+        report_title="GCP Load Balancer / Compute / SQL Demo",
+        fixture_name="gcp/sample_gcp_lb_compute_sql_plan.json",
+        description="External load-balancing edge, private compute, NAT egress posture, and private Cloud SQL in a common GCP web shape.",
+        emphasis="Common architecture",
+        theme="balanced",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="gcp-serverless",
+        title="GCP Serverless",
+        report_title="GCP Serverless Demo",
+        fixture_name="gcp/sample_gcp_serverless_plan.json",
+        description="Cloud Run and Cloud Functions public invoker paths with service-account access into Secret Manager.",
+        emphasis="Serverless workload",
+        theme="mixed",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="gcp-cross-project-iam",
+        title="GCP Cross-Project IAM",
+        report_title="GCP Cross-Project IAM Demo",
+        fixture_name="gcp/sample_gcp_cross_project_iam_plan.json",
+        description="Focused IAM blast-radius fixture for project-level grants, Secret Manager access, and Cloud KMS decryption trust.",
+        emphasis="Trust expansion",
+        theme="trust",
+    ),
+    DemoScenarioDefinition(
         scenario_id="gcp-scaffold",
-        title="GCP Inventory",
+        title="Mixed GCP Inventory",
         report_title="GCP Inventory Demo",
         fixture_name="gcp/sample_gcp_plan.json",
-        description="Terraform Google provider resources normalized with basic internet-to-compute boundary detection and first-pass GCP findings.",
+        description="Mixed Google provider inventory covering compute, network, IAM, Pub/Sub, BigQuery, Cloud SQL, Secret Manager, Cloud KMS, and GCS.",
         emphasis="Provider expansion",
         theme="balanced",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="gcp-nightmare",
+        title="GCP Nightmare Plan",
+        report_title="GCP Nightmare Plan Demo",
+        fixture_name="gcp/sample_gcp_nightmare_plan.json",
+        description="Stacked GCP risk across compute, GKE, serverless, data services, org/folder/project IAM, and unsupported-resource coverage.",
+        emphasis="Stress-case fixture",
+        theme="nightmare",
     ),
     DemoScenarioDefinition(
         scenario_id="trust-unconstrained",
@@ -369,6 +424,7 @@ def create_app() -> FastAPI:
     @app.get("/scenarios", response_class=HTMLResponse, include_in_schema=False)
     async def scenarios_page(request: Request) -> HTMLResponse:
         demo_scenarios = _get_demo_scenarios(request.app)
+        provider_counts = Counter(scenario.provider for scenario in demo_scenarios)
         return _template_response(
             request,
             "scenarios.html",
@@ -376,6 +432,7 @@ def create_app() -> FastAPI:
                 request,
                 page_title="tfSTRIDE Scenarios",
                 demo_scenarios=demo_scenarios,
+                provider_counts=provider_counts,
             ),
         )
 
@@ -539,7 +596,7 @@ async def _analyze_upload(
     upload: UploadFile,
     *,
     title: str,
-    engine: TFS,
+    engine: TfStride,
 ) -> DashboardAnalysis:
     filename = Path(upload.filename or "uploaded-plan.json").name or "uploaded-plan.json"
     bytes_written = 0
@@ -593,6 +650,7 @@ def _build_demo_scenarios(engine: TfStride) -> tuple[DemoScenario, ...]:
                 scenario_id=definition.scenario_id,
                 title=definition.title,
                 report_title=definition.report_title,
+                provider=definition.fixture_name.split("/", 1)[0],
                 fixture_name=definition.fixture_name,
                 fixture_path=str(fixture_path),
                 description=definition.description,
@@ -644,6 +702,7 @@ def _base_context(
     error: str | None = None,
     form_title: str = DEFAULT_REPORT_TITLE,
     demo_scenarios: tuple[DemoScenario, ...] = (),
+    provider_counts: Counter[str] | None = None,
 ) -> dict[str, object]:
     return {
         "request": request,
@@ -652,6 +711,7 @@ def _base_context(
         "form_title": form_title,
         "max_upload_mebibytes": MAX_UPLOAD_BYTES // (1024 * 1024),
         "demo_scenarios": demo_scenarios,
+        "provider_counts": provider_counts or Counter(),
     }
 
 
