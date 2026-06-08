@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from tfstride.analysis.gcp_iam_inheritance import (
+from tfstride.analysis.gcp.iam_inheritance import (
     GCP_IAM_SCOPE_FOLDER,
     GCP_IAM_SCOPE_ORGANIZATION,
     GCP_IAM_SCOPE_PROJECT,
     GcpIamScopeKey,
 )
-from tfstride.analysis.gcp_custom_roles import (
+from tfstride.analysis.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,

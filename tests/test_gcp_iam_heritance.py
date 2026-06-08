@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.gcp_iam_inheritance import (
+from tfstride.analysis.gcp.iam_inheritance import (
     GCP_IAM_SCOPE_FOLDER,
     GCP_IAM_SCOPE_ORGANIZATION,
     GCP_IAM_SCOPE_PROJECT,

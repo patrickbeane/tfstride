@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 from tfstride.analysis.control_observations import observe_controls as collect_control_observations
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.gcp_rules import GcpRuleDetectors
+from tfstride.analysis.gcp.rules import GcpRuleDetectors
 from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.network_data_rules import NetworkDataRuleDetectors

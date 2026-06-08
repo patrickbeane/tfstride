@@ -4,7 +4,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from tfstride.analysis.gcp_iam_inheritance import (
+from tfstride.analysis.gcp.iam_inheritance import (
     GcpIamInheritanceIndex,
     build_gcp_iam_inheritance_index,
     empty_gcp_iam_inheritance_index,

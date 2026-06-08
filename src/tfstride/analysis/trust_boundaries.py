@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from tfstride.analysis.gcp_custom_roles import (
+from tfstride.analysis.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,
