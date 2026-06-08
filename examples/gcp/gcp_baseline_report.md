@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **2 findings** across **8 normalized resources**.
+This run identified **1 trust boundaries** and **3 findings** across **8 normalized resources**.
 
-- High severity findings: `1`
+- High severity findings: `2`
 - Medium severity findings: `1`
 - Low severity findings: `0`
 
@@ -19,14 +19,15 @@ This run identified **1 trust boundaries** and **2 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `46`
-- Enabled rules: `46`
+- Registered rules: `47`
+- Enabled rules: `47`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-cloud-sql-point-in-time-recovery-disabled`: `1`
   - `gcp-project-iam-privileged-role`: `1`
+  - `gcp-inherited-iam-blast-radius`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -52,6 +53,22 @@ This run identified **1 trust boundaries** and **2 findings** across **8 normali
 - Evidence:
   - iam binding: member=group:deploy@example.com; role=projects/tfstride-demo/roles/deployAdmin
   - role risk: custom role includes high-impact permissions: iam.serviceAccounts.actAs
+  - custom role permissions: iam.serviceAccounts.actAs
+
+#### Inherited GCP IAM grant expands descendant blast radius
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.deploy_admin`, `google_compute_instance.web`, `google_compute_network.main`, `google_compute_subnetwork.app`, `google_project_iam_custom_role.deploy_admin`, `google_service_account.web`, `google_sql_database_instance.app`, `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +2, lateral_movement +2, blast_radius +2, final_score 8 => high
+- Rationale: google_project_iam_member.deploy_admin grants `projects/tfstride-demo/roles/deployAdmin` to `group:deploy@example.com` at project scope `tfstride-demo`, and that inherited grant applies to 7 concrete descendant resource(s). A high-level IAM grant with broad, external, or high-impact access increases control-plane blast radius because compromise or misuse can affect resources below the inherited scope.
+- Recommended mitigation: Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower resource-level or workload-specific bindings are possible; split inherited roles by service and review descendant resources before assigning public, external, or administrator principals.
+- Evidence:
+  - iam binding: source=google_project_iam_member.deploy_admin; scope=project:tfstride-demo; member=group:deploy@example.com; role=projects/tfstride-demo/roles/deployAdmin
+  - role risk: custom role includes high-impact permissions: iam.serviceAccounts.actAs
+  - descendant scope: scope=project:tfstride-demo; descendant_count=7; resource_type_count=7; projects=tfstride-demo
+  - descendant resource types: google_compute_instance: 1; google_compute_network: 1; google_compute_subnetwork: 1; google_project_iam_custom_role: 1; google_service_account: 1; google_sql_database_instance: 1; google_storage_bucket: 1
+  - descendant resources: google_compute_instance.web; google_compute_network.main; google_compute_subnetwork.app; google_project_iam_custom_role.deploy_admin; google_service_account.web; google_sql_database_instance.app; google_storage_bucket.logs
   - custom role permissions: iam.serviceAccounts.actAs
 
 ### Medium

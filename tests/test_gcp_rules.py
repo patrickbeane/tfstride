@@ -2974,6 +2974,134 @@ class GcpRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_inherited_project_iam_privileged_role_reports_descendant_blast_radius(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _secret_manager_secret(),
+                _bigquery_dataset(),
+                _project_iam_member(
+                    "roles/editor",
+                    member="serviceAccount:deployer@partner-project.iam.gserviceaccount.com",
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-blast-radius"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-inherited-iam-blast-radius")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_project_iam_member.binding",
+                "google_bigquery_dataset.analytics",
+                "google_secret_manager_secret.api_key",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_project_iam_member.binding",
+                "scope=project:tfstride-demo",
+                "member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com",
+                "role=roles/editor",
+            ],
+        )
+        self.assertEqual(evidence["role_risk"], ["broad write access across most project services"])
+        self.assertEqual(
+            evidence["trust_scope"],
+            [
+                "service account belongs to project `partner-project`, "
+                "outside resource project `tfstride-demo`"
+            ],
+        )
+        self.assertEqual(
+            evidence["descendant_scope"],
+            ["scope=project:tfstride-demo", "descendant_count=2", "resource_type_count=2", "projects=tfstride-demo"],
+        )
+        self.assertEqual(
+            evidence["descendant_resource_types"],
+            ["google_bigquery_dataset: 1", "google_secret_manager_secret: 1"],
+        )
+
+    def test_inherited_project_iam_low_risk_group_binding_is_not_blast_radius(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _secret_manager_secret(),
+                _bigquery_dataset(),
+                _project_iam_member("roles/viewer", member="group:ops@example.com"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-blast-radius"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_inherited_folder_iam_broad_principal_reports_descendant_blast_radius(self) -> None:
+        instance = _normalized_gcp_resource(
+            "google_compute_instance.folder_web",
+            "google_compute_instance",
+            ResourceCategory.COMPUTE,
+            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+        )
+        bucket = _normalized_gcp_resource(
+            "google_storage_bucket.folder_logs",
+            "google_storage_bucket",
+            ResourceCategory.DATA,
+            data_sensitivity="sensitive",
+            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+        )
+        folder_iam = _normalized_gcp_resource(
+            "google_folder_iam_member.domain_viewer",
+            "google_folder_iam_member",
+            ResourceCategory.IAM,
+            metadata={
+                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
+                GcpResourceMetadata.IAM_ROLE.key: "roles/viewer",
+                GcpResourceMetadata.IAM_MEMBER.key: "domain:example.com",
+            },
+        )
+        inventory = ResourceInventory(provider="gcp", resources=[instance, bucket, folder_iam])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-blast-radius"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_folder_iam_member.domain_viewer",
+                "google_compute_instance.folder_web",
+                "google_storage_bucket.folder_logs",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["trust_scope"],
+            ["member grants a whole Google Workspace domain"],
+        )
+        self.assertEqual(
+            evidence["descendant_scope"],
+            ["scope=folder:12345", "descendant_count=2", "resource_type_count=2", "folders=folders/12345"],
+        )
+
+
 
 if __name__ == "__main__":
     unittest.main()

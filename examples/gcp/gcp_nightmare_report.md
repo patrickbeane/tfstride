@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **32 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **33 findings** across **30 normalized resources**.
 
-- High severity findings: `13`
+- High severity findings: `14`
 - Medium severity findings: `19`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **32 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `46`
-- Enabled rules: `46`
+- Registered rules: `47`
+- Enabled rules: `47`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -56,6 +56,7 @@ This run identified **9 trust boundaries** and **32 findings** across **30 norma
   - `gcp-project-iam-broad-principal`: `1`
   - `gcp-project-iam-privileged-role`: `1`
   - `gcp-inherited-iam-sensitive-resource-access`: `1`
+  - `gcp-inherited-iam-blast-radius`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -214,6 +215,22 @@ This run identified **9 trust boundaries** and **32 findings** across **30 norma
   - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
   - node service account: 123456789-compute@developer.gserviceaccount.com
   - oauth scopes: https://www.googleapis.com/auth/cloud-platform
+
+#### Inherited GCP IAM grant expands descendant blast radius
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.public_owner`, `google_bigquery_dataset.analytics`, `google_bigquery_table.events`, `google_cloud_run_v2_service.api`, `google_cloudfunctions_function.worker`, `google_compute_firewall.public_admin`, `google_compute_firewall.public_all`, `google_compute_instance.web`, `google_compute_network.main`, `google_compute_route.default_internet`, `google_compute_subnetwork.app`, `google_container_cluster.app`, `google_container_node_pool.app`, `google_kms_crypto_key.customer`, `google_pubsub_subscription.events`, `google_pubsub_topic.events`, `google_secret_manager_secret.api_key`, `google_service_account.web`, `google_service_account_key.web`, `google_sql_database_instance.app`, `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +2, lateral_movement +2, blast_radius +2, final_score 10 => high
+- Rationale: google_project_iam_member.public_owner grants `roles/owner` to `allUsers` at project scope `tfstride-demo`, and that inherited grant applies to 20 concrete descendant resource(s). A high-level IAM grant with broad, external, or high-impact access increases control-plane blast radius because compromise or misuse can affect resources below the inherited scope.
+- Recommended mitigation: Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower resource-level or workload-specific bindings are possible; split inherited roles by service and review descendant resources before assigning public, external, or administrator principals.
+- Evidence:
+  - iam binding: source=google_project_iam_member.public_owner; scope=project:tfstride-demo; member=allUsers; role=roles/owner
+  - role risk: full project administration
+  - trust scope: member is public GCP principal `allUsers`
+  - descendant scope: scope=project:tfstride-demo; descendant_count=20; resource_type_count=19; projects=tfstride-demo
+  - descendant resource types: google_bigquery_dataset: 1; google_bigquery_table: 1; google_cloud_run_v2_service: 1; google_cloudfunctions_function: 1; google_compute_firewall: 2; google_compute_instance: 1; google_compute_network: 1; google_compute_route: 1; google_compute_subnetwork: 1; google_container_cluster: 1; google_container_node_pool: 1; google_kms_crypto_key: 1; google_pubsub_subscription: 1; google_pubsub_topic: 1; google_secret_manager_secret: 1; google_service_account: 1; google_service_account_key: 1; google_sql_database_instance: 1; google_storage_bucket: 1
+  - descendant resources: google_bigquery_dataset.analytics; google_bigquery_table.events; google_cloud_run_v2_service.api; google_cloudfunctions_function.worker; google_compute_firewall.public_admin; google_compute_firewall.public_all; google_compute_instance.web; google_compute_network.main; google_compute_route.default_internet; google_compute_subnetwork.app; and 10 more descendant resources
 
 #### Inherited GCP IAM grant reaches sensitive resources
 

@@ -56,6 +56,7 @@ _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
         GCP_IAM_SCOPE_PROJECT,
     }
 )
+_INHERITED_IAM_BLAST_RADIUS_MIN_DESCENDANTS = 2
 _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
@@ -213,6 +214,7 @@ class _InheritedSensitiveResourceAccess:
     resource_type: str
     risk: str
     data_sensitivity: int
+
 
 
 _HIGH_RISK_SERVICE_ACCOUNT_ROLES: dict[str, str] = {
@@ -1130,6 +1132,109 @@ class GcpRuleDetectors:
                                 evidence_item(
                                     "trust_scope",
                                     [member_assessment.scope_description if member_assessment else ""],
+                                ),
+                                evidence_item(
+                                    "custom_role_permissions",
+                                    custom_role_permissions(role, custom_roles),
+                                ),
+                            ),
+                            severity_reasoning=severity_reasoning,
+                        )
+                    )
+        return findings
+
+    def detect_inherited_iam_blast_radius(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        inheritance_index = context.analysis_indexes.gcp_iam_inheritance
+        custom_roles = build_gcp_custom_role_index(context.inventory.resources)
+
+        for scope, iam_resources in sorted(
+            inheritance_index.iam_resources_by_scope.items(),
+            key=lambda item: item[0].label,
+        ):
+            if scope.scope_type not in _INHERITED_GCP_IAM_SCOPE_TYPES:
+                continue
+            descendants = tuple(
+                sorted(
+                    inheritance_index.descendant_resources_for_scope(scope),
+                    key=lambda resource: resource.address,
+                )
+            )
+            if not _has_inherited_iam_blast_radius(scope, descendants):
+                continue
+
+            for binding in sorted(iam_resources, key=lambda resource: resource.address):
+                for role, member in _iam_resource_binding_members(binding):
+                    role_risk = _inherited_iam_role_risk(scope, role, custom_roles)
+                    member_assessment = _assess_inherited_gcp_iam_member(member, descendants)
+                    if role_risk is None and member_assessment is None:
+                        continue
+                    finding_key = (binding.address, scope.label, role, member)
+                    if finding_key in seen:
+                        continue
+                    seen.add(finding_key)
+
+                    severity_reasoning = build_severity_reasoning(
+                        internet_exposure=bool(member_assessment and member_assessment.is_public),
+                        privilege_breadth=_inherited_iam_blast_radius_privilege_breadth(
+                            role_risk,
+                            member_assessment,
+                        ),
+                        data_sensitivity=_inherited_iam_descendant_data_sensitivity(descendants, role_risk),
+                        lateral_movement=2 if role_risk is not None else 1,
+                        blast_radius=_inherited_iam_scope_blast_radius(scope, descendants, member_assessment),
+                    )
+                    scope_description = _inherited_iam_scope_description(scope)
+                    findings.append(
+                        self._finding_factory.build(
+                            rule_id=rule_id,
+                            severity=severity_reasoning.severity,
+                            affected_resources=_dedupe_addresses(
+                                [binding.address, *[resource.address for resource in descendants]]
+                            ),
+                            trust_boundary_id=None,
+                            rationale=(
+                                f"{binding.display_name} grants `{role}` to `{member}` at "
+                                f"{scope_description}, and that inherited grant applies to "
+                                f"{len(descendants)} concrete descendant resource(s). "
+                                "A high-level IAM grant with broad, external, or high-impact access increases "
+                                "control-plane blast radius because compromise or misuse can affect "
+                                "resources below the inherited scope."
+                            ),
+                            evidence=collect_evidence(
+                                evidence_item(
+                                    "iam_binding",
+                                    [
+                                        f"source={binding.address}",
+                                        f"scope={scope.label}",
+                                        f"member={member}",
+                                        f"role={role}",
+                                    ],
+                                ),
+                                evidence_item("role_risk", [role_risk or ""]),
+                                evidence_item(
+                                    "trust_scope",
+                                    [member_assessment.scope_description if member_assessment else ""],
+                                ),
+                                evidence_item(
+                                    "descendant_scope",
+                                    _inherited_iam_descendant_scope_evidence(scope, descendants),
+                                ),
+                                evidence_item(
+                                    "descendant_resource_types",
+                                    _inherited_iam_descendant_type_evidence(descendants),
+                                ),
+                                evidence_item(
+                                    "descendant_resources",
+                                    _inherited_iam_descendant_resource_evidence(descendants),
                                 ),
                                 evidence_item(
                                     "custom_role_permissions",
@@ -2217,6 +2322,114 @@ def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[st
             seen.add(key)
             members.append(key)
     return members
+
+
+def _has_inherited_iam_blast_radius(
+    scope: GcpIamScopeKey,
+    descendants: tuple[NormalizedResource, ...],
+) -> bool:
+    return len(descendants) >= _INHERITED_IAM_BLAST_RADIUS_MIN_DESCENDANTS
+
+
+def _inherited_iam_role_risk(
+    scope: GcpIamScopeKey,
+    role: str | None,
+    custom_roles: GcpCustomRoleIndex,
+) -> str | None:
+    if scope.scope_type in {GCP_IAM_SCOPE_ORGANIZATION, GCP_IAM_SCOPE_FOLDER}:
+        return _privileged_org_folder_role_risk(role, custom_roles)
+    return _privileged_project_role_risk(role, custom_roles)
+
+
+def _inherited_iam_blast_radius_privilege_breadth(
+    role_risk: str | None,
+    member_assessment: _GcpIamMemberAssessment | None,
+) -> int:
+    if role_risk is not None:
+        return 2
+    if member_assessment is not None and member_assessment.is_broad:
+        return 2
+    return 1
+
+
+def _inherited_iam_descendant_data_sensitivity(
+    descendants: tuple[NormalizedResource, ...],
+    role_risk: str | None,
+) -> int:
+    if role_risk is None:
+        return 0
+    return 2 if any(resource.data_sensitivity == "sensitive" for resource in descendants) else 0
+
+
+def _inherited_iam_scope_blast_radius(
+    scope: GcpIamScopeKey,
+    descendants: tuple[NormalizedResource, ...],
+    member_assessment: _GcpIamMemberAssessment | None,
+) -> int:
+    if scope.scope_type in {GCP_IAM_SCOPE_ORGANIZATION, GCP_IAM_SCOPE_FOLDER}:
+        return 2
+    if member_assessment is not None and member_assessment.is_broad:
+        return 2
+    if len(descendants) >= 5 or len({resource.resource_type for resource in descendants}) >= 3:
+        return 2
+    return 1
+
+
+def _inherited_iam_descendant_scope_evidence(
+    scope: GcpIamScopeKey,
+    descendants: tuple[NormalizedResource, ...],
+) -> list[str]:
+    projects = _descendant_scope_values(descendants, "project")
+    folders = _descendant_scope_values(descendants, "folder")
+    organizations = _descendant_scope_values(descendants, "organization")
+    values = [
+        f"scope={scope.label}",
+        f"descendant_count={len(descendants)}",
+        f"resource_type_count={len({resource.resource_type for resource in descendants})}",
+    ]
+    if projects:
+        values.append(f"projects={', '.join(projects[:5])}")
+    if folders:
+        values.append(f"folders={', '.join(folders[:5])}")
+    if organizations:
+        values.append(f"organizations={', '.join(organizations[:5])}")
+    return values
+
+
+def _inherited_iam_descendant_type_evidence(descendants: tuple[NormalizedResource, ...]) -> list[str]:
+    counts: dict[str, int] = {}
+    for resource in descendants:
+        counts[resource.resource_type] = counts.get(resource.resource_type, 0) + 1
+    return [f"{resource_type}: {counts[resource_type]}" for resource_type in sorted(counts)]
+
+
+def _inherited_iam_descendant_resource_evidence(
+    descendants: tuple[NormalizedResource, ...],
+    *,
+    limit: int = 10,
+) -> list[str]:
+    addresses = [resource.address for resource in descendants]
+    values = addresses[:limit]
+    remaining = len(addresses) - len(values)
+    if remaining > 0:
+        values.append(f"and {remaining} more descendant resources")
+    return values
+
+
+def _descendant_scope_values(
+    descendants: tuple[NormalizedResource, ...],
+    scope_type: str,
+) -> list[str]:
+    values: set[str] = set()
+    for resource in descendants:
+        facts = analysis_facts(resource)
+        if scope_type == "project" and facts.project:
+            values.add(facts.project)
+        elif scope_type == "folder" and facts.folder_id:
+            values.add(facts.folder_id)
+        elif scope_type == "organization" and facts.organization_id:
+            values.add(facts.organization_id)
+    return sorted(values)
 
 
 def _inherited_sensitive_resource_accesses(

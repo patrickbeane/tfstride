@@ -820,12 +820,12 @@ class TFSAnalysisTests(unittest.TestCase):
             "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 16, {"high": 5, "medium": 11}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
-            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 2, {"high": 1, "medium": 1}),
+            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 18, {"high": 6, "medium": 12}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 32, {"high": 13, "medium": 19}),
+            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 5, {"high": 3, "medium": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 19, {"high": 6, "medium": 13}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 33, {"high": 14, "medium": 19}),
         }
 
         expected_titles = {
@@ -859,6 +859,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "gcp-baseline": {
                 "Cloud SQL point-in-time recovery is disabled": 1,
                 "GCP project IAM binding grants a high-privilege role": 1,
+                "Inherited GCP IAM grant expands descendant blast radius": 1,
             },
             "gcp-lb-compute-sql": {},
             "gcp-serverless": {
@@ -870,6 +871,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCP project IAM binding grants a high-privilege role": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Inherited GCP IAM grant reaches sensitive resources": 1,
+                "Inherited GCP IAM grant expands descendant blast radius": 1,
             },
             "gcp-inventory": {
                 "BigQuery IAM binding allows public or broad data access": 1,
@@ -887,6 +889,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 1,
+                "Inherited GCP IAM grant expands descendant blast radius": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
@@ -918,6 +921,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 3,
                 "Inherited GCP IAM grant reaches sensitive resources": 1,
+                "Inherited GCP IAM grant expands descendant blast radius": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },
@@ -946,7 +950,7 @@ class TFSAnalysisTests(unittest.TestCase):
             result.analysis_coverage.resources.unsupported_resource_types,
             {"google_logging_project_sink": 1},
         )
-        self.assertEqual(len(result.findings), 18)
+        self.assertEqual(len(result.findings), 19)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)

@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **0 trust boundaries** and **4 findings** across **8 normalized resources**.
+This run identified **0 trust boundaries** and **5 findings** across **8 normalized resources**.
 
-- High severity findings: `2`
+- High severity findings: `3`
 - Medium severity findings: `2`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **0 trust boundaries** and **4 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `46`
-- Enabled rules: `46`
+- Registered rules: `47`
+- Enabled rules: `47`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -28,6 +28,7 @@ This run identified **0 trust boundaries** and **4 findings** across **8 normali
   - `gcp-sensitive-resource-iam-external-access`: `2`
   - `gcp-project-iam-privileged-role`: `1`
   - `gcp-inherited-iam-sensitive-resource-access`: `1`
+  - `gcp-inherited-iam-blast-radius`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -48,6 +49,22 @@ No trust boundaries were discovered.
 - Evidence:
   - iam binding: member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com; role=roles/editor
   - role risk: broad write access across most project services
+
+#### Inherited GCP IAM grant expands descendant blast radius
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.partner_editor`, `google_compute_network.main`, `google_compute_subnetwork.app`, `google_kms_crypto_key.customer`, `google_secret_manager_secret.api_key`, `google_service_account.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +2, lateral_movement +2, blast_radius +2, final_score 8 => high
+- Rationale: google_project_iam_member.partner_editor grants `roles/editor` to `serviceAccount:deployer@partner-project.iam.gserviceaccount.com` at project scope `tfstride-demo`, and that inherited grant applies to 5 concrete descendant resource(s). A high-level IAM grant with broad, external, or high-impact access increases control-plane blast radius because compromise or misuse can affect resources below the inherited scope.
+- Recommended mitigation: Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower resource-level or workload-specific bindings are possible; split inherited roles by service and review descendant resources before assigning public, external, or administrator principals.
+- Evidence:
+  - iam binding: source=google_project_iam_member.partner_editor; scope=project:tfstride-demo; member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com; role=roles/editor
+  - role risk: broad write access across most project services
+  - trust scope: service account belongs to project `partner-project`, outside resource project `tfstride-demo`
+  - descendant scope: scope=project:tfstride-demo; descendant_count=5; resource_type_count=5; projects=tfstride-demo
+  - descendant resource types: google_compute_network: 1; google_compute_subnetwork: 1; google_kms_crypto_key: 1; google_secret_manager_secret: 1; google_service_account: 1
+  - descendant resources: google_compute_network.main; google_compute_subnetwork.app; google_kms_crypto_key.customer; google_secret_manager_secret.api_key; google_service_account.web
 
 #### Inherited GCP IAM grant reaches sensitive resources
 

@@ -599,6 +599,24 @@ DEFAULT_RULE_METADATA = (
             "blast_radius",
         ),
     ),
+    RuleMetadata(
+        rule_id="gcp-inherited-iam-blast-radius",
+        title="Inherited GCP IAM grant expands descendant blast radius",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower "
+            "resource-level or workload-specific bindings are possible; split inherited roles by service and "
+            "review descendant resources before assigning public, external, or administrator principals."
+        ),
+        tags=("gcp", "iam", "inheritance", "blast-radius"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
 )
 
 

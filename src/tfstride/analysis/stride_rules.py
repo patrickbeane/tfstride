@@ -75,6 +75,7 @@ _RULE_GROUP_IDS = (
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role",
         "gcp-inherited-iam-sensitive-resource-access",
+        "gcp-inherited-iam-blast-radius",
     ),
     (
         "aws-private-data-transitive-exposure",
@@ -190,6 +191,7 @@ class StrideRuleEngine:
             "gcp-inherited-iam-sensitive-resource-access": (
                 gcp_detectors.detect_inherited_iam_sensitive_resource_access
             ),
+            "gcp-inherited-iam-blast-radius": gcp_detectors.detect_inherited_iam_blast_radius,
             "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,
             "aws-control-plane-sensitive-workload-chain": (
                 path_chain_detectors.detect_control_plane_sensitive_workload_chain

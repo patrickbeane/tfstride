@@ -84,6 +84,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-project-iam-broad-principal", output)
         self.assertIn("- gcp-project-iam-privileged-role", output)
         self.assertIn("- gcp-inherited-iam-sensitive-resource-access", output)
+        self.assertIn("- gcp-inherited-iam-blast-radius", output)
         self.assertTrue(output.endswith("\n"))
 
     def test_cli_lists_rules_as_json_without_plan(self) -> None:
@@ -235,7 +236,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["provider"], "gcp")
         self.assertEqual(len(report["inventory"]["resources"]), 22)
         self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
-        self.assertEqual(report["summary"]["active_findings"], 18)
+        self.assertEqual(report["summary"]["active_findings"], 19)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **18 findings** across **22 normalized resources**.
+This run identified **4 trust boundaries** and **19 findings** across **22 normalized resources**.
 
 - High severity findings: `6`
-- Medium severity findings: `12`
+- Medium severity findings: `13`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **4 trust boundaries** and **18 findings** across **22 norma
 - Provider resources considered: `23`
 - Normalized resources: `22`
 - Unsupported resources: `1`
-- Registered rules: `46`
-- Enabled rules: `46`
+- Registered rules: `47`
+- Enabled rules: `47`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -44,6 +44,7 @@ This run identified **4 trust boundaries** and **18 findings** across **22 norma
   - `gcp-compute-os-login-disabled`: `1`
   - `gcp-service-account-key-hygiene`: `1`
   - `gcp-service-account-key-effective-access`: `1`
+  - `gcp-inherited-iam-blast-radius`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -276,6 +277,21 @@ This run identified **4 trust boundaries** and **18 findings** across **22 norma
 - Recommended mitigation: Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules that match recovery objectives and storage cost constraints.
 - Evidence:
   - data protection posture: versioning.enabled is false; data_sensitivity is sensitive
+
+#### Inherited GCP IAM grant expands descendant blast radius
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_project_iam_member.web_viewer`, `google_bigquery_dataset.analytics`, `google_bigquery_table.events`, `google_compute_firewall.public_app`, `google_compute_firewall.public_ssh`, `google_compute_instance.web`, `google_compute_network.main`, `google_compute_route.default_internet`, `google_compute_subnetwork.app`, `google_kms_crypto_key.customer`, `google_pubsub_subscription.events`, `google_pubsub_topic.events`, `google_secret_manager_secret.api_key`, `google_service_account.web`, `google_service_account_key.web`, `google_sql_database_instance.app`, `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 4 => medium
+- Rationale: google_project_iam_member.web_viewer grants `roles/viewer` to `serviceAccount:tfstride-web@example.iam.gserviceaccount.com` at project scope `tfstride-demo`, and that inherited grant applies to 16 concrete descendant resource(s). A high-level IAM grant with broad, external, or high-impact access increases control-plane blast radius because compromise or misuse can affect resources below the inherited scope.
+- Recommended mitigation: Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower resource-level or workload-specific bindings are possible; split inherited roles by service and review descendant resources before assigning public, external, or administrator principals.
+- Evidence:
+  - iam binding: source=google_project_iam_member.web_viewer; scope=project:tfstride-demo; member=serviceAccount:tfstride-web@example.iam.gserviceaccount.com; role=roles/viewer
+  - trust scope: service account belongs to project `example`, outside resource project `tfstride-demo`
+  - descendant scope: scope=project:tfstride-demo; descendant_count=16; resource_type_count=15; projects=tfstride-demo
+  - descendant resource types: google_bigquery_dataset: 1; google_bigquery_table: 1; google_compute_firewall: 2; google_compute_instance: 1; google_compute_network: 1; google_compute_route: 1; google_compute_subnetwork: 1; google_kms_crypto_key: 1; google_pubsub_subscription: 1; google_pubsub_topic: 1; google_secret_manager_secret: 1; google_service_account: 1; google_service_account_key: 1; google_sql_database_instance: 1; google_storage_bucket: 1
+  - descendant resources: google_bigquery_dataset.analytics; google_bigquery_table.events; google_compute_firewall.public_app; google_compute_firewall.public_ssh; google_compute_instance.web; google_compute_network.main; google_compute_route.default_internet; google_compute_subnetwork.app; google_kms_crypto_key.customer; google_pubsub_subscription.events; and 6 more descendant resources
 
 #### Internet-exposed GCP compute instance permits broad ingress
 
