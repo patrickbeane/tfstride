@@ -2,29 +2,19 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
+from tfstride.providers.gcp.constants import (
+    GCP_IAM_POLICY_RESOURCE_TYPES,
+    GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+)
 from tfstride.providers.resource_capabilities import ResourceCapability
 
 
 GCP_RESOURCE_CAPABILITIES = MappingProxyType(
     {
-        ResourceCapability.WORKLOAD: frozenset(
-            {
-                "google_cloud_run_service",
-                "google_cloud_run_v2_service",
-                "google_cloudfunctions_function",
-                "google_cloudfunctions2_function",
-                "google_compute_instance",
-            }
-        ),
-        ResourceCapability.PUBLIC_COMPUTE: frozenset(
-            {
-                "google_cloud_run_service",
-                "google_cloud_run_v2_service",
-                "google_cloudfunctions_function",
-                "google_cloudfunctions2_function",
-                "google_compute_instance",
-            }
-        ),
+        ResourceCapability.WORKLOAD: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
+        | frozenset({"google_compute_instance"}),
+        ResourceCapability.PUBLIC_COMPUTE: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
+        | frozenset({"google_compute_instance"}),
         ResourceCapability.DATA_STORE: frozenset(
             {
                 "google_bigquery_dataset",
@@ -36,13 +26,10 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
                 "google_storage_bucket",
             }
         ),
-        ResourceCapability.PUBLIC_EDGE: frozenset(
+        ResourceCapability.PUBLIC_EDGE: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
+        | frozenset(
             {
                 "google_compute_forwarding_rule",
-                "google_cloud_run_service",
-                "google_cloud_run_v2_service",
-                "google_cloudfunctions_function",
-                "google_cloudfunctions2_function",
                 "google_compute_global_forwarding_rule",
                 "google_compute_instance",
                 "google_container_cluster",
@@ -51,60 +38,7 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
             }
         ),
         ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
-        ResourceCapability.IAM_POLICY: frozenset(
-            {
-                "google_bigquery_dataset_iam_binding",
-                "google_bigquery_dataset_iam_member",
-                "google_bigquery_dataset_iam_policy",
-                "google_bigquery_table_iam_binding",
-                "google_bigquery_table_iam_member",
-                "google_bigquery_table_iam_policy",
-                "google_cloud_run_service_iam_binding",
-                "google_cloud_run_service_iam_member",
-                "google_cloud_run_service_iam_policy",
-                "google_cloud_run_v2_service_iam_binding",
-                "google_cloud_run_v2_service_iam_member",
-                "google_cloud_run_v2_service_iam_policy",
-                "google_cloudfunctions_function_iam_binding",
-                "google_cloudfunctions_function_iam_member",
-                "google_cloudfunctions_function_iam_policy",
-                "google_cloudfunctions2_function_iam_binding",
-                "google_cloudfunctions2_function_iam_member",
-                "google_cloudfunctions2_function_iam_policy",
-                "google_kms_crypto_key_iam_binding",
-                "google_kms_crypto_key_iam_member",
-                "google_kms_crypto_key_iam_policy",
-                "google_kms_key_ring_iam_binding",
-                "google_kms_key_ring_iam_member",
-                "google_kms_key_ring_iam_policy",
-                "google_folder_iam_binding",
-                "google_folder_iam_member",
-                "google_folder_iam_policy",
-                "google_organization_iam_binding",
-                "google_organization_iam_custom_role",
-                "google_organization_iam_member",
-                "google_organization_iam_policy",
-                "google_project_iam_binding",
-                "google_project_iam_custom_role",
-                "google_project_iam_member",
-                "google_project_iam_policy",
-                "google_pubsub_subscription_iam_binding",
-                "google_pubsub_subscription_iam_member",
-                "google_pubsub_subscription_iam_policy",
-                "google_pubsub_topic_iam_binding",
-                "google_pubsub_topic_iam_member",
-                "google_pubsub_topic_iam_policy",
-                "google_secret_manager_secret_iam_binding",
-                "google_secret_manager_secret_iam_member",
-                "google_secret_manager_secret_iam_policy",
-                "google_service_account_iam_binding",
-                "google_service_account_iam_member",
-                "google_service_account_iam_policy",
-                "google_storage_bucket_iam_binding",
-                "google_storage_bucket_iam_member",
-                "google_storage_bucket_iam_policy",
-            }
-        ),
+        ResourceCapability.IAM_POLICY: GCP_IAM_POLICY_RESOURCE_TYPES,
         ResourceCapability.NETWORK_SECURITY_GROUP: frozenset({"google_compute_firewall"}),
         ResourceCapability.SUBNET: frozenset({"google_compute_subnetwork"}),
         ResourceCapability.DATABASE: frozenset({"google_sql_database_instance"}),
@@ -112,14 +46,7 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.SECRET_STORE: frozenset({"google_secret_manager_secret"}),
         ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset({"google_secret_manager_secret"}),
         ResourceCapability.KEY_MANAGEMENT: frozenset({"google_kms_crypto_key"}),
-        ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: frozenset(
-            {
-                "google_cloud_run_service",
-                "google_cloud_run_v2_service",
-                "google_cloudfunctions_function",
-                "google_cloudfunctions2_function",
-            }
-        ),
+        ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
         ResourceCapability.SENSITIVE_RESOURCE_POLICY: frozenset(
             {
                 "google_bigquery_dataset",

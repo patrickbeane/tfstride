@@ -7,6 +7,12 @@ from typing import TypeVar
 
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.constants import (
+    GCP_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_IAM_GRANT_RESOURCE_TYPES,
+    GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
+    GCP_PROJECT_IAM_RESOURCE_TYPES,
+)
 
 _T = TypeVar("_T")
 
@@ -14,69 +20,6 @@ GCP_IAM_SCOPE_ORGANIZATION = "organization"
 GCP_IAM_SCOPE_FOLDER = "folder"
 GCP_IAM_SCOPE_PROJECT = "project"
 GCP_IAM_SCOPE_RESOURCE = "resource"
-
-_PROJECT_IAM_RESOURCE_TYPES = frozenset(
-    {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
-)
-_ORGANIZATION_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_organization_iam_binding",
-        "google_organization_iam_member",
-        "google_organization_iam_policy",
-    }
-)
-_FOLDER_IAM_RESOURCE_TYPES = frozenset(
-    {"google_folder_iam_binding", "google_folder_iam_member", "google_folder_iam_policy"}
-)
-_RESOURCE_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_service_account_iam_binding",
-        "google_service_account_iam_member",
-        "google_service_account_iam_policy",
-        "google_storage_bucket_iam_binding",
-        "google_storage_bucket_iam_member",
-        "google_storage_bucket_iam_policy",
-        "google_secret_manager_secret_iam_binding",
-        "google_secret_manager_secret_iam_member",
-        "google_secret_manager_secret_iam_policy",
-        "google_pubsub_topic_iam_binding",
-        "google_pubsub_topic_iam_member",
-        "google_pubsub_topic_iam_policy",
-        "google_pubsub_subscription_iam_binding",
-        "google_pubsub_subscription_iam_member",
-        "google_pubsub_subscription_iam_policy",
-        "google_bigquery_dataset_iam_binding",
-        "google_bigquery_dataset_iam_member",
-        "google_bigquery_dataset_iam_policy",
-        "google_bigquery_table_iam_binding",
-        "google_bigquery_table_iam_member",
-        "google_bigquery_table_iam_policy",
-        "google_kms_crypto_key_iam_binding",
-        "google_kms_crypto_key_iam_member",
-        "google_kms_crypto_key_iam_policy",
-        "google_kms_key_ring_iam_binding",
-        "google_kms_key_ring_iam_member",
-        "google_kms_key_ring_iam_policy",
-        "google_cloud_run_service_iam_binding",
-        "google_cloud_run_service_iam_member",
-        "google_cloud_run_service_iam_policy",
-        "google_cloud_run_v2_service_iam_binding",
-        "google_cloud_run_v2_service_iam_member",
-        "google_cloud_run_v2_service_iam_policy",
-        "google_cloudfunctions_function_iam_binding",
-        "google_cloudfunctions_function_iam_member",
-        "google_cloudfunctions_function_iam_policy",
-        "google_cloudfunctions2_function_iam_binding",
-        "google_cloudfunctions2_function_iam_member",
-        "google_cloudfunctions2_function_iam_policy",
-    }
-)
-_GCP_IAM_GRANT_RESOURCE_TYPES = (
-    _PROJECT_IAM_RESOURCE_TYPES
-    | _ORGANIZATION_IAM_RESOURCE_TYPES
-    | _FOLDER_IAM_RESOURCE_TYPES
-    | _RESOURCE_IAM_RESOURCE_TYPES
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +113,7 @@ def build_gcp_iam_inheritance_index(
     unresolved_iam_resources: list[NormalizedResource] = []
 
     for resource in resource_tuple:
-        if resource.resource_type not in _GCP_IAM_GRANT_RESOURCE_TYPES:
+        if resource.resource_type not in GCP_IAM_GRANT_RESOURCE_TYPES:
             continue
         resolved_scopes = _resolve_iam_resource_scopes(resource, reference_index)
         if not resolved_scopes:
@@ -225,17 +168,17 @@ def _resolve_iam_resource_scopes(
     reference_index: Mapping[str, tuple[NormalizedResource, ...]],
 ) -> list[tuple[GcpIamScopeKey, NormalizedResource | None]]:
     facts = analysis_facts(resource)
-    if resource.resource_type in _PROJECT_IAM_RESOURCE_TYPES:
+    if resource.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
         project = _normalize_project_id(facts.project)
         if project:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_PROJECT, project), None)]
         return []
-    if resource.resource_type in _ORGANIZATION_IAM_RESOURCE_TYPES:
+    if resource.resource_type in GCP_ORGANIZATION_IAM_RESOURCE_TYPES:
         organization_id = _normalize_hierarchy_id(facts.organization_id, "organizations")
         if organization_id:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_ORGANIZATION, organization_id), None)]
         return []
-    if resource.resource_type in _FOLDER_IAM_RESOURCE_TYPES:
+    if resource.resource_type in GCP_FOLDER_IAM_RESOURCE_TYPES:
         folder_id = _normalize_hierarchy_id(facts.folder_id, "folders")
         if folder_id:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_FOLDER, folder_id), None)]
@@ -411,7 +354,7 @@ def _descendant_candidates(resources: list[NormalizedResource]) -> list[Normaliz
 
 
 def _is_descendant_candidate(resource: NormalizedResource) -> bool:
-    return resource.resource_type not in _GCP_IAM_GRANT_RESOURCE_TYPES
+    return resource.resource_type not in GCP_IAM_GRANT_RESOURCE_TYPES
 
 
 def _append_unique(items: list[_T], item: _T, key_getter: Callable[[_T], str]) -> None:

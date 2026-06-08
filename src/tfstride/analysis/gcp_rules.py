@@ -21,34 +21,18 @@ from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
+from tfstride.providers.gcp.constants import (
+    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_GKE_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_PROJECT_IAM_RESOURCE_TYPES,
+    GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
+    PUBLIC_GCP_IAM_MEMBERS,
+)
 from tfstride.resource_helpers import describe_security_group_rule
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
-_CLOUD_RUN_RESOURCE_TYPES = frozenset({"google_cloud_run_service", "google_cloud_run_v2_service"})
-_CLOUD_FUNCTION_RESOURCE_TYPES = frozenset(
-    {"google_cloudfunctions_function", "google_cloudfunctions2_function"}
-)
-_GKE_RESOURCE_TYPES = frozenset({"google_container_cluster", "google_container_node_pool"})
-_PROJECT_IAM_RESOURCE_TYPES = frozenset(
-    {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
-)
-_ORG_FOLDER_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_organization_iam_binding",
-        "google_organization_iam_member",
-        "google_organization_iam_policy",
-        "google_folder_iam_binding",
-        "google_folder_iam_member",
-        "google_folder_iam_policy",
-    }
-)
-_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_service_account_iam_binding",
-        "google_service_account_iam_member",
-        "google_service_account_iam_policy",
-    }
-)
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {
         GCP_IAM_SCOPE_ORGANIZATION,
@@ -82,7 +66,6 @@ _BIGQUERY_DATA_ACCESS_ROLES = frozenset(
         "roles/owner",
     }
 )
-_PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
     {
         "https://www.googleapis.com/auth/cloud-platform",
@@ -489,7 +472,7 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for resource in context.inventory.by_type(*_GKE_RESOURCE_TYPES):
+        for resource in context.inventory.by_type(*GCP_GKE_RESOURCE_TYPES):
             resource_facts = analysis_facts(resource)
             if resource_facts.gke_legacy_metadata_endpoints_enabled is not True:
                 continue
@@ -534,7 +517,7 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for resource in context.inventory.by_type(*_GKE_RESOURCE_TYPES):
+        for resource in context.inventory.by_type(*GCP_GKE_RESOURCE_TYPES):
             resource_facts = analysis_facts(resource)
             risk_descriptions = _gke_node_identity_risks(resource)
             if not risk_descriptions:
@@ -576,7 +559,7 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for service in context.inventory.by_type(*_CLOUD_RUN_RESOURCE_TYPES):
+        for service in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = _cloud_run_public_invoker_bindings(service)
             if not service.public_exposure or not public_invokers:
                 continue
@@ -629,7 +612,7 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for function in context.inventory.by_type(*_CLOUD_FUNCTION_RESOURCE_TYPES):
+        for function in context.inventory.by_type(*GCP_CLOUD_FUNCTION_RESOURCE_TYPES):
             public_invokers = _cloud_function_public_invoker_bindings(function)
             if not function.public_exposure or not public_invokers:
                 continue
@@ -851,7 +834,7 @@ class GcpRuleDetectors:
 
         findings: list[Finding] = []
         inventory = context.inventory
-        for binding in inventory.by_type(*_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
+        for binding in inventory.by_type(*GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
             target = _service_account_iam_target(binding, inventory)
             for role, member in _iam_resource_binding_members(binding):
                 assessment = _assess_gcp_broad_iam_member(member)
@@ -908,7 +891,7 @@ class GcpRuleDetectors:
 
         findings: list[Finding] = []
         inventory = context.inventory
-        for binding in inventory.by_type(*_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
+        for binding in inventory.by_type(*GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
             target = _service_account_iam_target(binding, inventory)
             for role, member in _iam_resource_binding_members(binding):
                 role_risk = _high_risk_service_account_role_risk(role)
@@ -965,9 +948,9 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for binding in context.inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
+        for binding in context.inventory.by_type(*GCP_PROJECT_IAM_RESOURCE_TYPES):
             for role, member in _project_iam_binding_members(binding):
-                if member not in _PUBLIC_GCP_IAM_MEMBERS:
+                if member not in PUBLIC_GCP_IAM_MEMBERS:
                     continue
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=True,
@@ -1005,7 +988,7 @@ class GcpRuleDetectors:
 
         findings: list[Finding] = []
         custom_roles = build_gcp_custom_role_index(context.inventory.resources)
-        for binding in context.inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
+        for binding in context.inventory.by_type(*GCP_PROJECT_IAM_RESOURCE_TYPES):
             for role, member in _project_iam_binding_members(binding):
                 role_risk = _privileged_project_role_risk(role, custom_roles)
                 if role_risk is None:
@@ -1407,7 +1390,7 @@ class GcpRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for binding in context.inventory.by_type(*_ORG_FOLDER_IAM_RESOURCE_TYPES):
+        for binding in context.inventory.by_type(*GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
             scope = _org_folder_scope_description(binding)
             for role, member in _org_folder_iam_binding_members(binding):
                 assessment = _assess_gcp_broad_iam_member(member)
@@ -1451,7 +1434,7 @@ class GcpRuleDetectors:
 
         findings: list[Finding] = []
         custom_roles = build_gcp_custom_role_index(context.inventory.resources)
-        for binding in context.inventory.by_type(*_ORG_FOLDER_IAM_RESOURCE_TYPES):
+        for binding in context.inventory.by_type(*GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
             scope = _org_folder_scope_description(binding)
             for role, member in _org_folder_iam_binding_members(binding):
                 role_risk = _privileged_org_folder_role_risk(role, custom_roles)
@@ -2050,7 +2033,7 @@ def _assess_gcp_sensitive_iam_member(
     normalized_member = str(member).strip()
     if not normalized_member:
         return None
-    if normalized_member in _PUBLIC_GCP_IAM_MEMBERS:
+    if normalized_member in PUBLIC_GCP_IAM_MEMBERS:
         return _GcpIamMemberAssessment(
             member=normalized_member,
             scope_description=f"member is public GCP principal `{normalized_member}`",
@@ -2143,7 +2126,7 @@ def _keyed_service_account_effective_access_grants(
         seen.add(dedupe_key)
         grants.append(grant)
 
-    for binding in inventory.by_type(*_PROJECT_IAM_RESOURCE_TYPES):
+    for binding in inventory.by_type(*GCP_PROJECT_IAM_RESOURCE_TYPES):
         for role, member in _project_iam_binding_members(binding):
             if not _member_matches_service_account_principal(member, principals):
                 continue
@@ -2176,7 +2159,7 @@ def _keyed_service_account_effective_access_grants(
                     )
                 )
 
-    for binding in inventory.by_type(*_ORG_FOLDER_IAM_RESOURCE_TYPES):
+    for binding in inventory.by_type(*GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
         scope = _org_folder_scope_description(binding)
         for role, member in _org_folder_iam_binding_members(binding):
             if not _member_matches_service_account_principal(member, principals):
@@ -2196,7 +2179,7 @@ def _keyed_service_account_effective_access_grants(
                 )
             )
 
-    for binding in inventory.by_type(*_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
+    for binding in inventory.by_type(*GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES):
         iam_target = _service_account_iam_target(binding, inventory)
         for role, member in _iam_resource_binding_members(binding):
             if not _member_matches_service_account_principal(member, principals):
@@ -2617,7 +2600,7 @@ def _assess_gcp_broad_iam_member(member: str) -> _GcpIamMemberAssessment | None:
     normalized_member = str(member).strip()
     if not normalized_member:
         return None
-    if normalized_member in _PUBLIC_GCP_IAM_MEMBERS:
+    if normalized_member in PUBLIC_GCP_IAM_MEMBERS:
         return _GcpIamMemberAssessment(
             member=normalized_member,
             scope_description=f"member is public GCP principal `{normalized_member}`",
@@ -2727,7 +2710,7 @@ def _public_invoker_bindings(
             continue
         source = str(binding.get("source") or "").strip()
         for member in _binding_members(binding):
-            if member in _PUBLIC_GCP_IAM_MEMBERS:
+            if member in PUBLIC_GCP_IAM_MEMBERS:
                 bindings.append((source, role, member))
     return bindings
 

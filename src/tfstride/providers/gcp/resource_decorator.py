@@ -7,11 +7,24 @@ from types import MappingProxyType
 from typing import Any
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.constants import (
+    GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
+    GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_IAM_RESOURCE_TYPES,
+    GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
+    GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
+    GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES,
+    GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES,
+    GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
+    GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
+    PUBLIC_GCP_IAM_MEMBERS,
+)
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_helpers import describe_security_group_rule
 
 
-_PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 _GCP_NETWORK_NAME_PATTERN = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _TERRAFORM_REFERENCE_TOKEN_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]\"-"
@@ -35,7 +48,7 @@ class GcpResourceDecorator:
             elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
                 _infer_instance_vpc_id(resource, index)
                 _derive_instance_network_posture(resource, index)
-            elif resource.resource_type in _SERVERLESS_WORKLOAD_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES:
                 _derive_public_serverless_exposure(resource, index)
             elif resource.resource_type == "google_secret_manager_secret":
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
@@ -49,7 +62,7 @@ class GcpResourceDecorator:
                 _derive_sensitive_resource_iam_bindings(resource, index.bigquery_table_iam_resources)
             elif resource.resource_type == "google_kms_crypto_key":
                 _derive_sensitive_resource_iam_bindings(
-                    resource, 
+                    resource,
                     index.kms_crypto_key_iam_resources + index.kms_key_ring_iam_resources,
                 )
             elif resource.resource_type == "google_storage_bucket":
@@ -111,25 +124,25 @@ class _GcpResourceIndex:
                 router_nats.append(resource)
             elif resource.resource_type == "google_compute_firewall":
                 firewalls.append(resource)
-            elif resource.resource_type in _GCS_BUCKET_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
                 bucket_iam_resources.append(resource)
-            elif resource.resource_type in _SECRET_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES:
                 secret_iam_resources.append(resource)
-            elif resource.resource_type in _PUBSUB_TOPIC_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES:
                 pubsub_topic_iam_resources.append(resource)
-            elif resource.resource_type in _PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES:
                 pubsub_subscription_iam_resources.append(resource)
-            elif resource.resource_type in _BIGQUERY_DATASET_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES:
                 bigquery_dataset_iam_resources.append(resource)
-            elif resource.resource_type in _BIGQUERY_TABLE_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES:
                 bigquery_table_iam_resources.append(resource)
-            elif resource.resource_type in _KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
                 kms_crypto_key_iam_resources.append(resource)
-            elif resource.resource_type in _KMS_KEY_RING_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES:
                 kms_key_ring_iam_resources.append(resource)
-            elif resource.resource_type in _CLOUD_RUN_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_CLOUD_RUN_IAM_RESOURCE_TYPES:
                 cloud_run_iam_resources.append(resource)
-            elif resource.resource_type in _CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
+            elif resource.resource_type in GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
                 cloud_function_iam_resources.append(resource)
         return cls(
             network_references=MappingProxyType(network_references),
@@ -151,93 +164,7 @@ class _GcpResourceIndex:
         )
 
 
-_SERVERLESS_WORKLOAD_RESOURCE_TYPES = frozenset(
-    {
-        "google_cloud_run_service",
-        "google_cloud_run_v2_service",
-        "google_cloudfunctions_function",
-        "google_cloudfunctions2_function",
-    }
-)
-_CLOUD_RUN_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_cloud_run_service_iam_binding",
-        "google_cloud_run_service_iam_member",
-        "google_cloud_run_service_iam_policy",
-        "google_cloud_run_v2_service_iam_binding",
-        "google_cloud_run_v2_service_iam_member",
-        "google_cloud_run_v2_service_iam_policy",
-    }
-)
-_CLOUD_FUNCTION_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_cloudfunctions_function_iam_binding",
-        "google_cloudfunctions_function_iam_member",
-        "google_cloudfunctions_function_iam_policy",
-        "google_cloudfunctions2_function_iam_binding",
-        "google_cloudfunctions2_function_iam_member",
-        "google_cloudfunctions2_function_iam_policy",
-    }
-)
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
-
-_GCS_BUCKET_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_storage_bucket_iam_binding",
-        "google_storage_bucket_iam_member",
-        "google_storage_bucket_iam_policy",
-    }
-)
-_SECRET_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_secret_manager_secret_iam_binding",
-        "google_secret_manager_secret_iam_member",
-        "google_secret_manager_secret_iam_policy",
-    }
-)
-_PUBSUB_TOPIC_IAM_RESOURCE_TYPES = frozenset(
-	{
-	    "google_pubsub_topic_iam_binding",
-	    "google_pubsub_topic_iam_member",
-	    "google_pubsub_topic_iam_policy",
-	}
-)
-_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_pubsub_subscription_iam_binding",
-	    "google_pubsub_subscription_iam_member",
-	    "google_pubsub_subscription_iam_policy",
-	    }
-)
-_BIGQUERY_DATASET_IAM_RESOURCE_TYPES = frozenset(
-	{
-		"google_bigquery_dataset_iam_binding",
-		"google_bigquery_dataset_iam_member",
-		"google_bigquery_dataset_iam_policy",
-	}
-)
-_BIGQUERY_TABLE_IAM_RESOURCE_TYPES = frozenset(
-	{
-	    "google_bigquery_table_iam_binding",
-		"google_bigquery_table_iam_member",
-		"google_bigquery_table_iam_policy",
-	}
-)
-
-_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES = frozenset(
-    {
-        "google_kms_crypto_key_iam_binding",
-        "google_kms_crypto_key_iam_member",
-        "google_kms_crypto_key_iam_policy",
-    }
-)
-_KMS_KEY_RING_IAM_RESOURCE_TYPES = frozenset(
-	{
-	    "google_kms_key_ring_iam_binding",
-	    "google_kms_key_ring_iam_member",
-	    "google_kms_key_ring_iam_policy",
-	}
-)
 
 
 def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -451,7 +378,7 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourc
             public_members = sorted(
                 member
                 for member in _binding_members(binding)
-                if member in _PUBLIC_GCP_IAM_MEMBERS
+                if member in PUBLIC_GCP_IAM_MEMBERS
             )
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
@@ -475,7 +402,7 @@ def _serverless_public_access_reasons(
             public_members = sorted(
                 member
                 for member in _binding_members(binding)
-                if member in _PUBLIC_GCP_IAM_MEMBERS
+                if member in PUBLIC_GCP_IAM_MEMBERS
             )
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
@@ -497,10 +424,10 @@ def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
         return pubsub_subscription_reference
     bigquery_table_reference = resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE)
     if bigquery_table_reference:
-	    return bigquery_table_reference
+        return bigquery_table_reference
     bigquery_dataset_reference = resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE)
     if bigquery_dataset_reference:
-	    return bigquery_dataset_reference
+        return bigquery_dataset_reference
     cloud_run_reference = resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE)
     if cloud_run_reference:
         return cloud_run_reference
@@ -509,7 +436,7 @@ def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
         return cloud_function_reference
     crypto_key_reference = resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE)
     if crypto_key_reference:
-	    return crypto_key_reference
+        return crypto_key_reference
     return resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING)
 
 
@@ -736,14 +663,14 @@ def _network_reference_key(value: str) -> str:
 def _reference_key(value: str) -> str:
     text = str(value).strip()
     for suffix in (
-	    ".id",
-	    ".name",
-	    ".secret_id",
-	    ".crypto_key_id",
-	    ".dataset_id",
-	    ".table_id",
-	    ".self_link",
-	):
+        ".id",
+        ".name",
+        ".secret_id",
+        ".crypto_key_id",
+        ".dataset_id",
+        ".table_id",
+        ".self_link",
+    ):
         if text.endswith(suffix):
             return text[: -len(suffix)]
     return text

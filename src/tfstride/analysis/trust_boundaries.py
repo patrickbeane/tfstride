@@ -32,11 +32,7 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
-
-
-_PROJECT_IAM_RESOURCE_TYPES = frozenset(
-    {"google_project_iam_binding", "google_project_iam_member", "google_project_iam_policy"}
-)
+from tfstride.providers.gcp.constants import GCP_PROJECT_IAM_RESOURCE_TYPES
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,7 +223,7 @@ def _build_data_store_candidate_index(
     project_iam_resources: list[NormalizedResource] = []
 
     for resource in resources:
-        if resource.resource_type in _PROJECT_IAM_RESOURCE_TYPES:
+        if resource.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
             project_iam_resources.append(resource)
 
     for data_store in data_stores:

@@ -3,6 +3,31 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.gcp.constants import (
+    GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
+    GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_CUSTOM_ROLE_RESOURCE_TYPES,
+    GCP_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_IAM_GRANT_RESOURCE_TYPES,
+    GCP_IAM_POLICY_RESOURCE_TYPES,
+    GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
+    GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
+    GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_PROJECT_IAM_RESOURCE_TYPES,
+    GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES,
+    GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES,
+    GCP_RESOURCE_IAM_RESOURCE_TYPES,
+    GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
+    GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+    GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
+    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
+    PUBLIC_GCP_IAM_MEMBERS,
+)
 from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
@@ -109,6 +134,45 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
         self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
+
+    def test_shared_gcp_constants_match_supported_resource_contract(self) -> None:
+        self.assertEqual(PUBLIC_GCP_IAM_MEMBERS, frozenset({"allUsers", "allAuthenticatedUsers"}))
+        self.assertEqual(
+            GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+            GCP_CLOUD_RUN_RESOURCE_TYPES | GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+        )
+        self.assertEqual(
+            GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
+            GCP_ORGANIZATION_IAM_RESOURCE_TYPES | GCP_FOLDER_IAM_RESOURCE_TYPES,
+        )
+        self.assertEqual(
+            GCP_RESOURCE_IAM_RESOURCE_TYPES,
+            GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES
+            | GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
+            | GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES
+            | GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES
+            | GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES
+            | GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES
+            | GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES
+            | GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES
+            | GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES
+            | GCP_CLOUD_RUN_IAM_RESOURCE_TYPES
+            | GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
+        )
+        self.assertEqual(
+            GCP_IAM_GRANT_RESOURCE_TYPES,
+            GCP_PROJECT_IAM_RESOURCE_TYPES
+            | GCP_ORGANIZATION_IAM_RESOURCE_TYPES
+            | GCP_FOLDER_IAM_RESOURCE_TYPES
+            | GCP_RESOURCE_IAM_RESOURCE_TYPES,
+        )
+        self.assertEqual(
+            GCP_IAM_POLICY_RESOURCE_TYPES,
+            GCP_IAM_GRANT_RESOURCE_TYPES | GCP_CUSTOM_ROLE_RESOURCE_TYPES,
+        )
+        self.assertLessEqual(GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
+        self.assertLessEqual(GCP_IAM_GRANT_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
+        self.assertLessEqual(GCP_IAM_POLICY_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
 
     def test_metadata_namespace_exposes_gcp_owned_fields(self) -> None:
         self.assertGreaterEqual(
