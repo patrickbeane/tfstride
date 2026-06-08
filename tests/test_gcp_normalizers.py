@@ -714,7 +714,6 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ],
         )
 
-
     def test_service_account_normalizer_preserves_identity_context(self) -> None:
         normalized = normalize_service_account(self.resources["google_service_account.web"])
 
@@ -862,9 +861,19 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_PUBLIC_KEY_TYPE),
             "TYPE_X509_PEM_FILE",
         )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_ID),
+            "google_service_account.web.email",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_AFTER),
+            "2026-01-01T00:00:00Z",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_BEFORE),
+            "2027-01-01T00:00:00Z",
+        )
         metadata = normalized.metadata_snapshot()
-        self.assertEqual(metadata["valid_after"], "2026-01-01T00:00:00Z")
-        self.assertEqual(metadata["valid_before"], "2027-01-01T00:00:00Z")
         self.assertNotIn("private_key", metadata)
 
     def test_service_account_iam_member_normalizer_preserves_binding_parts(self) -> None:
@@ -1891,6 +1900,18 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                     "policy_data": {"bindings": [{"role": "roles/editor", "members": ["group:admins@example.com"]}]},
                 },
             )
+        )
+
+        self.assertEqual(member.get_metadata_field(GcpResourceMetadata.FOLDER_ID), "folders/12345")
+        self.assertEqual(binding.get_metadata_field(GcpResourceMetadata.FOLDER_ID), "folders/12345")
+        self.assertEqual(policy.get_metadata_field(GcpResourceMetadata.FOLDER_ID), "folders/12345")
+        self.assertEqual(
+            binding.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/viewer", "members": ["domain:example.com"]}],
+        )
+        self.assertEqual(
+            policy.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/editor", "members": ["group:admins@example.com"]}],
         )
 
     def test_project_iam_member_normalizer_preserves_binding_parts(self) -> None:

@@ -192,12 +192,13 @@ def normalize_service_account_key(resource: TerraformResource) -> NormalizedReso
         metadata={
             GcpResourceMetadata.NAME.key: first_non_empty(values.get("name"), resource.name),
             GcpResourceMetadata.PROJECT.key: values.get("project"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_ID.key: service_account_reference,
             GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
             GcpResourceMetadata.SERVICE_ACCOUNT_KEY_ALGORITHM.key: values.get("key_algorithm"),
             GcpResourceMetadata.SERVICE_ACCOUNT_PUBLIC_KEY_TYPE.key: values.get("public_key_type"),
-            "valid_after": values.get("valid_after"),
-            "valid_before": values.get("valid_before"),
-            "keepers": values.get("keepers") or {},
+            GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_AFTER.key: values.get("valid_after"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_BEFORE.key: values.get("valid_before"),
+            GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS.key: values.get("keepers") or {},
         },
     )
 

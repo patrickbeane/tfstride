@@ -484,10 +484,7 @@ class GcpDataRuleDetectors:
                                 f"authorized_networks configured: {len(database_facts.cloud_sql_authorized_networks)}",
                             ],
                         ),
-                        evidence_item(
-                            "public_access_reasons",
-                            _metadata_string_list(database, "public_access_reasons"),
-                        ),
+                        evidence_item("public_access_reasons", database.public_access_reasons),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -639,15 +636,6 @@ def _bool_status(value: bool | None) -> str:
 
 def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
-
-
-def _metadata_string_list(resource: NormalizedResource, key: str) -> list[str]:
-    value = resource.metadata.get(key)
-    if isinstance(value, list):
-        return [str(item) for item in value if item not in (None, "")]
-    if value in (None, ""):
-        return []
-    return [str(value)]
 
 
 def _cloud_sql_ssl_enforced(database_facts: object) -> bool:
