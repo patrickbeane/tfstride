@@ -4,19 +4,25 @@ import unittest
 from dataclasses import fields
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.contracts import (
     DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT,
     DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT,
 )
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_metadata import MetadataField, ResourceMetadata
 
 
-def _resource_metadata_field_names() -> set[str]:
+def _metadata_field_names(namespace: type) -> set[str]:
     return {
         name
-        for name, value in vars(ResourceMetadata).items()
+        for name, value in vars(namespace).items()
         if isinstance(value, MetadataField)
     }
+
+
+def _resource_metadata_field_names() -> set[str]:
+    return _metadata_field_names(ResourceMetadata)
 
 
 class ProviderEncapsulationContractTests(unittest.TestCase):
@@ -60,16 +66,39 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertFalse(contract.shared_core_fields & contract.transitional_fields)
         self.assertFalse(provider_owned & contract.transitional_fields)
 
+    def test_provider_metadata_namespaces_match_ownership_contract(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        shared_or_transitional = contract.shared_core_fields | contract.transitional_fields
+        provider_namespaces = {
+            "aws": AwsResourceMetadata,
+            "gcp": GcpResourceMetadata,
+        }
+
+        for provider, namespace in provider_namespaces.items():
+            with self.subTest(provider=provider):
+                metadata_fields = _metadata_field_names(namespace)
+                provider_owned = contract.provider_owned_fields[provider]
+
+                self.assertEqual(metadata_fields - shared_or_transitional, provider_owned)
+                self.assertFalse(provider_owned & shared_or_transitional)
+                self.assertEqual(provider_owned - metadata_fields, set())
+
     def test_resource_metadata_ownership_contract_marks_known_boundaries(self) -> None:
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
         aws_owned = contract.provider_owned_fields["aws"]
+        gcp_owned = contract.provider_owned_fields["gcp"]
 
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)
+        self.assertIn("SERVICE_ACCOUNT_EMAIL", gcp_owned)
+        self.assertIn("KMS_CRYPTO_KEY_REFERENCE", gcp_owned)
+        self.assertIn("GKE_NODE_OAUTH_SCOPES", gcp_owned)
         self.assertIn("BUCKET_NAME", contract.transitional_fields)
         self.assertIn("POLICY_DOCUMENT", contract.transitional_fields)
+        self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", contract.transitional_fields)
         self.assertNotIn("SECURITY_GROUP_ID", contract.shared_core_fields)
+        self.assertNotIn("SERVICE_ACCOUNT_EMAIL", contract.shared_core_fields)
 
     def test_resource_metadata_ownership_contract_documents_migration_rules(self) -> None:
         guidelines = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT.guidelines
