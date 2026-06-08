@@ -514,6 +514,18 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-service-account-key-hygiene",
+        title="GCP service account user-managed key lacks rotation hygiene",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Avoid user-managed service account keys where Workload Identity Federation, workload identity, "
+            "or service-account impersonation can be used; when keys are unavoidable, keep lifetimes short, "
+            "configure explicit rotation triggers, and store private material outside Terraform state."
+        ),
+        tags=("gcp", "iam", "service-account", "credential"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-org-folder-iam-broad-principal",
         title="GCP organization or folder IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

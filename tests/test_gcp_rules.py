@@ -302,6 +302,31 @@ def _service_account() -> TerraformResource:
     )
 
 
+def _service_account_key(
+    *,
+    valid_after: str = "2026-01-01T00:00:00Z",
+    valid_before: str = "2027-01-01T00:00:00Z",
+    keepers: dict[str, object] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="google_service_account_key.deploy",
+        mode="managed",
+        resource_type="google_service_account_key",
+        name="deploy",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "name": "projects/tfstride-demo/serviceAccounts/tfstride-deploy@tfstride-demo.iam.gserviceaccount.com/keys/key-id",
+            "service_account_id": "google_service_account.deploy.name",
+            "key_algorithm": "KEY_ALG_RSA_2048",
+            "public_key_type": "TYPE_X509_PEM_FILE",
+            "valid_after": valid_after,
+            "valid_before": valid_before,
+            "keepers": keepers or {},
+            "private_key": "redacted-test-secret-material",
+        },
+    )
+
+
 def _service_account_iam_member(
     role: str = "roles/iam.serviceAccountTokenCreator",
     member: str = "group:deploy@example.com",
@@ -2349,6 +2374,55 @@ class GcpRuleTests(unittest.TestCase):
             ],
         )
         self.assertEqual(evidence["role_risk"], ["service account token minting and impersonation"])
+
+    def test_service_account_key_hygiene_detects_long_lived_key_without_keepers(self) -> None:
+        inventory = GcpNormalizer().normalize([_service_account(), _service_account_key()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-hygiene"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-service-account-key-hygiene")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_service_account.deploy", "google_service_account_key.deploy"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["key_context"],
+            [
+                "source=google_service_account_key.deploy",
+                "service_account_reference=google_service_account.deploy.name",
+                "key_algorithm=KEY_ALG_RSA_2048",
+                "public_key_type=TYPE_X509_PEM_FILE",
+            ],
+        )
+        self.assertEqual(
+            evidence["key_risk"],
+            [
+                "Terraform manages a user-created service-account key",
+                "validity window is 365 days and exceeds 180-day threshold",
+                "no Terraform keepers rotation trigger observed",
+            ],
+        )
+        self.assertEqual(
+            evidence["validity_window"],
+            [
+                "valid_after=2026-01-01T00:00:00Z",
+                "valid_before=2027-01-01T00:00:00Z",
+                "validity_days=365",
+            ],
+        )
+        self.assertEqual(
+            evidence["rotation_control"],
+            ["no Terraform keepers rotation trigger observed"],
+        )
+
 
     def test_service_account_iam_low_risk_group_binding_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.gcp_custom_roles import (
@@ -41,6 +42,7 @@ _SERVICE_ACCOUNT_IAM_RESOURCE_TYPES = frozenset(
         "google_service_account_iam_policy",
     }
 )
+_SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
@@ -921,6 +923,80 @@ class GcpRuleDetectors:
                 )
         return findings
 
+    def detect_service_account_key_hygiene(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        inventory = context.inventory
+        for key in inventory.by_type("google_service_account_key"):
+            metadata = key.metadata_snapshot()
+            service_account_reference = analysis_facts(key).service_account_reference
+            target = _service_account_iam_target(key, inventory)
+            validity_days = _service_account_key_validity_days(key)
+            keepers = metadata.get("keepers")
+            keepers_configured = isinstance(keepers, dict) and bool(keepers)
+
+            risks = ["Terraform manages a user-created service-account key"]
+            if validity_days is not None and validity_days > _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS:
+                risks.append(
+                    f"validity window is {validity_days} days and exceeds "
+                    f"{_SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS}-day threshold"
+                )
+            if not keepers_configured:
+                risks.append("no Terraform keepers rotation trigger observed")
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=2 if len(risks) > 1 else 1,
+            )
+            validity_evidence = _service_account_key_validity_evidence(metadata, validity_days)
+            rotation_evidence = (
+                [f"keepers configured: {', '.join(sorted(str(keeper_name) for keeper_name in keepers))}"]
+                if keepers_configured
+                else ["no Terraform keepers rotation trigger observed"]
+            )
+            target_label = (
+                target.address if target is not None else service_account_reference or "unknown service account"
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=_dedupe_addresses([target.address if target else "", key.address]),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{key.display_name} creates a user-managed GCP service account key for "
+                        f"`{target_label}`. User-managed service account keys are portable, long-lived "
+                        "credentials that can be copied outside GCP control, so they need explicit rotation "
+                        "controls or should be replaced with workload identity or impersonation flows."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "key_context",
+                            [
+                                f"source={key.address}",
+                                f"service_account_reference={service_account_reference or ''}",
+                                f"key_algorithm={metadata.get('service_account_key_algorithm') or ''}",
+                                f"public_key_type={metadata.get('service_account_public_key_type') or ''}",
+                            ],
+                        ),
+                        evidence_item("key_risk", risks),
+                        evidence_item("validity_window", validity_evidence),
+                        evidence_item("rotation_control", rotation_evidence),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_org_folder_iam_broad_principal(
         self,
         context: RuleEvaluationContext,
@@ -1644,6 +1720,45 @@ def _broad_resource_iam_bindings(
             seen.add(key)
             matches.append((source, role, assessment.member, assessment))
     return matches
+
+
+def _service_account_key_validity_days(resource: NormalizedResource) -> int | None:
+    metadata = resource.metadata_snapshot()
+    valid_after = _parse_rfc3339_timestamp(metadata.get("valid_after"))
+    valid_before = _parse_rfc3339_timestamp(metadata.get("valid_before"))
+    if valid_after is None or valid_before is None or valid_before <= valid_after:
+        return None
+    return int((valid_before - valid_after).total_seconds() // 86400)
+
+
+def _service_account_key_validity_evidence(
+    metadata: dict[str, object],
+    validity_days: int | None,
+) -> list[str]:
+    values = [
+        f"valid_after={metadata.get('valid_after') or ''}",
+        f"valid_before={metadata.get('valid_before') or ''}",
+    ]
+    if validity_days is not None:
+        values.append(f"validity_days={validity_days}")
+    return values
+
+
+def _parse_rfc3339_timestamp(value: object) -> datetime | None:
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:

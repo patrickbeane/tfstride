@@ -77,6 +77,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-public-workload-sensitive-data-access", output)
         self.assertIn("- gcp-service-account-iam-broad-principal", output)
         self.assertIn("- gcp-service-account-iam-privileged-role", output)
+        self.assertIn("- gcp-service-account-key-hygiene", output)
         self.assertIn("- gcp-org-folder-iam-broad-principal", output)
         self.assertIn("- gcp-org-folder-iam-privileged-role", output)
         self.assertIn("- gcp-project-iam-broad-principal", output)
@@ -232,7 +233,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["provider"], "gcp")
         self.assertEqual(len(report["inventory"]["resources"]), 22)
         self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
-        self.assertEqual(report["summary"]["active_findings"], 16)
+        self.assertEqual(report["summary"]["active_findings"], 17)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:

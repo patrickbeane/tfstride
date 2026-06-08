@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **16 findings** across **22 normalized resources**.
+This run identified **4 trust boundaries** and **17 findings** across **22 normalized resources**.
 
 - High severity findings: `5`
-- Medium severity findings: `11`
+- Medium severity findings: `12`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **4 trust boundaries** and **16 findings** across **22 norma
 - Provider resources considered: `23`
 - Normalized resources: `22`
 - Unsupported resources: `1`
-- Registered rules: `43`
-- Enabled rules: `43`
+- Registered rules: `44`
+- Enabled rules: `44`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -42,6 +42,7 @@ This run identified **4 trust boundaries** and **16 findings** across **22 norma
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
+  - `gcp-service-account-key-hygiene`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -202,6 +203,20 @@ This run identified **4 trust boundaries** and **16 findings** across **22 norma
 - Evidence:
   - os login posture: metadata.enable-oslogin is false
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### GCP service account user-managed key lacks rotation hygiene
+
+- STRIDE category: Spoofing
+- Affected resources: `google_service_account.web`, `google_service_account_key.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 4 => medium
+- Rationale: google_service_account_key.web creates a user-managed GCP service account key for `google_service_account.web`. User-managed service account keys are portable, long-lived credentials that can be copied outside GCP control, so they need explicit rotation controls or should be replaced with workload identity or impersonation flows.
+- Recommended mitigation: Avoid user-managed service account keys where Workload Identity Federation, workload identity, or service-account impersonation can be used; when keys are unavoidable, keep lifetimes short, configure explicit rotation triggers, and store private material outside Terraform state.
+- Evidence:
+  - key context: source=google_service_account_key.web; service_account_reference=google_service_account.web.email; key_algorithm=KEY_ALG_RSA_2048; public_key_type=TYPE_X509_PEM_FILE
+  - key risk: Terraform manages a user-created service-account key; validity window is 365 days and exceeds 180-day threshold; no Terraform keepers rotation trigger observed
+  - validity window: valid_after=2026-01-01T00:00:00Z; valid_before=2027-01-01T00:00:00Z; validity_days=365
+  - rotation control: no Terraform keepers rotation trigger observed
 
 #### GCS bucket does not enforce Public Access Prevention
 
