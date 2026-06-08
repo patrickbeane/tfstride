@@ -84,6 +84,14 @@ class FakeProviderFacts:
         return "fake-resource"
 
     @property
+    def reference_values(self) -> list[str]:
+        return ["fake-resource", "google_service_account.fake.email"]
+
+    @property
+    def iam_target_reference(self) -> str | None:
+        return "google_service_account.fake.email"
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
 
@@ -226,6 +234,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
         self.assertIsNone(facts.project)
         self.assertIsNone(facts.resource_name)
+        self.assertEqual(facts.reference_values, [])
+        self.assertIsNone(facts.iam_target_reference)
         self.assertEqual(facts.iam_bindings, [])
         self.assertIsNone(facts.custom_role_id)
         self.assertEqual(facts.custom_role_permissions, [])
@@ -286,6 +296,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.database_engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
         self.assertIsNone(facts.project)
+        self.assertEqual(facts.reference_values, ["logs"])
+        self.assertEqual(facts.iam_target_reference, "logs")
         self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.cloud_sql_authorized_networks, [])
         self.assertIsNone(facts.cloud_sql_backup_enabled)
@@ -359,6 +371,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         facts = analysis_facts(resource)
 
         self.assertEqual(facts.project, "tfstride-demo")
+        self.assertEqual(facts.reference_values, [])
+        self.assertIsNone(facts.iam_target_reference)
         self.assertEqual(
             facts.iam_bindings,
             [
@@ -388,6 +402,18 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         self.assertEqual(facts.organization_id, "1234567890")
         self.assertEqual(facts.folder_id, "folders/12345")
+
+    def test_gcp_iam_target_facts_read_provider_owned_reference_metadata(self) -> None:
+        resource = _resource(
+            {GcpResourceMetadata.SECRET_REFERENCE.key: "google_secret_manager_secret.api.id"},
+            provider="gcp",
+            resource_type="google_secret_manager_secret_iam_member",
+        )
+
+        facts = analysis_facts(resource)
+
+        self.assertEqual(facts.reference_values, ["google_secret_manager_secret.api.id"])
+        self.assertEqual(facts.iam_target_reference, "google_secret_manager_secret.api.id")
 
     def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
         resource = _resource(
@@ -550,6 +576,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         )
         self.assertEqual(facts.project, "tfstride-demo")
         self.assertEqual(facts.resource_name, "fake-resource")
+        self.assertEqual(facts.reference_values, ["fake-resource", "google_service_account.fake.email"])
+        self.assertEqual(facts.iam_target_reference, "google_service_account.fake.email")
         self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
         self.assertEqual(facts.custom_role_id, "deployAdmin")
         self.assertEqual(facts.custom_role_permissions, ["iam.serviceAccounts.actAs"])

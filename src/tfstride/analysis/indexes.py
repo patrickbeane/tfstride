@@ -4,6 +4,11 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from tfstride.analysis.gcp_iam_inheritance import (
+    GcpIamInheritanceIndex,
+    build_gcp_iam_inheritance_index,
+    empty_gcp_iam_inheritance_index,
+)
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     is_network_security_group_resource,
@@ -17,6 +22,7 @@ class AnalysisIndexes:
     security_groups_by_reference: Mapping[str, NormalizedResource]
     resources_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     public_workloads_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
+    gcp_iam_inheritance: GcpIamInheritanceIndex
 
     def attached_security_groups(self, resource: NormalizedResource) -> list[NormalizedResource]:
         return [
@@ -44,6 +50,11 @@ def build_analysis_indexes(inventory: ResourceInventory) -> AnalysisIndexes:
             _group_resources_by_security_group(
                 resource for resource in inventory.resources if resource.public_exposure
             )
+        ),
+        gcp_iam_inheritance=(
+            build_gcp_iam_inheritance_index(inventory.resources)
+            if inventory.provider == "gcp"
+            else empty_gcp_iam_inheritance_index()
         ),
     )
 

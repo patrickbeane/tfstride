@@ -88,6 +88,14 @@ class AnalysisResourceFacts:
         return self._facts.resource_name
 
     @property
+    def reference_values(self) -> list[str]:
+        return self._facts.reference_values
+
+    @property
+    def iam_target_reference(self) -> str | None:
+        return self._facts.iam_target_reference
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return self._facts.iam_bindings
 

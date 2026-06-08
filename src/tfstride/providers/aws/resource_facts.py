@@ -203,6 +203,14 @@ class AwsResourceFacts:
         return self.name
 
     @property
+    def reference_values(self) -> list[str]:
+        return []
+
+    @property
+    def iam_target_reference(self) -> str | None:
+        return None
+
+    @property
     def task_definition_reference(self) -> str | None:
         return self.get(AwsResourceMetadata.TASK_DEFINITION_REFERENCE)
 

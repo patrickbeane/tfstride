@@ -63,6 +63,14 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def reference_values(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def iam_target_reference(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -262,6 +270,14 @@ class NeutralProviderResourceFacts:
 
     @property
     def resource_name(self) -> str | None:
+        return None
+
+    @property
+    def reference_values(self) -> list[str]:
+        return []
+
+    @property
+    def iam_target_reference(self) -> str | None:
         return None
 
     @property

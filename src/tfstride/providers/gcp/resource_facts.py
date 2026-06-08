@@ -13,6 +13,41 @@ from tfstride.resource_metadata import MetadataField, StringListMetadataField
 _MetadataValue = TypeVar("_MetadataValue")
 
 
+_REFERENCE_VALUE_FIELDS = (
+    GcpResourceMetadata.NAME,
+    GcpResourceMetadata.SELF_LINK,
+    GcpResourceMetadata.BUCKET_NAME,
+    GcpResourceMetadata.SECRET_ID,
+    GcpResourceMetadata.SECRET_REFERENCE,
+    GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE,
+    GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE,
+    GcpResourceMetadata.BIGQUERY_DATASET_ID,
+    GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE,
+    GcpResourceMetadata.BIGQUERY_TABLE_ID,
+    GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE,
+    GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE,
+    GcpResourceMetadata.KMS_KEY_RING,
+    GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE,
+    GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE,
+    GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL,
+    GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER,
+    GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE,
+)
+_IAM_TARGET_REFERENCE_FIELDS = (
+    GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE,
+    GcpResourceMetadata.BUCKET_NAME,
+    GcpResourceMetadata.SECRET_REFERENCE,
+    GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE,
+    GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE,
+    GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE,
+    GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE,
+    GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE,
+    GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE,
+    GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE,
+    GcpResourceMetadata.KMS_KEY_RING,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class GcpResourceFacts(NeutralProviderResourceFacts):
     """GCP-owned view over provider-specific resource metadata."""
@@ -67,6 +102,24 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     @property
     def resource_name(self) -> str | None:
         return self.get(GcpResourceMetadata.NAME)
+
+    @property
+    def reference_values(self) -> list[str]:
+        values: list[str] = []
+        for field in _REFERENCE_VALUE_FIELDS:
+            value = self.get(field)
+            if value in (None, ""):
+                continue
+            values.append(str(value))
+        return _dedupe(values)
+
+    @property
+    def iam_target_reference(self) -> str | None:
+        for field in _IAM_TARGET_REFERENCE_FIELDS:
+            value = self.get(field)
+            if value:
+                return value
+        return None
 
     @property
     def iam_bindings(self) -> list[dict[str, Any]]:
