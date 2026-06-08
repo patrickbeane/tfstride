@@ -6,7 +6,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.gcp.coercion import as_bool, as_list, compact
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
-from tfstride.providers.gcp.resource_utils import first_non_empty, load_json_document
+from tfstride.providers.gcp.resource_utils import first_non_empty, load_json_document, service_account_member
 
 
 def normalize_project_iam_member(resource: TerraformResource) -> NormalizedResource:
@@ -157,7 +157,7 @@ def normalize_service_account(resource: TerraformResource) -> NormalizedResource
     values = resource.values
     account_id = first_non_empty(values.get("account_id"))
     email = first_non_empty(values.get("email"))
-    member = first_non_empty(values.get("member"), _service_account_member(email))
+    member = first_non_empty(values.get("member"), service_account_member(email))
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -740,9 +740,3 @@ def _binding_identifier(target: str | None, role: str | None, members: list[str 
     if not target or not role or not normalized_members:
         return None
     return f"{target}:{role}:{','.join(normalized_members)}"
-
-
-def _service_account_member(email: str | None) -> str | None:
-    if not email:
-        return None
-    return f"serviceAccount:{email}"

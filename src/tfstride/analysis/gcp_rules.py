@@ -30,6 +30,7 @@ from tfstride.providers.gcp.constants import (
     GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
     PUBLIC_GCP_IAM_MEMBERS,
 )
+from tfstride.providers.gcp.resource_utils import binding_members, gcp_reference_key
 from tfstride.resource_helpers import describe_security_group_rule
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
@@ -673,7 +674,7 @@ class GcpRuleDetectors:
                 if not _is_sensitive_gcp_resource_role(resource, role):
                     continue
                 source = str(binding.get("source") or "").strip()
-                for member in _binding_members(binding):
+                for member in binding_members(binding):
                     assessment = _assess_gcp_sensitive_iam_member(member, resource_facts.project)
                     if assessment is None:
                         continue
@@ -2094,7 +2095,7 @@ def _broad_resource_iam_bindings(
         if role not in allowed_roles:
             continue
         source = str(binding.get("source") or "").strip()
-        for member in _binding_members(binding):
+        for member in binding_members(binding):
             assessment = _assess_gcp_broad_iam_member(member)
             if assessment is None:
                 continue
@@ -2295,7 +2296,7 @@ def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[st
     for binding in analysis_facts(resource).iam_bindings:
         role = str(binding.get("role") or "unknown role").strip()
         source = str(binding.get("source") or "").strip()
-        for member in _binding_members(binding):
+        for member in binding_members(binding):
             normalized_member = str(member).strip()
             if not normalized_member:
                 continue
@@ -2591,7 +2592,7 @@ def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[st
     members: list[tuple[str, str]] = []
     for binding in bindings:
         role = str(binding.get("role") or "unknown role")
-        for member in _binding_members(binding):
+        for member in binding_members(binding):
             members.append((role, member))
     return members
 
@@ -2630,7 +2631,7 @@ def _service_account_iam_target(
     target_reference = analysis_facts(iam_resource).service_account_reference
     if not target_reference:
         return None
-    target_key = _gcp_reference_key(target_reference)
+    target_key = gcp_reference_key(target_reference)
     for service_account in inventory.by_type("google_service_account"):
         if target_key in _service_account_reference_keys(service_account):
             return service_account
@@ -2656,20 +2657,13 @@ def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
         text = str(value).strip()
         if not text:
             continue
-        keys.add(_gcp_reference_key(text))
+        keys.add(gcp_reference_key(text))
         if text.startswith("serviceAccount:"):
-            keys.add(_gcp_reference_key(text.removeprefix("serviceAccount:")))
+            keys.add(gcp_reference_key(text.removeprefix("serviceAccount:")))
         else:
-            keys.add(_gcp_reference_key(f"serviceAccount:{text}"))
+            keys.add(gcp_reference_key(f"serviceAccount:{text}"))
     return keys
 
-
-def _gcp_reference_key(value: str) -> str:
-    text = str(value).strip()
-    for suffix in (".id", ".name", ".email", ".member", ".self_link"):
-        if text.endswith(suffix):
-            return text[: -len(suffix)]
-    return text
 
 
 def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
@@ -2709,19 +2703,12 @@ def _public_invoker_bindings(
         if role not in invoker_roles:
             continue
         source = str(binding.get("source") or "").strip()
-        for member in _binding_members(binding):
+        for member in binding_members(binding):
             if member in PUBLIC_GCP_IAM_MEMBERS:
                 bindings.append((source, role, member))
     return bindings
 
 
-def _binding_members(binding: dict[str, object]) -> list[str]:
-    members = binding.get("members")
-    if isinstance(members, list):
-        return [str(member) for member in members if member not in (None, "")]
-    if members in (None, ""):
-        return []
-    return [str(members)]
 
 
 def _risky_public_firewall_rules(

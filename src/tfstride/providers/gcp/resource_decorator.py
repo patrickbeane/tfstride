@@ -22,6 +22,12 @@ from tfstride.providers.gcp.constants import (
     PUBLIC_GCP_IAM_MEMBERS,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_utils import (
+    GCP_NETWORK_REFERENCE_SUFFIXES,
+    binding_members,
+    dedupe,
+    gcp_reference_key,
+)
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -199,7 +205,9 @@ def _resource_subnetworks(resource: NormalizedResource, index: _GcpResourceIndex
     subnetworks: list[NormalizedResource] = []
     seen: set[str] = set()
     for subnet_reference in resource.subnet_ids:
-        subnetwork = index.subnetworks_by_reference.get(_reference_key(subnet_reference))
+        subnetwork = index.subnetworks_by_reference.get(
+            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+        )
         if subnetwork is None or subnetwork.address in seen:
             continue
         subnetworks.append(subnetwork)
@@ -222,7 +230,9 @@ def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceInde
 def _subnetwork_vpc_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
     references: list[str] = []
     for subnet_reference in resource.subnet_ids:
-        subnetwork = index.subnetworks_by_reference.get(_reference_key(subnet_reference))
+        subnetwork = index.subnetworks_by_reference.get(
+            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+        )
         if subnetwork is None:
             continue
         network_reference = _validated_network_reference(subnetwork.vpc_id)
@@ -242,7 +252,7 @@ def _instance_network_references(resource: NormalizedResource) -> list[str]:
         network_reference = _validated_network_reference(network)
         if network_reference is not None:
             references.append(network_reference)
-    return _dedupe(references)
+    return dedupe(references)
 
 
 def _unique_network_reference(references: list[str], index: _GcpResourceIndex) -> str | None:
@@ -277,7 +287,7 @@ def _resource_network_references(resource: NormalizedResource, index: _GcpResour
         references.append(direct_reference)
     references.extend(_subnetwork_vpc_references(resource, index))
     references.extend(_instance_network_references(resource))
-    return _dedupe(references)
+    return dedupe(references)
 
 
 def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -348,13 +358,17 @@ def _derive_sensitive_resource_iam_bindings(
     source_addresses: list[str] = []
     for iam_resource in iam_resources:
         target_reference = _resource_iam_target_reference(iam_resource)
-        if not target_reference or _reference_key(target_reference) not in resource_references:
+        if (
+            not target_reference
+            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            not in resource_references
+        ):
             continue
         for binding in _iam_bindings(iam_resource):
             bindings.append(
                 {
                     "role": str(binding.get("role") or "unknown role"),
-                    "members": _binding_members(binding),
+                    "members": binding_members(binding),
                     "source": iam_resource.address,
                 }
             )
@@ -371,18 +385,18 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourc
     bucket_references = set(_resource_references(bucket))
     for iam_resource in index.bucket_iam_resources:
         iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
-        if not iam_bucket or _reference_key(iam_bucket) not in bucket_references:
+        if not iam_bucket or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES) not in bucket_references:
             continue
         for binding in _iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")
             public_members = sorted(
                 member
-                for member in _binding_members(binding)
+                for member in binding_members(binding)
                 if member in PUBLIC_GCP_IAM_MEMBERS
             )
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
-    return _dedupe(reasons)
+    return dedupe(reasons)
 
 
 def _serverless_public_access_reasons(
@@ -393,7 +407,11 @@ def _serverless_public_access_reasons(
     resource_references = set(_resource_references(resource))
     for iam_resource in iam_resources:
         target_reference = _resource_iam_target_reference(iam_resource)
-        if not target_reference or _reference_key(target_reference) not in resource_references:
+        if (
+            not target_reference
+            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            not in resource_references
+        ):
             continue
         for binding in _iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")
@@ -401,12 +419,12 @@ def _serverless_public_access_reasons(
                 continue
             public_members = sorted(
                 member
-                for member in _binding_members(binding)
+                for member in binding_members(binding)
                 if member in PUBLIC_GCP_IAM_MEMBERS
             )
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
-    return _dedupe(reasons)
+    return dedupe(reasons)
 
 
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
@@ -450,14 +468,6 @@ def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:
         return [{"role": role, "members": [member]}]
     return []
 
-
-def _binding_members(binding: Mapping[str, Any]) -> list[str]:
-    members = binding.get("members")
-    if isinstance(members, list):
-        return [str(member) for member in members if member not in (None, "")]
-    if members in (None, ""):
-        return []
-    return [str(members)]
 
 
 def _public_access_prevention_enforced(bucket: NormalizedResource) -> bool:
@@ -533,7 +543,7 @@ def _nat_applies_to_subnetwork(
     subnetwork_references = set(_resource_references(subnetwork))
     for nat_subnetwork in router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS):
         reference = nat_subnetwork.get("name") if isinstance(nat_subnetwork, dict) else None
-        if reference and _reference_key(str(reference)) in subnetwork_references:
+        if reference and gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES) in subnetwork_references:
             return True
     return False
 
@@ -545,7 +555,7 @@ def _router_nat_network_references(
     router_reference = router_nat.get_metadata_field(GcpResourceMetadata.ROUTER_REFERENCE)
     if not router_reference:
         return ()
-    router = index.routers_by_reference.get(_reference_key(router_reference))
+    router = index.routers_by_reference.get(gcp_reference_key(router_reference, GCP_NETWORK_REFERENCE_SUFFIXES))
     if router is None or not router.vpc_id:
         return ()
     return (router.vpc_id,)
@@ -600,7 +610,13 @@ def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
     ):
         if reference:
             references.add(reference)
-    return tuple(sorted(_reference_key(reference) for reference in references if reference))
+    return tuple(
+        sorted(
+            gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            for reference in references
+            if reference
+        )
+    )
 
 
 def _same_network_reference(
@@ -614,7 +630,7 @@ def _same_network_reference(
 
 
 def _canonical_network_reference(value: str, index: _GcpResourceIndex | None) -> str:
-    reference_key = _reference_key(value)
+    reference_key = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
     network_key = _network_reference_key(value)
     if index is not None:
         return (
@@ -634,7 +650,7 @@ def _validated_network_reference(value: object) -> str | None:
     network_key = _network_reference_key(text)
     if _GCP_NETWORK_NAME_PATTERN.fullmatch(network_key):
         return text
-    reference_key = _reference_key(text)
+    reference_key = gcp_reference_key(text, GCP_NETWORK_REFERENCE_SUFFIXES)
     if _is_terraform_network_reference(reference_key):
         return text
     return None
@@ -653,35 +669,8 @@ def _is_terraform_network_reference(value: str) -> bool:
 
 
 def _network_reference_key(value: str) -> str:
-    text = _reference_key(value)
+    text = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
     for marker in ("/global/networks/", "/networks/"):
         if marker in text:
             return text.rsplit(marker, 1)[-1]
     return text
-
-
-def _reference_key(value: str) -> str:
-    text = str(value).strip()
-    for suffix in (
-        ".id",
-        ".name",
-        ".secret_id",
-        ".crypto_key_id",
-        ".dataset_id",
-        ".table_id",
-        ".self_link",
-    ):
-        if text.endswith(suffix):
-            return text[: -len(suffix)]
-    return text
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped

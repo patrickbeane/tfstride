@@ -12,6 +12,7 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
 
 GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset(
@@ -54,14 +55,14 @@ def build_gcp_custom_role_index(resources: Iterable[NormalizedResource]) -> GcpC
         if not permissions:
             continue
         for reference in _custom_role_references(resource):
-            permissions_by_reference.setdefault(_role_reference_key(reference), permissions)
+            permissions_by_reference.setdefault(gcp_reference_key(reference, GCP_ROLE_REFERENCE_SUFFIXES), permissions)
     return GcpCustomRoleIndex(MappingProxyType(permissions_by_reference))
 
 
 def custom_role_permissions(role: str | None, custom_roles: GcpCustomRoleIndex) -> tuple[str, ...]:
     if not role:
         return ()
-    return custom_roles.permissions_by_reference.get(_role_reference_key(role), ())
+    return custom_roles.permissions_by_reference.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES), ())
 
 
 def custom_role_privilege_risk(role: str | None, custom_roles: GcpCustomRoleIndex) -> str | None:
@@ -203,11 +204,3 @@ def _permission_matches_any(permissions: tuple[str, ...], candidates: set[str]) 
             if any(candidate.startswith(prefix) for candidate in candidates):
                 return True
     return False
-
-
-def _role_reference_key(value: str) -> str:
-    text = str(value).strip()
-    for suffix in (".id", ".name", ".role_id", ".self_link"):
-        if text.endswith(suffix):
-            return text[: -len(suffix)]
-    return text

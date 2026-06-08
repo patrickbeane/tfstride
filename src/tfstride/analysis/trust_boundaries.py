@@ -33,6 +33,7 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import BoundaryType, NormalizedResource, ResourceInventory, TrustBoundary
 from tfstride.providers.gcp.constants import GCP_PROJECT_IAM_RESOURCE_TYPES
+from tfstride.providers.gcp.resource_utils import binding_members, dedupe
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,15 +334,6 @@ def _freeze_resource_groups_by_key(
     return {key: tuple(resources) for key, resources in grouped.items()}
 
 
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped
 
 
 def _role_allows_object_storage_access(role: NormalizedResource) -> bool:
@@ -510,7 +502,7 @@ def _gcp_matching_iam_access_grants(
         role = str(binding.get("role") or "")
         if not _gcp_role_allows_data_store_access(data_store, role, candidate_index.gcp_custom_roles):
             continue
-        for member in sorted(workload_members.intersection(_binding_members(binding))):
+        for member in sorted(workload_members.intersection(binding_members(binding))):
             source = str(binding.get("source") or data_store.address)
             grants.append(f"{source} grants {role} to {member}")
 
@@ -525,7 +517,7 @@ def _gcp_matching_iam_access_grants(
             ):
                 continue
             grants.append(f"{project_iam_resource.address} grants {role} to {member} at project scope")
-    return _dedupe(grants)
+    return dedupe(grants)
 
 
 def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
@@ -541,7 +533,7 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
     members: list[tuple[str, str]] = []
     for binding in bindings:
         role = str(binding.get("role") or "")
-        for member in _binding_members(binding):
+        for member in binding_members(binding):
             members.append((role, member))
     return members
 
@@ -596,13 +588,6 @@ def _gcp_role_allows_data_store_access(
     return custom_role_allows_data_store_access(resource, role, custom_roles)
 
 
-def _binding_members(binding: Mapping[str, object]) -> list[str]:
-    members = binding.get("members")
-    if isinstance(members, list):
-        return [str(member) for member in members if member not in (None, "")]
-    if members in (None, ""):
-        return []
-    return [str(members)]
 
 
 def _database_reachability_rationale(

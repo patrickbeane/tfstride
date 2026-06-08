@@ -13,6 +13,7 @@ from tfstride.providers.gcp.constants import (
     GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
 )
+from tfstride.providers.gcp.resource_utils import gcp_reference_key
 
 _T = TypeVar("_T")
 
@@ -187,7 +188,7 @@ def _resolve_iam_resource_scopes(
     target_reference = _resource_iam_target_reference(resource)
     if not target_reference:
         return []
-    targets = reference_index.get(_reference_key(target_reference), ())
+    targets = reference_index.get(gcp_reference_key(target_reference), ())
     return [
         (GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, target.address), target)
         for target in targets
@@ -231,7 +232,7 @@ def _resource_reference_keys(resource: NormalizedResource) -> tuple[str, ...]:
         references.add(member)
         if member.startswith("serviceAccount:"):
             references.add(member.removeprefix("serviceAccount:"))
-    return tuple(sorted(_reference_key(reference) for reference in references if str(reference).strip()))
+    return tuple(sorted(gcp_reference_key(reference) for reference in references if str(reference).strip()))
 
 
 def _group_resources_by_scope(
@@ -330,23 +331,6 @@ def _path_segment(value: str, marker: str) -> str | None:
         return None
     return parts[value_index] or None
 
-
-def _reference_key(value: str) -> str:
-    text = str(value).strip()
-    for suffix in (
-        ".id",
-        ".name",
-        ".email",
-        ".member",
-        ".self_link",
-        ".secret_id",
-        ".crypto_key_id",
-        ".dataset_id",
-        ".table_id",
-    ):
-        if text.endswith(suffix):
-            return text[: -len(suffix)]
-    return text
 
 
 def _descendant_candidates(resources: list[NormalizedResource]) -> list[NormalizedResource]:

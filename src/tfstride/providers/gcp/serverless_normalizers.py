@@ -6,7 +6,12 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.gcp.coercion import as_bool, as_list, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
-from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
+from tfstride.providers.gcp.resource_utils import (
+    first_non_empty,
+    resource_identifier,
+    resource_name,
+    service_account_member,
+)
 
 
 def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResource:
@@ -182,7 +187,7 @@ def _serverless_workload(
         GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
         GcpResourceMetadata.PROJECT.key: values.get("project"),
         GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL.key: service_account_email,
-        GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: _service_account_member(service_account_email),
+        GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: service_account_member(service_account_email),
         GcpResourceMetadata.SERVICE_ACCOUNTS.key: _service_account_entries(service_account_email),
         GcpResourceMetadata.LABELS.key: values.get("labels") or {},
         "vpc_enabled": vpc_enabled,
@@ -368,11 +373,3 @@ def _service_account_entries(email: str | None) -> list[dict[str, str]]:
     if not email:
         return []
     return [{"email": email}]
-
-
-def _service_account_member(email: str | None) -> str | None:
-    if not email:
-        return None
-    if email.startswith("serviceAccount:"):
-        return email
-    return f"serviceAccount:{email}"

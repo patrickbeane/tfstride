@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_utils import dedupe, service_account_member
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
@@ -111,7 +112,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
             if value in (None, ""):
                 continue
             values.append(str(value))
-        return _dedupe(values)
+        return dedupe(values)
 
     @property
     def iam_target_reference(self) -> str | None:
@@ -240,8 +241,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
             email = _service_account_email(account)
             if email is None:
                 continue
-            members.append(_service_account_member(email))
-        return _dedupe(members)
+            member = service_account_member(email)
+            if member is not None:
+                members.append(member)
+        return dedupe(members)
 
     @property
     def workload_identity_scopes(self) -> list[str]:
@@ -256,7 +259,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
                 )
             elif account_scopes not in (None, ""):
                 scopes.append(str(account_scopes))
-        return _dedupe(scopes)
+        return dedupe(scopes)
 
     @property
     def network_tags(self) -> list[str]:
@@ -292,20 +295,3 @@ def _service_account_email(value: Any) -> str | None:
     if text.startswith("serviceAccount:"):
         return text.removeprefix("serviceAccount:")
     return text
-
-
-def _service_account_member(email: str) -> str:
-    if email.startswith("serviceAccount:"):
-        return email
-    return f"serviceAccount:{email}"
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped
