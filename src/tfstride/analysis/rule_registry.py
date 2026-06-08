@@ -526,6 +526,18 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-service-account-key-effective-access",
+        title="GCP service account key can exercise sensitive or privileged access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove sensitive data and high-impact IAM grants from service accounts that still have "
+            "user-managed keys, replace keys with workload identity or service-account impersonation, "
+            "and revoke or rotate existing keys after privilege reduction."
+        ),
+        tags=("gcp", "iam", "service-account", "credential", "effective-access"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-org-folder-iam-broad-principal",
         title="GCP organization or folder IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -2423,6 +2423,118 @@ class GcpRuleTests(unittest.TestCase):
             ["no Terraform keepers rotation trigger observed"],
         )
 
+    def test_service_account_key_effective_access_detects_sensitive_data_grant(self) -> None:
+        service_account = "serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_key(),
+                _bigquery_dataset(),
+                _bigquery_dataset_iam_member(member=service_account),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-service-account-key-effective-access")
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_service_account.deploy",
+                "google_service_account_key.deploy",
+                "google_bigquery_dataset.analytics",
+                "google_bigquery_dataset_iam_member.public_viewer",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["service_account_principals"],
+            [
+                "serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com",
+                "tfstride-deploy@tfstride-demo.iam.gserviceaccount.com",
+            ],
+        )
+        self.assertEqual(
+            evidence["effective_access"],
+            [
+                "resource=google_bigquery_dataset.analytics; "
+                "source=google_bigquery_dataset_iam_member.public_viewer; "
+                "scope=BigQuery dataset IAM; role=roles/bigquery.dataViewer; "
+                "member=serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com; "
+                "risk=BigQuery dataset IAM grants roles/bigquery.dataViewer",
+            ],
+        )
+
+    def test_service_account_key_effective_access_ignores_viewer_only_project_grant(self) -> None:
+        service_account = "serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_key(),
+                _project_iam_member("roles/viewer", member=service_account),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_service_account_key_effective_access_detects_service_account_iam_grant(self) -> None:
+        service_account = "serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _service_account(),
+                _service_account_key(),
+                _service_account_iam_member(member=service_account),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_service_account.deploy",
+                "google_service_account_key.deploy",
+                "google_service_account_iam_member.deploy_token_creator",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["effective_access"],
+            [
+                "resource=google_service_account.deploy; "
+                "source=google_service_account_iam_member.deploy_token_creator; "
+                "scope=service account IAM; role=roles/iam.serviceAccountTokenCreator; "
+                "member=serviceAccount:tfstride-deploy@tfstride-demo.iam.gserviceaccount.com; "
+                "risk=service account token minting and impersonation",
+            ],
+        )
+
 
     def test_service_account_iam_low_risk_group_binding_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(

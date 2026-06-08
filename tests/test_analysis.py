@@ -824,8 +824,8 @@ class TFSAnalysisTests(unittest.TestCase):
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 3, {"high": 1, "medium": 2}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 17, {"high": 5, "medium": 12}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 30, {"high": 11, "medium": 19}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 18, {"high": 6, "medium": 12}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 31, {"high": 12, "medium": 19}),
         }
 
         expected_titles = {
@@ -879,6 +879,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "Cloud SQL public client access does not require SSL": 1,
                 "GCP compute instance disables OS Login": 1,
                 "GCP service account user-managed key lacks rotation hygiene": 1,
+                "GCP service account key can exercise sensitive or privileged access": 1,
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
@@ -903,6 +904,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GCP project IAM binding grants a high-privilege role": 1,
                 "GCP project IAM binding grants access to public principals": 1,
                 "GCP service account user-managed key lacks rotation hygiene": 1,
+                "GCP service account key can exercise sensitive or privileged access": 1,
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
@@ -942,7 +944,7 @@ class TFSAnalysisTests(unittest.TestCase):
             result.analysis_coverage.resources.unsupported_resource_types,
             {"google_logging_project_sink": 1},
         )
-        self.assertEqual(len(result.findings), 17)
+        self.assertEqual(len(result.findings), 18)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -957,6 +959,15 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(
             findings_by_rule["gcp-service-account-key-hygiene"].affected_resources,
             ["google_service_account.web", "google_service_account_key.web"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-service-account-key-effective-access"].affected_resources,
+            [
+                "google_service_account.web",
+                "google_service_account_key.web",
+                "google_bigquery_dataset.analytics",
+                "google_bigquery_dataset_iam_binding.analytics_viewers",
+            ],
         )
         gcs_finding = findings_by_rule["gcp-gcs-public-access"]
         self.assertEqual(gcs_finding.severity, Severity.MEDIUM)

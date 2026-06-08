@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **17 findings** across **22 normalized resources**.
+This run identified **4 trust boundaries** and **18 findings** across **22 normalized resources**.
 
-- High severity findings: `5`
+- High severity findings: `6`
 - Medium severity findings: `12`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **4 trust boundaries** and **17 findings** across **22 norma
 - Provider resources considered: `23`
 - Normalized resources: `22`
 - Unsupported resources: `1`
-- Registered rules: `44`
-- Enabled rules: `44`
+- Registered rules: `45`
+- Enabled rules: `45`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -43,6 +43,7 @@ This run identified **4 trust boundaries** and **17 findings** across **22 norma
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
   - `gcp-service-account-key-hygiene`: `1`
+  - `gcp-service-account-key-effective-access`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -102,6 +103,19 @@ This run identified **4 trust boundaries** and **17 findings** across **22 norma
 - Evidence:
   - authorized networks: anywhere (0.0.0.0/0)
   - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
+
+#### GCP service account key can exercise sensitive or privileged access
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_service_account.web`, `google_service_account_key.web`, `google_bigquery_dataset.analytics`, `google_bigquery_dataset_iam_binding.analytics_viewers`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 6 => high
+- Rationale: google_service_account_key.web creates portable credentials for `google_service_account.web`, and that service account has sensitive data access or high-impact IAM grants. A copied key can exercise those effective permissions outside the intended workload boundary.
+- Recommended mitigation: Remove sensitive data and high-impact IAM grants from service accounts that still have user-managed keys, replace keys with workload identity or service-account impersonation, and revoke or rotate existing keys after privilege reduction.
+- Evidence:
+  - key context: source=google_service_account_key.web; service_account_reference=google_service_account.web.email; resolved_service_account=google_service_account.web
+  - service account principals: serviceAccount:tfstride-web@example.iam.gserviceaccount.com; tfstride-web@example.iam.gserviceaccount.com
+  - effective access: resource=google_bigquery_dataset.analytics; source=google_bigquery_dataset_iam_binding.analytics_viewers; scope=BigQuery dataset IAM; role=roles/bigquery.dataViewer; member=serviceAccount:tfstride-web@example.iam.gserviceaccount.com; risk=BigQuery dataset IAM grants roles/bigquery.dataViewer
 
 #### Internet-exposed GCP workload can access sensitive data services
 
