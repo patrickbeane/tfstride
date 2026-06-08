@@ -937,6 +937,157 @@ class TFSAnalysisTests(unittest.TestCase):
                 self.assertEqual(dict(severity_counts), expected_severities)
                 self.assertEqual(dict(title_counts), expected_titles[name])
 
+    def test_gcp_inherited_iam_blast_radius_fixture_findings_are_explicit(self) -> None:
+        scenarios = {
+            "gcp-baseline": {
+                "fixture_path": GCP_BASELINE_FIXTURE_PATH,
+                "severity": Severity.HIGH,
+                "source": "google_project_iam_member.deploy_admin",
+                "affected_count": 8,
+                "iam_binding": [
+                    "source=google_project_iam_member.deploy_admin",
+                    "scope=project:tfstride-demo",
+                    "member=group:deploy@example.com",
+                    "role=projects/tfstride-demo/roles/deployAdmin",
+                ],
+                "role_risk": ["custom role includes high-impact permissions: iam.serviceAccounts.actAs"],
+                "descendant_scope": [
+                    "scope=project:tfstride-demo",
+                    "descendant_count=7",
+                    "resource_type_count=7",
+                    "projects=tfstride-demo",
+                ],
+                "descendant_type": "google_project_iam_custom_role: 1",
+                "descendant_resource": "google_storage_bucket.logs",
+                "custom_role_permissions": ["iam.serviceAccounts.actAs"],
+            },
+            "gcp-cross-project-iam": {
+                "fixture_path": GCP_CROSS_PROJECT_IAM_FIXTURE_PATH,
+                "severity": Severity.HIGH,
+                "source": "google_project_iam_member.partner_editor",
+                "affected_count": 6,
+                "iam_binding": [
+                    "source=google_project_iam_member.partner_editor",
+                    "scope=project:tfstride-demo",
+                    "member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com",
+                    "role=roles/editor",
+                ],
+                "role_risk": ["broad write access across most project services"],
+                "trust_scope": [
+                    "service account belongs to project `partner-project`, outside resource project `tfstride-demo`"
+                ],
+                "descendant_scope": [
+                    "scope=project:tfstride-demo",
+                    "descendant_count=5",
+                    "resource_type_count=5",
+                    "projects=tfstride-demo",
+                ],
+                "descendant_type": "google_kms_crypto_key: 1",
+                "descendant_resource": "google_service_account.web",
+            },
+            "gcp-inventory": {
+                "fixture_path": GCP_FIXTURE_PATH,
+                "severity": Severity.MEDIUM,
+                "source": "google_project_iam_member.web_viewer",
+                "affected_count": 17,
+                "iam_binding": [
+                    "source=google_project_iam_member.web_viewer",
+                    "scope=project:tfstride-demo",
+                    "member=serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
+                    "role=roles/viewer",
+                ],
+                "trust_scope": [
+                    "service account belongs to project `example`, outside resource project `tfstride-demo`"
+                ],
+                "descendant_scope": [
+                    "scope=project:tfstride-demo",
+                    "descendant_count=16",
+                    "resource_type_count=15",
+                    "projects=tfstride-demo",
+                ],
+                "descendant_type": "google_compute_firewall: 2",
+                "descendant_resource": "and 6 more descendant resources",
+            },
+            "gcp-nightmare": {
+                "fixture_path": GCP_NIGHTMARE_FIXTURE_PATH,
+                "severity": Severity.HIGH,
+                "source": "google_project_iam_member.public_owner",
+                "affected_count": 21,
+                "iam_binding": [
+                    "source=google_project_iam_member.public_owner",
+                    "scope=project:tfstride-demo",
+                    "member=allUsers",
+                    "role=roles/owner",
+                ],
+                "role_risk": ["full project administration"],
+                "trust_scope": ["member is public GCP principal `allUsers`"],
+                "descendant_scope": [
+                    "scope=project:tfstride-demo",
+                    "descendant_count=20",
+                    "resource_type_count=19",
+                    "projects=tfstride-demo",
+                ],
+                "descendant_type": "google_cloud_run_v2_service: 1",
+                "descendant_resource": "and 10 more descendant resources",
+            },
+        }
+
+        for name, expected in scenarios.items():
+            with self.subTest(scenario=name):
+                result = self.engine.analyze_plan(expected["fixture_path"])
+                blast_radius_findings = [
+                    finding
+                    for finding in result.findings
+                    if finding.rule_id == "gcp-inherited-iam-blast-radius"
+                ]
+
+                self.assertEqual(len(blast_radius_findings), 1)
+                finding = blast_radius_findings[0]
+                evidence_by_key = {item.key: item.values for item in finding.evidence}
+
+                self.assertEqual(finding.severity, expected["severity"])
+                self.assertEqual(finding.affected_resources[0], expected["source"])
+                self.assertEqual(len(finding.affected_resources), expected["affected_count"])
+                self.assertEqual(evidence_by_key["iam_binding"], expected["iam_binding"])
+                self.assertEqual(evidence_by_key["descendant_scope"], expected["descendant_scope"])
+                self.assertIn(
+                    expected["descendant_type"],
+                    evidence_by_key["descendant_resource_types"],
+                )
+                self.assertIn(
+                    expected["descendant_resource"],
+                    evidence_by_key["descendant_resources"],
+                )
+                if "role_risk" in expected:
+                    self.assertEqual(evidence_by_key["role_risk"], expected["role_risk"])
+                else:
+                    self.assertNotIn("role_risk", evidence_by_key)
+                if "trust_scope" in expected:
+                    self.assertEqual(evidence_by_key["trust_scope"], expected["trust_scope"])
+                else:
+                    self.assertNotIn("trust_scope", evidence_by_key)
+                if "custom_role_permissions" in expected:
+                    self.assertEqual(
+                        evidence_by_key["custom_role_permissions"],
+                        expected["custom_role_permissions"],
+                    )
+
+    def test_gcp_inherited_iam_blast_radius_is_absent_from_low_blast_fixtures(self) -> None:
+        scenarios = {
+            "gcp-safe": GCP_SAFE_FIXTURE_PATH,
+            "gcp-lb-compute-sql": GCP_LB_COMPUTE_SQL_FIXTURE_PATH,
+            "gcp-serverless": GCP_SERVERLESS_FIXTURE_PATH,
+        }
+
+        for name, fixture_path in scenarios.items():
+            with self.subTest(scenario=name):
+                result = self.engine.analyze_plan(fixture_path)
+
+                self.assertNotIn(
+                    "gcp-inherited-iam-blast-radius",
+                    {finding.rule_id for finding in result.findings},
+                )
+
     def test_gcp_fixture_auto_selects_provider_and_detects_public_boundaries(self) -> None:
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
