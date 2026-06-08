@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.gcp_iam_rule_detectors import (
-    GCP_BIGQUERY_DATA_ACCESS_ROLES,
-    GCP_PUBSUB_DATA_ACCESS_ROLES,
-    GcpIamRuleDetectors,
-    broad_resource_iam_bindings,
+from tfstride.analysis.gcp_data_rule_detectors import GcpDataRuleDetectors
+from tfstride.analysis.gcp_iam_rule_detectors import GcpIamRuleDetectors
+from tfstride.analysis.finding_helpers import (
+    build_severity_reasoning,
+    collect_evidence,
+    dedupe_addresses,
+    evidence_item,
 )
-from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
@@ -22,8 +23,6 @@ from tfstride.resource_helpers import describe_security_group_rule
 
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
-_PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
-_BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
     {
         "https://www.googleapis.com/auth/cloud-platform",
@@ -33,7 +32,7 @@ _GKE_BROAD_OAUTH_SCOPES = frozenset(
 )
 
 
-class GcpRuleDetectors(GcpIamRuleDetectors):
+class GcpRuleDetectors(GcpIamRuleDetectors, GcpDataRuleDetectors):
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 
@@ -62,7 +61,7 @@ class GcpRuleDetectors(GcpIamRuleDetectors):
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", instance.address)
             )
-            affected_resources = _dedupe_addresses(
+            affected_resources = dedupe_addresses(
                 [instance.address, *[firewall.address for firewall, _ in risky_rules]]
             )
             findings.append(
@@ -375,7 +374,7 @@ class GcpRuleDetectors(GcpIamRuleDetectors):
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", service.address)
             )
-            affected_resources = _dedupe_addresses(
+            affected_resources = dedupe_addresses(
                 [service.address, *[source for source, _, _ in public_invokers]]
             )
             findings.append(
@@ -428,7 +427,7 @@ class GcpRuleDetectors(GcpIamRuleDetectors):
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", function.address)
             )
-            affected_resources = _dedupe_addresses(
+            affected_resources = dedupe_addresses(
                 [function.address, *[source for source, _, _ in public_invokers]]
             )
             findings.append(
@@ -458,617 +457,12 @@ class GcpRuleDetectors(GcpIamRuleDetectors):
             )
         return findings
 
-    def detect_pubsub_public_access(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for resource in context.inventory.by_type(*_PUBSUB_RESOURCE_TYPES):
-            for source, role, member, assessment in broad_resource_iam_bindings(
-                resource, GCP_PUBSUB_DATA_ACCESS_ROLES
-            ):
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=assessment.is_public,
-                    privilege_breadth=2 if assessment.is_public else 1,
-                    data_sensitivity=1,
-                    lateral_movement=1,
-                    blast_radius=1,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=_dedupe_addresses([resource.address, source]),
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{resource.display_name} grants `{role}` to `{member}` through Pub/Sub "
-                            "IAM. Public or broad principals can publish, consume, or administer event "
-                            "streams outside the expected service boundary."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item(
-                                "iam_binding",
-                                [
-                                    f"source={source}" if source else "source=unknown",
-                                    f"role={role}",
-                                    f"member={member}",
-                                ],
-                            ),
-                            evidence_item("trust_scope", [assessment.scope_description]),
-                            evidence_item(
-                                "resource_policy_sources",
-                                analysis_facts(resource).resource_policy_source_addresses,
-                            ),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
-        return findings
-
-    def detect_bigquery_public_access(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for resource in context.inventory.by_type(*_BIGQUERY_RESOURCE_TYPES):
-            for source, role, member, assessment in broad_resource_iam_bindings(
-                resource, GCP_BIGQUERY_DATA_ACCESS_ROLES
-            ):
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=assessment.is_public,
-                    privilege_breadth=2 if assessment.is_public else 1,
-                    data_sensitivity=2,
-                    lateral_movement=1,
-                    blast_radius=2 if assessment.is_public else 1,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=_dedupe_addresses([resource.address, source]),
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{resource.display_name} grants `{role}` to `{member}` through BigQuery "
-                            "IAM. Public or broad principals can read or modify analytical data outside "
-                            "the expected project trust boundary."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item(
-                                "iam_binding",
-                                [
-                                    f"source={source}" if source else "source=unknown",
-                                    f"role={role}",
-                                    f"member={member}",
-                                ],
-                            ),
-                            evidence_item("trust_scope", [assessment.scope_description]),
-                            evidence_item(
-                                "resource_policy_sources",
-                                analysis_facts(resource).resource_policy_source_addresses,
-                            ),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
-        return findings
-
-    def detect_gcs_public_access(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for bucket in context.inventory.by_type("google_storage_bucket"):
-            if not bucket.public_exposure:
-                continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-            )
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=True,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[bucket.address],
-                    trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{bucket.display_name} is publicly reachable through GCS IAM grants. "
-                        "Public bucket access is a common source of unintended object disclosure."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_gcs_uniform_bucket_level_access_disabled(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket)
-            if bucket_facts.gcs_uniform_bucket_level_access is True:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=1,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[bucket.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{bucket.display_name} does not enforce GCS uniform bucket-level access. "
-                        "Object ACLs can bypass the intended bucket-level IAM model and make access "
-                        "harder to audit consistently."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "access_control_posture",
-                            [
-                                f"uniform_bucket_level_access is {_bool_status(bucket_facts.gcs_uniform_bucket_level_access)}",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_gcs_public_access_prevention_not_enforced(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket)
-            if _gcs_public_access_prevention_enforced(bucket_facts.gcs_public_access_prevention):
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=bucket.public_exposure,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[bucket.address],
-                    trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{bucket.display_name} does not enforce GCS Public Access Prevention. "
-                        "Public principals can still be introduced through bucket IAM unless an "
-                        "organization-level policy blocks them."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "access_control_posture",
-                            [
-                                f"public_access_prevention is {bucket_facts.gcs_public_access_prevention or 'unset'}",
-                            ],
-                        ),
-                        evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_gcs_versioning_disabled(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket)
-            if bucket.data_sensitivity != "sensitive":
-                continue
-            if bucket_facts.gcs_versioning_enabled is True:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[bucket.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{bucket.display_name} stores sensitive GCS data without bucket versioning. "
-                        "Accidental overwrites, deletes, or destructive changes have fewer object-level "
-                        "recovery options."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "data_protection_posture",
-                            [
-                                f"versioning.enabled is {_bool_status(bucket_facts.gcs_versioning_enabled)}",
-                                f"data_sensitivity is {bucket.data_sensitivity}",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_gcs_customer_managed_encryption_missing(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket)
-            if bucket.data_sensitivity != "sensitive":
-                continue
-            if bucket_facts.gcs_default_kms_key_name:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[bucket.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{bucket.display_name} relies on default GCS encryption rather than a "
-                        "customer-managed KMS key. Sensitive buckets lose key ownership, rotation, and "
-                        "separation-of-duties controls that a CMEK can provide."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "encryption_posture",
-                            [
-                                "default_kms_key_name is unset",
-                                "customer_managed_encryption is false",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_public_authorized_network(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            if not database.public_exposure:
-                continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=True,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=1,
-                blast_radius=1,
-            )
-            public_networks = _cloud_sql_public_authorized_networks(database)
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{database.display_name} has a public Cloud SQL IPv4 endpoint and an authorized "
-                        "network that allows internet-wide client sources. That weakens the database trust "
-                        "boundary even when database authentication is still required."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item("authorized_networks", public_networks),
-                        evidence_item("public_exposure_reasons", database.public_exposure_reasons),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_backup_disabled(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database)
-            if database_facts.cloud_sql_backup_enabled:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            pitr_enabled = database_facts.cloud_sql_point_in_time_recovery_enabled
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{database.display_name} does not have Cloud SQL automated backups enabled. "
-                        "A destructive change, operator error, or data corruption event would have fewer "
-                        "managed recovery points."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "backup_posture",
-                            [
-                                "backup_configuration.enabled is false",
-                                f"point_in_time_recovery_enabled is {str(bool(pitr_enabled)).lower()}",
-                                f"engine is {database_facts.database_engine or 'unknown'}",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_public_ip_without_private_network(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_ipv4_enabled or database_facts.cloud_sql_private_network:
-                continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=True,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=1,
-                blast_radius=0,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{database.display_name} has Cloud SQL public IPv4 enabled without a private "
-                        "network attachment. That keeps database client access on a public endpoint instead "
-                        "of an internal VPC path."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "network_posture",
-                            [
-                                "ipv4_enabled is true",
-                                "private_network is unset",
-                                f"authorized_networks configured: {len(database_facts.cloud_sql_authorized_networks)}",
-                            ],
-                        ),
-                        evidence_item("public_access_reasons", _metadata_string_list(database, "public_access_reasons")),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_ssl_not_required(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_ipv4_enabled or _cloud_sql_ssl_enforced(database_facts):
-                continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=True,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=1,
-                blast_radius=0,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{database.display_name} allows Cloud SQL public IPv4 client access without "
-                        "requiring encrypted client connections. Credentials and database traffic should "
-                        "not depend on client-side optional TLS behavior."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "ssl_posture",
-                            [
-                                f"require_ssl is {str(bool(database_facts.cloud_sql_require_ssl)).lower()}",
-                                f"ssl_mode is {database_facts.cloud_sql_ssl_mode or 'unset'}",
-                                "ipv4_enabled is true",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_point_in_time_recovery_disabled(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_backup_enabled:
-                continue
-            if database_facts.cloud_sql_point_in_time_recovery_enabled is not False:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{database.display_name} has automated backups enabled but point-in-time "
-                        "recovery disabled. That narrows recovery options after accidental writes, "
-                        "destructive migrations, or credential misuse."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item(
-                            "backup_posture",
-                            [
-                                "backup_configuration.enabled is true",
-                                "point_in_time_recovery_enabled is false",
-                                f"engine is {database_facts.database_engine or 'unknown'}",
-                            ],
-                        ),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
-
-    def detect_cloud_sql_deletion_protection_disabled(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database)
-            if database_facts.deletion_protection is not False:
-                continue
-            severity_reasoning = build_severity_reasoning(
-                internet_exposure=False,
-                privilege_breadth=0,
-                data_sensitivity=2,
-                lateral_movement=0,
-                blast_radius=1,
-            )
-            findings.append(
-                self._finding_factory.build(
-                    rule_id=rule_id,
-                    severity=severity_reasoning.severity,
-                    affected_resources=[database.address],
-                    trust_boundary_id=None,
-                    rationale=(
-                        f"{database.display_name} has Cloud SQL deletion protection disabled. Accidental "
-                        "or unauthorized infrastructure changes could destroy the managed database instance "
-                        "without this provider-level guardrail."
-                    ),
-                    evidence=collect_evidence(
-                        evidence_item("lifecycle_posture", ["deletion_protection is false"]),
-                    ),
-                    severity_reasoning=severity_reasoning,
-                )
-            )
-        return findings
 
 def _bool_status(value: bool | None) -> str:
     if value is None:
         return "unset"
     return str(value).lower()
 
-def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
-    return str(value or "").strip().lower() == "enforced"
 
 def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
     facts = analysis_facts(cluster)
@@ -1082,6 +476,7 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
         name = str(network.get("display_name") or network.get("name") or "unnamed").strip() or "unnamed"
         descriptions.append(f"{name} ({cidr})")
     return descriptions
+
 
 def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:
     facts = analysis_facts(resource)
@@ -1099,9 +494,11 @@ def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:
         risks.extend(f"node OAuth scope is broad: {scope}" for scope in broad_scopes)
     return risks
 
+
 def _gke_scope_is_broad(scope: str) -> bool:
     normalized = str(scope).strip().lower()
     return normalized in _GKE_BROAD_OAUTH_SCOPES or normalized.endswith("/auth/cloud-platform")
+
 
 def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str:
     if instance.public_exposure:
@@ -1117,11 +514,14 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
         "or forwarding path is later attached."
     )
 
+
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     return _public_invoker_bindings(resource, _CLOUD_RUN_PUBLIC_INVOKER_ROLES)
 
+
 def _cloud_function_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     return _public_invoker_bindings(resource, _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES)
+
 
 def _public_invoker_bindings(
     resource: NormalizedResource,
@@ -1137,6 +537,7 @@ def _public_invoker_bindings(
             if member in PUBLIC_GCP_IAM_MEMBERS:
                 bindings.append((source, role, member))
     return bindings
+
 
 def _risky_public_firewall_rules(
     instance: NormalizedResource,
@@ -1156,37 +557,3 @@ def _risky_public_firewall_rules(
             ):
                 risky_rules.append((firewall, rule))
     return risky_rules
-
-def _metadata_string_list(resource: NormalizedResource, key: str) -> list[str]:
-    value = resource.metadata.get(key)
-    if isinstance(value, list):
-        return [str(item) for item in value if item not in (None, "")]
-    if value in (None, ""):
-        return []
-    return [str(value)]
-
-def _cloud_sql_ssl_enforced(database_facts: object) -> bool:
-    if getattr(database_facts, "cloud_sql_require_ssl", None):
-        return True
-    ssl_mode = str(getattr(database_facts, "cloud_sql_ssl_mode", None) or "").strip().upper()
-    return ssl_mode in {"ENCRYPTED_ONLY", "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"}
-
-def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[str]:
-    descriptions: list[str] = []
-    for network in analysis_facts(database).cloud_sql_authorized_networks:
-        value = str(network.get("value") or "").strip()
-        if value not in {"0.0.0.0/0", "::/0"}:
-            continue
-        name = str(network.get("name") or "unnamed").strip() or "unnamed"
-        descriptions.append(f"{name} ({value})")
-    return descriptions
-
-def _dedupe_addresses(addresses: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for address in addresses:
-        if not address or address in seen:
-            continue
-        deduped.append(address)
-        seen.add(address)
-    return deduped

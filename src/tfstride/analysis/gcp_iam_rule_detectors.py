@@ -16,7 +16,12 @@ from tfstride.analysis.gcp_custom_roles import (
     custom_role_permissions,
     custom_role_privilege_risk,
 )
-from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
+from tfstride.analysis.finding_helpers import (
+    build_severity_reasoning,
+    collect_evidence,
+    dedupe_addresses,
+    evidence_item,
+)
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
@@ -246,7 +251,7 @@ class GcpIamRuleDetectors:
                         lateral_movement=1,
                         blast_radius=2 if assessment.is_public or assessment.is_broad else 1,
                     )
-                    affected_resources = _dedupe_addresses([resource.address, source])
+                    affected_resources = dedupe_addresses([resource.address, source])
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
@@ -302,7 +307,7 @@ class GcpIamRuleDetectors:
                     lateral_movement=1,
                     blast_radius=2 if assessment.is_public else 1,
                 )
-                affected_resources = _dedupe_addresses(
+                affected_resources = dedupe_addresses(
                     [target.address if target else "", binding.address]
                 )
                 findings.append(
@@ -360,7 +365,7 @@ class GcpIamRuleDetectors:
                     lateral_movement=2,
                     blast_radius=2,
                 )
-                affected_resources = _dedupe_addresses(
+                affected_resources = dedupe_addresses(
                     [target.address if target else "", binding.address]
                 )
                 findings.append(
@@ -538,7 +543,7 @@ class GcpIamRuleDetectors:
                         self._finding_factory.build(
                             rule_id=rule_id,
                             severity=severity_reasoning.severity,
-                            affected_resources=_dedupe_addresses(
+                            affected_resources=dedupe_addresses(
                                 [binding.address, *[grant.resource_address for grant in access_grants]]
                             ),
                             trust_boundary_id=None,
@@ -635,7 +640,7 @@ class GcpIamRuleDetectors:
                         self._finding_factory.build(
                             rule_id=rule_id,
                             severity=severity_reasoning.severity,
-                            affected_resources=_dedupe_addresses(
+                            affected_resources=dedupe_addresses(
                                 [binding.address, *[resource.address for resource in descendants]]
                             ),
                             trust_boundary_id=None,
@@ -731,7 +736,7 @@ class GcpIamRuleDetectors:
                 self._finding_factory.build(
                     rule_id=rule_id,
                     severity=severity_reasoning.severity,
-                    affected_resources=_dedupe_addresses([target.address if target else "", key.address]),
+                    affected_resources=dedupe_addresses([target.address if target else "", key.address]),
                     trust_boundary_id=None,
                     rationale=(
                         f"{key.display_name} creates a user-managed GCP service account key for "
@@ -794,7 +799,7 @@ class GcpIamRuleDetectors:
                 target.address if target is not None else service_account_reference or "unknown service account"
             )
             principals = sorted(_service_account_key_principals(key, target))
-            affected_resources = _dedupe_addresses(
+            affected_resources = dedupe_addresses(
                 [
                     target.address if target else "",
                     key.address,
@@ -924,6 +929,7 @@ class GcpIamRuleDetectors:
                 )
         return findings
 
+
 def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> bool:
     normalized_role = str(role).strip()
     if resource.resource_type == "google_secret_manager_secret":
@@ -931,6 +937,7 @@ def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> 
     if resource.resource_type == "google_kms_crypto_key":
         return normalized_role in _KMS_ACCESS_ROLES
     return False
+
 
 def _assess_gcp_sensitive_iam_member(
     member: str,
@@ -964,6 +971,7 @@ def _assess_gcp_sensitive_iam_member(
             )
     return None
 
+
 def _service_account_project(member: str) -> str | None:
     email = member.split(":", 1)[1] if ":" in member else member
     suffix = ".iam.gserviceaccount.com"
@@ -971,6 +979,7 @@ def _service_account_project(member: str) -> str | None:
         return None
     domain = email.split("@", 1)[1]
     return domain[: -len(suffix)] or None
+
 
 def broad_resource_iam_bindings(
     resource: NormalizedResource,
@@ -993,6 +1002,7 @@ def broad_resource_iam_bindings(
             seen.add(key)
             matches.append((source, role, assessment.member, assessment))
     return matches
+
 
 def _keyed_service_account_effective_access_grants(
     key: NormalizedResource,
@@ -1117,6 +1127,7 @@ def _keyed_service_account_effective_access_grants(
         key=lambda grant: (grant.resource_address, grant.source, grant.role, grant.member),
     )
 
+
 def _service_account_key_principals(
     key: NormalizedResource,
     target: NormalizedResource | None,
@@ -1152,6 +1163,7 @@ def _service_account_key_principals(
         principals.add(f"serviceAccount:{email}")
     return principals
 
+
 def _service_account_email_from_reference(value: object) -> str | None:
     if value in (None, ""):
         return None
@@ -1166,12 +1178,14 @@ def _service_account_email_from_reference(value: object) -> str | None:
         return None
     return text
 
+
 def _member_matches_service_account_principal(member: str, principals: set[str]) -> bool:
     normalized_member = str(member).strip()
     if normalized_member in principals:
         return True
     email = _service_account_email_from_reference(normalized_member)
     return bool(email and (email in principals or f"serviceAccount:{email}" in principals))
+
 
 def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     members: list[tuple[str, str, str]] = []
@@ -1190,11 +1204,13 @@ def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[st
             members.append(key)
     return members
 
+
 def _has_inherited_iam_blast_radius(
     scope: GcpIamScopeKey,
     descendants: tuple[NormalizedResource, ...],
 ) -> bool:
     return len(descendants) >= _INHERITED_IAM_BLAST_RADIUS_MIN_DESCENDANTS
+
 
 def _inherited_iam_role_risk(
     scope: GcpIamScopeKey,
@@ -1204,6 +1220,7 @@ def _inherited_iam_role_risk(
     if scope.scope_type in {GCP_IAM_SCOPE_ORGANIZATION, GCP_IAM_SCOPE_FOLDER}:
         return _privileged_org_folder_role_risk(role, custom_roles)
     return _privileged_project_role_risk(role, custom_roles)
+
 
 def _inherited_iam_blast_radius_privilege_breadth(
     role_risk: str | None,
@@ -1215,6 +1232,7 @@ def _inherited_iam_blast_radius_privilege_breadth(
         return 2
     return 1
 
+
 def _inherited_iam_descendant_data_sensitivity(
     descendants: tuple[NormalizedResource, ...],
     role_risk: str | None,
@@ -1222,6 +1240,7 @@ def _inherited_iam_descendant_data_sensitivity(
     if role_risk is None:
         return 0
     return 2 if any(resource.data_sensitivity == "sensitive" for resource in descendants) else 0
+
 
 def _inherited_iam_scope_blast_radius(
     scope: GcpIamScopeKey,
@@ -1235,6 +1254,7 @@ def _inherited_iam_scope_blast_radius(
     if len(descendants) >= 5 or len({resource.resource_type for resource in descendants}) >= 3:
         return 2
     return 1
+
 
 def _inherited_iam_descendant_scope_evidence(
     scope: GcpIamScopeKey,
@@ -1256,11 +1276,13 @@ def _inherited_iam_descendant_scope_evidence(
         values.append(f"organizations={', '.join(organizations[:5])}")
     return values
 
+
 def _inherited_iam_descendant_type_evidence(descendants: tuple[NormalizedResource, ...]) -> list[str]:
     counts: dict[str, int] = {}
     for resource in descendants:
         counts[resource.resource_type] = counts.get(resource.resource_type, 0) + 1
     return [f"{resource_type}: {counts[resource_type]}" for resource_type in sorted(counts)]
+
 
 def _inherited_iam_descendant_resource_evidence(
     descendants: tuple[NormalizedResource, ...],
@@ -1273,6 +1295,7 @@ def _inherited_iam_descendant_resource_evidence(
     if remaining > 0:
         values.append(f"and {remaining} more descendant resources")
     return values
+
 
 def _descendant_scope_values(
     descendants: tuple[NormalizedResource, ...],
@@ -1288,6 +1311,7 @@ def _descendant_scope_values(
         elif scope_type == "organization" and facts.organization_id:
             values.add(facts.organization_id)
     return sorted(values)
+
 
 def _inherited_sensitive_resource_accesses(
     descendants: tuple[NormalizedResource, ...],
@@ -1310,6 +1334,7 @@ def _inherited_sensitive_resource_accesses(
         )
     return sorted(grants, key=lambda grant: grant.resource_address)
 
+
 def _inherited_sensitive_resource_access_risk(
     resource: NormalizedResource,
     role: str | None,
@@ -1327,6 +1352,7 @@ def _inherited_sensitive_resource_access_risk(
     if custom_role_allows_data_store_access(resource, normalized_role, custom_roles):
         return (f"{risk_label} through custom role {normalized_role}", data_sensitivity)
     return None
+
 
 def _assess_inherited_gcp_iam_member(
     member: str,
@@ -1348,6 +1374,7 @@ def _assess_inherited_gcp_iam_member(
             return assessment
     return None
 
+
 def _inherited_sensitive_resource_privilege_breadth(
     role: str | None,
     member_assessment: GcpIamMemberAssessment | None,
@@ -1362,6 +1389,7 @@ def _inherited_sensitive_resource_privilege_breadth(
         return 2
     return 1
 
+
 def _inherited_sensitive_resource_blast_radius(
     scope: GcpIamScopeKey,
     grants: list[_InheritedSensitiveResourceAccess],
@@ -1375,6 +1403,7 @@ def _inherited_sensitive_resource_blast_radius(
         return 2
     return 1
 
+
 def _inherited_iam_scope_description(scope: GcpIamScopeKey) -> str:
     if scope.scope_type == GCP_IAM_SCOPE_PROJECT:
         return f"project scope `{scope.identifier}`"
@@ -1384,6 +1413,7 @@ def _inherited_iam_scope_description(scope: GcpIamScopeKey) -> str:
         return f"organization scope `{scope.identifier}`"
     return f"{scope.scope_type} scope `{scope.identifier}`"
 
+
 def _inherited_sensitive_resource_access_evidence(
     grant: _InheritedSensitiveResourceAccess,
 ) -> str:
@@ -1392,10 +1422,12 @@ def _inherited_sensitive_resource_access_evidence(
         f"risk={grant.risk}"
     )
 
+
 def _project_level_data_role_risk(role: str | None) -> tuple[str, int] | None:
     if not role:
         return None
     return _PROJECT_LEVEL_DATA_ACCESS_ROLES.get(role.strip())
+
 
 def _keyed_service_account_grant_evidence(grant: _KeyedServiceAccountGrant) -> str:
     source = grant.source if grant.source else "unknown"
@@ -1404,6 +1436,7 @@ def _keyed_service_account_grant_evidence(grant: _KeyedServiceAccountGrant) -> s
         f"role={grant.role}; member={grant.member}; risk={grant.risk}"
     )
 
+
 def _service_account_key_validity_days(resource: NormalizedResource) -> int | None:
     metadata = resource.metadata_snapshot()
     valid_after = _parse_rfc3339_timestamp(metadata.get("valid_after"))
@@ -1411,6 +1444,7 @@ def _service_account_key_validity_days(resource: NormalizedResource) -> int | No
     if valid_after is None or valid_before is None or valid_before <= valid_after:
         return None
     return int((valid_before - valid_after).total_seconds() // 86400)
+
 
 def _service_account_key_validity_evidence(
     metadata: dict[str, object],
@@ -1423,6 +1457,7 @@ def _service_account_key_validity_evidence(
     if validity_days is not None:
         values.append(f"validity_days={validity_days}")
     return values
+
 
 def _parse_rfc3339_timestamp(value: object) -> datetime | None:
     if value in (None, ""):
@@ -1440,6 +1475,7 @@ def _parse_rfc3339_timestamp(value: object) -> datetime | None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
 
+
 def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
     bindings = analysis_facts(resource).iam_bindings
     if not bindings:
@@ -1456,6 +1492,7 @@ def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[st
         for member in binding_members(binding):
             members.append((role, member))
     return members
+
 
 def _assess_gcp_broad_iam_member(member: str) -> GcpIamMemberAssessment | None:
     normalized_member = str(member).strip()
@@ -1476,11 +1513,13 @@ def _assess_gcp_broad_iam_member(member: str) -> GcpIamMemberAssessment | None:
         )
     return None
 
+
 def _high_risk_service_account_role_risk(role: str | None) -> str | None:
     if not role:
         return None
     normalized_role = role.strip()
     return _HIGH_RISK_SERVICE_ACCOUNT_ROLES.get(normalized_role)
+
 
 def _service_account_iam_target(
     iam_resource: NormalizedResource,
@@ -1494,6 +1533,7 @@ def _service_account_iam_target(
         if target_key in _service_account_reference_keys(service_account):
             return service_account
     return None
+
 
 def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
     facts = analysis_facts(resource)
@@ -1521,11 +1561,14 @@ def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
             keys.add(gcp_reference_key(f"serviceAccount:{text}"))
     return keys
 
+
 def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
     return _iam_resource_binding_members(resource)
 
+
 def _org_folder_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
     return _iam_resource_binding_members(resource)
+
 
 def _org_folder_scope_description(resource: NormalizedResource) -> str:
     facts = analysis_facts(resource)
@@ -1536,6 +1579,7 @@ def _org_folder_scope_description(resource: NormalizedResource) -> str:
     if facts.folder_id:
         return f"folder scope `{facts.folder_id}`"
     return "folder scope"
+
 
 def _privileged_project_role_risk(
     role: str | None,
@@ -1548,6 +1592,7 @@ def _privileged_project_role_risk(
         custom_roles=custom_roles,
     )
 
+
 def _privileged_org_folder_role_risk(
     role: str | None,
     custom_roles: GcpCustomRoleIndex | None = None,
@@ -1558,6 +1603,7 @@ def _privileged_org_folder_role_risk(
         admin_risk="admin-level control over a GCP organization, folder, or descendant project surface",
         custom_roles=custom_roles,
     )
+
 
 def _privileged_gcp_role_risk(
     role: str | None,
@@ -1577,13 +1623,3 @@ def _privileged_gcp_role_risk(
     if custom_roles is not None:
         return custom_role_privilege_risk(normalized_role, custom_roles)
     return None
-
-def _dedupe_addresses(addresses: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for address in addresses:
-        if not address or address in seen:
-            continue
-        deduped.append(address)
-        seen.add(address)
-    return deduped

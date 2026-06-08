@@ -58,6 +58,17 @@ def evidence_item(key: str, values: list[str]) -> EvidenceItem | None:
     return EvidenceItem(key=key, values=deduped_values)
 
 
+def dedupe_addresses(addresses: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for address in addresses:
+        if not address or address in seen:
+            continue
+        deduped.append(address)
+        seen.add(address)
+    return deduped
+
+
 def describe_policy_statement(statement: IAMPolicyStatement) -> str:
     actions = ", ".join(statement.actions) if statement.actions else "no actions"
     resources = ", ".join(statement.resources) if statement.resources else "no resources"
