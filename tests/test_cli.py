@@ -83,6 +83,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- gcp-org-folder-iam-privileged-role", output)
         self.assertIn("- gcp-project-iam-broad-principal", output)
         self.assertIn("- gcp-project-iam-privileged-role", output)
+        self.assertIn("- gcp-inherited-iam-sensitive-resource-access", output)
         self.assertTrue(output.endswith("\n"))
 
     def test_cli_lists_rules_as_json_without_plan(self) -> None:

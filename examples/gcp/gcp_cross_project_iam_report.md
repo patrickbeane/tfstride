@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **0 trust boundaries** and **3 findings** across **8 normalized resources**.
+This run identified **0 trust boundaries** and **4 findings** across **8 normalized resources**.
 
-- High severity findings: `1`
+- High severity findings: `2`
 - Medium severity findings: `2`
 - Low severity findings: `0`
 
@@ -19,14 +19,15 @@ This run identified **0 trust boundaries** and **3 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `45`
-- Enabled rules: `45`
+- Registered rules: `46`
+- Enabled rules: `46`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-sensitive-resource-iam-external-access`: `2`
   - `gcp-project-iam-privileged-role`: `1`
+  - `gcp-inherited-iam-sensitive-resource-access`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -47,6 +48,19 @@ No trust boundaries were discovered.
 - Evidence:
   - iam binding: member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com; role=roles/editor
   - role risk: broad write access across most project services
+
+#### Inherited GCP IAM grant reaches sensitive resources
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_project_iam_member.partner_editor`, `google_kms_crypto_key.customer`, `google_secret_manager_secret.api_key`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 7 => high
+- Rationale: google_project_iam_member.partner_editor grants `roles/editor` to `serviceAccount:deployer@partner-project.iam.gserviceaccount.com` at project scope `tfstride-demo`, and that inherited grant reaches 2 sensitive GCP descendant resource(s). Project, folder, and organization IAM applies below the grant scope, so a single ancestor binding can expose data resources beyond their local IAM boundary.
+- Recommended mitigation: Move sensitive data access off organization, folder, and project-level IAM where possible; grant Secret Manager, KMS, GCS, Cloud SQL, BigQuery, and Pub/Sub permissions at the narrowest resource scope with reviewed principals and custom roles.
+- Evidence:
+  - iam binding: source=google_project_iam_member.partner_editor; scope=project:tfstride-demo; member=serviceAccount:deployer@partner-project.iam.gserviceaccount.com; role=roles/editor
+  - sensitive descendants: resource=google_kms_crypto_key.customer; type=google_kms_crypto_key; risk=Cloud KMS cryptographic key access through roles/editor; resource=google_secret_manager_secret.api_key; type=google_secret_manager_secret; risk=Secret Manager secret access through roles/editor
+  - trust scope: service account belongs to project `partner-project`, outside resource project `tfstride-demo`
 
 ### Medium
 

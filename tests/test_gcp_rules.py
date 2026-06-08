@@ -5,7 +5,8 @@ import unittest
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
-from tfstride.models import TerraformResource
+from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 
 
@@ -820,6 +821,27 @@ def _bigquery_table_iam_binding(
             "role": role,
             "members": members or ["domain:example.com"],
         },
+    )
+
+
+def _normalized_gcp_resource(
+    address: str,
+    resource_type: str,
+    category: ResourceCategory,
+    *,
+    identifier: str | None = None,
+    data_sensitivity: str = "standard",
+    metadata: dict[str, object] | None = None,
+) -> NormalizedResource:
+    return NormalizedResource(
+        address=address,
+        provider="gcp",
+        resource_type=resource_type,
+        name=address.rsplit(".", 1)[-1],
+        category=category,
+        identifier=identifier,
+        data_sensitivity=data_sensitivity,
+        metadata=metadata,
     )
 
 
@@ -2791,6 +2813,166 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(inventory, [])
 
         self.assertEqual(findings, [])
+
+    def test_inherited_project_iam_data_role_reaches_sensitive_descendant(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _secret_manager_secret(),
+                _bigquery_dataset(),
+                _project_iam_member(
+                    "roles/secretmanager.secretAccessor",
+                    member="group:secops@example.com",
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-inherited-iam-sensitive-resource-access")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_project_iam_member.binding",
+                "google_secret_manager_secret.api_key",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_project_iam_member.binding",
+                "scope=project:tfstride-demo",
+                "member=group:secops@example.com",
+                "role=roles/secretmanager.secretAccessor",
+            ],
+        )
+        self.assertEqual(
+            evidence["sensitive_descendants"],
+            [
+                "resource=google_secret_manager_secret.api_key; "
+                "type=google_secret_manager_secret; "
+                "risk=Secret Manager secret access through roles/secretmanager.secretAccessor"
+            ],
+        )
+
+    def test_inherited_project_iam_viewer_does_not_reach_sensitive_descendant(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _secret_manager_secret(),
+                _project_iam_member("roles/viewer", member="allUsers"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_inherited_folder_iam_data_role_reaches_folder_descendant(self) -> None:
+        secret = _normalized_gcp_resource(
+            "google_secret_manager_secret.folder_api",
+            "google_secret_manager_secret",
+            ResourceCategory.DATA,
+            identifier="projects/tfstride-folder/secrets/api",
+            data_sensitivity="sensitive",
+            metadata={
+                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
+                GcpResourceMetadata.PROJECT.key: "tfstride-folder",
+            },
+        )
+        folder_iam = _normalized_gcp_resource(
+            "google_folder_iam_member.secret_reader",
+            "google_folder_iam_member",
+            ResourceCategory.IAM,
+            metadata={
+                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
+                GcpResourceMetadata.IAM_ROLE.key: "roles/secretmanager.secretAccessor",
+                GcpResourceMetadata.IAM_MEMBER.key: "allUsers",
+            },
+        )
+        inventory = ResourceInventory(provider="gcp", resources=[secret, folder_iam])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "google_folder_iam_member.secret_reader",
+                "google_secret_manager_secret.folder_api",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_binding"],
+            [
+                "source=google_folder_iam_member.secret_reader",
+                "scope=folder:12345",
+                "member=allUsers",
+                "role=roles/secretmanager.secretAccessor",
+            ],
+        )
+        self.assertEqual(
+            evidence["trust_scope"],
+            ["member is public GCP principal `allUsers`"],
+        )
+
+    def test_inherited_project_iam_custom_role_data_permissions_are_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _project_iam_custom_role(
+                    role_id="analyticsReader",
+                    permissions=["bigquery.tables.getData"],
+                ),
+                _bigquery_dataset(),
+                _project_iam_member(
+                    "projects/tfstride-demo/roles/analyticsReader",
+                    member="group:analytics@example.com",
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
+            ),
+        )
+
+        self.assertEqual(len(findings), 1)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["custom_role_permissions"], ["bigquery.tables.getData"])
+        self.assertEqual(
+            evidence["sensitive_descendants"],
+            [
+                "resource=google_bigquery_dataset.analytics; type=google_bigquery_dataset; "
+                "risk=BigQuery dataset data access through custom role "
+                "projects/tfstride-demo/roles/analyticsReader"
+            ],
+        )
 
 
 if __name__ == "__main__":

@@ -581,6 +581,24 @@ DEFAULT_RULE_METADATA = (
         tags=("gcp", "iam", "privilege"),
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="gcp-inherited-iam-sensitive-resource-access",
+        title="Inherited GCP IAM grant reaches sensitive resources",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Move sensitive data access off organization, folder, and project-level IAM where possible; "
+            "grant Secret Manager, KMS, GCS, Cloud SQL, BigQuery, and Pub/Sub permissions at the narrowest "
+            "resource scope with reviewed principals and custom roles."
+        ),
+        tags=("gcp", "iam", "inheritance", "data"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
 )
 
 

@@ -60,7 +60,8 @@
         "gcp-org-folder-iam-broad-principal",
         "gcp-org-folder-iam-privileged-role",
         "gcp-project-iam-broad-principal",
-        "gcp-project-iam-privileged-role"
+        "gcp-project-iam-privileged-role",
+        "gcp-inherited-iam-sensitive-resource-access"
       ],
       "finding_counts_by_rule": {
         "aws-control-plane-sensitive-workload-chain": 0,
@@ -96,6 +97,7 @@
         "gcp-gke-legacy-metadata-endpoints-enabled": 0,
         "gcp-gke-public-control-plane": 0,
         "gcp-gke-workload-identity-disabled": 0,
+        "gcp-inherited-iam-sensitive-resource-access": 0,
         "gcp-org-folder-iam-broad-principal": 0,
         "gcp-org-folder-iam-privileged-role": 0,
         "gcp-project-iam-broad-principal": 0,
@@ -109,7 +111,7 @@
         "gcp-service-account-key-effective-access": 0,
         "gcp-service-account-key-hygiene": 0
       },
-      "registered_rule_count": 45,
+      "registered_rule_count": 46,
       "severity_overrides": {}
     }
   },

@@ -823,9 +823,9 @@ class TFSAnalysisTests(unittest.TestCase):
             "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 2, {"high": 1, "medium": 1}),
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 3, {"high": 1, "medium": 2}),
+            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
             "gcp-inventory": (GCP_FIXTURE_PATH, 18, {"high": 6, "medium": 12}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 31, {"high": 12, "medium": 19}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 32, {"high": 13, "medium": 19}),
         }
 
         expected_titles = {
@@ -869,6 +869,7 @@ class TFSAnalysisTests(unittest.TestCase):
             "gcp-cross-project-iam": {
                 "GCP project IAM binding grants a high-privilege role": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
+                "Inherited GCP IAM grant reaches sensitive resources": 1,
             },
             "gcp-inventory": {
                 "BigQuery IAM binding allows public or broad data access": 1,
@@ -916,6 +917,7 @@ class TFSAnalysisTests(unittest.TestCase):
                 "GKE node pool uses broad node identity settings": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 3,
+                "Inherited GCP IAM grant reaches sensitive resources": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
             },

@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **31 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **32 findings** across **30 normalized resources**.
 
-- High severity findings: `12`
+- High severity findings: `13`
 - Medium severity findings: `19`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **31 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `45`
-- Enabled rules: `45`
+- Registered rules: `46`
+- Enabled rules: `46`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -55,6 +55,7 @@ This run identified **9 trust boundaries** and **31 findings** across **30 norma
   - `gcp-org-folder-iam-privileged-role`: `1`
   - `gcp-project-iam-broad-principal`: `1`
   - `gcp-project-iam-privileged-role`: `1`
+  - `gcp-inherited-iam-sensitive-resource-access`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -213,6 +214,19 @@ This run identified **9 trust boundaries** and **31 findings** across **30 norma
   - node identity risks: node service account uses default Compute Engine identity `123456789-compute@developer.gserviceaccount.com`; node OAuth scope is broad: https://www.googleapis.com/auth/cloud-platform
   - node service account: 123456789-compute@developer.gserviceaccount.com
   - oauth scopes: https://www.googleapis.com/auth/cloud-platform
+
+#### Inherited GCP IAM grant reaches sensitive resources
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_project_iam_member.public_owner`, `google_bigquery_dataset.analytics`, `google_bigquery_table.events`, `google_kms_crypto_key.customer`, `google_pubsub_subscription.events`, `google_pubsub_topic.events`, `google_secret_manager_secret.api_key`, `google_sql_database_instance.app`, `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +2, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 9 => high
+- Rationale: google_project_iam_member.public_owner grants `roles/owner` to `allUsers` at project scope `tfstride-demo`, and that inherited grant reaches 8 sensitive GCP descendant resource(s). Project, folder, and organization IAM applies below the grant scope, so a single ancestor binding can expose data resources beyond their local IAM boundary.
+- Recommended mitigation: Move sensitive data access off organization, folder, and project-level IAM where possible; grant Secret Manager, KMS, GCS, Cloud SQL, BigQuery, and Pub/Sub permissions at the narrowest resource scope with reviewed principals and custom roles.
+- Evidence:
+  - iam binding: source=google_project_iam_member.public_owner; scope=project:tfstride-demo; member=allUsers; role=roles/owner
+  - sensitive descendants: resource=google_bigquery_dataset.analytics; type=google_bigquery_dataset; risk=BigQuery dataset data access through roles/owner; resource=google_bigquery_table.events; type=google_bigquery_table; risk=BigQuery table data access through roles/owner; resource=google_kms_crypto_key.customer; type=google_kms_crypto_key; risk=Cloud KMS cryptographic key access through roles/owner; resource=google_pubsub_subscription.events; type=google_pubsub_subscription; risk=Pub/Sub subscription data access through roles/owner; resource=google_pubsub_topic.events; type=google_pubsub_topic; risk=Pub/Sub topic data access through roles/owner; resource=google_secret_manager_secret.api_key; type=google_secret_manager_secret; risk=Secret Manager secret access through roles/owner; resource=google_sql_database_instance.app; type=google_sql_database_instance; risk=Cloud SQL client/admin access through roles/owner; resource=google_storage_bucket.logs; type=google_storage_bucket; risk=GCS object data access through roles/owner
+  - trust scope: member is public GCP principal `allUsers`
 
 #### Internet-exposed GCP workload can access sensitive data services
 
