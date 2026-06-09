@@ -19,13 +19,13 @@ from tfstride.analysis.gcp.iam_access import (
     assess_gcp_broad_iam_member as _assess_gcp_broad_iam_member,
     assess_gcp_sensitive_iam_member as _assess_gcp_sensitive_iam_member,
     iam_resource_binding_members as _iam_resource_binding_members,
-    org_folder_scope_description as _org_folder_scope_description,
 )
 from tfstride.analysis.gcp.iam_sensitive_resources import GcpSensitiveResourceIamDetectors
 from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk as _privileged_org_folder_role_risk,
     privileged_project_role_risk as _privileged_project_role_risk,
 )
+from tfstride.analysis.gcp.iam_scoped import GcpScopedIamDetectors
 from tfstride.analysis.gcp.iam_service_account_keys import GcpServiceAccountKeyDetectors
 from tfstride.analysis.gcp.iam_service_accounts import GcpServiceAccountIamDetectors
 from tfstride.analysis.gcp.custom_roles import (
@@ -43,11 +43,6 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.gcp.constants import (
-    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
-    GCP_PROJECT_IAM_RESOURCE_TYPES,
-    PUBLIC_GCP_IAM_MEMBERS,
-)
 
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {
@@ -108,89 +103,8 @@ class GcpIamRuleDetectors(
     GcpSensitiveResourceIamDetectors,
     GcpServiceAccountIamDetectors,
     GcpServiceAccountKeyDetectors,
+    GcpScopedIamDetectors,
 ):
-    def detect_project_iam_broad_principal(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for binding in context.inventory.by_type(*GCP_PROJECT_IAM_RESOURCE_TYPES):
-            for role, member in _project_iam_binding_members(binding):
-                if member not in PUBLIC_GCP_IAM_MEMBERS:
-                    continue
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=True,
-                    privilege_breadth=1,
-                    data_sensitivity=0,
-                    lateral_movement=1,
-                    blast_radius=1,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=[binding.address],
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{binding.display_name} grants `{role}` to `{member}` at project scope. Public "
-                            "or broadly authenticated principals can cross into the control plane without an "
-                            "organization-owned identity boundary."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
-        return findings
-
-    def detect_project_iam_privileged_role(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        custom_roles = build_gcp_custom_role_index(context.inventory.resources)
-        for binding in context.inventory.by_type(*GCP_PROJECT_IAM_RESOURCE_TYPES):
-            for role, member in _project_iam_binding_members(binding):
-                role_risk = _privileged_project_role_risk(role, custom_roles)
-                if role_risk is None:
-                    continue
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=False,
-                    privilege_breadth=2,
-                    data_sensitivity=0,
-                    lateral_movement=2,
-                    blast_radius=2,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=[binding.address],
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
-                            f"at project scope. That role enables {role_risk} and can materially expand "
-                            "control-plane blast radius if the principal is compromised or mis-scoped."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                            evidence_item("role_risk", [role_risk]),
-                            evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
-        return findings
-
     def detect_inherited_iam_sensitive_resource_access(
         self,
         context: RuleEvaluationContext,
@@ -397,94 +311,6 @@ class GcpIamRuleDetectors(
                             severity_reasoning=severity_reasoning,
                         )
                     )
-        return findings
-
-    def detect_org_folder_iam_broad_principal(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        for binding in context.inventory.by_type(*GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
-            scope = _org_folder_scope_description(binding)
-            for role, member in _org_folder_iam_binding_members(binding):
-                assessment = _assess_gcp_broad_iam_member(member)
-                if assessment is None:
-                    continue
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=assessment.is_public,
-                    privilege_breadth=2,
-                    data_sensitivity=0,
-                    lateral_movement=2,
-                    blast_radius=2,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=[binding.address],
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{binding.display_name} grants `{role}` to `{member}` at {scope}. Public or "
-                            "broad-domain principals at organization or folder scope can expand access across "
-                            "many descendant projects and workloads."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                            evidence_item("scope", [scope]),
-                            evidence_item("trust_scope", [assessment.scope_description]),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
-        return findings
-
-    def detect_org_folder_iam_privileged_role(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        custom_roles = build_gcp_custom_role_index(context.inventory.resources)
-        for binding in context.inventory.by_type(*GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
-            scope = _org_folder_scope_description(binding)
-            for role, member in _org_folder_iam_binding_members(binding):
-                role_risk = _privileged_org_folder_role_risk(role, custom_roles)
-                if role_risk is None:
-                    continue
-                severity_reasoning = build_severity_reasoning(
-                    internet_exposure=False,
-                    privilege_breadth=2,
-                    data_sensitivity=0,
-                    lateral_movement=2,
-                    blast_radius=2,
-                )
-                findings.append(
-                    self._finding_factory.build(
-                        rule_id=rule_id,
-                        severity=severity_reasoning.severity,
-                        affected_resources=[binding.address],
-                        trust_boundary_id=None,
-                        rationale=(
-                            f"{binding.display_name} grants the high-impact GCP role `{role}` to `{member}` "
-                            f"at {scope}. That role enables {role_risk} across a high-level resource "
-                            "boundary and can materially expand blast radius if the principal is compromised."
-                        ),
-                        evidence=collect_evidence(
-                            evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
-                            evidence_item("scope", [scope]),
-                            evidence_item("role_risk", [role_risk]),
-                            evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
-                        ),
-                        severity_reasoning=severity_reasoning,
-                    )
-                )
         return findings
 
 
@@ -704,11 +530,3 @@ def _inherited_sensitive_resource_access_evidence(
         f"resource={grant.resource_address}; type={grant.resource_type}; "
         f"risk={grant.risk}"
     )
-
-
-def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    return _iam_resource_binding_members(resource)
-
-
-def _org_folder_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    return _iam_resource_binding_members(resource)
