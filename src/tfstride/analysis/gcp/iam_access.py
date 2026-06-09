@@ -45,6 +45,26 @@ GCP_KMS_ACCESS_ROLES = frozenset(
     }
 )
 
+GCP_GCS_DATA_ACCESS_ROLES = frozenset(
+    {
+        "roles/editor",
+        "roles/owner",
+        "roles/storage.admin",
+        "roles/storage.objectAdmin",
+        "roles/storage.objectCreator",
+        "roles/storage.objectUser",
+        "roles/storage.objectViewer",
+    }
+)
+GCP_CLOUD_SQL_DATA_ACCESS_ROLES = frozenset(
+    {
+        "roles/cloudsql.admin",
+        "roles/cloudsql.client",
+        "roles/editor",
+        "roles/owner",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class GcpIamMemberAssessment:
@@ -146,6 +166,17 @@ def iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str
         for member in binding_members(binding):
             members.append((role, member))
     return members
+
+
+def org_folder_scope_description(resource: NormalizedResource) -> str:
+    facts = analysis_facts(resource)
+    if resource.resource_type.startswith("google_organization_iam_"):
+        if facts.iam.organization_id:
+            return f"organization scope `{facts.iam.organization_id}`"
+        return "organization scope"
+    if facts.iam.folder_id:
+        return f"folder scope `{facts.iam.folder_id}`"
+    return "folder scope"
 
 
 def _service_account_project(member: str) -> str | None:
