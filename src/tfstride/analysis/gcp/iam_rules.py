@@ -11,12 +11,15 @@ from tfstride.analysis.gcp.iam_inheritance import (
 )
 from tfstride.analysis.gcp.iam_access import (
     GCP_BIGQUERY_DATA_ACCESS_ROLES,
+    GCP_KMS_ACCESS_ROLES as _KMS_ACCESS_ROLES,
     GCP_PUBSUB_DATA_ACCESS_ROLES,
+    GCP_SECRET_ACCESS_ROLES as _SECRET_ACCESS_ROLES,
     GcpIamMemberAssessment,
     assess_gcp_broad_iam_member as _assess_gcp_broad_iam_member,
     assess_gcp_sensitive_iam_member as _assess_gcp_sensitive_iam_member,
     iam_resource_binding_members as _iam_resource_binding_members,
 )
+from tfstride.analysis.gcp.iam_sensitive_resources import GcpSensitiveResourceIamDetectors
 from tfstride.analysis.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
@@ -42,7 +45,6 @@ from tfstride.providers.gcp.constants import (
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_utils import binding_members, gcp_reference_key
 
-_SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {
         GCP_IAM_SCOPE_ORGANIZATION,
@@ -52,23 +54,6 @@ _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
 )
 _INHERITED_IAM_BLAST_RADIUS_MIN_DESCENDANTS = 2
 _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
-_SECRET_ACCESS_ROLES = frozenset(
-    {
-        "roles/editor",
-        "roles/owner",
-        "roles/secretmanager.admin",
-        "roles/secretmanager.secretAccessor",
-    }
-)
-_KMS_ACCESS_ROLES = frozenset(
-    {
-        "roles/cloudkms.admin",
-        "roles/cloudkms.cryptoKeyDecrypter",
-        "roles/cloudkms.cryptoKeyEncrypterDecrypter",
-        "roles/editor",
-        "roles/owner",
-    }
-)
 _GCS_DATA_ACCESS_ROLES = frozenset(
     {
         "roles/editor",
@@ -198,73 +183,7 @@ _PRIVILEGED_GCP_ORG_FOLDER_ROLES: dict[str, str] = {
 }
 
 
-class GcpIamRuleDetectors:
-    def detect_sensitive_iam_external_access(
-        self,
-        context: RuleEvaluationContext,
-        rule_id: str,
-    ) -> list[Finding]:
-        if context.inventory.provider != "gcp":
-            return []
-
-        findings: list[Finding] = []
-        seen: set[tuple[str, str, str]] = set()
-        for resource in context.inventory.by_type(*_SENSITIVE_GCP_RESOURCE_TYPES):
-            resource_facts = analysis_facts(resource)
-            for binding in resource_facts.iam.bindings:
-                role = str(binding.get("role") or "unknown role")
-                if not _is_sensitive_gcp_resource_role(resource, role):
-                    continue
-                source = str(binding.get("source") or "").strip()
-                for member in binding_members(binding):
-                    assessment = _assess_gcp_sensitive_iam_member(member, resource_facts.iam.project)
-                    if assessment is None:
-                        continue
-                    finding_key = (resource.address, role, assessment.member)
-                    if finding_key in seen:
-                        continue
-                    seen.add(finding_key)
-
-                    severity_reasoning = build_severity_reasoning(
-                        internet_exposure=assessment.is_public,
-                        privilege_breadth=2 if assessment.is_public or assessment.is_broad else 1,
-                        data_sensitivity=2,
-                        lateral_movement=1,
-                        blast_radius=2 if assessment.is_public or assessment.is_broad else 1,
-                    )
-                    affected_resources = dedupe_addresses([resource.address, source])
-                    findings.append(
-                        self._finding_factory.build(
-                            rule_id=rule_id,
-                            severity=severity_reasoning.severity,
-                            affected_resources=affected_resources,
-                            trust_boundary_id=None,
-                            rationale=(
-                                f"{resource.display_name} grants `{role}` to `{assessment.member}` through "
-                                "GCP IAM. Public, broad-domain, or foreign-project principals can access "
-                                "sensitive secrets or cryptographic key operations outside the expected "
-                                "project trust boundary."
-                            ),
-                            evidence=collect_evidence(
-                                evidence_item(
-                                    "iam_binding",
-                                    [
-                                        f"source={source}" if source else "source=unknown",
-                                        f"role={role}",
-                                        f"member={assessment.member}",
-                                    ],
-                                ),
-                                evidence_item("trust_scope", [assessment.scope_description]),
-                                evidence_item(
-                                    "resource_policy_sources",
-                                    resource_facts.iam.resource_policy_source_addresses,
-                                ),
-                            ),
-                            severity_reasoning=severity_reasoning,
-                        )
-                    )
-        return findings
-
+class GcpIamRuleDetectors(GcpSensitiveResourceIamDetectors):
     def detect_service_account_iam_broad_principal(
         self,
         context: RuleEvaluationContext,
@@ -910,15 +829,6 @@ class GcpIamRuleDetectors:
                     )
                 )
         return findings
-
-
-def _is_sensitive_gcp_resource_role(resource: NormalizedResource, role: str) -> bool:
-    normalized_role = str(role).strip()
-    if resource.resource_type == "google_secret_manager_secret":
-        return normalized_role in _SECRET_ACCESS_ROLES
-    if resource.resource_type == "google_kms_crypto_key":
-        return normalized_role in _KMS_ACCESS_ROLES
-    return False
 
 
 def _keyed_service_account_effective_access_grants(

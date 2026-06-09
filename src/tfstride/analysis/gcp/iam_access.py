@@ -27,6 +27,23 @@ GCP_BIGQUERY_DATA_ACCESS_ROLES = frozenset(
         "roles/owner",
     }
 )
+GCP_SECRET_ACCESS_ROLES = frozenset(
+    {
+        "roles/editor",
+        "roles/owner",
+        "roles/secretmanager.admin",
+        "roles/secretmanager.secretAccessor",
+    }
+)
+GCP_KMS_ACCESS_ROLES = frozenset(
+    {
+        "roles/cloudkms.admin",
+        "roles/cloudkms.cryptoKeyDecrypter",
+        "roles/cloudkms.cryptoKeyEncrypterDecrypter",
+        "roles/editor",
+        "roles/owner",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
