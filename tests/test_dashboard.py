@@ -10,7 +10,7 @@ from pathlib import Path
 
 FASTAPI_DEPS_AVAILABLE = all(
     importlib.util.find_spec(name) is not None
-    for name in ("fastapi", "httpx", "jinja2", "multipart")
+    for name in ("fastapi", "httpx2", "jinja2", "multipart")
 )
 
 if FASTAPI_DEPS_AVAILABLE:
