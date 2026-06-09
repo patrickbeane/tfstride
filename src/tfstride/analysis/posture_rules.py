@@ -123,7 +123,7 @@ class PostureRuleDetectors:
                             "encryption_posture",
                             [
                                 "storage_encrypted is false",
-                                f"engine is {analysis_facts(database).database_engine or 'unknown'}",
+                                f"engine is {analysis_facts(database).sql.engine or 'unknown'}",
                             ],
                         ),
                     ),

@@ -155,7 +155,7 @@ def detect_trust_boundaries(
     primary_account_id = inventory.primary_account_id
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
         seen_role_principals: set[tuple[str, str]] = set()
-        for trust_statement in analysis_facts(role).trust_statements:
+        for trust_statement in analysis_facts(role).iam.trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                 principal_key = (assessment.principal_kind, assessment.principal)
                 if principal_key in seen_role_principals:
@@ -498,7 +498,7 @@ def _gcp_matching_iam_access_grants(
         return []
 
     grants: list[str] = []
-    for binding in analysis_facts(data_store).iam_bindings:
+    for binding in analysis_facts(data_store).iam.bindings:
         role = str(binding.get("role") or "")
         if not _gcp_role_allows_data_store_access(data_store, role, candidate_index.gcp_custom_roles):
             continue
@@ -506,10 +506,10 @@ def _gcp_matching_iam_access_grants(
             source = str(binding.get("source") or data_store.address)
             grants.append(f"{source} grants {role} to {member}")
 
-    data_store_project = analysis_facts(data_store).project
+    data_store_project = analysis_facts(data_store).iam.project
     for project_iam_resource in candidate_index.project_iam_resources:
         project_iam_facts = analysis_facts(project_iam_resource)
-        if not data_store_project or project_iam_facts.project != data_store_project:
+        if not data_store_project or project_iam_facts.iam.project != data_store_project:
             continue
         for role, member in _project_iam_binding_members(project_iam_resource):
             if member not in workload_members or not _gcp_role_allows_data_store_access(
@@ -521,11 +521,11 @@ def _gcp_matching_iam_access_grants(
 
 
 def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    bindings = analysis_facts(resource).iam_bindings
+    bindings = analysis_facts(resource).iam.bindings
     if not bindings:
         facts = analysis_facts(resource)
-        role = facts.iam_role
-        member = facts.iam_member
+        role = facts.iam.role
+        member = facts.iam.member
         if role and member:
             return [(role, member)]
         return []
@@ -539,14 +539,14 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
 
 
 def _gcp_workload_identity_members(workload: NormalizedResource) -> list[str]:
-    return analysis_facts(workload).workload_identity_members
+    return analysis_facts(workload).workload.identity_members
 
 
 def _gcp_workload_scopes_allow_access(
     workload: NormalizedResource,
     data_store: NormalizedResource,
 ) -> bool:
-    scopes = {scope.lower() for scope in analysis_facts(workload).workload_identity_scopes}
+    scopes = {scope.lower() for scope in analysis_facts(workload).workload.identity_scopes}
     if not scopes:
         return True
     if any(scope.endswith("/cloud-platform") or scope == "cloud-platform" for scope in scopes):

@@ -202,7 +202,7 @@ _PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
     "roles/iam.serviceAccountUser": "service account attachment and impersonation paths",
     "roles/iam.serviceAccountAdmin": "service account administration",
     "roles/iam.securityAdmin": "IAM policy and security-control administration",
-    "roles/resourcemanager.projectIamAdmin": "project IAM policy administration",
+    "roles/resourcemanager.iam.projectIamAdmin": "project IAM policy administration",
 }
 
 _PRIVILEGED_GCP_ORG_FOLDER_ROLES: dict[str, str] = {
@@ -213,8 +213,8 @@ _PRIVILEGED_GCP_ORG_FOLDER_ROLES: dict[str, str] = {
     "roles/orgpolicy.policyAdmin": "organization policy administration",
     "roles/resourcemanager.folderAdmin": "folder hierarchy administration",
     "roles/resourcemanager.organizationAdmin": "organization-level resource administration",
-    "roles/resourcemanager.projectCreator": "project creation under the organization or folder",
-    "roles/resourcemanager.projectDeleter": "project deletion under the organization or folder",
+    "roles/resourcemanager.iam.projectCreator": "project creation under the organization or folder",
+    "roles/resourcemanager.iam.projectDeleter": "project deletion under the organization or folder",
 }
 
 
@@ -231,13 +231,13 @@ class GcpIamRuleDetectors:
         seen: set[tuple[str, str, str]] = set()
         for resource in context.inventory.by_type(*_SENSITIVE_GCP_RESOURCE_TYPES):
             resource_facts = analysis_facts(resource)
-            for binding in resource_facts.iam_bindings:
+            for binding in resource_facts.iam.bindings:
                 role = str(binding.get("role") or "unknown role")
                 if not _is_sensitive_gcp_resource_role(resource, role):
                     continue
                 source = str(binding.get("source") or "").strip()
                 for member in binding_members(binding):
-                    assessment = _assess_gcp_sensitive_iam_member(member, resource_facts.project)
+                    assessment = _assess_gcp_sensitive_iam_member(member, resource_facts.iam.project)
                     if assessment is None:
                         continue
                     finding_key = (resource.address, role, assessment.member)
@@ -277,7 +277,7 @@ class GcpIamRuleDetectors:
                                 evidence_item("trust_scope", [assessment.scope_description]),
                                 evidence_item(
                                     "resource_policy_sources",
-                                    resource_facts.resource_policy_source_addresses,
+                                    resource_facts.iam.resource_policy_source_addresses,
                                 ),
                             ),
                             severity_reasoning=severity_reasoning,
@@ -334,7 +334,7 @@ class GcpIamRuleDetectors:
                             evidence_item("trust_scope", [assessment.scope_description]),
                             evidence_item(
                                 "service_account_reference",
-                                [analysis_facts(binding).service_account_reference or ""],
+                                [analysis_facts(binding).iam.service_account_reference or ""],
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -392,7 +392,7 @@ class GcpIamRuleDetectors:
                             evidence_item("role_risk", [role_risk]),
                             evidence_item(
                                 "service_account_reference",
-                                [analysis_facts(binding).service_account_reference or ""],
+                                [analysis_facts(binding).iam.service_account_reference or ""],
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -701,7 +701,7 @@ class GcpIamRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         for key in inventory.by_type("google_service_account_key"):
-            service_account_reference = analysis_facts(key).service_account_reference
+            service_account_reference = analysis_facts(key).iam.service_account_reference
             target = _service_account_iam_target(key, inventory)
             validity_days = _service_account_key_validity_days(key)
             keepers = key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS)
@@ -796,7 +796,7 @@ class GcpIamRuleDetectors:
                 lateral_movement=2 if identity_control_plane_access else 1,
                 blast_radius=2,
             )
-            service_account_reference = analysis_facts(key).service_account_reference
+            service_account_reference = analysis_facts(key).iam.service_account_reference
             target_label = (
                 target.address if target is not None else service_account_reference or "unknown service account"
             )
@@ -989,7 +989,7 @@ def broad_resource_iam_bindings(
 ) -> list[tuple[str, str, str, GcpIamMemberAssessment]]:
     matches: list[tuple[str, str, str, GcpIamMemberAssessment]] = []
     seen: set[tuple[str, str, str]] = set()
-    for binding in analysis_facts(resource).iam_bindings:
+    for binding in analysis_facts(resource).iam.bindings:
         role = str(binding.get("role") or "unknown role").strip()
         if role not in allowed_roles:
             continue
@@ -1139,15 +1139,15 @@ def _service_account_key_principals(
         target_facts = analysis_facts(target)
         values.extend(
             [
-                target_facts.service_account_email,
-                target_facts.service_account_member,
-                target_facts.resource_name,
+                target_facts.iam.service_account_email,
+                target_facts.iam.service_account_member,
+                target_facts.iam.resource_name,
             ]
         )
     key_facts = analysis_facts(key)
     values.extend(
         [
-            key_facts.service_account_reference,
+            key_facts.iam.service_account_reference,
             key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE),
             key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_ID),
             key.get_metadata_field(GcpResourceMetadata.NAME),
@@ -1190,7 +1190,7 @@ def _member_matches_service_account_principal(member: str, principals: set[str])
 def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     members: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str, str]] = set()
-    for binding in analysis_facts(resource).iam_bindings:
+    for binding in analysis_facts(resource).iam.bindings:
         role = str(binding.get("role") or "unknown role").strip()
         source = str(binding.get("source") or "").strip()
         for member in binding_members(binding):
@@ -1304,12 +1304,12 @@ def _descendant_scope_values(
     values: set[str] = set()
     for resource in descendants:
         facts = analysis_facts(resource)
-        if scope_type == "project" and facts.project:
-            values.add(facts.project)
-        elif scope_type == "folder" and facts.folder_id:
-            values.add(facts.folder_id)
-        elif scope_type == "organization" and facts.organization_id:
-            values.add(facts.organization_id)
+        if scope_type == "project" and facts.iam.project:
+            values.add(facts.iam.project)
+        elif scope_type == "folder" and facts.iam.folder_id:
+            values.add(facts.iam.folder_id)
+        elif scope_type == "organization" and facts.iam.organization_id:
+            values.add(facts.iam.organization_id)
     return sorted(values)
 
 
@@ -1364,7 +1364,7 @@ def _assess_inherited_gcp_iam_member(
     projects = sorted(
         {
             project
-            for project in (analysis_facts(resource).project for resource in descendants)
+            for project in (analysis_facts(resource).iam.project for resource in descendants)
             if project
         }
     )
@@ -1482,11 +1482,11 @@ def _parse_rfc3339_timestamp(value: object) -> datetime | None:
 
 
 def _iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    bindings = analysis_facts(resource).iam_bindings
+    bindings = analysis_facts(resource).iam.bindings
     if not bindings:
         facts = analysis_facts(resource)
-        role = facts.iam_role
-        member = facts.iam_member
+        role = facts.iam.role
+        member = facts.iam.member
         if role and member:
             return [(role, member)]
         return []
@@ -1530,7 +1530,7 @@ def _service_account_iam_target(
     iam_resource: NormalizedResource,
     inventory: ResourceInventory,
 ) -> NormalizedResource | None:
-    target_reference = analysis_facts(iam_resource).service_account_reference
+    target_reference = analysis_facts(iam_resource).iam.service_account_reference
     if not target_reference:
         return None
     target_key = gcp_reference_key(target_reference)
@@ -1548,9 +1548,9 @@ def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
         f"{resource.address}.name",
         f"{resource.address}.email",
         resource.identifier,
-        facts.service_account_email,
-        facts.service_account_member,
-        facts.resource_name,
+        facts.iam.service_account_email,
+        facts.iam.service_account_member,
+        facts.iam.resource_name,
     ]
     keys: set[str] = set()
     for value in values:
@@ -1578,11 +1578,11 @@ def _org_folder_iam_binding_members(resource: NormalizedResource) -> list[tuple[
 def _org_folder_scope_description(resource: NormalizedResource) -> str:
     facts = analysis_facts(resource)
     if resource.resource_type.startswith("google_organization_iam_"):
-        if facts.organization_id:
-            return f"organization scope `{facts.organization_id}`"
+        if facts.iam.organization_id:
+            return f"organization scope `{facts.iam.organization_id}`"
         return "organization scope"
-    if facts.folder_id:
-        return f"folder scope `{facts.folder_id}`"
+    if facts.iam.folder_id:
+        return f"folder scope `{facts.iam.folder_id}`"
     return "folder scope"
 
 

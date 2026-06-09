@@ -11,7 +11,7 @@ from tfstride.analysis.gcp.iam_rules import (
     GCP_PUBSUB_DATA_ACCESS_ROLES,
     broad_resource_iam_bindings,
 )
-from tfstride.analysis.resource_facts import analysis_facts
+from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 
@@ -63,7 +63,7 @@ class GcpDataRuleDetectors:
                             evidence_item("trust_scope", [assessment.scope_description]),
                             evidence_item(
                                 "resource_policy_sources",
-                                analysis_facts(resource).resource_policy_source_addresses,
+                                analysis_facts(resource).iam.resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -114,7 +114,7 @@ class GcpDataRuleDetectors:
                             evidence_item("trust_scope", [assessment.scope_description]),
                             evidence_item(
                                 "resource_policy_sources",
-                                analysis_facts(resource).resource_policy_source_addresses,
+                                analysis_facts(resource).iam.resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -173,7 +173,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
             bucket_facts = analysis_facts(bucket)
-            if bucket_facts.gcs_uniform_bucket_level_access is True:
+            if bucket_facts.storage.uniform_bucket_level_access is True:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -199,7 +199,7 @@ class GcpDataRuleDetectors:
                             [
                                 (
                                     "uniform_bucket_level_access is "
-                                    f"{_bool_status(bucket_facts.gcs_uniform_bucket_level_access)}"
+                                    f"{_bool_status(bucket_facts.storage.uniform_bucket_level_access)}"
                                 ),
                             ],
                         ),
@@ -220,7 +220,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
             bucket_facts = analysis_facts(bucket)
-            if _gcs_public_access_prevention_enforced(bucket_facts.gcs_public_access_prevention):
+            if _gcs_public_access_prevention_enforced(bucket_facts.storage.public_access_prevention):
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=bucket.public_exposure,
@@ -247,7 +247,7 @@ class GcpDataRuleDetectors:
                         evidence_item(
                             "access_control_posture",
                             [
-                                f"public_access_prevention is {bucket_facts.gcs_public_access_prevention or 'unset'}",
+                                f"public_access_prevention is {bucket_facts.storage.public_access_prevention or 'unset'}",
                             ],
                         ),
                         evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
@@ -270,7 +270,7 @@ class GcpDataRuleDetectors:
             bucket_facts = analysis_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
-            if bucket_facts.gcs_versioning_enabled is True:
+            if bucket_facts.storage.versioning_enabled is True:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -294,7 +294,7 @@ class GcpDataRuleDetectors:
                         evidence_item(
                             "data_protection_posture",
                             [
-                                f"versioning.enabled is {_bool_status(bucket_facts.gcs_versioning_enabled)}",
+                                f"versioning.enabled is {_bool_status(bucket_facts.storage.versioning_enabled)}",
                                 f"data_sensitivity is {bucket.data_sensitivity}",
                             ],
                         ),
@@ -317,7 +317,7 @@ class GcpDataRuleDetectors:
             bucket_facts = analysis_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
-            if bucket_facts.gcs_default_kms_key_name:
+            if bucket_facts.storage.default_kms_key_name:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -405,7 +405,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
             database_facts = analysis_facts(database)
-            if database_facts.cloud_sql_backup_enabled:
+            if database_facts.sql.backup_enabled:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -414,7 +414,7 @@ class GcpDataRuleDetectors:
                 lateral_movement=0,
                 blast_radius=1,
             )
-            pitr_enabled = database_facts.cloud_sql_point_in_time_recovery_enabled
+            pitr_enabled = database_facts.sql.point_in_time_recovery_enabled
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -432,7 +432,7 @@ class GcpDataRuleDetectors:
                             [
                                 "backup_configuration.enabled is false",
                                 f"point_in_time_recovery_enabled is {str(bool(pitr_enabled)).lower()}",
-                                f"engine is {database_facts.database_engine or 'unknown'}",
+                                f"engine is {database_facts.sql.engine or 'unknown'}",
                             ],
                         ),
                     ),
@@ -452,7 +452,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
             database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_ipv4_enabled or database_facts.cloud_sql_private_network:
+            if not database_facts.sql.ipv4_enabled or database_facts.sql.private_network:
                 continue
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
@@ -481,7 +481,7 @@ class GcpDataRuleDetectors:
                             [
                                 "ipv4_enabled is true",
                                 "private_network is unset",
-                                f"authorized_networks configured: {len(database_facts.cloud_sql_authorized_networks)}",
+                                f"authorized_networks configured: {len(database_facts.sql.authorized_networks)}",
                             ],
                         ),
                         evidence_item("public_access_reasons", database.public_access_reasons),
@@ -502,7 +502,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
             database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_ipv4_enabled or _cloud_sql_ssl_enforced(database_facts):
+            if not database_facts.sql.ipv4_enabled or _cloud_sql_ssl_enforced(database_facts.sql):
                 continue
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
@@ -529,8 +529,8 @@ class GcpDataRuleDetectors:
                         evidence_item(
                             "ssl_posture",
                             [
-                                f"require_ssl is {str(bool(database_facts.cloud_sql_require_ssl)).lower()}",
-                                f"ssl_mode is {database_facts.cloud_sql_ssl_mode or 'unset'}",
+                                f"require_ssl is {str(bool(database_facts.sql.require_ssl)).lower()}",
+                                f"ssl_mode is {database_facts.sql.ssl_mode or 'unset'}",
                                 "ipv4_enabled is true",
                             ],
                         ),
@@ -551,9 +551,9 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
             database_facts = analysis_facts(database)
-            if not database_facts.cloud_sql_backup_enabled:
+            if not database_facts.sql.backup_enabled:
                 continue
-            if database_facts.cloud_sql_point_in_time_recovery_enabled is not False:
+            if database_facts.sql.point_in_time_recovery_enabled is not False:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -579,7 +579,7 @@ class GcpDataRuleDetectors:
                             [
                                 "backup_configuration.enabled is true",
                                 "point_in_time_recovery_enabled is false",
-                                f"engine is {database_facts.database_engine or 'unknown'}",
+                                f"engine is {database_facts.sql.engine or 'unknown'}",
                             ],
                         ),
                     ),
@@ -599,7 +599,7 @@ class GcpDataRuleDetectors:
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
             database_facts = analysis_facts(database)
-            if database_facts.deletion_protection is not False:
+            if database_facts.sql.deletion_protection is not False:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -638,16 +638,16 @@ def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
 
 
-def _cloud_sql_ssl_enforced(database_facts: object) -> bool:
-    if getattr(database_facts, "cloud_sql_require_ssl", None):
+def _cloud_sql_ssl_enforced(sql_facts: AnalysisSqlFacts) -> bool:
+    if sql_facts.require_ssl:
         return True
-    ssl_mode = str(getattr(database_facts, "cloud_sql_ssl_mode", None) or "").strip().upper()
+    ssl_mode = str(sql_facts.ssl_mode or "").strip().upper()
     return ssl_mode in {"ENCRYPTED_ONLY", "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"}
 
 
 def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[str]:
     descriptions: list[str] = []
-    for network in analysis_facts(database).cloud_sql_authorized_networks:
+    for network in analysis_facts(database).sql.authorized_networks:
         value = str(network.get("value") or "").strip()
         if value not in {"0.0.0.0/0", "::/0"}:
             continue

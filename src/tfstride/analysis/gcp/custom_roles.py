@@ -35,7 +35,7 @@ _PRIVILEGE_ESCALATION_PERMISSIONS = frozenset(
         "iam.serviceAccounts.setIamPolicy",
         "iam.serviceAccounts.signBlob",
         "iam.serviceAccounts.signJwt",
-        "resourcemanager.projects.setIamPolicy",
+        "resourcemanager.iam.projects.setIamPolicy",
         "run.services.update",
     }
 )
@@ -51,7 +51,7 @@ def build_gcp_custom_role_index(resources: Iterable[NormalizedResource]) -> GcpC
     for resource in resources:
         if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
             continue
-        permissions = tuple(sorted(set(analysis_facts(resource).custom_role_permissions)))
+        permissions = tuple(sorted(set(analysis_facts(resource).iam.custom_role_permissions)))
         if not permissions:
             continue
         for reference in _custom_role_references(resource):
@@ -170,11 +170,11 @@ def _custom_role_references(resource: NormalizedResource) -> set[str]:
         f"{resource.address}.role_id",
         resource.identifier,
         resource.name,
-        facts.resource_name,
-        facts.custom_role_id,
+        facts.iam.resource_name,
+        facts.iam.custom_role_id,
     }
-    if facts.project and facts.custom_role_id:
-        references.add(f"projects/{facts.project}/roles/{facts.custom_role_id}")
+    if facts.iam.project and facts.iam.custom_role_id:
+        references.add(f"projects/{facts.iam.project}/roles/{facts.iam.custom_role_id}")
     return {str(reference).strip() for reference in references if reference not in (None, "")}
 
 

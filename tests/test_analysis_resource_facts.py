@@ -221,51 +221,51 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         facts = analysis_facts(resource)
 
         self.assertIsInstance(facts, AnalysisResourceFacts)
-        self.assertEqual(facts.bucket_name, "logs")
-        self.assertEqual(facts.bucket_acl, "public-read")
-        self.assertEqual(facts.public_access_block, {"block_public_acls": True})
-        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
-        self.assertIsNone(facts.gcs_public_access_prevention)
-        self.assertIsNone(facts.gcs_versioning_enabled)
-        self.assertIsNone(facts.gcs_default_kms_key_name)
-        self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
-        self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
-        self.assertEqual(facts.database_engine, "postgres")
-        self.assertEqual(facts.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
-        self.assertIsNone(facts.project)
-        self.assertIsNone(facts.resource_name)
-        self.assertEqual(facts.reference_values, [])
-        self.assertIsNone(facts.iam_target_reference)
-        self.assertEqual(facts.iam_bindings, [])
-        self.assertIsNone(facts.custom_role_id)
-        self.assertEqual(facts.custom_role_permissions, [])
-        self.assertIsNone(facts.organization_id)
-        self.assertIsNone(facts.folder_id)
-        self.assertIsNone(facts.organization_id)
-        self.assertIsNone(facts.folder_id)
-        self.assertEqual(facts.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.cloud_sql_backup_enabled)
-        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
-        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
-        self.assertIsNone(facts.cloud_sql_private_network)
-        self.assertIsNone(facts.cloud_sql_require_ssl)
-        self.assertIsNone(facts.cloud_sql_ssl_mode)
-        self.assertIsNone(facts.deletion_protection)
-        self.assertIsNone(facts.service_account_email)
-        self.assertIsNone(facts.service_account_member)
-        self.assertIsNone(facts.service_account_reference)
-        self.assertEqual(facts.workload_identity_members, [])
-        self.assertEqual(facts.workload_identity_scopes, [])
-        self.assertIsNone(facts.gke_endpoint)
-        self.assertIsNone(facts.gke_private_endpoint_enabled)
-        self.assertIsNone(facts.gke_private_nodes_enabled)
-        self.assertEqual(facts.gke_master_authorized_networks, [])
-        self.assertIsNone(facts.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke_workload_identity_pool)
-        self.assertIsNone(facts.gke_node_service_account)
-        self.assertEqual(facts.gke_node_oauth_scopes, [])
-        self.assertIsNone(facts.gke_node_metadata_mode)
-        self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertEqual(facts.storage.bucket_name, "logs")
+        self.assertEqual(facts.storage.bucket_acl, "public-read")
+        self.assertEqual(facts.storage.public_access_block, {"block_public_acls": True})
+        self.assertIsNone(facts.storage.uniform_bucket_level_access)
+        self.assertIsNone(facts.storage.public_access_prevention)
+        self.assertIsNone(facts.storage.versioning_enabled)
+        self.assertIsNone(facts.storage.default_kms_key_name)
+        self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
+        self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(facts.sql.engine, "postgres")
+        self.assertEqual(facts.iam.resource_policy_source_addresses, ["aws_s3_bucket_policy.logs"])
+        self.assertIsNone(facts.iam.project)
+        self.assertIsNone(facts.iam.resource_name)
+        self.assertEqual(facts.iam.reference_values, [])
+        self.assertIsNone(facts.iam.target_reference)
+        self.assertEqual(facts.iam.bindings, [])
+        self.assertIsNone(facts.iam.custom_role_id)
+        self.assertEqual(facts.iam.custom_role_permissions, [])
+        self.assertIsNone(facts.iam.organization_id)
+        self.assertIsNone(facts.iam.folder_id)
+        self.assertIsNone(facts.iam.organization_id)
+        self.assertIsNone(facts.iam.folder_id)
+        self.assertEqual(facts.sql.authorized_networks, [])
+        self.assertIsNone(facts.sql.backup_enabled)
+        self.assertIsNone(facts.sql.point_in_time_recovery_enabled)
+        self.assertIsNone(facts.sql.ipv4_enabled)
+        self.assertIsNone(facts.sql.private_network)
+        self.assertIsNone(facts.sql.require_ssl)
+        self.assertIsNone(facts.sql.ssl_mode)
+        self.assertIsNone(facts.sql.deletion_protection)
+        self.assertIsNone(facts.iam.service_account_email)
+        self.assertIsNone(facts.iam.service_account_member)
+        self.assertIsNone(facts.iam.service_account_reference)
+        self.assertEqual(facts.workload.identity_members, [])
+        self.assertEqual(facts.workload.identity_scopes, [])
+        self.assertIsNone(facts.gke.endpoint)
+        self.assertIsNone(facts.gke.private_endpoint_enabled)
+        self.assertIsNone(facts.gke.private_nodes_enabled)
+        self.assertEqual(facts.gke.master_authorized_networks, [])
+        self.assertIsNone(facts.gke.workload_identity_enabled)
+        self.assertIsNone(facts.gke.workload_identity_pool)
+        self.assertIsNone(facts.gke.node_service_account)
+        self.assertEqual(facts.gke.node_oauth_scopes, [])
+        self.assertIsNone(facts.gke.node_metadata_mode)
+        self.assertIsNone(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
@@ -284,44 +284,44 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.bucket_name, "logs")
-        self.assertEqual(facts.bucket_acl, "")
-        self.assertIsNone(facts.public_access_block)
-        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
-        self.assertIsNone(facts.gcs_public_access_prevention)
-        self.assertIsNone(facts.gcs_versioning_enabled)
-        self.assertIsNone(facts.gcs_default_kms_key_name)
-        self.assertEqual(facts.policy_document, {})
-        self.assertEqual(facts.trust_statements, [])
-        self.assertIsNone(facts.database_engine)
-        self.assertEqual(facts.resource_policy_source_addresses, [])
-        self.assertIsNone(facts.project)
-        self.assertEqual(facts.reference_values, ["logs"])
-        self.assertEqual(facts.iam_target_reference, "logs")
-        self.assertEqual(facts.iam_bindings, [])
-        self.assertEqual(facts.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.cloud_sql_backup_enabled)
-        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
-        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
-        self.assertIsNone(facts.cloud_sql_private_network)
-        self.assertIsNone(facts.cloud_sql_require_ssl)
-        self.assertIsNone(facts.cloud_sql_ssl_mode)
-        self.assertIsNone(facts.deletion_protection)
-        self.assertIsNone(facts.service_account_email)
-        self.assertIsNone(facts.service_account_member)
-        self.assertIsNone(facts.service_account_reference)
-        self.assertEqual(facts.workload_identity_members, [])
-        self.assertEqual(facts.workload_identity_scopes, [])
-        self.assertIsNone(facts.gke_endpoint)
-        self.assertIsNone(facts.gke_private_endpoint_enabled)
-        self.assertIsNone(facts.gke_private_nodes_enabled)
-        self.assertEqual(facts.gke_master_authorized_networks, [])
-        self.assertIsNone(facts.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke_workload_identity_pool)
-        self.assertIsNone(facts.gke_node_service_account)
-        self.assertEqual(facts.gke_node_oauth_scopes, [])
-        self.assertIsNone(facts.gke_node_metadata_mode)
-        self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertEqual(facts.storage.bucket_name, "logs")
+        self.assertEqual(facts.storage.bucket_acl, "")
+        self.assertIsNone(facts.storage.public_access_block)
+        self.assertIsNone(facts.storage.uniform_bucket_level_access)
+        self.assertIsNone(facts.storage.public_access_prevention)
+        self.assertIsNone(facts.storage.versioning_enabled)
+        self.assertIsNone(facts.storage.default_kms_key_name)
+        self.assertEqual(facts.iam.policy_document, {})
+        self.assertEqual(facts.iam.trust_statements, [])
+        self.assertIsNone(facts.sql.engine)
+        self.assertEqual(facts.iam.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.iam.project)
+        self.assertEqual(facts.iam.reference_values, ["logs"])
+        self.assertEqual(facts.iam.target_reference, "logs")
+        self.assertEqual(facts.iam.bindings, [])
+        self.assertEqual(facts.sql.authorized_networks, [])
+        self.assertIsNone(facts.sql.backup_enabled)
+        self.assertIsNone(facts.sql.point_in_time_recovery_enabled)
+        self.assertIsNone(facts.sql.ipv4_enabled)
+        self.assertIsNone(facts.sql.private_network)
+        self.assertIsNone(facts.sql.require_ssl)
+        self.assertIsNone(facts.sql.ssl_mode)
+        self.assertIsNone(facts.sql.deletion_protection)
+        self.assertIsNone(facts.iam.service_account_email)
+        self.assertIsNone(facts.iam.service_account_member)
+        self.assertIsNone(facts.iam.service_account_reference)
+        self.assertEqual(facts.workload.identity_members, [])
+        self.assertEqual(facts.workload.identity_scopes, [])
+        self.assertIsNone(facts.gke.endpoint)
+        self.assertIsNone(facts.gke.private_endpoint_enabled)
+        self.assertIsNone(facts.gke.private_nodes_enabled)
+        self.assertEqual(facts.gke.master_authorized_networks, [])
+        self.assertIsNone(facts.gke.workload_identity_enabled)
+        self.assertIsNone(facts.gke.workload_identity_pool)
+        self.assertIsNone(facts.gke.node_service_account)
+        self.assertEqual(facts.gke.node_oauth_scopes, [])
+        self.assertIsNone(facts.gke.node_metadata_mode)
+        self.assertIsNone(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_gcp_storage_bucket_facts_read_provider_owned_posture_metadata(self) -> None:
         resource = _resource(
@@ -340,12 +340,12 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.bucket_name, "tfstride-logs")
-        self.assertTrue(facts.gcs_uniform_bucket_level_access)
-        self.assertEqual(facts.gcs_public_access_prevention, "enforced")
-        self.assertTrue(facts.gcs_versioning_enabled)
+        self.assertEqual(facts.storage.bucket_name, "tfstride-logs")
+        self.assertTrue(facts.storage.uniform_bucket_level_access)
+        self.assertEqual(facts.storage.public_access_prevention, "enforced")
+        self.assertTrue(facts.storage.versioning_enabled)
         self.assertEqual(
-            facts.gcs_default_kms_key_name,
+            facts.storage.default_kms_key_name,
             "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
         )
 
@@ -370,11 +370,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.project, "tfstride-demo")
-        self.assertEqual(facts.reference_values, [])
-        self.assertIsNone(facts.iam_target_reference)
+        self.assertEqual(facts.iam.project, "tfstride-demo")
+        self.assertEqual(facts.iam.reference_values, [])
+        self.assertIsNone(facts.iam.target_reference)
         self.assertEqual(
-            facts.iam_bindings,
+            facts.iam.bindings,
             [
                 {
                     "role": "roles/secretmanager.secretAccessor",
@@ -384,7 +384,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            facts.resource_policy_source_addresses,
+            facts.iam.resource_policy_source_addresses,
             ["google_secret_manager_secret_iam_member.public_accessor"],
         )
 
@@ -400,8 +400,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.organization_id, "1234567890")
-        self.assertEqual(facts.folder_id, "folders/12345")
+        self.assertEqual(facts.iam.organization_id, "1234567890")
+        self.assertEqual(facts.iam.folder_id, "folders/12345")
 
     def test_gcp_iam_target_facts_read_provider_owned_reference_metadata(self) -> None:
         resource = _resource(
@@ -412,8 +412,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.reference_values, ["google_secret_manager_secret.api.id"])
-        self.assertEqual(facts.iam_target_reference, "google_secret_manager_secret.api.id")
+        self.assertEqual(facts.iam.reference_values, ["google_secret_manager_secret.api.id"])
+        self.assertEqual(facts.iam.target_reference, "google_secret_manager_secret.api.id")
 
     def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
         resource = _resource(
@@ -436,15 +436,15 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.database_engine, "POSTGRES_15")
-        self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
-        self.assertFalse(facts.cloud_sql_backup_enabled)
-        self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
-        self.assertTrue(facts.cloud_sql_ipv4_enabled)
-        self.assertEqual(facts.cloud_sql_private_network, "google_compute_network.main.id")
-        self.assertTrue(facts.cloud_sql_require_ssl)
-        self.assertEqual(facts.cloud_sql_ssl_mode, "ENCRYPTED_ONLY")
-        self.assertTrue(facts.deletion_protection)
+        self.assertEqual(facts.sql.engine, "POSTGRES_15")
+        self.assertEqual(facts.sql.authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
+        self.assertFalse(facts.sql.backup_enabled)
+        self.assertTrue(facts.sql.point_in_time_recovery_enabled)
+        self.assertTrue(facts.sql.ipv4_enabled)
+        self.assertEqual(facts.sql.private_network, "google_compute_network.main.id")
+        self.assertTrue(facts.sql.require_ssl)
+        self.assertEqual(facts.sql.ssl_mode, "ENCRYPTED_ONLY")
+        self.assertTrue(facts.sql.deletion_protection)
 
 
     def test_gcp_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
@@ -469,19 +469,19 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertEqual(facts.gke_endpoint, "35.1.2.3")
-        self.assertFalse(facts.gke_private_endpoint_enabled)
-        self.assertFalse(facts.gke_private_nodes_enabled)
+        self.assertEqual(facts.gke.endpoint, "35.1.2.3")
+        self.assertFalse(facts.gke.private_endpoint_enabled)
+        self.assertFalse(facts.gke.private_nodes_enabled)
         self.assertEqual(
-            facts.gke_master_authorized_networks,
+            facts.gke.master_authorized_networks,
             [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}],
         )
-        self.assertFalse(facts.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke_workload_identity_pool)
-        self.assertEqual(facts.gke_node_service_account, "123456789-compute@developer.gserviceaccount.com")
-        self.assertEqual(facts.gke_node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke_node_metadata_mode, "GCE_METADATA")
-        self.assertTrue(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertFalse(facts.gke.workload_identity_enabled)
+        self.assertIsNone(facts.gke.workload_identity_pool)
+        self.assertEqual(facts.gke.node_service_account, "123456789-compute@developer.gserviceaccount.com")
+        self.assertEqual(facts.gke.node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
+        self.assertEqual(facts.gke.node_metadata_mode, "GCE_METADATA")
+        self.assertTrue(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_gcp_compute_facts_read_workload_identity_metadata(self) -> None:
         resource = _resource(
@@ -504,14 +504,14 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         facts = analysis_facts(resource)
 
         self.assertEqual(
-            facts.workload_identity_members,
+            facts.workload.identity_members,
             [
                 "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
                 "serviceAccount:worker@example.iam.gserviceaccount.com",
             ],
         )
         self.assertEqual(
-            facts.workload_identity_scopes,
+            facts.workload.identity_scopes,
             [
                 "https://www.googleapis.com/auth/cloud-platform",
                 "https://www.googleapis.com/auth/devstorage.read_only",
@@ -534,15 +534,15 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         facts = analysis_facts(resource)
 
         self.assertEqual(
-            facts.resource_name,
+            facts.iam.resource_name,
             "projects/tfstride-demo/serviceAccounts/tfstride-web",
         )
-        self.assertEqual(facts.service_account_email, "tfstride-web@example.iam.gserviceaccount.com")
+        self.assertEqual(facts.iam.service_account_email, "tfstride-web@example.iam.gserviceaccount.com")
         self.assertEqual(
-            facts.service_account_member,
+            facts.iam.service_account_member,
             "serviceAccount:tfstride-web@example.iam.gserviceaccount.com",
         )
-        self.assertIsNone(facts.service_account_reference)
+        self.assertIsNone(facts.iam.service_account_reference)
 
     def test_registered_provider_facts_are_used_without_analysis_branching(self) -> None:
         calls: list[NormalizedResource] = []
@@ -557,50 +557,50 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         facts = analysis_facts(resource, facts_registry=registry)
 
         self.assertEqual(calls, [resource])
-        self.assertEqual(facts.bucket_name, "gcp-logs")
-        self.assertEqual(facts.bucket_acl, "private")
-        self.assertEqual(facts.public_access_block, {"block_public_acls": True})
-        self.assertTrue(facts.gcs_uniform_bucket_level_access)
-        self.assertEqual(facts.gcs_public_access_prevention, "enforced")
-        self.assertTrue(facts.gcs_versioning_enabled)
+        self.assertEqual(facts.storage.bucket_name, "gcp-logs")
+        self.assertEqual(facts.storage.bucket_acl, "private")
+        self.assertEqual(facts.storage.public_access_block, {"block_public_acls": True})
+        self.assertTrue(facts.storage.uniform_bucket_level_access)
+        self.assertEqual(facts.storage.public_access_prevention, "enforced")
+        self.assertTrue(facts.storage.versioning_enabled)
         self.assertEqual(
-            facts.gcs_default_kms_key_name,
+            facts.storage.default_kms_key_name,
             "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
         )
-        self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
-        self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
-        self.assertEqual(facts.database_engine, "spanner")
+        self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
+        self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(facts.sql.engine, "spanner")
         self.assertEqual(
-            facts.resource_policy_source_addresses,
+            facts.iam.resource_policy_source_addresses,
             ["google_storage_bucket_iam_binding.logs"],
         )
-        self.assertEqual(facts.project, "tfstride-demo")
-        self.assertEqual(facts.resource_name, "fake-resource")
-        self.assertEqual(facts.reference_values, ["fake-resource", "google_service_account.fake.email"])
-        self.assertEqual(facts.iam_target_reference, "google_service_account.fake.email")
-        self.assertEqual(facts.iam_bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
-        self.assertEqual(facts.custom_role_id, "deployAdmin")
-        self.assertEqual(facts.custom_role_permissions, ["iam.serviceAccounts.actAs"])
-        self.assertEqual(facts.organization_id, "1234567890")
-        self.assertEqual(facts.folder_id, "folders/12345")
-        self.assertEqual(facts.cloud_sql_authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
-        self.assertFalse(facts.cloud_sql_backup_enabled)
-        self.assertTrue(facts.cloud_sql_point_in_time_recovery_enabled)
-        self.assertEqual(facts.service_account_email, "fake@example.iam.gserviceaccount.com")
-        self.assertEqual(facts.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
-        self.assertEqual(facts.service_account_reference, "google_service_account.fake.email")
-        self.assertEqual(facts.workload_identity_members, ["serviceAccount:fake@example.iam.gserviceaccount.com"])
-        self.assertEqual(facts.workload_identity_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke_endpoint, "35.1.2.3")
-        self.assertFalse(facts.gke_private_endpoint_enabled)
-        self.assertFalse(facts.gke_private_nodes_enabled)
-        self.assertEqual(facts.gke_master_authorized_networks, [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}])
-        self.assertFalse(facts.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke_workload_identity_pool)
-        self.assertEqual(facts.gke_node_service_account, "123456789-compute@developer.gserviceaccount.com")
-        self.assertEqual(facts.gke_node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke_node_metadata_mode, "GCE_METADATA")
-        self.assertTrue(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertEqual(facts.iam.project, "tfstride-demo")
+        self.assertEqual(facts.iam.resource_name, "fake-resource")
+        self.assertEqual(facts.iam.reference_values, ["fake-resource", "google_service_account.fake.email"])
+        self.assertEqual(facts.iam.target_reference, "google_service_account.fake.email")
+        self.assertEqual(facts.iam.bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
+        self.assertEqual(facts.iam.custom_role_id, "deployAdmin")
+        self.assertEqual(facts.iam.custom_role_permissions, ["iam.serviceAccounts.actAs"])
+        self.assertEqual(facts.iam.organization_id, "1234567890")
+        self.assertEqual(facts.iam.folder_id, "folders/12345")
+        self.assertEqual(facts.sql.authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
+        self.assertFalse(facts.sql.backup_enabled)
+        self.assertTrue(facts.sql.point_in_time_recovery_enabled)
+        self.assertEqual(facts.iam.service_account_email, "fake@example.iam.gserviceaccount.com")
+        self.assertEqual(facts.iam.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
+        self.assertEqual(facts.iam.service_account_reference, "google_service_account.fake.email")
+        self.assertEqual(facts.workload.identity_members, ["serviceAccount:fake@example.iam.gserviceaccount.com"])
+        self.assertEqual(facts.workload.identity_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
+        self.assertEqual(facts.gke.endpoint, "35.1.2.3")
+        self.assertFalse(facts.gke.private_endpoint_enabled)
+        self.assertFalse(facts.gke.private_nodes_enabled)
+        self.assertEqual(facts.gke.master_authorized_networks, [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}])
+        self.assertFalse(facts.gke.workload_identity_enabled)
+        self.assertIsNone(facts.gke.workload_identity_pool)
+        self.assertEqual(facts.gke.node_service_account, "123456789-compute@developer.gserviceaccount.com")
+        self.assertEqual(facts.gke.node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
+        self.assertEqual(facts.gke.node_metadata_mode, "GCE_METADATA")
+        self.assertTrue(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
@@ -611,13 +611,13 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         )
         facts = analysis_facts(resource)
 
-        policy_document = facts.policy_document
-        trust_statements = facts.trust_statements
+        policy_document = facts.iam.policy_document
+        trust_statements = facts.iam.trust_statements
         policy_document["Statement"].append({"Effect": "Deny"})
         trust_statements[0]["Effect"] = "Deny"
 
-        self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
-        self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
+        self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
 
     def test_analysis_metadata_reads_are_centralized_in_facts_facade(self) -> None:
         analysis_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis"

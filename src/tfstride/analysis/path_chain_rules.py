@@ -70,9 +70,9 @@ class PathChainRuleDetectors:
             policy_sources = [
                 source
                 for data_store, _ in data_paths
-                for source in analysis_facts(data_store).resource_policy_source_addresses
+                for source in analysis_facts(data_store).iam.resource_policy_source_addresses
             ]
-            workload_identities = analysis_facts(workload).workload_identity_members
+            workload_identities = analysis_facts(workload).workload.identity_members
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=2 if len(data_store_addresses) > 1 else 1,
@@ -100,7 +100,7 @@ class PathChainRuleDetectors:
                         evidence_item("workload_identity", workload_identities),
                         evidence_item(
                             "workload_identity_scopes",
-                            analysis_facts(workload).workload_identity_scopes,
+                            analysis_facts(workload).workload.identity_scopes,
                         ),
                         evidence_item(
                             "data_access_path",
@@ -191,7 +191,7 @@ class PathChainRuleDetectors:
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
-            for trust_statement in analysis_facts(role).trust_statements:
+            for trust_statement in analysis_facts(role).iam.trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue

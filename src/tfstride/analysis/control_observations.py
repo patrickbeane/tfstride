@@ -30,24 +30,24 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
     observations: list[Observation] = []
     access_block_index: dict[str, NormalizedResource] = {}
     for access_block in inventory.by_type(*OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES):
-        bucket_name = analysis_facts(access_block).bucket_name
+        bucket_name = analysis_facts(access_block).storage.bucket_name
         if bucket_name:
             access_block_index[bucket_name] = access_block
     for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
         bucket_facts = analysis_facts(bucket)
-        access_block = bucket_facts.public_access_block
+        access_block = bucket_facts.storage.public_access_block
         if not access_block or bucket.public_exposure:
             continue
         mitigation_signals: list[str] = []
-        acl = bucket_facts.bucket_acl
+        acl = bucket_facts.storage.bucket_acl
         if acl in {"public-read", "public-read-write", "website"}:
             mitigation_signals.append(f"bucket ACL `{acl}` would otherwise grant public access")
-        if policy_allows_public_access(bucket_facts.policy_document):
+        if policy_allows_public_access(bucket_facts.iam.policy_document):
             mitigation_signals.append("bucket policy would otherwise allow anonymous access")
         if not mitigation_signals:
             continue
         affected_resources = [bucket.address]
-        access_block_resource = access_block_index.get(bucket_facts.bucket_name)
+        access_block_resource = access_block_index.get(bucket_facts.storage.bucket_name)
         if access_block_resource is not None:
             affected_resources.append(access_block_resource.address)
         observations.append(
@@ -81,7 +81,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
     primary_account_id = inventory.primary_account_id
     seen: set[tuple[str, str]] = set()
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-        for trust_statement in analysis_facts(role).trust_statements:
+        for trust_statement in analysis_facts(role).iam.trust_statements:
             for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                 if not trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                     continue
@@ -136,7 +136,7 @@ def _observe_private_encrypted_databases(inventory: ResourceInventory) -> list[O
             "storage_encrypted is true",
             "no attached security group allows internet ingress",
         ]
-        engine = analysis_facts(database).database_engine
+        engine = analysis_facts(database).sql.engine
         if engine:
             posture_signals.append(f"engine is {engine}")
         observations.append(

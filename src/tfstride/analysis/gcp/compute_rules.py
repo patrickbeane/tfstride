@@ -73,7 +73,7 @@ class GcpComputeRuleDetectors:
                                 for firewall, rule in risky_rules
                             ],
                         ),
-                        evidence_item("network_tags", analysis_facts(instance).network_tags),
+                        evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                     ),
@@ -93,7 +93,7 @@ class GcpComputeRuleDetectors:
         findings: list[Finding] = []
         for instance in context.inventory.by_type("google_compute_instance"):
             instance_facts = analysis_facts(instance)
-            if instance_facts.os_login_enabled is not False:
+            if instance_facts.compute.os_login_enabled is not False:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=instance.public_exposure,
@@ -159,7 +159,7 @@ class GcpComputeRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item(
                             "control_plane_endpoint",
-                            [cluster_facts.gke_endpoint or "public endpoint configured"],
+                            [cluster_facts.gke.endpoint or "public endpoint configured"],
                         ),
                         evidence_item("public_access_reasons", cluster.public_access_reasons),
                         evidence_item("public_exposure_reasons", cluster.public_exposure_reasons),
@@ -210,7 +210,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("authorized_networks", broad_networks),
                         evidence_item(
                             "configured_authorized_network_count",
-                            [str(len(cluster_facts.gke_master_authorized_networks))],
+                            [str(len(cluster_facts.gke.master_authorized_networks))],
                         ),
                         evidence_item("public_exposure_reasons", cluster.public_exposure_reasons),
                     ),
@@ -230,7 +230,7 @@ class GcpComputeRuleDetectors:
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
             cluster_facts = analysis_facts(cluster)
-            if cluster_facts.gke_workload_identity_enabled is True:
+            if cluster_facts.gke.workload_identity_enabled is True:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=cluster.public_exposure,
@@ -256,9 +256,9 @@ class GcpComputeRuleDetectors:
                             [
                                 (
                                     "workload_identity_enabled is "
-                                    f"{_bool_status(cluster_facts.gke_workload_identity_enabled)}"
+                                    f"{_bool_status(cluster_facts.gke.workload_identity_enabled)}"
                                 ),
-                                f"workload_pool is {cluster_facts.gke_workload_identity_pool or 'unset'}",
+                                f"workload_pool is {cluster_facts.gke.workload_identity_pool or 'unset'}",
                             ],
                         ),
                     ),
@@ -278,7 +278,7 @@ class GcpComputeRuleDetectors:
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*GCP_GKE_RESOURCE_TYPES):
             resource_facts = analysis_facts(resource)
-            if resource_facts.gke_legacy_metadata_endpoints_enabled is not True:
+            if resource_facts.gke.legacy_metadata_endpoints_enabled is not True:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -303,7 +303,7 @@ class GcpComputeRuleDetectors:
                             "node_metadata_posture",
                             [
                                 "legacy metadata endpoints are enabled",
-                                f"metadata mode is {resource_facts.gke_node_metadata_mode or 'unset'}",
+                                f"metadata mode is {resource_facts.gke.node_metadata_mode or 'unset'}",
                             ],
                         ),
                     ),
@@ -346,8 +346,8 @@ class GcpComputeRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("node_identity_risks", risk_descriptions),
-                        evidence_item("node_service_account", [resource_facts.gke_node_service_account or "unset"]),
-                        evidence_item("oauth_scopes", resource_facts.gke_node_oauth_scopes),
+                        evidence_item("node_service_account", [resource_facts.gke.node_service_account or "unset"]),
+                        evidence_item("oauth_scopes", resource_facts.gke.node_oauth_scopes),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -471,10 +471,10 @@ def _bool_status(value: bool | None) -> str:
 
 def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
     facts = analysis_facts(cluster)
-    if not facts.gke_master_authorized_networks:
+    if not facts.gke.master_authorized_networks:
         return ["master authorized networks are not configured"]
     descriptions: list[str] = []
-    for network in facts.gke_master_authorized_networks:
+    for network in facts.gke.master_authorized_networks:
         cidr = str(network.get("cidr_block") or "").strip()
         if cidr not in {"0.0.0.0/0", "::/0"}:
             continue
@@ -486,15 +486,15 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
 def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:
     facts = analysis_facts(resource)
     risks: list[str] = []
-    service_account = str(facts.gke_node_service_account or "").strip()
-    if not service_account and not facts.gke_node_oauth_scopes:
-        if facts.gke_legacy_metadata_endpoints_enabled is None:
+    service_account = str(facts.gke.node_service_account or "").strip()
+    if not service_account and not facts.gke.node_oauth_scopes:
+        if facts.gke.legacy_metadata_endpoints_enabled is None:
             return []
     if not service_account or service_account == "default":
         risks.append("node service account is unset or default")
     elif service_account.endswith("-compute@developer.gserviceaccount.com"):
         risks.append(f"node service account uses default Compute Engine identity `{service_account}`")
-    broad_scopes = [scope for scope in facts.gke_node_oauth_scopes if _gke_scope_is_broad(scope)]
+    broad_scopes = [scope for scope in facts.gke.node_oauth_scopes if _gke_scope_is_broad(scope)]
     if broad_scopes:
         risks.extend(f"node OAuth scope is broad: {scope}" for scope in broad_scopes)
     return risks
@@ -533,7 +533,7 @@ def _public_invoker_bindings(
     invoker_roles: frozenset[str],
 ) -> list[tuple[str, str, str]]:
     bindings: list[tuple[str, str, str]] = []
-    for binding in analysis_facts(resource).iam_bindings:
+    for binding in analysis_facts(resource).iam.bindings:
         role = str(binding.get("role") or "").strip()
         if role not in invoker_roles:
             continue
@@ -548,7 +548,7 @@ def _risky_public_firewall_rules(
     instance: NormalizedResource,
     inventory: ResourceInventory,
 ) -> list[tuple[NormalizedResource, SecurityGroupRule]]:
-    firewall_addresses = analysis_facts(instance).internet_ingress_firewalls
+    firewall_addresses = analysis_facts(instance).compute.internet_ingress_firewalls
     risky_rules: list[tuple[NormalizedResource, SecurityGroupRule]] = []
     for firewall_address in firewall_addresses:
         firewall = inventory.get_by_address(firewall_address)

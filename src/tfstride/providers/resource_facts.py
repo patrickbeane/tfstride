@@ -7,8 +7,8 @@ from typing import Any, Protocol
 from tfstride.models import NormalizedResource
 
 
-class ProviderResourceFacts(Protocol):
-    """Provider-owned facts exposed to shared analysis."""
+class ProviderStorageFacts(Protocol):
+    """Storage facts exposed by provider-owned resource adapters."""
 
     @property
     def bucket_name(self) -> str | None:
@@ -38,16 +38,16 @@ class ProviderResourceFacts(Protocol):
     def gcs_default_kms_key_name(self) -> str | None:
         raise NotImplementedError
 
+
+class ProviderIamFacts(Protocol):
+    """IAM, policy, hierarchy, and identity facts from provider adapters."""
+
     @property
     def policy_document(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @property
     def trust_statements(self) -> list[dict[str, Any]]:
-        raise NotImplementedError
-
-    @property
-    def engine(self) -> str | None:
         raise NotImplementedError
 
     @property
@@ -91,6 +91,34 @@ class ProviderResourceFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def service_account_email(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def service_account_member(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def service_account_reference(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def iam_role(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def iam_member(self) -> str | None:
+        raise NotImplementedError
+
+
+class ProviderSqlFacts(Protocol):
+    """Managed SQL and database posture facts from provider adapters."""
+
+    @property
+    def engine(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -122,9 +150,9 @@ class ProviderResourceFacts(Protocol):
     def deletion_protection(self) -> bool | None:
         raise NotImplementedError
 
-    @property
-    def os_login_enabled(self) -> bool | None:
-        raise NotImplementedError
+
+class ProviderGkeFacts(Protocol):
+    """GKE cluster and node posture facts from provider adapters."""
 
     @property
     def gke_endpoint(self) -> str | None:
@@ -166,24 +194,12 @@ class ProviderResourceFacts(Protocol):
     def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
         raise NotImplementedError
 
-    @property
-    def service_account_email(self) -> str | None:
-        raise NotImplementedError
+
+class ProviderComputeFacts(Protocol):
+    """Compute and network posture facts from provider adapters."""
 
     @property
-    def service_account_member(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def service_account_reference(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def workload_identity_members(self) -> list[str]:
-        raise NotImplementedError
-
-    @property
-    def workload_identity_scopes(self) -> list[str]:
+    def os_login_enabled(self) -> bool | None:
         raise NotImplementedError
 
     @property
@@ -194,13 +210,29 @@ class ProviderResourceFacts(Protocol):
     def internet_ingress_firewalls(self) -> list[str]:
         raise NotImplementedError
 
+
+class ProviderWorkloadFacts(Protocol):
+    """Workload identity facts from provider adapters."""
+
     @property
-    def iam_role(self) -> str | None:
+    def workload_identity_members(self) -> list[str]:
         raise NotImplementedError
 
     @property
-    def iam_member(self) -> str | None:
+    def workload_identity_scopes(self) -> list[str]:
         raise NotImplementedError
+
+
+class ProviderResourceFacts(
+    ProviderStorageFacts,
+    ProviderIamFacts,
+    ProviderSqlFacts,
+    ProviderGkeFacts,
+    ProviderComputeFacts,
+    ProviderWorkloadFacts,
+    Protocol,
+):
+    """Provider-owned facts exposed to shared analysis."""
 
 
 ProviderResourceFactsFactory = Callable[[NormalizedResource], ProviderResourceFacts]

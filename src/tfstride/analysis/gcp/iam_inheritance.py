@@ -170,17 +170,17 @@ def _resolve_iam_resource_scopes(
 ) -> list[tuple[GcpIamScopeKey, NormalizedResource | None]]:
     facts = analysis_facts(resource)
     if resource.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
-        project = _normalize_project_id(facts.project)
+        project = _normalize_project_id(facts.iam.project)
         if project:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_PROJECT, project), None)]
         return []
     if resource.resource_type in GCP_ORGANIZATION_IAM_RESOURCE_TYPES:
-        organization_id = _normalize_hierarchy_id(facts.organization_id, "organizations")
+        organization_id = _normalize_hierarchy_id(facts.iam.organization_id, "organizations")
         if organization_id:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_ORGANIZATION, organization_id), None)]
         return []
     if resource.resource_type in GCP_FOLDER_IAM_RESOURCE_TYPES:
-        folder_id = _normalize_hierarchy_id(facts.folder_id, "folders")
+        folder_id = _normalize_hierarchy_id(facts.iam.folder_id, "folders")
         if folder_id:
             return [(GcpIamScopeKey(GCP_IAM_SCOPE_FOLDER, folder_id), None)]
         return []
@@ -197,7 +197,7 @@ def _resolve_iam_resource_scopes(
 
 
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
-    return analysis_facts(resource).iam_target_reference
+    return analysis_facts(resource).iam.target_reference
 
 
 def _build_resource_reference_index(
@@ -219,15 +219,15 @@ def _resource_reference_keys(resource: NormalizedResource) -> tuple[str, ...]:
         f"{resource.address}.id",
         f"{resource.address}.name",
     }
-    for value in (resource.identifier, resource.arn, facts.resource_name):
+    for value in (resource.identifier, resource.arn, facts.iam.resource_name):
         if value:
             references.add(str(value))
-    references.update(facts.reference_values)
-    email = facts.service_account_email
+    references.update(facts.iam.reference_values)
+    email = facts.iam.service_account_email
     if email:
         references.add(email)
         references.add(f"serviceAccount:{email}")
-    member = facts.service_account_member
+    member = facts.iam.service_account_member
     if member:
         references.add(member)
         if member.startswith("serviceAccount:"):
@@ -252,7 +252,7 @@ def _group_resources_by_scope(
 
 def _resource_project(resource: NormalizedResource) -> str | None:
     facts = analysis_facts(resource)
-    project = _normalize_project_id(facts.project)
+    project = _normalize_project_id(facts.iam.project)
     if project:
         return project
     for value in _scope_candidate_values(resource):
@@ -264,7 +264,7 @@ def _resource_project(resource: NormalizedResource) -> str | None:
 
 def _resource_folder_id(resource: NormalizedResource) -> str | None:
     facts = analysis_facts(resource)
-    folder_id = _normalize_hierarchy_id(facts.folder_id, "folders")
+    folder_id = _normalize_hierarchy_id(facts.iam.folder_id, "folders")
     if folder_id:
         return folder_id
     for value in _scope_candidate_values(resource):
@@ -276,7 +276,7 @@ def _resource_folder_id(resource: NormalizedResource) -> str | None:
 
 def _resource_organization_id(resource: NormalizedResource) -> str | None:
     facts = analysis_facts(resource)
-    organization_id = _normalize_hierarchy_id(facts.organization_id, "organizations")
+    organization_id = _normalize_hierarchy_id(facts.iam.organization_id, "organizations")
     if organization_id:
         return organization_id
     for value in _scope_candidate_values(resource):
@@ -289,10 +289,10 @@ def _resource_organization_id(resource: NormalizedResource) -> str | None:
 def _scope_candidate_values(resource: NormalizedResource) -> tuple[str, ...]:
     facts = analysis_facts(resource)
     values: list[str] = []
-    for value in (resource.identifier, facts.resource_name):
+    for value in (resource.identifier, facts.iam.resource_name):
         if value:
             values.append(str(value))
-    values.extend(facts.reference_values)
+    values.extend(facts.iam.reference_values)
     return tuple(values)
 
 
