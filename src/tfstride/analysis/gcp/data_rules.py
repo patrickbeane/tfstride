@@ -6,7 +6,7 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.gcp.iam_rules import (
+from tfstride.analysis.gcp.iam_access import (
     GCP_BIGQUERY_DATA_ACCESS_ROLES,
     GCP_PUBSUB_DATA_ACCESS_ROLES,
     broad_resource_iam_bindings,
