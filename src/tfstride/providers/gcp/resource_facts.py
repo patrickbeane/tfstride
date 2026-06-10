@@ -7,11 +7,16 @@ from typing import Any, TypeVar
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_utils import dedupe, service_account_member
+from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 
 _MetadataValue = TypeVar("_MetadataValue")
+_GCP_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
+    provider="gcp",
+    namespace=GcpResourceMetadata,
+)
 
 
 _REFERENCE_VALUE_FIELDS = (
@@ -57,6 +62,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.resource.get_metadata_field(field)
 
     def set(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
+        _GCP_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.set_metadata_field(field, value)
 
     def optional_bool(self, field: MetadataField[bool]) -> bool | None:
@@ -67,9 +73,11 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(field)
 
     def append(self, field: StringListMetadataField, value: str | None) -> None:
+        _GCP_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.append_metadata_field(field, value)
 
     def extend(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
+        _GCP_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.extend_metadata_field(field, values)
 
     @property

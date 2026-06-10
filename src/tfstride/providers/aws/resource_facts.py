@@ -6,10 +6,15 @@ from typing import Any, TypeVar
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 
 _MetadataValue = TypeVar("_MetadataValue")
+_AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
+    provider="aws",
+    namespace=AwsResourceMetadata,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,12 +27,15 @@ class AwsResourceFacts:
         return self.resource.get_metadata_field(field)
 
     def set(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
+        _AWS_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.set_metadata_field(field, value)
 
     def append(self, field: StringListMetadataField, value: str | None) -> None:
+        _AWS_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.append_metadata_field(field, value)
 
     def extend(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
+        _AWS_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.extend_metadata_field(field, values)
 
     @property
