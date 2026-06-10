@@ -9,6 +9,11 @@ from tfstride.analysis.gcp.iam_inheritance import (
     build_gcp_iam_inheritance_index,
     empty_gcp_iam_inheritance_index,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    GcpOrgPolicyGuardrailIndex,
+    build_gcp_org_policy_guardrail_index,
+    empty_gcp_org_policy_guardrail_index,
+)
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     is_network_security_group_resource,
@@ -23,6 +28,7 @@ class AnalysisIndexes:
     resources_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     public_workloads_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     gcp_iam_inheritance: GcpIamInheritanceIndex
+    gcp_org_policy_guardrails: GcpOrgPolicyGuardrailIndex
 
     def attached_security_groups(self, resource: NormalizedResource) -> list[NormalizedResource]:
         return [
@@ -55,6 +61,11 @@ def build_analysis_indexes(inventory: ResourceInventory) -> AnalysisIndexes:
             build_gcp_iam_inheritance_index(inventory.resources)
             if inventory.provider == "gcp"
             else empty_gcp_iam_inheritance_index()
+        ),
+        gcp_org_policy_guardrails=(
+            build_gcp_org_policy_guardrail_index(inventory.resources)
+            if inventory.provider == "gcp"
+            else empty_gcp_org_policy_guardrail_index()
         ),
     )
 

@@ -36,6 +36,14 @@ GCP_FOLDER_IAM_RESOURCE_TYPES = frozenset(
 GCP_ORG_FOLDER_IAM_RESOURCE_TYPES = (
     GCP_ORGANIZATION_IAM_RESOURCE_TYPES | GCP_FOLDER_IAM_RESOURCE_TYPES
 )
+GCP_ORGANIZATION_POLICY_RESOURCE_TYPES = frozenset(
+    {
+        "google_org_policy_policy",
+        "google_organization_policy",
+        "google_folder_organization_policy",
+        "google_project_organization_policy",
+    }
+)
 GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset(
     {
         "google_organization_iam_custom_role",
