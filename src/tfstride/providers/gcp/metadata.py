@@ -76,6 +76,7 @@ class GcpResourceMetadata:
     FIREWALL_POLICY_ATTACHMENT_TARGET = OptionalStringMetadataField("firewall_policy_attachment_target")
     FIREWALL_POLICY_ACTION = OptionalStringMetadataField("firewall_policy_action")
     FIREWALL_POLICY_DIRECTION = OptionalStringMetadataField("firewall_policy_direction")
+    FIREWALL_DIRECTION = OptionalStringMetadataField("firewall_direction")
     FORWARDING_RULE_IP_ADDRESS = OptionalStringMetadataField("forwarding_rule_ip_address")
     FORWARDING_RULE_LOAD_BALANCING_SCHEME = OptionalStringMetadataField("forwarding_rule_load_balancing_scheme")
     FORWARDING_RULE_TARGET = OptionalStringMetadataField("forwarding_rule_target")
@@ -93,6 +94,8 @@ class GcpResourceMetadata:
     GKE_NODE_SERVICE_ACCOUNT = OptionalStringMetadataField("gke_node_service_account")
     GKE_NODE_METADATA_MODE = OptionalStringMetadataField("gke_node_metadata_mode")
 
+    ROUTE_PRIORITY = OptionalIntMetadataField("route_priority")
+    FIREWALL_PRIORITY = OptionalIntMetadataField("firewall_priority")
     FIREWALL_POLICY_PRIORITY = OptionalIntMetadataField("firewall_policy_priority")
 
     AUTO_CREATE_SUBNETWORKS = BoolMetadataField("auto_create_subnetworks")
@@ -110,6 +113,9 @@ class GcpResourceMetadata:
     GKE_PRIVATE_NODES_ENABLED = BoolMetadataField("gke_private_nodes_enabled")
     GKE_WORKLOAD_IDENTITY_ENABLED = BoolMetadataField("gke_workload_identity_enabled")
     GKE_LEGACY_METADATA_ENDPOINTS_ENABLED = BoolMetadataField("gke_legacy_metadata_endpoints_enabled")
+    FIREWALL_DISABLED = BoolMetadataField("firewall_disabled")
+    FIREWALL_POLICY_DISABLED = BoolMetadataField("firewall_policy_disabled")
+    FIREWALL_POLICY_ENABLE_LOGGING = BoolMetadataField("firewall_policy_enable_logging")
     FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField(
         "fronted_by_internet_facing_load_balancer"
     )

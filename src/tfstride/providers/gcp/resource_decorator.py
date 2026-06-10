@@ -743,9 +743,12 @@ def _firewall_applies_to_instance(
     instance: NormalizedResource,
     index: _GcpResourceIndex,
 ) -> bool:
-    if firewall.metadata.get("disabled"):
+    if firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DISABLED):
         return False
-    if str(firewall.metadata.get("direction") or "ingress").strip().lower() != "ingress":
+    firewall_direction = str(
+        firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION) or "ingress"
+    ).strip().lower()
+    if firewall_direction != "ingress":
         return False
     if not _resource_has_network_reference(instance, firewall.vpc_id, index):
         return False
@@ -780,7 +783,7 @@ def _firewall_policy_rule_applies_to_instance(
     instance: NormalizedResource,
     index: _GcpResourceIndex,
 ) -> bool:
-    if policy_rule.metadata.get("disabled"):
+    if policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED):
         return False
     policy_action = str(
         policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION) or ""

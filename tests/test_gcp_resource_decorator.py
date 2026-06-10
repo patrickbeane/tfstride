@@ -53,7 +53,7 @@ def _policy_rule(
         GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: direction,
     }
     if disabled:
-        metadata["disabled"] = True
+        metadata[GcpResourceMetadata.FIREWALL_POLICY_DISABLED.key] = True
     if target_service_accounts is not None:
         metadata[GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key] = target_service_accounts
     if target_resources is not None:

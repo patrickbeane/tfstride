@@ -56,6 +56,14 @@ _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS = frozenset(
         "public_exposure_reasons",
     }
 )
+_GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS = frozenset(
+    {
+        "direction",
+        "disabled",
+        "enable_logging",
+        "priority",
+    }
+)
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
@@ -139,6 +147,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("SERVICE_ACCOUNT_EMAIL", gcp_owned)
         self.assertIn("KMS_CRYPTO_KEY_REFERENCE", gcp_owned)
         self.assertIn("GKE_NODE_OAUTH_SCOPES", gcp_owned)
+        self.assertIn("FIREWALL_DIRECTION", gcp_owned)
+        self.assertIn("FIREWALL_POLICY_ENABLE_LOGGING", gcp_owned)
         self.assertIn("BUCKET_NAME", contract.transitional_fields)
         self.assertIn("POLICY_DOCUMENT", contract.transitional_fields)
         self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", contract.transitional_fields)
@@ -157,7 +167,6 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertTrue(any("Provider packages own provider-specific facts" in item for item in guidelines))
         self.assertTrue(any("Do not add new provider-specific convenience accessors" in item for item in guidelines))
 
-
     def test_provider_normalizers_do_not_write_shared_posture_metadata_as_raw_keys(self) -> None:
         raw_writes: set[tuple[str, str]] = set()
 
@@ -171,6 +180,19 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
                     for key in _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS:
                         if f'"{key}":' in stripped:
                             raw_writes.add((relative_path, stripped))
+
+        self.assertEqual(raw_writes, set())
+
+    def test_gcp_network_normalizers_do_not_write_network_posture_as_raw_keys(self) -> None:
+        raw_writes: set[tuple[str, str]] = set()
+        path = _SOURCE_ROOT / "providers" / "gcp" / "network_normalizers.py"
+        relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            for key in _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS:
+                if f'"{key}":' in stripped:
+                    raw_writes.add((relative_path, stripped))
 
         self.assertEqual(raw_writes, set())
 

@@ -177,6 +177,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             "default-internet-gateway",
         )
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS), ["web"])
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.ROUTE_PRIORITY), 1000)
 
     def test_compute_router_and_nat_normalizers_preserve_egress_context(self) -> None:
         router = normalize_compute_router(
@@ -399,6 +400,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.category, ResourceCategory.NETWORK)
         self.assertEqual(normalized.vpc_id, "google_compute_network.main.name")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_TAGS), ["web"])
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION), "ingress")
+        self.assertIsNone(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_PRIORITY))
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_DISABLED))
         self.assertEqual(len(normalized.network_rules), 1)
         rule = normalized.network_rules[0]
         self.assertEqual(rule.direction, "ingress")
@@ -499,6 +503,8 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION), "allow")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION), "ingress")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PRIORITY), 1000)
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED))
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING))
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS),
             ["app@tfstride.iam.gserviceaccount.com"],

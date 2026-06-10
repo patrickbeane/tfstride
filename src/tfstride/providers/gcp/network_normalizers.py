@@ -79,7 +79,7 @@ def normalize_compute_route(resource: TerraformResource) -> NormalizedResource:
             GcpResourceMetadata.ROUTE_NEXT_HOP_ILB.key: values.get("next_hop_ilb"),
             GcpResourceMetadata.ROUTE_NEXT_HOP_VPN_TUNNEL.key: values.get("next_hop_vpn_tunnel"),
             GcpResourceMetadata.ROUTE_TAGS.key: compact(as_list(values.get("tags"))),
-            "priority": as_optional_int(values.get("priority")),
+            GcpResourceMetadata.ROUTE_PRIORITY.key: as_optional_int(values.get("priority")),
             "description": values.get("description"),
         },
     )
@@ -227,9 +227,9 @@ def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResourc
             GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS.key: compact(
                 as_list(values.get("source_service_accounts"))
             ),
-            "direction": str(values.get("direction") or "INGRESS").lower(),
-            "priority": as_optional_int(values.get("priority")),
-            "disabled": as_bool(values.get("disabled")),
+            GcpResourceMetadata.FIREWALL_DIRECTION.key: str(values.get("direction") or "INGRESS").lower(),
+            GcpResourceMetadata.FIREWALL_PRIORITY.key: as_optional_int(values.get("priority")),
+            GcpResourceMetadata.FIREWALL_DISABLED.key: as_bool(values.get("disabled")),
         },
     )
 
@@ -279,8 +279,8 @@ def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> Norma
             GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key: compact(
                 as_list(values.get("target_service_accounts"))
             ),
-            "disabled": as_bool(values.get("disabled")),
-            "enable_logging": as_bool(values.get("enable_logging")),
+            GcpResourceMetadata.FIREWALL_POLICY_DISABLED.key: as_bool(values.get("disabled")),
+            GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING.key: as_bool(values.get("enable_logging")),
             "description": values.get("description"),
         },
     )
