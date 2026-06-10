@@ -7,6 +7,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.gcp.coercion import as_bool, as_list, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
 
 
@@ -300,9 +301,11 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
             "storage_encrypted": True,
         },
     )
-    normalized.direct_internet_reachable = public_exposure
-    normalized.internet_ingress_capable = public_exposure
-    normalized.internet_ingress_reasons = public_exposure_reasons
+    gcp_mutations(normalized).set_public_endpoint_posture(
+        direct_internet_reachable=public_exposure,
+        internet_ingress_capable=public_exposure,
+        internet_ingress_reasons=public_exposure_reasons,
+    )
     return normalized
 
 

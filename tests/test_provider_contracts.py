@@ -41,60 +41,10 @@ _NORMALIZED_RESOURCE_WRITE_FACADES = frozenset(
         "providers/aws/resource_facts.py",
         "providers/aws/resource_mutations.py",
         "providers/gcp/resource_facts.py",
+        "providers/gcp/resource_mutations.py",
     }
 )
-_TEMPORARY_GCP_DIRECT_WRITE_EXCEPTIONS = frozenset(
-    {
-        ("providers/gcp/container_normalizers.py", "normalized.direct_internet_reachable = public_exposure"),
-        ("providers/gcp/container_normalizers.py", "normalized.internet_ingress_capable = public_endpoint"),
-        ("providers/gcp/container_normalizers.py", "normalized.internet_ingress_reasons = public_exposure_reasons"),
-        ("providers/gcp/data_normalizers.py", "normalized.direct_internet_reachable = public_exposure"),
-        ("providers/gcp/data_normalizers.py", "normalized.internet_ingress_capable = public_exposure"),
-        ("providers/gcp/data_normalizers.py", "normalized.internet_ingress_reasons = public_exposure_reasons"),
-        ("providers/gcp/resource_decorator.py", "forwarding_rule.set_metadata_field("),
-        (
-            "providers/gcp/resource_decorator.py",
-            "resource.set_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS, _dedupe_dicts(frontends))",
-        ),
-        (
-            "providers/gcp/resource_decorator.py",
-            "resource.set_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER, True)",
-        ),
-        ("providers/gcp/resource_decorator.py", "resource.append_metadata_field("),
-        ("providers/gcp/resource_decorator.py", "subnetwork.has_public_route = has_public_route"),
-        ("providers/gcp/resource_decorator.py", "subnetwork.is_public_subnet = has_public_route"),
-        ("providers/gcp/resource_decorator.py", "subnetwork.has_nat_gateway_egress = has_nat_egress"),
-        (
-            "providers/gcp/resource_decorator.py",
-            "resource.in_public_subnet = any(subnetwork.is_public_subnet for subnetwork in subnetworks)",
-        ),
-        (
-            "providers/gcp/resource_decorator.py",
-            "resource.has_nat_gateway_egress = any(subnetwork.has_nat_gateway_egress for subnetwork in subnetworks)",
-        ),
-        ("providers/gcp/resource_decorator.py", "resource.has_public_route = resource.in_public_subnet or any("),
-        ("providers/gcp/resource_decorator.py", "resource.vpc_id = subnet_network_reference"),
-        ("providers/gcp/resource_decorator.py", "resource.vpc_id = network_reference"),
-        ("providers/gcp/resource_decorator.py", "resource.internet_ingress_capable = internet_ingress"),
-        ("providers/gcp/resource_decorator.py", "resource.internet_ingress_reasons = internet_ingress_reasons"),
-        ("providers/gcp/resource_decorator.py", "resource.set_metadata_field("),
-        ("providers/gcp/resource_decorator.py", "resource.public_exposure = public_exposure"),
-        ("providers/gcp/resource_decorator.py", "resource.direct_internet_reachable = public_exposure"),
-        ("providers/gcp/resource_decorator.py", "resource.public_exposure_reasons = ["),
-        ("providers/gcp/resource_decorator.py", "bucket.public_access_configured = bool(public_access_reasons)"),
-        ("providers/gcp/resource_decorator.py", "bucket.public_access_reasons = public_access_reasons"),
-        ("providers/gcp/resource_decorator.py", "bucket.public_exposure = public_exposure"),
-        ("providers/gcp/resource_decorator.py", "bucket.direct_internet_reachable = public_exposure"),
-        ("providers/gcp/resource_decorator.py", "bucket.public_exposure_reasons = public_access_reasons"),
-        ("providers/gcp/resource_decorator.py", "resource.public_access_reasons = public_access_reasons"),
-        ("providers/gcp/resource_decorator.py", "resource.public_exposure_reasons = public_access_reasons"),
-        ("providers/gcp/resource_decorator.py", "resource.set_metadata_field(GcpResourceMetadata.IAM_BINDINGS, bindings)"),
-        (
-            "providers/gcp/resource_decorator.py",
-            "resource.extend_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES, source_addresses)",
-        ),
-    }
-)
+_NORMALIZED_RESOURCE_DIRECT_WRITE_EXCEPTIONS = frozenset()
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
@@ -213,7 +163,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
                     if any(pattern.search(stripped) for pattern in _NORMALIZED_RESOURCE_WRITE_PATTERNS):
                         direct_writes.add((relative_path, stripped))
 
-        self.assertEqual(direct_writes, _TEMPORARY_GCP_DIRECT_WRITE_EXCEPTIONS)
+        self.assertEqual(direct_writes, _NORMALIZED_RESOURCE_DIRECT_WRITE_EXCEPTIONS)
 
 
 if __name__ == "__main__":

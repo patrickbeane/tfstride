@@ -22,6 +22,7 @@ from tfstride.providers.gcp.constants import (
     PUBLIC_GCP_IAM_MEMBERS,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     binding_members,
@@ -217,10 +218,7 @@ def _derive_load_balancer_frontend_reachability(index: _GcpResourceIndex) -> Non
                 visited={forwarding_rule.address},
             )
         if reachable_backends:
-            forwarding_rule.set_metadata_field(
-                GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS,
-                _dedupe_dicts(reachable_backends),
-            )
+            gcp_mutations(forwarding_rule).set_load_balancer_reachable_backends(reachable_backends)
 
 
 def _forwarding_rule_next_hop_references(forwarding_rule: NormalizedResource) -> list[str]:
@@ -404,31 +402,12 @@ def _append_load_balancer_frontend(
     frontend: dict[str, Any],
     path: list[str],
 ) -> None:
-    entry = dict(frontend)
-    entry["path"] = list(path)
-    frontends = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)
-    frontends.append(entry)
-    resource.set_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS, _dedupe_dicts(frontends))
+    gcp_mutations(resource).append_load_balancer_frontend(frontend, path)
 
 
 def _mark_fronted_by_public_load_balancer(resource: NormalizedResource, frontend: dict[str, Any]) -> None:
-    forwarding_rule = frontend.get("forwarding_rule")
-    if not forwarding_rule:
-        return
-    resource.set_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER, True)
-    resource.append_metadata_field(
-        GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
-        str(forwarding_rule),
-    )
+    gcp_mutations(resource).mark_fronted_by_public_load_balancer(frontend)
 
-
-def _dedupe_dicts(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    deduped: list[dict[str, Any]] = []
-    for value in values:
-        if value in deduped:
-            continue
-        deduped.append(value)
-    return deduped
 
 
 def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -442,20 +421,26 @@ def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _Gcp
         _nat_applies_to_subnetwork(router_nat, subnetwork, index)
         for router_nat in index.router_nats
     )
-    subnetwork.has_public_route = has_public_route
-    subnetwork.is_public_subnet = has_public_route
-    subnetwork.has_nat_gateway_egress = has_nat_egress
+    gcp_mutations(subnetwork).set_subnetwork_route_posture(
+        has_public_route=has_public_route,
+        has_nat_gateway_egress=has_nat_egress,
+    )
 
 
 def _derive_instance_network_posture(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
     subnetworks = _resource_subnetworks(resource, index)
-    resource.in_public_subnet = any(subnetwork.is_public_subnet for subnetwork in subnetworks)
-    resource.has_nat_gateway_egress = any(subnetwork.has_nat_gateway_egress for subnetwork in subnetworks)
-    resource.has_public_route = resource.in_public_subnet or any(
+    in_public_subnet = any(subnetwork.is_public_subnet for subnetwork in subnetworks)
+    has_nat_gateway_egress = any(subnetwork.has_nat_gateway_egress for subnetwork in subnetworks)
+    has_public_route = in_public_subnet or any(
         _route_has_internet_gateway(route)
         and _route_tags_apply_to_instance(route, resource)
         and _resource_has_network_reference(resource, route.vpc_id, index)
         for route in index.routes
+    )
+    gcp_mutations(resource).set_instance_network_posture(
+        in_public_subnet=in_public_subnet,
+        has_nat_gateway_egress=has_nat_gateway_egress,
+        has_public_route=has_public_route,
     )
 
 
@@ -477,12 +462,10 @@ def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceInde
     if resource.vpc_id:
         return
     subnet_network_reference = _unique_network_reference(_subnetwork_vpc_references(resource, index), index)
-    if subnet_network_reference:
-        resource.vpc_id = subnet_network_reference
+    if gcp_mutations(resource).infer_vpc_id(subnet_network_reference):
         return
     network_reference = _unique_network_reference(_instance_network_references(resource), index)
-    if network_reference:
-        resource.vpc_id = network_reference
+    gcp_mutations(resource).infer_vpc_id(network_reference)
 
 
 def _subnetwork_vpc_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
@@ -560,33 +543,32 @@ def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpRes
         for firewall in matching_firewalls
         for reason in _internet_ingress_reasons(firewall)
     ]
-    internet_ingress = bool(internet_ingress_reasons)
-    resource.internet_ingress_capable = internet_ingress
-    resource.internet_ingress_reasons = internet_ingress_reasons
-    resource.set_metadata_field(
-        GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS,
-        [firewall.address for firewall in matching_firewalls],
+    gcp_mutations(resource).set_compute_internet_ingress(
+        internet_ingress_reasons=internet_ingress_reasons,
+        firewall_addresses=[firewall.address for firewall in matching_firewalls],
     )
 
-    public_exposure = bool(resource.public_access_configured and internet_ingress)
-    resource.public_exposure = public_exposure
-    resource.direct_internet_reachable = public_exposure
-    if public_exposure:
-        resource.public_exposure_reasons = [
+    public_exposure = bool(resource.public_access_configured and internet_ingress_reasons)
+    gcp_mutations(resource).set_public_exposure(
+        public_exposure,
+        reasons=[
             "compute instance has an external access config and matching firewall rules allow internet ingress"
-        ]
+        ] if public_exposure else None,
+    )
 
 
 def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResourceIndex) -> None:
     public_access_reasons = _bucket_public_access_reasons(bucket, index)
-    bucket.public_access_configured = bool(public_access_reasons)
-    bucket.public_access_reasons = public_access_reasons
+    gcp_mutations(bucket).set_public_access(
+        configured=bool(public_access_reasons),
+        reasons=public_access_reasons,
+    )
 
     public_exposure = bool(public_access_reasons) and not _public_access_prevention_enforced(bucket)
-    bucket.public_exposure = public_exposure
-    bucket.direct_internet_reachable = public_exposure
-    if public_exposure:
-        bucket.public_exposure_reasons = public_access_reasons
+    gcp_mutations(bucket).set_public_exposure(
+        public_exposure,
+        reasons=public_access_reasons if public_exposure else None,
+    )
 
 
 def _derive_public_serverless_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -597,12 +579,12 @@ def _derive_public_serverless_exposure(resource: NormalizedResource, index: _Gcp
     )
     public_access_reasons = _serverless_public_access_reasons(resource, iam_resources)
     if public_access_reasons:
-        resource.public_access_reasons = public_access_reasons
+        gcp_mutations(resource).set_public_access_reasons(public_access_reasons)
     public_exposure = bool(resource.public_access_configured and public_access_reasons)
-    resource.public_exposure = public_exposure
-    resource.direct_internet_reachable = public_exposure
-    if public_exposure:
-        resource.public_exposure_reasons = public_access_reasons
+    gcp_mutations(resource).set_public_exposure(
+        public_exposure,
+        reasons=public_access_reasons if public_exposure else None,
+    )
 
     _derive_sensitive_resource_iam_bindings(resource, iam_resources)
 
@@ -634,10 +616,10 @@ def _derive_sensitive_resource_iam_bindings(
             bindings.append(decorated_binding)
             source_addresses.append(iam_resource.address)
 
-    if bindings:
-        resource.set_metadata_field(GcpResourceMetadata.IAM_BINDINGS, bindings)
-    if source_addresses:
-        resource.extend_metadata_field(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES, source_addresses)
+    gcp_mutations(resource).set_sensitive_resource_iam_bindings(
+        bindings=bindings,
+        source_addresses=source_addresses,
+    )
 
 
 def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
