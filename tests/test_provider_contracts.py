@@ -65,6 +65,76 @@ _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS = frozenset(
     }
 )
 _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS = frozenset({"customer_managed_encryption"})
+_GCP_PROMOTED_RULE_FACING_METADATA_FIELDS = (
+    GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION,
+    GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS,
+    GcpResourceMetadata.GCS_VERSIONING_ENABLED,
+    GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME,
+    GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION,
+    GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED,
+    GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED,
+    GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED,
+    GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL,
+    GcpResourceMetadata.CLOUD_SQL_SSL_MODE,
+    GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS,
+    GcpResourceMetadata.OS_LOGIN_ENABLED,
+    GcpResourceMetadata.SERVERLESS_INGRESS,
+    GcpResourceMetadata.ROUTE_PRIORITY,
+    GcpResourceMetadata.FIREWALL_DIRECTION,
+    GcpResourceMetadata.FIREWALL_PRIORITY,
+    GcpResourceMetadata.FIREWALL_DISABLED,
+    GcpResourceMetadata.FIREWALL_POLICY_DIRECTION,
+    GcpResourceMetadata.FIREWALL_POLICY_PRIORITY,
+    GcpResourceMetadata.FIREWALL_POLICY_DISABLED,
+    GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING,
+    GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS,
+    GcpResourceMetadata.GKE_ENDPOINT,
+    GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED,
+    GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED,
+    GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS,
+    GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED,
+    GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT,
+    GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES,
+    GcpResourceMetadata.GKE_NODE_METADATA_MODE,
+    GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED,
+    GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER,
+    GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
+    GcpResourceMetadata.LOAD_BALANCER_FRONTENDS,
+    GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS,
+)
+_RULE_FACING_METADATA_RAW_KEYS = (
+    _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS
+    | _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS
+    | _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS
+    | frozenset(field.key for field in _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS)
+)
+_RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES = frozenset(
+    {
+        "providers/contracts.py",
+        "providers/aws/metadata.py",
+        "providers/gcp/metadata.py",
+    }
+)
+_RULE_FACING_METADATA_RAW_KEY_PATTERN = "|".join(
+    re.escape(key) for key in sorted(_RULE_FACING_METADATA_RAW_KEYS, key=len, reverse=True)
+)
+_RULE_FACING_METADATA_RAW_READ_PATTERNS = (
+    re.compile(
+        rf'(?:^|\W)(?:\w+\.)?metadata(?:_snapshot\(\))?\.get\(\s*["\']'
+        rf'(?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']'
+    ),
+    re.compile(
+        rf'(?:^|\W)(?:\w+\.)?metadata(?:_snapshot\(\))?\s*\[\s*["\']'
+        rf'(?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']'
+    ),
+    re.compile(
+        rf'\.(?:get|set|append|extend)_metadata_field\(\s*["\']'
+        rf'(?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']'
+    ),
+)
+_RULE_FACING_METADATA_RAW_WRITE_PATTERN = re.compile(
+    rf'["\'](?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']\s*:'
+)
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
@@ -77,6 +147,23 @@ def _metadata_field_names(namespace: type) -> set[str]:
 
 def _resource_metadata_field_names() -> set[str]:
     return _metadata_field_names(ResourceMetadata)
+
+
+def _uses_rule_facing_metadata_key_as_raw_string(path: Path, line: str) -> bool:
+    return _reads_rule_facing_metadata_key_as_raw_string(line) or _writes_rule_facing_metadata_key_as_raw_string(
+        path,
+        line,
+    )
+
+
+def _reads_rule_facing_metadata_key_as_raw_string(line: str) -> bool:
+    return any(pattern.search(line) for pattern in _RULE_FACING_METADATA_RAW_READ_PATTERNS)
+
+
+def _writes_rule_facing_metadata_key_as_raw_string(path: Path, line: str) -> bool:
+    if not path.relative_to(_SOURCE_ROOT).as_posix().startswith("providers/"):
+        return False
+    return bool(_RULE_FACING_METADATA_RAW_WRITE_PATTERN.search(line))
 
 
 class ProviderEncapsulationContractTests(unittest.TestCase):
@@ -210,6 +297,25 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
                     raw_writes.add((relative_path, stripped))
 
         self.assertEqual(raw_writes, set())
+
+    def test_rule_facing_metadata_keys_are_not_used_as_raw_metadata_strings(self) -> None:
+        raw_uses: set[tuple[str, int, str]] = set()
+        scanned_roots = (
+            _SOURCE_ROOT / "analysis",
+            _SOURCE_ROOT / "providers",
+        )
+
+        for root in scanned_roots:
+            for path in sorted(root.rglob("*.py")):
+                relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+                if relative_path in _RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES:
+                    continue
+                for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                    stripped = line.strip()
+                    if _uses_rule_facing_metadata_key_as_raw_string(path, stripped):
+                        raw_uses.add((relative_path, line_number, stripped))
+
+        self.assertEqual(raw_uses, set())
 
     def test_normalized_resource_write_paths_are_centralized(self) -> None:
         direct_writes: set[tuple[str, str]] = set()
