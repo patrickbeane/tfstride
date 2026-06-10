@@ -4,6 +4,7 @@ from tfstride.resource_metadata import (
     BoolMetadataField,
     DictListMetadataField,
     DictMetadataField,
+    OptionalIntMetadataField,
     OptionalStringMetadataField,
     StringListMetadataField,
 )
@@ -70,6 +71,11 @@ class GcpResourceMetadata:
     ROUTE_NEXT_HOP_ILB = OptionalStringMetadataField("route_next_hop_ilb")
     ROUTE_NEXT_HOP_VPN_TUNNEL = OptionalStringMetadataField("route_next_hop_vpn_tunnel")
     ROUTER_REFERENCE = OptionalStringMetadataField("router_reference")
+    FIREWALL_POLICY_REFERENCE = OptionalStringMetadataField("firewall_policy_reference")
+    FIREWALL_POLICY_PARENT = OptionalStringMetadataField("firewall_policy_parent")
+    FIREWALL_POLICY_ATTACHMENT_TARGET = OptionalStringMetadataField("firewall_policy_attachment_target")
+    FIREWALL_POLICY_ACTION = OptionalStringMetadataField("firewall_policy_action")
+    FIREWALL_POLICY_DIRECTION = OptionalStringMetadataField("firewall_policy_direction")
     FORWARDING_RULE_IP_ADDRESS = OptionalStringMetadataField("forwarding_rule_ip_address")
     FORWARDING_RULE_LOAD_BALANCING_SCHEME = OptionalStringMetadataField("forwarding_rule_load_balancing_scheme")
     FORWARDING_RULE_TARGET = OptionalStringMetadataField("forwarding_rule_target")
@@ -86,6 +92,8 @@ class GcpResourceMetadata:
     GKE_WORKLOAD_IDENTITY_POOL = OptionalStringMetadataField("gke_workload_identity_pool")
     GKE_NODE_SERVICE_ACCOUNT = OptionalStringMetadataField("gke_node_service_account")
     GKE_NODE_METADATA_MODE = OptionalStringMetadataField("gke_node_metadata_mode")
+
+    FIREWALL_POLICY_PRIORITY = OptionalIntMetadataField("firewall_policy_priority")
 
     AUTO_CREATE_SUBNETWORKS = BoolMetadataField("auto_create_subnetworks")
     PRIVATE_IP_GOOGLE_ACCESS = BoolMetadataField("private_ip_google_access")
@@ -119,6 +127,8 @@ class GcpResourceMetadata:
     FIREWALL_TARGET_TAGS = StringListMetadataField("target_tags")
     FIREWALL_SOURCE_TAGS = StringListMetadataField("source_tags")
     FIREWALL_TARGET_SERVICE_ACCOUNTS = StringListMetadataField("target_service_accounts")
+    FIREWALL_POLICY_TARGET_RESOURCES = StringListMetadataField("firewall_policy_target_resources")
+    FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS = StringListMetadataField("firewall_policy_target_service_accounts")
     FIREWALL_SOURCE_SERVICE_ACCOUNTS = StringListMetadataField("source_service_accounts")
     ROUTE_TAGS = StringListMetadataField("route_tags")
     FORWARDING_RULE_PORTS = StringListMetadataField("forwarding_rule_ports")
@@ -133,6 +143,7 @@ class GcpResourceMetadata:
 
     FIREWALL_ALLOW = DictListMetadataField("allow")
     FIREWALL_DENY = DictListMetadataField("deny")
+    FIREWALL_POLICY_MATCH = DictMetadataField("firewall_policy_match")
     IAM_BINDINGS = DictListMetadataField("iam_bindings")
     LOAD_BALANCER_BACKENDS = DictListMetadataField("load_balancer_backends")
     LOAD_BALANCER_HOST_RULES = DictListMetadataField("load_balancer_host_rules")

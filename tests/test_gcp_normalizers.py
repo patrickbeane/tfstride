@@ -67,6 +67,9 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_backend_bucket,
     normalize_compute_backend_service,
     normalize_compute_firewall,
+    normalize_compute_firewall_policy,
+    normalize_compute_firewall_policy_association,
+    normalize_compute_firewall_policy_rule,
     normalize_compute_forwarding_rule,
     normalize_compute_global_forwarding_rule,
     normalize_compute_network,
@@ -79,6 +82,7 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_target_https_proxy,
     normalize_compute_url_map,
     parse_firewall_allow_rules,
+    parse_firewall_policy_allow_rules,
 )
 from tfstride.providers.gcp.resource_utils import last_path_segment
 
@@ -430,6 +434,145 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                 "direction": "INGRESS",
                 "source_tags": ["app"],
                 "allow": [{"protocol": "tcp", "ports": ["443"]}],
+            }
+        )
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].cidr_blocks, [])
+
+    def test_compute_firewall_policy_normalizer_preserves_policy_scope(self) -> None:
+        normalized = normalize_compute_firewall_policy(
+            _terraform_resource(
+                "google_compute_firewall_policy.org",
+                "google_compute_firewall_policy",
+                {
+                    "short_name": "tfstride-org-policy",
+                    "name": "1234567890",
+                    "parent": "organizations/1234567890",
+                    "description": "organization ingress policy",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.identifier, "tfstride-org-policy")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.NAME), "tfstride-org-policy")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE),
+            "1234567890",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PARENT),
+            "organizations/1234567890",
+        )
+
+    def test_compute_firewall_policy_rule_normalizer_builds_allow_rules(self) -> None:
+        normalized = normalize_compute_firewall_policy_rule(
+            _terraform_resource(
+                "google_compute_firewall_policy_rule.public_admin",
+                "google_compute_firewall_policy_rule",
+                {
+                    "firewall_policy": "google_compute_firewall_policy.org.name",
+                    "priority": 1000,
+                    "action": "allow",
+                    "direction": "INGRESS",
+                    "target_service_accounts": ["app@tfstride.iam.gserviceaccount.com"],
+                    "match": [
+                        {
+                            "src_ip_ranges": ["0.0.0.0/0"],
+                            "layer4_configs": [
+                                {"ip_protocol": "tcp", "ports": ["22", "3389"]},
+                                {"ip_protocol": "icmp"},
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.identifier, "google_compute_firewall_policy.org.name/rules/1000")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE),
+            "google_compute_firewall_policy.org.name",
+        )
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION), "allow")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION), "ingress")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PRIORITY), 1000)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS),
+            ["app@tfstride.iam.gserviceaccount.com"],
+        )
+        self.assertEqual(
+            [(rule.protocol, rule.from_port, rule.to_port, rule.cidr_blocks) for rule in normalized.network_rules],
+            [
+                ("tcp", 22, 22, ["0.0.0.0/0"]),
+                ("tcp", 3389, 3389, ["0.0.0.0/0"]),
+                ("icmp", None, None, ["0.0.0.0/0"]),
+            ],
+        )
+
+    def test_compute_firewall_policy_association_normalizer_preserves_attachment_target(self) -> None:
+        normalized = normalize_compute_firewall_policy_association(
+            _terraform_resource(
+                "google_compute_firewall_policy_association.org",
+                "google_compute_firewall_policy_association",
+                {
+                    "name": "tfstride-org-policy-association",
+                    "firewall_policy": "google_compute_firewall_policy.org.name",
+                    "attachment_target": "organizations/1234567890",
+                },
+            )
+        )
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.identifier, "organizations/1234567890")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE),
+            "google_compute_firewall_policy.org.name",
+        )
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET),
+            "organizations/1234567890",
+        )
+
+    def test_firewall_policy_rule_parser_handles_egress_and_non_allow_actions(self) -> None:
+        allow_rules = parse_firewall_policy_allow_rules(
+            {
+                "action": "allow",
+                "direction": "EGRESS",
+                "match": [
+                    {
+                        "dest_ip_ranges": ["10.0.0.0/8"],
+                        "layer4_configs": [{"ip_protocol": "tcp", "ports": ["443"]}],
+                    }
+                ],
+            }
+        )
+        deny_rules = parse_firewall_policy_allow_rules(
+            {
+                "action": "deny",
+                "direction": "INGRESS",
+                "match": [{"src_ip_ranges": ["0.0.0.0/0"]}],
+            }
+        )
+
+        self.assertEqual(len(allow_rules), 1)
+        self.assertEqual(allow_rules[0].direction, "egress")
+        self.assertEqual(allow_rules[0].cidr_blocks, ["10.0.0.0/8"])
+        self.assertEqual(deny_rules, [])
+
+    def test_firewall_policy_rule_parser_does_not_default_source_scoped_rules_to_internet(self) -> None:
+        rules = parse_firewall_policy_allow_rules(
+            {
+                "action": "allow",
+                "direction": "INGRESS",
+                "match": [
+                    {
+                        "src_secure_tags": [{"name": "tagValues/123"}],
+                        "layer4_configs": [{"ip_protocol": "tcp", "ports": ["443"]}],
+                    }
+                ],
             }
         )
 

@@ -191,7 +191,14 @@ class ResourceConceptTests(unittest.TestCase):
         )
         self.assertEqual(
             NETWORK_SECURITY_GROUP_RESOURCE_TYPES,
-            frozenset({"aws_security_group", "google_compute_firewall"}),
+            frozenset(
+                {
+                    "aws_security_group",
+                    "google_compute_firewall",
+                    "google_compute_firewall_policy",
+                    "google_compute_firewall_policy_rule",
+                }
+            ),
         )
         self.assertEqual(SUBNET_RESOURCE_TYPES, frozenset({"aws_subnet", "google_compute_subnetwork"}))
         self.assertEqual(DATABASE_RESOURCE_TYPES, frozenset({"aws_db_instance", "google_sql_database_instance"}))
@@ -293,6 +300,10 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_iam_policy_resource(_resource("google_storage_bucket_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
         self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall", provider="gcp")))
+        self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall_policy", provider="gcp")))
+        self.assertTrue(
+            is_network_security_group_resource(_resource("google_compute_firewall_policy_rule", provider="gcp"))
+        )
         self.assertTrue(is_subnet_resource(_resource("aws_subnet")))
         self.assertTrue(is_subnet_resource(_resource("google_compute_subnetwork", provider="gcp")))
         self.assertTrue(is_database_resource(_resource("aws_db_instance")))

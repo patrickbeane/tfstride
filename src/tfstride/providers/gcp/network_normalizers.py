@@ -233,6 +233,77 @@ def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResourc
     )
 
 
+def normalize_compute_firewall_policy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.NETWORK,
+        identifier=first_non_empty(values.get("short_name"), values.get("name"), resource_identifier(resource)),
+        metadata={
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get("short_name"), values.get("name")),
+            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("name"),
+            GcpResourceMetadata.FIREWALL_POLICY_PARENT.key: values.get("parent"),
+            "description": values.get("description"),
+            "display_name": values.get("display_name"),
+        },
+    )
+
+
+def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    match = _firewall_policy_match(values)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.NETWORK,
+        identifier=_firewall_policy_rule_identifier(resource),
+        network_rules=parse_firewall_policy_allow_rules(values),
+        metadata={
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
+            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("firewall_policy"),
+            GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: values.get("action"),
+            GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: _firewall_policy_direction(values),
+            GcpResourceMetadata.FIREWALL_POLICY_PRIORITY.key: as_optional_int(values.get("priority")),
+            GcpResourceMetadata.FIREWALL_POLICY_MATCH.key: match,
+            GcpResourceMetadata.FIREWALL_SOURCE_RANGES.key: _firewall_policy_source_ranges(match),
+            GcpResourceMetadata.FIREWALL_DESTINATION_RANGES.key: _firewall_policy_destination_ranges(match),
+            GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES.key: compact(as_list(values.get("target_resources"))),
+            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key: compact(
+                as_list(values.get("target_service_accounts"))
+            ),
+            "disabled": as_bool(values.get("disabled")),
+            "enable_logging": as_bool(values.get("enable_logging")),
+            "description": values.get("description"),
+        },
+    )
+
+
+def normalize_compute_firewall_policy_association(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.NETWORK,
+        identifier=first_non_empty(values.get("attachment_target"), values.get("name"), resource_identifier(resource)),
+        metadata={
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
+            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("firewall_policy"),
+            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: values.get("attachment_target"),
+            "display_name": values.get("display_name"),
+        },
+    )
+
+
 def _normalize_url_map(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     return NormalizedResource(
@@ -423,6 +494,78 @@ def parse_firewall_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule
             from_port, to_port = _parse_port_range(port)
             rules.append(_firewall_rule(direction, protocol, from_port, to_port, cidr_blocks))
     return rules
+
+
+def parse_firewall_policy_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
+    if str(values.get("action") or "").strip().lower() != "allow":
+        return []
+
+    match = _firewall_policy_match(values)
+    direction = _firewall_policy_direction(values)
+    cidr_blocks = _firewall_policy_cidr_blocks(match, direction)
+    rules: list[SecurityGroupRule] = []
+    for layer4_config in _firewall_policy_layer4_configs(match):
+        protocol = str(layer4_config.get("ip_protocol") or layer4_config.get("protocol") or "-1")
+        ports = compact(as_list(layer4_config.get("ports")))
+        if not ports:
+            rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
+            continue
+        for port in ports:
+            from_port, to_port = _parse_port_range(port)
+            rules.append(_firewall_rule(direction, protocol, from_port, to_port, cidr_blocks))
+    return rules
+
+
+def _firewall_policy_rule_identifier(resource: TerraformResource) -> str | None:
+    values = resource.values
+    firewall_policy = first_non_empty(values.get("firewall_policy"))
+    priority = first_non_empty(values.get("priority"))
+    if firewall_policy and priority:
+        return f"{firewall_policy}/rules/{priority}"
+    return resource_identifier(resource)
+
+
+def _firewall_policy_match(values: dict[str, Any]) -> dict[str, Any]:
+    return first_item(values.get("match")) or {}
+
+
+def _firewall_policy_direction(values: dict[str, Any]) -> str:
+    return str(values.get("direction") or "INGRESS").strip().lower()
+
+
+def _firewall_policy_layer4_configs(match: dict[str, Any]) -> list[dict[str, Any]]:
+    return _dict_list(match.get("layer4_configs") or match.get("layer4_config"))
+
+
+def _firewall_policy_source_ranges(match: dict[str, Any]) -> list[str]:
+    return compact(as_list(match.get("src_ip_ranges") or match.get("src_ip_range")))
+
+
+def _firewall_policy_destination_ranges(match: dict[str, Any]) -> list[str]:
+    return compact(as_list(match.get("dest_ip_ranges") or match.get("dest_ip_range")))
+
+
+def _firewall_policy_cidr_blocks(match: dict[str, Any], direction: str) -> list[str]:
+    destination_ranges = _firewall_policy_destination_ranges(match)
+    if direction == "egress" and destination_ranges:
+        return destination_ranges
+    source_ranges = _firewall_policy_source_ranges(match)
+    if source_ranges:
+        return source_ranges
+    if direction == "ingress" and not _firewall_policy_has_non_cidr_source(match):
+        return ["0.0.0.0/0"]
+    return []
+
+
+def _firewall_policy_has_non_cidr_source(match: dict[str, Any]) -> bool:
+    source_scoped_fields = (
+        "src_address_groups",
+        "src_fqdns",
+        "src_region_codes",
+        "src_secure_tags",
+        "src_threat_intelligences",
+    )
+    return any(compact(as_list(match.get(field))) for field in source_scoped_fields)
 
 
 def _firewall_rule(

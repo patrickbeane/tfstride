@@ -39,7 +39,13 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ),
         ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
         ResourceCapability.IAM_POLICY: GCP_IAM_POLICY_RESOURCE_TYPES,
-        ResourceCapability.NETWORK_SECURITY_GROUP: frozenset({"google_compute_firewall"}),
+        ResourceCapability.NETWORK_SECURITY_GROUP: frozenset(
+            {
+                "google_compute_firewall",
+                "google_compute_firewall_policy",
+                "google_compute_firewall_policy_rule",
+            }
+        ),
         ResourceCapability.SUBNET: frozenset({"google_compute_subnetwork"}),
         ResourceCapability.DATABASE: frozenset({"google_sql_database_instance"}),
         ResourceCapability.OBJECT_STORAGE: frozenset({"google_storage_bucket"}),
