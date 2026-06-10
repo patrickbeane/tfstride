@@ -124,6 +124,8 @@ class GcpResourceMetadata:
     LOAD_BALANCER_HOST_RULES = DictListMetadataField("load_balancer_host_rules")
     LOAD_BALANCER_PATH_MATCHERS = DictListMetadataField("load_balancer_path_matchers")
     LOAD_BALANCER_SERVERLESS_ENDPOINTS = DictListMetadataField("load_balancer_serverless_endpoints")
+    LOAD_BALANCER_FRONTENDS = DictListMetadataField("load_balancer_frontends")
+    LOAD_BALANCER_REACHABLE_BACKENDS = DictListMetadataField("load_balancer_reachable_backends")
     GKE_MASTER_AUTHORIZED_NETWORKS = DictListMetadataField("gke_master_authorized_networks")
     CLOUD_SQL_AUTHORIZED_NETWORKS = DictListMetadataField("cloud_sql_authorized_networks")
     CLOUD_SQL_BACKUP_CONFIGURATION = DictMetadataField("cloud_sql_backup_configuration")

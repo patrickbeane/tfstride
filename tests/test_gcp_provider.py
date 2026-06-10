@@ -225,6 +225,8 @@ class GcpProviderTests(unittest.TestCase):
                 "LOAD_BALANCER_HOST_RULES",
                 "LOAD_BALANCER_PATH_MATCHERS",
                 "LOAD_BALANCER_SERVERLESS_ENDPOINTS",
+                "LOAD_BALANCER_FRONTENDS",
+                "LOAD_BALANCER_REACHABLE_BACKENDS",
                 "NETWORK_INTERFACES",
                 "SERVICE_ACCOUNTS",
                 "INTERNET_INGRESS_FIREWALLS",

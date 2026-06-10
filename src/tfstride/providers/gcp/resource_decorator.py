@@ -46,6 +46,8 @@ class GcpResourceDecorator:
             if resource.resource_type == "google_compute_subnetwork":
                 _derive_subnetwork_route_posture(resource, index)
 
+        _derive_load_balancer_frontend_reachability(index)
+
         for resource in resources:
             if resource.resource_type == "google_compute_instance":
                 _infer_instance_vpc_id(resource, index)
@@ -78,9 +80,11 @@ class GcpResourceDecorator:
 
 @dataclass(frozen=True, slots=True)
 class _GcpResourceIndex:
+    resources_by_reference: Mapping[str, NormalizedResource]
     network_references: Mapping[str, str]
     subnetworks_by_reference: Mapping[str, NormalizedResource]
     routers_by_reference: Mapping[str, NormalizedResource]
+    forwarding_rules: tuple[NormalizedResource, ...]
     routes: tuple[NormalizedResource, ...]
     router_nats: tuple[NormalizedResource, ...]
     firewalls: tuple[NormalizedResource, ...]
@@ -97,9 +101,11 @@ class _GcpResourceIndex:
 
     @classmethod
     def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
+        resources_by_reference: dict[str, NormalizedResource] = {}
         network_references: dict[str, str] = {}
         subnetworks_by_reference: dict[str, NormalizedResource] = {}
         routers_by_reference: dict[str, NormalizedResource] = {}
+        forwarding_rules: list[NormalizedResource] = []
         routes: list[NormalizedResource] = []
         router_nats: list[NormalizedResource] = []
         firewalls: list[NormalizedResource] = []
@@ -114,6 +120,8 @@ class _GcpResourceIndex:
         cloud_run_iam_resources: list[NormalizedResource] = []
         cloud_function_iam_resources: list[NormalizedResource] = []
         for resource in resources:
+            for reference in _resource_references(resource):
+                resources_by_reference.setdefault(reference, resource)
             if resource.resource_type == "google_compute_network":
                 for reference in _resource_references(resource):
                     network_references.setdefault(reference, resource.address)
@@ -128,6 +136,8 @@ class _GcpResourceIndex:
                 routes.append(resource)
             elif resource.resource_type == "google_compute_router_nat":
                 router_nats.append(resource)
+            elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
+                forwarding_rules.append(resource)
             elif resource.resource_type == "google_compute_firewall":
                 firewalls.append(resource)
             elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
@@ -151,9 +161,11 @@ class _GcpResourceIndex:
             elif resource.resource_type in GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
                 cloud_function_iam_resources.append(resource)
         return cls(
+            resources_by_reference=MappingProxyType(resources_by_reference),
             network_references=MappingProxyType(network_references),
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
             routers_by_reference=MappingProxyType(routers_by_reference),
+            forwarding_rules=tuple(forwarding_rules),
             routes=tuple(routes),
             router_nats=tuple(router_nats),
             firewalls=tuple(firewalls),
@@ -171,6 +183,233 @@ class _GcpResourceIndex:
 
 
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
+_GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES = frozenset(
+    {"google_compute_backend_service", "google_compute_region_backend_service"}
+)
+_GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES = frozenset({"google_compute_backend_bucket"})
+_GCP_LOAD_BALANCER_NEG_TYPES = frozenset(
+    {"google_compute_network_endpoint_group", "google_compute_region_network_endpoint_group"}
+)
+_GCP_LOAD_BALANCER_TARGET_PROXY_TYPES = frozenset(
+    {
+        "google_compute_target_http_proxy",
+        "google_compute_target_https_proxy",
+        "google_compute_region_target_http_proxy",
+        "google_compute_region_target_https_proxy",
+    }
+)
+_GCP_LOAD_BALANCER_URL_MAP_TYPES = frozenset({"google_compute_url_map", "google_compute_region_url_map"})
+
+
+def _derive_load_balancer_frontend_reachability(index: _GcpResourceIndex) -> None:
+    for forwarding_rule in index.forwarding_rules:
+        if not forwarding_rule.public_access_configured:
+            continue
+        frontend = _load_balancer_frontend_entry(forwarding_rule)
+        reachable_backends: list[dict[str, Any]] = []
+        for reference in _forwarding_rule_next_hop_references(forwarding_rule):
+            _traverse_load_balancer_reference(
+                reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=[forwarding_rule.address],
+                visited={forwarding_rule.address},
+            )
+        if reachable_backends:
+            forwarding_rule.set_metadata_field(
+                GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS,
+                _dedupe_dicts(reachable_backends),
+            )
+
+
+def _forwarding_rule_next_hop_references(forwarding_rule: NormalizedResource) -> list[str]:
+    return dedupe(
+        reference
+        for reference in (
+            forwarding_rule.get_metadata_field(GcpResourceMetadata.FORWARDING_RULE_TARGET),
+            forwarding_rule.get_metadata_field(GcpResourceMetadata.FORWARDING_RULE_BACKEND_SERVICE),
+        )
+        if reference
+    )
+
+
+def _traverse_load_balancer_reference(
+    reference: str,
+    index: _GcpResourceIndex,
+    frontend: dict[str, Any],
+    reachable_backends: list[dict[str, Any]],
+    *,
+    path: list[str],
+    visited: set[str],
+) -> None:
+    resource = _resource_by_reference(reference, index)
+    if resource is None or resource.address in visited:
+        return
+
+    next_path = [*path, resource.address]
+    next_visited = {*visited, resource.address}
+    _append_load_balancer_frontend(resource, frontend, next_path)
+
+    if resource.resource_type in _GCP_LOAD_BALANCER_TARGET_PROXY_TYPES:
+        url_map_reference = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_URL_MAP)
+        if url_map_reference:
+            _traverse_load_balancer_reference(
+                url_map_reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=next_path,
+                visited=next_visited,
+            )
+        return
+
+    if resource.resource_type in _GCP_LOAD_BALANCER_URL_MAP_TYPES:
+        for backend_reference in _url_map_backend_references(resource):
+            _traverse_load_balancer_reference(
+                backend_reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=next_path,
+                visited=next_visited,
+            )
+        return
+
+    if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES:
+        reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
+        for backend_reference in _backend_service_group_references(resource):
+            _traverse_load_balancer_reference(
+                backend_reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=next_path,
+                visited=next_visited,
+            )
+        return
+
+    if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES:
+        reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
+        bucket_reference = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME)
+        if bucket_reference:
+            _traverse_load_balancer_reference(
+                bucket_reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=next_path,
+                visited=next_visited,
+            )
+        return
+
+    if resource.resource_type in _GCP_LOAD_BALANCER_NEG_TYPES:
+        reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
+        for endpoint_reference in _network_endpoint_group_target_references(resource):
+            _traverse_load_balancer_reference(
+                endpoint_reference,
+                index,
+                frontend,
+                reachable_backends,
+                path=next_path,
+                visited=next_visited,
+            )
+        return
+
+    reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
+
+
+def _url_map_backend_references(url_map: NormalizedResource) -> list[str]:
+    references: list[str] = []
+    default_service = url_map.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE)
+    if default_service:
+        references.append(default_service)
+    for path_matcher in url_map.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS):
+        matcher_default = path_matcher.get("default_service")
+        if matcher_default:
+            references.append(str(matcher_default))
+        for path_rule in path_matcher.get("path_rule") or []:
+            if not isinstance(path_rule, Mapping):
+                continue
+            service = path_rule.get("service")
+            if service:
+                references.append(str(service))
+    return dedupe(references)
+
+
+def _backend_service_group_references(backend_service: NormalizedResource) -> list[str]:
+    references: list[str] = []
+    for backend in backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKENDS):
+        group = backend.get("group")
+        if group:
+            references.append(str(group))
+    return dedupe(references)
+
+
+def _network_endpoint_group_target_references(neg: NormalizedResource) -> list[str]:
+    references: list[str] = []
+    for endpoint in neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS):
+        platform = str(endpoint.get("platform") or "").strip()
+        if platform == "cloud_run" and endpoint.get("service"):
+            references.append(str(endpoint["service"]))
+        elif platform == "cloud_function" and endpoint.get("function"):
+            references.append(str(endpoint["function"]))
+    return dedupe(references)
+
+
+def _resource_by_reference(reference: str, index: _GcpResourceIndex) -> NormalizedResource | None:
+    reference_key = gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES)
+    return index.resources_by_reference.get(reference_key)
+
+
+def _load_balancer_frontend_entry(forwarding_rule: NormalizedResource) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "forwarding_rule": forwarding_rule.address,
+        "load_balancing_scheme": forwarding_rule.get_metadata_field(
+            GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME
+        ),
+        "ip_address": forwarding_rule.get_metadata_field(GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS),
+        "ports": forwarding_rule.get_metadata_field(GcpResourceMetadata.FORWARDING_RULE_PORTS),
+    }
+    return {key: value for key, value in entry.items() if value not in (None, "", [], {})}
+
+
+def _load_balancer_backend_entry(
+    frontend: dict[str, Any],
+    backend: NormalizedResource,
+    path: list[str],
+) -> dict[str, Any]:
+    entry = {
+        "forwarding_rule": frontend["forwarding_rule"],
+        "backend": backend.address,
+        "backend_type": backend.resource_type,
+        "path": list(path),
+    }
+    ip_address = frontend.get("ip_address")
+    if ip_address:
+        entry["ip_address"] = ip_address
+    return entry
+
+
+def _append_load_balancer_frontend(
+    resource: NormalizedResource,
+    frontend: dict[str, Any],
+    path: list[str],
+) -> None:
+    entry = dict(frontend)
+    entry["path"] = list(path)
+    frontends = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)
+    frontends.append(entry)
+    resource.set_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS, _dedupe_dicts(frontends))
+
+
+def _dedupe_dicts(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    for value in values:
+        if value in deduped:
+            continue
+        deduped.append(value)
+    return deduped
 
 
 def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _GcpResourceIndex) -> None:
@@ -612,6 +851,8 @@ def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING),
+        resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
+        resource.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
     ):
         if reference:
