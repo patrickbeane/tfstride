@@ -83,14 +83,25 @@ from tfstride.providers.gcp.serverless_normalizers import (
 )
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
+    normalize_compute_backend_bucket,
+    normalize_compute_backend_service,
     normalize_compute_firewall,
     normalize_compute_forwarding_rule,
     normalize_compute_global_forwarding_rule,
     normalize_compute_network,
+    normalize_compute_network_endpoint_group,
+    normalize_compute_region_backend_service,
+    normalize_compute_region_network_endpoint_group,
+    normalize_compute_region_target_http_proxy,
+    normalize_compute_region_target_https_proxy,
+    normalize_compute_region_url_map,
     normalize_compute_route,
     normalize_compute_router,
     normalize_compute_router_nat,
     normalize_compute_subnetwork,
+    normalize_compute_target_http_proxy,
+    normalize_compute_target_https_proxy,
+    normalize_compute_url_map,
 )
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.resource_metadata import InventoryMetadata
@@ -99,15 +110,26 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    "google_compute_backend_bucket": normalize_compute_backend_bucket,
+    "google_compute_backend_service": normalize_compute_backend_service,
     "google_compute_firewall": normalize_compute_firewall,
     "google_compute_forwarding_rule": normalize_compute_forwarding_rule,
     "google_compute_global_forwarding_rule": normalize_compute_global_forwarding_rule,
     "google_compute_instance": normalize_compute_instance,
     "google_compute_network": normalize_compute_network,
+    "google_compute_network_endpoint_group": normalize_compute_network_endpoint_group,
+    "google_compute_region_backend_service": normalize_compute_region_backend_service,
+    "google_compute_region_network_endpoint_group": normalize_compute_region_network_endpoint_group,
+    "google_compute_region_target_http_proxy": normalize_compute_region_target_http_proxy,
+    "google_compute_region_target_https_proxy": normalize_compute_region_target_https_proxy,
+    "google_compute_region_url_map": normalize_compute_region_url_map,
     "google_compute_route": normalize_compute_route,
     "google_compute_router": normalize_compute_router,
     "google_compute_router_nat": normalize_compute_router_nat,
     "google_compute_subnetwork": normalize_compute_subnetwork,
+    "google_compute_target_http_proxy": normalize_compute_target_http_proxy,
+    "google_compute_target_https_proxy": normalize_compute_target_https_proxy,
+    "google_compute_url_map": normalize_compute_url_map,
     "google_bigquery_dataset": normalize_bigquery_dataset,
     "google_bigquery_dataset_iam_binding": normalize_bigquery_dataset_iam_binding,
     "google_bigquery_dataset_iam_member": normalize_bigquery_dataset_iam_member,

@@ -58,14 +58,19 @@ from tfstride.providers.gcp.serverless_normalizers import (
     normalize_cloudfunctions_function_iam_member,
 )
 from tfstride.providers.gcp.network_normalizers import (
+    normalize_compute_backend_bucket,
+    normalize_compute_backend_service,
     normalize_compute_firewall,
     normalize_compute_forwarding_rule,
     normalize_compute_global_forwarding_rule,
     normalize_compute_network,
+    normalize_compute_region_network_endpoint_group,
     normalize_compute_route,
     normalize_compute_router,
     normalize_compute_router_nat,
     normalize_compute_subnetwork,
+    normalize_compute_target_https_proxy,
+    normalize_compute_url_map,
     parse_firewall_allow_rules,
 )
 from tfstride.providers.gcp.resource_utils import last_path_segment
@@ -241,6 +246,119 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         )
         self.assertFalse(global_rule.public_access_configured)
         self.assertFalse(global_rule.direct_internet_reachable)
+
+    def test_load_balancer_routing_normalizers_preserve_graph_references(self) -> None:
+        url_map = normalize_compute_url_map(
+            _terraform_resource(
+                "google_compute_url_map.web",
+                "google_compute_url_map",
+                {
+                    "name": "web-map",
+                    "default_service": "google_compute_backend_service.web.id",
+                    "host_rule": [{"hosts": ["app.example.com"], "path_matcher": "app"}],
+                    "path_matcher": [
+                        {
+                            "name": "app",
+                            "default_service": "google_compute_backend_service.web.id",
+                            "path_rule": [
+                                {"paths": ["/static/*"], "service": "google_compute_backend_bucket.assets.id"}
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+        target_proxy = normalize_compute_target_https_proxy(
+            _terraform_resource(
+                "google_compute_target_https_proxy.web",
+                "google_compute_target_https_proxy",
+                {
+                    "name": "web-proxy",
+                    "url_map": "google_compute_url_map.web.id",
+                    "ssl_certificates": ["google_compute_managed_ssl_certificate.web.id"],
+                },
+            )
+        )
+        backend_service = normalize_compute_backend_service(
+            _terraform_resource(
+                "google_compute_backend_service.web",
+                "google_compute_backend_service",
+                {
+                    "name": "web-backend",
+                    "protocol": "HTTP",
+                    "load_balancing_scheme": "EXTERNAL_MANAGED",
+                    "backend": [{"group": "google_compute_region_network_endpoint_group.run.id"}],
+                    "health_checks": ["google_compute_health_check.web.id"],
+                },
+            )
+        )
+        backend_bucket = normalize_compute_backend_bucket(
+            _terraform_resource(
+                "google_compute_backend_bucket.assets",
+                "google_compute_backend_bucket",
+                {"name": "assets", "bucket_name": "tfstride-assets", "enable_cdn": True},
+            )
+        )
+        neg = normalize_compute_region_network_endpoint_group(
+            _terraform_resource(
+                "google_compute_region_network_endpoint_group.run",
+                "google_compute_region_network_endpoint_group",
+                {
+                    "name": "run-neg",
+                    "region": "us-central1",
+                    "network_endpoint_type": "SERVERLESS",
+                    "cloud_run": [{"service": "google_cloud_run_v2_service.app.name", "tag": "stable"}],
+                },
+            )
+        )
+
+        self.assertEqual(url_map.category, ResourceCategory.EDGE)
+        self.assertEqual(
+            url_map.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE),
+            "google_compute_backend_service.web.id",
+        )
+        self.assertEqual(
+            url_map.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_HOST_RULES),
+            [{"hosts": ["app.example.com"], "path_matcher": "app"}],
+        )
+        self.assertEqual(
+            url_map.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS)[0]["path_rule"],
+            [{"paths": ["/static/*"], "service": "google_compute_backend_bucket.assets.id"}],
+        )
+        self.assertEqual(
+            target_proxy.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_URL_MAP),
+            "google_compute_url_map.web.id",
+        )
+        self.assertEqual(
+            target_proxy.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES),
+            ["google_compute_managed_ssl_certificate.web.id"],
+        )
+        self.assertEqual(
+            backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL),
+            "HTTP",
+        )
+        self.assertEqual(
+            backend_service.get_metadata_field(
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME
+            ),
+            "EXTERNAL_MANAGED",
+        )
+        self.assertEqual(
+            backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKENDS),
+            [{"group": "google_compute_region_network_endpoint_group.run.id"}],
+        )
+        self.assertEqual(
+            backend_bucket.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME),
+            "tfstride-assets",
+        )
+        self.assertEqual(
+            neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE),
+            "SERVERLESS",
+        )
+        self.assertEqual(
+            neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS),
+            [{"platform": "cloud_run", "service": "google_cloud_run_v2_service.app.name", "tag": "stable"}],
+        )
 
     def test_compute_firewall_normalizer_builds_allow_rules(self) -> None:
         normalized = normalize_compute_firewall(self.resources["google_compute_firewall.public_ssh"])

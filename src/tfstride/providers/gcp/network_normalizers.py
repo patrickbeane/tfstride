@@ -140,6 +140,64 @@ def normalize_compute_global_forwarding_rule(resource: TerraformResource) -> Nor
     return _normalize_forwarding_rule(resource)
 
 
+def normalize_compute_url_map(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_url_map(resource)
+
+
+def normalize_compute_region_url_map(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_url_map(resource)
+
+
+def normalize_compute_target_http_proxy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_proxy(resource)
+
+
+def normalize_compute_target_https_proxy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_proxy(resource)
+
+
+def normalize_compute_region_target_http_proxy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_proxy(resource)
+
+
+def normalize_compute_region_target_https_proxy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_target_proxy(resource)
+
+
+def normalize_compute_backend_service(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_backend_service(resource)
+
+
+def normalize_compute_region_backend_service(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_backend_service(resource)
+
+
+def normalize_compute_backend_bucket(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME.key: values.get("bucket_name"),
+            },
+        ),
+    )
+
+
+def normalize_compute_network_endpoint_group(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_network_endpoint_group(resource)
+
+
+def normalize_compute_region_network_endpoint_group(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_network_endpoint_group(resource)
+
+
 def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     return NormalizedResource(
@@ -173,6 +231,131 @@ def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResourc
             "disabled": as_bool(values.get("disabled")),
         },
     )
+
+
+def _normalize_url_map(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE.key: values.get("default_service"),
+                GcpResourceMetadata.LOAD_BALANCER_HOST_RULES.key: _dict_list(values.get("host_rule")),
+                GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS.key: _dict_list(values.get("path_matcher")),
+            },
+        ),
+    )
+
+
+def _normalize_target_proxy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.LOAD_BALANCER_URL_MAP.key: values.get("url_map"),
+                GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES.key: compact(
+                    as_list(values.get("ssl_certificates"))
+                ),
+            },
+        ),
+    )
+
+
+def _normalize_backend_service(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL.key: values.get("protocol"),
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME.key: values.get(
+                    "load_balancing_scheme"
+                ),
+                GcpResourceMetadata.LOAD_BALANCER_BACKENDS.key: _dict_list(values.get("backend")),
+            },
+        ),
+    )
+
+
+def _normalize_network_endpoint_group(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        vpc_id=values.get("network"),
+        subnet_ids=tuple(compact([values.get("subnetwork")])),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.NETWORK.key: values.get("network"),
+                GcpResourceMetadata.SUBNETWORK.key: values.get("subnetwork"),
+                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE.key: values.get(
+                    "network_endpoint_type"
+                ),
+                GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS.key: _serverless_neg_endpoints(values),
+            },
+        ),
+    )
+
+
+def _load_balancer_metadata(values: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    return {
+        GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
+        GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+        GcpResourceMetadata.PROJECT.key: values.get("project"),
+        GcpResourceMetadata.REGION.key: values.get("region"),
+        GcpResourceMetadata.ZONE.key: values.get("zone"),
+        **metadata,
+    }
+
+
+def _dict_list(value: Any) -> list[dict[str, Any]]:
+    return [item for item in as_list(value) if isinstance(item, dict)]
+
+
+def _serverless_neg_endpoints(values: dict[str, Any]) -> list[dict[str, Any]]:
+    endpoints: list[dict[str, Any]] = []
+    endpoints.extend(_serverless_neg_endpoint("cloud_run", item) for item in _dict_list(values.get("cloud_run")))
+    endpoints.extend(
+        _serverless_neg_endpoint("cloud_function", item) for item in _dict_list(values.get("cloud_function"))
+    )
+    endpoints.extend(_serverless_neg_endpoint("app_engine", item) for item in _dict_list(values.get("app_engine")))
+    return [endpoint for endpoint in endpoints if len(endpoint) > 1]
+
+
+def _serverless_neg_endpoint(platform: str, values: dict[str, Any]) -> dict[str, Any]:
+    endpoint = {
+        "platform": platform,
+        "service": values.get("service"),
+        "function": values.get("function"),
+        "version": values.get("version"),
+        "tag": values.get("tag"),
+        "url_mask": values.get("url_mask"),
+    }
+    return {key: value for key, value in endpoint.items() if value not in (None, "", [], {})}
 
 
 def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResource:

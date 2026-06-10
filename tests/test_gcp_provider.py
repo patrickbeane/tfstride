@@ -109,6 +109,17 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_compute_router_nat"))
         self.assertTrue(plugin.supports_resource_type("google_compute_forwarding_rule"))
         self.assertTrue(plugin.supports_resource_type("google_compute_global_forwarding_rule"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_target_http_proxy"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_target_https_proxy"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_region_target_http_proxy"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_region_target_https_proxy"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_url_map"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_region_url_map"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_backend_service"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_region_backend_service"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_backend_bucket"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_network_endpoint_group"))
+        self.assertTrue(plugin.supports_resource_type("google_compute_region_network_endpoint_group"))
         self.assertTrue(plugin.supports_resource_type("google_container_cluster"))
         self.assertTrue(plugin.supports_resource_type("google_container_node_pool"))
         self.assertTrue(plugin.supports_resource_type("google_service_account"))
@@ -203,6 +214,17 @@ class GcpProviderTests(unittest.TestCase):
                 "FORWARDING_RULE_BACKEND_SERVICE",
                 "FORWARDING_RULE_PORTS",
                 "FORWARDING_RULE_SOURCE_IP_RANGES",
+                "LOAD_BALANCER_URL_MAP",
+                "LOAD_BALANCER_DEFAULT_SERVICE",
+                "LOAD_BALANCER_BACKEND_BUCKET_NAME",
+                "LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL",
+                "LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME",
+                "LOAD_BALANCER_NETWORK_ENDPOINT_TYPE",
+                "LOAD_BALANCER_SSL_CERTIFICATES",
+                "LOAD_BALANCER_BACKENDS",
+                "LOAD_BALANCER_HOST_RULES",
+                "LOAD_BALANCER_PATH_MATCHERS",
+                "LOAD_BALANCER_SERVERLESS_ENDPOINTS",
                 "NETWORK_INTERFACES",
                 "SERVICE_ACCOUNTS",
                 "INTERNET_INGRESS_FIREWALLS",
