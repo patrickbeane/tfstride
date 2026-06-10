@@ -1132,6 +1132,73 @@ class GcpRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_firewall_policy_project_association_produces_public_compute_finding(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _compute_network(),
+                _compute_subnetwork(),
+                TerraformResource(
+                    address="google_compute_firewall_policy_association.project",
+                    mode="managed",
+                    resource_type="google_compute_firewall_policy_association",
+                    name="project",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "name": "tfstride-project-policy",
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "attachment_target": "projects/tfstride-demo",
+                    },
+                ),
+                TerraformResource(
+                    address="google_compute_firewall_policy_rule.public_admin",
+                    mode="managed",
+                    resource_type="google_compute_firewall_policy_rule",
+                    name="public_admin",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "priority": 1000,
+                        "action": "ALLOW",
+                        "direction": "INGRESS",
+                        "match": [
+                            {
+                                "src_ip_ranges": ["0.0.0.0/0"],
+                                "layer4_configs": [{"ip_protocol": "tcp", "ports": ["22"]}],
+                            }
+                        ],
+                    },
+                ),
+                _compute_instance(),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-compute-broad-ingress"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_compute_instance.web", "google_compute_firewall_policy_rule.public_admin"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "internet-to-service:internet->google_compute_instance.web",
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["firewall_rules"],
+            ["google_compute_firewall_policy_rule.public_admin ingress tcp 22 from 0.0.0.0/0"],
+        )
+        self.assertEqual(
+            evidence["internet_ingress_reasons"],
+            ["google_compute_firewall_policy_rule.public_admin ingress tcp 22 from 0.0.0.0/0"],
+        )
+
     def test_private_compute_broad_admin_firewall_is_still_detected(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

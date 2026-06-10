@@ -89,6 +89,8 @@ class _GcpResourceIndex:
     routes: tuple[NormalizedResource, ...]
     router_nats: tuple[NormalizedResource, ...]
     firewalls: tuple[NormalizedResource, ...]
+    firewall_policy_rules: tuple[NormalizedResource, ...]
+    firewall_policy_associations: tuple[NormalizedResource, ...]
     bucket_iam_resources: tuple[NormalizedResource, ...]
     secret_iam_resources: tuple[NormalizedResource, ...]
     pubsub_topic_iam_resources: tuple[NormalizedResource, ...]
@@ -110,6 +112,8 @@ class _GcpResourceIndex:
         routes: list[NormalizedResource] = []
         router_nats: list[NormalizedResource] = []
         firewalls: list[NormalizedResource] = []
+        firewall_policy_rules: list[NormalizedResource] = []
+        firewall_policy_associations: list[NormalizedResource] = []
         bucket_iam_resources: list[NormalizedResource] = []
         secret_iam_resources: list[NormalizedResource] = []
         pubsub_topic_iam_resources: list[NormalizedResource] = []
@@ -141,6 +145,10 @@ class _GcpResourceIndex:
                 forwarding_rules.append(resource)
             elif resource.resource_type == "google_compute_firewall":
                 firewalls.append(resource)
+            elif resource.resource_type == "google_compute_firewall_policy_rule":
+                firewall_policy_rules.append(resource)
+            elif resource.resource_type == "google_compute_firewall_policy_association":
+                firewall_policy_associations.append(resource)
             elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
                 bucket_iam_resources.append(resource)
             elif resource.resource_type in GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES:
@@ -170,6 +178,8 @@ class _GcpResourceIndex:
             routes=tuple(routes),
             router_nats=tuple(router_nats),
             firewalls=tuple(firewalls),
+            firewall_policy_rules=tuple(firewall_policy_rules),
+            firewall_policy_associations=tuple(firewall_policy_associations),
             bucket_iam_resources=tuple(bucket_iam_resources),
             secret_iam_resources=tuple(secret_iam_resources),
             pubsub_topic_iam_resources=tuple(pubsub_topic_iam_resources),
@@ -538,14 +548,21 @@ def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpRes
         if _firewall_applies_to_instance(firewall, resource, index)
         and _internet_ingress_reasons(firewall)
     ]
+    matching_policy_rules = [
+        policy_rule
+        for policy_rule in index.firewall_policy_rules
+        if _firewall_policy_rule_applies_to_instance(policy_rule, resource, index)
+        and _internet_ingress_reasons(policy_rule)
+    ]
+    ingress_sources = [*matching_firewalls, *matching_policy_rules]
     internet_ingress_reasons = [
         reason
-        for firewall in matching_firewalls
+        for firewall in ingress_sources
         for reason in _internet_ingress_reasons(firewall)
     ]
     gcp_mutations(resource).set_compute_internet_ingress(
         internet_ingress_reasons=internet_ingress_reasons,
-        firewall_addresses=[firewall.address for firewall in matching_firewalls],
+        firewall_addresses=[firewall.address for firewall in ingress_sources],
     )
 
     public_exposure = bool(resource.public_access_configured and internet_ingress_reasons)
@@ -756,6 +773,188 @@ def _internet_ingress_reasons(firewall: NormalizedResource) -> list[str]:
         for rule in firewall.network_rules
         if rule.direction == "ingress" and rule.allows_internet()
     ]
+
+
+def _firewall_policy_rule_applies_to_instance(
+    policy_rule: NormalizedResource,
+    instance: NormalizedResource,
+    index: _GcpResourceIndex,
+) -> bool:
+    if policy_rule.metadata.get("disabled"):
+        return False
+    policy_action = str(
+        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION) or ""
+    ).strip().lower()
+    if policy_action != "allow":
+        return False
+    policy_direction = str(
+        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION) or ""
+    ).strip().lower()
+    if policy_direction != "ingress":
+        return False
+
+    target_resources = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES)
+    target_resource_applies = bool(target_resources) and any(
+        _resource_has_network_reference(instance, target_resource, index)
+        for target_resource in target_resources
+    )
+    if target_resources and not target_resource_applies:
+        return False
+
+    target_service_accounts = _service_account_reference_keys(
+        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS)
+    )
+    if target_service_accounts and not target_service_accounts.intersection(
+        _instance_service_account_keys(instance)
+    ):
+        return False
+
+    associations = _firewall_policy_associations_for_rule(policy_rule, index)
+    if not associations:
+        return target_resource_applies
+    return any(
+        _firewall_policy_association_applies_to_instance(association, instance, index)
+        for association in associations
+    )
+
+
+def _firewall_policy_associations_for_rule(
+    policy_rule: NormalizedResource,
+    index: _GcpResourceIndex,
+) -> tuple[NormalizedResource, ...]:
+    policy_references = _firewall_policy_reference_keys(policy_rule, index)
+    if not policy_references:
+        return ()
+    return tuple(
+        association
+        for association in index.firewall_policy_associations
+        if policy_references.intersection(_firewall_policy_reference_keys(association, index))
+    )
+
+
+def _firewall_policy_association_applies_to_instance(
+    association: NormalizedResource,
+    instance: NormalizedResource,
+    index: _GcpResourceIndex,
+) -> bool:
+    target = association.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET)
+    if not target:
+        return False
+    if _resource_has_network_reference(instance, target, index):
+        return True
+
+    project = _project_from_scope_reference(target)
+    if project and project == _resource_project(instance):
+        return True
+
+    folder_id = _hierarchy_id_from_scope_reference(target, "folders")
+    if folder_id and folder_id == _resource_folder_id(instance):
+        return True
+
+    organization_id = _hierarchy_id_from_scope_reference(target, "organizations")
+    if organization_id and organization_id == _resource_organization_id(instance):
+        return True
+
+    return False
+
+
+def _firewall_policy_reference_keys(
+    resource: NormalizedResource,
+    index: _GcpResourceIndex | None = None,
+) -> set[str]:
+    references = {
+        resource.address,
+        f"{resource.address}.id",
+        f"{resource.address}.name",
+    }
+    for reference in (
+        resource.identifier,
+        resource.get_metadata_field(GcpResourceMetadata.NAME),
+        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
+        resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE),
+    ):
+        if reference:
+            references.add(reference)
+    keys = {gcp_reference_key(str(reference)) for reference in references if str(reference).strip()}
+    if index is None:
+        return keys
+
+    expanded_keys = set(keys)
+    for key in keys:
+        policy = index.resources_by_reference.get(key)
+        if policy is None or policy.resource_type != "google_compute_firewall_policy":
+            continue
+        expanded_keys.update(_firewall_policy_reference_keys(policy))
+    return expanded_keys
+
+
+def _resource_project(resource: NormalizedResource) -> str | None:
+    project = resource.get_metadata_field(GcpResourceMetadata.PROJECT)
+    if project:
+        return project
+    for reference in (
+        resource.identifier,
+        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
+        resource.vpc_id,
+    ):
+        project = _project_from_scope_reference(reference)
+        if project:
+            return project
+    return None
+
+
+def _resource_folder_id(resource: NormalizedResource) -> str | None:
+    folder_id = resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID)
+    if folder_id:
+        return _normalize_hierarchy_id(folder_id, "folders")
+    for reference in (resource.identifier, resource.get_metadata_field(GcpResourceMetadata.SELF_LINK)):
+        folder_id = _hierarchy_id_from_scope_reference(reference, "folders")
+        if folder_id:
+            return folder_id
+    return None
+
+
+def _resource_organization_id(resource: NormalizedResource) -> str | None:
+    organization_id = resource.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID)
+    if organization_id:
+        return _normalize_hierarchy_id(organization_id, "organizations")
+    for reference in (resource.identifier, resource.get_metadata_field(GcpResourceMetadata.SELF_LINK)):
+        organization_id = _hierarchy_id_from_scope_reference(reference, "organizations")
+        if organization_id:
+            return organization_id
+    return None
+
+
+def _project_from_scope_reference(value: object) -> str | None:
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return None
+    parts = [part for part in text.split("/") if part]
+    for index, part in enumerate(parts[:-1]):
+        if part == "projects":
+            return parts[index + 1] or None
+    return None
+
+
+def _hierarchy_id_from_scope_reference(value: object, marker: str) -> str | None:
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return None
+    parts = [part for part in text.split("/") if part]
+    for index, part in enumerate(parts[:-1]):
+        if part == marker:
+            return _normalize_hierarchy_id(parts[index + 1], marker)
+    return _normalize_hierarchy_id(text, marker) if text.startswith(f"{marker}/") else None
+
+
+def _normalize_hierarchy_id(value: str | None, marker: str) -> str | None:
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return None
+    prefix = f"{marker}/"
+    if text.startswith(prefix):
+        return text.removeprefix(prefix) or None
+    return text
 
 
 def _route_has_internet_gateway(route: NormalizedResource) -> bool:
