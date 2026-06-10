@@ -99,6 +99,9 @@ class GcpResourceMetadata:
     GKE_PRIVATE_NODES_ENABLED = BoolMetadataField("gke_private_nodes_enabled")
     GKE_WORKLOAD_IDENTITY_ENABLED = BoolMetadataField("gke_workload_identity_enabled")
     GKE_LEGACY_METADATA_ENDPOINTS_ENABLED = BoolMetadataField("gke_legacy_metadata_endpoints_enabled")
+    FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField(
+        "fronted_by_internet_facing_load_balancer"
+    )
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
     IAM_MEMBERS = StringListMetadataField("iam_members")
@@ -115,6 +118,9 @@ class GcpResourceMetadata:
     FORWARDING_RULE_PORTS = StringListMetadataField("forwarding_rule_ports")
     FORWARDING_RULE_SOURCE_IP_RANGES = StringListMetadataField("forwarding_rule_source_ip_ranges")
     LOAD_BALANCER_SSL_CERTIFICATES = StringListMetadataField("load_balancer_ssl_certificates")
+    INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField(
+        "internet_facing_load_balancer_addresses"
+    )
     GKE_NODE_OAUTH_SCOPES = StringListMetadataField("gke_node_oauth_scopes")
 
     FIREWALL_ALLOW = DictListMetadataField("allow")
@@ -124,6 +130,7 @@ class GcpResourceMetadata:
     LOAD_BALANCER_HOST_RULES = DictListMetadataField("load_balancer_host_rules")
     LOAD_BALANCER_PATH_MATCHERS = DictListMetadataField("load_balancer_path_matchers")
     LOAD_BALANCER_SERVERLESS_ENDPOINTS = DictListMetadataField("load_balancer_serverless_endpoints")
+    LOAD_BALANCER_NETWORK_ENDPOINTS = DictListMetadataField("load_balancer_network_endpoints")
     LOAD_BALANCER_FRONTENDS = DictListMetadataField("load_balancer_frontends")
     LOAD_BALANCER_REACHABLE_BACKENDS = DictListMetadataField("load_balancer_reachable_backends")
     GKE_MASTER_AUTHORIZED_NETWORKS = DictListMetadataField("gke_master_authorized_networks")

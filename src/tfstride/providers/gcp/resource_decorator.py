@@ -277,6 +277,7 @@ def _traverse_load_balancer_reference(
         return
 
     if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES:
+        _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         for backend_reference in _backend_service_group_references(resource):
             _traverse_load_balancer_reference(
@@ -290,6 +291,7 @@ def _traverse_load_balancer_reference(
         return
 
     if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES:
+        _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         bucket_reference = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME)
         if bucket_reference:
@@ -304,6 +306,7 @@ def _traverse_load_balancer_reference(
         return
 
     if resource.resource_type in _GCP_LOAD_BALANCER_NEG_TYPES:
+        _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         for endpoint_reference in _network_endpoint_group_target_references(resource):
             _traverse_load_balancer_reference(
@@ -316,6 +319,7 @@ def _traverse_load_balancer_reference(
             )
         return
 
+    _mark_fronted_by_public_load_balancer(resource, frontend)
     reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
 
 
@@ -354,6 +358,10 @@ def _network_endpoint_group_target_references(neg: NormalizedResource) -> list[s
             references.append(str(endpoint["service"]))
         elif platform == "cloud_function" and endpoint.get("function"):
             references.append(str(endpoint["function"]))
+    for endpoint in neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS):
+        instance = endpoint.get("instance")
+        if instance:
+            references.append(str(instance))
     return dedupe(references)
 
 
@@ -401,6 +409,17 @@ def _append_load_balancer_frontend(
     frontends = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)
     frontends.append(entry)
     resource.set_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS, _dedupe_dicts(frontends))
+
+
+def _mark_fronted_by_public_load_balancer(resource: NormalizedResource, frontend: dict[str, Any]) -> None:
+    forwarding_rule = frontend.get("forwarding_rule")
+    if not forwarding_rule:
+        return
+    resource.set_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER, True)
+    resource.append_metadata_field(
+        GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES,
+        str(forwarding_rule),
+    )
 
 
 def _dedupe_dicts(values: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -64,6 +64,7 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_forwarding_rule,
     normalize_compute_global_forwarding_rule,
     normalize_compute_network,
+    normalize_compute_network_endpoint_group,
     normalize_compute_region_network_endpoint_group,
     normalize_compute_route,
     normalize_compute_router,
@@ -311,6 +312,20 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                 },
             )
         )
+        compute_neg = normalize_compute_network_endpoint_group(
+            _terraform_resource(
+                "google_compute_network_endpoint_group.web",
+                "google_compute_network_endpoint_group",
+                {
+                    "name": "web-neg",
+                    "zone": "us-central1-a",
+                    "network_endpoint_type": "GCE_VM_IP_PORT",
+                    "network_endpoint": [
+                        {"instance": "google_compute_instance.web.id", "port": 8080}
+                    ],
+                },
+            )
+        )
 
         self.assertEqual(url_map.category, ResourceCategory.EDGE)
         self.assertEqual(
@@ -358,6 +373,14 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(
             neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS),
             [{"platform": "cloud_run", "service": "google_cloud_run_v2_service.app.name", "tag": "stable"}],
+        )
+        self.assertEqual(
+            compute_neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE),
+            "GCE_VM_IP_PORT",
+        )
+        self.assertEqual(
+            compute_neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS),
+            [{"instance": "google_compute_instance.web.id", "port": 8080}],
         )
 
     def test_compute_firewall_normalizer_builds_allow_rules(self) -> None:
@@ -1305,6 +1328,10 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                                     {
                                         "paths": ["/assets/*"],
                                         "service": "google_compute_backend_bucket.assets.id",
+                                    },
+                                    {
+                                        "paths": ["/vm/*"],
+                                        "service": "google_compute_backend_service.compute.id",
                                     }
                                 ],
                             }
@@ -1332,6 +1359,34 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                     },
                 ),
                 _terraform_resource(
+                    "google_compute_backend_service.compute",
+                    "google_compute_backend_service",
+                    {
+                        "name": "compute-backend",
+                        "protocol": "HTTP",
+                        "load_balancing_scheme": "EXTERNAL_MANAGED",
+                        "backend": [{"group": "google_compute_network_endpoint_group.web.id"}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_network_endpoint_group.web",
+                    "google_compute_network_endpoint_group",
+                    {
+                        "name": "web-neg",
+                        "zone": "us-central1-a",
+                        "network_endpoint_type": "GCE_VM_IP_PORT",
+                        "network_endpoint": [{"instance": "google_compute_instance.web.id", "port": 8080}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "network_interface": [{"network": "google_compute_network.main.id"}],
+                    },
+                ),
+                _terraform_resource(
                     "google_cloud_run_v2_service.api",
                     "google_cloud_run_v2_service",
                     {
@@ -1355,6 +1410,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         forwarding_rule = inventory.get_by_address("google_compute_global_forwarding_rule.web")
         backend_service = inventory.get_by_address("google_compute_backend_service.run")
         neg = inventory.get_by_address("google_compute_region_network_endpoint_group.run")
+        compute_backend_service = inventory.get_by_address("google_compute_backend_service.compute")
+        compute_neg = inventory.get_by_address("google_compute_network_endpoint_group.web")
+        instance = inventory.get_by_address("google_compute_instance.web")
         service = inventory.get_by_address("google_cloud_run_v2_service.api")
         backend_bucket = inventory.get_by_address("google_compute_backend_bucket.assets")
         bucket = inventory.get_by_address("google_storage_bucket.assets")
@@ -1362,12 +1420,18 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertIsNotNone(forwarding_rule)
         self.assertIsNotNone(backend_service)
         self.assertIsNotNone(neg)
+        self.assertIsNotNone(compute_backend_service)
+        self.assertIsNotNone(compute_neg)
+        self.assertIsNotNone(instance)
         self.assertIsNotNone(service)
         self.assertIsNotNone(backend_bucket)
         self.assertIsNotNone(bucket)
         assert forwarding_rule is not None
         assert backend_service is not None
         assert neg is not None
+        assert compute_backend_service is not None
+        assert compute_neg is not None
+        assert instance is not None
         assert service is not None
         assert backend_bucket is not None
         assert bucket is not None
@@ -1381,6 +1445,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                 "google_compute_backend_service.run",
                 "google_compute_region_network_endpoint_group.run",
                 "google_cloud_run_v2_service.api",
+                "google_compute_backend_service.compute",
+                "google_compute_network_endpoint_group.web",
+                "google_compute_instance.web",
                 "google_compute_backend_bucket.assets",
                 "google_storage_bucket.assets",
             },
@@ -1415,6 +1482,34 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0]["path"],
+            [
+                "google_compute_global_forwarding_rule.web",
+                "google_compute_target_https_proxy.web",
+                "google_compute_url_map.web",
+                "google_compute_backend_service.compute",
+                "google_compute_network_endpoint_group.web",
+                "google_compute_instance.web",
+            ],
+        )
+        for backend in (
+            backend_service,
+            neg,
+            service,
+            compute_backend_service,
+            compute_neg,
+            instance,
+            backend_bucket,
+            bucket,
+        ):
+            self.assertTrue(
+                backend.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER)
+            )
+            self.assertEqual(
+                backend.get_metadata_field(GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES),
+                ["google_compute_global_forwarding_rule.web"],
+            )
+        self.assertEqual(
             backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0][
                 "forwarding_rule"
             ],
@@ -1432,6 +1527,8 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         )
         self.assertFalse(service.public_exposure)
         self.assertFalse(service.direct_internet_reachable)
+        self.assertFalse(instance.public_exposure)
+        self.assertFalse(instance.direct_internet_reachable)
 
     def test_normalizer_derives_public_cloud_run_exposure_from_invoker_iam(self) -> None:
         inventory = GcpNormalizer().normalize(

@@ -270,6 +270,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS)
 
     @property
+    def fronted_by_internet_facing_load_balancer(self) -> bool:
+        return self.get(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER)
+
+    @property
+    def internet_facing_load_balancer_addresses(self) -> list[str]:
+        return self.get(GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES)
+
+    @property
+    def load_balancer_frontends(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)
+
+    @property
+    def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
+
+    @property
     def iam_role(self) -> str | None:
         return self.get(GcpResourceMetadata.IAM_ROLE)
 

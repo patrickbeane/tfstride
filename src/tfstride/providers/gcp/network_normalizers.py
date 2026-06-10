@@ -316,6 +316,9 @@ def _normalize_network_endpoint_group(resource: TerraformResource) -> Normalized
                     "network_endpoint_type"
                 ),
                 GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS.key: _serverless_neg_endpoints(values),
+                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS.key: _dict_list(
+                    values.get("network_endpoint")
+                ),
             },
         ),
     )
