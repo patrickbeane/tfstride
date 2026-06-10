@@ -26,6 +26,7 @@ class GcpResourceMetadata:
     CLOUD_SQL_SSL_MODE = OptionalStringMetadataField("cloud_sql_ssl_mode")
     IAM_ROLE = OptionalStringMetadataField("iam_role")
     IAM_MEMBER = OptionalStringMetadataField("iam_member")
+    IAM_CONDITION = DictMetadataField("iam_condition")
     CUSTOM_ROLE_ID = OptionalStringMetadataField("custom_role_id")
     CUSTOM_ROLE_STAGE = OptionalStringMetadataField("custom_role_stage")
     ORGANIZATION_ID = OptionalStringMetadataField("organization_id")

@@ -10,6 +10,8 @@ from tfstride.analysis.gcp.iam_access import (
     GCP_KMS_ACCESS_ROLES,
     GCP_SECRET_ACCESS_ROLES,
     assess_gcp_sensitive_iam_member,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
@@ -46,12 +48,17 @@ class GcpSensitiveResourceIamDetectors:
                         continue
                     seen.add(finding_key)
 
+                    condition = binding.get("condition")
                     severity_reasoning = build_severity_reasoning(
                         internet_exposure=assessment.is_public,
-                        privilege_breadth=2 if assessment.is_public or assessment.is_broad else 1,
+                        privilege_breadth=gcp_iam_condition_limited_score(
+                            2 if assessment.is_public or assessment.is_broad else 1, condition, floor=1
+                        ),
                         data_sensitivity=2,
                         lateral_movement=1,
-                        blast_radius=2 if assessment.is_public or assessment.is_broad else 1,
+                        blast_radius=gcp_iam_condition_limited_score(
+                            2 if assessment.is_public or assessment.is_broad else 1, condition, floor=0
+                        ),
                     )
                     affected_resources = dedupe_addresses([resource.address, source])
                     findings.append(
@@ -76,6 +83,7 @@ class GcpSensitiveResourceIamDetectors:
                                     ],
                                 ),
                                 evidence_item("trust_scope", [assessment.scope_description]),
+                                evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                                 evidence_item(
                                     "resource_policy_sources",
                                     resource_facts.iam.resource_policy_source_addresses,

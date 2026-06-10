@@ -10,6 +10,8 @@ from tfstride.analysis.gcp.iam_access import (
     GCP_BIGQUERY_DATA_ACCESS_ROLES,
     GCP_PUBSUB_DATA_ACCESS_ROLES,
     broad_resource_iam_bindings,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
 )
 from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
@@ -30,15 +32,17 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*_PUBSUB_RESOURCE_TYPES):
-            for source, role, member, assessment in broad_resource_iam_bindings(
+            for source, role, member, assessment, condition in broad_resource_iam_bindings(
                 resource, GCP_PUBSUB_DATA_ACCESS_ROLES
             ):
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=assessment.is_public,
-                    privilege_breadth=2 if assessment.is_public else 1,
+                    privilege_breadth=gcp_iam_condition_limited_score(
+                        2 if assessment.is_public else 1, condition, floor=1
+                    ),
                     data_sensitivity=1,
                     lateral_movement=1,
-                    blast_radius=1,
+                    blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -61,6 +65,7 @@ class GcpDataRuleDetectors:
                                 ],
                             ),
                             evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
                                 analysis_facts(resource).iam.resource_policy_source_addresses,
@@ -81,15 +86,19 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*_BIGQUERY_RESOURCE_TYPES):
-            for source, role, member, assessment in broad_resource_iam_bindings(
+            for source, role, member, assessment, condition in broad_resource_iam_bindings(
                 resource, GCP_BIGQUERY_DATA_ACCESS_ROLES
             ):
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=assessment.is_public,
-                    privilege_breadth=2 if assessment.is_public else 1,
+                    privilege_breadth=gcp_iam_condition_limited_score(
+                        2 if assessment.is_public else 1, condition, floor=1
+                    ),
                     data_sensitivity=2,
                     lateral_movement=1,
-                    blast_radius=2 if assessment.is_public else 1,
+                    blast_radius=gcp_iam_condition_limited_score(
+                        2 if assessment.is_public else 1, condition, floor=0
+                    ),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -112,6 +121,7 @@ class GcpDataRuleDetectors:
                                 ],
                             ),
                             evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
                                 analysis_facts(resource).iam.resource_policy_source_addresses,

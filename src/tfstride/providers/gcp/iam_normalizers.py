@@ -25,8 +25,10 @@ def normalize_project_iam_member(resource: TerraformResource) -> NormalizedResou
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -50,8 +52,8 @@ def normalize_project_iam_binding(resource: TerraformResource) -> NormalizedReso
             GcpResourceMetadata.PROJECT.key: values.get("project"),
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -224,8 +226,10 @@ def normalize_service_account_iam_member(resource: TerraformResource) -> Normali
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -250,8 +254,8 @@ def normalize_service_account_iam_binding(resource: TerraformResource) -> Normal
             GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE.key: service_account_reference,
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -293,8 +297,10 @@ def normalize_storage_bucket_iam_member(resource: TerraformResource) -> Normaliz
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -315,8 +321,8 @@ def normalize_storage_bucket_iam_binding(resource: TerraformResource) -> Normali
             GcpResourceMetadata.BUCKET_NAME.key: bucket,
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -531,8 +537,10 @@ def _normalize_scope_iam_member(
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -558,8 +566,8 @@ def _normalize_scope_iam_binding(
             scope_field.key: scope_reference,
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -655,8 +663,10 @@ def _normalize_target_iam_member(
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -683,8 +693,8 @@ def _normalize_target_iam_binding(
             GcpResourceMetadata.PROJECT.key: values.get("project"),
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -726,14 +736,35 @@ def _policy_bindings(policy_document: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         role = first_non_empty(binding.get("role"))
         members = compact(as_list(binding.get("members")))
-        bindings.extend(_iam_bindings(role, members))
+        bindings.extend(_iam_bindings(role, members, condition=binding.get("condition")))
     return bindings
 
 
-def _iam_bindings(role: str | None, members: list[str]) -> list[dict[str, Any]]:
+def _iam_bindings(
+    role: str | None,
+    members: list[str],
+    *,
+    condition: Any = None,
+) -> list[dict[str, Any]]:
     if not role or not members:
         return []
-    return [{"role": role, "members": list(members)}]
+    binding: dict[str, Any] = {"role": role, "members": list(members)}
+    normalized_condition = _condition(condition)
+    if normalized_condition:
+        binding["condition"] = normalized_condition
+    return [binding]
+
+
+def _condition(value: Any) -> dict[str, Any]:
+    if isinstance(value, list):
+        value = value[0] if value and isinstance(value[0], dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): raw_value
+        for key, raw_value in value.items()
+        if raw_value not in (None, "", [])
+    }
 
 
 def _binding_identifier(target: str | None, role: str | None, members: list[str | None]) -> str | None:

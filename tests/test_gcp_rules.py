@@ -189,6 +189,7 @@ def _cloud_run_service(
 def _cloud_run_service_iam_member(
     member: str = "allUsers",
     role: str = "roles/run.invoker",
+    condition: dict[str, object] | None = None,
 ) -> TerraformResource:
     return TerraformResource(
         address="google_cloud_run_v2_service_iam_member.public_invoker",
@@ -201,6 +202,7 @@ def _cloud_run_service_iam_member(
             "location": "us-central1",
             "role": role,
             "member": member,
+            **({"condition": [condition]} if condition else {}),
         },
     )
 
@@ -1922,6 +1924,41 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["public_exposure_reasons"],
             ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+        )
+
+    def test_cloud_run_public_invoker_reports_constraining_iam_condition(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(
+                    condition={
+                        "title": "expires_soon",
+                        'expression': 'request.time < timestamp("2026-07-01T00:00:00Z")',
+                    }
+                ),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertEqual(finding.severity_reasoning.blast_radius, 0)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["iam_condition"],
+            [
+                "category=time_limited",
+                "constraining=true",
+                "title=expires_soon",
+                'expression=request.time < timestamp("2026-07-01T00:00:00Z")',
+            ],
         )
 
     def test_cloud_run_public_invoker_requires_public_ingress_and_public_member(self) -> None:

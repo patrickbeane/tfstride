@@ -236,8 +236,10 @@ def _normalize_serverless_iam_member(
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBER.key: member,
             GcpResourceMetadata.IAM_MEMBERS.key: compact([member]),
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, compact([member])),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(
+                role, compact([member]), condition=values.get("condition")
+            ),
         },
     )
 
@@ -269,8 +271,8 @@ def _normalize_serverless_iam_binding(
             GcpResourceMetadata.REGION.key: first_non_empty(values.get("location"), values.get("region")),
             GcpResourceMetadata.IAM_ROLE.key: role,
             GcpResourceMetadata.IAM_MEMBERS.key: members,
-            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members),
-            "condition": values.get("condition"),
+            GcpResourceMetadata.IAM_CONDITION.key: _condition(values.get("condition")),
+            GcpResourceMetadata.IAM_BINDINGS.key: _iam_bindings(role, members, condition=values.get("condition")),
         },
     )
 
@@ -315,10 +317,19 @@ def _binding_identifier(target_reference: str | None, role: str | None, members:
     return f"{target_reference}:{role}:{','.join(compact_members)}"
 
 
-def _iam_bindings(role: str | None, members: list[str]) -> list[dict[str, object]]:
+def _iam_bindings(
+    role: str | None,
+    members: list[str],
+    *,
+    condition: Any = None,
+) -> list[dict[str, object]]:
     if not role or not members:
         return []
-    return [{"role": role, "members": members}]
+    binding: dict[str, object] = {"role": role, "members": members}
+    normalized_condition = _condition(condition)
+    if normalized_condition:
+        binding["condition"] = normalized_condition
+    return [binding]
 
 
 def _policy_bindings(policy_document: dict[str, Any]) -> list[dict[str, object]]:
@@ -332,8 +343,20 @@ def _policy_bindings(policy_document: dict[str, Any]) -> list[dict[str, object]]
         role = first_non_empty(binding.get("role"))
         members = compact(as_list(binding.get("members")))
         if role and members:
-            normalized.append({"role": role, "members": members})
+            normalized.extend(_iam_bindings(role, members, condition=binding.get("condition")))
     return normalized
+
+
+def _condition(value: Any) -> dict[str, Any]:
+    if isinstance(value, list):
+        value = value[0] if value and isinstance(value[0], dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): raw_value
+        for key, raw_value in value.items()
+        if raw_value not in (None, "", [])
+    }
 
 
 def _has_vpc_attachment(*values: object) -> bool:

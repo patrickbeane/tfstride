@@ -8,6 +8,9 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.gcp.iam_access import (
     assess_gcp_broad_iam_member,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+    iam_binding_condition,
     iam_resource_binding_members,
 )
 from tfstride.analysis.resource_facts import analysis_facts
@@ -40,12 +43,15 @@ class GcpServiceAccountIamDetectors:
                 assessment = assess_gcp_broad_iam_member(member)
                 if assessment is None:
                     continue
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=assessment.is_public,
-                    privilege_breadth=2,
+                    privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=1,
-                    blast_radius=2 if assessment.is_public else 1,
+                    blast_radius=gcp_iam_condition_limited_score(
+                        2 if assessment.is_public else 1, condition, floor=0
+                    ),
                 )
                 affected_resources = dedupe_addresses(
                     [target.address if target else "", binding.address]
@@ -71,6 +77,7 @@ class GcpServiceAccountIamDetectors:
                                 ],
                             ),
                             evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "service_account_reference",
                                 [analysis_facts(binding).iam.service_account_reference or ""],
@@ -98,12 +105,13 @@ class GcpServiceAccountIamDetectors:
                 if role_risk is None:
                     continue
                 broad_assessment = assess_gcp_broad_iam_member(member)
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=bool(broad_assessment and broad_assessment.is_public),
-                    privilege_breadth=2,
+                    privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=2,
-                    blast_radius=2,
+                    blast_radius=gcp_iam_condition_limited_score(2, condition, floor=1),
                 )
                 affected_resources = dedupe_addresses(
                     [target.address if target else "", binding.address]
@@ -129,6 +137,7 @@ class GcpServiceAccountIamDetectors:
                                 ],
                             ),
                             evidence_item("role_risk", [role_risk]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "service_account_reference",
                                 [analysis_facts(binding).iam.service_account_reference or ""],

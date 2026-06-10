@@ -174,6 +174,7 @@ GCP_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
         "CLOUD_SQL_SSL_MODE",
         "IAM_ROLE",
         "IAM_MEMBER",
+        "IAM_CONDITION",
         "CUSTOM_ROLE_ID",
         "CUSTOM_ROLE_STAGE",
         "ORGANIZATION_ID",

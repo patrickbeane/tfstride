@@ -6,6 +6,10 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
+from tfstride.analysis.gcp.iam_access import (
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+)
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
@@ -367,18 +371,19 @@ class GcpComputeRuleDetectors:
             public_invokers = _cloud_run_public_invoker_bindings(service)
             if not service.public_exposure or not public_invokers:
                 continue
+            condition = _public_invoker_condition(public_invokers)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
-                blast_radius=1,
+                blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
             )
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", service.address)
             )
             affected_resources = dedupe_addresses(
-                [service.address, *[source for source, _, _ in public_invokers]]
+                [service.address, *[source for source, _, _, _ in public_invokers]]
             )
             findings.append(
                 self._finding_factory.build(
@@ -396,9 +401,10 @@ class GcpComputeRuleDetectors:
                             "public_invoker_bindings",
                             [
                                 f"source={source}; role={role}; member={member}"
-                                for source, role, member in public_invokers
+                                for source, role, member, _ in public_invokers
                             ],
                         ),
+                        evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         evidence_item("public_access_reasons", service.public_access_reasons),
                         evidence_item("public_exposure_reasons", service.public_exposure_reasons),
                     ),
@@ -420,18 +426,19 @@ class GcpComputeRuleDetectors:
             public_invokers = _cloud_function_public_invoker_bindings(function)
             if not function.public_exposure or not public_invokers:
                 continue
+            condition = _public_invoker_condition(public_invokers)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
-                blast_radius=1,
+                blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
             )
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", function.address)
             )
             affected_resources = dedupe_addresses(
-                [function.address, *[source for source, _, _ in public_invokers]]
+                [function.address, *[source for source, _, _, _ in public_invokers]]
             )
             findings.append(
                 self._finding_factory.build(
@@ -449,9 +456,10 @@ class GcpComputeRuleDetectors:
                             "public_invoker_bindings",
                             [
                                 f"source={source}; role={role}; member={member}"
-                                for source, role, member in public_invokers
+                                for source, role, member, _ in public_invokers
                             ],
                         ),
+                        evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         evidence_item("public_access_reasons", function.public_access_reasons),
                         evidence_item("public_exposure_reasons", function.public_exposure_reasons),
                     ),
@@ -520,19 +528,19 @@ def _public_compute_broad_ingress_rationale(instance: NormalizedResource) -> str
     )
 
 
-def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
+def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str, dict | None]]:
     return _public_invoker_bindings(resource, _CLOUD_RUN_PUBLIC_INVOKER_ROLES)
 
 
-def _cloud_function_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str]]:
+def _cloud_function_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str, dict | None]]:
     return _public_invoker_bindings(resource, _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES)
 
 
 def _public_invoker_bindings(
     resource: NormalizedResource,
     invoker_roles: frozenset[str],
-) -> list[tuple[str, str, str]]:
-    bindings: list[tuple[str, str, str]] = []
+) -> list[tuple[str, str, str, dict | None]]:
+    bindings: list[tuple[str, str, str, dict | None]] = []
     for binding in analysis_facts(resource).iam.bindings:
         role = str(binding.get("role") or "").strip()
         if role not in invoker_roles:
@@ -540,8 +548,22 @@ def _public_invoker_bindings(
         source = str(binding.get("source") or "").strip()
         for member in binding_members(binding):
             if member in PUBLIC_GCP_IAM_MEMBERS:
-                bindings.append((source, role, member))
+                condition = binding.get("condition") if isinstance(binding.get("condition"), dict) else None
+                bindings.append((source, role, member, condition))
     return bindings
+
+
+def _public_invoker_condition(
+    bindings: list[tuple[str, str, str, dict | None]],
+) -> dict | None:
+    matched_condition: dict | None = None
+    for _, _, _, condition in bindings:
+        if not condition:
+            return None
+        if matched_condition is not None and condition != matched_condition:
+            return None
+        matched_condition = condition
+    return matched_condition
 
 
 def _risky_public_firewall_rules(

@@ -24,6 +24,9 @@ from tfstride.analysis.gcp.iam_access import (
     GcpIamMemberAssessment,
     assess_gcp_broad_iam_member,
     assess_gcp_sensitive_iam_member,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+    iam_binding_condition,
     iam_resource_binding_members,
 )
 from tfstride.analysis.gcp.iam_inheritance import (
@@ -139,18 +142,24 @@ class GcpInheritedIamDetectors:
                     seen.add(finding_key)
 
                     member_assessment = _assess_inherited_gcp_iam_member(member, descendant_resources)
+                    condition = iam_binding_condition(binding, role, member)
                     severity_reasoning = build_severity_reasoning(
                         internet_exposure=bool(member_assessment and member_assessment.is_public),
-                        privilege_breadth=_inherited_sensitive_resource_privilege_breadth(
-                            role,
-                            member_assessment,
+                        privilege_breadth=gcp_iam_condition_limited_score(
+                            _inherited_sensitive_resource_privilege_breadth(role, member_assessment),
+                            condition,
+                            floor=1,
                         ),
                         data_sensitivity=max(grant.data_sensitivity for grant in access_grants),
                         lateral_movement=1,
-                        blast_radius=_inherited_sensitive_resource_blast_radius(
-                            scope,
-                            access_grants,
-                            member_assessment,
+                        blast_radius=gcp_iam_condition_limited_score(
+                            _inherited_sensitive_resource_blast_radius(
+                                scope,
+                                access_grants,
+                                member_assessment,
+                            ),
+                            condition,
+                            floor=0,
                         ),
                     )
                     scope_description = _inherited_iam_scope_description(scope)
@@ -191,6 +200,7 @@ class GcpInheritedIamDetectors:
                                     "trust_scope",
                                     [member_assessment.scope_description if member_assessment else ""],
                                 ),
+                                evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                                 evidence_item(
                                     "custom_role_permissions",
                                     custom_role_permissions(role, custom_roles),
@@ -240,15 +250,21 @@ class GcpInheritedIamDetectors:
                         continue
                     seen.add(finding_key)
 
+                    condition = iam_binding_condition(binding, role, member)
                     severity_reasoning = build_severity_reasoning(
                         internet_exposure=bool(member_assessment and member_assessment.is_public),
-                        privilege_breadth=_inherited_iam_blast_radius_privilege_breadth(
-                            role_risk,
-                            member_assessment,
+                        privilege_breadth=gcp_iam_condition_limited_score(
+                            _inherited_iam_blast_radius_privilege_breadth(role_risk, member_assessment),
+                            condition,
+                            floor=1,
                         ),
                         data_sensitivity=_inherited_iam_descendant_data_sensitivity(descendants, role_risk),
                         lateral_movement=2 if role_risk is not None else 1,
-                        blast_radius=_inherited_iam_scope_blast_radius(scope, descendants, member_assessment),
+                        blast_radius=gcp_iam_condition_limited_score(
+                            _inherited_iam_scope_blast_radius(scope, descendants, member_assessment),
+                            condition,
+                            floor=1,
+                        ),
                     )
                     scope_description = _inherited_iam_scope_description(scope)
                     findings.append(
@@ -282,6 +298,7 @@ class GcpInheritedIamDetectors:
                                     "trust_scope",
                                     [member_assessment.scope_description if member_assessment else ""],
                                 ),
+                                evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                                 evidence_item(
                                     "descendant_scope",
                                     _inherited_iam_descendant_scope_evidence(scope, descendants),

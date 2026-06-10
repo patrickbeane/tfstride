@@ -365,13 +365,15 @@ def _derive_sensitive_resource_iam_bindings(
         ):
             continue
         for binding in _iam_bindings(iam_resource):
-            bindings.append(
-                {
-                    "role": str(binding.get("role") or "unknown role"),
-                    "members": binding_members(binding),
-                    "source": iam_resource.address,
-                }
-            )
+            decorated_binding = {
+                "role": str(binding.get("role") or "unknown role"),
+                "members": binding_members(binding),
+                "source": iam_resource.address,
+            }
+            condition = binding.get("condition")
+            if condition:
+                decorated_binding["condition"] = condition
+            bindings.append(decorated_binding)
             source_addresses.append(iam_resource.address)
 
     if bindings:
@@ -465,7 +467,11 @@ def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:
     role = resource.get_metadata_field(GcpResourceMetadata.IAM_ROLE)
     member = resource.get_metadata_field(GcpResourceMetadata.IAM_MEMBER)
     if role and member:
-        return [{"role": role, "members": [member]}]
+        binding: dict[str, Any] = {"role": role, "members": [member]}
+        condition = resource.get_metadata_field(GcpResourceMetadata.IAM_CONDITION)
+        if condition:
+            binding["condition"] = condition
+        return [binding]
     return []
 
 

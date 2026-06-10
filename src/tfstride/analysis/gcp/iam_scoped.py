@@ -8,6 +8,9 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.gcp.custom_roles import build_gcp_custom_role_index, custom_role_permissions
 from tfstride.analysis.gcp.iam_access import (
     assess_gcp_broad_iam_member,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+    iam_binding_condition,
     iam_resource_binding_members,
     org_folder_scope_description,
 )
@@ -38,12 +41,13 @@ class GcpScopedIamDetectors:
             for role, member in iam_resource_binding_members(binding):
                 if member not in PUBLIC_GCP_IAM_MEMBERS:
                     continue
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=True,
                     privilege_breadth=1,
                     data_sensitivity=0,
                     lateral_movement=1,
-                    blast_radius=1,
+                    blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -58,6 +62,7 @@ class GcpScopedIamDetectors:
                         ),
                         evidence=collect_evidence(
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         ),
                         severity_reasoning=severity_reasoning,
                     )
@@ -79,12 +84,13 @@ class GcpScopedIamDetectors:
                 role_risk = privileged_project_role_risk(role, custom_roles)
                 if role_risk is None:
                     continue
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=False,
-                    privilege_breadth=2,
+                    privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=2,
-                    blast_radius=2,
+                    blast_radius=gcp_iam_condition_limited_score(2, condition, floor=1),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -100,6 +106,7 @@ class GcpScopedIamDetectors:
                         evidence=collect_evidence(
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("role_risk", [role_risk]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -122,12 +129,13 @@ class GcpScopedIamDetectors:
                 assessment = assess_gcp_broad_iam_member(member)
                 if assessment is None:
                     continue
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=assessment.is_public,
-                    privilege_breadth=2,
+                    privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=2,
-                    blast_radius=2,
+                    blast_radius=gcp_iam_condition_limited_score(2, condition, floor=1),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -144,6 +152,7 @@ class GcpScopedIamDetectors:
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("scope", [scope]),
                             evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         ),
                         severity_reasoning=severity_reasoning,
                     )
@@ -166,12 +175,13 @@ class GcpScopedIamDetectors:
                 role_risk = privileged_org_folder_role_risk(role, custom_roles)
                 if role_risk is None:
                     continue
+                condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=False,
-                    privilege_breadth=2,
+                    privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=2,
-                    blast_radius=2,
+                    blast_radius=gcp_iam_condition_limited_score(2, condition, floor=1),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -188,6 +198,7 @@ class GcpScopedIamDetectors:
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("scope", [scope]),
                             evidence_item("role_risk", [role_risk]),
+                            evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item("custom_role_permissions", custom_role_permissions(role, custom_roles)),
                         ),
                         severity_reasoning=severity_reasoning,

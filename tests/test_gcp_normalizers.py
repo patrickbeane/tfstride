@@ -796,6 +796,32 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             [{"role": "roles/run.invoker", "members": ["allUsers"]}],
         )
 
+    def test_cloud_run_iam_member_normalizer_preserves_condition(self) -> None:
+        condition = {
+            "title": "expires_soon",
+            "description": "Temporary public launch access",
+            'expression': 'request.time < timestamp("2026-07-01T00:00:00Z")',
+        }
+        normalized = normalize_cloud_run_service_iam_member(
+            _terraform_resource(
+                "google_cloud_run_v2_service_iam_member.public_invoker",
+                "google_cloud_run_v2_service_iam_member",
+                {
+                    "name": "tfstride-api",
+                    "location": "us-central1",
+                    "role": "roles/run.invoker",
+                    "member": "allUsers",
+                    "condition": [condition],
+                },
+            )
+        )
+
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_CONDITION), condition)
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
+            [{"role": "roles/run.invoker", "members": ["allUsers"], "condition": condition}],
+        )
+
     def test_cloudfunctions_function_normalizer_preserves_workload_identity(self) -> None:
         normalized = normalize_cloudfunctions_function(
             _terraform_resource(

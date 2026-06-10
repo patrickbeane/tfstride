@@ -208,6 +208,7 @@ class GcpProviderTests(unittest.TestCase):
                 "INTERNET_INGRESS_FIREWALLS",
                 "IAM_ROLE",
                 "IAM_MEMBER",
+                "IAM_CONDITION",
                 "IAM_MEMBERS",
                 "CUSTOM_ROLE_ID",
                 "CUSTOM_ROLE_PERMISSIONS",
