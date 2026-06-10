@@ -8,6 +8,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     GCP_ORG_POLICY_SCOPE_PROJECT,
     GcpOrgPolicyScopeKey,
 )
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -152,6 +153,41 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
                 constraint="constraints/iam.disableServiceAccountKeyCreation",
             ),
             (effective[1],),
+        )
+
+
+    def test_organization_guardrail_evidence_formats_effective_guardrails(self) -> None:
+        guardrail = _org_policy(
+            "google_org_policy_policy.allowed_domains",
+            constraint="constraints/iam.allowedPolicyMemberDomains",
+            scope_type=GCP_ORG_POLICY_SCOPE_PROJECT,
+            scope="projects/tfstride-demo",
+            allowed_values=["C01abcd"],
+        )
+        binding = _gcp_resource(
+            "google_project_iam_member.public",
+            "google_project_iam_member",
+            ResourceCategory.IAM,
+            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+        )
+
+        evidence = organization_guardrail_evidence(
+            _guardrail_index([guardrail, binding]),
+            binding,
+            "constraints/iam.allowedPolicyMemberDomains",
+        )
+
+        self.assertIsNotNone(evidence)
+        assert evidence is not None
+        self.assertEqual(evidence.key, "organization_guardrails")
+        self.assertEqual(
+            evidence.values,
+            [
+                "constraint=constraints/iam.allowedPolicyMemberDomains; "
+                "scope=project:tfstride-demo; "
+                "source=google_org_policy_policy.allowed_domains; "
+                "allowed_values=C01abcd"
+            ],
         )
 
     def test_child_policy_replaces_parent_when_inheritance_disabled(self) -> None:

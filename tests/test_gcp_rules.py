@@ -10,6 +10,46 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 
 
+def _org_policy_policy(
+    address: str,
+    *,
+    constraint: str,
+    parent: str = "projects/tfstride-demo",
+    enforced: bool | None = None,
+    inherit_from_parent: bool | None = None,
+    restore_default: bool | None = None,
+    allowed_values: list[str] | None = None,
+    denied_values: list[str] | None = None,
+) -> TerraformResource:
+    rule: dict[str, object] = {}
+    if enforced is not None:
+        rule["enforce"] = enforced
+    values: dict[str, object] = {}
+    if allowed_values is not None:
+        values["allowed_values"] = allowed_values
+    if denied_values is not None:
+        values["denied_values"] = denied_values
+    if values:
+        rule["values"] = [values]
+    spec: dict[str, object] = {"rules": [rule]}
+    if inherit_from_parent is not None:
+        spec["inherit_from_parent"] = inherit_from_parent
+    resource_values: dict[str, object] = {
+        "name": f"{parent}/policies/{constraint}",
+        "parent": parent,
+        "spec": [spec],
+    }
+    if restore_default is not None:
+        resource_values["reset"] = restore_default
+    return TerraformResource(
+        address=address,
+        mode="managed",
+        resource_type="google_org_policy_policy",
+        name=address.rsplit(".", 1)[-1],
+        provider_name="registry.terraform.io/hashicorp/google",
+        values=resource_values,
+    )
+
 
 def _compute_network() -> TerraformResource:
     return TerraformResource(
@@ -73,6 +113,7 @@ def _compute_instance(
         provider_name="registry.terraform.io/hashicorp/google",
         values={
             "name": "tfstride-web",
+            "project": "tfstride-demo",
             "machine_type": "e2-medium",
             "zone": "us-central1-a",
             "tags": ["web"],
@@ -533,6 +574,7 @@ def _storage_bucket(
 ) -> TerraformResource:
     values = {
         "name": "tfstride-logs",
+        "project": "tfstride-demo",
         "location": "US",
         "uniform_bucket_level_access": uniform_bucket_level_access,
         "versioning": [{"enabled": versioning_enabled}],
@@ -1165,6 +1207,46 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(evidence["os_login_posture"], ["metadata.enable-oslogin is false"])
 
+    def test_compute_os_login_disabled_includes_organization_guardrail_evidence(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _org_policy_policy(
+                    "google_org_policy_policy.require_os_login",
+                    constraint="constraints/compute.requireOsLogin",
+                    enforced=True,
+                ),
+                TerraformResource(
+                    address="google_compute_instance.app",
+                    mode="managed",
+                    resource_type="google_compute_instance",
+                    name="app",
+                    provider_name="registry.terraform.io/hashicorp/google",
+                    values={
+                        "name": "tfstride-app",
+                        "project": "tfstride-demo",
+                        "metadata": {"enable-oslogin": "false"},
+                    },
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-compute-os-login-disabled"})),
+        )
+
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["organization_guardrails"],
+            [
+                "constraint=constraints/compute.requireOsLogin; "
+                "scope=project:tfstride-demo; "
+                "source=google_org_policy_policy.require_os_login; "
+                "enforced=true"
+            ],
+        )
+
     def test_compute_os_login_enabled_or_unset_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
@@ -1436,6 +1518,37 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(finding.severity.value, "medium")
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(evidence["access_control_posture"], ["public_access_prevention is inherited"])
+
+    def test_gcs_public_access_prevention_finding_includes_organization_guardrail_evidence(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _org_policy_policy(
+                    "google_org_policy_policy.storage_pap",
+                    constraint="constraints/storage.publicAccessPrevention",
+                    enforced=True,
+                ),
+                _storage_bucket(public_access_prevention="inherited"),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
+            ),
+        )
+
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["organization_guardrails"],
+            [
+                "constraint=constraints/storage.publicAccessPrevention; "
+                "scope=project:tfstride-demo; "
+                "source=google_org_policy_policy.storage_pap; "
+                "enforced=true"
+            ],
+        )
 
     def test_gcs_public_access_prevention_enforced_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize([_storage_bucket(public_access_prevention="enforced")])
@@ -2543,6 +2656,36 @@ class GcpRuleTests(unittest.TestCase):
         )
         self.assertEqual(evidence["role_risk"], ["service account token minting and impersonation"])
 
+    def test_service_account_key_hygiene_includes_organization_guardrail_evidence(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _org_policy_policy(
+                    "google_org_policy_policy.disable_sa_keys",
+                    constraint="constraints/iam.disableServiceAccountKeyCreation",
+                    enforced=True,
+                ),
+                _service_account(),
+                _service_account_key(),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-hygiene"})),
+        )
+
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["organization_guardrails"],
+            [
+                "constraint=constraints/iam.disableServiceAccountKeyCreation; "
+                "scope=project:tfstride-demo; "
+                "source=google_org_policy_policy.disable_sa_keys; "
+                "enforced=true"
+            ],
+        )
+
     def test_service_account_key_hygiene_detects_long_lived_key_without_keepers(self) -> None:
         inventory = GcpNormalizer().normalize([_service_account(), _service_account_key()])
 
@@ -2854,6 +2997,34 @@ class GcpRuleTests(unittest.TestCase):
         self.assertIsNone(finding.trust_boundary_id)
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(evidence["iam_binding"], ["member=allUsers", "role=roles/viewer"])
+
+    def test_project_iam_broad_principal_includes_organization_guardrail_evidence(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _org_policy_policy(
+                    "google_org_policy_policy.allowed_domains",
+                    constraint="constraints/iam.allowedPolicyMemberDomains",
+                    allowed_values=["C01abcd"],
+                ),
+                _project_iam_member(
+                    "roles/viewer",
+                    member="allUsers",
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(inventory, [])
+
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["organization_guardrails"],
+            [
+                "constraint=constraints/iam.allowedPolicyMemberDomains; "
+                "scope=project:tfstride-demo; "
+                "source=google_org_policy_policy.allowed_domains; "
+                "allowed_values=C01abcd"
+            ],
+        )
 
     def test_project_iam_binding_broad_principal_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(

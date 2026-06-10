@@ -13,6 +13,10 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+)
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
@@ -87,6 +91,11 @@ class GcpSensitiveResourceIamDetectors:
                                 evidence_item(
                                     "resource_policy_sources",
                                     resource_facts.iam.resource_policy_source_addresses,
+                                ),
+                                organization_guardrail_evidence(
+                                    context.analysis_indexes.gcp_org_policy_guardrails,
+                                    resource,
+                                    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                                 ),
                             ),
                             severity_reasoning=severity_reasoning,

@@ -18,6 +18,10 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+)
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.gcp.constants import (
@@ -63,6 +67,11 @@ class GcpScopedIamDetectors:
                         evidence=collect_evidence(
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
+                            organization_guardrail_evidence(
+                                context.analysis_indexes.gcp_org_policy_guardrails,
+                                binding,
+                                ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+                            ),
                         ),
                         severity_reasoning=severity_reasoning,
                     )
@@ -153,6 +162,11 @@ class GcpScopedIamDetectors:
                             evidence_item("scope", [scope]),
                             evidence_item("trust_scope", [assessment.scope_description]),
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
+                            organization_guardrail_evidence(
+                                context.analysis_indexes.gcp_org_policy_guardrails,
+                                binding,
+                                ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+                            ),
                         ),
                         severity_reasoning=severity_reasoning,
                     )

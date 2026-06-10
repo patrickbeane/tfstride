@@ -10,6 +10,12 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+    ORG_POLICY_REQUIRE_OS_LOGIN,
+    ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
+)
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule, TrustBoundary
@@ -89,6 +95,11 @@ class GcpComputeRuleDetectors:
                         evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            instance,
+                            ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -169,6 +180,11 @@ class GcpComputeRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("os_login_posture", ["metadata.enable-oslogin is false"]),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            instance,
+                            ORG_POLICY_REQUIRE_OS_LOGIN,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -456,6 +472,11 @@ class GcpComputeRuleDetectors:
                         evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         evidence_item("public_access_reasons", service.public_access_reasons),
                         evidence_item("public_exposure_reasons", service.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            service,
+                            ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -511,6 +532,11 @@ class GcpComputeRuleDetectors:
                         evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                         evidence_item("public_access_reasons", function.public_access_reasons),
                         evidence_item("public_exposure_reasons", function.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            function,
+                            ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )

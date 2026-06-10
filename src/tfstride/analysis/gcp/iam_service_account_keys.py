@@ -27,6 +27,10 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
+)
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.iam_service_accounts import (
     high_risk_service_account_role_risk,
     service_account_iam_target,
@@ -150,6 +154,11 @@ class GcpServiceAccountKeyDetectors:
                         evidence_item("key_risk", risks),
                         evidence_item("validity_window", validity_evidence),
                         evidence_item("rotation_control", rotation_evidence),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            target or key,
+                            ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -227,6 +236,11 @@ class GcpServiceAccountKeyDetectors:
                                 _keyed_service_account_grant_evidence(grant)
                                 for grant in grants
                             ],
+                        ),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            target or key,
+                            ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
                         ),
                     ),
                     severity_reasoning=severity_reasoning,

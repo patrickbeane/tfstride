@@ -17,6 +17,13 @@ GCP_ORG_POLICY_SCOPE_FOLDER = "folder"
 GCP_ORG_POLICY_SCOPE_PROJECT = "project"
 
 
+ORG_POLICY_ALLOWED_MEMBER_DOMAINS = "constraints/iam.allowedPolicyMemberDomains"
+ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION = "constraints/iam.disableServiceAccountKeyCreation"
+ORG_POLICY_REQUIRE_OS_LOGIN = "constraints/compute.requireOsLogin"
+ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION = "constraints/storage.publicAccessPrevention"
+ORG_POLICY_VM_EXTERNAL_IP_ACCESS = "constraints/compute.vmExternalIpAccess"
+
+
 @dataclass(frozen=True, slots=True)
 class GcpOrgPolicyScopeKey:
     scope_type: str

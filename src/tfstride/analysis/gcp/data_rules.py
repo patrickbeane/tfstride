@@ -13,6 +13,11 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+    ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+)
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
@@ -166,6 +171,12 @@ class GcpDataRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            bucket,
+                            ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+                            ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -261,6 +272,11 @@ class GcpDataRuleDetectors:
                             ],
                         ),
                         evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
+                        organization_guardrail_evidence(
+                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            bucket,
+                            ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
