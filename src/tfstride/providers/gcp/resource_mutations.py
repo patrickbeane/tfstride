@@ -73,6 +73,12 @@ class GcpResourceMutations:
     def set_public_access_reasons(self, reasons: Sequence[str]) -> None:
         self.resource.public_access_reasons = list(reasons)
 
+    def set_publicly_accessible(self, value: bool) -> None:
+        self.resource.publicly_accessible = value
+
+    def set_storage_encrypted(self, value: bool) -> None:
+        self.resource.storage_encrypted = value
+
     def set_public_exposure(
         self,
         value: bool,

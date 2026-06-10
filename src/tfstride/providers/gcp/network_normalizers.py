@@ -5,6 +5,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
 
 
@@ -440,7 +441,7 @@ def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResourc
         if public_access_configured
         else []
     )
-    return NormalizedResource(
+    normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
         resource_type=resource.resource_type,
@@ -470,12 +471,17 @@ def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResourc
             "port_range": values.get("port_range"),
             "all_ports": as_bool(values.get("all_ports", False)),
             "allow_global_access": as_bool(values.get("allow_global_access", False)),
-            "direct_internet_reachable": public_access_configured,
-            "internet_ingress_capable": public_access_configured,
-            "public_access_reasons": public_reasons,
-            "public_exposure_reasons": public_reasons,
         },
     )
+    mutations = gcp_mutations(normalized)
+    mutations.set_public_access(configured=public_access_configured, reasons=public_reasons)
+    mutations.set_public_endpoint_posture(
+        direct_internet_reachable=public_access_configured,
+        internet_ingress_capable=public_access_configured,
+        internet_ingress_reasons=public_reasons,
+    )
+    mutations.set_public_exposure(public_access_configured, reasons=public_reasons)
+    return normalized
 
 
 def parse_firewall_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:

@@ -8,13 +8,19 @@ from tfstride.providers.aws.policy_documents import (
     condition_entry,
     lambda_permission_principal_entries,
 )
+from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import ecs_task_definition_identifier
 
 
 def normalize_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     public_ip_requested = bool(values.get("associate_public_ip_address", False))
-    return NormalizedResource(
+    public_access_reasons = (
+        ["instance requests an associated public IP address"]
+        if public_ip_requested
+        else []
+    )
+    normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
@@ -30,15 +36,13 @@ def normalize_instance(resource: TerraformResource) -> NormalizedResource:
             "instance_type": values.get("instance_type"),
             "associate_public_ip_address": public_ip_requested,
             "iam_instance_profile": values.get("iam_instance_profile"),
-            "public_access_reasons": (
-                ["instance requests an associated public IP address"]
-                if public_ip_requested
-                else []
-            ),
-            "public_exposure_reasons": [],
             "tags": values.get("tags", {}),
         },
     )
+    mutations = aws_mutations(normalized)
+    mutations.set_public_access_reasons(public_access_reasons)
+    mutations.set_public_exposure_reasons([])
+    return normalized
 
 
 def normalize_ecs_cluster(resource: TerraformResource) -> NormalizedResource:
@@ -85,7 +89,8 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     network_configuration = first_item(values.get("network_configuration"))
     assign_public_ip = as_bool(network_configuration.get("assign_public_ip")) if network_configuration else False
-    return NormalizedResource(
+    public_access_reasons = ["ECS service assigns public IPs to tasks"] if assign_public_ip else []
+    normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
@@ -104,14 +109,12 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
             "platform_version": values.get("platform_version"),
             "assign_public_ip": assign_public_ip,
             "load_balancers": as_list(values.get("load_balancer")),
-            "public_access_reasons": (
-                ["ECS service assigns public IPs to tasks"]
-                if assign_public_ip
-                else []
-            ),
-            "public_exposure_reasons": [],
         },
     )
+    mutations = aws_mutations(normalized)
+    mutations.set_public_access_reasons(public_access_reasons)
+    mutations.set_public_exposure_reasons([])
+    return normalized
 
 
 def normalize_lambda_function(resource: TerraformResource) -> NormalizedResource:

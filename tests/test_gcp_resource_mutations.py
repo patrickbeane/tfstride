@@ -76,6 +76,8 @@ class GcpResourceMutationsTests(unittest.TestCase):
             firewall_addresses=["google_compute_firewall.web"],
         )
         mutations.set_public_access(configured=True, reasons=["public IAM grant"])
+        mutations.set_publicly_accessible(True)
+        mutations.set_storage_encrypted(True)
         mutations.set_public_exposure(True, reasons=["public IAM grant"])
 
         self.assertTrue(resource.internet_ingress_capable)
@@ -89,6 +91,8 @@ class GcpResourceMutationsTests(unittest.TestCase):
         )
         self.assertTrue(resource.public_access_configured)
         self.assertEqual(resource.public_access_reasons, ["public IAM grant"])
+        self.assertTrue(resource.publicly_accessible)
+        self.assertTrue(resource.storage_encrypted)
         self.assertTrue(resource.public_exposure)
         self.assertTrue(resource.direct_internet_reachable)
         self.assertEqual(resource.public_exposure_reasons, ["public IAM grant"])

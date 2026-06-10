@@ -4,6 +4,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.aws.coercion import as_list
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import load_json_document, parse_policy_statements
+from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
 from tfstride.resource_helpers import policy_allows_public_access
 
@@ -11,7 +12,12 @@ from tfstride.resource_helpers import policy_allows_public_access
 def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     publicly_accessible = bool(values.get("publicly_accessible", False))
-    return NormalizedResource(
+    public_access_reasons = (
+        ["database instance is marked publicly_accessible"]
+        if publicly_accessible
+        else []
+    )
+    normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
@@ -24,17 +30,15 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         metadata={
             "engine": values.get("engine"),
-            "publicly_accessible": publicly_accessible,
-            "public_access_reasons": (
-                ["database instance is marked publicly_accessible"]
-                if publicly_accessible
-                else []
-            ),
-            "public_exposure_reasons": [],
-            "storage_encrypted": bool(values.get("storage_encrypted", False)),
             "db_subnet_group_name": values.get("db_subnet_group_name"),
         },
     )
+    mutations = aws_mutations(normalized)
+    mutations.set_publicly_accessible(publicly_accessible)
+    mutations.set_public_access_reasons(public_access_reasons)
+    mutations.set_public_exposure_reasons([])
+    mutations.set_storage_encrypted(bool(values.get("storage_encrypted", False)))
+    return normalized
 
 
 def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
@@ -43,7 +47,8 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
     bucket_acl = values.get("acl", "")
     public_policy = policy_allows_public_access(policy_document)
     public_access_configured = bucket_acl in {"public-read", "public-read-write", "website"} or public_policy
-    return NormalizedResource(
+    public_reasons = bucket_public_exposure_reasons(bucket_acl, public_policy=public_policy)
+    normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
@@ -59,16 +64,12 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
             "bucket": values.get("bucket"),
             "acl": bucket_acl,
             "policy_document": policy_document,
-            "public_access_reasons": bucket_public_exposure_reasons(
-                bucket_acl,
-                public_policy=public_policy,
-            ),
-            "public_exposure_reasons": bucket_public_exposure_reasons(
-                bucket_acl,
-                public_policy=public_policy,
-            ),
         },
     )
+    mutations = aws_mutations(normalized)
+    mutations.set_public_access_reasons(public_reasons)
+    mutations.set_public_exposure_reasons(public_reasons)
+    return normalized
 
 
 def normalize_s3_bucket_policy(resource: TerraformResource) -> NormalizedResource:

@@ -46,6 +46,17 @@ _NORMALIZED_RESOURCE_WRITE_FACADES = frozenset(
 )
 _NORMALIZED_RESOURCE_DIRECT_WRITE_EXCEPTIONS = frozenset()
 
+_PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS = frozenset(
+    {
+        "direct_internet_reachable",
+        "internet_ingress_capable",
+        "publicly_accessible",
+        "storage_encrypted",
+        "public_access_reasons",
+        "public_exposure_reasons",
+    }
+)
+
 
 def _metadata_field_names(namespace: type) -> set[str]:
     return {
@@ -145,6 +156,23 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
         self.assertTrue(any("Provider packages own provider-specific facts" in item for item in guidelines))
         self.assertTrue(any("Do not add new provider-specific convenience accessors" in item for item in guidelines))
+
+
+    def test_provider_normalizers_do_not_write_shared_posture_metadata_as_raw_keys(self) -> None:
+        raw_writes: set[tuple[str, str]] = set()
+
+        for provider_root in sorted((_SOURCE_ROOT / "providers").iterdir()):
+            if not provider_root.is_dir():
+                continue
+            for path in sorted(provider_root.glob("*_normalizers.py")):
+                relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    stripped = line.strip()
+                    for key in _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS:
+                        if f'"{key}":' in stripped:
+                            raw_writes.add((relative_path, stripped))
+
+        self.assertEqual(raw_writes, set())
 
     def test_normalized_resource_write_paths_are_centralized(self) -> None:
         direct_writes: set[tuple[str, str]] = set()

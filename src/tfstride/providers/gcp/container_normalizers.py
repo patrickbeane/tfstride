@@ -56,8 +56,6 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
             "master_authorized_networks_config": authorized_networks_config or {},
             "workload_identity_config": workload_identity_config,
             "remove_default_node_pool": as_bool(values.get("remove_default_node_pool", False)),
-            "public_access_reasons": public_access_reasons,
-            "public_exposure_reasons": public_exposure_reasons,
         },
     )
     normalized = NormalizedResource(
@@ -73,11 +71,14 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         public_exposure=public_exposure,
         metadata=metadata,
     )
-    gcp_mutations(normalized).set_public_endpoint_posture(
+    mutations = gcp_mutations(normalized)
+    mutations.set_public_access(configured=public_endpoint, reasons=public_access_reasons)
+    mutations.set_public_endpoint_posture(
         direct_internet_reachable=public_exposure,
         internet_ingress_capable=public_endpoint,
         internet_ingress_reasons=public_exposure_reasons,
     )
+    mutations.set_public_exposure(public_exposure, reasons=public_exposure_reasons)
     return normalized
 
 

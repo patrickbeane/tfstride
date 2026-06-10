@@ -5,6 +5,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, compact
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import (
     has_external_access_config,
@@ -36,12 +37,10 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
         GcpResourceMetadata.LABELS.key: values.get("labels") or {},
         "metadata": instance_metadata,
         "can_ip_forward": bool(values.get("can_ip_forward", False)),
-        "public_access_reasons": public_access_reasons,
-        "public_exposure_reasons": [],
     }
     if os_login_enabled is not None:
         metadata[GcpResourceMetadata.OS_LOGIN_ENABLED.key] = os_login_enabled
-    return NormalizedResource(
+    normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
         resource_type=resource.resource_type,
@@ -52,6 +51,11 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
         public_access_configured=public_access_configured,
         metadata=metadata,
     )
+    gcp_mutations(normalized).set_public_access(
+        configured=public_access_configured,
+        reasons=public_access_reasons,
+    )
+    return normalized
 
 
 def _os_login_enabled(metadata: dict[str, Any]) -> bool | None:

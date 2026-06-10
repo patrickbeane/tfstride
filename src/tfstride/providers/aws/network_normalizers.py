@@ -4,6 +4,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
+from tfstride.providers.aws.resource_mutations import aws_mutations
 
 
 AWS_PROVIDER = "aws"
@@ -137,7 +138,12 @@ def normalize_nat_gateway(resource: TerraformResource) -> NormalizedResource:
 def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     internet_facing = not bool(values.get("internal", False))
-    return NormalizedResource(
+    public_access_reasons = (
+        ["load balancer is configured as internet-facing"]
+        if internet_facing
+        else []
+    )
+    normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
@@ -151,14 +157,12 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         metadata={
             "internal": not internet_facing,
             "load_balancer_type": values.get("load_balancer_type"),
-            "public_access_reasons": (
-                ["load balancer is configured as internet-facing"]
-                if internet_facing
-                else []
-            ),
-            "public_exposure_reasons": [],
         },
     )
+    mutations = aws_mutations(normalized)
+    mutations.set_public_access_reasons(public_access_reasons)
+    mutations.set_public_exposure_reasons([])
+    return normalized
 
 
 def parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:

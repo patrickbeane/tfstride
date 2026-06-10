@@ -6,6 +6,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.gcp.coercion import as_bool, as_list, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     first_non_empty,
     resource_identifier,
@@ -191,12 +192,10 @@ def _serverless_workload(
         GcpResourceMetadata.SERVICE_ACCOUNTS.key: _service_account_entries(service_account_email),
         GcpResourceMetadata.LABELS.key: values.get("labels") or {},
         "vpc_enabled": vpc_enabled,
-        "public_access_reasons": public_access_reasons,
-        "public_exposure_reasons": [],
         "provider_managed_egress": True,
     }
     metadata.update(extra_metadata)
-    return NormalizedResource(
+    normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
         resource_type=resource.resource_type,
@@ -206,6 +205,11 @@ def _serverless_workload(
         public_access_configured=public_access_configured,
         metadata=metadata,
     )
+    gcp_mutations(normalized).set_public_access(
+        configured=public_access_configured,
+        reasons=public_access_reasons,
+    )
+    return normalized
 
 
 def _normalize_serverless_iam_member(
