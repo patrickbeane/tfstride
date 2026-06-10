@@ -46,6 +46,10 @@ class AnalysisStorageFacts:
     def default_kms_key_name(self) -> str | None:
         return self._facts.gcs_default_kms_key_name
 
+    @property
+    def customer_managed_encryption(self) -> bool | None:
+        return self._facts.customer_managed_encryption
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIamFacts:

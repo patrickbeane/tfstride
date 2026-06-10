@@ -38,6 +38,10 @@ class ProviderStorageFacts(Protocol):
     def gcs_default_kms_key_name(self) -> str | None:
         raise NotImplementedError
 
+    @property
+    def customer_managed_encryption(self) -> bool | None:
+        raise NotImplementedError
+
 
 class ProviderIamFacts(Protocol):
     """IAM, policy, hierarchy, and identity facts from provider adapters."""
@@ -294,6 +298,10 @@ class NeutralProviderResourceFacts:
 
     @property
     def gcs_default_kms_key_name(self) -> str | None:
+        return None
+
+    @property
+    def customer_managed_encryption(self) -> bool | None:
         return None
 
     @property

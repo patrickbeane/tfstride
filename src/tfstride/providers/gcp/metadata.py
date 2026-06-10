@@ -113,6 +113,7 @@ class GcpResourceMetadata:
     GKE_PRIVATE_NODES_ENABLED = BoolMetadataField("gke_private_nodes_enabled")
     GKE_WORKLOAD_IDENTITY_ENABLED = BoolMetadataField("gke_workload_identity_enabled")
     GKE_LEGACY_METADATA_ENDPOINTS_ENABLED = BoolMetadataField("gke_legacy_metadata_endpoints_enabled")
+    CUSTOMER_MANAGED_ENCRYPTION = BoolMetadataField("customer_managed_encryption")
     FIREWALL_DISABLED = BoolMetadataField("firewall_disabled")
     FIREWALL_POLICY_DISABLED = BoolMetadataField("firewall_policy_disabled")
     FIREWALL_POLICY_ENABLE_LOGGING = BoolMetadataField("firewall_policy_enable_logging")

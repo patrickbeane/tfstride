@@ -55,6 +55,10 @@ class AwsResourceFacts:
         return None
 
     @property
+    def customer_managed_encryption(self) -> bool | None:
+        return None
+
+    @property
     def project(self) -> str | None:
         return None
 

@@ -725,6 +725,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.GCS_VERSIONING_ENABLED))
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION), {})
         self.assertIsNone(normalized.get_metadata_field(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME))
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION))
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION), {})
         self.assertTrue(normalized.storage_encrypted)
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
@@ -800,7 +801,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         )
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
         self.assertTrue(normalized.storage_encrypted)
-        self.assertTrue(normalized.metadata_snapshot()["customer_managed_encryption"])
+        self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION))
 
     def test_pubsub_subscription_normalizer_preserves_topic_reference(self) -> None:
         normalized = normalize_pubsub_subscription(
@@ -857,12 +858,14 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         )
 
         self.assertEqual(dataset.category, ResourceCategory.DATA)
+        self.assertTrue(dataset.get_metadata_field(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION))
         self.assertEqual(dataset.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID), "tfstride_analytics")
         self.assertEqual(
             dataset.get_metadata_field(GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME),
             "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/bq",
         )
         self.assertEqual(table.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_ID), "events")
+        self.assertFalse(table.get_metadata_field(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION))
         self.assertEqual(
             table.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID),
             "google_bigquery_dataset.analytics.dataset_id",

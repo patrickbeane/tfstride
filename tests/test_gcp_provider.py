@@ -273,6 +273,7 @@ class GcpProviderTests(unittest.TestCase):
                 "ORG_POLICY_RULES",
                 "BUCKET_NAME",
                 "GCS_DEFAULT_KMS_KEY_NAME",
+                "CUSTOMER_MANAGED_ENCRYPTION",
                 "GCS_VERSIONING_ENABLED",
                 "GCS_VERSIONING_CONFIGURATION",
                 "GCS_ENCRYPTION_CONFIGURATION",

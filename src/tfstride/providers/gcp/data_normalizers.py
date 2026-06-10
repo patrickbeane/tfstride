@@ -40,7 +40,7 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
                 "location": values.get("location"),
                 "storage_class": values.get("storage_class"),
                 "force_destroy": as_bool(values.get("force_destroy")),
-                "customer_managed_encryption": bool(default_kms_key_name),
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
     )
@@ -103,7 +103,7 @@ def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
                 "message_retention_duration": values.get("message_retention_duration"),
                 "message_storage_policy": as_list(values.get("message_storage_policy")),
                 "schema_settings": as_list(values.get("schema_settings")),
-                "customer_managed_encryption": bool(kms_key_name),
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(kms_key_name),
             },
         )
     )
@@ -172,7 +172,7 @@ def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResourc
                 "location": values.get("location"),
                 "max_time_travel_hours": values.get("max_time_travel_hours"),
                 "storage_billing_model": values.get("storage_billing_model"),
-                "customer_managed_encryption": bool(default_kms_key_name),
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
     )
@@ -211,7 +211,7 @@ def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
                 "schema": values.get("schema"),
                 "time_partitioning": as_list(values.get("time_partitioning")),
                 "view": as_list(values.get("view")),
-                "customer_managed_encryption": bool(default_kms_key_name),
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
     )

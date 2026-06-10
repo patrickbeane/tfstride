@@ -64,6 +64,7 @@ _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS = frozenset(
         "priority",
     }
 )
+_GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS = frozenset({"customer_managed_encryption"})
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
@@ -149,6 +150,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("GKE_NODE_OAUTH_SCOPES", gcp_owned)
         self.assertIn("FIREWALL_DIRECTION", gcp_owned)
         self.assertIn("FIREWALL_POLICY_ENABLE_LOGGING", gcp_owned)
+        self.assertIn("CUSTOMER_MANAGED_ENCRYPTION", gcp_owned)
         self.assertIn("BUCKET_NAME", contract.transitional_fields)
         self.assertIn("POLICY_DOCUMENT", contract.transitional_fields)
         self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", contract.transitional_fields)
@@ -191,6 +193,19 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             for key in _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS:
+                if f'"{key}":' in stripped:
+                    raw_writes.add((relative_path, stripped))
+
+        self.assertEqual(raw_writes, set())
+
+    def test_gcp_data_normalizers_do_not_write_encryption_posture_as_raw_keys(self) -> None:
+        raw_writes: set[tuple[str, str]] = set()
+        path = _SOURCE_ROOT / "providers" / "gcp" / "data_normalizers.py"
+        relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            for key in _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS:
                 if f'"{key}":' in stripped:
                     raw_writes.add((relative_path, stripped))
 

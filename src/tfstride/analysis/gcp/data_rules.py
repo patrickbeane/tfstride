@@ -350,7 +350,7 @@ class GcpDataRuleDetectors:
             bucket_facts = analysis_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
-            if bucket_facts.storage.default_kms_key_name:
+            if bucket_facts.storage.customer_managed_encryption:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -375,7 +375,10 @@ class GcpDataRuleDetectors:
                             "encryption_posture",
                             [
                                 "default_kms_key_name is unset",
-                                "customer_managed_encryption is false",
+                                (
+                                    "customer_managed_encryption is "
+                                    f"{_bool_status(bucket_facts.storage.customer_managed_encryption)}"
+                                ),
                             ],
                         ),
                     ),

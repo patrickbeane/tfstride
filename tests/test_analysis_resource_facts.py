@@ -60,6 +60,10 @@ class FakeProviderFacts:
         return "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
 
     @property
+    def customer_managed_encryption(self) -> bool | None:
+        return True
+
+    @property
     def policy_document(self) -> dict[str, Any]:
         return {"Statement": [{"Effect": "Allow"}]}
 
@@ -228,6 +232,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.storage.public_access_prevention)
         self.assertIsNone(facts.storage.versioning_enabled)
         self.assertIsNone(facts.storage.default_kms_key_name)
+        self.assertIsNone(facts.storage.customer_managed_encryption)
         self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
         self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.sql.engine, "postgres")
@@ -291,6 +296,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.storage.public_access_prevention)
         self.assertIsNone(facts.storage.versioning_enabled)
         self.assertIsNone(facts.storage.default_kms_key_name)
+        self.assertIsNone(facts.storage.customer_managed_encryption)
         self.assertEqual(facts.iam.policy_document, {})
         self.assertEqual(facts.iam.trust_statements, [])
         self.assertIsNone(facts.sql.engine)
@@ -333,6 +339,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME.key: (
                     "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
                 ),
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: True,
             },
             provider="gcp",
             resource_type="google_storage_bucket",
@@ -348,6 +355,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             facts.storage.default_kms_key_name,
             "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
         )
+        self.assertTrue(facts.storage.customer_managed_encryption)
 
     def test_gcp_sensitive_resource_facts_read_provider_owned_iam_metadata(self) -> None:
         resource = _resource(

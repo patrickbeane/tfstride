@@ -101,6 +101,15 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
 
     @property
+    def customer_managed_encryption(self) -> bool | None:
+        value = self.optional_bool(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION)
+        if value is not None:
+            return value
+        if self.gcs_default_kms_key_name:
+            return True
+        return None
+
+    @property
     def resource_policy_source_addresses(self) -> list[str]:
         return self.get(GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 
