@@ -137,6 +137,10 @@ class GcpProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type("google_organization_iam_member"))
         self.assertTrue(plugin.supports_resource_type("google_organization_iam_binding"))
         self.assertTrue(plugin.supports_resource_type("google_organization_iam_policy"))
+        self.assertTrue(plugin.supports_resource_type("google_org_policy_policy"))
+        self.assertTrue(plugin.supports_resource_type("google_organization_policy"))
+        self.assertTrue(plugin.supports_resource_type("google_folder_organization_policy"))
+        self.assertTrue(plugin.supports_resource_type("google_project_organization_policy"))
         self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
         self.assertTrue(plugin.supports_resource_type("google_project_iam_binding"))
         self.assertTrue(plugin.supports_resource_type("google_project_iam_custom_role"))
@@ -242,7 +246,16 @@ class GcpProviderTests(unittest.TestCase):
                 "CUSTOM_ROLE_STAGE",
                 "ORGANIZATION_ID",
                 "FOLDER_ID",
+                "ORG_POLICY_CONSTRAINT",
+                "ORG_POLICY_SCOPE",
+                "ORG_POLICY_SCOPE_TYPE",
                 "IAM_BINDINGS",
+                "ORG_POLICY_ENFORCED",
+                "ORG_POLICY_INHERIT_FROM_PARENT",
+                "ORG_POLICY_RESTORE_DEFAULT",
+                "ORG_POLICY_ALLOWED_VALUES",
+                "ORG_POLICY_DENIED_VALUES",
+                "ORG_POLICY_RULES",
                 "BUCKET_NAME",
                 "GCS_DEFAULT_KMS_KEY_NAME",
                 "GCS_VERSIONING_ENABLED",

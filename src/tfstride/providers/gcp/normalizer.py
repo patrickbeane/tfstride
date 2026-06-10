@@ -103,6 +103,12 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_target_https_proxy,
     normalize_compute_url_map,
 )
+from tfstride.providers.gcp.org_policy_normalizers import (
+    normalize_folder_organization_policy,
+    normalize_org_policy_policy,
+    normalize_organization_policy,
+    normalize_project_organization_policy,
+)
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.resource_metadata import InventoryMetadata
 
@@ -170,6 +176,10 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "google_organization_iam_custom_role": normalize_organization_iam_custom_role,
     "google_organization_iam_member": normalize_organization_iam_member,
     "google_organization_iam_policy": normalize_organization_iam_policy,
+    "google_folder_organization_policy": normalize_folder_organization_policy,
+    "google_org_policy_policy": normalize_org_policy_policy,
+    "google_organization_policy": normalize_organization_policy,
+    "google_project_organization_policy": normalize_project_organization_policy,
     "google_project_iam_binding": normalize_project_iam_binding,
     "google_project_iam_custom_role": normalize_project_iam_custom_role,
     "google_project_iam_member": normalize_project_iam_member,

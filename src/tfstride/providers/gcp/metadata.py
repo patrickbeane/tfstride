@@ -31,6 +31,9 @@ class GcpResourceMetadata:
     CUSTOM_ROLE_STAGE = OptionalStringMetadataField("custom_role_stage")
     ORGANIZATION_ID = OptionalStringMetadataField("organization_id")
     FOLDER_ID = OptionalStringMetadataField("folder_id")
+    ORG_POLICY_CONSTRAINT = OptionalStringMetadataField("org_policy_constraint")
+    ORG_POLICY_SCOPE = OptionalStringMetadataField("org_policy_scope")
+    ORG_POLICY_SCOPE_TYPE = OptionalStringMetadataField("org_policy_scope_type")
     BUCKET_NAME = OptionalStringMetadataField("bucket")
     SERVICE_ACCOUNT_ACCOUNT_ID = OptionalStringMetadataField("service_account_account_id")
     SERVICE_ACCOUNT_EMAIL = OptionalStringMetadataField("service_account_email")
@@ -102,6 +105,9 @@ class GcpResourceMetadata:
     FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField(
         "fronted_by_internet_facing_load_balancer"
     )
+    ORG_POLICY_ENFORCED = BoolMetadataField("org_policy_enforced")
+    ORG_POLICY_INHERIT_FROM_PARENT = BoolMetadataField("org_policy_inherit_from_parent")
+    ORG_POLICY_RESTORE_DEFAULT = BoolMetadataField("org_policy_restore_default")
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
     IAM_MEMBERS = StringListMetadataField("iam_members")
@@ -122,6 +128,8 @@ class GcpResourceMetadata:
         "internet_facing_load_balancer_addresses"
     )
     GKE_NODE_OAUTH_SCOPES = StringListMetadataField("gke_node_oauth_scopes")
+    ORG_POLICY_ALLOWED_VALUES = StringListMetadataField("org_policy_allowed_values")
+    ORG_POLICY_DENIED_VALUES = StringListMetadataField("org_policy_denied_values")
 
     FIREWALL_ALLOW = DictListMetadataField("allow")
     FIREWALL_DENY = DictListMetadataField("deny")
@@ -133,6 +141,7 @@ class GcpResourceMetadata:
     LOAD_BALANCER_NETWORK_ENDPOINTS = DictListMetadataField("load_balancer_network_endpoints")
     LOAD_BALANCER_FRONTENDS = DictListMetadataField("load_balancer_frontends")
     LOAD_BALANCER_REACHABLE_BACKENDS = DictListMetadataField("load_balancer_reachable_backends")
+    ORG_POLICY_RULES = DictListMetadataField("org_policy_rules")
     GKE_MASTER_AUTHORIZED_NETWORKS = DictListMetadataField("gke_master_authorized_networks")
     CLOUD_SQL_AUTHORIZED_NETWORKS = DictListMetadataField("cloud_sql_authorized_networks")
     CLOUD_SQL_BACKUP_CONFIGURATION = DictMetadataField("cloud_sql_backup_configuration")
