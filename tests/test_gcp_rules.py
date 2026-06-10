@@ -5,9 +5,16 @@ import unittest
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
-from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
+from tfstride.models import (
+    NormalizedResource,
+    ResourceCategory,
+    ResourceInventory,
+    SecurityGroupRule,
+    TerraformResource,
+)
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 
 
 def _org_policy_policy(
@@ -894,6 +901,9 @@ def _normalized_gcp_resource(
     category: ResourceCategory,
     *,
     identifier: str | None = None,
+    vpc_id: str | None = None,
+    network_rules: list[SecurityGroupRule] | None = None,
+    public_access_configured: bool = False,
     data_sensitivity: str = "standard",
     metadata: dict[str, object] | None = None,
 ) -> NormalizedResource:
@@ -904,6 +914,9 @@ def _normalized_gcp_resource(
         name=address.rsplit(".", 1)[-1],
         category=category,
         identifier=identifier,
+        vpc_id=vpc_id,
+        network_rules=network_rules or [],
+        public_access_configured=public_access_configured,
         data_sensitivity=data_sensitivity,
         metadata=metadata,
     )
@@ -1197,6 +1210,115 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["internet_ingress_reasons"],
             ["google_compute_firewall_policy_rule.public_admin ingress tcp 22 from 0.0.0.0/0"],
+        )
+
+    def test_hierarchical_firewall_policy_org_and_folder_admin_ingress_produce_findings(self) -> None:
+        org_rule = _normalized_gcp_resource(
+            "google_compute_firewall_policy_rule.org_admin",
+            "google_compute_firewall_policy_rule",
+            ResourceCategory.NETWORK,
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=22,
+                    to_port=22,
+                    cidr_blocks=["0.0.0.0/0"],
+                )
+            ],
+            metadata={
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "org-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: "allow",
+                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: "ingress",
+            },
+        )
+        org_association = _normalized_gcp_resource(
+            "google_compute_firewall_policy_association.organization",
+            "google_compute_firewall_policy_association",
+            ResourceCategory.NETWORK,
+            metadata={
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "org-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: "organizations/1234567890",
+            },
+        )
+        org_instance = _normalized_gcp_resource(
+            "google_compute_instance.org_web",
+            "google_compute_instance",
+            ResourceCategory.COMPUTE,
+            public_access_configured=True,
+            metadata={GcpResourceMetadata.ORGANIZATION_ID.key: "1234567890"},
+        )
+        folder_rule = _normalized_gcp_resource(
+            "google_compute_firewall_policy_rule.folder_admin",
+            "google_compute_firewall_policy_rule",
+            ResourceCategory.NETWORK,
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=3389,
+                    to_port=3389,
+                    cidr_blocks=["0.0.0.0/0"],
+                )
+            ],
+            metadata={
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "folder-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: "allow",
+                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: "ingress",
+            },
+        )
+        folder_association = _normalized_gcp_resource(
+            "google_compute_firewall_policy_association.folder",
+            "google_compute_firewall_policy_association",
+            ResourceCategory.NETWORK,
+            metadata={
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "folder-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: "folders/12345",
+            },
+        )
+        folder_instance = _normalized_gcp_resource(
+            "google_compute_instance.folder_web",
+            "google_compute_instance",
+            ResourceCategory.COMPUTE,
+            public_access_configured=True,
+            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+        )
+        resources = [
+            org_rule,
+            org_association,
+            org_instance,
+            folder_rule,
+            folder_association,
+            folder_instance,
+        ]
+        GcpResourceDecorator().decorate(resources)
+        inventory = ResourceInventory(provider="gcp", resources=resources)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-compute-broad-ingress"})),
+        )
+
+        self.assertEqual(
+            [finding.affected_resources for finding in findings],
+            [
+                ["google_compute_instance.org_web", "google_compute_firewall_policy_rule.org_admin"],
+                ["google_compute_instance.folder_web", "google_compute_firewall_policy_rule.folder_admin"],
+            ],
+        )
+        evidence_by_instance = {finding.affected_resources[0]: finding.evidence for finding in findings}
+        org_evidence = {item.key: item.values for item in evidence_by_instance["google_compute_instance.org_web"]}
+        folder_evidence = {
+            item.key: item.values for item in evidence_by_instance["google_compute_instance.folder_web"]
+        }
+        self.assertEqual(
+            org_evidence["firewall_rules"],
+            ["google_compute_firewall_policy_rule.org_admin ingress tcp 22 from 0.0.0.0/0"],
+        )
+        self.assertEqual(
+            folder_evidence["firewall_rules"],
+            ["google_compute_firewall_policy_rule.folder_admin ingress tcp 3389 from 0.0.0.0/0"],
         )
 
     def test_private_compute_broad_admin_firewall_is_still_detected(self) -> None:

@@ -2247,6 +2247,97 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(instance.internet_ingress_reasons, [])
         self.assertFalse(instance.public_exposure)
 
+    def test_normalizer_ignores_disabled_egress_and_non_public_firewall_policy_rules(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_network.main",
+                    "google_compute_network",
+                    {"name": "tfstride-main"},
+                ),
+                _terraform_resource(
+                    "google_compute_firewall_policy_association.project",
+                    "google_compute_firewall_policy_association",
+                    {
+                        "name": "tfstride-project-policy",
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "attachment_target": "projects/tfstride-demo",
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_firewall_policy_rule.disabled_admin",
+                    "google_compute_firewall_policy_rule",
+                    {
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "priority": 1000,
+                        "action": "allow",
+                        "direction": "INGRESS",
+                        "disabled": True,
+                        "match": [
+                            {
+                                "src_ip_ranges": ["0.0.0.0/0"],
+                                "layer4_configs": [{"ip_protocol": "tcp", "ports": ["22"]}],
+                            }
+                        ],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_firewall_policy_rule.egress_admin",
+                    "google_compute_firewall_policy_rule",
+                    {
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "priority": 1001,
+                        "action": "allow",
+                        "direction": "EGRESS",
+                        "match": [
+                            {
+                                "dest_ip_ranges": ["0.0.0.0/0"],
+                                "layer4_configs": [{"ip_protocol": "tcp", "ports": ["3389"]}],
+                            }
+                        ],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_firewall_policy_rule.internal_admin",
+                    "google_compute_firewall_policy_rule",
+                    {
+                        "firewall_policy": "google_compute_firewall_policy.org.name",
+                        "priority": 1002,
+                        "action": "allow",
+                        "direction": "INGRESS",
+                        "match": [
+                            {
+                                "src_ip_ranges": ["10.10.0.0/16"],
+                                "layer4_configs": [{"ip_protocol": "tcp", "ports": ["22"]}],
+                            }
+                        ],
+                    },
+                ),
+                _terraform_resource(
+                    "google_compute_instance.web",
+                    "google_compute_instance",
+                    {
+                        "name": "tfstride-web",
+                        "project": "tfstride-demo",
+                        "network_interface": [
+                            {
+                                "network": "google_compute_network.main.id",
+                                "access_config": [{}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+        instance = inventory.get_by_address("google_compute_instance.web")
+
+        self.assertIsNotNone(instance)
+        assert instance is not None
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertEqual(instance.internet_ingress_reasons, [])
+        self.assertEqual(instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS), [])
+        self.assertFalse(instance.public_exposure)
+
     def test_normalizer_matches_firewall_on_later_instance_network_interface(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
