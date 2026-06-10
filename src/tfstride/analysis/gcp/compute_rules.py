@@ -12,7 +12,7 @@ from tfstride.analysis.gcp.iam_access import (
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule
+from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule, TrustBoundary
 from tfstride.providers.gcp.constants import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
@@ -30,6 +30,15 @@ _GKE_BROAD_OAUTH_SCOPES = frozenset(
         "https://www.googleapis.com/auth/compute",
         "https://www.googleapis.com/auth/devstorage.full_control",
     }
+)
+_GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES = (
+    "google_compute_instance",
+    "google_compute_backend_service",
+    "google_compute_region_backend_service",
+    "google_storage_bucket",
+    *GCP_CLOUD_RUN_RESOURCE_TYPES,
+    *GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    *GCP_GKE_RESOURCE_TYPES,
 )
 
 
@@ -80,6 +89,46 @@ class GcpComputeRuleDetectors:
                         evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_public_load_balanced_workload(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES):
+            resource_facts = analysis_facts(resource)
+            if not resource_facts.compute.fronted_by_internet_facing_load_balancer:
+                continue
+            frontends = resource_facts.compute.load_balancer_frontends
+            frontend_addresses = resource_facts.compute.internet_facing_load_balancer_addresses
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=_load_balanced_resource_data_sensitivity(resource),
+                lateral_movement=_load_balanced_resource_lateral_movement(resource),
+                blast_radius=1,
+            )
+            boundary = _load_balancer_frontend_boundary(context, frontends)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([resource.address, *frontend_addresses]),
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=_public_load_balanced_resource_rationale(resource),
+                    evidence=collect_evidence(
+                        evidence_item("frontend_load_balancers", frontend_addresses),
+                        evidence_item("load_balancer_paths", _load_balancer_path_evidence(frontends)),
+                        evidence_item("direct_public_exposure", [str(resource.public_exposure).lower()]),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -469,6 +518,92 @@ class GcpComputeRuleDetectors:
         return findings
 
 
+def _load_balancer_frontend_boundary(
+    context: RuleEvaluationContext,
+    frontends: list[dict[str, object]],
+) -> TrustBoundary | None:
+    for frontend in frontends:
+        forwarding_rule = str(frontend.get("forwarding_rule") or "").strip()
+        if not forwarding_rule:
+            continue
+        boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", forwarding_rule))
+        if boundary is not None:
+            return boundary
+    return None
+
+
+def _load_balancer_path_evidence(frontends: list[dict[str, object]]) -> list[str]:
+    values: list[str] = []
+    for frontend in frontends:
+        parts = []
+        forwarding_rule = frontend.get("forwarding_rule")
+        if forwarding_rule:
+            parts.append(f"forwarding_rule={forwarding_rule}")
+        scheme = frontend.get("load_balancing_scheme")
+        if scheme:
+            parts.append(f"scheme={scheme}")
+        ip_address = frontend.get("ip_address")
+        if ip_address:
+            parts.append(f"ip_address={ip_address}")
+        ports = frontend.get("ports")
+        if isinstance(ports, list) and ports:
+            parts.append(f"ports={','.join(str(port) for port in ports)}")
+        path = frontend.get("path")
+        if isinstance(path, list) and path:
+            parts.append("path=" + " -> ".join(str(item) for item in path))
+        if parts:
+            values.append("; ".join(parts))
+    return values
+
+
+def _load_balanced_resource_data_sensitivity(resource: NormalizedResource) -> int:
+    if resource.data_sensitivity == "sensitive":
+        return 2
+    if resource.resource_type == "google_storage_bucket":
+        return 1
+    return 0
+
+
+def _load_balanced_resource_lateral_movement(resource: NormalizedResource) -> int:
+    if resource.resource_type in {"google_compute_instance", *GCP_GKE_RESOURCE_TYPES}:
+        return 1
+    return 0
+
+
+def _public_load_balanced_resource_rationale(resource: NormalizedResource) -> str:
+    if resource.resource_type == "google_storage_bucket":
+        return (
+            f"{resource.display_name} is reachable through a public GCP load balancer backend path. "
+            "The bucket is not directly public through GCS IAM, but public edge routing can still expose "
+            "objects served by the backend bucket."
+        )
+    if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES:
+        return (
+            f"{resource.display_name} is reachable through a public GCP load balancer frontend. "
+            "This is distinct from a public Cloud Run invoker grant: the service is exposed through "
+            "load-balancer routing rather than direct anonymous invoke IAM."
+        )
+    if resource.resource_type in GCP_CLOUD_FUNCTION_RESOURCE_TYPES:
+        return (
+            f"{resource.display_name} is reachable through a public GCP load balancer frontend. "
+            "This is distinct from a public Cloud Functions invoker grant and should be reviewed as "
+            "edge-routed exposure."
+        )
+    if resource.resource_type in GCP_GKE_RESOURCE_TYPES:
+        return (
+            f"{resource.display_name} is behind a public GCP load balancer frontend. Public edge routing "
+            "to cluster workloads increases exposure even when the control plane is not directly public."
+        )
+    if resource.resource_type in {"google_compute_backend_service", "google_compute_region_backend_service"}:
+        return (
+            f"{resource.display_name} is a backend service reached by a public GCP load balancer frontend. "
+            "Backend service exposure should be reviewed with its downstream groups, NEGs, and serverless "
+            "targets."
+        )
+    return (
+        f"{resource.display_name} is reachable through a public GCP load balancer frontend. This is "
+        "LB-fronted exposure, not direct public exposure from the workload resource itself."
+    )
 
 
 def _bool_status(value: bool | None) -> str:

@@ -46,6 +46,7 @@ _RULE_GROUP_IDS = (
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
+        "gcp-public-load-balanced-workload",
         "gcp-compute-os-login-disabled",
         "gcp-gke-public-control-plane",
         "gcp-gke-broad-authorized-networks",
@@ -154,6 +155,7 @@ class StrideRuleEngine:
                 gcp_detectors.detect_gcs_customer_managed_encryption_missing
             ),
             "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
+            "gcp-public-load-balanced-workload": gcp_detectors.detect_public_load_balanced_workload,
             "gcp-compute-os-login-disabled": gcp_detectors.detect_compute_os_login_disabled,
             "gcp-gke-public-control-plane": gcp_detectors.detect_gke_public_control_plane,
             "gcp-gke-broad-authorized-networks": gcp_detectors.detect_gke_broad_authorized_networks,

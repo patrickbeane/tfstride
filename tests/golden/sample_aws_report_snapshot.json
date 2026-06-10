@@ -45,6 +45,7 @@
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
+        "gcp-public-load-balanced-workload",
         "gcp-compute-os-login-disabled",
         "gcp-gke-public-control-plane",
         "gcp-gke-broad-authorized-networks",
@@ -105,6 +106,7 @@
         "gcp-project-iam-broad-principal": 0,
         "gcp-project-iam-privileged-role": 0,
         "gcp-public-compute-broad-ingress": 0,
+        "gcp-public-load-balanced-workload": 0,
         "gcp-public-workload-sensitive-data-access": 0,
         "gcp-pubsub-public-access": 0,
         "gcp-sensitive-resource-iam-external-access": 0,
@@ -113,7 +115,7 @@
         "gcp-service-account-key-effective-access": 0,
         "gcp-service-account-key-hygiene": 0
       },
-      "registered_rule_count": 47,
+      "registered_rule_count": 48,
       "severity_overrides": {}
     }
   },

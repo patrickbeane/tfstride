@@ -222,6 +222,22 @@ class AnalysisComputeFacts:
     def internet_ingress_firewalls(self) -> list[str]:
         return self._facts.internet_ingress_firewalls
 
+    @property
+    def fronted_by_internet_facing_load_balancer(self) -> bool:
+        return self._facts.fronted_by_internet_facing_load_balancer
+
+    @property
+    def internet_facing_load_balancer_addresses(self) -> list[str]:
+        return self._facts.internet_facing_load_balancer_addresses
+
+    @property
+    def load_balancer_frontends(self) -> list[dict[str, Any]]:
+        return self._facts.load_balancer_frontends
+
+    @property
+    def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
+        return self._facts.load_balancer_reachable_backends
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisWorkloadFacts:

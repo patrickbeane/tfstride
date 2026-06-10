@@ -826,6 +826,26 @@ def _bigquery_table_iam_binding(
     )
 
 
+def _load_balancer_fronted_metadata(
+    path: list[str],
+    *,
+    forwarding_rule: str = "google_compute_global_forwarding_rule.web",
+) -> dict[str, object]:
+    return {
+        GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER.key: True,
+        GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES.key: [forwarding_rule],
+        GcpResourceMetadata.LOAD_BALANCER_FRONTENDS.key: [
+            {
+                "forwarding_rule": forwarding_rule,
+                "load_balancing_scheme": "EXTERNAL_MANAGED",
+                "ip_address": "35.1.2.3",
+                "ports": ["443"],
+                "path": path,
+            }
+        ],
+    }
+
+
 def _normalized_gcp_resource(
     address: str,
     resource_type: str,
@@ -848,6 +868,95 @@ def _normalized_gcp_resource(
 
 
 class GcpRuleTests(unittest.TestCase):
+    def test_public_load_balanced_workload_reports_distinct_exposure(self) -> None:
+        forwarding_rule = _normalized_gcp_resource(
+            "google_compute_global_forwarding_rule.web",
+            "google_compute_global_forwarding_rule",
+            ResourceCategory.EDGE,
+            metadata={
+                GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME.key: "EXTERNAL_MANAGED",
+            },
+        )
+        forwarding_rule.public_exposure = True
+        forwarding_rule.direct_internet_reachable = True
+        service = _normalized_gcp_resource(
+            "google_cloud_run_v2_service.api",
+            "google_cloud_run_v2_service",
+            ResourceCategory.COMPUTE,
+            metadata=_load_balancer_fronted_metadata(
+                [
+                    "google_compute_global_forwarding_rule.web",
+                    "google_compute_target_https_proxy.web",
+                    "google_compute_url_map.web",
+                    "google_compute_backend_service.run",
+                    "google_compute_region_network_endpoint_group.run",
+                    "google_cloud_run_v2_service.api",
+                ]
+            ),
+        )
+        bucket = _normalized_gcp_resource(
+            "google_storage_bucket.assets",
+            "google_storage_bucket",
+            ResourceCategory.DATA,
+            data_sensitivity="sensitive",
+            metadata=_load_balancer_fronted_metadata(
+                [
+                    "google_compute_global_forwarding_rule.web",
+                    "google_compute_target_https_proxy.web",
+                    "google_compute_url_map.web",
+                    "google_compute_backend_bucket.assets",
+                    "google_storage_bucket.assets",
+                ]
+            ),
+        )
+        inventory = ResourceInventory(provider="gcp", resources=[forwarding_rule, service, bucket])
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-load-balanced-workload"})),
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [
+            "gcp-public-load-balanced-workload",
+            "gcp-public-load-balanced-workload",
+        ])
+        self.assertEqual(
+            [finding.affected_resources for finding in findings],
+            [
+                ["google_cloud_run_v2_service.api", "google_compute_global_forwarding_rule.web"],
+                ["google_storage_bucket.assets", "google_compute_global_forwarding_rule.web"],
+            ],
+        )
+        self.assertEqual(
+            findings[0].trust_boundary_id,
+            "internet-to-service:internet->google_compute_global_forwarding_rule.web",
+        )
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["frontend_load_balancers"], ["google_compute_global_forwarding_rule.web"])
+        self.assertEqual(evidence["direct_public_exposure"], ["false"])
+        self.assertIn("scheme=EXTERNAL_MANAGED", evidence["load_balancer_paths"][0])
+        self.assertIn("path=google_compute_global_forwarding_rule.web ->", evidence["load_balancer_paths"][0])
+
+    def test_public_load_balanced_workload_rule_ignores_direct_exposure_without_lb_marker(self) -> None:
+        service = _normalized_gcp_resource(
+            "google_cloud_run_v2_service.api",
+            "google_cloud_run_v2_service",
+            ResourceCategory.COMPUTE,
+        )
+        service.public_exposure = True
+        service.direct_internet_reachable = True
+        inventory = ResourceInventory(provider="gcp", resources=[service])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-load-balanced-workload"})),
+        )
+
+        self.assertEqual(findings, [])
+
     def test_public_compute_ssh_and_rdp_broad_ingress_is_detected_for_each_target(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

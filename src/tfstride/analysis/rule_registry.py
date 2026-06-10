@@ -402,6 +402,18 @@ DEFAULT_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-public-load-balanced-workload",
+        title="GCP workload is exposed through a public load balancer",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Review public forwarding rules, URL maps, backend services, backend buckets, and NEGs that route "
+            "to this resource. Require authentication or edge policy controls where public access is intended, "
+            "and restrict or remove public load balancer frontends where it is not."
+        ),
+        tags=("gcp", "load-balancer", "compute", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-compute-os-login-disabled",
         title="GCP compute instance disables OS Login",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

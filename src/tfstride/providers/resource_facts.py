@@ -210,6 +210,22 @@ class ProviderComputeFacts(Protocol):
     def internet_ingress_firewalls(self) -> list[str]:
         raise NotImplementedError
 
+    @property
+    def fronted_by_internet_facing_load_balancer(self) -> bool:
+        raise NotImplementedError
+
+    @property
+    def internet_facing_load_balancer_addresses(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def load_balancer_frontends(self) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @property
+    def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
 
 class ProviderWorkloadFacts(Protocol):
     """Workload identity facts from provider adapters."""
@@ -434,6 +450,22 @@ class NeutralProviderResourceFacts:
 
     @property
     def internet_ingress_firewalls(self) -> list[str]:
+        return []
+
+    @property
+    def fronted_by_internet_facing_load_balancer(self) -> bool:
+        return False
+
+    @property
+    def internet_facing_load_balancer_addresses(self) -> list[str]:
+        return []
+
+    @property
+    def load_balancer_frontends(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
         return []
 
     @property
