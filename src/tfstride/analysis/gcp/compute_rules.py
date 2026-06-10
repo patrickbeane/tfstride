@@ -16,6 +16,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule, TrustBoundary
@@ -64,7 +65,10 @@ class GcpComputeRuleDetectors:
             if not risky_rules:
                 continue
 
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                instance,
+                constraints=(ORG_POLICY_VM_EXTERNAL_IP_ACCESS,),
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=0,
@@ -159,7 +163,10 @@ class GcpComputeRuleDetectors:
             instance_facts = analysis_facts(instance)
             if instance_facts.compute.os_login_enabled is not False:
                 continue
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                instance,
+                constraints=(ORG_POLICY_REQUIRE_OS_LOGIN,),
                 internet_exposure=instance.public_exposure,
                 privilege_breadth=1,
                 data_sensitivity=0,
@@ -437,7 +444,10 @@ class GcpComputeRuleDetectors:
             if not service.public_exposure or not public_invokers:
                 continue
             condition = _public_invoker_condition(public_invokers)
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                service,
+                constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=0,
@@ -497,7 +507,10 @@ class GcpComputeRuleDetectors:
             if not function.public_exposure or not public_invokers:
                 continue
             condition = _public_invoker_condition(public_invokers)
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                function,
+                constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=0,

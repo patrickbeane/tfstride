@@ -22,6 +22,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.gcp.constants import (
@@ -46,7 +47,10 @@ class GcpScopedIamDetectors:
                 if member not in PUBLIC_GCP_IAM_MEMBERS:
                     continue
                 condition = iam_binding_condition(binding, role, member)
-                severity_reasoning = build_severity_reasoning(
+                severity_reasoning = guardrail_adjusted_severity_reasoning(
+                    context.analysis_indexes.gcp_org_policy_guardrails,
+                    binding,
+                    constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                     internet_exposure=True,
                     privilege_breadth=1,
                     data_sensitivity=0,
@@ -139,7 +143,10 @@ class GcpScopedIamDetectors:
                 if assessment is None:
                     continue
                 condition = iam_binding_condition(binding, role, member)
-                severity_reasoning = build_severity_reasoning(
+                severity_reasoning = guardrail_adjusted_severity_reasoning(
+                    context.analysis_indexes.gcp_org_policy_guardrails,
+                    binding,
+                    constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                     internet_exposure=assessment.is_public,
                     privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,

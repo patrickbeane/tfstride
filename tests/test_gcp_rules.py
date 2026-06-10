@@ -1236,7 +1236,12 @@ class GcpRuleTests(unittest.TestCase):
             rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-compute-os-login-disabled"})),
         )
 
-        evidence = {item.key: item.values for item in findings[0].evidence}
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertIsNotNone(finding.severity_reasoning)
+        assert finding.severity_reasoning is not None
+        self.assertEqual(finding.severity_reasoning.final_score, 0)
+        evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["organization_guardrails"],
             [
@@ -1539,7 +1544,12 @@ class GcpRuleTests(unittest.TestCase):
             ),
         )
 
-        evidence = {item.key: item.values for item in findings[0].evidence}
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertIsNotNone(finding.severity_reasoning)
+        assert finding.severity_reasoning is not None
+        self.assertEqual(finding.severity_reasoning.final_score, 2)
+        evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["organization_guardrails"],
             [
@@ -2675,7 +2685,12 @@ class GcpRuleTests(unittest.TestCase):
             rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-hygiene"})),
         )
 
-        evidence = {item.key: item.values for item in findings[0].evidence}
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertIsNotNone(finding.severity_reasoning)
+        assert finding.severity_reasoning is not None
+        self.assertEqual(finding.severity_reasoning.final_score, 1)
+        evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["organization_guardrails"],
             [
@@ -3015,7 +3030,12 @@ class GcpRuleTests(unittest.TestCase):
 
         findings = StrideRuleEngine().evaluate(inventory, [])
 
-        evidence = {item.key: item.values for item in findings[0].evidence}
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertIsNotNone(finding.severity_reasoning)
+        assert finding.severity_reasoning is not None
+        self.assertEqual(finding.severity_reasoning.final_score, 1)
+        evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["organization_guardrails"],
             [

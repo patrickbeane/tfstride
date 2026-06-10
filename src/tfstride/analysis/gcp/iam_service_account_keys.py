@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from tfstride.analysis.finding_helpers import (
-    build_severity_reasoning,
     collect_evidence,
     dedupe_addresses,
     evidence_item,
@@ -31,6 +30,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.gcp.iam_service_accounts import (
     high_risk_service_account_role_risk,
     service_account_iam_target,
@@ -111,7 +111,10 @@ class GcpServiceAccountKeyDetectors:
             if not keepers_configured:
                 risks.append("no Terraform keepers rotation trigger observed")
 
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                target or key,
+                constraints=(ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,),
                 internet_exposure=False,
                 privilege_breadth=1,
                 data_sensitivity=0,
@@ -189,7 +192,10 @@ class GcpServiceAccountKeyDetectors:
                 or grant.scope.startswith(("project", "organization", "folder"))
                 for grant in grants
             )
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                target or key,
+                constraints=(ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,),
                 internet_exposure=False,
                 privilege_breadth=2 if identity_control_plane_access else 1,
                 data_sensitivity=max(grant.data_sensitivity for grant in grants),

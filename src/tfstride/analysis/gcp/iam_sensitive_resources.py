@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import (
-    build_severity_reasoning,
     collect_evidence,
     dedupe_addresses,
     evidence_item,
@@ -17,6 +16,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
@@ -53,7 +53,10 @@ class GcpSensitiveResourceIamDetectors:
                     seen.add(finding_key)
 
                     condition = binding.get("condition")
-                    severity_reasoning = build_severity_reasoning(
+                    severity_reasoning = guardrail_adjusted_severity_reasoning(
+                        context.analysis_indexes.gcp_org_policy_guardrails,
+                        resource,
+                        constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                         internet_exposure=assessment.is_public,
                         privilege_breadth=gcp_iam_condition_limited_score(
                             2 if assessment.is_public or assessment.is_broad else 1, condition, floor=1

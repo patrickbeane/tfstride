@@ -6,9 +6,11 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     GCP_ORG_POLICY_SCOPE_FOLDER,
     GCP_ORG_POLICY_SCOPE_ORGANIZATION,
     GCP_ORG_POLICY_SCOPE_PROJECT,
+    ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
     GcpOrgPolicyScopeKey,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -155,6 +157,68 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             (effective[1],),
         )
 
+
+    def test_guardrail_adjusted_severity_reduces_active_enforced_guardrails(self) -> None:
+        guardrail = _org_policy(
+            "google_org_policy_policy.storage_pap",
+            constraint=ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+            scope_type=GCP_ORG_POLICY_SCOPE_PROJECT,
+            scope="projects/tfstride-demo",
+            enforced=True,
+        )
+        bucket = _gcp_resource(
+            "google_storage_bucket.logs",
+            "google_storage_bucket",
+            ResourceCategory.DATA,
+            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+        )
+
+        reasoning = guardrail_adjusted_severity_reasoning(
+            _guardrail_index([guardrail, bucket]),
+            bucket,
+            constraints=(ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,),
+            internet_exposure=True,
+            privilege_breadth=0,
+            data_sensitivity=2,
+            lateral_movement=0,
+            blast_radius=1,
+        )
+
+        self.assertEqual(reasoning.internet_exposure, 0)
+        self.assertEqual(reasoning.blast_radius, 0)
+        self.assertEqual(reasoning.final_score, 2)
+        self.assertEqual(reasoning.severity.value, "low")
+
+    def test_guardrail_adjusted_severity_ignores_restore_default_guardrails(self) -> None:
+        guardrail = _org_policy(
+            "google_org_policy_policy.storage_pap",
+            constraint=ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+            scope_type=GCP_ORG_POLICY_SCOPE_PROJECT,
+            scope="projects/tfstride-demo",
+            restore_default=True,
+        )
+        bucket = _gcp_resource(
+            "google_storage_bucket.logs",
+            "google_storage_bucket",
+            ResourceCategory.DATA,
+            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+        )
+
+        reasoning = guardrail_adjusted_severity_reasoning(
+            _guardrail_index([guardrail, bucket]),
+            bucket,
+            constraints=(ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,),
+            internet_exposure=True,
+            privilege_breadth=0,
+            data_sensitivity=2,
+            lateral_movement=0,
+            blast_radius=1,
+        )
+
+        self.assertEqual(reasoning.internet_exposure, 2)
+        self.assertEqual(reasoning.blast_radius, 1)
+        self.assertEqual(reasoning.final_score, 5)
+        self.assertEqual(reasoning.severity.value, "medium")
 
     def test_organization_guardrail_evidence_formats_effective_guardrails(self) -> None:
         guardrail = _org_policy(

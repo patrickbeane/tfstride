@@ -18,6 +18,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
 )
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
@@ -152,7 +153,10 @@ class GcpDataRuleDetectors:
             boundary = context.boundary_index.get(
                 (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
             )
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                bucket,
+                constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS, ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION),
                 internet_exposure=True,
                 privilege_breadth=0,
                 data_sensitivity=2,
@@ -243,7 +247,10 @@ class GcpDataRuleDetectors:
             bucket_facts = analysis_facts(bucket)
             if _gcs_public_access_prevention_enforced(bucket_facts.storage.public_access_prevention):
                 continue
-            severity_reasoning = build_severity_reasoning(
+            severity_reasoning = guardrail_adjusted_severity_reasoning(
+                context.analysis_indexes.gcp_org_policy_guardrails,
+                bucket,
+                constraints=(ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,),
                 internet_exposure=bucket.public_exposure,
                 privilege_breadth=0,
                 data_sensitivity=2,
