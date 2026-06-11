@@ -82,6 +82,19 @@ class GcpAttributeTests(unittest.TestCase):
         self.assertEqual(values.raw(GcpAttr.POLICY_DATA), '{"bindings": []}')
         self.assertIsNone(values.raw(RawAttribute("missing")))
 
+    def test_same_key_can_have_scalar_and_block_readers(self) -> None:
+        scalar_values = GcpValues({"service_account": "deploy@example.iam.gserviceaccount.com"})
+        block_values = GcpValues({"service_account": [{"email": "deploy@example.iam.gserviceaccount.com"}]})
+
+        self.assertEqual(
+            scalar_values.get(GcpAttr.SERVICE_ACCOUNT),
+            "deploy@example.iam.gserviceaccount.com",
+        )
+        self.assertEqual(
+            block_values.get(GcpAttr.SERVICE_ACCOUNT_BLOCKS),
+            [{"email": "deploy@example.iam.gserviceaccount.com"}],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
