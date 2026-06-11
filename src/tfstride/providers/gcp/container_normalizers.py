@@ -4,7 +4,8 @@ import ipaddress
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.gcp.coercion import as_bool, as_list, compact, first_item
+from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
+from tfstride.providers.gcp.coercion import as_bool, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -12,13 +13,15 @@ from tfstride.providers.gcp.resource_utils import first_non_empty, resource_iden
 
 
 def normalize_container_cluster(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    private_cluster_config = first_item(values.get("private_cluster_config")) or {}
-    authorized_networks_config = first_item(values.get("master_authorized_networks_config"))
+    values = GcpValues(resource.values)
+    private_cluster_config_values = _first_block(values, GcpAttr.PRIVATE_CLUSTER_CONFIG)
+    private_cluster_config = GcpValues(private_cluster_config_values)
+    authorized_networks_config = _optional_first_block(values, GcpAttr.MASTER_AUTHORIZED_NETWORKS_CONFIG)
     authorized_networks = _authorized_networks(authorized_networks_config)
-    workload_identity_config = first_item(values.get("workload_identity_config")) or {}
-    node_config_value = first_item(values.get("node_config"))
-    node_config = node_config_value or {}
+    workload_identity_config_values = _first_block(values, GcpAttr.WORKLOAD_IDENTITY_CONFIG)
+    workload_identity_config = GcpValues(workload_identity_config_values)
+    node_config_value = _optional_first_block(values, GcpAttr.NODE_CONFIG)
+    node_config_values = node_config_value or {}
     public_endpoint = _public_endpoint_enabled(values, private_cluster_config)
     broad_authorized_networks = _broad_authorized_networks(authorized_networks)
     public_exposure = public_endpoint and (
@@ -31,31 +34,26 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         authorized_networks,
         broad_authorized_networks,
     )
-    has_node_config = node_config_value is not None or not as_bool(values.get("remove_default_node_pool", False))
+    has_node_config = node_config_value is not None or not values.get(GcpAttr.REMOVE_DEFAULT_NODE_POOL)
+    workload_pool = first_non_empty(workload_identity_config.get(GcpAttr.WORKLOAD_POOL))
     metadata = _container_metadata(
         resource,
         values,
-        node_config,
+        node_config_values,
         has_node_config,
         {
-            GcpResourceMetadata.GKE_ENDPOINT.key: first_non_empty(values.get("endpoint")),
-            GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED.key: as_bool(
-                private_cluster_config.get("enable_private_endpoint", False)
+            GcpResourceMetadata.GKE_ENDPOINT.key: first_non_empty(values.get(GcpAttr.ENDPOINT)),
+            GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED.key: private_cluster_config.get(
+                GcpAttr.ENABLE_PRIVATE_ENDPOINT
             ),
-            GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED.key: as_bool(
-                private_cluster_config.get("enable_private_nodes", False)
-            ),
+            GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED.key: private_cluster_config.get(GcpAttr.ENABLE_PRIVATE_NODES),
             GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS.key: authorized_networks,
-            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL.key: first_non_empty(
-                workload_identity_config.get("workload_pool")
-            ),
-            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED.key: bool(
-                first_non_empty(workload_identity_config.get("workload_pool"))
-            ),
-            "private_cluster_config": private_cluster_config,
+            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL.key: workload_pool,
+            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED.key: bool(workload_pool),
+            "private_cluster_config": private_cluster_config_values,
             "master_authorized_networks_config": authorized_networks_config or {},
-            "workload_identity_config": workload_identity_config,
-            "remove_default_node_pool": as_bool(values.get("remove_default_node_pool", False)),
+            "workload_identity_config": workload_identity_config_values,
+            "remove_default_node_pool": values.get(GcpAttr.REMOVE_DEFAULT_NODE_POOL),
         },
     )
     normalized = NormalizedResource(
@@ -65,8 +63,8 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         name=resource.name,
         category=ResourceCategory.COMPUTE,
         identifier=resource_identifier(resource),
-        vpc_id=first_non_empty(values.get("network")),
-        subnet_ids=tuple(compact(as_list(values.get("subnetwork")))),
+        vpc_id=first_non_empty(values.get(GcpAttr.NETWORK)),
+        subnet_ids=tuple(compact([values.get(GcpAttr.SUBNETWORK)])),
         public_access_configured=public_endpoint,
         public_exposure=public_exposure,
         metadata=metadata,
@@ -83,18 +81,17 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
 
 
 def normalize_container_node_pool(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    node_config_value = first_item(values.get("node_config"))
-    node_config = node_config_value or {}
+    values = GcpValues(resource.values)
+    node_config_value = _optional_first_block(values, GcpAttr.NODE_CONFIG)
     metadata = _container_metadata(
         resource,
         values,
-        node_config,
+        node_config_value or {},
         True,
         {
-            "cluster": values.get("cluster"),
-            "node_locations": compact(as_list(values.get("node_locations"))),
-            "initial_node_count": values.get("initial_node_count"),
+            "cluster": values.get(GcpAttr.CLUSTER),
+            "node_locations": values.get(GcpAttr.NODE_LOCATIONS),
+            "initial_node_count": values.raw(GcpAttr.INITIAL_NODE_COUNT),
         },
     )
     return NormalizedResource(
@@ -110,47 +107,52 @@ def normalize_container_node_pool(resource: TerraformResource) -> NormalizedReso
 
 def _container_metadata(
     resource: TerraformResource,
-    values: dict[str, Any],
-    node_config: dict[str, Any],
+    values: GcpValues,
+    node_config_values: dict[str, Any],
     has_node_config: bool,
     extra: dict[str, Any],
 ) -> dict[str, Any]:
-    node_metadata = node_config.get("metadata") if isinstance(node_config.get("metadata"), dict) else {}
+    node_config = GcpValues(node_config_values)
+    node_metadata_values = node_config.get(GcpAttr.METADATA)
     metadata_mode = _node_metadata_mode(node_config)
-    service_account = first_non_empty(node_config.get("service_account"))
+    service_account = first_non_empty(node_config.get(GcpAttr.SERVICE_ACCOUNT))
     metadata = {
         GcpResourceMetadata.NAME.key: resource_name(resource),
-        GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-        GcpResourceMetadata.PROJECT.key: values.get("project"),
-        GcpResourceMetadata.REGION.key: values.get("location"),
-        GcpResourceMetadata.NETWORK.key: values.get("network"),
-        GcpResourceMetadata.SUBNETWORK.key: values.get("subnetwork"),
-        GcpResourceMetadata.LABELS.key: values.get("resource_labels") or values.get("labels") or {},
+        GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+        GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.REGION.key: values.get(GcpAttr.LOCATION),
+        GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+        GcpResourceMetadata.SUBNETWORK.key: values.get(GcpAttr.SUBNETWORK),
+        GcpResourceMetadata.LABELS.key: values.get(GcpAttr.RESOURCE_LABELS) or values.get(GcpAttr.LABELS),
         GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT.key: service_account,
-        GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES.key: compact(as_list(node_config.get("oauth_scopes"))),
+        GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES.key: node_config.get(GcpAttr.OAUTH_SCOPES),
         GcpResourceMetadata.GKE_NODE_METADATA_MODE.key: metadata_mode,
         GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED.key: (
-            _legacy_metadata_enabled(node_metadata, metadata_mode) if has_node_config else None
+            _legacy_metadata_enabled(node_metadata_values, metadata_mode) if has_node_config else None
         ),
-        "node_config": node_config,
-        "node_metadata": node_metadata,
+        "node_config": node_config_values,
+        "node_metadata": node_metadata_values,
     }
     metadata.update(extra)
     return metadata
 
 
+def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:
+    return first_item(values.get(attribute)) or {}
+
+
+def _optional_first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any] | None:
+    return first_item(values.get(attribute))
+
+
 def _authorized_networks(config: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not config:
         return []
-    return [
-        network
-        for network in as_list(config.get("cidr_blocks"))
-        if isinstance(network, dict)
-    ]
+    return GcpValues(config).get(GcpAttr.CIDR_BLOCKS)
 
 
 def _broad_authorized_networks(networks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [network for network in networks if _cidr_allows_internet(network.get("cidr_block"))]
+    return [network for network in networks if _cidr_allows_internet(GcpValues(network).get(GcpAttr.CIDR_BLOCK))]
 
 
 def _cidr_allows_internet(value: object) -> bool:
@@ -163,10 +165,10 @@ def _cidr_allows_internet(value: object) -> bool:
     return parsed.prefixlen == 0
 
 
-def _public_endpoint_enabled(values: dict[str, Any], private_cluster_config: dict[str, Any]) -> bool:
-    if as_bool(private_cluster_config.get("enable_private_endpoint", False)):
+def _public_endpoint_enabled(values: GcpValues, private_cluster_config: GcpValues) -> bool:
+    if private_cluster_config.get(GcpAttr.ENABLE_PRIVATE_ENDPOINT):
         return False
-    return bool(first_non_empty(values.get("endpoint"))) or not private_cluster_config
+    return bool(first_non_empty(values.get(GcpAttr.ENDPOINT))) or not private_cluster_config.values
 
 
 def _public_exposure_reasons(
@@ -182,27 +184,28 @@ def _public_exposure_reasons(
     if not authorized_networks:
         return ["GKE master authorized networks do not define CIDR blocks"]
     return [
-        f"authorized network `{_network_name(network)}` allows {network.get('cidr_block')}"
+        f"authorized network `{_network_name(network)}` allows {GcpValues(network).get(GcpAttr.CIDR_BLOCK)}"
         for network in broad_authorized_networks
     ]
 
 
 def _network_name(network: dict[str, Any]) -> str:
-    return first_non_empty(network.get("display_name"), network.get("name"), "unnamed") or "unnamed"
+    values = GcpValues(network)
+    return first_non_empty(values.get(GcpAttr.DISPLAY_NAME), values.get(GcpAttr.NAME), "unnamed") or "unnamed"
 
 
-def _node_metadata_mode(node_config: dict[str, Any]) -> str | None:
-    workload_metadata_config = first_item(node_config.get("workload_metadata_config")) or {}
+def _node_metadata_mode(node_config: GcpValues) -> str | None:
+    workload_metadata_config = GcpValues(_first_block(node_config, GcpAttr.WORKLOAD_METADATA_CONFIG))
     return first_non_empty(
-        workload_metadata_config.get("mode"),
-        workload_metadata_config.get("node_metadata"),
+        workload_metadata_config.get(GcpAttr.MODE),
+        workload_metadata_config.get(GcpAttr.NODE_METADATA),
     )
 
 
-def _legacy_metadata_enabled(node_metadata: dict[str, Any], metadata_mode: str | None) -> bool:
-    disabled = node_metadata.get("disable-legacy-endpoints")
-    if disabled is not None:
-        return not as_bool(disabled)
+def _legacy_metadata_enabled(node_metadata_values: dict[str, Any], metadata_mode: str | None) -> bool:
+    node_metadata = GcpValues(node_metadata_values)
+    if node_metadata.has(GcpAttr.DISABLE_LEGACY_ENDPOINTS):
+        return not as_bool(node_metadata.raw(GcpAttr.DISABLE_LEGACY_ENDPOINTS))
     if metadata_mode is None:
         return True
     return str(metadata_mode).strip().upper() in {"EXPOSE", "GCE_METADATA", "UNSPECIFIED"}

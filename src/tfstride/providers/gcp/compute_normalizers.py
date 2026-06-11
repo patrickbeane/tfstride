@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.gcp.coercion import as_bool, as_list, compact
+from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
+from tfstride.providers.gcp.coercion import as_bool
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
@@ -16,10 +17,10 @@ from tfstride.providers.gcp.resource_utils import (
 
 
 def normalize_compute_instance(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    instance_metadata = values.get("metadata") if isinstance(values.get("metadata"), dict) else {}
+    values = GcpValues(resource.values)
+    instance_metadata = values.get(GcpAttr.METADATA)
     os_login_enabled = _os_login_enabled(instance_metadata)
-    public_access_configured = has_external_access_config(values)
+    public_access_configured = has_external_access_config(resource.values)
     public_access_reasons = (
         ["compute instance has an external access config"]
         if public_access_configured
@@ -27,16 +28,16 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
     )
     metadata = {
         GcpResourceMetadata.NAME.key: resource_name(resource),
-        GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-        GcpResourceMetadata.PROJECT.key: values.get("project"),
-        GcpResourceMetadata.ZONE.key: values.get("zone"),
-        GcpResourceMetadata.MACHINE_TYPE.key: values.get("machine_type"),
-        GcpResourceMetadata.NETWORK_TAGS.key: compact(as_list(values.get("tags"))),
-        GcpResourceMetadata.NETWORK_INTERFACES.key: as_list(values.get("network_interface")),
-        GcpResourceMetadata.SERVICE_ACCOUNTS.key: as_list(values.get("service_account")),
-        GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+        GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+        GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.ZONE.key: values.get(GcpAttr.ZONE),
+        GcpResourceMetadata.MACHINE_TYPE.key: values.get(GcpAttr.MACHINE_TYPE),
+        GcpResourceMetadata.NETWORK_TAGS.key: values.get(GcpAttr.TAGS),
+        GcpResourceMetadata.NETWORK_INTERFACES.key: values.get(GcpAttr.NETWORK_INTERFACE),
+        GcpResourceMetadata.SERVICE_ACCOUNTS.key: values.get(GcpAttr.SERVICE_ACCOUNT_BLOCKS),
+        GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
         "metadata": instance_metadata,
-        "can_ip_forward": bool(values.get("can_ip_forward", False)),
+        "can_ip_forward": bool(values.raw(GcpAttr.CAN_IP_FORWARD)),
     }
     if os_login_enabled is not None:
         metadata[GcpResourceMetadata.OS_LOGIN_ENABLED.key] = os_login_enabled
@@ -47,7 +48,7 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
         name=resource.name,
         category=ResourceCategory.COMPUTE,
         identifier=resource_identifier(resource),
-        subnet_ids=tuple(network_interface_subnetworks(values)),
+        subnet_ids=tuple(network_interface_subnetworks(resource.values)),
         public_access_configured=public_access_configured,
         metadata=metadata,
     )
@@ -59,6 +60,7 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
 
 
 def _os_login_enabled(metadata: dict[str, Any]) -> bool | None:
-    if "enable-oslogin" not in metadata:
+    values = GcpValues(metadata)
+    if not values.has(GcpAttr.ENABLE_OSLOGIN):
         return None
-    return as_bool(metadata.get("enable-oslogin"))
+    return as_bool(values.raw(GcpAttr.ENABLE_OSLOGIN))
