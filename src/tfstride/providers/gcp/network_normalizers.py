@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
-from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
+from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
+from tfstride.providers.gcp.coercion import as_list, as_optional_int, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
@@ -13,7 +14,7 @@ GCP_PROVIDER = "gcp"
 
 
 def normalize_compute_network(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -23,17 +24,17 @@ def normalize_compute_network(resource: TerraformResource) -> NormalizedResource
         identifier=resource_identifier(resource),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.AUTO_CREATE_SUBNETWORKS.key: as_bool(values.get("auto_create_subnetworks")),
-            "routing_mode": values.get("routing_mode"),
-            "description": values.get("description"),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.AUTO_CREATE_SUBNETWORKS.key: values.get(GcpAttr.AUTO_CREATE_SUBNETWORKS),
+            "routing_mode": values.get(GcpAttr.ROUTING_MODE),
+            "description": values.get(GcpAttr.DESCRIPTION),
         },
     )
 
 
 def normalize_compute_subnetwork(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -41,24 +42,24 @@ def normalize_compute_subnetwork(resource: TerraformResource) -> NormalizedResou
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
+        vpc_id=values.get(GcpAttr.NETWORK),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.REGION.key: values.get("region"),
-            GcpResourceMetadata.NETWORK.key: values.get("network"),
-            GcpResourceMetadata.CIDR_RANGE.key: values.get("ip_cidr_range"),
-            GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS.key: as_bool(values.get("private_ip_google_access")),
-            "purpose": values.get("purpose"),
-            "stack_type": values.get("stack_type"),
-            "secondary_ip_ranges": as_list(values.get("secondary_ip_range")),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
+            GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+            GcpResourceMetadata.CIDR_RANGE.key: values.get(GcpAttr.IP_CIDR_RANGE),
+            GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS.key: values.get(GcpAttr.PRIVATE_IP_GOOGLE_ACCESS),
+            "purpose": values.get(GcpAttr.PURPOSE),
+            "stack_type": values.get(GcpAttr.STACK_TYPE),
+            "secondary_ip_ranges": values.get(GcpAttr.SECONDARY_IP_RANGE),
         },
     )
 
 
 def normalize_compute_route(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -66,27 +67,27 @@ def normalize_compute_route(resource: TerraformResource) -> NormalizedResource:
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
+        vpc_id=values.get(GcpAttr.NETWORK),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.NETWORK.key: values.get("network"),
-            GcpResourceMetadata.ROUTE_DEST_RANGE.key: values.get("dest_range"),
-            GcpResourceMetadata.ROUTE_NEXT_HOP_GATEWAY.key: values.get("next_hop_gateway"),
-            GcpResourceMetadata.ROUTE_NEXT_HOP_INSTANCE.key: values.get("next_hop_instance"),
-            GcpResourceMetadata.ROUTE_NEXT_HOP_IP.key: values.get("next_hop_ip"),
-            GcpResourceMetadata.ROUTE_NEXT_HOP_ILB.key: values.get("next_hop_ilb"),
-            GcpResourceMetadata.ROUTE_NEXT_HOP_VPN_TUNNEL.key: values.get("next_hop_vpn_tunnel"),
-            GcpResourceMetadata.ROUTE_TAGS.key: compact(as_list(values.get("tags"))),
-            GcpResourceMetadata.ROUTE_PRIORITY.key: as_optional_int(values.get("priority")),
-            "description": values.get("description"),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+            GcpResourceMetadata.ROUTE_DEST_RANGE.key: values.get(GcpAttr.DEST_RANGE),
+            GcpResourceMetadata.ROUTE_NEXT_HOP_GATEWAY.key: values.get(GcpAttr.NEXT_HOP_GATEWAY),
+            GcpResourceMetadata.ROUTE_NEXT_HOP_INSTANCE.key: values.get(GcpAttr.NEXT_HOP_INSTANCE),
+            GcpResourceMetadata.ROUTE_NEXT_HOP_IP.key: values.get(GcpAttr.NEXT_HOP_IP),
+            GcpResourceMetadata.ROUTE_NEXT_HOP_ILB.key: values.get(GcpAttr.NEXT_HOP_ILB),
+            GcpResourceMetadata.ROUTE_NEXT_HOP_VPN_TUNNEL.key: values.get(GcpAttr.NEXT_HOP_VPN_TUNNEL),
+            GcpResourceMetadata.ROUTE_TAGS.key: values.get(GcpAttr.TAGS),
+            GcpResourceMetadata.ROUTE_PRIORITY.key: values.get(GcpAttr.PRIORITY),
+            "description": values.get(GcpAttr.DESCRIPTION),
         },
     )
 
 
 def normalize_compute_router(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -94,23 +95,23 @@ def normalize_compute_router(resource: TerraformResource) -> NormalizedResource:
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
+        vpc_id=values.get(GcpAttr.NETWORK),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.REGION.key: values.get("region"),
-            GcpResourceMetadata.NETWORK.key: values.get("network"),
-            "bgp": first_item(values.get("bgp")) or {},
-            "description": values.get("description"),
-            "encrypted_interconnect_router": as_bool(values.get("encrypted_interconnect_router", False)),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
+            GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+            "bgp": first_item(values.get(GcpAttr.BGP)) or {},
+            "description": values.get(GcpAttr.DESCRIPTION),
+            "encrypted_interconnect_router": values.get(GcpAttr.ENCRYPTED_INTERCONNECT_ROUTER),
         },
     )
 
 
 def normalize_compute_router_nat(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    router_reference = first_non_empty(values.get("router"))
+    values = GcpValues(resource.values)
+    router_reference = first_non_empty(values.get(GcpAttr.ROUTER))
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -120,15 +121,15 @@ def normalize_compute_router_nat(resource: TerraformResource) -> NormalizedResou
         identifier=resource_identifier(resource),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.REGION.key: values.get("region"),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
             GcpResourceMetadata.ROUTER_REFERENCE.key: router_reference,
-            GcpResourceMetadata.NAT_SUBNETWORKS.key: as_list(values.get("subnetwork")),
-            "nat_ip_allocate_option": values.get("nat_ip_allocate_option"),
-            "source_subnetwork_ip_ranges_to_nat": values.get("source_subnetwork_ip_ranges_to_nat"),
-            "min_ports_per_vm": as_optional_int(values.get("min_ports_per_vm")),
-            "enable_endpoint_independent_mapping": as_bool(values.get("enable_endpoint_independent_mapping", False)),
-            "log_config": first_item(values.get("log_config")) or {},
+            GcpResourceMetadata.NAT_SUBNETWORKS.key: values.get(GcpAttr.SUBNETWORK_BLOCKS),
+            "nat_ip_allocate_option": values.get(GcpAttr.NAT_IP_ALLOCATE_OPTION),
+            "source_subnetwork_ip_ranges_to_nat": values.get(GcpAttr.SOURCE_SUBNETWORK_IP_RANGES_TO_NAT),
+            "min_ports_per_vm": values.get(GcpAttr.MIN_PORTS_PER_VM),
+            "enable_endpoint_independent_mapping": values.get(GcpAttr.ENABLE_ENDPOINT_INDEPENDENT_MAPPING),
+            "log_config": first_item(values.get(GcpAttr.LOG_CONFIG)) or {},
         },
     )
 
@@ -174,7 +175,7 @@ def normalize_compute_region_backend_service(resource: TerraformResource) -> Nor
 
 
 def normalize_compute_backend_bucket(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -185,7 +186,7 @@ def normalize_compute_backend_bucket(resource: TerraformResource) -> NormalizedR
         metadata=_load_balancer_metadata(
             values,
             {
-                GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME.key: values.get("bucket_name"),
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME.key: values.get(GcpAttr.BUCKET_NAME),
             },
         ),
     )
@@ -200,7 +201,7 @@ def normalize_compute_region_network_endpoint_group(resource: TerraformResource)
 
 
 def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -208,54 +209,52 @@ def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResourc
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
+        vpc_id=values.get(GcpAttr.NETWORK),
         network_rules=parse_firewall_allow_rules(values),
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.NETWORK.key: values.get("network"),
-            GcpResourceMetadata.FIREWALL_ALLOW.key: as_list(values.get("allow")),
-            GcpResourceMetadata.FIREWALL_DENY.key: as_list(values.get("deny")),
-            GcpResourceMetadata.FIREWALL_SOURCE_RANGES.key: compact(as_list(values.get("source_ranges"))),
-            GcpResourceMetadata.FIREWALL_DESTINATION_RANGES.key: compact(as_list(values.get("destination_ranges"))),
-            GcpResourceMetadata.FIREWALL_TARGET_TAGS.key: compact(as_list(values.get("target_tags"))),
-            GcpResourceMetadata.FIREWALL_SOURCE_TAGS.key: compact(as_list(values.get("source_tags"))),
-            GcpResourceMetadata.FIREWALL_TARGET_SERVICE_ACCOUNTS.key: compact(
-                as_list(values.get("target_service_accounts"))
-            ),
-            GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS.key: compact(
-                as_list(values.get("source_service_accounts"))
-            ),
-            GcpResourceMetadata.FIREWALL_DIRECTION.key: str(values.get("direction") or "INGRESS").lower(),
-            GcpResourceMetadata.FIREWALL_PRIORITY.key: as_optional_int(values.get("priority")),
-            GcpResourceMetadata.FIREWALL_DISABLED.key: as_bool(values.get("disabled")),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+            GcpResourceMetadata.FIREWALL_ALLOW.key: values.get(GcpAttr.ALLOW),
+            GcpResourceMetadata.FIREWALL_DENY.key: values.get(GcpAttr.DENY),
+            GcpResourceMetadata.FIREWALL_SOURCE_RANGES.key: values.get(GcpAttr.SOURCE_RANGES),
+            GcpResourceMetadata.FIREWALL_DESTINATION_RANGES.key: values.get(GcpAttr.DESTINATION_RANGES),
+            GcpResourceMetadata.FIREWALL_TARGET_TAGS.key: values.get(GcpAttr.TARGET_TAGS),
+            GcpResourceMetadata.FIREWALL_SOURCE_TAGS.key: values.get(GcpAttr.SOURCE_TAGS),
+            GcpResourceMetadata.FIREWALL_TARGET_SERVICE_ACCOUNTS.key: values.get(GcpAttr.TARGET_SERVICE_ACCOUNTS),
+            GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS.key: values.get(GcpAttr.SOURCE_SERVICE_ACCOUNTS),
+            GcpResourceMetadata.FIREWALL_DIRECTION.key: str(values.get(GcpAttr.DIRECTION) or "INGRESS").lower(),
+            GcpResourceMetadata.FIREWALL_PRIORITY.key: values.get(GcpAttr.PRIORITY),
+            GcpResourceMetadata.FIREWALL_DISABLED.key: values.get(GcpAttr.DISABLED),
         },
     )
 
 
 def normalize_compute_firewall_policy(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.NETWORK,
-        identifier=first_non_empty(values.get("short_name"), values.get("name"), resource_identifier(resource)),
+        identifier=first_non_empty(
+            values.get(GcpAttr.SHORT_NAME), values.get(GcpAttr.NAME), resource_identifier(resource)
+        ),
         metadata={
-            GcpResourceMetadata.NAME.key: first_non_empty(values.get("short_name"), values.get("name")),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("name"),
-            GcpResourceMetadata.FIREWALL_POLICY_PARENT.key: values.get("parent"),
-            "description": values.get("description"),
-            "display_name": values.get("display_name"),
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get(GcpAttr.SHORT_NAME), values.get(GcpAttr.NAME)),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get(GcpAttr.NAME),
+            GcpResourceMetadata.FIREWALL_POLICY_PARENT.key: values.get(GcpAttr.PARENT),
+            "description": values.get(GcpAttr.DESCRIPTION),
+            "display_name": values.get(GcpAttr.DISPLAY_NAME),
         },
     )
 
 
 def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     match = _firewall_policy_match(values)
     return NormalizedResource(
         address=resource.address,
@@ -266,47 +265,49 @@ def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> Norma
         identifier=_firewall_policy_rule_identifier(resource),
         network_rules=parse_firewall_policy_allow_rules(values),
         metadata={
-            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("firewall_policy"),
-            GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: values.get("action"),
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get(GcpAttr.NAME)),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get(GcpAttr.FIREWALL_POLICY),
+            GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: values.get(GcpAttr.ACTION),
             GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: _firewall_policy_direction(values),
-            GcpResourceMetadata.FIREWALL_POLICY_PRIORITY.key: as_optional_int(values.get("priority")),
+            GcpResourceMetadata.FIREWALL_POLICY_PRIORITY.key: values.get(GcpAttr.PRIORITY),
             GcpResourceMetadata.FIREWALL_POLICY_MATCH.key: match,
             GcpResourceMetadata.FIREWALL_SOURCE_RANGES.key: _firewall_policy_source_ranges(match),
             GcpResourceMetadata.FIREWALL_DESTINATION_RANGES.key: _firewall_policy_destination_ranges(match),
-            GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES.key: compact(as_list(values.get("target_resources"))),
-            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key: compact(
-                as_list(values.get("target_service_accounts"))
+            GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES.key: values.get(GcpAttr.TARGET_RESOURCES),
+            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key: values.get(
+                GcpAttr.TARGET_SERVICE_ACCOUNTS
             ),
-            GcpResourceMetadata.FIREWALL_POLICY_DISABLED.key: as_bool(values.get("disabled")),
-            GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING.key: as_bool(values.get("enable_logging")),
-            "description": values.get("description"),
+            GcpResourceMetadata.FIREWALL_POLICY_DISABLED.key: values.get(GcpAttr.DISABLED),
+            GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING.key: values.get(GcpAttr.ENABLE_LOGGING),
+            "description": values.get(GcpAttr.DESCRIPTION),
         },
     )
 
 
 def normalize_compute_firewall_policy_association(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.NETWORK,
-        identifier=first_non_empty(values.get("attachment_target"), values.get("name"), resource_identifier(resource)),
+        identifier=first_non_empty(
+            values.get(GcpAttr.ATTACHMENT_TARGET), values.get(GcpAttr.NAME), resource_identifier(resource)
+        ),
         metadata={
-            GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get("firewall_policy"),
-            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: values.get("attachment_target"),
-            "display_name": values.get("display_name"),
+            GcpResourceMetadata.NAME.key: first_non_empty(values.get(GcpAttr.NAME)),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: values.get(GcpAttr.FIREWALL_POLICY),
+            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: values.get(GcpAttr.ATTACHMENT_TARGET),
+            "display_name": values.get(GcpAttr.DISPLAY_NAME),
         },
     )
 
 
 def _normalize_url_map(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -317,16 +318,16 @@ def _normalize_url_map(resource: TerraformResource) -> NormalizedResource:
         metadata=_load_balancer_metadata(
             values,
             {
-                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE.key: values.get("default_service"),
-                GcpResourceMetadata.LOAD_BALANCER_HOST_RULES.key: _dict_list(values.get("host_rule")),
-                GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS.key: _dict_list(values.get("path_matcher")),
+                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE.key: values.get(GcpAttr.DEFAULT_SERVICE),
+                GcpResourceMetadata.LOAD_BALANCER_HOST_RULES.key: _dict_list(values.get(GcpAttr.HOST_RULE)),
+                GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS.key: _dict_list(values.get(GcpAttr.PATH_MATCHER)),
             },
         ),
     )
 
 
 def _normalize_target_proxy(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -337,17 +338,15 @@ def _normalize_target_proxy(resource: TerraformResource) -> NormalizedResource:
         metadata=_load_balancer_metadata(
             values,
             {
-                GcpResourceMetadata.LOAD_BALANCER_URL_MAP.key: values.get("url_map"),
-                GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES.key: compact(
-                    as_list(values.get("ssl_certificates"))
-                ),
+                GcpResourceMetadata.LOAD_BALANCER_URL_MAP.key: values.get(GcpAttr.URL_MAP),
+                GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES.key: values.get(GcpAttr.SSL_CERTIFICATES),
             },
         ),
     )
 
 
 def _normalize_backend_service(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -358,18 +357,18 @@ def _normalize_backend_service(resource: TerraformResource) -> NormalizedResourc
         metadata=_load_balancer_metadata(
             values,
             {
-                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL.key: values.get("protocol"),
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL.key: values.get(GcpAttr.PROTOCOL),
                 GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME.key: values.get(
-                    "load_balancing_scheme"
+                    GcpAttr.LOAD_BALANCING_SCHEME
                 ),
-                GcpResourceMetadata.LOAD_BALANCER_BACKENDS.key: _dict_list(values.get("backend")),
+                GcpResourceMetadata.LOAD_BALANCER_BACKENDS.key: _dict_list(values.get(GcpAttr.BACKEND)),
             },
         ),
     )
 
 
 def _normalize_network_endpoint_group(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -377,32 +376,30 @@ def _normalize_network_endpoint_group(resource: TerraformResource) -> Normalized
         name=resource.name,
         category=ResourceCategory.EDGE,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
-        subnet_ids=tuple(compact([values.get("subnetwork")])),
+        vpc_id=values.get(GcpAttr.NETWORK),
+        subnet_ids=tuple(compact([values.get(GcpAttr.SUBNETWORK)])),
         metadata=_load_balancer_metadata(
             values,
             {
-                GcpResourceMetadata.NETWORK.key: values.get("network"),
-                GcpResourceMetadata.SUBNETWORK.key: values.get("subnetwork"),
-                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE.key: values.get(
-                    "network_endpoint_type"
-                ),
+                GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+                GcpResourceMetadata.SUBNETWORK.key: values.get(GcpAttr.SUBNETWORK),
+                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE.key: values.get(GcpAttr.NETWORK_ENDPOINT_TYPE),
                 GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS.key: _serverless_neg_endpoints(values),
                 GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS.key: _dict_list(
-                    values.get("network_endpoint")
+                    values.get(GcpAttr.NETWORK_ENDPOINT)
                 ),
             },
         ),
     )
 
 
-def _load_balancer_metadata(values: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+def _load_balancer_metadata(values: GcpValues, metadata: dict[str, Any]) -> dict[str, Any]:
     return {
-        GcpResourceMetadata.NAME.key: first_non_empty(values.get("name")),
-        GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-        GcpResourceMetadata.PROJECT.key: values.get("project"),
-        GcpResourceMetadata.REGION.key: values.get("region"),
-        GcpResourceMetadata.ZONE.key: values.get("zone"),
+        GcpResourceMetadata.NAME.key: first_non_empty(values.get(GcpAttr.NAME)),
+        GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+        GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
+        GcpResourceMetadata.ZONE.key: values.get(GcpAttr.ZONE),
         **metadata,
     }
 
@@ -411,30 +408,41 @@ def _dict_list(value: Any) -> list[dict[str, Any]]:
     return [item for item in as_list(value) if isinstance(item, dict)]
 
 
-def _serverless_neg_endpoints(values: dict[str, Any]) -> list[dict[str, Any]]:
+def _gcp_values(values: dict[str, Any] | GcpValues) -> GcpValues:
+    if isinstance(values, GcpValues):
+        return values
+    return GcpValues(values)
+
+
+def _serverless_neg_endpoints(values: GcpValues) -> list[dict[str, Any]]:
     endpoints: list[dict[str, Any]] = []
-    endpoints.extend(_serverless_neg_endpoint("cloud_run", item) for item in _dict_list(values.get("cloud_run")))
+    endpoints.extend(_serverless_neg_endpoint("cloud_run", item) for item in _dict_list(values.get(GcpAttr.CLOUD_RUN)))
     endpoints.extend(
-        _serverless_neg_endpoint("cloud_function", item) for item in _dict_list(values.get("cloud_function"))
+        _serverless_neg_endpoint("cloud_function", item)
+        for item in _dict_list(values.get(GcpAttr.CLOUD_FUNCTION_BLOCKS))
     )
-    endpoints.extend(_serverless_neg_endpoint("app_engine", item) for item in _dict_list(values.get("app_engine")))
+    endpoints.extend(
+        _serverless_neg_endpoint("app_engine", item)
+        for item in _dict_list(values.get(GcpAttr.APP_ENGINE))
+    )
     return [endpoint for endpoint in endpoints if len(endpoint) > 1]
 
 
 def _serverless_neg_endpoint(platform: str, values: dict[str, Any]) -> dict[str, Any]:
+    endpoint_values = GcpValues(values)
     endpoint = {
         "platform": platform,
-        "service": values.get("service"),
-        "function": values.get("function"),
-        "version": values.get("version"),
-        "tag": values.get("tag"),
-        "url_mask": values.get("url_mask"),
+        "service": endpoint_values.get(GcpAttr.SERVICE),
+        "function": endpoint_values.get(GcpAttr.FUNCTION),
+        "version": endpoint_values.get(GcpAttr.VERSION),
+        "tag": endpoint_values.get(GcpAttr.TAG),
+        "url_mask": endpoint_values.get(GcpAttr.URL_MASK),
     }
     return {key: value for key, value in endpoint.items() if value not in (None, "", [], {})}
 
 
 def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
+    values = GcpValues(resource.values)
     public_access_configured = _forwarding_rule_is_public(values)
     public_reasons = (
         ["forwarding rule uses an external load balancing scheme"]
@@ -448,29 +456,27 @@ def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResourc
         name=resource.name,
         category=ResourceCategory.EDGE,
         identifier=resource_identifier(resource),
-        vpc_id=values.get("network"),
-        subnet_ids=tuple(compact([values.get("subnetwork")])),
+        vpc_id=values.get(GcpAttr.NETWORK),
+        subnet_ids=tuple(compact([values.get(GcpAttr.SUBNETWORK)])),
         public_access_configured=public_access_configured,
         public_exposure=public_access_configured,
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.REGION.key: values.get("region"),
-            GcpResourceMetadata.NETWORK.key: values.get("network"),
-            GcpResourceMetadata.SUBNETWORK.key: values.get("subnetwork"),
-            GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS.key: values.get("ip_address"),
-            GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME.key: values.get("load_balancing_scheme"),
-            GcpResourceMetadata.FORWARDING_RULE_TARGET.key: values.get("target"),
-            GcpResourceMetadata.FORWARDING_RULE_BACKEND_SERVICE.key: values.get("backend_service"),
-            GcpResourceMetadata.FORWARDING_RULE_PORTS.key: compact(as_list(values.get("ports"))),
-            GcpResourceMetadata.FORWARDING_RULE_SOURCE_IP_RANGES.key: compact(
-                as_list(values.get("source_ip_ranges"))
-            ),
-            "ip_protocol": values.get("ip_protocol"),
-            "port_range": values.get("port_range"),
-            "all_ports": as_bool(values.get("all_ports", False)),
-            "allow_global_access": as_bool(values.get("allow_global_access", False)),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
+            GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
+            GcpResourceMetadata.SUBNETWORK.key: values.get(GcpAttr.SUBNETWORK),
+            GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS.key: values.get(GcpAttr.IP_ADDRESS),
+            GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME.key: values.get(GcpAttr.LOAD_BALANCING_SCHEME),
+            GcpResourceMetadata.FORWARDING_RULE_TARGET.key: values.get(GcpAttr.TARGET),
+            GcpResourceMetadata.FORWARDING_RULE_BACKEND_SERVICE.key: values.get(GcpAttr.BACKEND_SERVICE),
+            GcpResourceMetadata.FORWARDING_RULE_PORTS.key: values.get(GcpAttr.PORTS),
+            GcpResourceMetadata.FORWARDING_RULE_SOURCE_IP_RANGES.key: values.get(GcpAttr.SOURCE_IP_RANGES),
+            "ip_protocol": values.get(GcpAttr.IP_PROTOCOL),
+            "port_range": values.get(GcpAttr.PORT_RANGE),
+            "all_ports": values.get(GcpAttr.ALL_PORTS),
+            "allow_global_access": values.get(GcpAttr.ALLOW_GLOBAL_ACCESS),
         },
     )
     mutations = gcp_mutations(normalized)
@@ -484,15 +490,15 @@ def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResourc
     return normalized
 
 
-def parse_firewall_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
-    direction = str(values.get("direction") or "INGRESS").strip().lower()
-    cidr_blocks = _firewall_cidr_blocks(values, direction)
+def parse_firewall_allow_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:
+    gcp_values = _gcp_values(values)
+    direction = str(gcp_values.get(GcpAttr.DIRECTION) or "INGRESS").strip().lower()
+    cidr_blocks = _firewall_cidr_blocks(gcp_values, direction)
     rules: list[SecurityGroupRule] = []
-    for allow in as_list(values.get("allow")):
-        if not isinstance(allow, dict):
-            continue
-        protocol = str(allow.get("protocol") or "-1")
-        ports = compact(as_list(allow.get("ports")))
+    for allow in gcp_values.get(GcpAttr.ALLOW):
+        allow_values = GcpValues(allow)
+        protocol = str(allow_values.get(GcpAttr.PROTOCOL) or "-1")
+        ports = allow_values.get(GcpAttr.PORTS)
         if not ports:
             rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
             continue
@@ -502,17 +508,19 @@ def parse_firewall_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule
     return rules
 
 
-def parse_firewall_policy_allow_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
-    if str(values.get("action") or "").strip().lower() != "allow":
+def parse_firewall_policy_allow_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:
+    gcp_values = _gcp_values(values)
+    if str(gcp_values.get(GcpAttr.ACTION) or "").strip().lower() != "allow":
         return []
 
-    match = _firewall_policy_match(values)
-    direction = _firewall_policy_direction(values)
+    match = _firewall_policy_match(gcp_values)
+    direction = _firewall_policy_direction(gcp_values)
     cidr_blocks = _firewall_policy_cidr_blocks(match, direction)
     rules: list[SecurityGroupRule] = []
     for layer4_config in _firewall_policy_layer4_configs(match):
-        protocol = str(layer4_config.get("ip_protocol") or layer4_config.get("protocol") or "-1")
-        ports = compact(as_list(layer4_config.get("ports")))
+        layer4_values = GcpValues(layer4_config)
+        protocol = str(layer4_values.get(GcpAttr.IP_PROTOCOL) or layer4_values.get(GcpAttr.PROTOCOL) or "-1")
+        ports = layer4_values.get(GcpAttr.PORTS)
         if not ports:
             rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
             continue
@@ -523,32 +531,35 @@ def parse_firewall_policy_allow_rules(values: dict[str, Any]) -> list[SecurityGr
 
 
 def _firewall_policy_rule_identifier(resource: TerraformResource) -> str | None:
-    values = resource.values
-    firewall_policy = first_non_empty(values.get("firewall_policy"))
-    priority = first_non_empty(values.get("priority"))
+    values = GcpValues(resource.values)
+    firewall_policy = first_non_empty(values.get(GcpAttr.FIREWALL_POLICY))
+    priority = first_non_empty(values.get(GcpAttr.PRIORITY))
     if firewall_policy and priority:
         return f"{firewall_policy}/rules/{priority}"
     return resource_identifier(resource)
 
 
-def _firewall_policy_match(values: dict[str, Any]) -> dict[str, Any]:
-    return first_item(values.get("match")) or {}
+def _firewall_policy_match(values: GcpValues) -> dict[str, Any]:
+    return first_item(values.get(GcpAttr.MATCH)) or {}
 
 
-def _firewall_policy_direction(values: dict[str, Any]) -> str:
-    return str(values.get("direction") or "INGRESS").strip().lower()
+def _firewall_policy_direction(values: GcpValues) -> str:
+    return str(values.get(GcpAttr.DIRECTION) or "INGRESS").strip().lower()
 
 
 def _firewall_policy_layer4_configs(match: dict[str, Any]) -> list[dict[str, Any]]:
-    return _dict_list(match.get("layer4_configs") or match.get("layer4_config"))
+    match_values = GcpValues(match)
+    return match_values.get(GcpAttr.LAYER4_CONFIGS) or match_values.get(GcpAttr.LAYER4_CONFIG)
 
 
 def _firewall_policy_source_ranges(match: dict[str, Any]) -> list[str]:
-    return compact(as_list(match.get("src_ip_ranges") or match.get("src_ip_range")))
+    match_values = GcpValues(match)
+    return match_values.get(GcpAttr.SRC_IP_RANGES) or match_values.get(GcpAttr.SRC_IP_RANGE)
 
 
 def _firewall_policy_destination_ranges(match: dict[str, Any]) -> list[str]:
-    return compact(as_list(match.get("dest_ip_ranges") or match.get("dest_ip_range")))
+    match_values = GcpValues(match)
+    return match_values.get(GcpAttr.DEST_IP_RANGES) or match_values.get(GcpAttr.DEST_IP_RANGE)
 
 
 def _firewall_policy_cidr_blocks(match: dict[str, Any], direction: str) -> list[str]:
@@ -564,14 +575,15 @@ def _firewall_policy_cidr_blocks(match: dict[str, Any], direction: str) -> list[
 
 
 def _firewall_policy_has_non_cidr_source(match: dict[str, Any]) -> bool:
+    match_values = GcpValues(match)
     source_scoped_fields = (
-        "src_address_groups",
-        "src_fqdns",
-        "src_region_codes",
-        "src_secure_tags",
-        "src_threat_intelligences",
+        GcpAttr.SRC_ADDRESS_GROUPS,
+        GcpAttr.SRC_FQDNS,
+        GcpAttr.SRC_REGION_CODES,
+        GcpAttr.SRC_SECURE_TAGS,
+        GcpAttr.SRC_THREAT_INTELLIGENCES,
     )
-    return any(compact(as_list(match.get(field))) for field in source_scoped_fields)
+    return any(match_values.get(field) for field in source_scoped_fields)
 
 
 def _firewall_rule(
@@ -590,22 +602,22 @@ def _firewall_rule(
     )
 
 
-def _firewall_cidr_blocks(values: dict[str, Any], direction: str) -> list[str]:
-    source_ranges = compact(as_list(values.get("source_ranges")))
-    destination_ranges = compact(as_list(values.get("destination_ranges")))
+def _firewall_cidr_blocks(values: GcpValues, direction: str) -> list[str]:
+    source_ranges = values.get(GcpAttr.SOURCE_RANGES)
+    destination_ranges = values.get(GcpAttr.DESTINATION_RANGES)
     if direction == "egress" and destination_ranges:
         return destination_ranges
     if source_ranges:
         return source_ranges
-    source_tags = compact(as_list(values.get("source_tags")))
-    source_service_accounts = compact(as_list(values.get("source_service_accounts")))
+    source_tags = values.get(GcpAttr.SOURCE_TAGS)
+    source_service_accounts = values.get(GcpAttr.SOURCE_SERVICE_ACCOUNTS)
     if direction == "ingress" and not source_tags and not source_service_accounts:
         return ["0.0.0.0/0"]
     return []
 
 
-def _forwarding_rule_is_public(values: dict[str, Any]) -> bool:
-    scheme = str(values.get("load_balancing_scheme") or "EXTERNAL").strip().upper()
+def _forwarding_rule_is_public(values: GcpValues) -> bool:
+    scheme = str(values.get(GcpAttr.LOAD_BALANCING_SCHEME) or "EXTERNAL").strip().upper()
     return scheme in {"EXTERNAL", "EXTERNAL_MANAGED"}
 
 
