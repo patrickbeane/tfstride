@@ -35,6 +35,7 @@ from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
+from tfstride.providers.gcp.resource_types import GCP_NORMALIZED_RESOURCE_TYPES, GcpResourceType
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.resource_metadata import InventoryMetadata, MetadataField
 
@@ -59,7 +60,7 @@ def _normalized_resource(provider: str = "gcp") -> NormalizedResource:
     return NormalizedResource(
         address="google_storage_bucket.logs",
         provider=provider,
-        resource_type="google_storage_bucket",
+        resource_type=GcpResourceType.STORAGE_BUCKET,
         name="logs",
         category=ResourceCategory.DATA,
     )
@@ -88,66 +89,16 @@ class GcpProviderTests(unittest.TestCase):
             plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
             frozenset(
                 {
-                    "google_cloud_run_service",
-                    "google_cloud_run_v2_service",
-                    "google_cloudfunctions_function",
-                    "google_cloudfunctions2_function",
-                    "google_compute_instance",
+                    GcpResourceType.CLOUD_RUN_SERVICE,
+                    GcpResourceType.CLOUD_RUN_V2_SERVICE,
+                    GcpResourceType.CLOUDFUNCTIONS_FUNCTION,
+                    GcpResourceType.CLOUDFUNCTIONS2_FUNCTION,
+                    GcpResourceType.COMPUTE_INSTANCE,
                 }
             ),
         )
-        self.assertTrue(plugin.supports_resource_type("google_cloud_run_service"))
-        self.assertTrue(plugin.supports_resource_type("google_cloud_run_v2_service"))
-        self.assertTrue(plugin.supports_resource_type("google_cloud_run_service_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_cloud_run_v2_service_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions_function"))
-        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions2_function"))
-        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions_function_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_cloudfunctions2_function_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_route"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_router"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_router_nat"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_forwarding_rule"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_global_forwarding_rule"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_target_http_proxy"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_target_https_proxy"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_region_target_http_proxy"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_region_target_https_proxy"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_url_map"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_region_url_map"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_backend_service"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_region_backend_service"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_backend_bucket"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_network_endpoint_group"))
-        self.assertTrue(plugin.supports_resource_type("google_compute_region_network_endpoint_group"))
-        self.assertTrue(plugin.supports_resource_type("google_container_cluster"))
-        self.assertTrue(plugin.supports_resource_type("google_container_node_pool"))
-        self.assertTrue(plugin.supports_resource_type("google_service_account"))
-        self.assertTrue(plugin.supports_resource_type("google_service_account_key"))
-        self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret"))
-        self.assertTrue(plugin.supports_resource_type("google_secret_manager_secret_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key"))
-        self.assertTrue(plugin.supports_resource_type("google_kms_crypto_key_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_kms_key_ring_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_kms_key_ring_iam_binding"))
-        self.assertTrue(plugin.supports_resource_type("google_kms_key_ring_iam_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_folder_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_folder_iam_binding"))
-        self.assertTrue(plugin.supports_resource_type("google_folder_iam_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_organization_iam_member"))
-        self.assertTrue(plugin.supports_resource_type("google_organization_iam_binding"))
-        self.assertTrue(plugin.supports_resource_type("google_organization_iam_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_org_policy_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_organization_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_folder_organization_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_project_organization_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_sql_database_instance"))
-        self.assertTrue(plugin.supports_resource_type("google_project_iam_binding"))
-        self.assertTrue(plugin.supports_resource_type("google_project_iam_custom_role"))
-        self.assertTrue(plugin.supports_resource_type("google_project_iam_policy"))
-        self.assertTrue(plugin.supports_resource_type("google_organization_iam_custom_role"))
-        self.assertTrue(plugin.supports_resource_type("google_storage_bucket"))
-        self.assertTrue(plugin.supports_resource_type("google_storage_bucket_iam_member"))
+        for resource_type in sorted(GCP_NORMALIZED_RESOURCE_TYPES):
+            self.assertTrue(plugin.supports_resource_type(resource_type), resource_type)
         self.assertFalse(plugin.supports_resource_type("google_project_service"))
 
     def test_shared_gcp_constants_match_supported_resource_contract(self) -> None:
@@ -185,6 +136,7 @@ class GcpProviderTests(unittest.TestCase):
             GCP_IAM_POLICY_RESOURCE_TYPES,
             GCP_IAM_GRANT_RESOURCE_TYPES | GCP_CUSTOM_ROLE_RESOURCE_TYPES,
         )
+        self.assertEqual(SUPPORTED_GCP_TYPES, GCP_NORMALIZED_RESOURCE_TYPES)
         self.assertLessEqual(GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(GCP_IAM_GRANT_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(GCP_IAM_POLICY_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
@@ -368,7 +320,7 @@ class GcpProviderTests(unittest.TestCase):
             normalizer.owns_resource(
                 _terraform_resource(
                     address="google_storage_bucket.logs",
-                    resource_type="google_storage_bucket",
+                    resource_type=GcpResourceType.STORAGE_BUCKET,
                 )
             )
         )
@@ -376,7 +328,7 @@ class GcpProviderTests(unittest.TestCase):
             normalizer.owns_resource(
                 _terraform_resource(
                     address="google_compute_instance.web",
-                    resource_type="google_compute_instance",
+                    resource_type=GcpResourceType.COMPUTE_INSTANCE,
                     provider_name="registry.terraform.io/hashicorp/google-beta",
                 )
             )
@@ -395,16 +347,16 @@ class GcpProviderTests(unittest.TestCase):
         resources = [
             _terraform_resource(
                 address="google_storage_bucket.logs",
-                resource_type="google_storage_bucket",
+                resource_type=GcpResourceType.STORAGE_BUCKET,
             ),
             _terraform_resource(
                 address="google_compute_instance.web",
-                resource_type="google_compute_instance",
+                resource_type=GcpResourceType.COMPUTE_INSTANCE,
                 provider_name="registry.terraform.io/hashicorp/google-beta",
             ),
             _terraform_resource(
                 address="google_service_account.web",
-                resource_type="google_service_account",
+                resource_type=GcpResourceType.SERVICE_ACCOUNT,
             ),
             _terraform_resource(
                 address="google_project_service.compute",

@@ -7,11 +7,21 @@ from types import MappingProxyType
 from typing import Any
 
 from tfstride.models import NormalizedResource
-from tfstride.providers.gcp.constants import (
+from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
+from tfstride.providers.gcp.resource_types import (
     GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
     GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
     GCP_CLOUD_RUN_IAM_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_FORWARDING_RULE_RESOURCE_TYPES,
+    GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES,
+    GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES,
+    GCP_LOAD_BALANCER_NEG_TYPES,
+    GCP_LOAD_BALANCER_TARGET_PROXY_TYPES,
+    GCP_LOAD_BALANCER_URL_MAP_TYPES,
     GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
     GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
     GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES,
@@ -19,10 +29,8 @@ from tfstride.providers.gcp.constants import (
     GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
     GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
-    PUBLIC_GCP_IAM_MEMBERS,
+    GcpResourceType,
 )
-from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     binding_members,
@@ -44,37 +52,37 @@ class GcpResourceDecorator:
     def decorate(self, resources: list[NormalizedResource]) -> None:
         index = _GcpResourceIndex.build(resources)
         for resource in resources:
-            if resource.resource_type == "google_compute_subnetwork":
+            if resource.resource_type == GcpResourceType.COMPUTE_SUBNETWORK:
                 _derive_subnetwork_route_posture(resource, index)
 
         _derive_load_balancer_frontend_reachability(index)
 
         for resource in resources:
-            if resource.resource_type == "google_compute_instance":
+            if resource.resource_type == GcpResourceType.COMPUTE_INSTANCE:
                 _infer_instance_vpc_id(resource, index)
                 _derive_instance_network_posture(resource, index)
                 _derive_public_compute_exposure(resource, index)
-            elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
+            elif resource.resource_type in GCP_FORWARDING_RULE_RESOURCE_TYPES:
                 _infer_instance_vpc_id(resource, index)
                 _derive_instance_network_posture(resource, index)
             elif resource.resource_type in GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES:
                 _derive_public_serverless_exposure(resource, index)
-            elif resource.resource_type == "google_secret_manager_secret":
+            elif resource.resource_type == GcpResourceType.SECRET_MANAGER_SECRET:
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
-            elif resource.resource_type == "google_pubsub_topic":
+            elif resource.resource_type == GcpResourceType.PUBSUB_TOPIC:
                 _derive_sensitive_resource_iam_bindings(resource, index.pubsub_topic_iam_resources)
-            elif resource.resource_type == "google_pubsub_subscription":
+            elif resource.resource_type == GcpResourceType.PUBSUB_SUBSCRIPTION:
                 _derive_sensitive_resource_iam_bindings(resource, index.pubsub_subscription_iam_resources)
-            elif resource.resource_type == "google_bigquery_dataset":
+            elif resource.resource_type == GcpResourceType.BIGQUERY_DATASET:
                 _derive_sensitive_resource_iam_bindings(resource, index.bigquery_dataset_iam_resources)
-            elif resource.resource_type == "google_bigquery_table":
+            elif resource.resource_type == GcpResourceType.BIGQUERY_TABLE:
                 _derive_sensitive_resource_iam_bindings(resource, index.bigquery_table_iam_resources)
-            elif resource.resource_type == "google_kms_crypto_key":
+            elif resource.resource_type == GcpResourceType.KMS_CRYPTO_KEY:
                 _derive_sensitive_resource_iam_bindings(
                     resource,
                     index.kms_crypto_key_iam_resources + index.kms_key_ring_iam_resources,
                 )
-            elif resource.resource_type == "google_storage_bucket":
+            elif resource.resource_type == GcpResourceType.STORAGE_BUCKET:
                 _derive_sensitive_resource_iam_bindings(resource, index.bucket_iam_resources)
                 _derive_public_bucket_exposure(resource, index)
 
@@ -127,27 +135,27 @@ class _GcpResourceIndex:
         for resource in resources:
             for reference in _resource_references(resource):
                 resources_by_reference.setdefault(reference, resource)
-            if resource.resource_type == "google_compute_network":
+            if resource.resource_type == GcpResourceType.COMPUTE_NETWORK:
                 for reference in _resource_references(resource):
                     network_references.setdefault(reference, resource.address)
                     network_references.setdefault(_network_reference_key(reference), resource.address)
-            elif resource.resource_type == "google_compute_subnetwork":
+            elif resource.resource_type == GcpResourceType.COMPUTE_SUBNETWORK:
                 for reference in _resource_references(resource):
                     subnetworks_by_reference.setdefault(reference, resource)
-            elif resource.resource_type == "google_compute_router":
+            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTER:
                 for reference in _resource_references(resource):
                     routers_by_reference.setdefault(reference, resource)
-            elif resource.resource_type == "google_compute_route":
+            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTE:
                 routes.append(resource)
-            elif resource.resource_type == "google_compute_router_nat":
+            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTER_NAT:
                 router_nats.append(resource)
-            elif resource.resource_type in {"google_compute_forwarding_rule", "google_compute_global_forwarding_rule"}:
+            elif resource.resource_type in GCP_FORWARDING_RULE_RESOURCE_TYPES:
                 forwarding_rules.append(resource)
-            elif resource.resource_type == "google_compute_firewall":
+            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL:
                 firewalls.append(resource)
-            elif resource.resource_type == "google_compute_firewall_policy_rule":
+            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE:
                 firewall_policy_rules.append(resource)
-            elif resource.resource_type == "google_compute_firewall_policy_association":
+            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION:
                 firewall_policy_associations.append(resource)
             elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
                 bucket_iam_resources.append(resource)
@@ -194,23 +202,6 @@ class _GcpResourceIndex:
 
 
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
-_GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES = frozenset(
-    {"google_compute_backend_service", "google_compute_region_backend_service"}
-)
-_GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES = frozenset({"google_compute_backend_bucket"})
-_GCP_LOAD_BALANCER_NEG_TYPES = frozenset(
-    {"google_compute_network_endpoint_group", "google_compute_region_network_endpoint_group"}
-)
-_GCP_LOAD_BALANCER_TARGET_PROXY_TYPES = frozenset(
-    {
-        "google_compute_target_http_proxy",
-        "google_compute_target_https_proxy",
-        "google_compute_region_target_http_proxy",
-        "google_compute_region_target_https_proxy",
-    }
-)
-_GCP_LOAD_BALANCER_URL_MAP_TYPES = frozenset({"google_compute_url_map", "google_compute_region_url_map"})
-
 
 def _derive_load_balancer_frontend_reachability(index: _GcpResourceIndex) -> None:
     for forwarding_rule in index.forwarding_rules:
@@ -259,7 +250,7 @@ def _traverse_load_balancer_reference(
     next_visited = {*visited, resource.address}
     _append_load_balancer_frontend(resource, frontend, next_path)
 
-    if resource.resource_type in _GCP_LOAD_BALANCER_TARGET_PROXY_TYPES:
+    if resource.resource_type in GCP_LOAD_BALANCER_TARGET_PROXY_TYPES:
         url_map_reference = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_URL_MAP)
         if url_map_reference:
             _traverse_load_balancer_reference(
@@ -272,7 +263,7 @@ def _traverse_load_balancer_reference(
             )
         return
 
-    if resource.resource_type in _GCP_LOAD_BALANCER_URL_MAP_TYPES:
+    if resource.resource_type in GCP_LOAD_BALANCER_URL_MAP_TYPES:
         for backend_reference in _url_map_backend_references(resource):
             _traverse_load_balancer_reference(
                 backend_reference,
@@ -284,7 +275,7 @@ def _traverse_load_balancer_reference(
             )
         return
 
-    if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES:
+    if resource.resource_type in GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES:
         _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         for backend_reference in _backend_service_group_references(resource):
@@ -298,7 +289,7 @@ def _traverse_load_balancer_reference(
             )
         return
 
-    if resource.resource_type in _GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES:
+    if resource.resource_type in GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES:
         _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         bucket_reference = resource.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_BUCKET_NAME)
@@ -313,7 +304,7 @@ def _traverse_load_balancer_reference(
             )
         return
 
-    if resource.resource_type in _GCP_LOAD_BALANCER_NEG_TYPES:
+    if resource.resource_type in GCP_LOAD_BALANCER_NEG_TYPES:
         _mark_fronted_by_public_load_balancer(resource, frontend)
         reachable_backends.append(_load_balancer_backend_entry(frontend, resource, next_path))
         for endpoint_reference in _network_endpoint_group_target_references(resource):
@@ -591,7 +582,7 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResour
 def _derive_public_serverless_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
     iam_resources = (
         index.cloud_run_iam_resources
-        if resource.resource_type in {"google_cloud_run_service", "google_cloud_run_v2_service"}
+        if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
         else index.cloud_function_iam_resources
     )
     public_access_reasons = _serverless_public_access_reasons(resource, iam_resources)
@@ -885,7 +876,7 @@ def _firewall_policy_reference_keys(
     expanded_keys = set(keys)
     for key in keys:
         policy = index.resources_by_reference.get(key)
-        if policy is None or policy.resource_type != "google_compute_firewall_policy":
+        if policy is None or policy.resource_type != GcpResourceType.COMPUTE_FIREWALL_POLICY:
             continue
         expanded_keys.update(_firewall_policy_reference_keys(policy))
     return expanded_keys
@@ -1109,7 +1100,7 @@ def _validated_network_reference(value: object) -> str | None:
 def _is_terraform_network_reference(value: str) -> bool:
     parts = value.split(".")
     for index, part in enumerate(parts[:-1]):
-        if part != "google_compute_network":
+        if part != GcpResourceType.COMPUTE_NETWORK:
             continue
         resource_name = parts[index + 1]
         return bool(resource_name) and all(

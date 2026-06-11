@@ -2,67 +2,37 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from tfstride.providers.gcp.constants import (
+from tfstride.providers.gcp.resource_types import (
+    GCP_DATA_STORE_RESOURCE_TYPES,
     GCP_IAM_POLICY_RESOURCE_TYPES,
+    GCP_NETWORK_SECURITY_GROUP_RESOURCE_TYPES,
+    GCP_PUBLIC_EDGE_RESOURCE_TYPES,
+    GCP_SENSITIVE_RESOURCE_POLICY_TYPES,
     GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+    GCP_WORKLOAD_RESOURCE_TYPES,
+    GcpResourceType,
 )
 from tfstride.providers.resource_capabilities import ResourceCapability
 
 
 GCP_RESOURCE_CAPABILITIES = MappingProxyType(
     {
-        ResourceCapability.WORKLOAD: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
-        | frozenset({"google_compute_instance"}),
-        ResourceCapability.PUBLIC_COMPUTE: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
-        | frozenset({"google_compute_instance"}),
-        ResourceCapability.DATA_STORE: frozenset(
-            {
-                "google_bigquery_dataset",
-                "google_bigquery_table",
-                "google_pubsub_subscription",
-                "google_pubsub_topic",
-                "google_secret_manager_secret",
-                "google_sql_database_instance",
-                "google_storage_bucket",
-            }
-        ),
-        ResourceCapability.PUBLIC_EDGE: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES
-        | frozenset(
-            {
-                "google_compute_forwarding_rule",
-                "google_compute_global_forwarding_rule",
-                "google_compute_instance",
-                "google_container_cluster",
-                "google_sql_database_instance",
-                "google_storage_bucket",
-            }
-        ),
-        ResourceCapability.IDENTITY_ROLE: frozenset({"google_service_account"}),
+        ResourceCapability.WORKLOAD: GCP_WORKLOAD_RESOURCE_TYPES,
+        ResourceCapability.PUBLIC_COMPUTE: GCP_WORKLOAD_RESOURCE_TYPES,
+        ResourceCapability.DATA_STORE: GCP_DATA_STORE_RESOURCE_TYPES,
+        ResourceCapability.PUBLIC_EDGE: GCP_PUBLIC_EDGE_RESOURCE_TYPES,
+        ResourceCapability.IDENTITY_ROLE: frozenset({GcpResourceType.SERVICE_ACCOUNT}),
         ResourceCapability.IAM_POLICY: GCP_IAM_POLICY_RESOURCE_TYPES,
-        ResourceCapability.NETWORK_SECURITY_GROUP: frozenset(
-            {
-                "google_compute_firewall",
-                "google_compute_firewall_policy",
-                "google_compute_firewall_policy_rule",
-            }
+        ResourceCapability.NETWORK_SECURITY_GROUP: GCP_NETWORK_SECURITY_GROUP_RESOURCE_TYPES,
+        ResourceCapability.SUBNET: frozenset({GcpResourceType.COMPUTE_SUBNETWORK}),
+        ResourceCapability.DATABASE: frozenset({GcpResourceType.SQL_DATABASE_INSTANCE}),
+        ResourceCapability.OBJECT_STORAGE: frozenset({GcpResourceType.STORAGE_BUCKET}),
+        ResourceCapability.SECRET_STORE: frozenset({GcpResourceType.SECRET_MANAGER_SECRET}),
+        ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset(
+            {GcpResourceType.SECRET_MANAGER_SECRET}
         ),
-        ResourceCapability.SUBNET: frozenset({"google_compute_subnetwork"}),
-        ResourceCapability.DATABASE: frozenset({"google_sql_database_instance"}),
-        ResourceCapability.OBJECT_STORAGE: frozenset({"google_storage_bucket"}),
-        ResourceCapability.SECRET_STORE: frozenset({"google_secret_manager_secret"}),
-        ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset({"google_secret_manager_secret"}),
-        ResourceCapability.KEY_MANAGEMENT: frozenset({"google_kms_crypto_key"}),
+        ResourceCapability.KEY_MANAGEMENT: frozenset({GcpResourceType.KMS_CRYPTO_KEY}),
         ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
-        ResourceCapability.SENSITIVE_RESOURCE_POLICY: frozenset(
-            {
-                "google_bigquery_dataset",
-                "google_bigquery_table",
-                "google_kms_crypto_key",
-                "google_pubsub_subscription",
-                "google_pubsub_topic",
-                "google_secret_manager_secret",
-                "google_storage_bucket",
-            }
-        ),
+        ResourceCapability.SENSITIVE_RESOURCE_POLICY: GCP_SENSITIVE_RESOURCE_POLICY_TYPES,
     }
 )
