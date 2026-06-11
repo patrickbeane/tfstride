@@ -249,6 +249,27 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
             },
         )
 
+    def test_metadata_field_keys_are_normalized_with_field_setters(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                ResourceMetadata.PUBLIC_ACCESS_CONFIGURED: "enabled",
+                ResourceMetadata.STORAGE_ENCRYPTED: None,
+                "raw": {"items": ["value"]},
+            },
+        )
+
+        self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertFalse(resource.has_metadata_field(ResourceMetadata.STORAGE_ENCRYPTED))
+        self.assertEqual(
+            resource.metadata_snapshot(),
+            {"public_access_configured": True, "raw": {"items": ["value"]}},
+        )
+
     def test_metadata_view_is_read_only_and_detached(self) -> None:
         source_metadata = {"tags": {"env": "prod"}}
         resource = NormalizedResource(

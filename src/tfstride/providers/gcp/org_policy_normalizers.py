@@ -71,7 +71,7 @@ def _normalize_legacy_org_policy(
     values = resource.values
     scope = first_non_empty(*(values.get(key) for key in scope_keys))
     rules = _legacy_policy_rules(values)
-    metadata_scope = {scope_field.key: scope} if scope else {}
+    metadata_scope = {scope_field: scope} if scope else {}
     return _org_policy_resource(
         resource,
         constraint=first_non_empty(values.get("constraint")),
@@ -108,24 +108,24 @@ def _org_policy_resource(
     extra_metadata: dict[str, Any] | None = None,
 ) -> NormalizedResource:
     metadata = {
-        GcpResourceMetadata.NAME.key: resource_name(resource),
-        GcpResourceMetadata.SELF_LINK.key: resource.values.get("self_link"),
-        GcpResourceMetadata.PROJECT.key: project,
-        GcpResourceMetadata.FOLDER_ID.key: folder_id,
-        GcpResourceMetadata.ORGANIZATION_ID.key: organization_id,
-        GcpResourceMetadata.ORG_POLICY_CONSTRAINT.key: constraint,
-        GcpResourceMetadata.ORG_POLICY_SCOPE.key: scope,
-        GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE.key: scope_type,
-        GcpResourceMetadata.ORG_POLICY_RULES.key: rules,
-        GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES.key: allowed_values,
-        GcpResourceMetadata.ORG_POLICY_DENIED_VALUES.key: denied_values,
+        GcpResourceMetadata.NAME: resource_name(resource),
+        GcpResourceMetadata.SELF_LINK: resource.values.get("self_link"),
+        GcpResourceMetadata.PROJECT: project,
+        GcpResourceMetadata.FOLDER_ID: folder_id,
+        GcpResourceMetadata.ORGANIZATION_ID: organization_id,
+        GcpResourceMetadata.ORG_POLICY_CONSTRAINT: constraint,
+        GcpResourceMetadata.ORG_POLICY_SCOPE: scope,
+        GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE: scope_type,
+        GcpResourceMetadata.ORG_POLICY_RULES: rules,
+        GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES: allowed_values,
+        GcpResourceMetadata.ORG_POLICY_DENIED_VALUES: denied_values,
     }
     if inherit_from_parent is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT.key] = inherit_from_parent
+        metadata[GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT] = inherit_from_parent
     if restore_default is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT.key] = restore_default
+        metadata[GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT] = restore_default
     if enforced is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_ENFORCED.key] = enforced
+        metadata[GcpResourceMetadata.ORG_POLICY_ENFORCED] = enforced
     if extra_metadata:
         metadata.update(extra_metadata)
     return NormalizedResource(

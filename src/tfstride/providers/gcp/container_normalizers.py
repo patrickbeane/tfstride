@@ -42,14 +42,14 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         node_config_values,
         has_node_config,
         {
-            GcpResourceMetadata.GKE_ENDPOINT.key: first_non_empty(values.get(GcpAttr.ENDPOINT)),
-            GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED.key: private_cluster_config.get(
+            GcpResourceMetadata.GKE_ENDPOINT: first_non_empty(values.get(GcpAttr.ENDPOINT)),
+            GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED: private_cluster_config.get(
                 GcpAttr.ENABLE_PRIVATE_ENDPOINT
             ),
-            GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED.key: private_cluster_config.get(GcpAttr.ENABLE_PRIVATE_NODES),
-            GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS.key: authorized_networks,
-            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL.key: workload_pool,
-            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED.key: bool(workload_pool),
+            GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED: private_cluster_config.get(GcpAttr.ENABLE_PRIVATE_NODES),
+            GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS: authorized_networks,
+            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL: workload_pool,
+            GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED: bool(workload_pool),
             "private_cluster_config": private_cluster_config_values,
             "master_authorized_networks_config": authorized_networks_config or {},
             "workload_identity_config": workload_identity_config_values,
@@ -117,17 +117,17 @@ def _container_metadata(
     metadata_mode = _node_metadata_mode(node_config)
     service_account = first_non_empty(node_config.get(GcpAttr.SERVICE_ACCOUNT))
     metadata = {
-        GcpResourceMetadata.NAME.key: resource_name(resource),
-        GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
-        GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
-        GcpResourceMetadata.REGION.key: values.get(GcpAttr.LOCATION),
-        GcpResourceMetadata.NETWORK.key: values.get(GcpAttr.NETWORK),
-        GcpResourceMetadata.SUBNETWORK.key: values.get(GcpAttr.SUBNETWORK),
-        GcpResourceMetadata.LABELS.key: values.get(GcpAttr.RESOURCE_LABELS) or values.get(GcpAttr.LABELS),
-        GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT.key: service_account,
-        GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES.key: node_config.get(GcpAttr.OAUTH_SCOPES),
-        GcpResourceMetadata.GKE_NODE_METADATA_MODE.key: metadata_mode,
-        GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED.key: (
+        GcpResourceMetadata.NAME: resource_name(resource),
+        GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
+        GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.REGION: values.get(GcpAttr.LOCATION),
+        GcpResourceMetadata.NETWORK: values.get(GcpAttr.NETWORK),
+        GcpResourceMetadata.SUBNETWORK: values.get(GcpAttr.SUBNETWORK),
+        GcpResourceMetadata.LABELS: values.get(GcpAttr.RESOURCE_LABELS) or values.get(GcpAttr.LABELS),
+        GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT: service_account,
+        GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES: node_config.get(GcpAttr.OAUTH_SCOPES),
+        GcpResourceMetadata.GKE_NODE_METADATA_MODE: metadata_mode,
+        GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED: (
             _legacy_metadata_enabled(node_metadata_values, metadata_mode) if has_node_config else None
         ),
         "node_config": node_config_values,

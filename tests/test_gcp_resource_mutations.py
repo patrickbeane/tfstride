@@ -101,7 +101,7 @@ class GcpResourceMutationsTests(unittest.TestCase):
         resource = _resource(
             resource_type="google_compute_backend_service",
             metadata={
-                GcpResourceMetadata.LOAD_BALANCER_FRONTENDS.key: [
+                GcpResourceMetadata.LOAD_BALANCER_FRONTENDS: [
                     {"forwarding_rule": "google_compute_global_forwarding_rule.public", "path": ["old"]}
                 ],
             },

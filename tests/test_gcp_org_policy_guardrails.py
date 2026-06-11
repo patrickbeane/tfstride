@@ -50,25 +50,25 @@ def _org_policy(
     resource_type: str = "google_org_policy_policy",
 ) -> NormalizedResource:
     metadata: dict[str, object] = {
-        GcpResourceMetadata.ORG_POLICY_CONSTRAINT.key: constraint,
-        GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE.key: scope_type,
-        GcpResourceMetadata.ORG_POLICY_SCOPE.key: scope,
-        GcpResourceMetadata.ORG_POLICY_RULES.key: rules or [],
-        GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES.key: allowed_values or [],
-        GcpResourceMetadata.ORG_POLICY_DENIED_VALUES.key: denied_values or [],
+        GcpResourceMetadata.ORG_POLICY_CONSTRAINT: constraint,
+        GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE: scope_type,
+        GcpResourceMetadata.ORG_POLICY_SCOPE: scope,
+        GcpResourceMetadata.ORG_POLICY_RULES: rules or [],
+        GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES: allowed_values or [],
+        GcpResourceMetadata.ORG_POLICY_DENIED_VALUES: denied_values or [],
     }
     if scope_type == GCP_ORG_POLICY_SCOPE_PROJECT:
-        metadata[GcpResourceMetadata.PROJECT.key] = scope
+        metadata[GcpResourceMetadata.PROJECT] = scope
     elif scope_type == GCP_ORG_POLICY_SCOPE_FOLDER:
-        metadata[GcpResourceMetadata.FOLDER_ID.key] = scope
+        metadata[GcpResourceMetadata.FOLDER_ID] = scope
     elif scope_type == GCP_ORG_POLICY_SCOPE_ORGANIZATION:
-        metadata[GcpResourceMetadata.ORGANIZATION_ID.key] = scope
+        metadata[GcpResourceMetadata.ORGANIZATION_ID] = scope
     if enforced is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_ENFORCED.key] = enforced
+        metadata[GcpResourceMetadata.ORG_POLICY_ENFORCED] = enforced
     if inherit_from_parent is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT.key] = inherit_from_parent
+        metadata[GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT] = inherit_from_parent
     if restore_default is not None:
-        metadata[GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT.key] = restore_default
+        metadata[GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT] = restore_default
     return _gcp_resource(
         address,
         resource_type,
@@ -132,9 +132,9 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_compute_instance",
             ResourceCategory.COMPUTE,
             metadata={
-                GcpResourceMetadata.PROJECT.key: "tfstride-demo",
-                GcpResourceMetadata.FOLDER_ID.key: "folders/456",
-                GcpResourceMetadata.ORGANIZATION_ID.key: "organizations/123",
+                GcpResourceMetadata.PROJECT: "tfstride-demo",
+                GcpResourceMetadata.FOLDER_ID: "folders/456",
+                GcpResourceMetadata.ORGANIZATION_ID: "organizations/123",
             },
         )
 
@@ -170,7 +170,7 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_storage_bucket.logs",
             "google_storage_bucket",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "tfstride-demo"},
         )
 
         reasoning = guardrail_adjusted_severity_reasoning(
@@ -201,7 +201,7 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_storage_bucket.logs",
             "google_storage_bucket",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "tfstride-demo"},
         )
 
         reasoning = guardrail_adjusted_severity_reasoning(
@@ -232,7 +232,7 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_project_iam_member.public",
             "google_project_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "tfstride-demo"},
         )
 
         evidence = organization_guardrail_evidence(
@@ -275,8 +275,8 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_storage_bucket",
             ResourceCategory.DATA,
             metadata={
-                GcpResourceMetadata.PROJECT.key: "projects/tfstride-demo",
-                GcpResourceMetadata.ORGANIZATION_ID.key: "123",
+                GcpResourceMetadata.PROJECT: "projects/tfstride-demo",
+                GcpResourceMetadata.ORGANIZATION_ID: "123",
             },
         )
 
@@ -314,8 +314,8 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_compute_instance",
             ResourceCategory.COMPUTE,
             metadata={
-                GcpResourceMetadata.PROJECT.key: "tfstride-demo",
-                GcpResourceMetadata.ORGANIZATION_ID.key: "organizations/123",
+                GcpResourceMetadata.PROJECT: "tfstride-demo",
+                GcpResourceMetadata.ORGANIZATION_ID: "organizations/123",
             },
         )
 
@@ -353,8 +353,8 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_org_policy_policy",
             ResourceCategory.IAM,
             metadata={
-                GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE.key: GCP_ORG_POLICY_SCOPE_PROJECT,
-                GcpResourceMetadata.ORG_POLICY_SCOPE.key: "projects/tfstride-demo",
+                GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE: GCP_ORG_POLICY_SCOPE_PROJECT,
+                GcpResourceMetadata.ORG_POLICY_SCOPE: "projects/tfstride-demo",
             },
         )
         missing_scope = _gcp_resource(
@@ -362,7 +362,7 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             "google_org_policy_policy",
             ResourceCategory.IAM,
             metadata={
-                GcpResourceMetadata.ORG_POLICY_CONSTRAINT.key: "constraints/storage.publicAccessPrevention",
+                GcpResourceMetadata.ORG_POLICY_CONSTRAINT: "constraints/storage.publicAccessPrevention",
             },
         )
 

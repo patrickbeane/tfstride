@@ -48,16 +48,16 @@ def _policy_rule(
     target_resources: list[str] | None = None,
 ) -> NormalizedResource:
     metadata: dict[str, object] = {
-        GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: policy_reference,
-        GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: action,
-        GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: direction,
+        GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: policy_reference,
+        GcpResourceMetadata.FIREWALL_POLICY_ACTION: action,
+        GcpResourceMetadata.FIREWALL_POLICY_DIRECTION: direction,
     }
     if disabled:
-        metadata[GcpResourceMetadata.FIREWALL_POLICY_DISABLED.key] = True
+        metadata[GcpResourceMetadata.FIREWALL_POLICY_DISABLED] = True
     if target_service_accounts is not None:
-        metadata[GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS.key] = target_service_accounts
+        metadata[GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS] = target_service_accounts
     if target_resources is not None:
-        metadata[GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES.key] = target_resources
+        metadata[GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES] = target_resources
 
     return _gcp_resource(
         address,
@@ -88,8 +88,8 @@ def _policy_association(
         "google_compute_firewall_policy_association",
         ResourceCategory.NETWORK,
         metadata={
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: policy_reference,
-            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: target,
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: policy_reference,
+            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: target,
         },
     )
 
@@ -105,13 +105,13 @@ def _instance(
 ) -> NormalizedResource:
     metadata: dict[str, object] = {}
     if folder_id is not None:
-        metadata[GcpResourceMetadata.FOLDER_ID.key] = folder_id
+        metadata[GcpResourceMetadata.FOLDER_ID] = folder_id
     if organization_id is not None:
-        metadata[GcpResourceMetadata.ORGANIZATION_ID.key] = organization_id
+        metadata[GcpResourceMetadata.ORGANIZATION_ID] = organization_id
     if project is not None:
-        metadata[GcpResourceMetadata.PROJECT.key] = project
+        metadata[GcpResourceMetadata.PROJECT] = project
     if service_account_email is not None:
-        metadata[GcpResourceMetadata.SERVICE_ACCOUNTS.key] = [{"email": service_account_email}]
+        metadata[GcpResourceMetadata.SERVICE_ACCOUNTS] = [{"email": service_account_email}]
 
     return _gcp_resource(
         address,

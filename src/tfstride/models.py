@@ -16,6 +16,20 @@ from tfstride.resource_metadata import (
 
 
 _MetadataValue = TypeVar("_MetadataValue")
+_MetadataKey = str | MetadataField[Any]
+
+
+def _normalized_metadata(metadata: Mapping[_MetadataKey, Any] | None) -> dict[str, Any]:
+    if metadata is None:
+        return {}
+    normalized: dict[str, Any] = {}
+    for key, value in metadata.items():
+        if isinstance(key, MetadataField):
+            if value is not None:
+                key.set(normalized, value)
+            continue
+        normalized[str(key)] = deepcopy(value)
+    return normalized
 
 
 class ResourceCategory(str, Enum):
@@ -150,12 +164,12 @@ class NormalizedResource:
     public_exposure: bool = False
     data_sensitivity: str = "standard"
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
-    metadata: InitVar[dict[str, Any] | None] = None
+    metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
 
-    def __post_init__(self, metadata: dict[str, Any] | None) -> None:
+    def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self.subnet_ids = tuple(self.subnet_ids)
         self.security_group_ids = tuple(self.security_group_ids)
-        self._metadata = deepcopy(metadata) if metadata is not None else {}
+        self._metadata = _normalized_metadata(metadata)
 
     @property
     def display_name(self) -> str:
@@ -305,14 +319,14 @@ class ResourceInventory:
     resources: Sequence[NormalizedResource]
     unsupported_resources: list[str] = field(default_factory=list)
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
-    metadata: InitVar[dict[str, Any] | None] = None
+    metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resources_by_identifier: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resource_positions: dict[int, int] = field(init=False, repr=False, default_factory=dict)
 
-    def __post_init__(self, metadata: dict[str, Any] | None) -> None:
-        self._metadata = deepcopy(metadata) if metadata is not None else {}
+    def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
+        self._metadata = _normalized_metadata(metadata)
         resources = tuple(self.resources)
         self.resources = resources
         resources_by_type: dict[str, list[NormalizedResource]] = {}

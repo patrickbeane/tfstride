@@ -43,26 +43,26 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             "google_compute_instance.web",
             "google_compute_instance",
             ResourceCategory.COMPUTE,
-            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "tfstride-demo"},
         )
         secret = _gcp_resource(
             "google_secret_manager_secret.api",
             "google_secret_manager_secret",
             ResourceCategory.DATA,
             identifier="projects/tfstride-demo/secrets/api",
-            metadata={GcpResourceMetadata.PROJECT.key: "tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "tfstride-demo"},
         )
         other_project_bucket = _gcp_resource(
             "google_storage_bucket.logs",
             "google_storage_bucket",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.PROJECT.key: "other-project"},
+            metadata={GcpResourceMetadata.PROJECT: "other-project"},
         )
         project_iam = _gcp_resource(
             "google_project_iam_member.owner",
             "google_project_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.PROJECT.key: "projects/tfstride-demo"},
+            metadata={GcpResourceMetadata.PROJECT: "projects/tfstride-demo"},
         )
 
         index = _inheritance_index([instance, secret, other_project_bucket, project_iam])
@@ -84,25 +84,25 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             "google_compute_instance.folder_web",
             "google_compute_instance",
             ResourceCategory.COMPUTE,
-            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/456"},
+            metadata={GcpResourceMetadata.FOLDER_ID: "folders/456"},
         )
         org_key = _gcp_resource(
             "google_kms_crypto_key.org_key",
             "google_kms_crypto_key",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.ORGANIZATION_ID.key: "organizations/123"},
+            metadata={GcpResourceMetadata.ORGANIZATION_ID: "organizations/123"},
         )
         folder_iam = _gcp_resource(
             "google_folder_iam_binding.viewer",
             "google_folder_iam_binding",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/456"},
+            metadata={GcpResourceMetadata.FOLDER_ID: "folders/456"},
         )
         organization_iam = _gcp_resource(
             "google_organization_iam_member.owner",
             "google_organization_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.ORGANIZATION_ID.key: "organizations/123"},
+            metadata={GcpResourceMetadata.ORGANIZATION_ID: "organizations/123"},
         )
 
         index = _inheritance_index([folder_workload, org_key, folder_iam, organization_iam])
@@ -120,13 +120,13 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             "google_secret_manager_secret",
             ResourceCategory.DATA,
             identifier="projects/tfstride-demo/secrets/api",
-            metadata={GcpResourceMetadata.SECRET_ID.key: "api"},
+            metadata={GcpResourceMetadata.SECRET_ID: "api"},
         )
         secret_iam = _gcp_resource(
             "google_secret_manager_secret_iam_member.reader",
             "google_secret_manager_secret_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.SECRET_REFERENCE.key: "google_secret_manager_secret.api.id"},
+            metadata={GcpResourceMetadata.SECRET_REFERENCE: "google_secret_manager_secret.api.id"},
         )
 
         index = _inheritance_index([secret, secret_iam])
@@ -141,19 +141,19 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             "google_kms_crypto_key.first",
             "google_kms_crypto_key",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.KMS_KEY_RING.key: "projects/tfstride-demo/locations/global/keyRings/app"},
+            metadata={GcpResourceMetadata.KMS_KEY_RING: "projects/tfstride-demo/locations/global/keyRings/app"},
         )
         second_key = _gcp_resource(
             "google_kms_crypto_key.second",
             "google_kms_crypto_key",
             ResourceCategory.DATA,
-            metadata={GcpResourceMetadata.KMS_KEY_RING.key: "projects/tfstride-demo/locations/global/keyRings/app"},
+            metadata={GcpResourceMetadata.KMS_KEY_RING: "projects/tfstride-demo/locations/global/keyRings/app"},
         )
         key_ring_iam = _gcp_resource(
             "google_kms_key_ring_iam_member.decryptor",
             "google_kms_key_ring_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.KMS_KEY_RING.key: "projects/tfstride-demo/locations/global/keyRings/app"},
+            metadata={GcpResourceMetadata.KMS_KEY_RING: "projects/tfstride-demo/locations/global/keyRings/app"},
         )
 
         index = _inheritance_index([first_key, second_key, key_ring_iam])
@@ -177,7 +177,7 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             "google_secret_manager_secret_iam_member.missing_secret",
             "google_secret_manager_secret_iam_member",
             ResourceCategory.IAM,
-            metadata={GcpResourceMetadata.SECRET_REFERENCE.key: "google_secret_manager_secret.missing.id"},
+            metadata={GcpResourceMetadata.SECRET_REFERENCE: "google_secret_manager_secret.missing.id"},
         )
 
         index = _inheritance_index([project_iam, secret_iam])

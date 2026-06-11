@@ -881,9 +881,9 @@ def _load_balancer_fronted_metadata(
     forwarding_rule: str = "google_compute_global_forwarding_rule.web",
 ) -> dict[str, object]:
     return {
-        GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER.key: True,
-        GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES.key: [forwarding_rule],
-        GcpResourceMetadata.LOAD_BALANCER_FRONTENDS.key: [
+        GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER: True,
+        GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES: [forwarding_rule],
+        GcpResourceMetadata.LOAD_BALANCER_FRONTENDS: [
             {
                 "forwarding_rule": forwarding_rule,
                 "load_balancing_scheme": "EXTERNAL_MANAGED",
@@ -929,7 +929,7 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_global_forwarding_rule",
             ResourceCategory.EDGE,
             metadata={
-                GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME.key: "EXTERNAL_MANAGED",
+                GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME: "EXTERNAL_MANAGED",
             },
         )
         forwarding_rule.public_exposure = True
@@ -1227,9 +1227,9 @@ class GcpRuleTests(unittest.TestCase):
                 )
             ],
             metadata={
-                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "org-policy",
-                GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: "allow",
-                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: "ingress",
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: "org-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ACTION: "allow",
+                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION: "ingress",
             },
         )
         org_association = _normalized_gcp_resource(
@@ -1237,8 +1237,8 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_firewall_policy_association",
             ResourceCategory.NETWORK,
             metadata={
-                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "org-policy",
-                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: "organizations/1234567890",
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: "org-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: "organizations/1234567890",
             },
         )
         org_instance = _normalized_gcp_resource(
@@ -1246,7 +1246,7 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_instance",
             ResourceCategory.COMPUTE,
             public_access_configured=True,
-            metadata={GcpResourceMetadata.ORGANIZATION_ID.key: "1234567890"},
+            metadata={GcpResourceMetadata.ORGANIZATION_ID: "1234567890"},
         )
         folder_rule = _normalized_gcp_resource(
             "google_compute_firewall_policy_rule.folder_admin",
@@ -1262,9 +1262,9 @@ class GcpRuleTests(unittest.TestCase):
                 )
             ],
             metadata={
-                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "folder-policy",
-                GcpResourceMetadata.FIREWALL_POLICY_ACTION.key: "allow",
-                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION.key: "ingress",
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: "folder-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ACTION: "allow",
+                GcpResourceMetadata.FIREWALL_POLICY_DIRECTION: "ingress",
             },
         )
         folder_association = _normalized_gcp_resource(
@@ -1272,8 +1272,8 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_firewall_policy_association",
             ResourceCategory.NETWORK,
             metadata={
-                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE.key: "folder-policy",
-                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET.key: "folders/12345",
+                GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: "folder-policy",
+                GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: "folders/12345",
             },
         )
         folder_instance = _normalized_gcp_resource(
@@ -1281,7 +1281,7 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_instance",
             ResourceCategory.COMPUTE,
             public_access_configured=True,
-            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+            metadata={GcpResourceMetadata.FOLDER_ID: "folders/12345"},
         )
         resources = [
             org_rule,
@@ -3416,8 +3416,8 @@ class GcpRuleTests(unittest.TestCase):
             identifier="projects/tfstride-folder/secrets/api",
             data_sensitivity="sensitive",
             metadata={
-                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
-                GcpResourceMetadata.PROJECT.key: "tfstride-folder",
+                GcpResourceMetadata.FOLDER_ID: "folders/12345",
+                GcpResourceMetadata.PROJECT: "tfstride-folder",
             },
         )
         folder_iam = _normalized_gcp_resource(
@@ -3425,9 +3425,9 @@ class GcpRuleTests(unittest.TestCase):
             "google_folder_iam_member",
             ResourceCategory.IAM,
             metadata={
-                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
-                GcpResourceMetadata.IAM_ROLE.key: "roles/secretmanager.secretAccessor",
-                GcpResourceMetadata.IAM_MEMBER.key: "allUsers",
+                GcpResourceMetadata.FOLDER_ID: "folders/12345",
+                GcpResourceMetadata.IAM_ROLE: "roles/secretmanager.secretAccessor",
+                GcpResourceMetadata.IAM_MEMBER: "allUsers",
             },
         )
         inventory = ResourceInventory(provider="gcp", resources=[secret, folder_iam])
@@ -3579,23 +3579,23 @@ class GcpRuleTests(unittest.TestCase):
             "google_compute_instance.folder_web",
             "google_compute_instance",
             ResourceCategory.COMPUTE,
-            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+            metadata={GcpResourceMetadata.FOLDER_ID: "folders/12345"},
         )
         bucket = _normalized_gcp_resource(
             "google_storage_bucket.folder_logs",
             "google_storage_bucket",
             ResourceCategory.DATA,
             data_sensitivity="sensitive",
-            metadata={GcpResourceMetadata.FOLDER_ID.key: "folders/12345"},
+            metadata={GcpResourceMetadata.FOLDER_ID: "folders/12345"},
         )
         folder_iam = _normalized_gcp_resource(
             "google_folder_iam_member.domain_viewer",
             "google_folder_iam_member",
             ResourceCategory.IAM,
             metadata={
-                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
-                GcpResourceMetadata.IAM_ROLE.key: "roles/viewer",
-                GcpResourceMetadata.IAM_MEMBER.key: "domain:example.com",
+                GcpResourceMetadata.FOLDER_ID: "folders/12345",
+                GcpResourceMetadata.IAM_ROLE: "roles/viewer",
+                GcpResourceMetadata.IAM_MEMBER: "domain:example.com",
             },
         )
         inventory = ResourceInventory(provider="gcp", resources=[instance, bucket, folder_iam])

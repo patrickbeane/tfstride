@@ -332,14 +332,14 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_storage_bucket_facts_read_provider_owned_posture_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.BUCKET_NAME.key: "tfstride-logs",
-                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS.key: True,
-                GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION.key: "enforced",
-                GcpResourceMetadata.GCS_VERSIONING_ENABLED.key: True,
-                GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME.key: (
+                GcpResourceMetadata.BUCKET_NAME: "tfstride-logs",
+                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS: True,
+                GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION: "enforced",
+                GcpResourceMetadata.GCS_VERSIONING_ENABLED: True,
+                GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME: (
                     "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
                 ),
-                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: True,
+                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION: True,
             },
             provider="gcp",
             resource_type="google_storage_bucket",
@@ -360,15 +360,15 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_sensitive_resource_facts_read_provider_owned_iam_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.PROJECT.key: "tfstride-demo",
-                GcpResourceMetadata.IAM_BINDINGS.key: [
+                GcpResourceMetadata.PROJECT: "tfstride-demo",
+                GcpResourceMetadata.IAM_BINDINGS: [
                     {
                         "role": "roles/secretmanager.secretAccessor",
                         "members": ["allAuthenticatedUsers"],
                         "source": "google_secret_manager_secret_iam_member.public_accessor",
                     }
                 ],
-                GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES.key: [
+                GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES: [
                     "google_secret_manager_secret_iam_member.public_accessor"
                 ],
             },
@@ -399,8 +399,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_organization_folder_facts_read_provider_owned_scope_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.ORGANIZATION_ID.key: "1234567890",
-                GcpResourceMetadata.FOLDER_ID.key: "folders/12345",
+                GcpResourceMetadata.ORGANIZATION_ID: "1234567890",
+                GcpResourceMetadata.FOLDER_ID: "folders/12345",
             },
             provider="gcp",
             resource_type="google_folder_iam_member",
@@ -413,7 +413,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
     def test_gcp_iam_target_facts_read_provider_owned_reference_metadata(self) -> None:
         resource = _resource(
-            {GcpResourceMetadata.SECRET_REFERENCE.key: "google_secret_manager_secret.api.id"},
+            {GcpResourceMetadata.SECRET_REFERENCE: "google_secret_manager_secret.api.id"},
             provider="gcp",
             resource_type="google_secret_manager_secret_iam_member",
         )
@@ -426,17 +426,17 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_cloud_sql_facts_read_provider_owned_database_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.DATABASE_VERSION.key: "POSTGRES_15",
-                GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS.key: [
+                GcpResourceMetadata.DATABASE_VERSION: "POSTGRES_15",
+                GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS: [
                     {"name": "anywhere", "value": "0.0.0.0/0"}
                 ],
-                GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED.key: False,
-                GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED.key: True,
-                GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED.key: True,
-                GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK.key: "google_compute_network.main.id",
-                GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL.key: True,
-                GcpResourceMetadata.CLOUD_SQL_SSL_MODE.key: "ENCRYPTED_ONLY",
-                GcpResourceMetadata.DELETION_PROTECTION.key: True,
+                GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED: False,
+                GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED: True,
+                GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED: True,
+                GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK: "google_compute_network.main.id",
+                GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL: True,
+                GcpResourceMetadata.CLOUD_SQL_SSL_MODE: "ENCRYPTED_ONLY",
+                GcpResourceMetadata.DELETION_PROTECTION: True,
             },
             provider="gcp",
             resource_type="google_sql_database_instance",
@@ -458,18 +458,18 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.GKE_ENDPOINT.key: "35.1.2.3",
-                GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED.key: False,
-                GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED.key: False,
-                GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS.key: [
+                GcpResourceMetadata.GKE_ENDPOINT: "35.1.2.3",
+                GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED: False,
+                GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED: False,
+                GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS: [
                     {"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}
                 ],
-                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED.key: False,
-                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL.key: None,
-                GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT.key: "123456789-compute@developer.gserviceaccount.com",
-                GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES.key: ["https://www.googleapis.com/auth/cloud-platform"],
-                GcpResourceMetadata.GKE_NODE_METADATA_MODE.key: "GCE_METADATA",
-                GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED.key: True,
+                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED: False,
+                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL: None,
+                GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT: "123456789-compute@developer.gserviceaccount.com",
+                GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES: ["https://www.googleapis.com/auth/cloud-platform"],
+                GcpResourceMetadata.GKE_NODE_METADATA_MODE: "GCE_METADATA",
+                GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED: True,
             },
             provider="gcp",
             resource_type="google_container_cluster",
@@ -494,7 +494,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_compute_facts_read_workload_identity_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.SERVICE_ACCOUNTS.key: [
+                GcpResourceMetadata.SERVICE_ACCOUNTS: [
                     {
                         "email": "tfstride-web@example.iam.gserviceaccount.com",
                         "scopes": ["https://www.googleapis.com/auth/cloud-platform"],
@@ -529,9 +529,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_service_account_facts_read_provider_owned_identity_metadata(self) -> None:
         resource = _resource(
             {
-                GcpResourceMetadata.NAME.key: "projects/tfstride-demo/serviceAccounts/tfstride-web",
-                GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL.key: "tfstride-web@example.iam.gserviceaccount.com",
-                GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER.key: (
+                GcpResourceMetadata.NAME: "projects/tfstride-demo/serviceAccounts/tfstride-web",
+                GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL: "tfstride-web@example.iam.gserviceaccount.com",
+                GcpResourceMetadata.SERVICE_ACCOUNT_MEMBER: (
                     "serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
                 ),
             },

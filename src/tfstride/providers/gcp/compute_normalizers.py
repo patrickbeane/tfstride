@@ -27,20 +27,20 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
         else []
     )
     metadata = {
-        GcpResourceMetadata.NAME.key: resource_name(resource),
-        GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
-        GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
-        GcpResourceMetadata.ZONE.key: values.get(GcpAttr.ZONE),
-        GcpResourceMetadata.MACHINE_TYPE.key: values.get(GcpAttr.MACHINE_TYPE),
-        GcpResourceMetadata.NETWORK_TAGS.key: values.get(GcpAttr.TAGS),
-        GcpResourceMetadata.NETWORK_INTERFACES.key: values.get(GcpAttr.NETWORK_INTERFACE),
-        GcpResourceMetadata.SERVICE_ACCOUNTS.key: values.get(GcpAttr.SERVICE_ACCOUNT_BLOCKS),
-        GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+        GcpResourceMetadata.NAME: resource_name(resource),
+        GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
+        GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.ZONE: values.get(GcpAttr.ZONE),
+        GcpResourceMetadata.MACHINE_TYPE: values.get(GcpAttr.MACHINE_TYPE),
+        GcpResourceMetadata.NETWORK_TAGS: values.get(GcpAttr.TAGS),
+        GcpResourceMetadata.NETWORK_INTERFACES: values.get(GcpAttr.NETWORK_INTERFACE),
+        GcpResourceMetadata.SERVICE_ACCOUNTS: values.get(GcpAttr.SERVICE_ACCOUNT_BLOCKS),
+        GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
         "metadata": instance_metadata,
         "can_ip_forward": bool(values.raw(GcpAttr.CAN_IP_FORWARD)),
     }
     if os_login_enabled is not None:
-        metadata[GcpResourceMetadata.OS_LOGIN_ENABLED.key] = os_login_enabled
+        metadata[GcpResourceMetadata.OS_LOGIN_ENABLED] = os_login_enabled
     normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
