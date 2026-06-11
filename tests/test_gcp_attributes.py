@@ -8,6 +8,7 @@ from tfstride.providers.gcp.attributes import (
     DictListAttribute,
     GcpAttr,
     GcpValues,
+    ListAttribute,
     OptionalIntAttribute,
     OptionalStringAttribute,
     RawAttribute,
@@ -72,6 +73,17 @@ class GcpAttributeTests(unittest.TestCase):
         self.assertEqual(parsed, [{"protocol": "icmp"}, {"protocol": "udp"}])
         self.assertEqual(allow[0], {"protocol": "tcp"})
         self.assertEqual(values.get(DictListAttribute("missing")), [])
+
+    def test_list_attribute_accepts_scalar_or_list_and_returns_detached_copy(self) -> None:
+        policy = {"dead_letter_topic": "projects/demo/topics/dead"}
+        values = GcpValues({"dead_letter_policy": [policy], "topic": "projects/demo/topics/events"})
+
+        parsed = values.get(GcpAttr.DEAD_LETTER_POLICY)
+        parsed[0]["dead_letter_topic"] = "changed"
+
+        self.assertEqual(policy, {"dead_letter_topic": "projects/demo/topics/dead"})
+        self.assertEqual(values.get(ListAttribute("topic")), ["projects/demo/topics/events"])
+        self.assertEqual(values.get(ListAttribute("missing")), [])
 
     def test_raw_and_has_expose_boundary_without_coercion(self) -> None:
         values = GcpValues({"policy_data": '{"bindings": []}', "empty": None})

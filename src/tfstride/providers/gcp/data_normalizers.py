@@ -4,7 +4,8 @@ import ipaddress
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.gcp.coercion import as_bool, as_list, first_item
+from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
+from tfstride.providers.gcp.coercion import as_bool, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -12,10 +13,12 @@ from tfstride.providers.gcp.resource_utils import first_non_empty, resource_iden
 
 
 def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    versioning = first_item(values.get("versioning")) or {}
-    encryption = first_item(values.get("encryption")) or {}
-    default_kms_key_name = first_non_empty(encryption.get("default_kms_key_name"))
+    values = GcpValues(resource.values)
+    versioning_values = _first_block(values, GcpAttr.VERSIONING)
+    encryption_values = _first_block(values, GcpAttr.ENCRYPTION)
+    versioning = GcpValues(versioning_values)
+    encryption = GcpValues(encryption_values)
+    default_kms_key_name = first_non_empty(encryption.get(GcpAttr.DEFAULT_KMS_KEY_NAME))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -28,18 +31,18 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
             metadata={
                 GcpResourceMetadata.NAME.key: resource_name(resource),
                 GcpResourceMetadata.BUCKET_NAME.key: resource_name(resource),
-                GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-                GcpResourceMetadata.PROJECT.key: values.get("project"),
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS.key: as_bool(values.get("uniform_bucket_level_access")),
-                GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION.key: values.get("public_access_prevention"),
-                GcpResourceMetadata.GCS_VERSIONING_ENABLED.key: as_bool(versioning.get("enabled", False)),
-                GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION.key: versioning,
+                GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+                GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS.key: as_bool(values.get(GcpAttr.UNIFORM_BUCKET_LEVEL_ACCESS)),
+                GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION.key: values.get(GcpAttr.PUBLIC_ACCESS_PREVENTION),
+                GcpResourceMetadata.GCS_VERSIONING_ENABLED.key: as_bool(versioning.get(GcpAttr.ENABLED)),
+                GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION.key: versioning_values,
                 GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
-                GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION.key: encryption,
-                "location": values.get("location"),
-                "storage_class": values.get("storage_class"),
-                "force_destroy": as_bool(values.get("force_destroy")),
+                GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION.key: encryption_values,
+                "location": values.get(GcpAttr.LOCATION),
+                "storage_class": values.get(GcpAttr.STORAGE_CLASS),
+                "force_destroy": as_bool(values.get(GcpAttr.FORCE_DESTROY)),
                 GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
@@ -47,14 +50,14 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
 
 
 def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    secret_id = first_non_empty(values.get("secret_id"), values.get("name"), resource.name)
+    values = GcpValues(resource.values)
+    secret_id = first_non_empty(values.get(GcpAttr.SECRET_ID), values.get(GcpAttr.NAME), resource.name)
     project = first_non_empty(
-        values.get("project"),
-        _project_from_resource_path(values.get("name")),
-        _project_from_resource_path(values.get("id")),
+        values.get(GcpAttr.PROJECT),
+        _project_from_resource_path(values.get(GcpAttr.NAME)),
+        _project_from_resource_path(values.get(GcpAttr.ID)),
     )
-    name = first_non_empty(values.get("name"), _secret_resource_name(project, secret_id))
+    name = first_non_empty(values.get(GcpAttr.NAME), _secret_resource_name(project, secret_id))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -62,29 +65,29 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
             resource_type=resource.resource_type,
             name=resource.name,
             category=ResourceCategory.DATA,
-            identifier=first_non_empty(values.get("id"), name, secret_id, resource.address),
+            identifier=first_non_empty(values.get(GcpAttr.ID), name, secret_id, resource.address),
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
                 GcpResourceMetadata.SECRET_ID.key: secret_id,
                 GcpResourceMetadata.PROJECT.key: project,
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                "annotations": values.get("annotations") or {},
-                "replication": as_list(values.get("replication")),
-                "topics": as_list(values.get("topics")),
-                "expire_time": values.get("expire_time"),
-                "ttl": values.get("ttl"),
-                "version_destroy_ttl": values.get("version_destroy_ttl"),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                "annotations": values.get(GcpAttr.ANNOTATIONS),
+                "replication": values.get(GcpAttr.REPLICATION),
+                "topics": values.get(GcpAttr.TOPICS),
+                "expire_time": values.get(GcpAttr.EXPIRE_TIME),
+                "ttl": values.get(GcpAttr.TTL),
+                "version_destroy_ttl": values.get(GcpAttr.VERSION_DESTROY_TTL),
             },
         )
     )
 
 
 def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    name = first_non_empty(values.get("name"), resource.name)
-    identifier = first_non_empty(values.get("id"), name, resource.address)
-    kms_key_name = first_non_empty(values.get("kms_key_name"))
+    values = GcpValues(resource.values)
+    name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
+    identifier = first_non_empty(values.get(GcpAttr.ID), name, resource.address)
+    kms_key_name = first_non_empty(values.get(GcpAttr.KMS_KEY_NAME))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -96,13 +99,13 @@ def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
-                GcpResourceMetadata.PROJECT.key: values.get("project"),
+                GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
                 GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE.key: identifier,
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
                 "kms_key_name": kms_key_name,
-                "message_retention_duration": values.get("message_retention_duration"),
-                "message_storage_policy": as_list(values.get("message_storage_policy")),
-                "schema_settings": as_list(values.get("schema_settings")),
+                "message_retention_duration": values.get(GcpAttr.MESSAGE_RETENTION_DURATION),
+                "message_storage_policy": values.get(GcpAttr.MESSAGE_STORAGE_POLICY),
+                "schema_settings": values.get(GcpAttr.SCHEMA_SETTINGS),
                 GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(kms_key_name),
             },
         )
@@ -110,10 +113,10 @@ def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
 
 
 def normalize_pubsub_subscription(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    name = first_non_empty(values.get("name"), resource.name)
-    identifier = first_non_empty(values.get("id"), name, resource.address)
-    topic_reference = first_non_empty(values.get("topic"))
+    values = GcpValues(resource.values)
+    name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
+    identifier = first_non_empty(values.get(GcpAttr.ID), name, resource.address)
+    topic_reference = first_non_empty(values.get(GcpAttr.TOPIC))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -125,30 +128,30 @@ def normalize_pubsub_subscription(resource: TerraformResource) -> NormalizedReso
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
-                GcpResourceMetadata.PROJECT.key: values.get("project"),
+                GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
                 GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE.key: identifier,
                 GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE.key: topic_reference,
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                "ack_deadline_seconds": values.get("ack_deadline_seconds"),
-                "dead_letter_policy": as_list(values.get("dead_letter_policy")),
-                "expiration_policy": as_list(values.get("expiration_policy")),
-                "filter": values.get("filter"),
-                "message_retention_duration": values.get("message_retention_duration"),
-                "push_config": as_list(values.get("push_config")),
-                "retain_acked_messages": as_bool(values.get("retain_acked_messages", False)),
-                "retry_policy": as_list(values.get("retry_policy")),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                "ack_deadline_seconds": values.raw(GcpAttr.ACK_DEADLINE_SECONDS),
+                "dead_letter_policy": values.get(GcpAttr.DEAD_LETTER_POLICY),
+                "expiration_policy": values.get(GcpAttr.EXPIRATION_POLICY),
+                "filter": values.get(GcpAttr.FILTER),
+                "message_retention_duration": values.get(GcpAttr.MESSAGE_RETENTION_DURATION),
+                "push_config": values.get(GcpAttr.PUSH_CONFIG),
+                "retain_acked_messages": as_bool(values.get(GcpAttr.RETAIN_ACKED_MESSAGES)),
+                "retry_policy": values.get(GcpAttr.RETRY_POLICY),
             },
         )
     )
 
 
 def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    dataset_id = first_non_empty(values.get("dataset_id"), values.get("name"), resource.name)
-    project = first_non_empty(values.get("project"), _project_from_resource_path(values.get("id")))
-    name = first_non_empty(values.get("id"), _bigquery_dataset_resource_name(project, dataset_id), dataset_id)
-    encryption = first_item(values.get("default_encryption_configuration")) or {}
-    default_kms_key_name = first_non_empty(encryption.get("kms_key_name"))
+    values = GcpValues(resource.values)
+    dataset_id = first_non_empty(values.get(GcpAttr.DATASET_ID), values.get(GcpAttr.NAME), resource.name)
+    project = first_non_empty(values.get(GcpAttr.PROJECT), _project_from_resource_path(values.get(GcpAttr.ID)))
+    name = first_non_empty(values.get(GcpAttr.ID), _bigquery_dataset_resource_name(project, dataset_id), dataset_id)
+    encryption = GcpValues(_first_block(values, GcpAttr.DEFAULT_ENCRYPTION_CONFIGURATION))
+    default_kms_key_name = first_non_empty(encryption.get(GcpAttr.KMS_KEY_NAME))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -156,22 +159,22 @@ def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResourc
             resource_type=resource.resource_type,
             name=resource.name,
             category=ResourceCategory.DATA,
-            identifier=first_non_empty(values.get("id"), name, dataset_id, resource.address),
+            identifier=first_non_empty(values.get(GcpAttr.ID), name, dataset_id, resource.address),
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
                 GcpResourceMetadata.PROJECT.key: project,
                 GcpResourceMetadata.BIGQUERY_DATASET_ID.key: dataset_id,
-                GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE.key: first_non_empty(values.get("id"), name, dataset_id),
+                GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE.key: first_non_empty(values.get(GcpAttr.ID), name, dataset_id),
                 GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                "delete_contents_on_destroy": as_bool(values.get("delete_contents_on_destroy", False)),
-                "default_table_expiration_ms": values.get("default_table_expiration_ms"),
-                "description": values.get("description"),
-                "friendly_name": values.get("friendly_name"),
-                "location": values.get("location"),
-                "max_time_travel_hours": values.get("max_time_travel_hours"),
-                "storage_billing_model": values.get("storage_billing_model"),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                "delete_contents_on_destroy": as_bool(values.get(GcpAttr.DELETE_CONTENTS_ON_DESTROY)),
+                "default_table_expiration_ms": values.raw(GcpAttr.DEFAULT_TABLE_EXPIRATION_MS),
+                "description": values.get(GcpAttr.DESCRIPTION),
+                "friendly_name": values.get(GcpAttr.FRIENDLY_NAME),
+                "location": values.get(GcpAttr.LOCATION),
+                "max_time_travel_hours": values.raw(GcpAttr.MAX_TIME_TRAVEL_HOURS),
+                "storage_billing_model": values.get(GcpAttr.STORAGE_BILLING_MODEL),
                 GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
@@ -179,13 +182,13 @@ def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResourc
 
 
 def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    dataset_id = first_non_empty(values.get("dataset_id"), values.get("dataset"))
-    table_id = first_non_empty(values.get("table_id"), values.get("name"), resource.name)
-    project = first_non_empty(values.get("project"), _project_from_resource_path(values.get("id")))
-    name = first_non_empty(values.get("id"), _bigquery_table_resource_name(project, dataset_id, table_id), table_id)
-    encryption = first_item(values.get("encryption_configuration")) or {}
-    default_kms_key_name = first_non_empty(encryption.get("kms_key_name"))
+    values = GcpValues(resource.values)
+    dataset_id = first_non_empty(values.get(GcpAttr.DATASET_ID), values.get(GcpAttr.DATASET))
+    table_id = first_non_empty(values.get(GcpAttr.TABLE_ID), values.get(GcpAttr.NAME), resource.name)
+    project = first_non_empty(values.get(GcpAttr.PROJECT), _project_from_resource_path(values.get(GcpAttr.ID)))
+    name = first_non_empty(values.get(GcpAttr.ID), _bigquery_table_resource_name(project, dataset_id, table_id), table_id)
+    encryption = GcpValues(_first_block(values, GcpAttr.ENCRYPTION_CONFIGURATION))
+    default_kms_key_name = first_non_empty(encryption.get(GcpAttr.KMS_KEY_NAME))
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -193,7 +196,7 @@ def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
             resource_type=resource.resource_type,
             name=resource.name,
             category=ResourceCategory.DATA,
-            identifier=first_non_empty(values.get("id"), name, table_id, resource.address),
+            identifier=first_non_empty(values.get(GcpAttr.ID), name, table_id, resource.address),
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
@@ -201,16 +204,16 @@ def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
                 GcpResourceMetadata.BIGQUERY_DATASET_ID.key: dataset_id,
                 GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE.key: dataset_id,
                 GcpResourceMetadata.BIGQUERY_TABLE_ID.key: table_id,
-                GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE.key: first_non_empty(values.get("id"), name, table_id),
+                GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE.key: first_non_empty(values.get(GcpAttr.ID), name, table_id),
                 GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME.key: default_kms_key_name,
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                "clustering": as_list(values.get("clustering")),
-                "deletion_protection": as_bool(values.get("deletion_protection", False)),
-                "description": values.get("description"),
-                "friendly_name": values.get("friendly_name"),
-                "schema": values.get("schema"),
-                "time_partitioning": as_list(values.get("time_partitioning")),
-                "view": as_list(values.get("view")),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                "clustering": values.get(GcpAttr.CLUSTERING),
+                "deletion_protection": as_bool(values.get(GcpAttr.DELETION_PROTECTION)),
+                "description": values.get(GcpAttr.DESCRIPTION),
+                "friendly_name": values.get(GcpAttr.FRIENDLY_NAME),
+                "schema": values.raw(GcpAttr.SCHEMA),
+                "time_partitioning": values.get(GcpAttr.TIME_PARTITIONING),
+                "view": values.get(GcpAttr.VIEW),
                 GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION.key: bool(default_kms_key_name),
             },
         )
@@ -218,10 +221,10 @@ def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
 
 
 def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    key_ring = first_non_empty(values.get("key_ring"))
-    name = first_non_empty(values.get("name"), resource.name)
-    identifier = first_non_empty(values.get("id"), values.get("self_link"), name, resource.address)
+    values = GcpValues(resource.values)
+    key_ring = first_non_empty(values.get(GcpAttr.KEY_RING))
+    name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
+    identifier = first_non_empty(values.get(GcpAttr.ID), values.get(GcpAttr.SELF_LINK), name, resource.address)
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -233,43 +236,46 @@ def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
             data_sensitivity="sensitive",
             metadata={
                 GcpResourceMetadata.NAME.key: name,
-                GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
+                GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
                 GcpResourceMetadata.PROJECT.key: first_non_empty(
-                    values.get("project"),
+                    values.get(GcpAttr.PROJECT),
                     _project_from_resource_path(key_ring),
                 ),
                 GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE.key: identifier,
                 GcpResourceMetadata.KMS_KEY_RING.key: key_ring,
-                GcpResourceMetadata.KMS_PURPOSE.key: values.get("purpose"),
-                GcpResourceMetadata.KMS_ROTATION_PERIOD.key: values.get("rotation_period"),
-                GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-                "destroy_scheduled_duration": values.get("destroy_scheduled_duration"),
-                "import_only": as_bool(values.get("import_only", False)),
-                "skip_initial_version_creation": as_bool(values.get("skip_initial_version_creation", False)),
+                GcpResourceMetadata.KMS_PURPOSE.key: values.get(GcpAttr.PURPOSE),
+                GcpResourceMetadata.KMS_ROTATION_PERIOD.key: values.get(GcpAttr.ROTATION_PERIOD),
+                GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+                "destroy_scheduled_duration": values.raw(GcpAttr.DESTROY_SCHEDULED_DURATION),
+                "import_only": as_bool(values.get(GcpAttr.IMPORT_ONLY)),
+                "skip_initial_version_creation": as_bool(values.get(GcpAttr.SKIP_INITIAL_VERSION_CREATION)),
             },
         )
     )
 
 
 def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    settings = first_item(values.get("settings")) or {}
-    ip_configuration = first_item(settings.get("ip_configuration")) or {}
-    backup_configuration = first_item(settings.get("backup_configuration")) or {}
+    values = GcpValues(resource.values)
+    settings_values = _first_block(values, GcpAttr.SETTINGS)
+    settings = GcpValues(settings_values)
+    ip_configuration_values = _first_block(settings, GcpAttr.IP_CONFIGURATION)
+    backup_configuration_values = _first_block(settings, GcpAttr.BACKUP_CONFIGURATION)
+    ip_configuration = GcpValues(ip_configuration_values)
+    backup_configuration = GcpValues(backup_configuration_values)
     authorized_networks = _authorized_networks(ip_configuration)
     public_authorized_networks = [
         network for network in authorized_networks if _authorized_network_allows_internet(network)
     ]
-    ipv4_enabled = as_bool(ip_configuration.get("ipv4_enabled", bool(authorized_networks)))
+    ipv4_enabled = _bool_with_default(ip_configuration, GcpAttr.IPV4_ENABLED, bool(authorized_networks))
     public_exposure = ipv4_enabled and bool(public_authorized_networks)
     public_access_reasons = ["Cloud SQL public IPv4 access is enabled"] if ipv4_enabled else []
     public_exposure_reasons = [
         f"authorized network `{_network_name(network)}` allows {_network_value(network)}"
         for network in public_authorized_networks
     ]
-    private_network = first_non_empty(ip_configuration.get("private_network"))
-    backup_enabled = as_bool(backup_configuration.get("enabled", False))
-    pitr_enabled = as_bool(backup_configuration.get("point_in_time_recovery_enabled", False))
+    private_network = first_non_empty(ip_configuration.get(GcpAttr.PRIVATE_NETWORK))
+    backup_enabled = as_bool(backup_configuration.get(GcpAttr.ENABLED))
+    pitr_enabled = as_bool(backup_configuration.get(GcpAttr.POINT_IN_TIME_RECOVERY_ENABLED))
     normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -283,25 +289,25 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
         data_sensitivity="sensitive",
         metadata={
             GcpResourceMetadata.NAME.key: resource_name(resource),
-            GcpResourceMetadata.SELF_LINK.key: values.get("self_link"),
-            GcpResourceMetadata.PROJECT.key: values.get("project"),
-            GcpResourceMetadata.REGION.key: values.get("region"),
-            GcpResourceMetadata.DATABASE_VERSION.key: values.get("database_version"),
+            GcpResourceMetadata.SELF_LINK.key: values.get(GcpAttr.SELF_LINK),
+            GcpResourceMetadata.PROJECT.key: values.get(GcpAttr.PROJECT),
+            GcpResourceMetadata.REGION.key: values.get(GcpAttr.REGION),
+            GcpResourceMetadata.DATABASE_VERSION.key: values.get(GcpAttr.DATABASE_VERSION),
             GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK.key: private_network,
-            GcpResourceMetadata.CLOUD_SQL_SSL_MODE.key: ip_configuration.get("ssl_mode"),
+            GcpResourceMetadata.CLOUD_SQL_SSL_MODE.key: ip_configuration.get(GcpAttr.SSL_MODE),
             GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED.key: ipv4_enabled,
             GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED.key: backup_enabled,
             GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED.key: pitr_enabled,
-            GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL.key: as_bool(ip_configuration.get("require_ssl", False)),
+            GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL.key: as_bool(ip_configuration.get(GcpAttr.REQUIRE_SSL)),
             GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS.key: authorized_networks,
-            GcpResourceMetadata.CLOUD_SQL_BACKUP_CONFIGURATION.key: backup_configuration,
-            GcpResourceMetadata.CLOUD_SQL_IP_CONFIGURATION.key: ip_configuration,
-            GcpResourceMetadata.DELETION_PROTECTION.key: as_bool(values.get("deletion_protection", False)),
-            GcpResourceMetadata.LABELS.key: values.get("labels") or {},
-            "availability_type": settings.get("availability_type"),
-            "tier": settings.get("tier"),
-            "disk_type": settings.get("disk_type"),
-            "disk_size": settings.get("disk_size"),
+            GcpResourceMetadata.CLOUD_SQL_BACKUP_CONFIGURATION.key: backup_configuration_values,
+            GcpResourceMetadata.CLOUD_SQL_IP_CONFIGURATION.key: ip_configuration_values,
+            GcpResourceMetadata.DELETION_PROTECTION.key: as_bool(values.get(GcpAttr.DELETION_PROTECTION)),
+            GcpResourceMetadata.LABELS.key: values.get(GcpAttr.LABELS),
+            "availability_type": settings.get(GcpAttr.AVAILABILITY_TYPE),
+            "tier": settings.get(GcpAttr.TIER),
+            "disk_type": settings.get(GcpAttr.DISK_TYPE),
+            "disk_size": settings.raw(GcpAttr.DISK_SIZE),
         },
     )
     mutations = gcp_mutations(normalized)
@@ -315,6 +321,16 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
     mutations.set_publicly_accessible(ipv4_enabled)
     mutations.set_storage_encrypted(True)
     return normalized
+
+
+def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:
+    return first_item(values.get(attribute)) or {}
+
+
+def _bool_with_default(values: GcpValues, attribute: GcpAttribute[Any], default: bool) -> bool:
+    if not values.has(attribute):
+        return default
+    return as_bool(values.raw(attribute))
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:
@@ -354,12 +370,8 @@ def _project_from_resource_path(value: object) -> str | None:
     return first_non_empty(parts[project_index])
 
 
-def _authorized_networks(ip_configuration: dict[str, Any]) -> list[dict[str, Any]]:
-    return [
-        network
-        for network in as_list(ip_configuration.get("authorized_networks"))
-        if isinstance(network, dict)
-    ]
+def _authorized_networks(ip_configuration: GcpValues) -> list[dict[str, Any]]:
+    return ip_configuration.get(GcpAttr.AUTHORIZED_NETWORKS)
 
 
 def _authorized_network_allows_internet(network: dict[str, Any]) -> bool:
@@ -374,8 +386,8 @@ def _authorized_network_allows_internet(network: dict[str, Any]) -> bool:
 
 
 def _network_name(network: dict[str, Any]) -> str:
-    return first_non_empty(network.get("name"), "unnamed") or "unnamed"
+    return first_non_empty(GcpValues(network).get(GcpAttr.NAME), "unnamed") or "unnamed"
 
 
 def _network_value(network: dict[str, Any]) -> str:
-    return first_non_empty(network.get("value")) or "unknown"
+    return first_non_empty(GcpValues(network).get(GcpAttr.VALUE)) or "unknown"
