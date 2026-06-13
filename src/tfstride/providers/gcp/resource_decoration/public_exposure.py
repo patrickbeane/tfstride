@@ -74,6 +74,7 @@ class _FirewallPolicyAction(str, Enum):
 @dataclass(frozen=True, slots=True)
 class _FirewallPolicyIngressCandidate:
     policy_rule: NormalizedResource
+    policy_key: str
     action: _FirewallPolicyAction
     priority: int
     matches_internet_ingress: bool
@@ -97,13 +98,17 @@ class _FirewallPolicyIngressDecision:
 
     @property
     def terminal_candidate(self) -> _FirewallPolicyIngressCandidate | None:
+        skipped_policy_keys: set[str] = set()
         for candidate in sorted(
             self.candidates,
             key=lambda candidate: (candidate.priority, candidate.policy_rule.address),
         ):
+            if candidate.policy_key in skipped_policy_keys:
+                continue
             if not candidate.matches_internet_ingress:
                 continue
             if candidate.action == _FirewallPolicyAction.GOTO_NEXT:
+                skipped_policy_keys.add(candidate.policy_key)
                 continue
             if candidate.is_terminal:
                 return candidate
@@ -271,17 +276,19 @@ def _firewall_policy_ingress_candidates(
         candidate
         for policy_rule in index.firewall_policy_rules
         if _firewall_policy_rule_targets_instance(policy_rule, resource, index)
-        for candidate in (_firewall_policy_ingress_candidate(policy_rule),)
+        for candidate in (_firewall_policy_ingress_candidate(policy_rule, index),)
     )
 
 
 def _firewall_policy_ingress_candidate(
     policy_rule: NormalizedResource,
+    index: GcpResourceIndex,
 ) -> _FirewallPolicyIngressCandidate:
     action = _firewall_policy_action(policy_rule)
     internet_ingress_rules = _firewall_policy_internet_ingress_rules(policy_rule)
     return _FirewallPolicyIngressCandidate(
         policy_rule=policy_rule,
+        policy_key=_firewall_policy_group_key(policy_rule, index),
         action=action,
         priority=_firewall_policy_priority(policy_rule),
         matches_internet_ingress=bool(internet_ingress_rules),
@@ -571,6 +578,23 @@ def _firewall_policy_action(policy_rule: NormalizedResource) -> _FirewallPolicyA
     if action in {"goto_next", "go_to_next"}:
         return _FirewallPolicyAction.GOTO_NEXT
     return _FirewallPolicyAction.UNKNOWN
+
+
+def _firewall_policy_group_key(
+    policy_rule: NormalizedResource,
+    index: GcpResourceIndex,
+) -> str:
+    policy_reference = policy_rule.get_metadata_field(
+        GcpResourceMetadata.FIREWALL_POLICY_REFERENCE
+    )
+    if policy_reference:
+        return gcp_reference_key(str(policy_reference))
+    policy_references = sorted(_firewall_policy_reference_keys(policy_rule, index))
+    return (
+        policy_references[0]
+        if policy_references
+        else gcp_reference_key(policy_rule.address)
+    )
 
 
 def _firewall_policy_priority(policy_rule: NormalizedResource) -> int:
