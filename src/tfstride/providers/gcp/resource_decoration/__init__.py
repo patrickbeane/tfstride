@@ -1,0 +1,1 @@
+"""GCP resource decoration stage implementations."""
