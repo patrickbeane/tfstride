@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
-from tfstride.models import NormalizedResource
+from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam import (
@@ -115,12 +116,78 @@ def _compute_firewall_ingress_sources(
     resource: NormalizedResource,
     index: GcpResourceIndex,
 ) -> tuple[_FirewallIngressSource, ...]:
-    return tuple(
-        source
+    applicable_firewalls = tuple(
+        firewall
         for firewall in index.firewalls
         if _firewall_applies_to_instance(firewall, resource, index)
-        for source in (_firewall_ingress_source(firewall),)
+    )
+    return tuple(
+        source
+        for firewall in applicable_firewalls
+        for source in (
+            _effective_compute_firewall_ingress_source(
+                firewall,
+                applicable_firewalls,
+            ),
+        )
         if source is not None
+    )
+
+
+def _effective_compute_firewall_ingress_source(
+    firewall: NormalizedResource,
+    applicable_firewalls: tuple[NormalizedResource, ...],
+) -> _FirewallIngressSource | None:
+    internet_ingress_reasons = tuple(
+        describe_security_group_rule(firewall, allow_rule)
+        for allow_rule in _internet_ingress_rules(firewall)
+        if _compute_firewall_allow_rule_is_effective(
+            firewall,
+            allow_rule,
+            applicable_firewalls,
+        )
+    )
+    if not internet_ingress_reasons:
+        return None
+    return _FirewallIngressSource(
+        resource=firewall,
+        internet_ingress_reasons=internet_ingress_reasons,
+    )
+
+
+def _compute_firewall_allow_rule_is_effective(
+    allow_firewall: NormalizedResource,
+    allow_rule: SecurityGroupRule,
+    applicable_firewalls: tuple[NormalizedResource, ...],
+) -> bool:
+    allow_priority = _firewall_priority(allow_firewall)
+    winning_priority = min(
+        _firewall_priority(firewall)
+        for firewall in applicable_firewalls
+        if _firewall_has_overlapping_internet_rule(firewall, allow_rule)
+    )
+    if allow_priority != winning_priority:
+        return False
+    return not any(
+        _firewall_priority(firewall) == allow_priority
+        and any(
+            _firewall_rules_overlap(deny_rule, allow_rule)
+            for deny_rule in _internet_deny_rules(firewall)
+        )
+        for firewall in applicable_firewalls
+    )
+
+
+def _firewall_has_overlapping_internet_rule(
+    firewall: NormalizedResource,
+    allow_rule: SecurityGroupRule,
+) -> bool:
+    return any(
+        _firewall_rules_overlap(candidate_rule, allow_rule)
+        for candidate_rule in (
+            *_internet_ingress_rules(firewall),
+            *_internet_deny_rules(firewall),
+        )
     )
 
 
@@ -269,9 +336,144 @@ def _firewall_applies_to_instance(
 def _internet_ingress_reasons(firewall: NormalizedResource) -> list[str]:
     return [
         describe_security_group_rule(firewall, rule)
+        for rule in _internet_ingress_rules(firewall)
+    ]
+
+
+def _internet_ingress_rules(firewall: NormalizedResource) -> tuple[SecurityGroupRule, ...]:
+    return tuple(
+        rule
         for rule in firewall.network_rules
         if rule.direction == "ingress" and rule.allows_internet()
-    ]
+    )
+
+
+def _internet_deny_rules(firewall: NormalizedResource) -> tuple[SecurityGroupRule, ...]:
+    return tuple(
+        rule
+        for rule in _metadata_firewall_rules(
+            firewall,
+            GcpResourceMetadata.FIREWALL_DENY,
+        )
+        if rule.direction == "ingress" and rule.allows_internet()
+    )
+
+
+def _metadata_firewall_rules(
+    firewall: NormalizedResource,
+    metadata_field: object,
+) -> tuple[SecurityGroupRule, ...]:
+    direction = str(
+        firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION) or "ingress"
+    ).strip().lower()
+    cidr_blocks = _firewall_cidr_blocks(firewall, direction)
+    rules: list[SecurityGroupRule] = []
+    for rule_block in firewall.get_metadata_field(metadata_field):
+        if not isinstance(rule_block, Mapping):
+            continue
+        protocol = str(rule_block.get("protocol") or "-1")
+        ports = rule_block.get("ports")
+        if not ports:
+            rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
+            continue
+        for port in ports if isinstance(ports, list) else [ports]:
+            from_port, to_port = _parse_firewall_port_range(port)
+            rules.append(
+                _firewall_rule(direction, protocol, from_port, to_port, cidr_blocks)
+            )
+    return tuple(rules)
+
+
+def _firewall_rule(
+    direction: str,
+    protocol: str,
+    from_port: int | None,
+    to_port: int | None,
+    cidr_blocks: list[str],
+) -> SecurityGroupRule:
+    return SecurityGroupRule(
+        direction=direction,
+        protocol="-1" if protocol.lower() in {"all", "-1"} else protocol,
+        from_port=from_port,
+        to_port=to_port,
+        cidr_blocks=list(cidr_blocks),
+    )
+
+
+def _firewall_cidr_blocks(firewall: NormalizedResource, direction: str) -> list[str]:
+    source_ranges = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_RANGES)
+    destination_ranges = firewall.get_metadata_field(
+        GcpResourceMetadata.FIREWALL_DESTINATION_RANGES
+    )
+    if direction == "egress" and destination_ranges:
+        return destination_ranges
+    if source_ranges:
+        return source_ranges
+    source_tags = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_TAGS)
+    source_service_accounts = firewall.get_metadata_field(
+        GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS
+    )
+    if direction == "ingress" and not source_tags and not source_service_accounts:
+        return ["0.0.0.0/0"]
+    return []
+
+
+def _parse_firewall_port_range(value: object) -> tuple[int | None, int | None]:
+    text = str(value).strip()
+    if not text:
+        return (None, None)
+    if "-" not in text:
+        port = _optional_int(text)
+        return (port, port)
+    start, end = text.split("-", 1)
+    return (_optional_int(start.strip()), _optional_int(end.strip()))
+
+
+def _optional_int(value: str) -> int | None:
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def _firewall_priority(firewall: NormalizedResource) -> int:
+    priority = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_PRIORITY)
+    if priority is None:
+        return 1000
+    if isinstance(priority, int):
+        return priority
+    try:
+        return int(str(priority).strip())
+    except ValueError:
+        return 1000
+
+
+def _firewall_rules_overlap(left: SecurityGroupRule, right: SecurityGroupRule) -> bool:
+    if not _firewall_protocols_overlap(left.protocol, right.protocol):
+        return False
+    left_ports = _firewall_port_range(left)
+    right_ports = _firewall_port_range(right)
+    if left_ports is None or right_ports is None:
+        return True
+    left_start, left_end = left_ports
+    right_start, right_end = right_ports
+    return left_start <= right_end and right_start <= left_end
+
+
+def _firewall_protocols_overlap(left: str, right: str) -> bool:
+    left_protocol = left.lower()
+    right_protocol = right.lower()
+    return (
+        left_protocol == "-1"
+        or right_protocol == "-1"
+        or left_protocol == right_protocol
+    )
+
+
+def _firewall_port_range(rule: SecurityGroupRule) -> tuple[int, int] | None:
+    if rule.protocol == "-1" or rule.from_port is None or rule.to_port is None:
+        return None
+    return (rule.from_port, rule.to_port)
 
 
 def _firewall_policy_rule_applies_to_instance(

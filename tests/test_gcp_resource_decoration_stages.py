@@ -120,24 +120,26 @@ def _compute_firewall(
     address: str,
     *,
     action: str,
-    priority: int,
+    priority: int | None = None,
 ) -> NormalizedResource:
+    metadata: dict[Any, object] = {
+        GcpResourceMetadata.FIREWALL_DIRECTION: "ingress",
+        GcpResourceMetadata.FIREWALL_ALLOW: (
+            [{"protocol": "tcp", "ports": ["22"]}] if action == "allow" else []
+        ),
+        GcpResourceMetadata.FIREWALL_DENY: (
+            [{"protocol": "tcp", "ports": ["22"]}] if action == "deny" else []
+        ),
+    }
+    if priority is not None:
+        metadata[GcpResourceMetadata.FIREWALL_PRIORITY] = priority
     return _gcp_resource(
         address,
         GcpResourceType.COMPUTE_FIREWALL,
         ResourceCategory.NETWORK,
         vpc_id="google_compute_network.main.id",
         network_rules=[_public_ssh_rule()] if action == "allow" else [],
-        metadata={
-            GcpResourceMetadata.FIREWALL_DIRECTION: "ingress",
-            GcpResourceMetadata.FIREWALL_PRIORITY: priority,
-            GcpResourceMetadata.FIREWALL_ALLOW: (
-                [{"protocol": "tcp", "ports": ["22"]}] if action == "allow" else []
-            ),
-            GcpResourceMetadata.FIREWALL_DENY: (
-                [{"protocol": "tcp", "ports": ["22"]}] if action == "deny" else []
-            ),
-        },
+        metadata=metadata,
     )
 
 
@@ -471,14 +473,13 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertTrue(explicit_app.has_nat_gateway_egress)
         self.assertFalse(explicit_data.has_nat_gateway_egress)
 
-    def test_public_exposure_stage_currently_ignores_higher_priority_compute_deny(
+    def test_public_exposure_stage_honors_higher_priority_compute_deny(
         self,
     ) -> None:
         instance = _public_compute_instance()
         allow = _compute_firewall(
             "google_compute_firewall.allow_ssh",
             action="allow",
-            priority=1000,
         )
         deny = _compute_firewall(
             "google_compute_firewall.deny_ssh",
@@ -489,21 +490,21 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
 
         DerivePublicExposureStage().apply(resources, _context(resources))
 
-        self.assertTrue(instance.internet_ingress_capable)
-        self.assertTrue(instance.public_exposure)
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertEqual(instance.internet_ingress_reasons, [])
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
-            ["google_compute_firewall.allow_ssh"],
+            [],
         )
 
-    def test_public_exposure_stage_currently_ignores_same_priority_compute_deny(
+    def test_public_exposure_stage_honors_default_priority_compute_deny(
         self,
     ) -> None:
         instance = _public_compute_instance()
         allow = _compute_firewall(
             "google_compute_firewall.allow_ssh",
             action="allow",
-            priority=1000,
         )
         deny = _compute_firewall(
             "google_compute_firewall.deny_ssh",
@@ -514,11 +515,12 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
 
         DerivePublicExposureStage().apply(resources, _context(resources))
 
-        self.assertTrue(instance.internet_ingress_capable)
-        self.assertTrue(instance.public_exposure)
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertEqual(instance.internet_ingress_reasons, [])
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
-            ["google_compute_firewall.allow_ssh"],
+            [],
         )
 
     def test_public_exposure_stage_keeps_higher_priority_compute_allow_public(
@@ -533,7 +535,6 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         deny = _compute_firewall(
             "google_compute_firewall.deny_ssh",
             action="deny",
-            priority=1000,
         )
         resources = [instance, allow, deny]
 
