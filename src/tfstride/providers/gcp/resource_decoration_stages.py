@@ -69,8 +69,8 @@ class DeriveNetworkPostureStage:
             _derive_instance_network_posture(resource, index)
 
 
-class ApplyGcpResourceDecorationStage:
-    name = "apply_gcp_resource_decoration"
+class DerivePublicExposureStage:
+    name = "derive_public_exposure"
 
     def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
         index = context.index
@@ -79,6 +79,21 @@ class ApplyGcpResourceDecorationStage:
                 _derive_public_compute_exposure(resource, index)
             elif resource.resource_type in GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES:
                 _derive_public_serverless_exposure(resource, index)
+            elif resource.resource_type == GcpResourceType.STORAGE_BUCKET:
+                _derive_public_bucket_exposure(resource, index)
+
+
+class ApplyGcpResourceDecorationStage:
+    name = "apply_gcp_resource_decoration"
+
+    def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
+        index = context.index
+        for resource in resources:
+            if resource.resource_type in GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES:
+                _derive_sensitive_resource_iam_bindings(
+                    resource,
+                    _serverless_iam_resources(resource, index),
+                )
             elif resource.resource_type == GcpResourceType.SECRET_MANAGER_SECRET:
                 _derive_sensitive_resource_iam_bindings(resource, index.secret_iam_resources)
             elif resource.resource_type == GcpResourceType.PUBSUB_TOPIC:
@@ -96,13 +111,13 @@ class ApplyGcpResourceDecorationStage:
                 )
             elif resource.resource_type == GcpResourceType.STORAGE_BUCKET:
                 _derive_sensitive_resource_iam_bindings(resource, index.bucket_iam_resources)
-                _derive_public_bucket_exposure(resource, index)
 
 
 def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
     return (
         DeriveLoadBalancerReachabilityStage(),
         DeriveNetworkPostureStage(),
+        DerivePublicExposureStage(),
         ApplyGcpResourceDecorationStage(),
     )
 
@@ -492,12 +507,10 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: GcpResourc
 
 
 def _derive_public_serverless_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
-    iam_resources = (
-        index.cloud_run_iam_resources
-        if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
-        else index.cloud_function_iam_resources
+    public_access_reasons = _serverless_public_access_reasons(
+        resource,
+        _serverless_iam_resources(resource, index),
     )
-    public_access_reasons = _serverless_public_access_reasons(resource, iam_resources)
     if public_access_reasons:
         gcp_mutations(resource).set_public_access_reasons(public_access_reasons)
     public_exposure = bool(resource.public_access_configured and public_access_reasons)
@@ -506,7 +519,16 @@ def _derive_public_serverless_exposure(resource: NormalizedResource, index: GcpR
         reasons=public_access_reasons if public_exposure else None,
     )
 
-    _derive_sensitive_resource_iam_bindings(resource, iam_resources)
+
+def _serverless_iam_resources(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+) -> tuple[NormalizedResource, ...]:
+    return (
+        index.cloud_run_iam_resources
+        if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
+        else index.cloud_function_iam_resources
+    )
 
 
 def _derive_sensitive_resource_iam_bindings(
@@ -633,7 +655,6 @@ def _iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:
             binding["condition"] = condition
         return [binding]
     return []
-
 
 
 def _public_access_prevention_enforced(bucket: NormalizedResource) -> bool:
