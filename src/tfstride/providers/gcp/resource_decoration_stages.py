@@ -49,8 +49,8 @@ class DeriveLoadBalancerReachabilityStage:
         _derive_load_balancer_frontend_reachability(context.index)
 
 
-class ApplyGcpResourceDecorationStage:
-    name = "apply_gcp_resource_decoration"
+class DeriveNetworkPostureStage:
+    name = "derive_network_posture"
 
     def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
         index = context.index
@@ -59,13 +59,24 @@ class ApplyGcpResourceDecorationStage:
                 _derive_subnetwork_route_posture(resource, index)
 
         for resource in resources:
+            is_network_posture_resource = (
+                resource.resource_type == GcpResourceType.COMPUTE_INSTANCE
+                or resource.resource_type in GCP_FORWARDING_RULE_RESOURCE_TYPES
+            )
+            if not is_network_posture_resource:
+                continue
+            _infer_instance_vpc_id(resource, index)
+            _derive_instance_network_posture(resource, index)
+
+
+class ApplyGcpResourceDecorationStage:
+    name = "apply_gcp_resource_decoration"
+
+    def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
+        index = context.index
+        for resource in resources:
             if resource.resource_type == GcpResourceType.COMPUTE_INSTANCE:
-                _infer_instance_vpc_id(resource, index)
-                _derive_instance_network_posture(resource, index)
                 _derive_public_compute_exposure(resource, index)
-            elif resource.resource_type in GCP_FORWARDING_RULE_RESOURCE_TYPES:
-                _infer_instance_vpc_id(resource, index)
-                _derive_instance_network_posture(resource, index)
             elif resource.resource_type in GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES:
                 _derive_public_serverless_exposure(resource, index)
             elif resource.resource_type == GcpResourceType.SECRET_MANAGER_SECRET:
@@ -91,6 +102,7 @@ class ApplyGcpResourceDecorationStage:
 def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
     return (
         DeriveLoadBalancerReachabilityStage(),
+        DeriveNetworkPostureStage(),
         ApplyGcpResourceDecorationStage(),
     )
 
@@ -309,7 +321,6 @@ def _append_load_balancer_frontend(
 
 def _mark_fronted_by_public_load_balancer(resource: NormalizedResource, frontend: dict[str, Any]) -> None:
     gcp_mutations(resource).mark_fronted_by_public_load_balancer(frontend)
-
 
 
 def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: GcpResourceIndex) -> None:
