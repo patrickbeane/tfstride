@@ -4,6 +4,7 @@ import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_decoration_stages import default_gcp_decoration_stages
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
@@ -251,6 +252,49 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         GcpResourceDecorator(stages=[RecordingStage("first"), RecordingStage("second")]).decorate([network])
 
         self.assertEqual(calls, ["first:True", "second:True"])
+
+    def test_default_decoration_stages_are_ordered_by_contract(self) -> None:
+        self.assertEqual(
+            [stage.name for stage in default_gcp_decoration_stages()],
+            [
+                "derive_load_balancer_reachability",
+                "derive_network_posture",
+                "derive_public_exposure",
+                "decorate_sensitive_iam_bindings",
+            ],
+        )
+
+    def test_configured_stages_replace_default_pipeline(self) -> None:
+        calls: list[str] = []
+
+        class RecordingStage:
+            name = "recording"
+
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"recording:{bool(context.index.bucket_iam_resources)}")
+
+        bucket = _gcp_resource(
+            "google_storage_bucket.logs",
+            GcpResourceType.STORAGE_BUCKET,
+            ResourceCategory.DATA,
+            identifier="logs",
+            metadata={GcpResourceMetadata.BUCKET_NAME: "logs"},
+        )
+        iam_member = _iam_member(
+            "google_storage_bucket_iam_member.public_reader",
+            GcpResourceType.STORAGE_BUCKET_IAM_MEMBER,
+            GcpResourceMetadata.BUCKET_NAME,
+            "logs",
+            role="roles/storage.objectViewer",
+            member="allUsers",
+        )
+
+        GcpResourceDecorator(stages=[RecordingStage()]).decorate([bucket, iam_member])
+
+        self.assertEqual(calls, ["recording:True"])
+        self.assertFalse(bucket.public_access_configured)
+        self.assertEqual(bucket.public_access_reasons, [])
+        self.assertEqual(bucket.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS), [])
 
     def test_firewall_policy_folder_association_matches_public_ssh_and_rdp(self) -> None:
         policy_rule = _policy_rule(ports=(22, 3389))
