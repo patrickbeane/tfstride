@@ -146,6 +146,11 @@ class GcpDecorationContext:
     index: GcpResourceIndex
 
 
+class GcpResourceIndexBuilder:
+    def build(self, resources: list[NormalizedResource]) -> GcpResourceIndex:
+        return GcpResourceIndex.build(resources)
+
+
 def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
     references = {
         resource.address,

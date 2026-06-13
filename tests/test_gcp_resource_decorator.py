@@ -6,6 +6,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupR
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration_stages import default_gcp_decoration_stages
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
+from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
 _POLICY_REFERENCE = "google_compute_firewall_policy.org.name"
@@ -263,6 +264,34 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                 "decorate_sensitive_iam_bindings",
             ],
         )
+
+    def test_decorator_uses_configured_index_builder(self) -> None:
+        calls: list[str] = []
+
+        class RecordingIndexBuilder(GcpResourceIndexBuilder):
+            def build(self, resources: list[NormalizedResource]) -> GcpResourceIndex:
+                calls.append(f"builder:{len(resources)}")
+                return super().build(resources)
+
+        class RecordingStage:
+            name = "recording"
+
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"stage:{bool(context.index.resources_by_reference)}")
+
+        network = _gcp_resource(
+            "google_compute_network.main",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier="main",
+        )
+
+        GcpResourceDecorator(
+            index_builder=RecordingIndexBuilder(),
+            stages=[RecordingStage()],
+        ).decorate([network])
+
+        self.assertEqual(calls, ["builder:1", "stage:True"])
 
     def test_configured_stages_replace_default_pipeline(self) -> None:
         calls: list[str] = []
