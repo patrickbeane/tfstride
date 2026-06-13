@@ -7,9 +7,11 @@ from tfstride.models import (
     IAMPolicyStatement,
     IAMPrincipal,
     NormalizedResource,
-    SecurityGroupRule,
 )
 from tfstride.providers.aws.coercion import as_list
+from tfstride.providers.aws.resource_decoration.security_groups import (
+    MergeStandaloneSecurityGroupRulesStage,
+)
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.resource_mutations import aws_mutations
@@ -27,25 +29,6 @@ class AwsDecorationStage(Protocol):
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         """Apply one ordered AWS resource decoration step."""
         ...
-
-
-class MergeStandaloneSecurityGroupRulesStage:
-    name = "merge_standalone_security_group_rules"
-
-    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
-        # Standalone SG rule resources carry the same security meaning as inline rules, so fold
-        # them into the parent security group before any exposure analysis runs.
-        for rule_resource in resources:
-            if rule_resource.resource_type != "aws_security_group_rule":
-                continue
-            security_group_id = aws_facts(rule_resource).security_group_id
-            target_group = context.index.security_groups.get(security_group_id)
-            if target_group is None:
-                continue
-            aws_mutations(target_group).merge_security_group_rules(
-                _clone_security_group_rules(rule_resource.network_rules)
-            )
-            aws_facts(target_group).add_standalone_rule_address(rule_resource.address)
 
 
 class MergeRolePolicyResourcesStage:
@@ -502,22 +485,6 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         DerivePublicExposureStage(),
         MarkEcsLoadBalancerExposureStage(),
     )
-
-
-def _clone_security_group_rules(rules: list[SecurityGroupRule]) -> list[SecurityGroupRule]:
-    return [
-        SecurityGroupRule(
-            direction=rule.direction,
-            protocol=rule.protocol,
-            from_port=rule.from_port,
-            to_port=rule.to_port,
-            cidr_blocks=list(rule.cidr_blocks),
-            ipv6_cidr_blocks=list(rule.ipv6_cidr_blocks),
-            referenced_security_group_ids=list(rule.referenced_security_group_ids),
-            description=rule.description,
-        )
-        for rule in rules
-    ]
 
 
 def _clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPolicyStatement]:

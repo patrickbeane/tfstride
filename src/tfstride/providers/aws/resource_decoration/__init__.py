@@ -1,0 +1,1 @@
+"""AWS resource decoration stage implementations."""
