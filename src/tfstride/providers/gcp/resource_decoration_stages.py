@@ -83,8 +83,8 @@ class DerivePublicExposureStage:
                 _derive_public_bucket_exposure(resource, index)
 
 
-class ApplyGcpResourceDecorationStage:
-    name = "apply_gcp_resource_decoration"
+class DecorateSensitiveIamBindingsStage:
+    name = "decorate_sensitive_iam_bindings"
 
     def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
         index = context.index
@@ -118,7 +118,7 @@ def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
         DeriveLoadBalancerReachabilityStage(),
         DeriveNetworkPostureStage(),
         DerivePublicExposureStage(),
-        ApplyGcpResourceDecorationStage(),
+        DecorateSensitiveIamBindingsStage(),
     )
 
 
