@@ -42,6 +42,13 @@ class GcpDecorationStage(Protocol):
         ...
 
 
+class DeriveLoadBalancerReachabilityStage:
+    name = "derive_load_balancer_reachability"
+
+    def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
+        _derive_load_balancer_frontend_reachability(context.index)
+
+
 class ApplyGcpResourceDecorationStage:
     name = "apply_gcp_resource_decoration"
 
@@ -50,8 +57,6 @@ class ApplyGcpResourceDecorationStage:
         for resource in resources:
             if resource.resource_type == GcpResourceType.COMPUTE_SUBNETWORK:
                 _derive_subnetwork_route_posture(resource, index)
-
-        _derive_load_balancer_frontend_reachability(index)
 
         for resource in resources:
             if resource.resource_type == GcpResourceType.COMPUTE_INSTANCE:
@@ -84,7 +89,10 @@ class ApplyGcpResourceDecorationStage:
 
 
 def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
-    return (ApplyGcpResourceDecorationStage(),)
+    return (
+        DeriveLoadBalancerReachabilityStage(),
+        ApplyGcpResourceDecorationStage(),
+    )
 
 
 _GCP_NETWORK_NAME_PATTERN = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
