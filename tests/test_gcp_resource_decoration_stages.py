@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
-from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam_bindings import (
     DecorateSensitiveIamBindingsStage,
@@ -26,6 +26,7 @@ def _gcp_resource(
     vpc_id: str | None = None,
     subnet_ids: tuple[str, ...] = (),
     public_access_configured: bool = False,
+    network_rules: list[SecurityGroupRule] | None = None,
     metadata: dict[Any, object] | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
@@ -38,6 +39,7 @@ def _gcp_resource(
         vpc_id=vpc_id,
         subnet_ids=subnet_ids,
         public_access_configured=public_access_configured,
+        network_rules=network_rules or [],
         metadata=metadata,
     )
 
@@ -83,6 +85,95 @@ def _router() -> NormalizedResource:
         ResourceCategory.NETWORK,
         vpc_id="google_compute_network.main.id",
         metadata={GcpResourceMetadata.NAME: "main"},
+    )
+
+
+def _public_compute_instance(
+    address: str = "google_compute_instance.web",
+    *,
+    folder_id: str | None = None,
+) -> NormalizedResource:
+    metadata: dict[Any, object] = {}
+    if folder_id is not None:
+        metadata[GcpResourceMetadata.FOLDER_ID] = folder_id
+    return _gcp_resource(
+        address,
+        GcpResourceType.COMPUTE_INSTANCE,
+        ResourceCategory.COMPUTE,
+        vpc_id="google_compute_network.main.id",
+        public_access_configured=True,
+        metadata=metadata,
+    )
+
+
+def _public_ssh_rule() -> SecurityGroupRule:
+    return SecurityGroupRule(
+        direction="ingress",
+        protocol="tcp",
+        from_port=22,
+        to_port=22,
+        cidr_blocks=["0.0.0.0/0"],
+    )
+
+
+def _compute_firewall(
+    address: str,
+    *,
+    action: str,
+    priority: int,
+) -> NormalizedResource:
+    return _gcp_resource(
+        address,
+        GcpResourceType.COMPUTE_FIREWALL,
+        ResourceCategory.NETWORK,
+        vpc_id="google_compute_network.main.id",
+        network_rules=[_public_ssh_rule()] if action == "allow" else [],
+        metadata={
+            GcpResourceMetadata.FIREWALL_DIRECTION: "ingress",
+            GcpResourceMetadata.FIREWALL_PRIORITY: priority,
+            GcpResourceMetadata.FIREWALL_ALLOW: (
+                [{"protocol": "tcp", "ports": ["22"]}] if action == "allow" else []
+            ),
+            GcpResourceMetadata.FIREWALL_DENY: (
+                [{"protocol": "tcp", "ports": ["22"]}] if action == "deny" else []
+            ),
+        },
+    )
+
+
+def _firewall_policy_rule(
+    address: str,
+    *,
+    action: str,
+    priority: int,
+) -> NormalizedResource:
+    return _gcp_resource(
+        address,
+        GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE,
+        ResourceCategory.NETWORK,
+        network_rules=[_public_ssh_rule()] if action == "allow" else [],
+        metadata={
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
+                "google_compute_firewall_policy.org.name"
+            ),
+            GcpResourceMetadata.FIREWALL_POLICY_ACTION: action,
+            GcpResourceMetadata.FIREWALL_POLICY_DIRECTION: "ingress",
+            GcpResourceMetadata.FIREWALL_POLICY_PRIORITY: priority,
+        },
+    )
+
+
+def _firewall_policy_association() -> NormalizedResource:
+    return _gcp_resource(
+        "google_compute_firewall_policy_association.folder",
+        GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION,
+        ResourceCategory.NETWORK,
+        metadata={
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
+                "google_compute_firewall_policy.org.name"
+            ),
+            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: "folders/12345",
+        },
     )
 
 
@@ -379,6 +470,107 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
 
         self.assertTrue(explicit_app.has_nat_gateway_egress)
         self.assertFalse(explicit_data.has_nat_gateway_egress)
+
+    def test_public_exposure_stage_currently_ignores_higher_priority_compute_deny(
+        self,
+    ) -> None:
+        instance = _public_compute_instance()
+        allow = _compute_firewall(
+            "google_compute_firewall.allow_ssh",
+            action="allow",
+            priority=1000,
+        )
+        deny = _compute_firewall(
+            "google_compute_firewall.deny_ssh",
+            action="deny",
+            priority=900,
+        )
+        resources = [instance, allow, deny]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.allow_ssh"],
+        )
+
+    def test_public_exposure_stage_currently_ignores_same_priority_compute_deny(
+        self,
+    ) -> None:
+        instance = _public_compute_instance()
+        allow = _compute_firewall(
+            "google_compute_firewall.allow_ssh",
+            action="allow",
+            priority=1000,
+        )
+        deny = _compute_firewall(
+            "google_compute_firewall.deny_ssh",
+            action="deny",
+            priority=1000,
+        )
+        resources = [instance, allow, deny]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.allow_ssh"],
+        )
+
+    def test_public_exposure_stage_keeps_higher_priority_compute_allow_public(
+        self,
+    ) -> None:
+        instance = _public_compute_instance()
+        allow = _compute_firewall(
+            "google_compute_firewall.allow_ssh",
+            action="allow",
+            priority=900,
+        )
+        deny = _compute_firewall(
+            "google_compute_firewall.deny_ssh",
+            action="deny",
+            priority=1000,
+        )
+        resources = [instance, allow, deny]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall.allow_ssh"],
+        )
+
+    def test_public_exposure_stage_currently_ignores_hierarchical_policy_deny(
+        self,
+    ) -> None:
+        instance = _public_compute_instance(folder_id="folders/12345")
+        allow = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.allow_ssh",
+            action="allow",
+            priority=1000,
+        )
+        deny = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.deny_ssh",
+            action="deny",
+            priority=900,
+        )
+        association = _firewall_policy_association()
+        resources = [instance, allow, deny, association]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall_policy_rule.allow_ssh"],
+        )
 
     def test_public_exposure_stage_normalizes_bucket_iam_member_binding_and_policy(self) -> None:
         bucket = _gcp_resource(
