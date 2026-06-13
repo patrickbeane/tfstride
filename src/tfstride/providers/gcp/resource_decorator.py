@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
+from tfstride.providers.gcp.resource_index import (
+    GcpResourceIndex,
+    gcp_network_reference_key,
+    gcp_resource_references,
+)
 from tfstride.providers.gcp.resource_types import (
-    GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
-    GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
-    GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
-    GCP_CLOUD_RUN_IAM_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
     GCP_FORWARDING_RULE_RESOURCE_TYPES,
     GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES,
@@ -22,13 +21,7 @@ from tfstride.providers.gcp.resource_types import (
     GCP_LOAD_BALANCER_NEG_TYPES,
     GCP_LOAD_BALANCER_TARGET_PROXY_TYPES,
     GCP_LOAD_BALANCER_URL_MAP_TYPES,
-    GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
-    GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
-    GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES,
-    GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES,
-    GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
     GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
-    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
 from tfstride.providers.gcp.resource_utils import (
@@ -50,7 +43,7 @@ class GcpResourceDecorator:
     """Derive cross-resource GCP posture from normalized Terraform resources."""
 
     def decorate(self, resources: list[NormalizedResource]) -> None:
-        index = _GcpResourceIndex.build(resources)
+        index = GcpResourceIndex.build(resources)
         for resource in resources:
             if resource.resource_type == GcpResourceType.COMPUTE_SUBNETWORK:
                 _derive_subnetwork_route_posture(resource, index)
@@ -87,123 +80,10 @@ class GcpResourceDecorator:
                 _derive_public_bucket_exposure(resource, index)
 
 
-@dataclass(frozen=True, slots=True)
-class _GcpResourceIndex:
-    resources_by_reference: Mapping[str, NormalizedResource]
-    network_references: Mapping[str, str]
-    subnetworks_by_reference: Mapping[str, NormalizedResource]
-    routers_by_reference: Mapping[str, NormalizedResource]
-    forwarding_rules: tuple[NormalizedResource, ...]
-    routes: tuple[NormalizedResource, ...]
-    router_nats: tuple[NormalizedResource, ...]
-    firewalls: tuple[NormalizedResource, ...]
-    firewall_policy_rules: tuple[NormalizedResource, ...]
-    firewall_policy_associations: tuple[NormalizedResource, ...]
-    bucket_iam_resources: tuple[NormalizedResource, ...]
-    secret_iam_resources: tuple[NormalizedResource, ...]
-    pubsub_topic_iam_resources: tuple[NormalizedResource, ...]
-    pubsub_subscription_iam_resources: tuple[NormalizedResource, ...]
-    bigquery_dataset_iam_resources: tuple[NormalizedResource, ...]
-    bigquery_table_iam_resources: tuple[NormalizedResource, ...]
-    kms_crypto_key_iam_resources: tuple[NormalizedResource, ...]
-    kms_key_ring_iam_resources: tuple[NormalizedResource, ...]
-    cloud_run_iam_resources: tuple[NormalizedResource, ...]
-    cloud_function_iam_resources: tuple[NormalizedResource, ...]
-
-    @classmethod
-    def build(cls, resources: list[NormalizedResource]) -> "_GcpResourceIndex":
-        resources_by_reference: dict[str, NormalizedResource] = {}
-        network_references: dict[str, str] = {}
-        subnetworks_by_reference: dict[str, NormalizedResource] = {}
-        routers_by_reference: dict[str, NormalizedResource] = {}
-        forwarding_rules: list[NormalizedResource] = []
-        routes: list[NormalizedResource] = []
-        router_nats: list[NormalizedResource] = []
-        firewalls: list[NormalizedResource] = []
-        firewall_policy_rules: list[NormalizedResource] = []
-        firewall_policy_associations: list[NormalizedResource] = []
-        bucket_iam_resources: list[NormalizedResource] = []
-        secret_iam_resources: list[NormalizedResource] = []
-        pubsub_topic_iam_resources: list[NormalizedResource] = []
-        pubsub_subscription_iam_resources: list[NormalizedResource] = []
-        bigquery_dataset_iam_resources: list[NormalizedResource] = []
-        bigquery_table_iam_resources: list[NormalizedResource] = []
-        kms_crypto_key_iam_resources: list[NormalizedResource] = []
-        kms_key_ring_iam_resources: list[NormalizedResource] = []
-        cloud_run_iam_resources: list[NormalizedResource] = []
-        cloud_function_iam_resources: list[NormalizedResource] = []
-        for resource in resources:
-            for reference in _resource_references(resource):
-                resources_by_reference.setdefault(reference, resource)
-            if resource.resource_type == GcpResourceType.COMPUTE_NETWORK:
-                for reference in _resource_references(resource):
-                    network_references.setdefault(reference, resource.address)
-                    network_references.setdefault(_network_reference_key(reference), resource.address)
-            elif resource.resource_type == GcpResourceType.COMPUTE_SUBNETWORK:
-                for reference in _resource_references(resource):
-                    subnetworks_by_reference.setdefault(reference, resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTER:
-                for reference in _resource_references(resource):
-                    routers_by_reference.setdefault(reference, resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTE:
-                routes.append(resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_ROUTER_NAT:
-                router_nats.append(resource)
-            elif resource.resource_type in GCP_FORWARDING_RULE_RESOURCE_TYPES:
-                forwarding_rules.append(resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL:
-                firewalls.append(resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE:
-                firewall_policy_rules.append(resource)
-            elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION:
-                firewall_policy_associations.append(resource)
-            elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
-                bucket_iam_resources.append(resource)
-            elif resource.resource_type in GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES:
-                secret_iam_resources.append(resource)
-            elif resource.resource_type in GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES:
-                pubsub_topic_iam_resources.append(resource)
-            elif resource.resource_type in GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES:
-                pubsub_subscription_iam_resources.append(resource)
-            elif resource.resource_type in GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES:
-                bigquery_dataset_iam_resources.append(resource)
-            elif resource.resource_type in GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES:
-                bigquery_table_iam_resources.append(resource)
-            elif resource.resource_type in GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES:
-                kms_crypto_key_iam_resources.append(resource)
-            elif resource.resource_type in GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES:
-                kms_key_ring_iam_resources.append(resource)
-            elif resource.resource_type in GCP_CLOUD_RUN_IAM_RESOURCE_TYPES:
-                cloud_run_iam_resources.append(resource)
-            elif resource.resource_type in GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
-                cloud_function_iam_resources.append(resource)
-        return cls(
-            resources_by_reference=MappingProxyType(resources_by_reference),
-            network_references=MappingProxyType(network_references),
-            subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
-            routers_by_reference=MappingProxyType(routers_by_reference),
-            forwarding_rules=tuple(forwarding_rules),
-            routes=tuple(routes),
-            router_nats=tuple(router_nats),
-            firewalls=tuple(firewalls),
-            firewall_policy_rules=tuple(firewall_policy_rules),
-            firewall_policy_associations=tuple(firewall_policy_associations),
-            bucket_iam_resources=tuple(bucket_iam_resources),
-            secret_iam_resources=tuple(secret_iam_resources),
-            pubsub_topic_iam_resources=tuple(pubsub_topic_iam_resources),
-            pubsub_subscription_iam_resources=tuple(pubsub_subscription_iam_resources),
-            bigquery_dataset_iam_resources=tuple(bigquery_dataset_iam_resources),
-            bigquery_table_iam_resources=tuple(bigquery_table_iam_resources),
-            kms_crypto_key_iam_resources=tuple(kms_crypto_key_iam_resources),
-            kms_key_ring_iam_resources=tuple(kms_key_ring_iam_resources),
-            cloud_run_iam_resources=tuple(cloud_run_iam_resources),
-            cloud_function_iam_resources=tuple(cloud_function_iam_resources),
-        )
-
-
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
 
-def _derive_load_balancer_frontend_reachability(index: _GcpResourceIndex) -> None:
+
+def _derive_load_balancer_frontend_reachability(index: GcpResourceIndex) -> None:
     for forwarding_rule in index.forwarding_rules:
         if not forwarding_rule.public_access_configured:
             continue
@@ -235,7 +115,7 @@ def _forwarding_rule_next_hop_references(forwarding_rule: NormalizedResource) ->
 
 def _traverse_load_balancer_reference(
     reference: str,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
     frontend: dict[str, Any],
     reachable_backends: list[dict[str, Any]],
     *,
@@ -364,7 +244,7 @@ def _network_endpoint_group_target_references(neg: NormalizedResource) -> list[s
     return dedupe(references)
 
 
-def _resource_by_reference(reference: str, index: _GcpResourceIndex) -> NormalizedResource | None:
+def _resource_by_reference(reference: str, index: GcpResourceIndex) -> NormalizedResource | None:
     reference_key = gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES)
     return index.resources_by_reference.get(reference_key)
 
@@ -411,7 +291,7 @@ def _mark_fronted_by_public_load_balancer(resource: NormalizedResource, frontend
 
 
 
-def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: GcpResourceIndex) -> None:
     has_public_route = any(
         _route_has_internet_gateway(route)
         and not route.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS)
@@ -428,7 +308,7 @@ def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: _Gcp
     )
 
 
-def _derive_instance_network_posture(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _derive_instance_network_posture(resource: NormalizedResource, index: GcpResourceIndex) -> None:
     subnetworks = _resource_subnetworks(resource, index)
     in_public_subnet = any(subnetwork.is_public_subnet for subnetwork in subnetworks)
     has_nat_gateway_egress = any(subnetwork.has_nat_gateway_egress for subnetwork in subnetworks)
@@ -445,7 +325,7 @@ def _derive_instance_network_posture(resource: NormalizedResource, index: _GcpRe
     )
 
 
-def _resource_subnetworks(resource: NormalizedResource, index: _GcpResourceIndex) -> list[NormalizedResource]:
+def _resource_subnetworks(resource: NormalizedResource, index: GcpResourceIndex) -> list[NormalizedResource]:
     subnetworks: list[NormalizedResource] = []
     seen: set[str] = set()
     for subnet_reference in resource.subnet_ids:
@@ -459,7 +339,7 @@ def _resource_subnetworks(resource: NormalizedResource, index: _GcpResourceIndex
     return subnetworks
 
 
-def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _infer_instance_vpc_id(resource: NormalizedResource, index: GcpResourceIndex) -> None:
     if resource.vpc_id:
         return
     subnet_network_reference = _unique_network_reference(_subnetwork_vpc_references(resource, index), index)
@@ -469,7 +349,7 @@ def _infer_instance_vpc_id(resource: NormalizedResource, index: _GcpResourceInde
     gcp_mutations(resource).infer_vpc_id(network_reference)
 
 
-def _subnetwork_vpc_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+def _subnetwork_vpc_references(resource: NormalizedResource, index: GcpResourceIndex) -> list[str]:
     references: list[str] = []
     for subnet_reference in resource.subnet_ids:
         subnetwork = index.subnetworks_by_reference.get(
@@ -497,7 +377,7 @@ def _instance_network_references(resource: NormalizedResource) -> list[str]:
     return dedupe(references)
 
 
-def _unique_network_reference(references: list[str], index: _GcpResourceIndex) -> str | None:
+def _unique_network_reference(references: list[str], index: GcpResourceIndex) -> str | None:
     inferred_reference: str | None = None
     inferred_canonical_reference: str | None = None
     for reference in references:
@@ -514,7 +394,7 @@ def _unique_network_reference(references: list[str], index: _GcpResourceIndex) -
 def _resource_has_network_reference(
     resource: NormalizedResource,
     network_reference: str | None,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> bool:
     return any(
         _same_network_reference(candidate, network_reference, index)
@@ -522,7 +402,7 @@ def _resource_has_network_reference(
     )
 
 
-def _resource_network_references(resource: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+def _resource_network_references(resource: NormalizedResource, index: GcpResourceIndex) -> list[str]:
     references: list[str] = []
     direct_reference = _validated_network_reference(resource.vpc_id)
     if direct_reference is not None:
@@ -532,7 +412,7 @@ def _resource_network_references(resource: NormalizedResource, index: _GcpResour
     return dedupe(references)
 
 
-def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _derive_public_compute_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
     matching_firewalls = [
         firewall
         for firewall in index.firewalls
@@ -565,7 +445,7 @@ def _derive_public_compute_exposure(resource: NormalizedResource, index: _GcpRes
     )
 
 
-def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _derive_public_bucket_exposure(bucket: NormalizedResource, index: GcpResourceIndex) -> None:
     public_access_reasons = _bucket_public_access_reasons(bucket, index)
     gcp_mutations(bucket).set_public_access(
         configured=bool(public_access_reasons),
@@ -579,7 +459,7 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: _GcpResour
     )
 
 
-def _derive_public_serverless_exposure(resource: NormalizedResource, index: _GcpResourceIndex) -> None:
+def _derive_public_serverless_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
     iam_resources = (
         index.cloud_run_iam_resources
         if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
@@ -601,7 +481,7 @@ def _derive_sensitive_resource_iam_bindings(
     resource: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
 ) -> None:
-    resource_references = set(_resource_references(resource))
+    resource_references = set(gcp_resource_references(resource))
     bindings: list[dict[str, Any]] = []
     source_addresses: list[str] = []
     for iam_resource in iam_resources:
@@ -630,9 +510,9 @@ def _derive_sensitive_resource_iam_bindings(
     )
 
 
-def _bucket_public_access_reasons(bucket: NormalizedResource, index: _GcpResourceIndex) -> list[str]:
+def _bucket_public_access_reasons(bucket: NormalizedResource, index: GcpResourceIndex) -> list[str]:
     reasons: list[str] = []
-    bucket_references = set(_resource_references(bucket))
+    bucket_references = set(gcp_resource_references(bucket))
     for iam_resource in index.bucket_iam_resources:
         iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
         if not iam_bucket or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES) not in bucket_references:
@@ -654,7 +534,7 @@ def _serverless_public_access_reasons(
     iam_resources: tuple[NormalizedResource, ...],
 ) -> list[str]:
     reasons: list[str] = []
-    resource_references = set(_resource_references(resource))
+    resource_references = set(gcp_resource_references(resource))
     for iam_resource in iam_resources:
         target_reference = _resource_iam_target_reference(iam_resource)
         if (
@@ -732,7 +612,7 @@ def _public_access_prevention_enforced(bucket: NormalizedResource) -> bool:
 def _firewall_applies_to_instance(
     firewall: NormalizedResource,
     instance: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> bool:
     if firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DISABLED):
         return False
@@ -772,7 +652,7 @@ def _internet_ingress_reasons(firewall: NormalizedResource) -> list[str]:
 def _firewall_policy_rule_applies_to_instance(
     policy_rule: NormalizedResource,
     instance: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> bool:
     if policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED):
         return False
@@ -814,7 +694,7 @@ def _firewall_policy_rule_applies_to_instance(
 
 def _firewall_policy_associations_for_rule(
     policy_rule: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> tuple[NormalizedResource, ...]:
     policy_references = _firewall_policy_reference_keys(policy_rule, index)
     if not policy_references:
@@ -829,7 +709,7 @@ def _firewall_policy_associations_for_rule(
 def _firewall_policy_association_applies_to_instance(
     association: NormalizedResource,
     instance: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> bool:
     target = association.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET)
     if not target:
@@ -854,7 +734,7 @@ def _firewall_policy_association_applies_to_instance(
 
 def _firewall_policy_reference_keys(
     resource: NormalizedResource,
-    index: _GcpResourceIndex | None = None,
+    index: GcpResourceIndex | None = None,
 ) -> set[str]:
     references = {
         resource.address,
@@ -970,7 +850,7 @@ def _route_tags_apply_to_instance(route: NormalizedResource, instance: Normalize
 def _nat_applies_to_subnetwork(
     router_nat: NormalizedResource,
     subnetwork: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> bool:
     source_mode = str(router_nat.metadata.get("source_subnetwork_ip_ranges_to_nat") or "").upper()
     if source_mode.startswith("ALL_SUBNETWORKS"):
@@ -979,7 +859,7 @@ def _nat_applies_to_subnetwork(
             for network_reference in _router_nat_network_references(router_nat, index)
         )
 
-    subnetwork_references = set(_resource_references(subnetwork))
+    subnetwork_references = set(gcp_resource_references(subnetwork))
     for nat_subnetwork in router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS):
         reference = nat_subnetwork.get("name") if isinstance(nat_subnetwork, dict) else None
         if reference and gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES) in subnetwork_references:
@@ -989,7 +869,7 @@ def _nat_applies_to_subnetwork(
 
 def _router_nat_network_references(
     router_nat: NormalizedResource,
-    index: _GcpResourceIndex,
+    index: GcpResourceIndex,
 ) -> tuple[str, ...]:
     router_reference = router_nat.get_metadata_field(GcpResourceMetadata.ROUTER_REFERENCE)
     if not router_reference:
@@ -1025,54 +905,19 @@ def _service_account_reference_keys(values: list[object]) -> set[str]:
     return keys
 
 
-def _resource_references(resource: NormalizedResource) -> tuple[str, ...]:
-    references = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-    }
-    for reference in (
-        resource.identifier,
-        resource.get_metadata_field(GcpResourceMetadata.NAME),
-        resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME),
-        resource.get_metadata_field(GcpResourceMetadata.SECRET_ID),
-        resource.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_ID),
-        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_ID),
-        resource.get_metadata_field(GcpResourceMetadata.BIGQUERY_TABLE_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING),
-        resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE),
-        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
-    ):
-        if reference:
-            references.add(reference)
-    return tuple(
-        sorted(
-            gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-            for reference in references
-            if reference
-        )
-    )
-
-
 def _same_network_reference(
     left: str | None,
     right: str | None,
-    index: _GcpResourceIndex | None = None,
+    index: GcpResourceIndex | None = None,
 ) -> bool:
     if not left or not right:
         return False
     return _canonical_network_reference(left, index) == _canonical_network_reference(right, index)
 
 
-def _canonical_network_reference(value: str, index: _GcpResourceIndex | None) -> str:
+def _canonical_network_reference(value: str, index: GcpResourceIndex | None) -> str:
     reference_key = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
-    network_key = _network_reference_key(value)
+    network_key = gcp_network_reference_key(value)
     if index is not None:
         return (
             index.network_references.get(reference_key)
@@ -1088,7 +933,7 @@ def _validated_network_reference(value: object) -> str | None:
     text = value.strip()
     if not text or any(character.isspace() for character in text):
         return None
-    network_key = _network_reference_key(text)
+    network_key = gcp_network_reference_key(text)
     if _GCP_NETWORK_NAME_PATTERN.fullmatch(network_key):
         return text
     reference_key = gcp_reference_key(text, GCP_NETWORK_REFERENCE_SUFFIXES)
@@ -1107,11 +952,3 @@ def _is_terraform_network_reference(value: str) -> bool:
             token and set(token) <= _TERRAFORM_REFERENCE_TOKEN_CHARS for token in parts
         )
     return False
-
-
-def _network_reference_key(value: str) -> str:
-    text = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
-    for marker in ("/global/networks/", "/networks/"):
-        if marker in text:
-            return text.rsplit(marker, 1)[-1]
-    return text
