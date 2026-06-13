@@ -165,7 +165,10 @@ def _firewall_policy_rule(
     )
 
 
-def _firewall_policy_association() -> NormalizedResource:
+def _firewall_policy_association(
+    *,
+    target: str = "folders/12345",
+) -> NormalizedResource:
     return _gcp_resource(
         "google_compute_firewall_policy_association.folder",
         GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION,
@@ -174,7 +177,7 @@ def _firewall_policy_association() -> NormalizedResource:
             GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
                 "google_compute_firewall_policy.org.name"
             ),
-            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: "folders/12345",
+            GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: target,
         },
     )
 
@@ -563,6 +566,85 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         )
         association = _firewall_policy_association()
         resources = [instance, allow, deny, association]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall_policy_rule.allow_ssh"],
+        )
+
+    def test_public_exposure_stage_keeps_higher_priority_policy_allow_public(
+        self,
+    ) -> None:
+        instance = _public_compute_instance(folder_id="folders/12345")
+        allow = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.allow_ssh",
+            action="allow",
+            priority=900,
+        )
+        deny = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.deny_ssh",
+            action="deny",
+            priority=1000,
+        )
+        association = _firewall_policy_association()
+        resources = [instance, allow, deny, association]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertEqual(
+            instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
+            ["google_compute_firewall_policy_rule.allow_ssh"],
+        )
+
+    def test_public_exposure_stage_policy_association_scope_limits_matches(
+        self,
+    ) -> None:
+        matching_instance = _public_compute_instance(
+            "google_compute_instance.web",
+            folder_id="folders/12345",
+        )
+        unmatched_instance = _public_compute_instance(
+            "google_compute_instance.worker",
+            folder_id="folders/99999",
+        )
+        allow = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.allow_ssh",
+            action="allow",
+            priority=1000,
+        )
+        association = _firewall_policy_association(target="folders/12345")
+        resources = [matching_instance, unmatched_instance, allow, association]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(matching_instance.internet_ingress_capable)
+        self.assertTrue(matching_instance.public_exposure)
+        self.assertFalse(unmatched_instance.internet_ingress_capable)
+        self.assertFalse(unmatched_instance.public_exposure)
+        self.assertEqual(unmatched_instance.internet_ingress_reasons, [])
+
+    def test_public_exposure_stage_currently_allows_policy_after_goto_next(
+        self,
+    ) -> None:
+        instance = _public_compute_instance(folder_id="folders/12345")
+        goto_next = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.goto_next",
+            action="goto_next",
+            priority=900,
+        )
+        allow = _firewall_policy_rule(
+            "google_compute_firewall_policy_rule.allow_ssh",
+            action="allow",
+            priority=1000,
+        )
+        association = _firewall_policy_association()
+        resources = [instance, goto_next, allow, association]
 
         DerivePublicExposureStage().apply(resources, _context(resources))
 
