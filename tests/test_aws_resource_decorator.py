@@ -12,8 +12,9 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
+from tfstride.providers.aws.resource_decoration_stages import default_aws_decoration_stages
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.aws.resource_index import AwsResourceIndexBuilder
+from tfstride.providers.aws.resource_index import AwsResourceIndex, AwsResourceIndexBuilder
 
 
 def _resource(
@@ -152,6 +153,90 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         AwsResourceDecorator(stages=[RecordingStage("first"), RecordingStage("second")]).decorate([subnet])
 
         self.assertEqual(calls, ["first:True", "second:True"])
+
+    def test_default_decoration_stages_are_ordered_by_contract(self) -> None:
+        self.assertEqual(
+            [stage.name for stage in default_aws_decoration_stages()],
+            [
+                "merge_standalone_security_group_rules",
+                "merge_role_policy_resources",
+                "resolve_instance_profile_roles",
+                "resolve_ecs_service_relationships",
+                "merge_resource_policy_resources",
+                "apply_s3_public_access_blocks",
+                "derive_subnet_posture",
+                "infer_vpc_ids",
+                "derive_public_exposure",
+                "mark_ecs_services_fronted_by_internet_facing_load_balancers",
+            ],
+        )
+
+    def test_decorator_uses_configured_index_builder(self) -> None:
+        calls: list[str] = []
+
+        class RecordingIndexBuilder(AwsResourceIndexBuilder):
+            def build(self, resources: list[NormalizedResource]) -> AwsResourceIndex:
+                calls.append(f"builder:{len(resources)}")
+                return super().build(resources)
+
+        class RecordingStage:
+            name = "recording"
+
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"stage:{bool(context.index.subnets)}")
+
+        subnet = _resource(
+            address="aws_subnet.app",
+            resource_type="aws_subnet",
+            category=ResourceCategory.NETWORK,
+            identifier="subnet-app",
+        )
+
+        AwsResourceDecorator(
+            index_builder=RecordingIndexBuilder(),
+            stages=[RecordingStage()],
+        ).decorate([subnet])
+
+        self.assertEqual(calls, ["builder:1", "stage:True"])
+
+    def test_configured_stages_replace_default_pipeline(self) -> None:
+        calls: list[str] = []
+
+        class RecordingStage:
+            name = "recording"
+
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"recording:{bool(context.index.security_groups)}")
+
+        security_group = _resource(
+            address="aws_security_group.app",
+            resource_type="aws_security_group",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-app",
+        )
+        rule_resource = _resource(
+            address="aws_security_group_rule.app_ingress",
+            resource_type="aws_security_group_rule",
+            category=ResourceCategory.NETWORK,
+            metadata={"security_group_id": "sg-app"},
+            network_rules=[
+                SecurityGroupRule(
+                    direction="ingress",
+                    protocol="tcp",
+                    from_port=443,
+                    to_port=443,
+                    cidr_blocks=["0.0.0.0/0"],
+                )
+            ],
+        )
+
+        AwsResourceDecorator(stages=[RecordingStage()]).decorate(
+            [security_group, rule_resource]
+        )
+
+        self.assertEqual(calls, ["recording:True"])
+        self.assertEqual(security_group.network_rules, [])
+        self.assertNotIn("standalone_rule_addresses", security_group.metadata)
 
     def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
         security_group = _resource(
