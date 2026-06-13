@@ -46,8 +46,14 @@ class GcpResourceIndex:
     cloud_run_iam_resources: tuple[NormalizedResource, ...]
     cloud_function_iam_resources: tuple[NormalizedResource, ...]
 
-    @classmethod
-    def build(cls, resources: list[NormalizedResource]) -> "GcpResourceIndex":
+
+@dataclass(slots=True)
+class GcpDecorationContext:
+    index: GcpResourceIndex
+
+
+class GcpResourceIndexBuilder:
+    def build(self, resources: list[NormalizedResource]) -> GcpResourceIndex:
         resources_by_reference: dict[str, NormalizedResource] = {}
         network_references: dict[str, str] = {}
         subnetworks_by_reference: dict[str, NormalizedResource] = {}
@@ -117,7 +123,7 @@ class GcpResourceIndex:
                 cloud_run_iam_resources.append(resource)
             elif resource.resource_type in GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
                 cloud_function_iam_resources.append(resource)
-        return cls(
+        return GcpResourceIndex(
             resources_by_reference=MappingProxyType(resources_by_reference),
             network_references=MappingProxyType(network_references),
             subnetworks_by_reference=MappingProxyType(subnetworks_by_reference),
@@ -139,16 +145,6 @@ class GcpResourceIndex:
             cloud_run_iam_resources=tuple(cloud_run_iam_resources),
             cloud_function_iam_resources=tuple(cloud_function_iam_resources),
         )
-
-
-@dataclass(slots=True)
-class GcpDecorationContext:
-    index: GcpResourceIndex
-
-
-class GcpResourceIndexBuilder:
-    def build(self, resources: list[NormalizedResource]) -> GcpResourceIndex:
-        return GcpResourceIndex.build(resources)
 
 
 def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
