@@ -141,6 +141,11 @@ class GcpResourceIndex:
         )
 
 
+@dataclass(slots=True)
+class GcpDecorationContext:
+    index: GcpResourceIndex
+
+
 def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
     references = {
         resource.address,

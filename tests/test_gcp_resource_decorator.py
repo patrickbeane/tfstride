@@ -229,6 +229,29 @@ def _iam_member(
 
 
 class GcpResourceDecoratorTests(unittest.TestCase):
+    def test_decorator_runs_configured_stages_in_order_with_shared_context(self) -> None:
+        calls: list[str] = []
+
+        class RecordingStage:
+            name = "recording"
+
+            def __init__(self, call_name: str) -> None:
+                self._call_name = call_name
+
+            def apply(self, resources: list[NormalizedResource], context) -> None:
+                calls.append(f"{self._call_name}:{bool(context.index.resources_by_reference)}")
+
+        network = _gcp_resource(
+            "google_compute_network.main",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier="main",
+        )
+
+        GcpResourceDecorator(stages=[RecordingStage("first"), RecordingStage("second")]).decorate([network])
+
+        self.assertEqual(calls, ["first:True", "second:True"])
+
     def test_firewall_policy_folder_association_matches_public_ssh_and_rdp(self) -> None:
         policy_rule = _policy_rule(ports=(22, 3389))
         association = _policy_association(
