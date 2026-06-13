@@ -83,6 +83,7 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_url_map,
     parse_firewall_allow_rules,
     parse_firewall_policy_allow_rules,
+    parse_firewall_policy_rules,
 )
 from tfstride.providers.gcp.resource_utils import last_path_segment
 
@@ -518,6 +519,38 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ],
         )
 
+    def test_compute_firewall_policy_rule_normalizer_builds_deny_match_rules(self) -> None:
+        normalized = normalize_compute_firewall_policy_rule(
+            _terraform_resource(
+                "google_compute_firewall_policy_rule.deny_admin",
+                "google_compute_firewall_policy_rule",
+                {
+                    "firewall_policy": "google_compute_firewall_policy.org.name",
+                    "priority": 900,
+                    "action": "deny",
+                    "direction": "INGRESS",
+                    "match": [
+                        {
+                            "src_ip_ranges": ["0.0.0.0/0"],
+                            "layer4_configs": [{"ip_protocol": "tcp", "ports": ["22"]}],
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION),
+            "deny",
+        )
+        self.assertEqual(
+            [
+                (rule.protocol, rule.from_port, rule.to_port, rule.cidr_blocks)
+                for rule in normalized.network_rules
+            ],
+            [("tcp", 22, 22, ["0.0.0.0/0"])],
+        )
+
     def test_compute_firewall_policy_association_normalizer_preserves_attachment_target(self) -> None:
         normalized = normalize_compute_firewall_policy_association(
             _terraform_resource(
@@ -555,18 +588,26 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                 ],
             }
         )
-        deny_rules = parse_firewall_policy_allow_rules(
-            {
-                "action": "deny",
-                "direction": "INGRESS",
-                "match": [{"src_ip_ranges": ["0.0.0.0/0"]}],
-            }
-        )
+        deny_values = {
+            "action": "deny",
+            "direction": "INGRESS",
+            "match": [
+                {
+                    "src_ip_ranges": ["0.0.0.0/0"],
+                    "layer4_configs": [{"ip_protocol": "tcp", "ports": ["22"]}],
+                }
+            ],
+        }
+        legacy_allow_parser_deny_rules = parse_firewall_policy_allow_rules(deny_values)
+        policy_deny_rules = parse_firewall_policy_rules(deny_values)
 
         self.assertEqual(len(allow_rules), 1)
         self.assertEqual(allow_rules[0].direction, "egress")
         self.assertEqual(allow_rules[0].cidr_blocks, ["10.0.0.0/8"])
-        self.assertEqual(deny_rules, [])
+        self.assertEqual(legacy_allow_parser_deny_rules, [])
+        self.assertEqual(len(policy_deny_rules), 1)
+        self.assertEqual(policy_deny_rules[0].direction, "ingress")
+        self.assertEqual(policy_deny_rules[0].cidr_blocks, ["0.0.0.0/0"])
 
     def test_firewall_policy_rule_parser_does_not_default_source_scoped_rules_to_internet(self) -> None:
         rules = parse_firewall_policy_allow_rules(

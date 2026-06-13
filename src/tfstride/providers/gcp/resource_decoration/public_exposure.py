@@ -76,11 +76,19 @@ class _FirewallPolicyIngressCandidate:
     policy_rule: NormalizedResource
     action: _FirewallPolicyAction
     priority: int
+    matches_internet_ingress: bool
     internet_ingress_reasons: tuple[str, ...]
 
     @property
     def is_allow(self) -> bool:
         return self.action == _FirewallPolicyAction.ALLOW
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.action in {
+            _FirewallPolicyAction.ALLOW,
+            _FirewallPolicyAction.DENY,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,14 +96,33 @@ class _FirewallPolicyIngressDecision:
     candidates: tuple[_FirewallPolicyIngressCandidate, ...]
 
     @property
+    def terminal_candidate(self) -> _FirewallPolicyIngressCandidate | None:
+        for candidate in sorted(
+            self.candidates,
+            key=lambda candidate: (candidate.priority, candidate.policy_rule.address),
+        ):
+            if not candidate.matches_internet_ingress:
+                continue
+            if candidate.action == _FirewallPolicyAction.GOTO_NEXT:
+                continue
+            if candidate.is_terminal:
+                return candidate
+        return None
+
+    @property
+    def continues_to_compute_firewalls(self) -> bool:
+        return self.terminal_candidate is None
+
+    @property
     def sources(self) -> tuple[_FirewallIngressSource, ...]:
-        return tuple(
+        candidate = self.terminal_candidate
+        if candidate is None or not candidate.is_allow or not candidate.internet_ingress_reasons:
+            return ()
+        return (
             _FirewallIngressSource(
                 resource=candidate.policy_rule,
                 internet_ingress_reasons=candidate.internet_ingress_reasons,
-            )
-            for candidate in self.candidates
-            if candidate.is_allow and candidate.internet_ingress_reasons
+            ),
         )
 
 
@@ -141,11 +168,10 @@ def _compute_internet_ingress_decision(
     index: GcpResourceIndex,
 ) -> _FirewallIngressDecision:
     policy_decision = _firewall_policy_ingress_decision(resource, index)
+    if not policy_decision.continues_to_compute_firewalls:
+        return _FirewallIngressDecision(sources=policy_decision.sources)
     return _FirewallIngressDecision(
-        sources=(
-            *_compute_firewall_ingress_sources(resource, index),
-            *policy_decision.sources,
-        )
+        sources=(*_compute_firewall_ingress_sources(resource, index),)
     )
 
 
@@ -253,12 +279,17 @@ def _firewall_policy_ingress_candidate(
     policy_rule: NormalizedResource,
 ) -> _FirewallPolicyIngressCandidate:
     action = _firewall_policy_action(policy_rule)
+    internet_ingress_rules = _firewall_policy_internet_ingress_rules(policy_rule)
     return _FirewallPolicyIngressCandidate(
         policy_rule=policy_rule,
         action=action,
         priority=_firewall_policy_priority(policy_rule),
+        matches_internet_ingress=bool(internet_ingress_rules),
         internet_ingress_reasons=(
-            _firewall_policy_internet_ingress_reasons(policy_rule)
+            tuple(
+                describe_security_group_rule(policy_rule, rule)
+                for rule in internet_ingress_rules
+            )
             if action == _FirewallPolicyAction.ALLOW
             else ()
         ),
@@ -545,15 +576,6 @@ def _firewall_policy_action(policy_rule: NormalizedResource) -> _FirewallPolicyA
 def _firewall_policy_priority(policy_rule: NormalizedResource) -> int:
     return _priority_value(
         policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PRIORITY)
-    )
-
-
-def _firewall_policy_internet_ingress_reasons(
-    policy_rule: NormalizedResource,
-) -> tuple[str, ...]:
-    return tuple(
-        describe_security_group_rule(policy_rule, rule)
-        for rule in _firewall_policy_internet_ingress_rules(policy_rule)
     )
 
 

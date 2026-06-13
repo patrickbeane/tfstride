@@ -263,7 +263,7 @@ def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> Norma
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=_firewall_policy_rule_identifier(resource),
-        network_rules=parse_firewall_policy_allow_rules(values),
+        network_rules=parse_firewall_policy_rules(values),
         metadata={
             GcpResourceMetadata.NAME: first_non_empty(values.get(GcpAttr.NAME)),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
@@ -512,7 +512,13 @@ def parse_firewall_policy_allow_rules(values: dict[str, Any] | GcpValues) -> lis
     gcp_values = _gcp_values(values)
     if str(gcp_values.get(GcpAttr.ACTION) or "").strip().lower() != "allow":
         return []
+    return parse_firewall_policy_rules(gcp_values)
 
+
+def parse_firewall_policy_rules(
+    values: dict[str, Any] | GcpValues,
+) -> list[SecurityGroupRule]:
+    gcp_values = _gcp_values(values)
     match = _firewall_policy_match(gcp_values)
     direction = _firewall_policy_direction(gcp_values)
     cidr_blocks = _firewall_policy_cidr_blocks(match, direction)

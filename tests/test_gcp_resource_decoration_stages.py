@@ -149,11 +149,16 @@ def _firewall_policy_rule(
     action: str,
     priority: int,
 ) -> NormalizedResource:
+    action_key = action.strip().lower()
     return _gcp_resource(
         address,
         GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE,
         ResourceCategory.NETWORK,
-        network_rules=[_public_ssh_rule()] if action == "allow" else [],
+        network_rules=(
+            [_public_ssh_rule()]
+            if action_key in {"allow", "deny", "goto_next", "go_to_next"}
+            else []
+        ),
         metadata={
             GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
                 "google_compute_firewall_policy.org.name"
@@ -550,10 +555,14 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             ["google_compute_firewall.allow_ssh"],
         )
 
-    def test_public_exposure_stage_currently_ignores_hierarchical_policy_deny(
+    def test_public_exposure_stage_honors_higher_priority_policy_deny(
         self,
     ) -> None:
         instance = _public_compute_instance(folder_id="folders/12345")
+        compute_allow = _compute_firewall(
+            "google_compute_firewall.allow_ssh",
+            action="allow",
+        )
         allow = _firewall_policy_rule(
             "google_compute_firewall_policy_rule.allow_ssh",
             action="allow",
@@ -565,15 +574,16 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             priority=900,
         )
         association = _firewall_policy_association()
-        resources = [instance, allow, deny, association]
+        resources = [instance, compute_allow, allow, deny, association]
 
         DerivePublicExposureStage().apply(resources, _context(resources))
 
-        self.assertTrue(instance.internet_ingress_capable)
-        self.assertTrue(instance.public_exposure)
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertEqual(instance.internet_ingress_reasons, [])
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
-            ["google_compute_firewall_policy_rule.allow_ssh"],
+            [],
         )
 
     def test_public_exposure_stage_keeps_higher_priority_policy_allow_public(
@@ -629,7 +639,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertFalse(unmatched_instance.public_exposure)
         self.assertEqual(unmatched_instance.internet_ingress_reasons, [])
 
-    def test_public_exposure_stage_currently_allows_policy_after_goto_next(
+    def test_public_exposure_stage_allows_policy_after_goto_next(
         self,
     ) -> None:
         instance = _public_compute_instance(folder_id="folders/12345")
