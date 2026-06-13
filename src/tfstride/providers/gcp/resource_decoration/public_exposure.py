@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -8,14 +10,19 @@ from tfstride.providers.gcp.resource_decoration.iam import (
     resource_iam_target_reference,
     serverless_iam_resources,
 )
-from tfstride.providers.gcp.resource_decoration.network_posture import resource_has_network_reference
+from tfstride.providers.gcp.resource_decoration.network_posture import (
+    resource_has_network_reference,
+)
 from tfstride.providers.gcp.resource_index import (
     GcpDecorationContext,
     GcpResourceIndex,
     gcp_resource_references,
 )
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
-from tfstride.providers.gcp.resource_types import GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES, GcpResourceType
+from tfstride.providers.gcp.resource_types import (
+    GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
+    GcpResourceType,
+)
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     binding_members,
@@ -26,6 +33,33 @@ from tfstride.resource_helpers import describe_security_group_rule
 
 
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
+
+
+@dataclass(frozen=True, slots=True)
+class _FirewallIngressSource:
+    resource: NormalizedResource
+    internet_ingress_reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _FirewallIngressDecision:
+    sources: tuple[_FirewallIngressSource, ...]
+
+    @property
+    def has_internet_ingress(self) -> bool:
+        return any(source.internet_ingress_reasons for source in self.sources)
+
+    @property
+    def internet_ingress_reasons(self) -> tuple[str, ...]:
+        return tuple(
+            reason
+            for source in self.sources
+            for reason in source.internet_ingress_reasons
+        )
+
+    @property
+    def firewall_addresses(self) -> tuple[str, ...]:
+        return tuple(source.resource.address for source in self.sources)
 
 
 class DerivePublicExposureStage:
@@ -43,35 +77,73 @@ class DerivePublicExposureStage:
 
 
 def _derive_public_compute_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
-    matching_firewalls = [
-        firewall
-        for firewall in index.firewalls
-        if _firewall_applies_to_instance(firewall, resource, index)
-        and _internet_ingress_reasons(firewall)
-    ]
-    matching_policy_rules = [
-        policy_rule
-        for policy_rule in index.firewall_policy_rules
-        if _firewall_policy_rule_applies_to_instance(policy_rule, resource, index)
-        and _internet_ingress_reasons(policy_rule)
-    ]
-    ingress_sources = [*matching_firewalls, *matching_policy_rules]
-    internet_ingress_reasons = [
-        reason
-        for firewall in ingress_sources
-        for reason in _internet_ingress_reasons(firewall)
-    ]
+    ingress_decision = _compute_internet_ingress_decision(resource, index)
     gcp_mutations(resource).set_compute_internet_ingress(
-        internet_ingress_reasons=internet_ingress_reasons,
-        firewall_addresses=[firewall.address for firewall in ingress_sources],
+        internet_ingress_reasons=ingress_decision.internet_ingress_reasons,
+        firewall_addresses=ingress_decision.firewall_addresses,
     )
 
-    public_exposure = bool(resource.public_access_configured and internet_ingress_reasons)
+    public_exposure = bool(
+        resource.public_access_configured and ingress_decision.has_internet_ingress
+    )
     gcp_mutations(resource).set_public_exposure(
         public_exposure,
-        reasons=[
-            "compute instance has an external access config and matching firewall rules allow internet ingress"
-        ] if public_exposure else None,
+        reasons=(
+            [
+                "compute instance has an external access config and matching firewall "
+                "rules allow internet ingress"
+            ]
+            if public_exposure
+            else None
+        ),
+    )
+
+
+def _compute_internet_ingress_decision(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+) -> _FirewallIngressDecision:
+    return _FirewallIngressDecision(
+        sources=(
+            *_compute_firewall_ingress_sources(resource, index),
+            *_firewall_policy_ingress_sources(resource, index),
+        )
+    )
+
+
+def _compute_firewall_ingress_sources(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+) -> tuple[_FirewallIngressSource, ...]:
+    return tuple(
+        source
+        for firewall in index.firewalls
+        if _firewall_applies_to_instance(firewall, resource, index)
+        for source in (_firewall_ingress_source(firewall),)
+        if source is not None
+    )
+
+
+def _firewall_policy_ingress_sources(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+) -> tuple[_FirewallIngressSource, ...]:
+    return tuple(
+        source
+        for policy_rule in index.firewall_policy_rules
+        if _firewall_policy_rule_applies_to_instance(policy_rule, resource, index)
+        for source in (_firewall_ingress_source(policy_rule),)
+        if source is not None
+    )
+
+
+def _firewall_ingress_source(resource: NormalizedResource) -> _FirewallIngressSource | None:
+    internet_ingress_reasons = tuple(_internet_ingress_reasons(resource))
+    if not internet_ingress_reasons:
+        return None
+    return _FirewallIngressSource(
+        resource=resource,
+        internet_ingress_reasons=internet_ingress_reasons,
     )
 
 
@@ -89,7 +161,10 @@ def _derive_public_bucket_exposure(bucket: NormalizedResource, index: GcpResourc
     )
 
 
-def _derive_public_serverless_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
+def _derive_public_serverless_exposure(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+) -> None:
     public_access_reasons = _serverless_public_access_reasons(
         resource,
         serverless_iam_resources(resource, index),
@@ -108,7 +183,11 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: GcpResource
     bucket_references = set(gcp_resource_references(bucket))
     for iam_resource in index.bucket_iam_resources:
         iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
-        if not iam_bucket or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES) not in bucket_references:
+        if (
+            not iam_bucket
+            or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES)
+            not in bucket_references
+        ):
             continue
         for binding in iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")
@@ -213,7 +292,9 @@ def _firewall_policy_rule_applies_to_instance(
     if policy_direction != "ingress":
         return False
 
-    target_resources = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES)
+    target_resources = policy_rule.get_metadata_field(
+        GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES
+    )
     target_resource_applies = bool(target_resources) and any(
         resource_has_network_reference(instance, target_resource, index)
         for target_resource in target_resources
@@ -327,7 +408,10 @@ def _resource_folder_id(resource: NormalizedResource) -> str | None:
     folder_id = resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID)
     if folder_id:
         return _normalize_hierarchy_id(folder_id, "folders")
-    for reference in (resource.identifier, resource.get_metadata_field(GcpResourceMetadata.SELF_LINK)):
+    for reference in (
+        resource.identifier,
+        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
+    ):
         folder_id = _hierarchy_id_from_scope_reference(reference, "folders")
         if folder_id:
             return folder_id
@@ -338,7 +422,10 @@ def _resource_organization_id(resource: NormalizedResource) -> str | None:
     organization_id = resource.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID)
     if organization_id:
         return _normalize_hierarchy_id(organization_id, "organizations")
-    for reference in (resource.identifier, resource.get_metadata_field(GcpResourceMetadata.SELF_LINK)):
+    for reference in (
+        resource.identifier,
+        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
+    ):
         organization_id = _hierarchy_id_from_scope_reference(reference, "organizations")
         if organization_id:
             return organization_id
