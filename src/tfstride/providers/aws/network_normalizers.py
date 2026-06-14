@@ -165,6 +165,67 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
     return normalized
 
 
+def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=values.get("id") or values.get("arn"),
+        arn=values.get("arn"),
+        metadata={
+            "load_balancer_arn": values.get("load_balancer_arn"),
+            "target_group_arns": _load_balancer_action_target_group_arns(
+                values.get("default_action")
+            ),
+            "port": as_optional_int(values.get("port")),
+            "protocol": values.get("protocol"),
+        },
+    )
+
+
+def normalize_load_balancer_listener_rule(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=values.get("id") or values.get("arn"),
+        arn=values.get("arn"),
+        metadata={
+            "listener_arn": values.get("listener_arn"),
+            "target_group_arns": _load_balancer_action_target_group_arns(
+                values.get("action")
+            ),
+            "listener_rule_priority": as_optional_int(values.get("priority")),
+        },
+    )
+
+
+def normalize_load_balancer_target_group(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=values.get("id") or values.get("arn") or values.get("name"),
+        arn=values.get("arn"),
+        vpc_id=values.get("vpc_id"),
+        metadata={
+            "name": values.get("name"),
+            "port": as_optional_int(values.get("port")),
+            "protocol": values.get("protocol"),
+            "target_type": values.get("target_type"),
+        },
+    )
+
+
 def parse_security_group_rules(values: dict[str, Any]) -> list[SecurityGroupRule]:
     rules: list[SecurityGroupRule] = []
     for direction in ("ingress", "egress"):
@@ -198,3 +259,34 @@ def parse_standalone_security_group_rule(values: dict[str, Any]) -> SecurityGrou
         referenced_security_group_ids=referenced_security_group_ids,
         description=values.get("description"),
     )
+
+
+def _load_balancer_action_target_group_arns(actions: Any) -> list[str]:
+    target_group_arns: list[str] = []
+    for action in as_list(actions):
+        if not isinstance(action, dict):
+            continue
+        target_group_arn = action.get("target_group_arn")
+        if target_group_arn:
+            target_group_arns.append(str(target_group_arn))
+        for forward in as_list(action.get("forward")):
+            if not isinstance(forward, dict):
+                continue
+            for target_group in as_list(forward.get("target_group")):
+                if not isinstance(target_group, dict):
+                    continue
+                target_group_arn = target_group.get("arn")
+                if target_group_arn:
+                    target_group_arns.append(str(target_group_arn))
+    return _dedupe(target_group_arns)
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped

@@ -20,6 +20,10 @@ class AwsResourceIndex:
     lambda_functions: dict[str, NormalizedResource]
     ecs_clusters: dict[str, NormalizedResource]
     ecs_task_definitions: dict[str, NormalizedResource]
+    load_balancers: dict[str, NormalizedResource]
+    load_balancer_listeners: dict[str, NormalizedResource]
+    load_balancer_listener_rules: tuple[NormalizedResource, ...]
+    load_balancer_target_groups: dict[str, NormalizedResource]
     role_index: dict[str, NormalizedResource]
     instance_profile_index: dict[str, NormalizedResource]
     policy_index: dict[str, NormalizedResource]
@@ -44,6 +48,10 @@ class AwsResourceIndexBuilder:
         lambda_functions: dict[str, NormalizedResource] = {}
         ecs_clusters: dict[str, NormalizedResource] = {}
         ecs_task_definitions: dict[str, NormalizedResource] = {}
+        load_balancers: dict[str, NormalizedResource] = {}
+        load_balancer_listeners: dict[str, NormalizedResource] = {}
+        load_balancer_listener_rules: list[NormalizedResource] = []
+        load_balancer_target_groups: dict[str, NormalizedResource] = {}
         role_index: dict[str, NormalizedResource] = {}
         instance_profile_index: dict[str, NormalizedResource] = {}
         policy_index: dict[str, NormalizedResource] = {}
@@ -111,6 +119,48 @@ class AwsResourceIndexBuilder:
                         ),
                     ),
                 )
+            elif resource_type == "aws_lb":
+                _index_resource_aliases(
+                    load_balancers,
+                    resource,
+                    (
+                        resource.identifier,
+                        resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.arn",
+                        resource.arn,
+                        resource.name,
+                    ),
+                )
+            elif resource_type == "aws_lb_listener":
+                _index_resource_aliases(
+                    load_balancer_listeners,
+                    resource,
+                    (
+                        resource.identifier,
+                        resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.arn",
+                        resource.arn,
+                    ),
+                )
+            elif resource_type == "aws_lb_listener_rule":
+                load_balancer_listener_rules.append(resource)
+            elif resource_type == "aws_lb_target_group":
+                _index_resource_aliases(
+                    load_balancer_target_groups,
+                    resource,
+                    (
+                        resource.identifier,
+                        resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.arn",
+                        f"{resource.address}.name",
+                        resource.arn,
+                        resource.name,
+                        str(resource.metadata.get("name") or "") or None,
+                    ),
+                )
             elif resource_type == "aws_iam_role":
                 _index_resource_aliases(
                     role_index,
@@ -145,6 +195,10 @@ class AwsResourceIndexBuilder:
             lambda_functions=lambda_functions,
             ecs_clusters=ecs_clusters,
             ecs_task_definitions=ecs_task_definitions,
+            load_balancers=load_balancers,
+            load_balancer_listeners=load_balancer_listeners,
+            load_balancer_listener_rules=tuple(load_balancer_listener_rules),
+            load_balancer_target_groups=load_balancer_target_groups,
             role_index=role_index,
             instance_profile_index=instance_profile_index,
             policy_index=policy_index,

@@ -514,6 +514,156 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             ["aws_lb.web"],
         )
 
+    def test_ecs_load_balancer_stage_marks_services_from_listener_target_group_path(self) -> None:
+        load_balancer_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/abc"
+        listener_arn = f"{load_balancer_arn}/listener/443"
+        target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/app/def"
+        load_balancer = _resource(
+            "aws_lb.web",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            identifier="app/web/abc",
+            arn=load_balancer_arn,
+            public_exposure=True,
+        )
+        listener = _resource(
+            "aws_lb_listener.https",
+            "aws_lb_listener",
+            ResourceCategory.EDGE,
+            identifier=listener_arn,
+            arn=listener_arn,
+            metadata={
+                "load_balancer_arn": load_balancer_arn,
+                "target_group_arns": [target_group_arn],
+            },
+        )
+        target_group = _resource(
+            "aws_lb_target_group.app",
+            "aws_lb_target_group",
+            ResourceCategory.EDGE,
+            identifier=target_group_arn,
+            arn=target_group_arn,
+        )
+        service = _resource(
+            "aws_ecs_service.app",
+            "aws_ecs_service",
+            ResourceCategory.COMPUTE,
+            metadata={
+                "load_balancers": [
+                    {
+                        "target_group_arn": target_group_arn,
+                        "container_name": "app",
+                        "container_port": 8080,
+                    }
+                ]
+            },
+        )
+        resources = [load_balancer, listener, target_group, service]
+
+        MarkEcsLoadBalancerExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(service.metadata["fronted_by_internet_facing_load_balancer"])
+        self.assertEqual(
+            service.metadata["internet_facing_load_balancer_addresses"],
+            ["aws_lb.web"],
+        )
+
+    def test_ecs_load_balancer_stage_marks_services_from_listener_rule_target_group_path(self) -> None:
+        load_balancer_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/abc"
+        listener_arn = f"{load_balancer_arn}/listener/443"
+        target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/app/def"
+        target_group_reference = "aws_lb_target_group.app.arn"
+        load_balancer = _resource(
+            "aws_lb.web",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            identifier="app/web/abc",
+            arn=load_balancer_arn,
+            public_exposure=True,
+        )
+        listener = _resource(
+            "aws_lb_listener.https",
+            "aws_lb_listener",
+            ResourceCategory.EDGE,
+            identifier=listener_arn,
+            arn=listener_arn,
+            metadata={"load_balancer_arn": load_balancer_arn, "target_group_arns": []},
+        )
+        listener_rule = _resource(
+            "aws_lb_listener_rule.app",
+            "aws_lb_listener_rule",
+            ResourceCategory.EDGE,
+            metadata={
+                "listener_arn": listener_arn,
+                "target_group_arns": [target_group_reference],
+            },
+        )
+        target_group = _resource(
+            "aws_lb_target_group.app",
+            "aws_lb_target_group",
+            ResourceCategory.EDGE,
+            identifier=target_group_arn,
+            arn=target_group_arn,
+        )
+        service = _resource(
+            "aws_ecs_service.app",
+            "aws_ecs_service",
+            ResourceCategory.COMPUTE,
+            metadata={"load_balancers": [{"target_group_arn": target_group_reference}]},
+        )
+        resources = [load_balancer, listener, listener_rule, target_group, service]
+
+        MarkEcsLoadBalancerExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(service.metadata["fronted_by_internet_facing_load_balancer"])
+        self.assertEqual(
+            service.metadata["internet_facing_load_balancer_addresses"],
+            ["aws_lb.web"],
+        )
+
+    def test_ecs_load_balancer_stage_ignores_private_listener_target_group_path(self) -> None:
+        load_balancer_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/private/abc"
+        listener_arn = f"{load_balancer_arn}/listener/443"
+        target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/app/def"
+        load_balancer = _resource(
+            "aws_lb.private",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            identifier="app/private/abc",
+            arn=load_balancer_arn,
+            public_exposure=False,
+        )
+        listener = _resource(
+            "aws_lb_listener.https",
+            "aws_lb_listener",
+            ResourceCategory.EDGE,
+            identifier=listener_arn,
+            arn=listener_arn,
+            metadata={
+                "load_balancer_arn": load_balancer_arn,
+                "target_group_arns": [target_group_arn],
+            },
+        )
+        target_group = _resource(
+            "aws_lb_target_group.app",
+            "aws_lb_target_group",
+            ResourceCategory.EDGE,
+            identifier=target_group_arn,
+            arn=target_group_arn,
+        )
+        service = _resource(
+            "aws_ecs_service.app",
+            "aws_ecs_service",
+            ResourceCategory.COMPUTE,
+            metadata={"load_balancers": [{"target_group_arn": target_group_arn}]},
+        )
+        resources = [load_balancer, listener, target_group, service]
+
+        MarkEcsLoadBalancerExposureStage().apply(resources, _context(resources))
+
+        self.assertFalse(service.metadata["fronted_by_internet_facing_load_balancer"])
+        self.assertNotIn("internet_facing_load_balancer_addresses", service.metadata)
+
 
 if __name__ == "__main__":
     unittest.main()
