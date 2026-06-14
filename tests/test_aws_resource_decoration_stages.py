@@ -82,6 +82,16 @@ def _public_http_rule() -> SecurityGroupRule:
     )
 
 
+def _private_http_rule() -> SecurityGroupRule:
+    return SecurityGroupRule(
+        direction="ingress",
+        protocol="tcp",
+        from_port=80,
+        to_port=80,
+        cidr_blocks=["10.0.0.0/8"],
+    )
+
+
 def _referenced_security_group_rule(security_group_id: str) -> SecurityGroupRule:
     return SecurityGroupRule(
         direction="ingress",
@@ -283,6 +293,374 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
                 "instance has a public IP path and attached security groups allow internet ingress"
             ],
         )
+
+    def test_public_exposure_stage_uses_explicit_public_route_association_for_instances(self) -> None:
+        security_group = _resource(
+            "aws_security_group.web",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-web",
+            network_rules=[_public_http_rule()],
+        )
+        subnet = _resource(
+            "aws_subnet.public",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-public",
+            vpc_id="vpc-app",
+        )
+        route_table = _resource(
+            "aws_route_table.public",
+            "aws_route_table",
+            ResourceCategory.NETWORK,
+            identifier="rtb-public",
+            vpc_id="vpc-app",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "gateway_id": "igw-app",
+                    }
+                ]
+            },
+        )
+        association = _resource(
+            "aws_route_table_association.public",
+            "aws_route_table_association",
+            ResourceCategory.NETWORK,
+            metadata={"subnet_id": "subnet-public", "route_table_id": "rtb-public"},
+        )
+        instance = _resource(
+            "aws_instance.web",
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            subnet_ids=("subnet-public",),
+            security_group_ids=("sg-web",),
+            public_access_configured=True,
+        )
+        resources = [security_group, subnet, route_table, association, instance]
+        context = _context(resources)
+
+        DeriveSubnetPostureStage().apply(resources, context)
+        DerivePublicExposureStage().apply(resources, context)
+
+        self.assertEqual(context.public_subnet_ids, {"subnet-public"})
+        self.assertTrue(subnet.is_public_subnet)
+        self.assertTrue(instance.in_public_subnet)
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertTrue(instance.public_exposure)
+        self.assertTrue(instance.direct_internet_reachable)
+
+    def test_public_exposure_stage_keeps_nat_only_subnet_instance_private(self) -> None:
+        security_group = _resource(
+            "aws_security_group.web",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-web",
+            network_rules=[_public_http_rule()],
+        )
+        subnet = _resource(
+            "aws_subnet.private",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-private",
+            vpc_id="vpc-app",
+            metadata={"map_public_ip_on_launch": True},
+        )
+        internet_gateway = _resource(
+            "aws_internet_gateway.main",
+            "aws_internet_gateway",
+            ResourceCategory.NETWORK,
+            identifier="igw-app",
+            vpc_id="vpc-app",
+        )
+        public_route_table = _resource(
+            "aws_route_table.public",
+            "aws_route_table",
+            ResourceCategory.NETWORK,
+            identifier="rtb-public",
+            vpc_id="vpc-app",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "gateway_id": "igw-app",
+                    }
+                ]
+            },
+        )
+        private_route_table = _resource(
+            "aws_route_table.private",
+            "aws_route_table",
+            ResourceCategory.NETWORK,
+            identifier="rtb-private",
+            vpc_id="vpc-app",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "nat_gateway_id": "nat-app",
+                    }
+                ]
+            },
+        )
+        nat_gateway = _resource(
+            "aws_nat_gateway.private",
+            "aws_nat_gateway",
+            ResourceCategory.NETWORK,
+            identifier="nat-app",
+        )
+        association = _resource(
+            "aws_route_table_association.private",
+            "aws_route_table_association",
+            ResourceCategory.NETWORK,
+            metadata={"subnet_id": "subnet-private", "route_table_id": "rtb-private"},
+        )
+        instance = _resource(
+            "aws_instance.web",
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            subnet_ids=("subnet-private",),
+            security_group_ids=("sg-web",),
+            public_access_configured=True,
+        )
+        resources = [
+            security_group,
+            subnet,
+            internet_gateway,
+            public_route_table,
+            private_route_table,
+            nat_gateway,
+            association,
+            instance,
+        ]
+        context = _context(resources)
+
+        DeriveSubnetPostureStage().apply(resources, context)
+        DerivePublicExposureStage().apply(resources, context)
+
+        self.assertEqual(context.public_subnet_ids, set())
+        self.assertFalse(subnet.is_public_subnet)
+        self.assertFalse(subnet.has_public_route)
+        self.assertTrue(subnet.has_nat_gateway_egress)
+        self.assertFalse(instance.in_public_subnet)
+        self.assertTrue(instance.has_nat_gateway_egress)
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertFalse(instance.direct_internet_reachable)
+        self.assertEqual(instance.public_exposure_reasons, [])
+
+    def test_public_exposure_stage_requires_instance_public_access_configured(self) -> None:
+        security_group = _resource(
+            "aws_security_group.web",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-web",
+            network_rules=[_public_http_rule()],
+        )
+        subnet = _resource(
+            "aws_subnet.public",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-public",
+        )
+        instance = _resource(
+            "aws_instance.web",
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            subnet_ids=("subnet-public",),
+            security_group_ids=("sg-web",),
+            public_access_configured=False,
+        )
+        resources = [security_group, subnet, instance]
+        context = _context(resources)
+        context.public_subnet_ids = {"subnet-public"}
+
+        DerivePublicExposureStage().apply(resources, context)
+
+        self.assertTrue(instance.in_public_subnet)
+        self.assertTrue(instance.internet_ingress_capable)
+        self.assertFalse(instance.public_exposure)
+        self.assertFalse(instance.direct_internet_reachable)
+        self.assertEqual(instance.public_exposure_reasons, [])
+
+    def test_public_exposure_stage_keeps_instance_without_security_groups_private(self) -> None:
+        subnet = _resource(
+            "aws_subnet.public",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-public",
+        )
+        instance = _resource(
+            "aws_instance.web",
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            subnet_ids=("subnet-public",),
+            public_access_configured=True,
+        )
+        resources = [subnet, instance]
+        context = _context(resources)
+        context.public_subnet_ids = {"subnet-public"}
+
+        DerivePublicExposureStage().apply(resources, context)
+
+        self.assertTrue(instance.in_public_subnet)
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertEqual(instance.internet_ingress_reasons, [])
+        self.assertFalse(instance.public_exposure)
+        self.assertFalse(instance.direct_internet_reachable)
+        self.assertEqual(instance.public_exposure_reasons, [])
+
+    def test_public_exposure_stage_marks_public_db_without_security_groups(self) -> None:
+        database = _resource(
+            "aws_db_instance.app",
+            "aws_db_instance",
+            ResourceCategory.DATA,
+            public_access_configured=True,
+        )
+        resources = [database]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertFalse(database.internet_ingress_capable)
+        self.assertTrue(database.public_exposure)
+        self.assertTrue(database.direct_internet_reachable)
+        self.assertEqual(
+            database.public_exposure_reasons,
+            [
+                "database is marked publicly_accessible and no attached security "
+                "groups provide ingress evidence"
+            ],
+        )
+
+    def test_public_exposure_stage_keeps_public_db_with_private_sg_private(self) -> None:
+        security_group = _resource(
+            "aws_security_group.db",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-db",
+            network_rules=[_private_http_rule()],
+        )
+        database = _resource(
+            "aws_db_instance.app",
+            "aws_db_instance",
+            ResourceCategory.DATA,
+            security_group_ids=("sg-db",),
+            public_access_configured=True,
+        )
+        resources = [security_group, database]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertFalse(database.internet_ingress_capable)
+        self.assertFalse(database.public_exposure)
+        self.assertFalse(database.direct_internet_reachable)
+        self.assertEqual(database.public_exposure_reasons, [])
+
+    def test_public_exposure_stage_marks_public_db_with_internet_sg(self) -> None:
+        security_group = _resource(
+            "aws_security_group.db",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-db",
+            network_rules=[_public_http_rule()],
+        )
+        database = _resource(
+            "aws_db_instance.app",
+            "aws_db_instance",
+            ResourceCategory.DATA,
+            security_group_ids=("sg-db",),
+            public_access_configured=True,
+        )
+        resources = [security_group, database]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(database.internet_ingress_capable)
+        self.assertTrue(database.public_exposure)
+        self.assertTrue(database.direct_internet_reachable)
+        self.assertEqual(
+            database.public_exposure_reasons,
+            [
+                "database is marked publicly_accessible and attached security groups allow internet ingress"
+            ],
+        )
+
+    def test_public_exposure_stage_marks_internet_facing_lb_without_security_groups(self) -> None:
+        load_balancer = _resource(
+            "aws_lb.web",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            public_access_configured=True,
+        )
+        resources = [load_balancer]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertFalse(load_balancer.internet_ingress_capable)
+        self.assertTrue(load_balancer.public_exposure)
+        self.assertTrue(load_balancer.direct_internet_reachable)
+        self.assertEqual(
+            load_balancer.public_exposure_reasons,
+            ["load balancer is configured as internet-facing"],
+        )
+
+    def test_public_exposure_stage_marks_internet_facing_lb_with_internet_sg(self) -> None:
+        security_group = _resource(
+            "aws_security_group.lb",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-lb",
+            network_rules=[_public_http_rule()],
+        )
+        load_balancer = _resource(
+            "aws_lb.web",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            security_group_ids=("sg-lb",),
+            public_access_configured=True,
+        )
+        resources = [security_group, load_balancer]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertTrue(load_balancer.internet_ingress_capable)
+        self.assertEqual(
+            load_balancer.internet_ingress_reasons,
+            ["aws_security_group.lb ingress tcp 80 from 0.0.0.0/0"],
+        )
+        self.assertTrue(load_balancer.public_exposure)
+        self.assertTrue(load_balancer.direct_internet_reachable)
+        self.assertEqual(
+            load_balancer.public_exposure_reasons,
+            [
+                "load balancer is internet-facing and attached security groups allow internet ingress"
+            ],
+        )
+
+    def test_public_exposure_stage_keeps_internet_facing_lb_with_private_sg_private(self) -> None:
+        security_group = _resource(
+            "aws_security_group.lb",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier="sg-lb",
+            network_rules=[_private_http_rule()],
+        )
+        load_balancer = _resource(
+            "aws_lb.web",
+            "aws_lb",
+            ResourceCategory.EDGE,
+            security_group_ids=("sg-lb",),
+            public_access_configured=True,
+        )
+        resources = [security_group, load_balancer]
+
+        DerivePublicExposureStage().apply(resources, _context(resources))
+
+        self.assertFalse(load_balancer.internet_ingress_capable)
+        self.assertFalse(load_balancer.public_exposure)
+        self.assertFalse(load_balancer.direct_internet_reachable)
+        self.assertEqual(load_balancer.public_exposure_reasons, [])
 
     def test_resource_policy_stage_merges_bucket_policy_statements_and_document(self) -> None:
         bucket = _resource(
