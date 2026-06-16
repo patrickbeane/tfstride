@@ -216,10 +216,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 AwsResourceMetadata.BUCKET_NAME: "logs",
                 AwsResourceMetadata.BUCKET_ACL: "public-read",
                 AwsResourceMetadata.PUBLIC_ACCESS_BLOCK: {"block_public_acls": True},
-                "policy_document": {"Statement": [{"Effect": "Allow"}]},
-                "trust_statements": [{"Effect": "Allow"}],
+                AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": [{"Effect": "Allow"}]},
+                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
                 AwsResourceMetadata.ENGINE: "postgres",
-                "resource_policy_source_addresses": ["aws_s3_bucket_policy.logs"],
+                AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES: ["aws_s3_bucket_policy.logs"],
             }
         )
 
@@ -276,13 +276,15 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
             {
-                "bucket": "logs",
-                "acl": "public-read",
-                "public_access_block": {"block_public_acls": True},
-                "policy_document": {"Statement": [{"Effect": "Allow"}]},
-                "trust_statements": [{"Effect": "Allow"}],
-                "engine": "postgres",
-                "resource_policy_source_addresses": ["google_storage_bucket_iam_binding.logs"],
+                GcpResourceMetadata.BUCKET_NAME: "logs",
+                GcpResourceMetadata.POLICY_DOCUMENT: {
+                    "bindings": [{"role": "roles/viewer", "members": ["user:ops@example.com"]}]
+                },
+                AwsResourceMetadata.BUCKET_ACL: "public-read",
+                AwsResourceMetadata.PUBLIC_ACCESS_BLOCK: {"block_public_acls": True},
+                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
+                AwsResourceMetadata.ENGINE: "postgres",
+                AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES: ["google_storage_bucket_iam_binding.logs"],
             },
             provider="gcp",
             resource_type="google_storage_bucket",
@@ -298,7 +300,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.storage.versioning_enabled)
         self.assertIsNone(facts.storage.default_kms_key_name)
         self.assertIsNone(facts.storage.customer_managed_encryption)
-        self.assertEqual(facts.iam.policy_document, {})
+        self.assertEqual(
+            facts.iam.policy_document,
+            {"bindings": [{"role": "roles/viewer", "members": ["user:ops@example.com"]}]},
+        )
         self.assertEqual(facts.iam.trust_statements, [])
         self.assertIsNone(facts.sql.engine)
         self.assertEqual(facts.iam.resource_policy_source_addresses, [])
@@ -614,8 +619,8 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
             {
-                "policy_document": {"Statement": [{"Effect": "Allow"}]},
-                "trust_statements": [{"Effect": "Allow"}],
+                AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": [{"Effect": "Allow"}]},
+                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
             }
         )
         facts = analysis_facts(resource)

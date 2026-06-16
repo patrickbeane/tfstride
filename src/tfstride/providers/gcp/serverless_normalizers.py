@@ -308,7 +308,7 @@ def _normalize_serverless_iam_policy(
             GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
             GcpResourceMetadata.REGION: first_non_empty(values.get(GcpAttr.LOCATION), values.get(GcpAttr.REGION)),
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 

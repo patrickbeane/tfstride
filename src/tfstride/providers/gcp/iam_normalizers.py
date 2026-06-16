@@ -73,7 +73,7 @@ def normalize_project_iam_policy(resource: TerraformResource) -> NormalizedResou
         metadata={
             GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 
@@ -276,7 +276,7 @@ def normalize_service_account_iam_policy(resource: TerraformResource) -> Normali
         metadata={
             GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE: service_account_reference,
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 
@@ -343,7 +343,7 @@ def normalize_storage_bucket_iam_policy(resource: TerraformResource) -> Normaliz
         metadata={
             GcpResourceMetadata.BUCKET_NAME: bucket,
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 
@@ -593,7 +593,7 @@ def _normalize_scope_iam_policy(
         metadata={
             scope_field: scope_reference,
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 
@@ -721,7 +721,7 @@ def _normalize_target_iam_policy(
             target_field: target_reference,
             GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
             GcpResourceMetadata.IAM_BINDINGS: bindings,
-            "policy_document": policy_document,
+            GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 

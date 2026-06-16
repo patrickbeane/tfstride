@@ -28,6 +28,7 @@ class GcpResourceMetadata:
     IAM_ROLE = OptionalStringMetadataField("iam_role")
     IAM_MEMBER = OptionalStringMetadataField("iam_member")
     IAM_CONDITION = DictMetadataField("iam_condition")
+    POLICY_DOCUMENT = DictMetadataField("policy_document")
     CUSTOM_ROLE_ID = OptionalStringMetadataField("custom_role_id")
     CUSTOM_ROLE_STAGE = OptionalStringMetadataField("custom_role_stage")
     ORGANIZATION_ID = OptionalStringMetadataField("organization_id")

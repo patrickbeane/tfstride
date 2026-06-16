@@ -64,7 +64,7 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
         metadata={
             AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
             AwsResourceMetadata.BUCKET_ACL: bucket_acl,
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
     mutations = aws_mutations(normalized)
@@ -86,7 +86,7 @@ def normalize_s3_bucket_policy(resource: TerraformResource) -> NormalizedResourc
         policy_statements=parse_policy_statements(policy_document),
         metadata={
             AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
 
@@ -124,7 +124,7 @@ def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
         policy_statements=parse_policy_statements(policy_document),
         data_sensitivity="sensitive",
         metadata={
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
             "key_usage": values.get("key_usage"),
             "enable_key_rotation": bool(values.get("enable_key_rotation", False)),
         },
@@ -144,7 +144,7 @@ def normalize_sns_topic(resource: TerraformResource) -> NormalizedResource:
         arn=values.get("arn"),
         policy_statements=parse_policy_statements(policy_document),
         metadata={
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
             "display_name": values.get("display_name"),
         },
     )
@@ -163,7 +163,7 @@ def normalize_sqs_queue(resource: TerraformResource) -> NormalizedResource:
         arn=values.get("arn"),
         policy_statements=parse_policy_statements(policy_document),
         metadata={
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
             "queue_url": values.get("url"),
         },
     )
@@ -200,6 +200,6 @@ def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> Norma
         policy_statements=parse_policy_statements(policy_document),
         metadata={
             "secret_arn": values.get("secret_arn"),
-            "policy_document": policy_document,
+            AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )

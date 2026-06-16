@@ -72,6 +72,13 @@ _PROVIDER_STORAGE_SQL_METADATA_FIELDS = (
     GcpResourceMetadata.BUCKET_NAME,
     GcpResourceMetadata.DATABASE_VERSION,
 )
+_PROVIDER_IAM_POLICY_METADATA_FIELDS = (
+    AwsResourceMetadata.POLICY_DOCUMENT,
+    AwsResourceMetadata.TRUST_STATEMENTS,
+    AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES,
+    GcpResourceMetadata.POLICY_DOCUMENT,
+    GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES,
+)
 _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS = (
     GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION,
     GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS,
@@ -114,6 +121,7 @@ _RULE_FACING_METADATA_RAW_KEYS = (
     | _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS
     | _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS
     | frozenset(field.key for field in _PROVIDER_STORAGE_SQL_METADATA_FIELDS)
+    | frozenset(field.key for field in _PROVIDER_IAM_POLICY_METADATA_FIELDS)
     | frozenset(field.key for field in _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS)
 )
 _RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES = frozenset(
@@ -250,11 +258,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("BUCKET_ACL", aws_owned)
         self.assertIn("ENGINE", aws_owned)
         self.assertIn("PUBLIC_ACCESS_BLOCK", aws_owned)
+        self.assertIn("POLICY_DOCUMENT", aws_owned)
+        self.assertIn("TRUST_STATEMENTS", aws_owned)
+        self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", aws_owned)
         self.assertIn("BUCKET_NAME", gcp_owned)
-        self.assertNotIn("BUCKET_NAME", contract.transitional_fields)
-        self.assertNotIn("ENGINE", contract.transitional_fields)
-        self.assertIn("POLICY_DOCUMENT", contract.transitional_fields)
-        self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", contract.transitional_fields)
+        self.assertIn("POLICY_DOCUMENT", gcp_owned)
+        self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", gcp_owned)
+        self.assertEqual(contract.transitional_fields, frozenset())
         self.assertNotIn("SECURITY_GROUP_ID", contract.shared_core_fields)
         self.assertNotIn("SERVICE_ACCOUNT_EMAIL", contract.shared_core_fields)
 

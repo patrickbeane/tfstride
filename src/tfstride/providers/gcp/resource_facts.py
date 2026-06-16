@@ -84,6 +84,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.BUCKET_NAME)
 
     @property
+    def policy_document(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.POLICY_DOCUMENT)
+
+    @property
     def gcs_uniform_bucket_level_access(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS)
 

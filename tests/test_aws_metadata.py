@@ -19,7 +19,7 @@ def _metadata_field_names(namespace: type) -> set[str]:
 
 
 class AwsResourceMetadataTests(unittest.TestCase):
-    def test_aws_metadata_namespace_covers_owned_and_transitional_fields(self) -> None:
+    def test_aws_metadata_namespace_covers_classified_fields(self) -> None:
         ownership_contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
         expected_fields = (
             ownership_contract.provider_owned_fields["aws"]

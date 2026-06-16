@@ -21,7 +21,7 @@ def _resource(provider: str) -> NormalizedResource:
 
 
 class ProviderMetadataOwnershipTests(unittest.TestCase):
-    def test_aws_facts_accept_aws_owned_and_transitional_metadata_writes(self) -> None:
+    def test_aws_facts_accept_aws_owned_metadata_writes(self) -> None:
         resource = _resource("aws")
         facts = aws_facts(resource)
 
@@ -31,17 +31,19 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(resource.get_metadata_field(AwsResourceMetadata.POLICY_DOCUMENT), {"Statement": []})
 
-    def test_gcp_facts_accept_gcp_owned_and_transitional_metadata_writes(self) -> None:
+    def test_gcp_facts_accept_gcp_owned_metadata_writes(self) -> None:
         resource = _resource("gcp")
         facts = gcp_facts(resource)
 
         facts.set(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL, "app@tfstride.iam.gserviceaccount.com")
+        facts.set(GcpResourceMetadata.POLICY_DOCUMENT, {"bindings": []})
         facts.extend(
             GcpResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES,
             ["google_secret_manager_secret_iam_member.public"],
         )
 
         self.assertEqual(facts.service_account_email, "app@tfstride.iam.gserviceaccount.com")
+        self.assertEqual(facts.policy_document, {"bindings": []})
         self.assertEqual(
             facts.resource_policy_source_addresses,
             ["google_secret_manager_secret_iam_member.public"],
