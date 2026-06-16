@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.aws.coercion import as_list
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import load_json_document, parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
@@ -29,7 +30,7 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
         public_access_configured=publicly_accessible,
         data_sensitivity="sensitive",
         metadata={
-            "engine": values.get("engine"),
+            AwsResourceMetadata.ENGINE: values.get("engine"),
             "db_subnet_group_name": values.get("db_subnet_group_name"),
         },
     )
@@ -61,8 +62,8 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         policy_statements=parse_policy_statements(policy_document),
         metadata={
-            "bucket": values.get("bucket"),
-            "acl": bucket_acl,
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.BUCKET_ACL: bucket_acl,
             "policy_document": policy_document,
         },
     )
@@ -84,7 +85,7 @@ def normalize_s3_bucket_policy(resource: TerraformResource) -> NormalizedResourc
         identifier=values.get("id") or resource.address,
         policy_statements=parse_policy_statements(policy_document),
         metadata={
-            "bucket": values.get("bucket"),
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
             "policy_document": policy_document,
         },
     )
@@ -100,11 +101,11 @@ def normalize_s3_bucket_public_access_block(resource: TerraformResource) -> Norm
         category=ResourceCategory.DATA,
         identifier=values.get("id") or values.get("bucket") or resource.address,
         metadata={
-            "bucket": values.get("bucket"),
-            "block_public_acls": bool(values.get("block_public_acls", False)),
-            "block_public_policy": bool(values.get("block_public_policy", False)),
-            "ignore_public_acls": bool(values.get("ignore_public_acls", False)),
-            "restrict_public_buckets": bool(values.get("restrict_public_buckets", False)),
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.BLOCK_PUBLIC_ACLS: bool(values.get("block_public_acls", False)),
+            AwsResourceMetadata.BLOCK_PUBLIC_POLICY: bool(values.get("block_public_policy", False)),
+            AwsResourceMetadata.IGNORE_PUBLIC_ACLS: bool(values.get("ignore_public_acls", False)),
+            AwsResourceMetadata.RESTRICT_PUBLIC_BUCKETS: bool(values.get("restrict_public_buckets", False)),
         },
     )
 

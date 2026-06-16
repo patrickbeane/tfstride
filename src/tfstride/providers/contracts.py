@@ -144,6 +144,9 @@ AWS_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
         "POLICY_NAME",
         "CLUSTER_REFERENCE",
         "NAME",
+        "BUCKET_NAME",
+        "BUCKET_ACL",
+        "ENGINE",
         "TASK_DEFINITION_REFERENCE",
         "TASK_DEFINITION_FAMILY",
         "NETWORK_MODE",
@@ -155,6 +158,7 @@ AWS_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
         "SUBNET_ID",
         "TASK_DEFINITION_REVISION",
         "ROUTES",
+        "PUBLIC_ACCESS_BLOCK",
     }
 )
 
@@ -169,6 +173,7 @@ GCP_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
         "SUBNETWORK",
         "CIDR_RANGE",
         "MACHINE_TYPE",
+        "BUCKET_NAME",
         "DATABASE_VERSION",
         "CLOUD_SQL_PRIVATE_NETWORK",
         "CLOUD_SQL_SSL_MODE",
@@ -311,12 +316,8 @@ GCP_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
 
 TRANSITIONAL_RESOURCE_METADATA_FIELDS = frozenset(
     {
-        "BUCKET_NAME",
-        "BUCKET_ACL",
-        "ENGINE",
         "POLICY_DOCUMENT",
         "TRUST_STATEMENTS",
-        "PUBLIC_ACCESS_BLOCK",
         "RESOURCE_POLICY_SOURCE_ADDRESSES",
     }
 )

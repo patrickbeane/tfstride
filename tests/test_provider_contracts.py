@@ -64,6 +64,14 @@ _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS = frozenset(
     }
 )
 _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS = frozenset({"customer_managed_encryption"})
+_PROVIDER_STORAGE_SQL_METADATA_FIELDS = (
+    AwsResourceMetadata.BUCKET_NAME,
+    AwsResourceMetadata.BUCKET_ACL,
+    AwsResourceMetadata.ENGINE,
+    AwsResourceMetadata.PUBLIC_ACCESS_BLOCK,
+    GcpResourceMetadata.BUCKET_NAME,
+    GcpResourceMetadata.DATABASE_VERSION,
+)
 _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS = (
     GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION,
     GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS,
@@ -105,6 +113,7 @@ _RULE_FACING_METADATA_RAW_KEYS = (
     _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS
     | _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS
     | _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS
+    | frozenset(field.key for field in _PROVIDER_STORAGE_SQL_METADATA_FIELDS)
     | frozenset(field.key for field in _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS)
 )
 _RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES = frozenset(
@@ -237,7 +246,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("FIREWALL_DIRECTION", gcp_owned)
         self.assertIn("FIREWALL_POLICY_ENABLE_LOGGING", gcp_owned)
         self.assertIn("CUSTOMER_MANAGED_ENCRYPTION", gcp_owned)
-        self.assertIn("BUCKET_NAME", contract.transitional_fields)
+        self.assertIn("BUCKET_NAME", aws_owned)
+        self.assertIn("BUCKET_ACL", aws_owned)
+        self.assertIn("ENGINE", aws_owned)
+        self.assertIn("PUBLIC_ACCESS_BLOCK", aws_owned)
+        self.assertIn("BUCKET_NAME", gcp_owned)
+        self.assertNotIn("BUCKET_NAME", contract.transitional_fields)
+        self.assertNotIn("ENGINE", contract.transitional_fields)
         self.assertIn("POLICY_DOCUMENT", contract.transitional_fields)
         self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", contract.transitional_fields)
         self.assertNotIn("SECURITY_GROUP_ID", contract.shared_core_fields)

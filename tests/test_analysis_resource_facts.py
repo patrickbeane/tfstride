@@ -7,6 +7,7 @@ from typing import Any
 
 from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_facts
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 
@@ -212,12 +213,12 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_reads_provider_backed_analysis_facts(self) -> None:
         resource = _resource(
             {
-                "bucket": "logs",
-                "acl": "public-read",
-                "public_access_block": {"block_public_acls": True},
+                AwsResourceMetadata.BUCKET_NAME: "logs",
+                AwsResourceMetadata.BUCKET_ACL: "public-read",
+                AwsResourceMetadata.PUBLIC_ACCESS_BLOCK: {"block_public_acls": True},
                 "policy_document": {"Statement": [{"Effect": "Allow"}]},
                 "trust_statements": [{"Effect": "Allow"}],
-                "engine": "postgres",
+                AwsResourceMetadata.ENGINE: "postgres",
                 "resource_policy_source_addresses": ["aws_s3_bucket_policy.logs"],
             }
         )
