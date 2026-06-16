@@ -37,11 +37,7 @@ class ProviderMetadataWriteValidator:
             raise ProviderMetadataOwnershipError(f"Unknown provider `{provider}` in metadata ownership contract.")
 
         fields_by_name = _metadata_fields_by_name(namespace)
-        allowed_names = (
-            contract.shared_core_fields
-            | contract.transitional_fields
-            | contract.provider_owned_fields[provider_key]
-        )
+        allowed_names = contract.shared_core_fields | contract.provider_owned_fields[provider_key]
         unclassified_names = frozenset(fields_by_name) - allowed_names
         if unclassified_names:
             formatted = ", ".join(sorted(unclassified_names))

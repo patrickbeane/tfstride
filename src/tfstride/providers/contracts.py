@@ -21,7 +21,6 @@ class ResourceMetadataOwnershipContract:
 
     shared_core_fields: frozenset[str]
     provider_owned_fields: Mapping[str, frozenset[str]]
-    transitional_fields: frozenset[str]
     guidelines: tuple[str, ...]
 
 
@@ -35,7 +34,7 @@ PROVIDER_ENCAPSULATION_GUIDELINES = (
 RESOURCE_METADATA_OWNERSHIP_GUIDELINES = (
     "Shared-core metadata backs provider-neutral NormalizedResource posture and reporting fields.",
     "Provider-owned metadata belongs behind provider facts, mutation facades, or provider metadata namespaces.",
-    "Transitional metadata is provider-shaped data still exposed through shared analysis facades; migrate it before adding another provider.",
+    "Provider-shaped data used by shared analysis must be exposed through provider facts before adding another provider.",
     "Do not add new ResourceMetadata fields without classifying their ownership here.",
 )
 
@@ -319,8 +318,6 @@ GCP_OWNED_RESOURCE_METADATA_FIELDS = frozenset(
     }
 )
 
-TRANSITIONAL_RESOURCE_METADATA_FIELDS = frozenset()
-
 PROVIDER_OWNED_RESOURCE_METADATA_FIELDS = MappingProxyType(
     {
         "aws": AWS_OWNED_RESOURCE_METADATA_FIELDS,
@@ -339,6 +336,5 @@ DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT = ProviderEncapsulationContract(
 DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT = ResourceMetadataOwnershipContract(
     shared_core_fields=SHARED_CORE_RESOURCE_METADATA_FIELDS,
     provider_owned_fields=PROVIDER_OWNED_RESOURCE_METADATA_FIELDS,
-    transitional_fields=TRANSITIONAL_RESOURCE_METADATA_FIELDS,
     guidelines=RESOURCE_METADATA_OWNERSHIP_GUIDELINES,
 )

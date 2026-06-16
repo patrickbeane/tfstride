@@ -21,11 +21,7 @@ def _metadata_field_names(namespace: type) -> set[str]:
 class AwsResourceMetadataTests(unittest.TestCase):
     def test_aws_metadata_namespace_covers_classified_fields(self) -> None:
         ownership_contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
-        expected_fields = (
-            ownership_contract.provider_owned_fields["aws"]
-            | ownership_contract.transitional_fields
-            | AWS_SHARED_CORE_METADATA_FIELD_NAMES
-        )
+        expected_fields = ownership_contract.provider_owned_fields["aws"] | AWS_SHARED_CORE_METADATA_FIELD_NAMES
 
         self.assertEqual(_metadata_field_names(AwsResourceMetadata), expected_fields)
 
@@ -40,7 +36,7 @@ class AwsResourceMetadataTests(unittest.TestCase):
                     getattr(ResourceMetadata, field_name),
                 )
 
-        for field_name in aws_owned | ownership_contract.transitional_fields:
+        for field_name in aws_owned:
             with self.subTest(field_name=field_name):
                 self.assertFalse(hasattr(ResourceMetadata, field_name))
 

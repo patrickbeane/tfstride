@@ -218,14 +218,11 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
         self.assertEqual(actual_fields, contract.shared_core_fields)
         self.assertFalse(actual_fields & provider_owned)
-        self.assertFalse(actual_fields & contract.transitional_fields)
         self.assertFalse(contract.shared_core_fields & provider_owned)
-        self.assertFalse(contract.shared_core_fields & contract.transitional_fields)
-        self.assertFalse(provider_owned & contract.transitional_fields)
 
     def test_provider_metadata_namespaces_match_ownership_contract(self) -> None:
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
-        shared_or_transitional = contract.shared_core_fields | contract.transitional_fields
+        shared_core = contract.shared_core_fields
         provider_namespaces = {
             "aws": AwsResourceMetadata,
             "gcp": GcpResourceMetadata,
@@ -236,8 +233,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
                 metadata_fields = _metadata_field_names(namespace)
                 provider_owned = contract.provider_owned_fields[provider]
 
-                self.assertEqual(metadata_fields - shared_or_transitional, provider_owned)
-                self.assertFalse(provider_owned & shared_or_transitional)
+                self.assertEqual(metadata_fields - shared_core, provider_owned)
+                self.assertFalse(provider_owned & shared_core)
                 self.assertEqual(provider_owned - metadata_fields, set())
 
     def test_resource_metadata_ownership_contract_marks_known_boundaries(self) -> None:
@@ -264,7 +261,6 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("BUCKET_NAME", gcp_owned)
         self.assertIn("POLICY_DOCUMENT", gcp_owned)
         self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", gcp_owned)
-        self.assertEqual(contract.transitional_fields, frozenset())
         self.assertNotIn("SECURITY_GROUP_ID", contract.shared_core_fields)
         self.assertNotIn("SERVICE_ACCOUNT_EMAIL", contract.shared_core_fields)
 
@@ -272,7 +268,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         guidelines = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT.guidelines
 
         self.assertTrue(any("Provider-owned metadata" in item for item in guidelines))
-        self.assertTrue(any("Transitional metadata" in item for item in guidelines))
+        self.assertTrue(any("provider facts" in item for item in guidelines))
 
     def test_provider_contract_documents_encapsulation_rules(self) -> None:
         guidelines = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.guidelines
