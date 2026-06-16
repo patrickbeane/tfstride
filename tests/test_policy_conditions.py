@@ -4,18 +4,18 @@ import unittest
 
 from tfstride.analysis.policy_conditions import (
     assess_principal,
-    federated_provider_description,
     describe_trust_narrowing,
     describe_trust_narrowing_for_principal,
+    federated_provider_description,
     policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
-    trust_statement_has_supported_narrowing,
-    trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing,
     trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_has_supported_narrowing,
     trust_statement_has_supported_narrowing_for_principal,
     trust_statement_narrowing_conditions,
     trust_statement_narrowing_keys,
+    trust_statement_principal_assessments,
 )
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
 

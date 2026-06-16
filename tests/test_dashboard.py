@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import unittest
 from copy import deepcopy
-from unittest import mock
 from pathlib import Path
-
+from unittest import mock
 
 FASTAPI_DEPS_AVAILABLE = all(
     importlib.util.find_spec(name) is not None

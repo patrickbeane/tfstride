@@ -28,15 +28,15 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_bigquery_table_iam_binding,
     normalize_bigquery_table_iam_member,
     normalize_bigquery_table_iam_policy,
+    normalize_folder_iam_binding,
+    normalize_folder_iam_member,
+    normalize_folder_iam_policy,
     normalize_kms_crypto_key_iam_binding,
     normalize_kms_crypto_key_iam_member,
     normalize_kms_crypto_key_iam_policy,
     normalize_kms_key_ring_iam_binding,
     normalize_kms_key_ring_iam_member,
     normalize_kms_key_ring_iam_policy,
-    normalize_folder_iam_binding,
-    normalize_folder_iam_member,
-    normalize_folder_iam_policy,
     normalize_organization_iam_binding,
     normalize_organization_iam_custom_role,
     normalize_organization_iam_member,
@@ -62,24 +62,6 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_storage_bucket_iam_binding,
     normalize_storage_bucket_iam_member,
     normalize_storage_bucket_iam_policy,
-)
-from tfstride.providers.gcp.serverless_normalizers import (
-    normalize_cloud_run_service,
-    normalize_cloud_run_service_iam_binding,
-    normalize_cloud_run_service_iam_member,
-    normalize_cloud_run_service_iam_policy,
-    normalize_cloud_run_v2_service,
-    normalize_cloud_run_v2_service_iam_binding,
-    normalize_cloud_run_v2_service_iam_member,
-    normalize_cloud_run_v2_service_iam_policy,
-    normalize_cloudfunctions2_function,
-    normalize_cloudfunctions2_function_iam_binding,
-    normalize_cloudfunctions2_function_iam_member,
-    normalize_cloudfunctions2_function_iam_policy,
-    normalize_cloudfunctions_function,
-    normalize_cloudfunctions_function_iam_binding,
-    normalize_cloudfunctions_function_iam_member,
-    normalize_cloudfunctions_function_iam_policy,
 )
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
@@ -114,8 +96,25 @@ from tfstride.providers.gcp.org_policy_normalizers import (
 )
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_types import GcpResourceType
+from tfstride.providers.gcp.serverless_normalizers import (
+    normalize_cloud_run_service,
+    normalize_cloud_run_service_iam_binding,
+    normalize_cloud_run_service_iam_member,
+    normalize_cloud_run_service_iam_policy,
+    normalize_cloud_run_v2_service,
+    normalize_cloud_run_v2_service_iam_binding,
+    normalize_cloud_run_v2_service_iam_member,
+    normalize_cloud_run_v2_service_iam_policy,
+    normalize_cloudfunctions2_function,
+    normalize_cloudfunctions2_function_iam_binding,
+    normalize_cloudfunctions2_function_iam_member,
+    normalize_cloudfunctions2_function_iam_policy,
+    normalize_cloudfunctions_function,
+    normalize_cloudfunctions_function_iam_binding,
+    normalize_cloudfunctions_function_iam_member,
+    normalize_cloudfunctions_function_iam_policy,
+)
 from tfstride.resource_metadata import InventoryMetadata
-
 
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 

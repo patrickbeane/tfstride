@@ -15,7 +15,6 @@ from tfstride.models import (
 )
 from tfstride.resource_metadata import InventoryMetadata
 
-
 UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
 
 

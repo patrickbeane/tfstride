@@ -26,7 +26,6 @@ from tfstride.reporting.json_report import (
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.sarif import render_sarif
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
 FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"

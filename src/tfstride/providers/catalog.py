@@ -13,7 +13,6 @@ from tfstride.providers.registry import ProviderRegistry
 from tfstride.providers.resource_capabilities import ProviderResourceCapabilityRegistry
 from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 
-
 DEFAULT_PROVIDER = "aws"
 
 

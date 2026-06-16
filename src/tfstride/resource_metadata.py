@@ -5,7 +5,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
-
 T = TypeVar("T")
 
 

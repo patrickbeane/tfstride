@@ -10,13 +10,6 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import AwsResourceFacts
-from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
-from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
-from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
-from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
-from tfstride.providers.gcp.resource_facts import GcpResourceFacts
-from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_limitations,
@@ -25,7 +18,13 @@ from tfstride.providers.catalog import (
     default_resource_capability_registry,
     default_resource_facts_registry,
 )
-
+from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
+from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
+from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts
+from tfstride.providers.resource_capabilities import ResourceCapability
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"

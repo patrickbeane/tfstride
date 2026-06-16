@@ -11,8 +11,8 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
 )
-from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_decoration_stages import default_aws_decoration_stages
+from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsResourceIndex, AwsResourceIndexBuilder
 

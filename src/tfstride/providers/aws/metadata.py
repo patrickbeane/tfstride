@@ -11,7 +11,6 @@ from tfstride.resource_metadata import (
     StringListMetadataField,
 )
 
-
 AWS_SHARED_CORE_METADATA_FIELD_NAMES = frozenset(
     {
         "PUBLIC_ACCESS_CONFIGURED",

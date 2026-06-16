@@ -25,7 +25,6 @@ from tfstride.analysis.rule_registry import (
 )
 from tfstride.models import Finding, Observation, ResourceInventory, TrustBoundary
 
-
 _RULE_GROUP_IDS = (
     (
         "aws-public-compute-broad-ingress",

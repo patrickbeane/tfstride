@@ -17,7 +17,6 @@ from tfstride.providers.catalog import (
 )
 from tfstride.providers.registry import ProviderRegistry
 
-
 AUTO_PROVIDER = "auto"
 SHARED_LIMITATIONS = (
     "The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.",

@@ -4,7 +4,6 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.catalog import default_resource_capability_registry
 from tfstride.providers.resource_capabilities import ResourceCapability
 
-
 _DEFAULT_RESOURCE_CAPABILITY_REGISTRY = default_resource_capability_registry()
 
 WORKLOAD_RESOURCE_TYPES = _DEFAULT_RESOURCE_CAPABILITY_REGISTRY.resource_types(

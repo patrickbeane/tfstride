@@ -13,10 +13,10 @@ from tfstride.analysis.gcp.iam_access import (
     iam_binding_condition,
     iam_resource_binding_members,
 )
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext

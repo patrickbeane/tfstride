@@ -11,7 +11,6 @@ from tfstride.providers.gcp.constants import GCP_ORGANIZATION_POLICY_RESOURCE_TY
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_metadata import MetadataField
 
-
 GCP_ORG_POLICY_SCOPE_ORGANIZATION = "organization"
 GCP_ORG_POLICY_SCOPE_FOLDER = "folder"
 GCP_ORG_POLICY_SCOPE_PROJECT = "project"

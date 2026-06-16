@@ -9,7 +9,6 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
-
 _MetadataValue = TypeVar("_MetadataValue")
 _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
     provider="aws",

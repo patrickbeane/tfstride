@@ -10,16 +10,23 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
     ORG_POLICY_REQUIRE_OS_LOGIN,
     ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
 )
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import BoundaryType, Finding, NormalizedResource, ResourceInventory, SecurityGroupRule, TrustBoundary
+from tfstride.models import (
+    BoundaryType,
+    Finding,
+    NormalizedResource,
+    ResourceInventory,
+    SecurityGroupRule,
+    TrustBoundary,
+)
 from tfstride.providers.gcp.constants import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,

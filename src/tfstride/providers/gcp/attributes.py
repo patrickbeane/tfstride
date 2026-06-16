@@ -7,7 +7,6 @@ from typing import Any, Generic, TypeVar
 
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact
 
-
 T = TypeVar("T")
 
 

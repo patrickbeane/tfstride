@@ -14,7 +14,6 @@ from tfstride.resource_metadata import (
     StringListMetadataField,
 )
 
-
 _MetadataValue = TypeVar("_MetadataValue")
 _MetadataKey = str | MetadataField[Any]
 
@@ -50,7 +49,7 @@ class Severity(str, Enum):
         return tuple(type(self)).index(self)
 
     @classmethod
-    def sort_key(cls, severity: "Severity") -> int:
+    def sort_key(cls, severity: Severity) -> int:
         return len(tuple(cls)) - severity.rank - 1
 
 
@@ -129,7 +128,7 @@ class IAMPolicyStatement:
     resources: list[str] = field(default_factory=list)
     principals: list[str] = field(default_factory=list)
     principal_entries: list[IAMPrincipal] = field(default_factory=list)
-    conditions: list["IAMPolicyCondition"] = field(default_factory=list)
+    conditions: list[IAMPolicyCondition] = field(default_factory=list)
 
     def has_wildcard_action(self) -> bool:
         return any(action == "*" or action.endswith(":*") for action in self.actions)

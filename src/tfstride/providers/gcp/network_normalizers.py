@@ -9,7 +9,6 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
 
-
 GCP_PROVIDER = "gcp"
 
 

@@ -31,7 +31,7 @@ class ProviderMetadataWriteValidator:
         provider: str,
         namespace: type,
         contract: ResourceMetadataOwnershipContract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT,
-    ) -> "ProviderMetadataWriteValidator":
+    ) -> ProviderMetadataWriteValidator:
         provider_key = provider.strip().lower()
         if provider_key not in contract.provider_owned_fields:
             raise ProviderMetadataOwnershipError(f"Unknown provider `{provider}` in metadata ownership contract.")

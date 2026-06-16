@@ -14,7 +14,6 @@ from tfstride.providers.gcp.resource_types import (
 )
 from tfstride.providers.resource_capabilities import ResourceCapability
 
-
 GCP_RESOURCE_CAPABILITIES = MappingProxyType(
     {
         ResourceCapability.WORKLOAD: GCP_WORKLOAD_RESOURCE_TYPES,

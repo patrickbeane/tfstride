@@ -22,13 +22,13 @@ from tfstride.providers.gcp.data_normalizers import (
 from tfstride.providers.gcp.iam_normalizers import (
     normalize_bigquery_dataset_iam_member,
     normalize_bigquery_table_iam_binding,
+    normalize_folder_iam_binding,
+    normalize_folder_iam_member,
+    normalize_folder_iam_policy,
     normalize_kms_crypto_key_iam_member,
     normalize_kms_key_ring_iam_binding,
     normalize_kms_key_ring_iam_member,
     normalize_kms_key_ring_iam_policy,
-    normalize_folder_iam_binding,
-    normalize_folder_iam_member,
-    normalize_folder_iam_policy,
     normalize_organization_iam_binding,
     normalize_organization_iam_custom_role,
     normalize_organization_iam_member,
@@ -50,19 +50,6 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_storage_bucket_iam_policy,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.normalizer import GcpNormalizer
-from tfstride.providers.gcp.serverless_normalizers import (
-    normalize_cloud_run_service_iam_member,
-    normalize_cloud_run_v2_service,
-    normalize_cloudfunctions_function,
-    normalize_cloudfunctions_function_iam_member,
-)
-from tfstride.providers.gcp.org_policy_normalizers import (
-    normalize_folder_organization_policy,
-    normalize_org_policy_policy,
-    normalize_organization_policy,
-    normalize_project_organization_policy,
-)
 from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_backend_bucket,
     normalize_compute_backend_service,
@@ -85,8 +72,20 @@ from tfstride.providers.gcp.network_normalizers import (
     parse_firewall_policy_allow_rules,
     parse_firewall_policy_rules,
 )
+from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.org_policy_normalizers import (
+    normalize_folder_organization_policy,
+    normalize_org_policy_policy,
+    normalize_organization_policy,
+    normalize_project_organization_policy,
+)
 from tfstride.providers.gcp.resource_utils import last_path_segment
-
+from tfstride.providers.gcp.serverless_normalizers import (
+    normalize_cloud_run_service_iam_member,
+    normalize_cloud_run_v2_service,
+    normalize_cloudfunctions_function,
+    normalize_cloudfunctions_function_iam_member,
+)
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "gcp" / "sample_gcp_plan.json"
 

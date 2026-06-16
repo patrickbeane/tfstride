@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning
 from tfstride.analysis.gcp.org_policy_guardrails import (
-    GcpOrgPolicyGuardrail,
-    GcpOrgPolicyGuardrailIndex,
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
     ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
     ORG_POLICY_REQUIRE_OS_LOGIN,
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
     ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
+    GcpOrgPolicyGuardrail,
+    GcpOrgPolicyGuardrailIndex,
 )
 from tfstride.models import NormalizedResource, SeverityReasoning
 

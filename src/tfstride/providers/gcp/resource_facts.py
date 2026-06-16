@@ -11,7 +11,6 @@ from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
-
 _MetadataValue = TypeVar("_MetadataValue")
 _GCP_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
     provider="gcp",

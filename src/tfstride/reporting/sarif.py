@@ -8,7 +8,6 @@ from tfstride.analysis.rule_registry import default_rule_metadata
 from tfstride.models import AnalysisResult, Finding, Severity
 from tfstride.reporting.finding_serialization import serialize_evidence, serialize_severity_reasoning
 
-
 SARIF_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
 SARIF_VERSION = "2.1.0"
 SARIF_LEVELS = {

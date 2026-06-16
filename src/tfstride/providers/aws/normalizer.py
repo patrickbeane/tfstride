@@ -5,9 +5,6 @@ from collections.abc import Callable
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
-from tfstride.providers.base import ProviderNormalizer
-from tfstride.resource_helpers import parse_aws_account_id
-from tfstride.resource_metadata import InventoryMetadata
 from tfstride.providers.aws.compute_normalizers import (
     normalize_ecs_cluster,
     normalize_ecs_service,
@@ -49,7 +46,9 @@ from tfstride.providers.aws.network_normalizers import (
     normalize_vpc,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
-
+from tfstride.providers.base import ProviderNormalizer
+from tfstride.resource_helpers import parse_aws_account_id
+from tfstride.resource_metadata import InventoryMetadata
 
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 

@@ -22,7 +22,6 @@ from tfstride.filtering import (
     load_suppressions,
 )
 
-
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_plan.json"
 BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
 SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_safe_plan.json"

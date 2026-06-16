@@ -16,7 +16,6 @@ from tfstride.providers.gcp.resource_utils import (
     gcp_reference_key,
 )
 
-
 _SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
 
 

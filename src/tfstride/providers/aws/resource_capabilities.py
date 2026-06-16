@@ -4,7 +4,6 @@ from types import MappingProxyType
 
 from tfstride.providers.resource_capabilities import ResourceCapability
 
-
 AWS_RESOURCE_CAPABILITIES = MappingProxyType(
     {
         ResourceCapability.WORKLOAD: frozenset(

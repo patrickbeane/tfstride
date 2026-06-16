@@ -10,7 +10,6 @@ from tfstride.providers.resource_facts import (
     ProviderResourceFactsRegistry,
 )
 
-
 _DEFAULT_RESOURCE_FACTS_REGISTRY = default_resource_facts_registry()
 
 

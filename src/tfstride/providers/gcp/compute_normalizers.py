@@ -6,8 +6,8 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import as_bool
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
+from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     has_external_access_config,
     network_interface_subnetworks,

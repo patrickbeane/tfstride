@@ -8,7 +8,6 @@ from typing import Any
 from tfstride.analysis.rule_registry import RulePolicy, default_rule_registry
 from tfstride.models import Severity
 
-
 CONFIG_FILENAME = "tfstride.toml"
 CONFIG_FORMAT_VERSION = "1.0"
 

@@ -16,7 +16,6 @@ from tfstride.reporting.report_contract import (
     UnresolvedReferencePayload,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"

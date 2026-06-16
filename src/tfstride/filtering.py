@@ -3,13 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from tfstride import __version__
 from tfstride.models import AnalysisResult, Finding, Severity
-
 
 BASELINE_FORMAT_VERSION = "1.0"
 SUPPRESSIONS_FORMAT_VERSION = "1.0"
@@ -120,7 +119,7 @@ def build_baseline_payload(findings: list[Finding]) -> dict[str, Any]:
     entries = sorted(entries_by_fingerprint.values(), key=lambda entry: (entry["rule_id"], entry["fingerprint"]))
     return {
         "version": BASELINE_FORMAT_VERSION,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tool": {
             "name": "tfstride",
             "version": __version__,

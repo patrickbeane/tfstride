@@ -6,7 +6,6 @@ from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupR
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
 from tfstride.providers.aws.resource_mutations import aws_mutations
 
-
 AWS_PROVIDER = "aws"
 
 

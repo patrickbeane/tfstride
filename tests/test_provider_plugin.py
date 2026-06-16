@@ -6,7 +6,6 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
-from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
@@ -15,6 +14,7 @@ from tfstride.providers.plugin import (
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
 )
+from tfstride.providers.resource_capabilities import ResourceCapability
 
 
 class FakeMetadata:

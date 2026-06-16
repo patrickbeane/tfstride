@@ -18,10 +18,10 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding

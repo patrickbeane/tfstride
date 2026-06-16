@@ -8,7 +8,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, cast
 
-from fastapi import FastAPI, File, Form, HTTPException, Path as FastApiPath, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Path as FastApiPath
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,7 +26,6 @@ from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.reporting.json_report import REPORT_FORMAT_VERSION, build_json_report_payload
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.report_contract import TFSReportPayload
-
 
 APP_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = APP_ROOT.parents[1]

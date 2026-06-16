@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from tfstride.analysis.finding_helpers import (
     collect_evidence,
@@ -26,15 +26,15 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
-from tfstride.analysis.gcp.org_policy_guardrails import (
-    ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
-)
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.gcp.iam_service_accounts import (
     high_risk_service_account_role_risk,
     service_account_iam_target,
 )
+from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.analysis.gcp.org_policy_guardrails import (
+    ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
+)
+from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
@@ -508,5 +508,5 @@ def _parse_rfc3339_timestamp(value: object) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

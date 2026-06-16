@@ -7,7 +7,6 @@ from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.models import BoundaryType, Finding, ResourceInventory, TrustBoundary
 
-
 BoundaryIndex = dict[tuple[BoundaryType, str, str], TrustBoundary]
 
 

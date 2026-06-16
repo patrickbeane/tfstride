@@ -31,17 +31,17 @@ class DerivePublicExposureStage:
             )
             if resource.resource_type != "aws_subnet":
                 mutations.set_in_public_subnet(
-                    (
+                    
                         any(
                             subnet_id in context.public_subnet_ids
                             for subnet_id in resource.subnet_ids
                         )
                         if resource.subnet_ids
                         else resource.in_public_subnet
-                    )
+                    
                 )
             mutations.set_nat_gateway_egress(
-                (
+                
                     any(
                         context.index.subnets[subnet_id].has_nat_gateway_egress
                         for subnet_id in resource.subnet_ids
@@ -49,7 +49,7 @@ class DerivePublicExposureStage:
                     )
                     if resource.subnet_ids
                     else resource.has_nat_gateway_egress
-                )
+                
             )
             # Public exposure is inferred conservatively from network placement and ingress
             # rules so later detectors can reason over a normalized signal instead of

@@ -30,7 +30,7 @@ class RulePolicy:
             MappingProxyType(dict(self.severity_overrides)),
         )
 
-    def is_enabled(self, rule_id: str, registry: "RuleRegistry") -> bool:
+    def is_enabled(self, rule_id: str, registry: RuleRegistry) -> bool:
         if self.enabled_rule_ids is None:
             return registry.get(rule_id).enabled_by_default
         return rule_id in self.enabled_rule_ids

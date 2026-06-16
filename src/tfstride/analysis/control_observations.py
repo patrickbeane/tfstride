@@ -3,8 +3,8 @@ from __future__ import annotations
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.analysis.policy_conditions import (
     describe_trust_narrowing_for_principal,
-    trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_principal_assessments,
 )
 from tfstride.analysis.resource_concepts import (
     DATABASE_RESOURCE_TYPES,

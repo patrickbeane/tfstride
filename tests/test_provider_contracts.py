@@ -14,7 +14,6 @@ from tfstride.providers.contracts import (
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_metadata import MetadataField, ResourceMetadata
 
-
 _SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "tfstride"
 _NORMALIZED_RESOURCE_WRITE_PATTERNS = (
     re.compile(r"\.\s*(?:set_metadata_field|append_metadata_field|extend_metadata_field)\("),

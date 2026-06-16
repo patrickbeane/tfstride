@@ -16,7 +16,6 @@ from tfstride.reporting.json_report import render_json
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.sarif import render_sarif
 
-
 INPUT_ERROR_EXIT_CODE = 2
 POLICY_VIOLATION_EXIT_CODE = 3
 RULE_CATALOG_KIND = "tfstride-rule-catalog"

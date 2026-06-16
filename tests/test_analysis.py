@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter
 import json
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from tfstride.analysis.rule_definitions import RuleDefinition
@@ -23,10 +23,9 @@ from tfstride.models import (
     TerraformResource,
     TrustBoundary,
 )
+from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry, ProviderSelectionError
-from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
-
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"

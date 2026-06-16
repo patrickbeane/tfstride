@@ -22,7 +22,6 @@ from tfstride.providers.gcp.resource_utils import (
     gcp_reference_key,
 )
 
-
 _GCP_NETWORK_NAME_PATTERN = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _TERRAFORM_REFERENCE_TOKEN_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]\"-"

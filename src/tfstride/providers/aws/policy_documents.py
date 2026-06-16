@@ -6,7 +6,6 @@ from typing import Any
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
 from tfstride.providers.aws.coercion import as_list, compact
 
-
 SUPPORTED_TRUST_NARROWING_CONDITIONS = {
     "sts:ExternalId": {
         "StringEquals",

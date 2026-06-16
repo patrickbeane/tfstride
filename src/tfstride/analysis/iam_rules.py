@@ -16,7 +16,6 @@ from tfstride.models import (
     IAMPolicyStatement,
 )
 
-
 SENSITIVE_ACTION_PREFIXES = {
     "kms:Decrypt",
     "secretsmanager:GetSecretValue",

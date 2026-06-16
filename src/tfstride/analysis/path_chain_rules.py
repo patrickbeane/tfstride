@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
     collect_evidence,
     evidence_item,
 )
+from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.policy_conditions import (
     describe_trust_narrowing_for_principal,
-    trust_statement_principal_assessments,
     trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_principal_assessments,
 )
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -18,6 +18,7 @@ from tfstride.analysis.resource_concepts import (
     is_control_plane_sensitive_data_store,
     is_database_resource,
 )
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import (
@@ -28,7 +29,6 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -417,7 +417,7 @@ def _build_transitive_private_data_finding(
     workload_path = [entry, *path_workloads]
     hop_descriptions = [
         f"{source.display_name} can reach {target.display_name}"
-        for source, target in zip(workload_path[:-1], workload_path[1:])
+        for source, target in zip(workload_path[:-1], workload_path[1:], strict=True)
     ]
     data_posture = [
         f"{data_store.address} is not directly public",
@@ -448,7 +448,7 @@ def _build_transitive_private_data_finding(
                 f"internet reaches {entry.address}",
                 *[
                     f"{source.address} reaches {target.address}"
-                    for source, target in zip(workload_path[:-1], workload_path[1:])
+                    for source, target in zip(workload_path[:-1], workload_path[1:], strict=True)
                 ],
                 f"{terminal_workload.address} reaches {data_store.address}",
             ]),

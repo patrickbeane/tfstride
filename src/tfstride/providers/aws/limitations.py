@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 AWS_LIMITATIONS = (
     "AWS support is intentionally limited to a curated v1 resource set rather than the full Terraform AWS provider.",
     "Subnet public/private classification prefers explicit route table associations and NAT or internet routes when present, but it does not model main-route-table inheritance or every routing edge case.",
