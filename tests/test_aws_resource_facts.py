@@ -6,8 +6,19 @@ from pathlib import Path
 
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
-from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts
+from tfstride.providers.aws.resource_facts import (
+    AwsIamFacts,
+    AwsResourceFacts,
+    AwsSqlFacts,
+    AwsStorageFacts,
+    aws_fact_domains,
+    aws_facts,
+)
+from tfstride.providers.resource_facts import (
+    NeutralProviderComputeFacts,
+    NeutralProviderGkeFacts,
+    NeutralProviderWorkloadFacts,
+)
 
 
 def _resource(metadata: dict[str, object] | None = None) -> NormalizedResource:
@@ -73,7 +84,7 @@ class AwsResourceFactsTests(unittest.TestCase):
 
         self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
 
-    def test_unsupported_provider_defaults_are_inherited_from_neutral_facts(self) -> None:
+    def test_raw_aws_facts_expose_only_aws_owned_fact_properties(self) -> None:
         facts = aws_facts(_resource())
         unsupported_defaults = {
             "gcs_uniform_bucket_level_access",
@@ -123,16 +134,41 @@ class AwsResourceFactsTests(unittest.TestCase):
             "workload_identity_scopes",
         }
 
-        self.assertIsInstance(facts, NeutralProviderResourceFacts)
-        self.assertFalse(unsupported_defaults & vars(AwsResourceFacts).keys())
-        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
-        self.assertEqual(facts.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.gke_endpoint)
-        self.assertEqual(facts.gke_master_authorized_networks, [])
-        self.assertEqual(facts.workload_identity_members, [])
-        self.assertEqual(facts.network_tags, [])
-        self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
-        self.assertIsNone(facts.iam_role)
+        for fact_name in sorted(unsupported_defaults):
+            with self.subTest(fact_name=fact_name):
+                self.assertFalse(hasattr(facts, fact_name))
+
+    def test_aws_fact_domains_add_neutral_defaults_at_analysis_boundary(self) -> None:
+        resource = _resource(
+            {
+                AwsResourceMetadata.BUCKET_NAME: "logs",
+                AwsResourceMetadata.BUCKET_ACL: "private",
+                AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": []},
+                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
+                AwsResourceMetadata.ENGINE: "postgres",
+            }
+        )
+
+        domains = aws_fact_domains(resource)
+
+        self.assertIsInstance(domains.storage, AwsStorageFacts)
+        self.assertIsInstance(domains.iam, AwsIamFacts)
+        self.assertIsInstance(domains.sql, AwsSqlFacts)
+        self.assertIsInstance(domains.gke, NeutralProviderGkeFacts)
+        self.assertIsInstance(domains.compute, NeutralProviderComputeFacts)
+        self.assertIsInstance(domains.workload, NeutralProviderWorkloadFacts)
+        self.assertEqual(domains.storage.bucket_name, "logs")
+        self.assertEqual(domains.storage.bucket_acl, "private")
+        self.assertIsNone(domains.storage.gcs_uniform_bucket_level_access)
+        self.assertEqual(domains.iam.policy_document, {"Statement": []})
+        self.assertEqual(domains.iam.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(domains.iam.reference_values, [])
+        self.assertIsNone(domains.iam.service_account_email)
+        self.assertEqual(domains.sql.engine, "postgres")
+        self.assertEqual(domains.sql.cloud_sql_authorized_networks, [])
+        self.assertIsNone(domains.gke.gke_endpoint)
+        self.assertFalse(domains.compute.fronted_by_internet_facing_load_balancer)
+        self.assertEqual(domains.workload.workload_identity_members, [])
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "providers" / "aws"

@@ -7,7 +7,15 @@ from typing import Any, TypeVar
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts
+from tfstride.providers.resource_facts import (
+    NeutralProviderComputeFacts,
+    NeutralProviderGkeFacts,
+    NeutralProviderIamFacts,
+    NeutralProviderSqlFacts,
+    NeutralProviderStorageFacts,
+    NeutralProviderWorkloadFacts,
+    ProviderResourceFactDomains,
+)
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -18,8 +26,10 @@ _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 
 
 @dataclass(frozen=True, slots=True)
-class AwsResourceFacts(NeutralProviderResourceFacts):
+class AwsResourceFacts:
     """AWS-owned view over provider-specific resource metadata."""
+
+    resource: NormalizedResource
 
     def get(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return self.resource.get_metadata_field(field)
@@ -284,6 +294,28 @@ class AwsResourceFacts(NeutralProviderResourceFacts):
         return self.get(AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 
 
+class AwsStorageFacts(AwsResourceFacts, NeutralProviderStorageFacts):
+    __slots__ = ()
+
+
+class AwsIamFacts(AwsResourceFacts, NeutralProviderIamFacts):
+    __slots__ = ()
+
+
+class AwsSqlFacts(AwsResourceFacts, NeutralProviderSqlFacts):
+    __slots__ = ()
+
 
 def aws_facts(resource: NormalizedResource) -> AwsResourceFacts:
     return AwsResourceFacts(resource)
+
+
+def aws_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
+    return ProviderResourceFactDomains(
+        storage=AwsStorageFacts(resource),
+        iam=AwsIamFacts(resource),
+        sql=AwsSqlFacts(resource),
+        gke=NeutralProviderGkeFacts(),
+        compute=NeutralProviderComputeFacts(),
+        workload=NeutralProviderWorkloadFacts(),
+    )

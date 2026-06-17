@@ -3,13 +3,13 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from tfstride.app import TfStride
+from tfstride.app import TFS
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
-from tfstride.providers.aws.resource_facts import AwsResourceFacts
+from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsStorageFacts
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_limitations,
@@ -74,8 +74,12 @@ class ProviderCatalogTests(unittest.TestCase):
             category=ResourceCategory.DATA,
         )
 
+        aws_facts = registry.facts_for(aws_resource)
+
         self.assertEqual(registry.providers(), ("aws", "gcp"))
-        self.assertIsInstance(registry.facts_for(aws_resource).storage, AwsResourceFacts)
+        self.assertIsInstance(aws_facts.storage, AwsStorageFacts)
+        self.assertIsInstance(aws_facts.iam, AwsIamFacts)
+        self.assertIsInstance(aws_facts.sql, AwsSqlFacts)
         self.assertIsInstance(registry.facts_for(gcp_resource).storage, GcpResourceFacts)
 
     def test_default_resource_capability_registry_registers_builtin_providers(self) -> None:
