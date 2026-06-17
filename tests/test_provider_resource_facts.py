@@ -10,6 +10,7 @@ from tfstride.providers.resource_facts import (
     ProviderComputeFacts,
     ProviderGkeFacts,
     ProviderIamFacts,
+    ProviderResourceFactDomains,
     ProviderResourceFactsNotRegisteredError,
     ProviderResourceFactsRegistry,
     ProviderResourceFactsRegistryError,
@@ -168,7 +169,7 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIs(registry.get(" aws "), factory)
         self.assertEqual(registry.providers(), ("aws",))
 
-    def test_facts_for_delegates_to_registered_provider_factory(self) -> None:
+    def test_facts_for_adapts_legacy_provider_facts_across_domains(self) -> None:
         calls: list[NormalizedResource] = []
 
         def factory(resource: NormalizedResource) -> RecordingFacts:
@@ -179,67 +180,103 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         facts = ProviderResourceFactsRegistry([("aws", factory)]).facts_for(resource)
 
         self.assertEqual(calls, [resource])
-        self.assertIsInstance(facts, RecordingFacts)
-        self.assertEqual(facts.bucket_name, "aws-bucket")
+        self.assertIsInstance(facts, ProviderResourceFactDomains)
+        self.assertIsInstance(facts.storage, RecordingFacts)
+        self.assertIs(facts.iam, facts.storage)
+        self.assertIs(facts.sql, facts.storage)
+        self.assertIs(facts.gke, facts.storage)
+        self.assertIs(facts.compute, facts.storage)
+        self.assertIs(facts.workload, facts.storage)
+        self.assertEqual(facts.storage.bucket_name, "aws-bucket")
+
+    def test_facts_for_preserves_pre_split_domain_bundle(self) -> None:
+        resource = _resource("aws")
+        storage = RecordingFacts(resource)
+        iam = RecordingFacts(resource)
+        neutral = NeutralProviderResourceFacts(resource)
+        provider_facts = ProviderResourceFactDomains(
+            storage=storage,
+            iam=iam,
+            sql=neutral,
+            gke=neutral,
+            compute=neutral,
+            workload=neutral,
+        )
+
+        def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
+            return provider_facts
+
+        facts = ProviderResourceFactsRegistry([("aws", factory)]).facts_for(resource)
+
+        self.assertIs(facts, provider_facts)
+        self.assertIs(facts.storage, storage)
+        self.assertIs(facts.iam, iam)
+        self.assertIs(facts.sql, neutral)
 
     def test_facts_for_returns_neutral_facts_for_unregistered_providers(self) -> None:
         resource = _resource("gcp")
         facts = ProviderResourceFactsRegistry().facts_for(resource)
 
-        self.assertIsInstance(facts, NeutralProviderResourceFacts)
-        self.assertIsNone(facts.bucket_name)
-        self.assertEqual(facts.bucket_acl, "")
-        self.assertIsNone(facts.public_access_block)
-        self.assertEqual(facts.policy_document, {})
-        self.assertEqual(facts.trust_statements, [])
-        self.assertIsNone(facts.engine)
-        self.assertEqual(facts.resource_policy_source_addresses, [])
-        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
-        self.assertIsNone(facts.gcs_public_access_prevention)
-        self.assertIsNone(facts.gcs_versioning_enabled)
-        self.assertIsNone(facts.gcs_default_kms_key_name)
-        self.assertIsNone(facts.customer_managed_encryption)
-        self.assertIsNone(facts.project)
-        self.assertIsNone(facts.resource_name)
-        self.assertEqual(facts.reference_values, [])
-        self.assertIsNone(facts.iam_target_reference)
-        self.assertEqual(facts.iam_bindings, [])
-        self.assertIsNone(facts.custom_role_id)
-        self.assertEqual(facts.custom_role_permissions, [])
-        self.assertIsNone(facts.organization_id)
-        self.assertIsNone(facts.folder_id)
-        self.assertEqual(facts.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.cloud_sql_backup_enabled)
-        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
-        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
-        self.assertIsNone(facts.cloud_sql_private_network)
-        self.assertIsNone(facts.cloud_sql_require_ssl)
-        self.assertIsNone(facts.cloud_sql_ssl_mode)
-        self.assertIsNone(facts.deletion_protection)
-        self.assertIsNone(facts.os_login_enabled)
-        self.assertIsNone(facts.gke_endpoint)
-        self.assertIsNone(facts.gke_private_endpoint_enabled)
-        self.assertIsNone(facts.gke_private_nodes_enabled)
-        self.assertEqual(facts.gke_master_authorized_networks, [])
-        self.assertIsNone(facts.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke_workload_identity_pool)
-        self.assertIsNone(facts.gke_node_service_account)
-        self.assertEqual(facts.gke_node_oauth_scopes, [])
-        self.assertIsNone(facts.gke_node_metadata_mode)
-        self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
-        self.assertIsNone(facts.service_account_email)
-        self.assertIsNone(facts.service_account_member)
-        self.assertIsNone(facts.service_account_reference)
-        self.assertEqual(facts.workload_identity_members, [])
-        self.assertEqual(facts.workload_identity_scopes, [])
-        self.assertEqual(facts.network_tags, [])
-        self.assertEqual(facts.internet_ingress_firewalls, [])
-        self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
-        self.assertEqual(facts.internet_facing_load_balancer_addresses, [])
-        self.assertEqual(facts.load_balancer_frontends, [])
-        self.assertEqual(facts.load_balancer_reachable_backends, [])
-        self.assertIsNone(facts.iam_role)
-        self.assertIsNone(facts.iam_member)
+        self.assertIsInstance(facts, ProviderResourceFactDomains)
+        self.assertIsInstance(facts.storage, NeutralProviderResourceFacts)
+        self.assertIs(facts.iam, facts.storage)
+        self.assertIs(facts.sql, facts.storage)
+        self.assertIs(facts.gke, facts.storage)
+        self.assertIs(facts.compute, facts.storage)
+        self.assertIs(facts.workload, facts.storage)
+        self.assertIsNone(facts.storage.bucket_name)
+        self.assertEqual(facts.storage.bucket_acl, "")
+        self.assertIsNone(facts.storage.public_access_block)
+        self.assertIsNone(facts.storage.gcs_uniform_bucket_level_access)
+        self.assertIsNone(facts.storage.gcs_public_access_prevention)
+        self.assertIsNone(facts.storage.gcs_versioning_enabled)
+        self.assertIsNone(facts.storage.gcs_default_kms_key_name)
+        self.assertIsNone(facts.storage.customer_managed_encryption)
+        self.assertEqual(facts.iam.policy_document, {})
+        self.assertEqual(facts.iam.trust_statements, [])
+        self.assertEqual(facts.iam.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.iam.project)
+        self.assertIsNone(facts.iam.resource_name)
+        self.assertEqual(facts.iam.reference_values, [])
+        self.assertIsNone(facts.iam.iam_target_reference)
+        self.assertEqual(facts.iam.iam_bindings, [])
+        self.assertIsNone(facts.iam.custom_role_id)
+        self.assertEqual(facts.iam.custom_role_permissions, [])
+        self.assertIsNone(facts.iam.organization_id)
+        self.assertIsNone(facts.iam.folder_id)
+        self.assertIsNone(facts.iam.service_account_email)
+        self.assertIsNone(facts.iam.service_account_member)
+        self.assertIsNone(facts.iam.service_account_reference)
+        self.assertIsNone(facts.iam.iam_role)
+        self.assertIsNone(facts.iam.iam_member)
+        self.assertIsNone(facts.sql.engine)
+        self.assertEqual(facts.sql.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.sql.cloud_sql_backup_enabled)
+        self.assertIsNone(facts.sql.cloud_sql_point_in_time_recovery_enabled)
+        self.assertIsNone(facts.sql.cloud_sql_ipv4_enabled)
+        self.assertIsNone(facts.sql.cloud_sql_private_network)
+        self.assertIsNone(facts.sql.cloud_sql_require_ssl)
+        self.assertIsNone(facts.sql.cloud_sql_ssl_mode)
+        self.assertIsNone(facts.sql.deletion_protection)
+        self.assertIsNone(facts.gke.gke_endpoint)
+        self.assertIsNone(facts.gke.gke_private_endpoint_enabled)
+        self.assertIsNone(facts.gke.gke_private_nodes_enabled)
+        self.assertEqual(facts.gke.gke_master_authorized_networks, [])
+        self.assertIsNone(facts.gke.gke_workload_identity_enabled)
+        self.assertIsNone(facts.gke.gke_workload_identity_pool)
+        self.assertIsNone(facts.gke.gke_node_service_account)
+        self.assertEqual(facts.gke.gke_node_oauth_scopes, [])
+        self.assertIsNone(facts.gke.gke_node_metadata_mode)
+        self.assertIsNone(facts.gke.gke_legacy_metadata_endpoints_enabled)
+        self.assertIsNone(facts.compute.os_login_enabled)
+        self.assertEqual(facts.compute.network_tags, [])
+        self.assertEqual(facts.compute.internet_ingress_firewalls, [])
+        self.assertFalse(facts.compute.fronted_by_internet_facing_load_balancer)
+        self.assertEqual(facts.compute.internet_facing_load_balancer_addresses, [])
+        self.assertEqual(facts.compute.load_balancer_frontends, [])
+        self.assertEqual(facts.compute.load_balancer_reachable_backends, [])
+        self.assertEqual(facts.workload.workload_identity_members, [])
+        self.assertEqual(facts.workload.workload_identity_scopes, [])
 
     def test_rejects_duplicate_provider_registration(self) -> None:
         def factory(resource: NormalizedResource) -> RecordingFacts:

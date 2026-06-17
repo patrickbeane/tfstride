@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.catalog import default_resource_facts_registry
 from tfstride.providers.resource_facts import (
-    ProviderResourceFacts,
+    ProviderComputeFacts,
+    ProviderGkeFacts,
+    ProviderIamFacts,
+    ProviderResourceFactDomains,
     ProviderResourceFactsRegistry,
+    ProviderSqlFacts,
+    ProviderStorageFacts,
+    ProviderWorkloadFacts,
+    provider_resource_fact_domains,
 )
 
 _DEFAULT_RESOURCE_FACTS_REGISTRY = default_resource_facts_registry()
@@ -15,7 +22,7 @@ _DEFAULT_RESOURCE_FACTS_REGISTRY = default_resource_facts_registry()
 
 @dataclass(frozen=True, slots=True)
 class AnalysisStorageFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderStorageFacts
 
     @property
     def bucket_name(self) -> str | None:
@@ -52,7 +59,7 @@ class AnalysisStorageFacts:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIamFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderIamFacts
 
     @property
     def policy_document(self) -> dict[str, Any]:
@@ -125,7 +132,7 @@ class AnalysisIamFacts:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisSqlFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderSqlFacts
 
     @property
     def engine(self) -> str | None:
@@ -166,7 +173,7 @@ class AnalysisSqlFacts:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisGkeFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderGkeFacts
 
     @property
     def endpoint(self) -> str | None:
@@ -211,7 +218,7 @@ class AnalysisGkeFacts:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisComputeFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderComputeFacts
 
     @property
     def os_login_enabled(self) -> bool | None:
@@ -244,7 +251,7 @@ class AnalysisComputeFacts:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisWorkloadFacts:
-    _facts: ProviderResourceFacts
+    _facts: ProviderWorkloadFacts
 
     @property
     def identity_members(self) -> list[str]:
@@ -260,45 +267,47 @@ class AnalysisResourceFacts:
     """Domain facades for provider-backed facts used by shared analysis."""
 
     resource: NormalizedResource
-    _provider_facts: ProviderResourceFacts | None = None
+    _provider_facts: object | None = None
 
     def __post_init__(self) -> None:
-        if self._provider_facts is None:
-            object.__setattr__(
-                self,
-                "_provider_facts",
-                _DEFAULT_RESOURCE_FACTS_REGISTRY.facts_for(self.resource),
-            )
+        provider_facts = self._provider_facts
+        if provider_facts is None:
+            provider_facts = _DEFAULT_RESOURCE_FACTS_REGISTRY.facts_for(self.resource)
+        object.__setattr__(
+            self,
+            "_provider_facts",
+            provider_resource_fact_domains(provider_facts),
+        )
 
     @property
-    def _facts(self) -> ProviderResourceFacts:
+    def _facts(self) -> ProviderResourceFactDomains:
         if self._provider_facts is None:
             raise RuntimeError("AnalysisResourceFacts was initialized without provider facts.")
-        return self._provider_facts
+        return cast(ProviderResourceFactDomains, self._provider_facts)
 
     @property
     def storage(self) -> AnalysisStorageFacts:
-        return AnalysisStorageFacts(self._facts)
+        return AnalysisStorageFacts(self._facts.storage)
 
     @property
     def iam(self) -> AnalysisIamFacts:
-        return AnalysisIamFacts(self._facts)
+        return AnalysisIamFacts(self._facts.iam)
 
     @property
     def sql(self) -> AnalysisSqlFacts:
-        return AnalysisSqlFacts(self._facts)
+        return AnalysisSqlFacts(self._facts.sql)
 
     @property
     def gke(self) -> AnalysisGkeFacts:
-        return AnalysisGkeFacts(self._facts)
+        return AnalysisGkeFacts(self._facts.gke)
 
     @property
     def compute(self) -> AnalysisComputeFacts:
-        return AnalysisComputeFacts(self._facts)
+        return AnalysisComputeFacts(self._facts.compute)
 
     @property
     def workload(self) -> AnalysisWorkloadFacts:
-        return AnalysisWorkloadFacts(self._facts)
+        return AnalysisWorkloadFacts(self._facts.workload)
 
 
 def analysis_facts(

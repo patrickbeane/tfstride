@@ -75,8 +75,8 @@ class ProviderCatalogTests(unittest.TestCase):
         )
 
         self.assertEqual(registry.providers(), ("aws", "gcp"))
-        self.assertIsInstance(registry.facts_for(aws_resource), AwsResourceFacts)
-        self.assertIsInstance(registry.facts_for(gcp_resource), GcpResourceFacts)
+        self.assertIsInstance(registry.facts_for(aws_resource).storage, AwsResourceFacts)
+        self.assertIsInstance(registry.facts_for(gcp_resource).storage, GcpResourceFacts)
 
     def test_default_resource_capability_registry_registers_builtin_providers(self) -> None:
         registry = default_resource_capability_registry()

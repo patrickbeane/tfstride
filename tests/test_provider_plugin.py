@@ -147,7 +147,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(facts_registry.providers(), ("aws",))
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
-        self.assertEqual(facts_registry.facts_for(resource).bucket_name, "aws-bucket")
+        self.assertEqual(facts_registry.facts_for(resource).storage.bucket_name, "aws-bucket")
 
     def test_plugin_helper_builds_resource_capability_registry(self) -> None:
         plugin = _plugin()

@@ -22,10 +22,12 @@ from tfstride.providers.resource_capabilities import (
 )
 from tfstride.providers.resource_facts import (
     NeutralProviderResourceFacts,
+    ProviderResourceFactDomains,
     ProviderResourceFacts,
     ProviderResourceFactsNotRegisteredError,
     ProviderResourceFactsRegistry,
     ProviderResourceFactsRegistryError,
+    provider_resource_fact_domains,
 )
 
 __all__ = [
@@ -38,6 +40,7 @@ __all__ = [
     "ProviderResourceCapabilityRegistry",
     "ProviderResourceCapabilityRegistryError",
     "ProviderResourceDecorator",
+    "ProviderResourceFactDomains",
     "ProviderResourceFacts",
     "ProviderSelectionError",
     "ProviderResourceFactsNotRegisteredError",
@@ -47,5 +50,6 @@ __all__ = [
     "provider_limitations_from_plugins",
     "provider_registry_from_plugins",
     "resource_capability_registry_from_plugins",
+    "provider_resource_fact_domains",
     "resource_facts_registry_from_plugins",
 ]

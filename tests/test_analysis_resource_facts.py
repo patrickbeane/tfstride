@@ -9,7 +9,10 @@ from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_fac
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
+from tfstride.providers.resource_facts import (
+    ProviderResourceFactDomains,
+    ProviderResourceFactsRegistry,
+)
 
 
 def _resource(
@@ -309,7 +312,17 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             resource = _resource()
             provider_values = {provider_property: value for _, provider_property, value in expectations}
             tracker = AccessTrackingFacts(resource, provider_values, [])
-            facts = AnalysisResourceFacts(resource, tracker)
+            fallback = AccessTrackingFacts(resource, {}, [])
+            domain_facts = {
+                "storage": fallback,
+                "iam": fallback,
+                "sql": fallback,
+                "gke": fallback,
+                "compute": fallback,
+                "workload": fallback,
+            }
+            domain_facts[domain] = tracker
+            facts = AnalysisResourceFacts(resource, ProviderResourceFactDomains(**domain_facts))
             facade = getattr(facts, domain)
 
             with self.subTest(domain=domain):
@@ -319,6 +332,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                     tracker.accessed,
                     [provider_property for _, provider_property, _ in expectations],
                 )
+                self.assertEqual(fallback.accessed, [])
 
     def test_reads_provider_backed_analysis_facts(self) -> None:
         resource = _resource(

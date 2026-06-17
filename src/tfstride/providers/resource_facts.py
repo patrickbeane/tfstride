@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from tfstride.models import NormalizedResource
 
@@ -243,19 +243,35 @@ class ProviderWorkloadFacts(Protocol):
         raise NotImplementedError
 
 
-class ProviderResourceFacts(
-    ProviderStorageFacts,
-    ProviderIamFacts,
-    ProviderSqlFacts,
-    ProviderGkeFacts,
-    ProviderComputeFacts,
-    ProviderWorkloadFacts,
-    Protocol,
-):
-    """Provider-owned facts exposed to shared analysis."""
+@dataclass(frozen=True, slots=True)
+class ProviderResourceFactDomains:
+    """Provider-owned facts grouped by shared analysis domain."""
+
+    storage: ProviderStorageFacts
+    iam: ProviderIamFacts
+    sql: ProviderSqlFacts
+    gke: ProviderGkeFacts
+    compute: ProviderComputeFacts
+    workload: ProviderWorkloadFacts
 
 
-ProviderResourceFactsFactory = Callable[[NormalizedResource], ProviderResourceFacts]
+ProviderResourceFacts = ProviderResourceFactDomains
+ProviderResourceFactsFactory = Callable[[NormalizedResource], object]
+
+
+def provider_resource_fact_domains(facts: object) -> ProviderResourceFactDomains:
+    """Adapt a provider facts object or pre-split bundle into domain facts."""
+
+    if isinstance(facts, ProviderResourceFactDomains):
+        return facts
+    return ProviderResourceFactDomains(
+        storage=cast(ProviderStorageFacts, facts),
+        iam=cast(ProviderIamFacts, facts),
+        sql=cast(ProviderSqlFacts, facts),
+        gke=cast(ProviderGkeFacts, facts),
+        compute=cast(ProviderComputeFacts, facts),
+        workload=cast(ProviderWorkloadFacts, facts),
+    )
 
 
 class ProviderResourceFactsRegistryError(ValueError):
@@ -519,12 +535,12 @@ class ProviderResourceFactsRegistry:
                 f"No provider facts factory registered for `{provider_name}`."
             ) from exc
 
-    def facts_for(self, resource: NormalizedResource) -> ProviderResourceFacts:
+    def facts_for(self, resource: NormalizedResource) -> ProviderResourceFactDomains:
         provider_name = _normalize_provider_name(resource.provider)
         factory = self._factories.get(provider_name)
         if factory is None:
-            return NeutralProviderResourceFacts(resource)
-        return factory(resource)
+            return provider_resource_fact_domains(NeutralProviderResourceFacts(resource))
+        return provider_resource_fact_domains(factory(resource))
 
     def providers(self) -> tuple[str, ...]:
         return tuple(self._factories)
