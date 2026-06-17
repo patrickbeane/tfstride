@@ -7,6 +7,7 @@ from pathlib import Path
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 
 
 def _resource(metadata: dict[str, object] | None = None) -> NormalizedResource:
@@ -71,6 +72,67 @@ class AwsResourceFactsTests(unittest.TestCase):
         policy_document["Statement"].append({"Effect": "Deny"})
 
         self.assertEqual(facts.policy_document, {"Statement": [{"Effect": "Allow"}]})
+
+    def test_unsupported_provider_defaults_are_inherited_from_neutral_facts(self) -> None:
+        facts = aws_facts(_resource())
+        unsupported_defaults = {
+            "gcs_uniform_bucket_level_access",
+            "gcs_public_access_prevention",
+            "gcs_versioning_enabled",
+            "gcs_default_kms_key_name",
+            "customer_managed_encryption",
+            "project",
+            "reference_values",
+            "iam_target_reference",
+            "iam_bindings",
+            "custom_role_id",
+            "custom_role_permissions",
+            "organization_id",
+            "folder_id",
+            "service_account_email",
+            "service_account_member",
+            "service_account_reference",
+            "iam_role",
+            "iam_member",
+            "cloud_sql_authorized_networks",
+            "cloud_sql_backup_enabled",
+            "cloud_sql_point_in_time_recovery_enabled",
+            "cloud_sql_ipv4_enabled",
+            "cloud_sql_private_network",
+            "cloud_sql_require_ssl",
+            "cloud_sql_ssl_mode",
+            "deletion_protection",
+            "os_login_enabled",
+            "network_tags",
+            "internet_ingress_firewalls",
+            "fronted_by_internet_facing_load_balancer",
+            "internet_facing_load_balancer_addresses",
+            "load_balancer_frontends",
+            "load_balancer_reachable_backends",
+            "gke_endpoint",
+            "gke_private_endpoint_enabled",
+            "gke_private_nodes_enabled",
+            "gke_master_authorized_networks",
+            "gke_workload_identity_enabled",
+            "gke_workload_identity_pool",
+            "gke_node_service_account",
+            "gke_node_oauth_scopes",
+            "gke_node_metadata_mode",
+            "gke_legacy_metadata_endpoints_enabled",
+            "workload_identity_members",
+            "workload_identity_scopes",
+        }
+
+        self.assertIsInstance(facts, NeutralProviderResourceFacts)
+        self.assertFalse(unsupported_defaults & vars(AwsResourceFacts).keys())
+        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
+        self.assertEqual(facts.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.gke_endpoint)
+        self.assertEqual(facts.gke_master_authorized_networks, [])
+        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.network_tags, [])
+        self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
+        self.assertIsNone(facts.iam_role)
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "providers" / "aws"

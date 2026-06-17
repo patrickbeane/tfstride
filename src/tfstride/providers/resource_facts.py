@@ -243,50 +243,10 @@ class ProviderWorkloadFacts(Protocol):
         raise NotImplementedError
 
 
-@dataclass(frozen=True, slots=True)
-class ProviderResourceFactDomains:
-    """Provider-owned facts grouped by shared analysis domain."""
+class NeutralProviderStorageFacts:
+    """Neutral storage facts for providers without storage posture signals."""
 
-    storage: ProviderStorageFacts
-    iam: ProviderIamFacts
-    sql: ProviderSqlFacts
-    gke: ProviderGkeFacts
-    compute: ProviderComputeFacts
-    workload: ProviderWorkloadFacts
-
-
-ProviderResourceFacts = ProviderResourceFactDomains
-ProviderResourceFactsFactory = Callable[[NormalizedResource], object]
-
-
-def provider_resource_fact_domains(facts: object) -> ProviderResourceFactDomains:
-    """Adapt a provider facts object or pre-split bundle into domain facts."""
-
-    if isinstance(facts, ProviderResourceFactDomains):
-        return facts
-    return ProviderResourceFactDomains(
-        storage=cast(ProviderStorageFacts, facts),
-        iam=cast(ProviderIamFacts, facts),
-        sql=cast(ProviderSqlFacts, facts),
-        gke=cast(ProviderGkeFacts, facts),
-        compute=cast(ProviderComputeFacts, facts),
-        workload=cast(ProviderWorkloadFacts, facts),
-    )
-
-
-class ProviderResourceFactsRegistryError(ValueError):
-    """Raised when provider facts registry configuration or lookup fails."""
-
-
-class ProviderResourceFactsNotRegisteredError(ProviderResourceFactsRegistryError):
-    """Raised when a requested provider has no registered facts factory."""
-
-
-@dataclass(frozen=True, slots=True)
-class NeutralProviderResourceFacts:
-    """Neutral facts for providers without a shared-analysis facts adapter yet."""
-
-    resource: NormalizedResource
+    __slots__ = ()
 
     @property
     def bucket_name(self) -> str | None:
@@ -320,6 +280,12 @@ class NeutralProviderResourceFacts:
     def customer_managed_encryption(self) -> bool | None:
         return None
 
+
+class NeutralProviderIamFacts:
+    """Neutral IAM facts for providers without IAM hierarchy signals."""
+
+    __slots__ = ()
+
     @property
     def policy_document(self) -> dict[str, Any]:
         return {}
@@ -327,10 +293,6 @@ class NeutralProviderResourceFacts:
     @property
     def trust_statements(self) -> list[dict[str, Any]]:
         return []
-
-    @property
-    def engine(self) -> str | None:
-        return None
 
     @property
     def resource_policy_source_addresses(self) -> list[str]:
@@ -373,6 +335,36 @@ class NeutralProviderResourceFacts:
         return None
 
     @property
+    def service_account_email(self) -> str | None:
+        return None
+
+    @property
+    def service_account_member(self) -> str | None:
+        return None
+
+    @property
+    def service_account_reference(self) -> str | None:
+        return None
+
+    @property
+    def iam_role(self) -> str | None:
+        return None
+
+    @property
+    def iam_member(self) -> str | None:
+        return None
+
+
+class NeutralProviderSqlFacts:
+    """Neutral SQL facts for providers without managed SQL signals."""
+
+    __slots__ = ()
+
+    @property
+    def engine(self) -> str | None:
+        return None
+
+    @property
     def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
         return []
 
@@ -404,9 +396,11 @@ class NeutralProviderResourceFacts:
     def deletion_protection(self) -> bool | None:
         return None
 
-    @property
-    def os_login_enabled(self) -> bool | None:
-        return None
+
+class NeutralProviderGkeFacts:
+    """Neutral GKE facts for providers without GKE cluster signals."""
+
+    __slots__ = ()
 
     @property
     def gke_endpoint(self) -> str | None:
@@ -448,25 +442,15 @@ class NeutralProviderResourceFacts:
     def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
         return None
 
+
+class NeutralProviderComputeFacts:
+    """Neutral compute facts for providers without compute posture signals."""
+
+    __slots__ = ()
+
     @property
-    def service_account_email(self) -> str | None:
+    def os_login_enabled(self) -> bool | None:
         return None
-
-    @property
-    def service_account_member(self) -> str | None:
-        return None
-
-    @property
-    def service_account_reference(self) -> str | None:
-        return None
-
-    @property
-    def workload_identity_members(self) -> list[str]:
-        return []
-
-    @property
-    def workload_identity_scopes(self) -> list[str]:
-        return []
 
     @property
     def network_tags(self) -> list[str]:
@@ -492,14 +476,72 @@ class NeutralProviderResourceFacts:
     def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
         return []
 
-    @property
-    def iam_role(self) -> str | None:
-        return None
+
+class NeutralProviderWorkloadFacts:
+    """Neutral workload facts for providers without workload identity signals."""
+
+    __slots__ = ()
 
     @property
-    def iam_member(self) -> str | None:
-        return None
+    def workload_identity_members(self) -> list[str]:
+        return []
 
+    @property
+    def workload_identity_scopes(self) -> list[str]:
+        return []
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderResourceFactDomains:
+    """Provider-owned facts grouped by shared analysis domain."""
+
+    storage: ProviderStorageFacts
+    iam: ProviderIamFacts
+    sql: ProviderSqlFacts
+    gke: ProviderGkeFacts
+    compute: ProviderComputeFacts
+    workload: ProviderWorkloadFacts
+
+
+ProviderResourceFacts = ProviderResourceFactDomains
+ProviderResourceFactsFactory = Callable[[NormalizedResource], object]
+
+
+def provider_resource_fact_domains(facts: object) -> ProviderResourceFactDomains:
+    """Adapt a provider facts object or pre-split bundle into domain facts."""
+
+    if isinstance(facts, ProviderResourceFactDomains):
+        return facts
+    return ProviderResourceFactDomains(
+        storage=cast(ProviderStorageFacts, facts),
+        iam=cast(ProviderIamFacts, facts),
+        sql=cast(ProviderSqlFacts, facts),
+        gke=cast(ProviderGkeFacts, facts),
+        compute=cast(ProviderComputeFacts, facts),
+        workload=cast(ProviderWorkloadFacts, facts),
+    )
+
+
+class ProviderResourceFactsRegistryError(ValueError):
+    """Raised when provider facts registry configuration or lookup fails."""
+
+
+class ProviderResourceFactsNotRegisteredError(ProviderResourceFactsRegistryError):
+    """Raised when a requested provider has no registered facts factory."""
+
+
+@dataclass(frozen=True, slots=True)
+class NeutralProviderResourceFacts(
+    NeutralProviderStorageFacts,
+    NeutralProviderIamFacts,
+    NeutralProviderSqlFacts,
+    NeutralProviderGkeFacts,
+    NeutralProviderComputeFacts,
+    NeutralProviderWorkloadFacts,
+):
+    """Neutral facts for providers without a shared-analysis facts adapter yet."""
+
+    resource: NormalizedResource
 
 class ProviderResourceFactsRegistry:
     def __init__(

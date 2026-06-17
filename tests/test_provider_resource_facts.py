@@ -6,7 +6,13 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.resource_facts import (
+    NeutralProviderComputeFacts,
+    NeutralProviderGkeFacts,
+    NeutralProviderIamFacts,
     NeutralProviderResourceFacts,
+    NeutralProviderSqlFacts,
+    NeutralProviderStorageFacts,
+    NeutralProviderWorkloadFacts,
     ProviderComputeFacts,
     ProviderGkeFacts,
     ProviderIamFacts,
@@ -159,6 +165,22 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
             )
             with self.subTest(domain=domain):
                 self.assertFalse(properties & other_properties)
+
+    def test_neutral_resource_facts_composes_domain_defaults(self) -> None:
+        facts = NeutralProviderResourceFacts(_resource("unknown"))
+
+        self.assertIsInstance(facts, NeutralProviderStorageFacts)
+        self.assertIsInstance(facts, NeutralProviderIamFacts)
+        self.assertIsInstance(facts, NeutralProviderSqlFacts)
+        self.assertIsInstance(facts, NeutralProviderGkeFacts)
+        self.assertIsInstance(facts, NeutralProviderComputeFacts)
+        self.assertIsInstance(facts, NeutralProviderWorkloadFacts)
+        self.assertEqual(facts.bucket_acl, "")
+        self.assertEqual(facts.policy_document, {})
+        self.assertIsNone(facts.engine)
+        self.assertEqual(facts.gke_master_authorized_networks, [])
+        self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
+        self.assertEqual(facts.workload_identity_members, [])
 
     def test_registers_and_returns_factories_by_provider_name(self) -> None:
         def factory(resource: NormalizedResource) -> RecordingFacts:

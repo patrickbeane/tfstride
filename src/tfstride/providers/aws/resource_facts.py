@@ -7,6 +7,7 @@ from typing import Any, TypeVar
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
+from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -17,10 +18,8 @@ _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 
 
 @dataclass(frozen=True, slots=True)
-class AwsResourceFacts:
+class AwsResourceFacts(NeutralProviderResourceFacts):
     """AWS-owned view over provider-specific resource metadata."""
-
-    resource: NormalizedResource
 
     def get(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return self.resource.get_metadata_field(field)
@@ -36,142 +35,6 @@ class AwsResourceFacts:
     def extend(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
         _AWS_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.extend_metadata_field(field, values)
-
-    @property
-    def gcs_uniform_bucket_level_access(self) -> bool | None:
-        return None
-
-    @property
-    def gcs_public_access_prevention(self) -> str | None:
-        return None
-
-    @property
-    def gcs_versioning_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gcs_default_kms_key_name(self) -> str | None:
-        return None
-
-    @property
-    def customer_managed_encryption(self) -> bool | None:
-        return None
-
-    @property
-    def project(self) -> str | None:
-        return None
-
-    @property
-    def iam_bindings(self) -> list[dict[str, Any]]:
-        return []
-
-    @property
-    def custom_role_id(self) -> str | None:
-        return None
-
-    @property
-    def custom_role_permissions(self) -> list[str]:
-        return []
-
-    @property
-    def organization_id(self) -> str | None:
-        return None
-
-    @property
-    def folder_id(self) -> str | None:
-        return None
-
-    @property
-    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
-        return []
-
-    @property
-    def cloud_sql_backup_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def cloud_sql_ipv4_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def cloud_sql_private_network(self) -> str | None:
-        return None
-
-    @property
-    def cloud_sql_require_ssl(self) -> bool | None:
-        return None
-
-    @property
-    def cloud_sql_ssl_mode(self) -> str | None:
-        return None
-
-    @property
-    def deletion_protection(self) -> bool | None:
-        return None
-
-    @property
-    def service_account_email(self) -> str | None:
-        return None
-
-    @property
-    def service_account_member(self) -> str | None:
-        return None
-
-    @property
-    def service_account_reference(self) -> str | None:
-        return None
-
-    @property
-    def workload_identity_members(self) -> list[str]:
-        return []
-
-    @property
-    def workload_identity_scopes(self) -> list[str]:
-        return []
-
-    @property
-    def gke_endpoint(self) -> str | None:
-        return None
-
-    @property
-    def gke_private_endpoint_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_private_nodes_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
-        return []
-
-    @property
-    def gke_workload_identity_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_workload_identity_pool(self) -> str | None:
-        return None
-
-    @property
-    def gke_node_service_account(self) -> str | None:
-        return None
-
-    @property
-    def gke_node_oauth_scopes(self) -> list[str]:
-        return []
-
-    @property
-    def gke_node_metadata_mode(self) -> str | None:
-        return None
-
-    @property
-    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
-        return None
 
     @property
     def security_group_id(self) -> str | None:
@@ -212,14 +75,6 @@ class AwsResourceFacts:
     @property
     def resource_name(self) -> str | None:
         return self.name
-
-    @property
-    def reference_values(self) -> list[str]:
-        return []
-
-    @property
-    def iam_target_reference(self) -> str | None:
-        return None
 
     @property
     def task_definition_reference(self) -> str | None:
@@ -428,21 +283,6 @@ class AwsResourceFacts:
     def resource_policy_source_addresses(self) -> list[str]:
         return self.get(AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 
-    @property
-    def network_tags(self) -> list[str]:
-        return []
-
-    @property
-    def internet_ingress_firewalls(self) -> list[str]:
-        return []
-
-    @property
-    def iam_role(self) -> str | None:
-        return None
-
-    @property
-    def iam_member(self) -> str | None:
-        return None
 
 
 def aws_facts(resource: NormalizedResource) -> AwsResourceFacts:
