@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from tfstride.app import TFS
+from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata

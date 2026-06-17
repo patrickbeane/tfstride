@@ -8,7 +8,7 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_utils import dedupe, service_account_member
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts
+from tfstride.providers.resource_facts import NeutralProviderResourceFacts, ProviderResourceFactDomains
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -316,6 +316,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
 
 def gcp_facts(resource: NormalizedResource) -> GcpResourceFacts:
     return GcpResourceFacts(resource)
+
+
+def gcp_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
+    facts = gcp_facts(resource)
+    return ProviderResourceFactDomains(
+        storage=facts,
+        iam=facts,
+        sql=facts,
+        gke=facts,
+        compute=facts,
+        workload=facts,
+    )
 
 
 def _service_account_email(value: Any) -> str | None:

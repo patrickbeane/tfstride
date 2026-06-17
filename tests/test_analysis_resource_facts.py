@@ -685,9 +685,17 @@ class AnalysisResourceFactsTests(unittest.TestCase):
     def test_registered_provider_facts_are_used_without_analysis_branching(self) -> None:
         calls: list[NormalizedResource] = []
 
-        def gcp_facts(resource: NormalizedResource) -> FakeProviderFacts:
+        def gcp_facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
             calls.append(resource)
-            return FakeProviderFacts(resource)
+            facts = FakeProviderFacts(resource)
+            return ProviderResourceFactDomains(
+                storage=facts,
+                iam=facts,
+                sql=facts,
+                gke=facts,
+                compute=facts,
+                workload=facts,
+            )
 
         resource = _resource(provider="gcp", resource_type="google_storage_bucket")
         registry = ProviderResourceFactsRegistry([("gcp", gcp_facts)])

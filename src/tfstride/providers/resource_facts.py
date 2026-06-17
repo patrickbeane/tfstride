@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from tfstride.models import NormalizedResource
 
@@ -503,22 +503,20 @@ class ProviderResourceFactDomains:
     workload: ProviderWorkloadFacts
 
 
-ProviderResourceFacts = ProviderResourceFactDomains
-ProviderResourceFactsFactory = Callable[[NormalizedResource], object]
+ProviderResourceFactsFactory = Callable[[NormalizedResource], ProviderResourceFactDomains]
 
 
-def provider_resource_fact_domains(facts: object) -> ProviderResourceFactDomains:
-    """Adapt a provider facts object or pre-split bundle into domain facts."""
+def neutral_provider_resource_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
+    """Build a neutral domain facts bundle for providers without facts adapters."""
 
-    if isinstance(facts, ProviderResourceFactDomains):
-        return facts
+    neutral = NeutralProviderResourceFacts(resource)
     return ProviderResourceFactDomains(
-        storage=cast(ProviderStorageFacts, facts),
-        iam=cast(ProviderIamFacts, facts),
-        sql=cast(ProviderSqlFacts, facts),
-        gke=cast(ProviderGkeFacts, facts),
-        compute=cast(ProviderComputeFacts, facts),
-        workload=cast(ProviderWorkloadFacts, facts),
+        storage=neutral,
+        iam=neutral,
+        sql=neutral,
+        gke=neutral,
+        compute=neutral,
+        workload=neutral,
     )
 
 
@@ -581,8 +579,8 @@ class ProviderResourceFactsRegistry:
         provider_name = _normalize_provider_name(resource.provider)
         factory = self._factories.get(provider_name)
         if factory is None:
-            return provider_resource_fact_domains(NeutralProviderResourceFacts(resource))
-        return provider_resource_fact_domains(factory(resource))
+            return neutral_provider_resource_fact_domains(resource)
+        return factory(resource)
 
     def providers(self) -> tuple[str, ...]:
         return tuple(self._factories)

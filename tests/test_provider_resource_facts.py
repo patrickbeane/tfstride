@@ -77,6 +77,17 @@ class RecordingFacts:
         return ["example.policy"]
 
 
+def _fact_domains(facts: RecordingFacts) -> ProviderResourceFactDomains:
+    return ProviderResourceFactDomains(
+        storage=facts,
+        iam=facts,
+        sql=facts,
+        gke=facts,
+        compute=facts,
+        workload=facts,
+    )
+
+
 class ProviderResourceFactsRegistryTests(unittest.TestCase):
     def test_provider_fact_domain_protocols_are_disjoint(self) -> None:
         domains = {
@@ -183,20 +194,20 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertEqual(facts.workload_identity_members, [])
 
     def test_registers_and_returns_factories_by_provider_name(self) -> None:
-        def factory(resource: NormalizedResource) -> RecordingFacts:
-            return RecordingFacts(resource)
+        def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
+            return _fact_domains(RecordingFacts(resource))
 
         registry = ProviderResourceFactsRegistry([("AWS", factory)])
 
         self.assertIs(registry.get(" aws "), factory)
         self.assertEqual(registry.providers(), ("aws",))
 
-    def test_facts_for_adapts_legacy_provider_facts_across_domains(self) -> None:
+    def test_facts_for_delegates_to_registered_provider_domain_factory(self) -> None:
         calls: list[NormalizedResource] = []
 
-        def factory(resource: NormalizedResource) -> RecordingFacts:
+        def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
             calls.append(resource)
-            return RecordingFacts(resource)
+            return _fact_domains(RecordingFacts(resource))
 
         resource = _resource("aws")
         facts = ProviderResourceFactsRegistry([("aws", factory)]).facts_for(resource)
@@ -211,7 +222,7 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIs(facts.workload, facts.storage)
         self.assertEqual(facts.storage.bucket_name, "aws-bucket")
 
-    def test_facts_for_preserves_pre_split_domain_bundle(self) -> None:
+    def test_facts_for_returns_registered_domain_bundle(self) -> None:
         resource = _resource("aws")
         storage = RecordingFacts(resource)
         iam = RecordingFacts(resource)
@@ -301,8 +312,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertEqual(facts.workload.workload_identity_scopes, [])
 
     def test_rejects_duplicate_provider_registration(self) -> None:
-        def factory(resource: NormalizedResource) -> RecordingFacts:
-            return RecordingFacts(resource)
+        def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
+            return _fact_domains(RecordingFacts(resource))
 
         registry = ProviderResourceFactsRegistry([("aws", factory)])
 
@@ -310,8 +321,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
             registry.register("AWS", factory)
 
     def test_rejects_empty_provider_names(self) -> None:
-        def factory(resource: NormalizedResource) -> RecordingFacts:
-            return RecordingFacts(resource)
+        def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
+            return _fact_domains(RecordingFacts(resource))
 
         with self.assertRaises(ProviderResourceFactsRegistryError):
             ProviderResourceFactsRegistry([(" ", factory)])

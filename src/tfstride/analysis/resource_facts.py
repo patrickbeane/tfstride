@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.catalog import default_resource_facts_registry
@@ -14,7 +14,6 @@ from tfstride.providers.resource_facts import (
     ProviderSqlFacts,
     ProviderStorageFacts,
     ProviderWorkloadFacts,
-    provider_resource_fact_domains,
 )
 
 _DEFAULT_RESOURCE_FACTS_REGISTRY = default_resource_facts_registry()
@@ -267,23 +266,21 @@ class AnalysisResourceFacts:
     """Domain facades for provider-backed facts used by shared analysis."""
 
     resource: NormalizedResource
-    _provider_facts: object | None = None
+    _provider_facts: ProviderResourceFactDomains | None = None
 
     def __post_init__(self) -> None:
-        provider_facts = self._provider_facts
-        if provider_facts is None:
-            provider_facts = _DEFAULT_RESOURCE_FACTS_REGISTRY.facts_for(self.resource)
-        object.__setattr__(
-            self,
-            "_provider_facts",
-            provider_resource_fact_domains(provider_facts),
-        )
+        if self._provider_facts is None:
+            object.__setattr__(
+                self,
+                "_provider_facts",
+                _DEFAULT_RESOURCE_FACTS_REGISTRY.facts_for(self.resource),
+            )
 
     @property
     def _facts(self) -> ProviderResourceFactDomains:
         if self._provider_facts is None:
             raise RuntimeError("AnalysisResourceFacts was initialized without provider facts.")
-        return cast(ProviderResourceFactDomains, self._provider_facts)
+        return self._provider_facts
 
     @property
     def storage(self) -> AnalysisStorageFacts:

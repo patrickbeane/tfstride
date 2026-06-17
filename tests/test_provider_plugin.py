@@ -15,6 +15,7 @@ from tfstride.providers.plugin import (
     resource_facts_registry_from_plugins,
 )
 from tfstride.providers.resource_capabilities import ResourceCapability
+from tfstride.providers.resource_facts import ProviderResourceFactDomains
 
 
 class FakeMetadata:
@@ -72,8 +73,16 @@ class RecordingDecorator:
         self.calls.append(resources)
 
 
-def _facts(resource: NormalizedResource) -> RecordingFacts:
-    return RecordingFacts(resource)
+def _facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
+    facts = RecordingFacts(resource)
+    return ProviderResourceFactDomains(
+        storage=facts,
+        iam=facts,
+        sql=facts,
+        gke=facts,
+        compute=facts,
+        workload=facts,
+    )
 
 
 def _resource(provider: str = "aws") -> NormalizedResource:
