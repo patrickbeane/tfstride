@@ -28,6 +28,20 @@ def _resource(
     )
 
 
+@dataclass(slots=True)
+class AccessTrackingFacts:
+    resource: NormalizedResource
+    values: dict[str, object]
+    accessed: list[str]
+
+    def __getattr__(self, name: str) -> object:
+        self.accessed.append(name)
+        try:
+            return self.values[name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+
 @dataclass(frozen=True, slots=True)
 class FakeProviderFacts:
     resource: NormalizedResource
@@ -210,6 +224,102 @@ class FakeProviderFacts:
 
 
 class AnalysisResourceFactsTests(unittest.TestCase):
+    def test_analysis_fact_facades_read_only_their_provider_fact_domain(self) -> None:
+        domain_cases = {
+            "storage": (
+                (
+                    ("bucket_name", "bucket_name", "logs"),
+                    ("bucket_acl", "bucket_acl", "private"),
+                    ("public_access_block", "public_access_block", {"block_public_acls": True}),
+                    ("uniform_bucket_level_access", "gcs_uniform_bucket_level_access", True),
+                    ("public_access_prevention", "gcs_public_access_prevention", "enforced"),
+                    ("versioning_enabled", "gcs_versioning_enabled", True),
+                    ("default_kms_key_name", "gcs_default_kms_key_name", "projects/demo/keyRings/app/keys/gcs"),
+                    ("customer_managed_encryption", "customer_managed_encryption", True),
+                ),
+            ),
+            "iam": (
+                (
+                    ("policy_document", "policy_document", {"Statement": []}),
+                    ("trust_statements", "trust_statements", [{"Effect": "Allow"}]),
+                    ("resource_policy_source_addresses", "resource_policy_source_addresses", ["policy.source"]),
+                    ("project", "project", "tfstride-demo"),
+                    ("resource_name", "resource_name", "resource-name"),
+                    ("reference_values", "reference_values", ["resource-name"]),
+                    ("target_reference", "iam_target_reference", "target-ref"),
+                    ("bindings", "iam_bindings", [{"role": "roles/viewer"}]),
+                    ("custom_role_id", "custom_role_id", "deployAdmin"),
+                    ("custom_role_permissions", "custom_role_permissions", ["iam.serviceAccounts.actAs"]),
+                    ("organization_id", "organization_id", "1234567890"),
+                    ("folder_id", "folder_id", "folders/12345"),
+                    ("service_account_email", "service_account_email", "app@example.iam.gserviceaccount.com"),
+                    ("service_account_member", "service_account_member", "serviceAccount:app@example.com"),
+                    ("service_account_reference", "service_account_reference", "google_service_account.app.email"),
+                    ("role", "iam_role", "roles/viewer"),
+                    ("member", "iam_member", "user:ops@example.com"),
+                ),
+            ),
+            "sql": (
+                (
+                    ("engine", "engine", "POSTGRES_15"),
+                    ("authorized_networks", "cloud_sql_authorized_networks", [{"value": "0.0.0.0/0"}]),
+                    ("backup_enabled", "cloud_sql_backup_enabled", False),
+                    ("point_in_time_recovery_enabled", "cloud_sql_point_in_time_recovery_enabled", True),
+                    ("ipv4_enabled", "cloud_sql_ipv4_enabled", True),
+                    ("private_network", "cloud_sql_private_network", "google_compute_network.main.id"),
+                    ("require_ssl", "cloud_sql_require_ssl", True),
+                    ("ssl_mode", "cloud_sql_ssl_mode", "ENCRYPTED_ONLY"),
+                    ("deletion_protection", "deletion_protection", True),
+                ),
+            ),
+            "gke": (
+                (
+                    ("endpoint", "gke_endpoint", "35.1.2.3"),
+                    ("private_endpoint_enabled", "gke_private_endpoint_enabled", False),
+                    ("private_nodes_enabled", "gke_private_nodes_enabled", False),
+                    ("master_authorized_networks", "gke_master_authorized_networks", [{"cidr_block": "0.0.0.0/0"}]),
+                    ("workload_identity_enabled", "gke_workload_identity_enabled", False),
+                    ("workload_identity_pool", "gke_workload_identity_pool", "tfstride-demo.svc.id.goog"),
+                    ("node_service_account", "gke_node_service_account", "node@example.iam.gserviceaccount.com"),
+                    ("node_oauth_scopes", "gke_node_oauth_scopes", ["https://www.googleapis.com/auth/cloud-platform"]),
+                    ("node_metadata_mode", "gke_node_metadata_mode", "GCE_METADATA"),
+                    ("legacy_metadata_endpoints_enabled", "gke_legacy_metadata_endpoints_enabled", True),
+                ),
+            ),
+            "compute": (
+                (
+                    ("os_login_enabled", "os_login_enabled", True),
+                    ("network_tags", "network_tags", ["web"]),
+                    ("internet_ingress_firewalls", "internet_ingress_firewalls", ["google_compute_firewall.web"]),
+                    ("fronted_by_internet_facing_load_balancer", "fronted_by_internet_facing_load_balancer", True),
+                    ("internet_facing_load_balancer_addresses", "internet_facing_load_balancer_addresses", ["lb-address"]),
+                    ("load_balancer_frontends", "load_balancer_frontends", [{"address": "lb-address"}]),
+                    ("load_balancer_reachable_backends", "load_balancer_reachable_backends", [{"address": "backend"}]),
+                ),
+            ),
+            "workload": (
+                (
+                    ("identity_members", "workload_identity_members", ["serviceAccount:app@example.com"]),
+                    ("identity_scopes", "workload_identity_scopes", ["https://www.googleapis.com/auth/cloud-platform"]),
+                ),
+            ),
+        }
+
+        for domain, (expectations,) in domain_cases.items():
+            resource = _resource()
+            provider_values = {provider_property: value for _, provider_property, value in expectations}
+            tracker = AccessTrackingFacts(resource, provider_values, [])
+            facts = AnalysisResourceFacts(resource, tracker)
+            facade = getattr(facts, domain)
+
+            with self.subTest(domain=domain):
+                for facade_property, _, expected_value in expectations:
+                    self.assertEqual(getattr(facade, facade_property), expected_value)
+                self.assertEqual(
+                    tracker.accessed,
+                    [provider_property for _, provider_property, _ in expectations],
+                )
+
     def test_reads_provider_backed_analysis_facts(self) -> None:
         resource = _resource(
             {

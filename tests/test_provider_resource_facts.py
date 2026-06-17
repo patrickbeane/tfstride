@@ -7,9 +7,15 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.resource_facts import (
     NeutralProviderResourceFacts,
+    ProviderComputeFacts,
+    ProviderGkeFacts,
+    ProviderIamFacts,
     ProviderResourceFactsNotRegisteredError,
     ProviderResourceFactsRegistry,
     ProviderResourceFactsRegistryError,
+    ProviderSqlFacts,
+    ProviderStorageFacts,
+    ProviderWorkloadFacts,
 )
 
 
@@ -21,6 +27,14 @@ def _resource(provider: str = "aws") -> NormalizedResource:
         name="resource",
         category=ResourceCategory.DATA,
     )
+
+
+def _protocol_properties(protocol: type) -> set[str]:
+    return {
+        name
+        for name, value in vars(protocol).items()
+        if isinstance(value, property)
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +71,94 @@ class RecordingFacts:
 
 
 class ProviderResourceFactsRegistryTests(unittest.TestCase):
+    def test_provider_fact_domain_protocols_are_disjoint(self) -> None:
+        domains = {
+            "storage": {
+                "bucket_name",
+                "bucket_acl",
+                "public_access_block",
+                "gcs_uniform_bucket_level_access",
+                "gcs_public_access_prevention",
+                "gcs_versioning_enabled",
+                "gcs_default_kms_key_name",
+                "customer_managed_encryption",
+            },
+            "iam": {
+                "policy_document",
+                "trust_statements",
+                "resource_policy_source_addresses",
+                "project",
+                "resource_name",
+                "reference_values",
+                "iam_target_reference",
+                "iam_bindings",
+                "custom_role_id",
+                "custom_role_permissions",
+                "organization_id",
+                "folder_id",
+                "service_account_email",
+                "service_account_member",
+                "service_account_reference",
+                "iam_role",
+                "iam_member",
+            },
+            "sql": {
+                "engine",
+                "cloud_sql_authorized_networks",
+                "cloud_sql_backup_enabled",
+                "cloud_sql_point_in_time_recovery_enabled",
+                "cloud_sql_ipv4_enabled",
+                "cloud_sql_private_network",
+                "cloud_sql_require_ssl",
+                "cloud_sql_ssl_mode",
+                "deletion_protection",
+            },
+            "gke": {
+                "gke_endpoint",
+                "gke_private_endpoint_enabled",
+                "gke_private_nodes_enabled",
+                "gke_master_authorized_networks",
+                "gke_workload_identity_enabled",
+                "gke_workload_identity_pool",
+                "gke_node_service_account",
+                "gke_node_oauth_scopes",
+                "gke_node_metadata_mode",
+                "gke_legacy_metadata_endpoints_enabled",
+            },
+            "compute": {
+                "os_login_enabled",
+                "network_tags",
+                "internet_ingress_firewalls",
+                "fronted_by_internet_facing_load_balancer",
+                "internet_facing_load_balancer_addresses",
+                "load_balancer_frontends",
+                "load_balancer_reachable_backends",
+            },
+            "workload": {
+                "workload_identity_members",
+                "workload_identity_scopes",
+            },
+        }
+        protocols = {
+            "storage": ProviderStorageFacts,
+            "iam": ProviderIamFacts,
+            "sql": ProviderSqlFacts,
+            "gke": ProviderGkeFacts,
+            "compute": ProviderComputeFacts,
+            "workload": ProviderWorkloadFacts,
+        }
+
+        for domain, expected_properties in domains.items():
+            with self.subTest(domain=domain):
+                self.assertEqual(_protocol_properties(protocols[domain]), expected_properties)
+
+        for domain, properties in domains.items():
+            other_properties = set().union(
+                *(other for other_domain, other in domains.items() if other_domain != domain)
+            )
+            with self.subTest(domain=domain):
+                self.assertFalse(properties & other_properties)
+
     def test_registers_and_returns_factories_by_provider_name(self) -> None:
         def factory(resource: NormalizedResource) -> RecordingFacts:
             return RecordingFacts(resource)
@@ -92,6 +194,52 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.gcs_uniform_bucket_level_access)
+        self.assertIsNone(facts.gcs_public_access_prevention)
+        self.assertIsNone(facts.gcs_versioning_enabled)
+        self.assertIsNone(facts.gcs_default_kms_key_name)
+        self.assertIsNone(facts.customer_managed_encryption)
+        self.assertIsNone(facts.project)
+        self.assertIsNone(facts.resource_name)
+        self.assertEqual(facts.reference_values, [])
+        self.assertIsNone(facts.iam_target_reference)
+        self.assertEqual(facts.iam_bindings, [])
+        self.assertIsNone(facts.custom_role_id)
+        self.assertEqual(facts.custom_role_permissions, [])
+        self.assertIsNone(facts.organization_id)
+        self.assertIsNone(facts.folder_id)
+        self.assertEqual(facts.cloud_sql_authorized_networks, [])
+        self.assertIsNone(facts.cloud_sql_backup_enabled)
+        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
+        self.assertIsNone(facts.cloud_sql_ipv4_enabled)
+        self.assertIsNone(facts.cloud_sql_private_network)
+        self.assertIsNone(facts.cloud_sql_require_ssl)
+        self.assertIsNone(facts.cloud_sql_ssl_mode)
+        self.assertIsNone(facts.deletion_protection)
+        self.assertIsNone(facts.os_login_enabled)
+        self.assertIsNone(facts.gke_endpoint)
+        self.assertIsNone(facts.gke_private_endpoint_enabled)
+        self.assertIsNone(facts.gke_private_nodes_enabled)
+        self.assertEqual(facts.gke_master_authorized_networks, [])
+        self.assertIsNone(facts.gke_workload_identity_enabled)
+        self.assertIsNone(facts.gke_workload_identity_pool)
+        self.assertIsNone(facts.gke_node_service_account)
+        self.assertEqual(facts.gke_node_oauth_scopes, [])
+        self.assertIsNone(facts.gke_node_metadata_mode)
+        self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertIsNone(facts.service_account_email)
+        self.assertIsNone(facts.service_account_member)
+        self.assertIsNone(facts.service_account_reference)
+        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.workload_identity_scopes, [])
+        self.assertEqual(facts.network_tags, [])
+        self.assertEqual(facts.internet_ingress_firewalls, [])
+        self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
+        self.assertEqual(facts.internet_facing_load_balancer_addresses, [])
+        self.assertEqual(facts.load_balancer_frontends, [])
+        self.assertEqual(facts.load_balancer_reachable_backends, [])
+        self.assertIsNone(facts.iam_role)
+        self.assertIsNone(facts.iam_member)
 
     def test_rejects_duplicate_provider_registration(self) -> None:
         def factory(resource: NormalizedResource) -> RecordingFacts:
