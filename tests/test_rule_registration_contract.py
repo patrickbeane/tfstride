@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis import stride_rules
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws import rules as aws_rules
+from tfstride.providers.gcp import rules as gcp_rules
 
 EXPECTED_AWS_RULE_GROUP_IDS = (
     (
@@ -111,11 +111,11 @@ def _engine_rule_group_ids(engine: StrideRuleEngine) -> tuple[tuple[str, ...], .
 class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_provider_rule_group_ids_match_locked_stage_order(self) -> None:
         self.assertEqual(aws_rules.AWS_RULE_GROUP_IDS, EXPECTED_AWS_RULE_GROUP_IDS)
-        self.assertEqual(stride_rules._GCP_RULE_GROUP_IDS, EXPECTED_GCP_RULE_GROUP_IDS)
+        self.assertEqual(gcp_rules.GCP_RULE_GROUP_IDS, EXPECTED_GCP_RULE_GROUP_IDS)
 
-    def test_aws_provider_owns_aws_rule_ids(self) -> None:
+    def test_provider_rule_ids_stay_in_provider_domains(self) -> None:
         self.assertTrue(all(rule_id.startswith("aws-") for rule_id in _flatten(aws_rules.AWS_RULE_GROUP_IDS)))
-        self.assertFalse(any(rule_id.startswith("aws-") for rule_id in _flatten(stride_rules._GCP_RULE_GROUP_IDS)))
+        self.assertTrue(all(rule_id.startswith("gcp-") for rule_id in _flatten(gcp_rules.GCP_RULE_GROUP_IDS)))
 
     def test_aws_rule_contribution_matches_provider_rule_groups(self) -> None:
         contribution = aws_rules.build_aws_rule_contribution(
@@ -126,6 +126,17 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         self.assertEqual(
             tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in contribution.rule_groups),
             EXPECTED_AWS_RULE_GROUP_IDS,
+        )
+
+    def test_gcp_rule_contribution_matches_provider_rule_groups(self) -> None:
+        contribution = gcp_rules.build_gcp_rule_contribution(
+            FindingFactory(DEFAULT_RULE_REGISTRY),
+            DEFAULT_RULE_REGISTRY,
+        )
+
+        self.assertEqual(
+            tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in contribution.rule_groups),
+            EXPECTED_GCP_RULE_GROUP_IDS,
         )
 
     def test_default_rule_group_ids_match_locked_stage_order(self) -> None:
@@ -151,9 +162,7 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (27, 2, 2, 12, 3, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (3, 2, 2, 2, 2, 2))
-        self.assertEqual(
-            tuple(len(rule_group) for rule_group in stride_rules._GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0)
-        )
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)
