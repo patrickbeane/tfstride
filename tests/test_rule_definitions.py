@@ -9,6 +9,7 @@ from tfstride.analysis.rule_definitions import (
     RuleDefinition,
     RuleEvaluationContext,
     build_rule_contribution,
+    build_rule_registry_from_contribution,
 )
 from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -47,6 +48,20 @@ class RuleContributionTests(unittest.TestCase):
         )
         self.assertIs(contribution.rule_groups[0][0].metadata, registry.get("rule-b"))
         self.assertIs(contribution.rule_groups[0][0].detector, _detector)
+
+    def test_build_rule_registry_from_contribution_preserves_metadata_order(self) -> None:
+        first_metadata = _metadata("rule-b")
+        second_metadata = _metadata("rule-a")
+        contribution = RuleContribution(
+            (
+                (RuleDefinition(first_metadata, _detector),),
+                (RuleDefinition(second_metadata, _detector),),
+            )
+        )
+
+        registry = build_rule_registry_from_contribution(contribution)
+
+        self.assertEqual(registry.rules(), (first_metadata, second_metadata))
 
     def test_build_rule_contribution_rejects_duplicate_rule_ids(self) -> None:
         registry = RuleRegistry([_metadata("rule-a")])
@@ -98,8 +113,9 @@ class ExecutableRuleTests(unittest.TestCase):
             received_indexes.append(received_context.analysis_indexes)
             return []
 
-        engine = StrideRuleEngine(rule_registry=RuleRegistry([metadata]))
-        engine._rule_groups_by_stage = ((RuleDefinition(metadata=metadata, detector=detector),),)
+        engine = StrideRuleEngine(
+            rule_contribution=RuleContribution(((RuleDefinition(metadata=metadata, detector=detector),),))
+        )
 
         self.assertEqual(
             engine.evaluate(inventory, [], analysis_indexes=analysis_indexes),

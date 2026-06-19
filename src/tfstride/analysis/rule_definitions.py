@@ -46,6 +46,10 @@ class RuleContribution:
 RuleContributionInput = Iterable[Iterable[tuple[str, RuleDetector]]]
 
 
+def build_rule_registry_from_contribution(contribution: RuleContribution) -> RuleRegistry:
+    return RuleRegistry([rule.metadata for rule_group in contribution.rule_groups for rule in rule_group])
+
+
 def build_rule_contribution(
     rule_groups: RuleContributionInput,
     rule_registry: RuleRegistry,

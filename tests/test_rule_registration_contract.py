@@ -91,7 +91,14 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         engine = StrideRuleEngine()
 
         self.assertIsInstance(engine._rule_contribution, RuleContribution)
-        self.assertIs(engine._rule_groups_by_stage, engine._rule_contribution.rule_groups)
+        self.assertIs(engine._rule_groups(), engine._rule_contribution.rule_groups)
+
+    def test_default_rule_registry_is_derived_from_rule_contribution_metadata(self) -> None:
+        engine = StrideRuleEngine()
+
+        for rule_group in engine._rule_contribution.rule_groups:
+            for rule in rule_group:
+                self.assertIs(engine._rule_registry.get(rule.metadata.rule_id), rule.metadata)
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(stride_rules._RULE_GROUP_IDS), 6)
