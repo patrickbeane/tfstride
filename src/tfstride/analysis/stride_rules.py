@@ -11,11 +11,7 @@ from tfstride.analysis.rule_definitions import (
     RuleEvaluationContext,
     build_rule_registry_from_contribution,
 )
-from tfstride.analysis.rule_registry import (
-    RulePolicy,
-    RuleRegistry,
-    default_rule_registry,
-)
+from tfstride.analysis.rule_registry import RulePolicy, RuleRegistry
 from tfstride.models import Finding, Observation, ResourceInventory, TrustBoundary
 from tfstride.providers.catalog import default_rule_contribution
 
@@ -27,8 +23,8 @@ class StrideRuleEngine:
         rule_contribution: RuleContribution | None = None,
     ) -> None:
         if rule_contribution is None:
-            finding_registry = rule_registry if rule_registry is not None else default_rule_registry()
-            rule_contribution = default_rule_contribution(FindingFactory(finding_registry))
+            finding_factory = FindingFactory() if rule_registry is None else FindingFactory(rule_registry)
+            rule_contribution = default_rule_contribution(finding_factory)
 
         self._rule_contribution = rule_contribution
         self._rule_registry = (

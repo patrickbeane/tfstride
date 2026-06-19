@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 
+from tfstride.analysis import stride_rules
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
@@ -138,6 +140,14 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
             tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in contribution.rule_groups),
             EXPECTED_GCP_RULE_GROUP_IDS,
         )
+
+    def test_stride_rule_engine_does_not_own_provider_rule_ids_or_detector_maps(self) -> None:
+        source = inspect.getsource(stride_rules)
+
+        self.assertNotIn("_RULE_GROUP_IDS", source)
+        self.assertNotIn("detectors_by_rule_id", source)
+        self.assertNotIn("aws-", source)
+        self.assertNotIn("gcp-", source)
 
     def test_default_rule_group_ids_match_locked_stage_order(self) -> None:
         self.assertEqual(
