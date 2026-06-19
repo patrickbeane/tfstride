@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tfstride.analysis.finding_factory import FindingFactory
+    from tfstride.analysis.rule_definitions import RuleContribution
+
 from tfstride.providers.aws.plugin import aws_provider_plugin
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.plugin import (
@@ -8,6 +14,7 @@ from tfstride.providers.plugin import (
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
+    rule_contribution_from_plugins,
 )
 from tfstride.providers.registry import ProviderRegistry
 from tfstride.providers.resource_capabilities import ProviderResourceCapabilityRegistry
@@ -34,3 +41,7 @@ def default_resource_capability_registry() -> ProviderResourceCapabilityRegistry
 
 def default_provider_limitations() -> dict[str, tuple[str, ...]]:
     return provider_limitations_from_plugins(default_provider_plugins())
+
+
+def default_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:
+    return rule_contribution_from_plugins(default_provider_plugins(), finding_factory)

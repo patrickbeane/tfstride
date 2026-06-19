@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
@@ -10,6 +12,7 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsStorageFacts
+from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_limitations,
@@ -17,6 +20,7 @@ from tfstride.providers.catalog import (
     default_provider_registry,
     default_resource_capability_registry,
     default_resource_facts_registry,
+    default_rule_contribution,
 )
 from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -24,6 +28,7 @@ from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts
+from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 from tfstride.providers.resource_capabilities import ResourceCapability
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -50,12 +55,36 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(aws_plugin.limitations, AWS_LIMITATIONS)
         self.assertIsInstance(aws_plugin.create_normalizer(), AwsNormalizer)
         self.assertIsInstance(aws_plugin.create_resource_decorator(), AwsResourceDecorator)
+        self.assertEqual(
+            tuple(
+                tuple(rule.metadata.rule_id for rule in rule_group)
+                for rule_group in aws_plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY)).rule_groups
+            ),
+            AWS_RULE_GROUP_IDS,
+        )
         self.assertIs(gcp_plugin.metadata_namespace, GcpResourceMetadata)
         self.assertEqual(gcp_plugin.supported_resource_types, SUPPORTED_GCP_TYPES)
         self.assertEqual(dict(gcp_plugin.resource_capabilities), dict(GCP_RESOURCE_CAPABILITIES))
         self.assertEqual(gcp_plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(gcp_plugin.create_normalizer(), GcpNormalizer)
         self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
+        self.assertEqual(
+            tuple(
+                tuple(rule.metadata.rule_id for rule in rule_group)
+                for rule_group in gcp_plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY)).rule_groups
+            ),
+            GCP_RULE_GROUP_IDS,
+        )
+
+    def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
+        contribution = default_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))
+        rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
+
+        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (27, 2, 2, 12, 3, 2))
+        self.assertEqual(
+            {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
+            DEFAULT_RULE_REGISTRY.known_rule_ids(),
+        )
 
     def test_default_provider_limitations_register_builtin_provider_caveats(self) -> None:
         limitations = default_provider_limitations()

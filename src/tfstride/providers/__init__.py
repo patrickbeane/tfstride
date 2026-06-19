@@ -4,10 +4,12 @@ from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
     ProviderResourceDecorator,
+    ProviderRuleContributionFactory,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
+    rule_contribution_from_plugins,
 )
 from tfstride.providers.registry import (
     ProviderNotRegisteredError,
@@ -38,6 +40,7 @@ __all__ = [
     "ProviderResourceCapabilityRegistry",
     "ProviderResourceCapabilityRegistryError",
     "ProviderResourceDecorator",
+    "ProviderRuleContributionFactory",
     "ProviderResourceFactDomains",
     "ProviderSelectionError",
     "ProviderResourceFactsNotRegisteredError",
@@ -48,4 +51,5 @@ __all__ = [
     "provider_registry_from_plugins",
     "resource_capability_registry_from_plugins",
     "resource_facts_registry_from_plugins",
+    "rule_contribution_from_plugins",
 ]

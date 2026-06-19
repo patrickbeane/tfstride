@@ -9,7 +9,7 @@ from tfstride.analysis.path_chain_rules import PathChainRuleDetectors
 from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.posture_rules import PostureRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
-from tfstride.analysis.rule_registry import RuleRegistry
+from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 
 AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
@@ -42,7 +42,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
 
 def build_aws_rule_contribution(
     finding_factory: FindingFactory,
-    metadata_registry: RuleRegistry,
+    metadata_registry: RuleRegistry | None = None,
 ) -> RuleContribution:
     posture_detectors = PostureRuleDetectors(finding_factory)
     network_data_detectors = NetworkDataRuleDetectors(finding_factory)
@@ -68,10 +68,11 @@ def build_aws_rule_contribution(
         "aws-role-trust-expansion": policy_trust_detectors.detect_trust_expansion,
         "aws-role-trust-missing-narrowing": policy_trust_detectors.detect_unconstrained_trust,
     }
+    resolved_metadata_registry = metadata_registry if metadata_registry is not None else default_rule_registry()
     return build_rule_contribution(
         (
             tuple((rule_id, detectors_by_rule_id[rule_id]) for rule_id in rule_group)
             for rule_group in AWS_RULE_GROUP_IDS
         ),
-        metadata_registry,
+        resolved_metadata_registry,
     )

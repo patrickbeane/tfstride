@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.base import ProviderNormalizer
@@ -18,6 +18,12 @@ from tfstride.providers.resource_facts import (
     ProviderResourceFactsFactory,
     ProviderResourceFactsRegistry,
 )
+
+if TYPE_CHECKING:
+    from tfstride.analysis.finding_factory import FindingFactory
+    from tfstride.analysis.rule_definitions import RuleContribution
+
+ProviderRuleContributionFactory = Callable[["FindingFactory"], "RuleContribution"]
 
 
 class ProviderPluginError(ValueError):
@@ -43,6 +49,7 @@ class ProviderPlugin:
     resource_capabilities: ResourceCapabilityMap = field(default_factory=dict)
     limitations: tuple[str, ...] = ()
     resource_decorator_factory: Callable[[], ProviderResourceDecorator] | None = None
+    rule_contribution_factory: ProviderRuleContributionFactory | None = None
 
     def __post_init__(self) -> None:
         provider = _normalize_provider_name(self.provider)
@@ -54,6 +61,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` facts factory must be callable.")
         if self.resource_decorator_factory is not None and not callable(self.resource_decorator_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` decorator factory must be callable.")
+        if self.rule_contribution_factory is not None and not callable(self.rule_contribution_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` rule contribution factory must be callable.")
         if not isinstance(self.metadata_namespace, type):
             raise ProviderPluginError(f"Provider plugin `{provider}` metadata namespace must be a type.")
 
@@ -85,6 +94,11 @@ class ProviderPlugin:
         if self.resource_decorator_factory is None:
             return None
         return self.resource_decorator_factory()
+
+    def create_rule_contribution(self, finding_factory: FindingFactory) -> RuleContribution | None:
+        if self.rule_contribution_factory is None:
+            return None
+        return self.rule_contribution_factory(finding_factory)
 
     def supports_resource_type(self, resource_type: str) -> bool:
         return str(resource_type).strip() in self.supported_resource_types
@@ -124,6 +138,21 @@ def resource_capability_registry_from_plugins(
 
 def provider_limitations_from_plugins(plugins: Iterable[ProviderPlugin]) -> dict[str, tuple[str, ...]]:
     return {provider: limitations for provider, limitations in (plugin.limitations_entry() for plugin in plugins)}
+
+
+def rule_contribution_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+    finding_factory: FindingFactory,
+) -> RuleContribution:
+    from tfstride.analysis.rule_definitions import merge_rule_contributions_by_stage
+
+    return merge_rule_contributions_by_stage(
+        *(
+            contribution
+            for plugin in plugins
+            if (contribution := plugin.create_rule_contribution(finding_factory)) is not None
+        )
+    )
 
 
 def _normalize_resource_capabilities(
