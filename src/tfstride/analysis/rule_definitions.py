@@ -50,6 +50,30 @@ def build_rule_registry_from_contribution(contribution: RuleContribution) -> Rul
     return RuleRegistry([rule.metadata for rule_group in contribution.rule_groups for rule in rule_group])
 
 
+def merge_rule_contributions_by_stage(*contributions: RuleContribution) -> RuleContribution:
+    if not contributions:
+        return RuleContribution(())
+
+    stage_count = len(contributions[0].rule_groups)
+    for contribution in contributions:
+        if len(contribution.rule_groups) != stage_count:
+            raise ValueError("Rule contributions must have the same stage count.")
+
+    merged_groups: list[tuple[RuleDefinition, ...]] = []
+    seen_rule_ids: set[str] = set()
+    for stage_index in range(stage_count):
+        merged_rules: list[RuleDefinition] = []
+        for contribution in contributions:
+            for rule in contribution.rule_groups[stage_index]:
+                if rule.metadata.rule_id in seen_rule_ids:
+                    raise ValueError(f"Duplicate rule contribution for `{rule.metadata.rule_id}`.")
+                seen_rule_ids.add(rule.metadata.rule_id)
+                merged_rules.append(rule)
+        merged_groups.append(tuple(merged_rules))
+
+    return RuleContribution(tuple(merged_groups))
+
+
 def build_rule_contribution(
     rule_groups: RuleContributionInput,
     rule_registry: RuleRegistry,

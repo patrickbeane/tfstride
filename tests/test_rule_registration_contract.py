@@ -3,15 +3,42 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis import stride_rules
+from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.providers.aws import rules as aws_rules
 
-EXPECTED_DEFAULT_RULE_GROUP_IDS = (
+EXPECTED_AWS_RULE_GROUP_IDS = (
     (
         "aws-public-compute-broad-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
+    ),
+    (
+        "aws-database-permissive-ingress",
+        "aws-missing-tier-segmentation",
+    ),
+    (
+        "aws-sensitive-resource-policy-external-access",
+        "aws-service-resource-policy-external-access",
+    ),
+    (
+        "aws-iam-wildcard-permissions",
+        "aws-workload-role-sensitive-permissions",
+    ),
+    (
+        "aws-private-data-transitive-exposure",
+        "aws-control-plane-sensitive-workload-chain",
+    ),
+    (
+        "aws-role-trust-expansion",
+        "aws-role-trust-missing-narrowing",
+    ),
+)
+
+EXPECTED_GCP_RULE_GROUP_IDS = (
+    (
         "gcp-sensitive-resource-iam-external-access",
         "gcp-pubsub-public-access",
         "gcp-bigquery-public-access",
@@ -37,17 +64,9 @@ EXPECTED_DEFAULT_RULE_GROUP_IDS = (
         "gcp-cloud-run-public-invoker",
         "gcp-cloud-functions-public-invoker",
     ),
+    (),
+    (),
     (
-        "aws-database-permissive-ingress",
-        "aws-missing-tier-segmentation",
-    ),
-    (
-        "aws-sensitive-resource-policy-external-access",
-        "aws-service-resource-policy-external-access",
-    ),
-    (
-        "aws-iam-wildcard-permissions",
-        "aws-workload-role-sensitive-permissions",
         "gcp-service-account-iam-broad-principal",
         "gcp-service-account-iam-privileged-role",
         "gcp-service-account-key-hygiene",
@@ -59,15 +78,8 @@ EXPECTED_DEFAULT_RULE_GROUP_IDS = (
         "gcp-inherited-iam-sensitive-resource-access",
         "gcp-inherited-iam-blast-radius",
     ),
-    (
-        "aws-private-data-transitive-exposure",
-        "aws-control-plane-sensitive-workload-chain",
-        "gcp-public-workload-sensitive-data-access",
-    ),
-    (
-        "aws-role-trust-expansion",
-        "aws-role-trust-missing-narrowing",
-    ),
+    ("gcp-public-workload-sensitive-data-access",),
+    (),
 )
 
 
@@ -75,13 +87,48 @@ def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> tuple[str, ...]:
     return tuple(rule_id for rule_group in rule_groups for rule_id in rule_group)
 
 
+def _merge_stage_rule_groups(*rule_group_sets: tuple[tuple[str, ...], ...]) -> tuple[tuple[str, ...], ...]:
+    stage_counts = {len(rule_groups) for rule_groups in rule_group_sets}
+    if len(stage_counts) != 1:
+        raise AssertionError("Expected rule group sets to share a stage count.")
+
+    return tuple(
+        tuple(rule_id for rule_groups in rule_group_sets for rule_id in rule_groups[stage_index])
+        for stage_index in range(len(rule_group_sets[0]))
+    )
+
+
+EXPECTED_DEFAULT_RULE_GROUP_IDS = _merge_stage_rule_groups(
+    EXPECTED_AWS_RULE_GROUP_IDS,
+    EXPECTED_GCP_RULE_GROUP_IDS,
+)
+
+
 def _engine_rule_group_ids(engine: StrideRuleEngine) -> tuple[tuple[str, ...], ...]:
     return tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in engine._rule_groups())
 
 
 class DefaultRuleRegistrationContractTests(unittest.TestCase):
+    def test_provider_rule_group_ids_match_locked_stage_order(self) -> None:
+        self.assertEqual(aws_rules.AWS_RULE_GROUP_IDS, EXPECTED_AWS_RULE_GROUP_IDS)
+        self.assertEqual(stride_rules._GCP_RULE_GROUP_IDS, EXPECTED_GCP_RULE_GROUP_IDS)
+
+    def test_aws_provider_owns_aws_rule_ids(self) -> None:
+        self.assertTrue(all(rule_id.startswith("aws-") for rule_id in _flatten(aws_rules.AWS_RULE_GROUP_IDS)))
+        self.assertFalse(any(rule_id.startswith("aws-") for rule_id in _flatten(stride_rules._GCP_RULE_GROUP_IDS)))
+
+    def test_aws_rule_contribution_matches_provider_rule_groups(self) -> None:
+        contribution = aws_rules.build_aws_rule_contribution(
+            FindingFactory(DEFAULT_RULE_REGISTRY),
+            DEFAULT_RULE_REGISTRY,
+        )
+
+        self.assertEqual(
+            tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in contribution.rule_groups),
+            EXPECTED_AWS_RULE_GROUP_IDS,
+        )
+
     def test_default_rule_group_ids_match_locked_stage_order(self) -> None:
-        self.assertEqual(stride_rules._RULE_GROUP_IDS, EXPECTED_DEFAULT_RULE_GROUP_IDS)
         self.assertEqual(
             _engine_rule_group_ids(StrideRuleEngine()),
             EXPECTED_DEFAULT_RULE_GROUP_IDS,
@@ -101,11 +148,15 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
                 self.assertIs(engine._rule_registry.get(rule.metadata.rule_id), rule.metadata)
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
-        self.assertEqual(len(stride_rules._RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in stride_rules._RULE_GROUP_IDS), (27, 2, 2, 12, 3, 2))
+        self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (27, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (3, 2, 2, 2, 2, 2))
+        self.assertEqual(
+            tuple(len(rule_group) for rule_group in stride_rules._GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0)
+        )
 
     def test_default_rule_ids_are_unique(self) -> None:
-        rule_ids = _flatten(stride_rules._RULE_GROUP_IDS)
+        rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)
 
         self.assertEqual(len(rule_ids), len(set(rule_ids)))
 

@@ -10,6 +10,7 @@ from tfstride.analysis.rule_definitions import (
     RuleEvaluationContext,
     build_rule_contribution,
     build_rule_registry_from_contribution,
+    merge_rule_contributions_by_stage,
 )
 from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -27,6 +28,14 @@ def _metadata(rule_id: str) -> RuleMetadata:
 
 def _detector(received_context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
     return []
+
+
+def _contribution(rule_groups: tuple[tuple[str, ...], ...]) -> RuleContribution:
+    return RuleContribution(
+        tuple(
+            tuple(RuleDefinition(_metadata(rule_id), _detector) for rule_id in rule_group) for rule_group in rule_groups
+        )
+    )
 
 
 class RuleContributionTests(unittest.TestCase):
@@ -62,6 +71,31 @@ class RuleContributionTests(unittest.TestCase):
         registry = build_rule_registry_from_contribution(contribution)
 
         self.assertEqual(registry.rules(), (first_metadata, second_metadata))
+
+    def test_merge_rule_contributions_by_stage_preserves_contribution_order_per_stage(self) -> None:
+        first = _contribution((("rule-a",), (), ("rule-c",)))
+        second = _contribution((("rule-b",), ("rule-d",), ()))
+
+        merged = merge_rule_contributions_by_stage(first, second)
+
+        self.assertEqual(
+            tuple(tuple(rule.metadata.rule_id for rule in group) for group in merged.rule_groups),
+            (("rule-a", "rule-b"), ("rule-d",), ("rule-c",)),
+        )
+
+    def test_merge_rule_contributions_by_stage_rejects_stage_count_mismatch(self) -> None:
+        first = _contribution((("rule-a",),))
+        second = _contribution((("rule-b",), ("rule-c",)))
+
+        with self.assertRaisesRegex(ValueError, "same stage count"):
+            merge_rule_contributions_by_stage(first, second)
+
+    def test_merge_rule_contributions_by_stage_rejects_duplicate_rule_ids(self) -> None:
+        first = _contribution((("rule-a",),))
+        second = _contribution((("rule-a",),))
+
+        with self.assertRaisesRegex(ValueError, "Duplicate rule contribution"):
+            merge_rule_contributions_by_stage(first, second)
 
     def test_build_rule_contribution_rejects_duplicate_rule_ids(self) -> None:
         registry = RuleRegistry([_metadata("rule-a")])
