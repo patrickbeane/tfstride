@@ -22,6 +22,11 @@ dashboard = [
   "python-multipart>=0.0.9,<1",
   "uvicorn[standard]>=0.30,<1",
 ]
+dev = [
+  "pytest>=8,<10",
+  "ruff>=0.5,<1",
+  "vulture>=2.16,<3",
+]
 
 [project.scripts]
 tfstride = "tfstride.cli:main"
@@ -31,3 +36,25 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+  # Keep the first lint pass focused on correctness and import hygiene. Existing
+  # long test fixtures and explanatory strings can be wrapped separately.
+  "E501",
+  # FastAPI intentionally uses File()/Form() in endpoint parameter defaults.
+  "B008",
+  # StrEnum migration is safe on Python 3.11+, but it is not needed for the
+  # initial lint gate.
+  "UP042",
+]
+
+[tool.vulture]
+paths = ["src", "tests"]
+min_confidence = 100
+sort_by_size = true
