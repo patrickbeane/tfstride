@@ -21,11 +21,7 @@ class FirewallIngressDecision:
 
     @property
     def internet_ingress_reasons(self) -> tuple[str, ...]:
-        return tuple(
-            reason
-            for source in self.sources
-            for reason in source.internet_ingress_reasons
-        )
+        return tuple(reason for source in self.sources for reason in source.internet_ingress_reasons)
 
     @property
     def firewall_addresses(self) -> tuple[str, ...]:

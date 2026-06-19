@@ -47,11 +47,7 @@ def firewall_rules_overlap(left: SecurityGroupRule, right: SecurityGroupRule) ->
 def _firewall_protocols_overlap(left: str, right: str) -> bool:
     left_protocol = left.lower()
     right_protocol = right.lower()
-    return (
-        left_protocol == "-1"
-        or right_protocol == "-1"
-        or left_protocol == right_protocol
-    )
+    return left_protocol == "-1" or right_protocol == "-1" or left_protocol == right_protocol
 
 
 def _firewall_port_range(rule: SecurityGroupRule) -> tuple[int, int] | None:

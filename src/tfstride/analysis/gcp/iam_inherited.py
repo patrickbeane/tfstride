@@ -191,10 +191,7 @@ class GcpInheritedIamDetectors:
                                 ),
                                 evidence_item(
                                     "sensitive_descendants",
-                                    [
-                                        _inherited_sensitive_resource_access_evidence(grant)
-                                        for grant in access_grants
-                                    ],
+                                    [_inherited_sensitive_resource_access_evidence(grant) for grant in access_grants],
                                 ),
                                 evidence_item(
                                     "trust_scope",
@@ -479,11 +476,7 @@ def _assess_inherited_gcp_iam_member(
     if broad_assessment is not None:
         return broad_assessment
     projects = sorted(
-        {
-            project
-            for project in (analysis_facts(resource).iam.project for resource in descendants)
-            if project
-        }
+        {project for project in (analysis_facts(resource).iam.project for resource in descendants) if project}
     )
     for project in projects:
         assessment = assess_gcp_sensitive_iam_member(member, project)
@@ -534,7 +527,4 @@ def _inherited_iam_scope_description(scope: GcpIamScopeKey) -> str:
 def _inherited_sensitive_resource_access_evidence(
     grant: _InheritedSensitiveResourceAccess,
 ) -> str:
-    return (
-        f"resource={grant.resource_address}; type={grant.resource_type}; "
-        f"risk={grant.risk}"
-    )
+    return f"resource={grant.resource_address}; type={grant.resource_type}; risk={grant.risk}"

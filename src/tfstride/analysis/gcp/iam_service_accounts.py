@@ -57,13 +57,9 @@ class GcpServiceAccountIamDetectors:
                     privilege_breadth=gcp_iam_condition_limited_score(2, condition, floor=1),
                     data_sensitivity=0,
                     lateral_movement=1,
-                    blast_radius=gcp_iam_condition_limited_score(
-                        2 if assessment.is_public else 1, condition, floor=0
-                    ),
+                    blast_radius=gcp_iam_condition_limited_score(2 if assessment.is_public else 1, condition, floor=0),
                 )
-                affected_resources = dedupe_addresses(
-                    [target.address if target else "", binding.address]
-                )
+                affected_resources = dedupe_addresses([target.address if target else "", binding.address])
                 findings.append(
                     self._finding_factory.build(
                         rule_id=rule_id,
@@ -126,9 +122,7 @@ class GcpServiceAccountIamDetectors:
                     lateral_movement=2,
                     blast_radius=gcp_iam_condition_limited_score(2, condition, floor=1),
                 )
-                affected_resources = dedupe_addresses(
-                    [target.address if target else "", binding.address]
-                )
+                affected_resources = dedupe_addresses([target.address if target else "", binding.address])
                 findings.append(
                     self._finding_factory.build(
                         rule_id=rule_id,

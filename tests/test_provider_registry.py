@@ -19,10 +19,7 @@ class RecordingNormalizer(ProviderNormalizer):
         self.calls: list[list[TerraformResource]] = []
 
     def owns_resource(self, resource: TerraformResource) -> bool:
-        return (
-            self.owned_prefix is not None
-            and resource.resource_type.startswith(self.owned_prefix)
-        )
+        return self.owned_prefix is not None and resource.resource_type.startswith(self.owned_prefix)
 
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
         self.calls.append(resources)

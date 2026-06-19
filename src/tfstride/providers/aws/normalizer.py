@@ -102,9 +102,7 @@ class AwsNormalizer(ProviderNormalizer):
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
         aws_resources = [resource for resource in resources if self.owns_resource(resource)]
         unsupported_resource_types = Counter(
-            resource.resource_type
-            for resource in aws_resources
-            if resource.resource_type not in SUPPORTED_AWS_TYPES
+            resource.resource_type for resource in aws_resources if resource.resource_type not in SUPPORTED_AWS_TYPES
         )
         unsupported = sorted(
             resource.address for resource in aws_resources if resource.resource_type not in SUPPORTED_AWS_TYPES

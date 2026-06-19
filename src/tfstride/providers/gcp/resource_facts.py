@@ -274,9 +274,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
                 continue
             account_scopes = account.get("scopes")
             if isinstance(account_scopes, list):
-                scopes.extend(
-                    str(scope) for scope in account_scopes if scope not in (None, "")
-                )
+                scopes.extend(str(scope) for scope in account_scopes if scope not in (None, ""))
             elif account_scopes not in (None, ""):
                 scopes.append(str(account_scopes))
         return dedupe(scopes)

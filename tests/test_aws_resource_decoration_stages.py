@@ -289,9 +289,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         self.assertEqual(
             instance.public_exposure_reasons,
-            [
-                "instance has a public IP path and attached security groups allow internet ingress"
-            ],
+            ["instance has a public IP path and attached security groups allow internet ingress"],
         )
 
     def test_public_exposure_stage_uses_explicit_public_route_association_for_instances(self) -> None:
@@ -527,10 +525,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertTrue(database.direct_internet_reachable)
         self.assertEqual(
             database.public_exposure_reasons,
-            [
-                "database is marked publicly_accessible and no attached security "
-                "groups provide ingress evidence"
-            ],
+            ["database is marked publicly_accessible and no attached security groups provide ingress evidence"],
         )
 
     def test_public_exposure_stage_keeps_public_db_with_private_sg_private(self) -> None:
@@ -581,9 +576,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertTrue(database.direct_internet_reachable)
         self.assertEqual(
             database.public_exposure_reasons,
-            [
-                "database is marked publicly_accessible and attached security groups allow internet ingress"
-            ],
+            ["database is marked publicly_accessible and attached security groups allow internet ingress"],
         )
 
     def test_public_exposure_stage_marks_internet_facing_lb_without_security_groups(self) -> None:
@@ -633,9 +626,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertTrue(load_balancer.direct_internet_reachable)
         self.assertEqual(
             load_balancer.public_exposure_reasons,
-            [
-                "load balancer is internet-facing and attached security groups allow internet ingress"
-            ],
+            ["load balancer is internet-facing and attached security groups allow internet ingress"],
         )
 
     def test_public_exposure_stage_keeps_internet_facing_lb_with_private_sg_private(self) -> None:
@@ -718,9 +709,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
                 "bucket": "logs",
                 "acl": "public-read",
                 "policy_document": {},
-                "public_exposure_reasons": [
-                    "bucket ACL `public-read` grants public access"
-                ],
+                "public_exposure_reasons": ["bucket ACL `public-read` grants public access"],
             },
         )
         access_block = _resource(

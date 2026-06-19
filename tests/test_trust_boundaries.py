@@ -96,10 +96,7 @@ class TrustBoundaryIndexTests(unittest.TestCase):
             boundaries = detect_trust_boundaries(inventory, indexes=indexes)
 
         build_indexes.assert_not_called()
-        boundary_pairs = {
-            (boundary.boundary_type, boundary.source, boundary.target)
-            for boundary in boundaries
-        }
+        boundary_pairs = {(boundary.boundary_type, boundary.source, boundary.target) for boundary in boundaries}
         self.assertIn(
             (BoundaryType.CONTROL_TO_WORKLOAD, "aws_iam_role.app", "aws_instance.app"),
             boundary_pairs,

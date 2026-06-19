@@ -157,7 +157,6 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             (effective[1],),
         )
 
-
     def test_guardrail_adjusted_severity_reduces_active_enforced_guardrails(self) -> None:
         guardrail = _org_policy(
             "google_org_policy_policy.storage_pap",
@@ -288,9 +287,9 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
                 constraint="constraints/iam.allowedPolicyMemberDomains",
             ),
             (
-                index.direct_guardrails_for_scope(
-                    GcpOrgPolicyScopeKey(GCP_ORG_POLICY_SCOPE_PROJECT, "tfstride-demo")
-                )[0],
+                index.direct_guardrails_for_scope(GcpOrgPolicyScopeKey(GCP_ORG_POLICY_SCOPE_PROJECT, "tfstride-demo"))[
+                    0
+                ],
             ),
         )
 
@@ -341,9 +340,9 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
         index = _guardrail_index([project_policy])
 
         self.assertEqual(
-            index.direct_guardrails_for_scope(
-                GcpOrgPolicyScopeKey(GCP_ORG_POLICY_SCOPE_PROJECT, "tfstride-demo")
-            )[0].resource,
+            index.direct_guardrails_for_scope(GcpOrgPolicyScopeKey(GCP_ORG_POLICY_SCOPE_PROJECT, "tfstride-demo"))[
+                0
+            ].resource,
             project_policy,
         )
 

@@ -165,8 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         if (count := sum(1 for finding in violating_findings if finding.severity == severity))
     )
     sys.stderr.write(
-        f"Policy gate failed: {len(violating_findings)} finding(s) meet or exceed `{threshold.value}`"
-        f" ({summary}).\n"
+        f"Policy gate failed: {len(violating_findings)} finding(s) meet or exceed `{threshold.value}` ({summary}).\n"
     )
     return POLICY_VIOLATION_EXIT_CODE
 

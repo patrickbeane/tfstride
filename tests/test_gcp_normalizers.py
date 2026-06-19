@@ -152,7 +152,6 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.REGION), "us-central1")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CIDR_RANGE), "10.10.1.0/24")
 
-
     def test_compute_route_normalizer_preserves_default_route_context(self) -> None:
         normalized = normalize_compute_route(
             _terraform_resource(
@@ -331,9 +330,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                     "name": "web-neg",
                     "zone": "us-central1-a",
                     "network_endpoint_type": "GCE_VM_IP_PORT",
-                    "network_endpoint": [
-                        {"instance": "google_compute_instance.web.id", "port": 8080}
-                    ],
+                    "network_endpoint": [{"instance": "google_compute_instance.web.id", "port": 8080}],
                 },
             )
         )
@@ -364,9 +361,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             "HTTP",
         )
         self.assertEqual(
-            backend_service.get_metadata_field(
-                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME
-            ),
+            backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME),
             "EXTERNAL_MANAGED",
         )
         self.assertEqual(
@@ -423,14 +418,16 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual([(rule.protocol, rule.from_port, rule.to_port) for rule in rules], [
-            ("tcp", 443, 443),
-            ("tcp", 8000, 8080),
-            ("-1", None, None),
-        ])
+        self.assertEqual(
+            [(rule.protocol, rule.from_port, rule.to_port) for rule in rules],
+            [
+                ("tcp", 443, 443),
+                ("tcp", 8000, 8080),
+                ("-1", None, None),
+            ],
+        )
         self.assertEqual(rules[0].direction, "egress")
         self.assertEqual(rules[0].cidr_blocks, ["10.0.0.0/8"])
-
 
     def test_firewall_rule_parser_does_not_default_source_scoped_rules_to_internet(self) -> None:
         rules = parse_firewall_allow_rules(
@@ -543,10 +540,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             "deny",
         )
         self.assertEqual(
-            [
-                (rule.protocol, rule.from_port, rule.to_port, rule.cidr_blocks)
-                for rule in normalized.network_rules
-            ],
+            [(rule.protocol, rule.from_port, rule.to_port, rule.cidr_blocks) for rule in normalized.network_rules],
             [("tcp", 22, 22, ["0.0.0.0/0"])],
         )
 
@@ -677,9 +671,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                     "network": "google_compute_network.main.id",
                     "subnetwork": "google_compute_subnetwork.app.id",
                     "endpoint": "35.1.2.3",
-                    "private_cluster_config": [
-                        {"enable_private_endpoint": False, "enable_private_nodes": False}
-                    ],
+                    "private_cluster_config": [{"enable_private_endpoint": False, "enable_private_nodes": False}],
                     "master_authorized_networks_config": [
                         {"cidr_blocks": [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}]}
                     ],
@@ -714,9 +706,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES),
             ["https://www.googleapis.com/auth/cloud-platform"],
         )
-        self.assertTrue(
-            normalized.get_metadata_field(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED)
-        )
+        self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED))
 
     def test_container_node_pool_normalizer_preserves_node_identity(self) -> None:
         normalized = normalize_container_node_pool(
@@ -750,9 +740,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             ["https://www.googleapis.com/auth/logging.write"],
         )
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GKE_NODE_METADATA_MODE), "GKE_METADATA")
-        self.assertFalse(
-            normalized.get_metadata_field(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED)
-        )
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED))
         self.assertEqual(normalized.metadata_snapshot()["cluster"], "google_container_cluster.public.name")
 
     def test_storage_bucket_normalizer_preserves_bucket_posture(self) -> None:
@@ -806,9 +794,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(normalized.direct_internet_reachable)
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.DATABASE_VERSION), "POSTGRES_15")
         self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
-        self.assertFalse(
-            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
-        )
+        self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED))
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS),
             [{"name": "anywhere", "value": "0.0.0.0/0"}],
@@ -946,9 +932,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertFalse(normalized.public_exposure)
         self.assertFalse(normalized.direct_internet_reachable)
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
-        self.assertTrue(
-            normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
-        )
+        self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED))
 
     def test_secret_manager_secret_iam_member_normalizer_preserves_binding_parts(self) -> None:
         normalized = normalize_secret_manager_secret_iam_member(
@@ -964,7 +948,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.SECRET_REFERENCE),
             "google_secret_manager_secret.api_key.id",
         )
-        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/secretmanager.secretAccessor")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/secretmanager.secretAccessor"
+        )
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER), "allAuthenticatedUsers")
 
     def test_kms_crypto_key_iam_member_normalizer_preserves_binding_parts(self) -> None:
@@ -977,7 +963,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             normalized.get_metadata_field(GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE),
             "google_kms_crypto_key.customer.id",
         )
-        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/cloudkms.cryptoKeyDecrypter")
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/cloudkms.cryptoKeyDecrypter"
+        )
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.IAM_MEMBER),
             "serviceAccount:decryptor@partner-project.iam.gserviceaccount.com",
@@ -1139,7 +1127,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         condition = {
             "title": "expires_soon",
             "description": "Temporary public launch access",
-            'expression': 'request.time < timestamp("2026-07-01T00:00:00Z")',
+            "expression": 'request.time < timestamp("2026-07-01T00:00:00Z")',
         }
         normalized = normalize_cloud_run_service_iam_member(
             _terraform_resource(
@@ -1530,7 +1518,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
                                     {
                                         "paths": ["/vm/*"],
                                         "service": "google_compute_backend_service.compute.id",
-                                    }
+                                    },
                                 ],
                             }
                         ],
@@ -1634,9 +1622,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         assert backend_bucket is not None
         assert bucket is not None
 
-        reachable_backends = forwarding_rule.get_metadata_field(
-            GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS
-        )
+        reachable_backends = forwarding_rule.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
         self.assertGreaterEqual(
             {backend["backend"] for backend in reachable_backends},
             {
@@ -1700,17 +1686,13 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             backend_bucket,
             bucket,
         ):
-            self.assertTrue(
-                backend.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER)
-            )
+            self.assertTrue(backend.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER))
             self.assertEqual(
                 backend.get_metadata_field(GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES),
                 ["google_compute_global_forwarding_rule.web"],
             )
         self.assertEqual(
-            backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0][
-                "forwarding_rule"
-            ],
+            backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0]["forwarding_rule"],
             "google_compute_global_forwarding_rule.web",
         )
         self.assertEqual(
@@ -1718,9 +1700,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
             "google_compute_global_forwarding_rule.web",
         )
         self.assertEqual(
-            backend_bucket.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0][
-                "forwarding_rule"
-            ],
+            backend_bucket.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_FRONTENDS)[0]["forwarding_rule"],
             "google_compute_global_forwarding_rule.web",
         )
         self.assertFalse(service.public_exposure)
@@ -1897,10 +1877,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(bucket.direct_internet_reachable)
         self.assertEqual(
             bucket.public_exposure_reasons,
-            [
-                "google_storage_bucket_iam_member.public_logs_reader grants "
-                "roles/storage.objectViewer to allUsers"
-            ],
+            ["google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers"],
         )
         self.assertEqual(
             bucket.get_metadata_field(GcpResourceMetadata.IAM_BINDINGS),
@@ -2047,9 +2024,7 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         self.assertTrue(instance.direct_internet_reachable)
         self.assertEqual(
             instance.public_exposure_reasons,
-            [
-                "compute instance has an external access config and matching firewall rules allow internet ingress"
-            ],
+            ["compute instance has an external access config and matching firewall rules allow internet ingress"],
         )
 
     def test_normalizer_derives_public_compute_exposure_from_direct_network_firewall(self) -> None:
@@ -2907,7 +2882,9 @@ class GcpResourceNormalizerTests(unittest.TestCase):
         normalized = normalize_project_iam_member(self.resources["google_project_iam_member.web_viewer"])
 
         self.assertEqual(normalized.category, ResourceCategory.IAM)
-        self.assertEqual(normalized.identifier, "roles/viewer:serviceAccount:tfstride-web@example.iam.gserviceaccount.com")
+        self.assertEqual(
+            normalized.identifier, "roles/viewer:serviceAccount:tfstride-web@example.iam.gserviceaccount.com"
+        )
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.IAM_ROLE), "roles/viewer")
         self.assertEqual(

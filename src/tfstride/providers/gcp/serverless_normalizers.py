@@ -89,7 +89,9 @@ def normalize_cloudfunctions2_function(resource: TerraformResource) -> Normalize
     service_config_values = _first_block(values, GcpAttr.SERVICE_CONFIG)
     service_config = GcpValues(service_config_values)
     service_account = first_non_empty(service_config.get(GcpAttr.SERVICE_ACCOUNT_EMAIL))
-    trigger_http = bool(service_config.get(GcpAttr.URI) or values.get(GcpAttr.URL) or service_config.get(GcpAttr.SERVICE))
+    trigger_http = bool(
+        service_config.get(GcpAttr.URI) or values.get(GcpAttr.URL) or service_config.get(GcpAttr.SERVICE)
+    )
     return _serverless_workload(
         resource,
         service_account_email=service_account,
@@ -359,11 +361,7 @@ def _condition(value: Any) -> dict[str, Any]:
         value = value[0] if value and isinstance(value[0], dict) else {}
     if not isinstance(value, dict):
         return {}
-    return {
-        str(key): raw_value
-        for key, raw_value in value.items()
-        if raw_value not in (None, "", [])
-    }
+    return {str(key): raw_value for key, raw_value in value.items() if raw_value not in (None, "", [])}
 
 
 def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:

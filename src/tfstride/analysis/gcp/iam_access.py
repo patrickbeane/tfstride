@@ -308,11 +308,7 @@ def _binding_condition(value: Mapping[str, Any] | None) -> Mapping[str, Any] | N
         return None
     if not isinstance(raw_condition, Mapping):
         return None
-    condition = {
-        str(key): raw_value
-        for key, raw_value in raw_condition.items()
-        if raw_value not in (None, "", [])
-    }
+    condition = {str(key): raw_value for key, raw_value in raw_condition.items() if raw_value not in (None, "", [])}
     return condition or None
 
 

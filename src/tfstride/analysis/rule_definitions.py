@@ -28,8 +28,7 @@ class RuleEvaluationContext:
 
 
 class RuleDetector(Protocol):
-    def __call__(self, context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
-        ...
+    def __call__(self, context: RuleEvaluationContext, rule_id: str) -> list[Finding]: ...
 
 
 @dataclass(frozen=True, slots=True)

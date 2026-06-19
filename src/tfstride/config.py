@@ -200,6 +200,4 @@ def _severity_override_map(value: Any, path: Path) -> dict[str, Severity]:
 def _ensure_known_keys(payload: dict[str, Any], *, allowed: set[str], label: str, path: Path) -> None:
     unknown_keys = sorted(set(payload) - allowed)
     if unknown_keys:
-        raise ProjectConfigLoadError(
-            f"Unknown {label} key(s) in {path}: {', '.join(unknown_keys)}"
-        )
+        raise ProjectConfigLoadError(f"Unknown {label} key(s) in {path}: {', '.join(unknown_keys)}")

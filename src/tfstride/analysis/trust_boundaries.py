@@ -96,11 +96,7 @@ def detect_trust_boundaries(
                 "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
             )
 
-    public_subnets = [
-        resource
-        for resource in resources
-        if is_subnet_resource(resource) and resource.is_public_subnet
-    ]
+    public_subnets = [resource for resource in resources if is_subnet_resource(resource) and resource.is_public_subnet]
     private_subnets_by_vpc = _private_subnets_by_vpc(resources)
     for public_subnet in public_subnets:
         if not public_subnet.vpc_id:
@@ -334,20 +330,16 @@ def _freeze_resource_groups_by_key(
     return {key: tuple(resources) for key, resources in grouped.items()}
 
 
-
-
 def _role_allows_object_storage_access(role: NormalizedResource) -> bool:
     return any(
-        statement.effect == "Allow"
-        and any(action == "*" or action.startswith("s3:") for action in statement.actions)
+        statement.effect == "Allow" and any(action == "*" or action.startswith("s3:") for action in statement.actions)
         for statement in role.policy_statements
     )
 
 
 def _role_allows_secret_read(role: NormalizedResource) -> bool:
     return any(
-        statement.effect == "Allow"
-        and any(_allows_secret_read(action) for action in statement.actions)
+        statement.effect == "Allow" and any(_allows_secret_read(action) for action in statement.actions)
         for statement in role.policy_statements
     )
 
@@ -578,16 +570,10 @@ def _gcp_role_allows_data_store_access(
     if is_database_resource(resource) and role in _GCP_CLOUD_SQL_ACCESS_ROLES:
         return True
     if resource.resource_type in {"google_bigquery_dataset", "google_bigquery_table"}:
-        return role in _GCP_BIGQUERY_ACCESS_ROLES or custom_role_allows_data_store_access(
-            resource, role, custom_roles
-        )
+        return role in _GCP_BIGQUERY_ACCESS_ROLES or custom_role_allows_data_store_access(resource, role, custom_roles)
     if resource.resource_type in {"google_pubsub_subscription", "google_pubsub_topic"}:
-        return role in _GCP_PUBSUB_ACCESS_ROLES or custom_role_allows_data_store_access(
-            resource, role, custom_roles
-        )
+        return role in _GCP_PUBSUB_ACCESS_ROLES or custom_role_allows_data_store_access(resource, role, custom_roles)
     return custom_role_allows_data_store_access(resource, role, custom_roles)
-
-
 
 
 def _database_reachability_rationale(

@@ -102,9 +102,7 @@ class GcpDataRuleDetectors:
                     ),
                     data_sensitivity=2,
                     lateral_movement=1,
-                    blast_radius=gcp_iam_condition_limited_score(
-                        2 if assessment.is_public else 1, condition, floor=0
-                    ),
+                    blast_radius=gcp_iam_condition_limited_score(2 if assessment.is_public else 1, condition, floor=0),
                 )
                 findings.append(
                     self._finding_factory.build(
@@ -150,9 +148,7 @@ class GcpDataRuleDetectors:
         for bucket in context.inventory.by_type("google_storage_bucket"):
             if not bucket.public_exposure:
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address))
             severity_reasoning = guardrail_adjusted_severity_reasoning(
                 context.analysis_indexes.gcp_org_policy_guardrails,
                 bucket,
@@ -257,9 +253,7 @@ class GcpDataRuleDetectors:
                 lateral_movement=0,
                 blast_radius=1,
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address))
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -399,9 +393,7 @@ class GcpDataRuleDetectors:
         for database in context.inventory.by_type("google_sql_database_instance"):
             if not database.public_exposure:
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
@@ -490,9 +482,7 @@ class GcpDataRuleDetectors:
             database_facts = analysis_facts(database)
             if not database_facts.sql.ipv4_enabled or database_facts.sql.private_network:
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,
@@ -540,9 +530,7 @@ class GcpDataRuleDetectors:
             database_facts = analysis_facts(database)
             if not database_facts.sql.ipv4_enabled or _cloud_sql_ssl_enforced(database_facts.sql):
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", database.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,

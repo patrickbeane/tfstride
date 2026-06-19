@@ -230,9 +230,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             ],
         )
 
-        AwsResourceDecorator(stages=[RecordingStage()]).decorate(
-            [security_group, rule_resource]
-        )
+        AwsResourceDecorator(stages=[RecordingStage()]).decorate([security_group, rule_resource])
 
         self.assertEqual(calls, ["recording:True"])
         self.assertEqual(security_group.network_rules, [])
@@ -492,8 +490,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         AwsResourceDecorator().decorate(resources)
         coverage = build_analysis_coverage(ResourceInventory(provider="aws", resources=resources))
         unresolved_by_resource = {
-            reference.resource: reference.references
-            for reference in coverage.references.unresolved_references
+            reference.resource: reference.references for reference in coverage.references.unresolved_references
         }
 
         self.assertEqual(bucket_policy.metadata["unresolved_bucket_references"], ["missing-logs"])

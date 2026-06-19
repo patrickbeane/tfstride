@@ -148,17 +148,11 @@ _RULE_FACING_METADATA_RAW_READ_PATTERNS = (
         rf'(?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']'
     ),
 )
-_RULE_FACING_METADATA_RAW_WRITE_PATTERN = re.compile(
-    rf'["\'](?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']\s*:'
-)
+_RULE_FACING_METADATA_RAW_WRITE_PATTERN = re.compile(rf'["\'](?:{_RULE_FACING_METADATA_RAW_KEY_PATTERN})["\']\s*:')
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
-    return {
-        name
-        for name, value in vars(namespace).items()
-        if isinstance(value, MetadataField)
-    }
+    return {name for name, value in vars(namespace).items() if isinstance(value, MetadataField)}
 
 
 def _resource_metadata_field_names() -> set[str]:
@@ -184,11 +178,7 @@ def _writes_rule_facing_metadata_key_as_raw_string(path: Path, line: str) -> boo
 
 class ProviderEncapsulationContractTests(unittest.TestCase):
     def test_normalized_resource_fields_match_provider_contract(self) -> None:
-        actual_fields = {
-            field.name
-            for field in fields(NormalizedResource)
-            if not field.name.startswith("_")
-        }
+        actual_fields = {field.name for field in fields(NormalizedResource) if not field.name.startswith("_")}
 
         self.assertEqual(
             actual_fields,
@@ -196,11 +186,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         )
 
     def test_normalized_resource_accessors_are_classified_by_provider_contract(self) -> None:
-        actual_accessors = {
-            name
-            for name, value in vars(NormalizedResource).items()
-            if isinstance(value, property)
-        }
+        actual_accessors = {name for name, value in vars(NormalizedResource).items() if isinstance(value, property)}
         provider_neutral = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.provider_neutral_resource_accessors
         legacy_provider_owned = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.legacy_provider_metadata_accessors
         classified_accessors = provider_neutral | legacy_provider_owned

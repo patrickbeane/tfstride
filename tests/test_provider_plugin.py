@@ -163,9 +163,7 @@ class ProviderPluginTests(unittest.TestCase):
         registry = resource_capability_registry_from_plugins([plugin])
 
         self.assertEqual(registry.providers(), ("aws",))
-        self.assertTrue(
-            registry.has_capability(_resource("aws"), ResourceCapability.WORKLOAD)
-        )
+        self.assertTrue(registry.has_capability(_resource("aws"), ResourceCapability.WORKLOAD))
 
     def test_plugin_rejects_normalizer_provider_mismatch(self) -> None:
         plugin = _plugin(provider="aws", normalizer_provider="gcp")

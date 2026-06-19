@@ -56,16 +56,16 @@ class ProviderResourceCapabilityRegistryTests(unittest.TestCase):
             frozenset({"aws_db_instance"}),
         )
         self.assertTrue(registry.has_capability(_resource("aws_instance"), ResourceCapability.WORKLOAD))
-        self.assertFalse(registry.has_capability(_resource("aws_instance", provider="gcp"), ResourceCapability.WORKLOAD))
+        self.assertFalse(
+            registry.has_capability(_resource("aws_instance", provider="gcp"), ResourceCapability.WORKLOAD)
+        )
         self.assertEqual(
             registry.capabilities_for(_resource("aws_db_instance")),
             frozenset({ResourceCapability.DATABASE}),
         )
 
     def test_accepts_capability_values_as_strings(self) -> None:
-        registry = ProviderResourceCapabilityRegistry(
-            [("aws", {"workload": frozenset({"aws_instance"})})]
-        )
+        registry = ProviderResourceCapabilityRegistry([("aws", {"workload": frozenset({"aws_instance"})})])
 
         self.assertTrue(registry.has_capability(_resource("aws_instance"), "workload"))
 
@@ -81,9 +81,7 @@ class ProviderResourceCapabilityRegistryTests(unittest.TestCase):
 
     def test_rejects_empty_resource_type_names(self) -> None:
         with self.assertRaises(ProviderResourceCapabilityRegistryError):
-            ProviderResourceCapabilityRegistry(
-                [("aws", {ResourceCapability.WORKLOAD: frozenset({" "})})]
-            )
+            ProviderResourceCapabilityRegistry([("aws", {ResourceCapability.WORKLOAD: frozenset({" "})})])
 
     def test_rejects_non_mapping_capabilities(self) -> None:
         registry = ProviderResourceCapabilityRegistry()
@@ -93,15 +91,11 @@ class ProviderResourceCapabilityRegistryTests(unittest.TestCase):
 
     def test_rejects_string_resource_type_collections(self) -> None:
         with self.assertRaises(ProviderResourceCapabilityRegistryError):
-            ProviderResourceCapabilityRegistry(
-                [("aws", {ResourceCapability.WORKLOAD: "aws_instance"})]
-            )
+            ProviderResourceCapabilityRegistry([("aws", {ResourceCapability.WORKLOAD: "aws_instance"})])
 
     def test_rejects_unknown_capabilities(self) -> None:
         with self.assertRaises(ProviderResourceCapabilityRegistryError):
-            ProviderResourceCapabilityRegistry(
-                [("aws", {"not-a-capability": frozenset({"aws_instance"})})]
-            )
+            ProviderResourceCapabilityRegistry([("aws", {"not-a-capability": frozenset({"aws_instance"})})])
 
 
 if __name__ == "__main__":

@@ -24,9 +24,7 @@ class AwsResourceMetadata:
     """AWS-owned metadata fields plus shared core fields used by AWS decorators."""
 
     INTERNET_INGRESS = BoolMetadataField("internet_ingress")
-    FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField(
-        "fronted_by_internet_facing_load_balancer"
-    )
+    FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField("fronted_by_internet_facing_load_balancer")
     MAP_PUBLIC_IP_ON_LAUNCH = BoolMetadataField("map_public_ip_on_launch")
     BLOCK_PUBLIC_ACLS = BoolMetadataField("block_public_acls")
     BLOCK_PUBLIC_POLICY = BoolMetadataField("block_public_policy")
@@ -34,9 +32,7 @@ class AwsResourceMetadata:
     RESTRICT_PUBLIC_BUCKETS = BoolMetadataField("restrict_public_buckets")
 
     ROUTE_TABLE_IDS = StringListMetadataField("route_table_ids")
-    INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField(
-        "internet_facing_load_balancer_addresses"
-    )
+    INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField("internet_facing_load_balancer_addresses")
     ROLE_REFERENCES = StringListMetadataField("role_references")
     RESOLVED_ROLE_REFERENCES = StringListMetadataField("resolved_role_references")
     RESOLVED_ROLE_ADDRESSES = StringListMetadataField("resolved_role_addresses")
@@ -48,22 +44,14 @@ class AwsResourceMetadata:
     ATTACHED_POLICY_ADDRESSES = StringListMetadataField("attached_policy_addresses")
     UNRESOLVED_ROLE_REFERENCES = StringListMetadataField("unresolved_role_references")
     UNRESOLVED_INSTANCE_PROFILES = StringListMetadataField("unresolved_instance_profiles")
-    RESOLVED_INSTANCE_PROFILE_ADDRESSES = StringListMetadataField(
-        "resolved_instance_profile_addresses"
-    )
+    RESOLVED_INSTANCE_PROFILE_ADDRESSES = StringListMetadataField("resolved_instance_profile_addresses")
     UNRESOLVED_CLUSTER_REFERENCES = StringListMetadataField("unresolved_cluster_references")
     RESOLVED_CLUSTER_ADDRESSES = StringListMetadataField("resolved_cluster_addresses")
-    UNRESOLVED_TASK_DEFINITION_REFERENCES = StringListMetadataField(
-        "unresolved_task_definition_references"
-    )
-    RESOLVED_TASK_DEFINITION_ADDRESSES = StringListMetadataField(
-        "resolved_task_definition_addresses"
-    )
+    UNRESOLVED_TASK_DEFINITION_REFERENCES = StringListMetadataField("unresolved_task_definition_references")
+    RESOLVED_TASK_DEFINITION_ADDRESSES = StringListMetadataField("resolved_task_definition_addresses")
     RESOLVED_TASK_ROLE_ADDRESSES = StringListMetadataField("resolved_task_role_addresses")
     UNRESOLVED_TASK_ROLE_ARNS = StringListMetadataField("unresolved_task_role_arns")
-    RESOLVED_EXECUTION_ROLE_ADDRESSES = StringListMetadataField(
-        "resolved_execution_role_addresses"
-    )
+    RESOLVED_EXECUTION_ROLE_ADDRESSES = StringListMetadataField("resolved_execution_role_addresses")
     UNRESOLVED_EXECUTION_ROLE_ARNS = StringListMetadataField("unresolved_execution_role_arns")
     UNRESOLVED_BUCKET_REFERENCES = StringListMetadataField("unresolved_bucket_references")
     UNRESOLVED_SECRET_ARNS = StringListMetadataField("unresolved_secret_arns")

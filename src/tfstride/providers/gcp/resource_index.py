@@ -174,11 +174,7 @@ def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         if reference:
             references.add(reference)
     return tuple(
-        sorted(
-            gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-            for reference in references
-            if reference
-        )
+        sorted(gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES) for reference in references if reference)
     )
 
 

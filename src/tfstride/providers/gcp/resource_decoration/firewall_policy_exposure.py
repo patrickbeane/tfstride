@@ -91,9 +91,7 @@ def firewall_policy_ingress_decision(
     resource: NormalizedResource,
     index: GcpResourceIndex,
 ) -> _FirewallPolicyIngressDecision:
-    return _FirewallPolicyIngressDecision(
-        candidates=_firewall_policy_ingress_candidates(resource, index)
-    )
+    return _FirewallPolicyIngressDecision(candidates=_firewall_policy_ingress_candidates(resource, index))
 
 
 def _firewall_policy_ingress_candidates(
@@ -121,10 +119,7 @@ def _firewall_policy_ingress_candidate(
         priority=_firewall_policy_priority(policy_rule),
         matches_internet_ingress=bool(internet_ingress_rules),
         internet_ingress_reasons=(
-            tuple(
-                describe_security_group_rule(policy_rule, rule)
-                for rule in internet_ingress_rules
-            )
+            tuple(describe_security_group_rule(policy_rule, rule) for rule in internet_ingress_rules)
             if action == _FirewallPolicyAction.ALLOW
             else ()
         ),
@@ -132,9 +127,7 @@ def _firewall_policy_ingress_candidate(
 
 
 def _firewall_policy_action(policy_rule: NormalizedResource) -> _FirewallPolicyAction:
-    action = str(
-        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION) or ""
-    ).strip().lower()
+    action = str(policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ACTION) or "").strip().lower()
     if action == "allow":
         return _FirewallPolicyAction.ALLOW
     if action == "deny":
@@ -148,33 +141,21 @@ def _firewall_policy_group_key(
     policy_rule: NormalizedResource,
     index: GcpResourceIndex,
 ) -> str:
-    policy_reference = policy_rule.get_metadata_field(
-        GcpResourceMetadata.FIREWALL_POLICY_REFERENCE
-    )
+    policy_reference = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
     if policy_reference:
         return gcp_reference_key(str(policy_reference))
     policy_references = sorted(_firewall_policy_reference_keys(policy_rule, index))
-    return (
-        policy_references[0]
-        if policy_references
-        else gcp_reference_key(policy_rule.address)
-    )
+    return policy_references[0] if policy_references else gcp_reference_key(policy_rule.address)
 
 
 def _firewall_policy_priority(policy_rule: NormalizedResource) -> int:
-    return priority_value(
-        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PRIORITY)
-    )
+    return priority_value(policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_PRIORITY))
 
 
 def _firewall_policy_internet_ingress_rules(
     policy_rule: NormalizedResource,
 ) -> tuple[SecurityGroupRule, ...]:
-    return tuple(
-        rule
-        for rule in policy_rule.network_rules
-        if rule.direction == "ingress" and rule.allows_internet()
-    )
+    return tuple(rule for rule in policy_rule.network_rules if rule.direction == "ingress" and rule.allows_internet())
 
 
 def _firewall_policy_rule_targets_instance(
@@ -184,38 +165,30 @@ def _firewall_policy_rule_targets_instance(
 ) -> bool:
     if policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED):
         return False
-    policy_direction = str(
-        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION) or ""
-    ).strip().lower()
+    policy_direction = (
+        str(policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION) or "").strip().lower()
+    )
     if policy_direction != "ingress":
         return False
 
-    target_resources = policy_rule.get_metadata_field(
-        GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES
-    )
+    target_resources = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES)
     target_resource_applies = bool(target_resources) and any(
-        resource_has_network_reference(instance, target_resource, index)
-        for target_resource in target_resources
+        resource_has_network_reference(instance, target_resource, index) for target_resource in target_resources
     )
     if target_resources and not target_resource_applies:
         return False
 
     target_service_accounts = service_account_reference_keys(
-        policy_rule.get_metadata_field(
-            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS
-        )
+        policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS)
     )
-    if target_service_accounts and not target_service_accounts.intersection(
-        instance_service_account_keys(instance)
-    ):
+    if target_service_accounts and not target_service_accounts.intersection(instance_service_account_keys(instance)):
         return False
 
     associations = _firewall_policy_associations_for_rule(policy_rule, index)
     if not associations:
         return target_resource_applies
     return any(
-        _firewall_policy_association_applies_to_instance(association, instance, index)
-        for association in associations
+        _firewall_policy_association_applies_to_instance(association, instance, index) for association in associations
     )
 
 

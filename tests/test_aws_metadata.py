@@ -11,11 +11,7 @@ from tfstride.resource_metadata import MetadataField, ResourceMetadata
 
 
 def _metadata_field_names(namespace: type) -> set[str]:
-    return {
-        name
-        for name, value in vars(namespace).items()
-        if isinstance(value, MetadataField)
-    }
+    return {name for name, value in vars(namespace).items() if isinstance(value, MetadataField)}
 
 
 class AwsResourceMetadataTests(unittest.TestCase):

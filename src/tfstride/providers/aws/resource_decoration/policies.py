@@ -11,8 +11,7 @@ def clone_policy_statements(statements: list[IAMPolicyStatement]) -> list[IAMPol
             resources=list(statement.resources),
             principals=list(statement.principals),
             principal_entries=[
-                IAMPrincipal(kind=principal.kind, value=principal.value)
-                for principal in statement.principal_entries
+                IAMPrincipal(kind=principal.kind, value=principal.value) for principal in statement.principal_entries
             ],
             conditions=[
                 IAMPolicyCondition(

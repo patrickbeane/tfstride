@@ -169,15 +169,11 @@ def _policy_scope(resource: NormalizedResource) -> GcpOrgPolicyScopeKey | None:
     scope = resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_SCOPE)
     if scope_type == GCP_ORG_POLICY_SCOPE_PROJECT:
         identifier = _normalize_project_id(
-            resource.get_metadata_field(GcpResourceMetadata.PROJECT)
-            or _path_segment(scope, "projects")
-            or scope
+            resource.get_metadata_field(GcpResourceMetadata.PROJECT) or _path_segment(scope, "projects") or scope
         )
     elif scope_type == GCP_ORG_POLICY_SCOPE_FOLDER:
         identifier = _normalize_hierarchy_id(
-            resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID)
-            or _path_segment(scope, "folders")
-            or scope,
+            resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID) or _path_segment(scope, "folders") or scope,
             "folders",
         )
     elif scope_type == GCP_ORG_POLICY_SCOPE_ORGANIZATION:

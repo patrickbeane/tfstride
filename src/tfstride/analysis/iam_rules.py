@@ -56,19 +56,12 @@ class IAMRuleDetectors:
                 }
             )
             wildcard_resources = sorted(
-                {
-                    resource
-                    for statement in wildcard_statements
-                    for resource in statement.resources
-                    if resource == "*"
-                }
+                {resource for statement in wildcard_statements for resource in statement.resources if resource == "*"}
             )
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=(
-                    2
-                    if any(statement.has_wildcard_action() for statement in wildcard_statements)
-                    else 1
+                    2 if any(statement.has_wildcard_action() for statement in wildcard_statements) else 1
                 ),
                 data_sensitivity=0,
                 lateral_movement=1,
@@ -112,9 +105,7 @@ class IAMRuleDetectors:
             sensitive_actions = _sensitive_actions(role.policy_statements)
             if not sensitive_actions:
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.CONTROL_TO_WORKLOAD, role.address, workload.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.CONTROL_TO_WORKLOAD, role.address, workload.address))
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=workload.public_exposure,
                 privilege_breadth=2 if "*" in sensitive_actions or "s3:*" in sensitive_actions else 1,

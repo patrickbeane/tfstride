@@ -45,26 +45,26 @@ class ResourceCoveragePayload(TypedDict):
     normalized_resources: int
     unsupported_resources: int
     unsupported_resource_types: dict[str, int]
-	
-	
+
+
 class RuleCoveragePayload(TypedDict):
     registered_rule_count: int
     enabled_rules: list[str]
     disabled_rules: list[str]
     severity_overrides: dict[str, str]
     finding_counts_by_rule: dict[str, int]
-	
-	
+
+
 class UnresolvedReferencePayload(TypedDict):
     resource: str
     references: dict[str, list[str]]
-	
-	
+
+
 class ReferenceCoveragePayload(TypedDict):
     unresolved_reference_count: int
     unresolved_references: list[UnresolvedReferencePayload]
-	
-	
+
+
 class AnalysisCoveragePayload(TypedDict):
     resources: ResourceCoveragePayload
     rules: RuleCoveragePayload

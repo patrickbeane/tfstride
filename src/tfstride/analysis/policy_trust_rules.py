@@ -190,9 +190,7 @@ class PolicyTrustRuleDetectors:
                         lateral_movement=2,
                         blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
-                    boundary = context.boundary_index.get(
-                        (BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address)
-                    )
+                    boundary = context.boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
@@ -243,9 +241,7 @@ class PolicyTrustRuleDetectors:
                         lateral_movement=1,
                         blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
-                    boundary = context.boundary_index.get(
-                        (BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address)
-                    )
+                    boundary = context.boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,

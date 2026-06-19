@@ -49,13 +49,9 @@ def build_analysis_indexes(inventory: ResourceInventory) -> AnalysisIndexes:
     return AnalysisIndexes(
         role_index=_freeze_resource_map(_build_role_index(inventory)),
         security_groups_by_reference=_freeze_resource_map(security_groups_by_reference),
-        resources_by_security_group=_freeze_resource_groups(
-            _group_resources_by_security_group(inventory.resources)
-        ),
+        resources_by_security_group=_freeze_resource_groups(_group_resources_by_security_group(inventory.resources)),
         public_workloads_by_security_group=_freeze_resource_groups(
-            _group_resources_by_security_group(
-                resource for resource in inventory.resources if resource.public_exposure
-            )
+            _group_resources_by_security_group(resource for resource in inventory.resources if resource.public_exposure)
         ),
         gcp_iam_inheritance=(
             build_gcp_iam_inheritance_index(inventory.resources)
@@ -111,7 +107,6 @@ def _freeze_resource_map(
 def _freeze_resource_groups(
     resource_groups: dict[str, list[NormalizedResource]],
 ) -> Mapping[str, tuple[NormalizedResource, ...]]:
-    return MappingProxyType({
-        security_group_id: tuple(resources)
-        for security_group_id, resources in resource_groups.items()
-    })
+    return MappingProxyType(
+        {security_group_id: tuple(resources) for security_group_id, resources in resource_groups.items()}
+    )

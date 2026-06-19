@@ -14,13 +14,7 @@ def build_severity_reasoning(
     # The v1 model is intentionally additive and explainable: each detector supplies a few
     # concrete signals and the final banding stays easy to tune without hiding logic in ML.
     internet_exposure_score = 2 if internet_exposure else 0
-    score = (
-        internet_exposure_score
-        + privilege_breadth
-        + data_sensitivity
-        + lateral_movement
-        + blast_radius
-    )
+    score = internet_exposure_score + privilege_breadth + data_sensitivity + lateral_movement + blast_radius
     if score >= 6:
         severity = Severity.HIGH
     elif score >= 3:
@@ -77,8 +71,5 @@ def describe_policy_statement(statement: IAMPolicyStatement) -> str:
             f"{condition.operator} {condition.key}=[{', '.join(condition.values)}]"
             for condition in statement.conditions
         )
-        return (
-            f"{statement.effect} actions=[{actions}] "
-            f"resources=[{resources}] conditions=[{conditions}]"
-        )
+        return f"{statement.effect} actions=[{actions}] resources=[{resources}] conditions=[{conditions}]"
     return f"{statement.effect} actions=[{actions}] resources=[{resources}]"

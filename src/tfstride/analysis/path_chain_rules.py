@@ -85,9 +85,7 @@ class PathChainRuleDetectors:
                 self._finding_factory.build(
                     rule_id=rule_id,
                     severity=severity_reasoning.severity,
-                    affected_resources=list(
-                        dict.fromkeys([workload.address, *data_store_addresses, *policy_sources])
-                    ),
+                    affected_resources=list(dict.fromkeys([workload.address, *data_store_addresses, *policy_sources])),
                     trust_boundary_id=trust_boundary_id,
                     rationale=(
                         f"{workload.display_name} is internet-exposed and runs with GCP workload identity "
@@ -229,9 +227,7 @@ class PathChainRuleDetectors:
                         lateral_movement=1,
                         blast_radius=blast_radius,
                     )
-                    trust_boundary = boundary_index.get(
-                        (BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address)
-                    )
+                    trust_boundary = boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
@@ -271,14 +267,8 @@ class PathChainRuleDetectors:
                                 evidence_item(
                                     "boundary_rationale",
                                     [
-                                        *[
-                                            control_boundary.rationale
-                                            for _, control_boundary, _, _ in chained_paths
-                                        ],
-                                        *[
-                                            data_boundary.rationale
-                                            for _, _, _, data_boundary in chained_paths
-                                        ],
+                                        *[control_boundary.rationale for _, control_boundary, _, _ in chained_paths],
+                                        *[data_boundary.rationale for _, _, _, data_boundary in chained_paths],
                                     ],
                                 ),
                                 evidence_item(
@@ -327,12 +317,14 @@ def _iter_transitive_workload_paths(
     max_hops: int,
 ) -> list[tuple[list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]]:
     discovered_paths: list[tuple[list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = []
-    frontier: list[tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = [
-        (entry, [], [])
-    ]
+    frontier: list[
+        tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]
+    ] = [(entry, [], [])]
 
     for _ in range(max_hops):
-        next_frontier: list[tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]] = []
+        next_frontier: list[
+            tuple[NormalizedResource, list[NormalizedResource], list[tuple[NormalizedResource, SecurityGroupRule]]]
+        ] = []
         for source, path_workloads, security_group_hops in frontier:
             for downstream, security_group, rule in trusted_workload_hops.get(source.address, []):
                 if downstream.address == entry.address:
@@ -391,11 +383,7 @@ def _control_workload_boundaries_by_role(
 
 
 def _is_hidden_data_store(resource: NormalizedResource) -> bool:
-    return not (
-        resource.public_exposure
-        or resource.direct_internet_reachable
-        or resource.internet_ingress_capable
-    )
+    return not (resource.public_exposure or resource.direct_internet_reachable or resource.internet_ingress_capable)
 
 
 def _is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool:
@@ -444,19 +432,25 @@ def _build_transitive_private_data_finding(
             f"{terminal_workload.display_name}. That creates a quieter transitive exposure path than a directly public data store."
         ),
         evidence=collect_evidence(
-            evidence_item("network_path", [
-                f"internet reaches {entry.address}",
-                *[
-                    f"{source.address} reaches {target.address}"
-                    for source, target in zip(workload_path[:-1], workload_path[1:], strict=True)
+            evidence_item(
+                "network_path",
+                [
+                    f"internet reaches {entry.address}",
+                    *[
+                        f"{source.address} reaches {target.address}"
+                        for source, target in zip(workload_path[:-1], workload_path[1:], strict=True)
+                    ],
+                    f"{terminal_workload.address} reaches {data_store.address}",
                 ],
-                f"{terminal_workload.address} reaches {data_store.address}",
-            ]),
+            ),
             evidence_item(
                 "security_group_rules",
                 [describe_security_group_rule(security_group, rule) for security_group, rule in security_group_hops],
             ),
-            evidence_item("subnet_posture", [posture for workload in workload_path for posture in subnet_posture(workload, inventory)]),
+            evidence_item(
+                "subnet_posture",
+                [posture for workload in workload_path for posture in subnet_posture(workload, inventory)],
+            ),
             evidence_item("data_tier_posture", data_posture),
             evidence_item("boundary_rationale", [data_boundary.rationale]),
         ),

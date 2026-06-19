@@ -199,11 +199,7 @@ class UploadSizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (
-            scope["type"] != "http"
-            or scope.get("method") != "POST"
-            or scope.get("path") not in UPLOAD_ENDPOINT_PATHS
-        ):
+        if scope["type"] != "http" or scope.get("method") != "POST" or scope.get("path") not in UPLOAD_ENDPOINT_PATHS:
             await self.app(scope, receive, send)
             return
 
@@ -427,9 +423,7 @@ def create_app() -> FastAPI:
         selected_provider = request.query_params.get("provider", "aws").lower()
         if selected_provider not in {"aws", "gcp"}:
             selected_provider = "aws"
-        visible_scenarios = tuple(
-            scenario for scenario in demo_scenarios if scenario.provider == selected_provider
-        )
+        visible_scenarios = tuple(scenario for scenario in demo_scenarios if scenario.provider == selected_provider)
         return _template_response(
             request,
             "scenarios.html",
@@ -596,6 +590,7 @@ def create_app() -> FastAPI:
         return analysis.payload
 
     return app
+
 
 async def _analyze_upload(
     upload: UploadFile,
@@ -865,8 +860,7 @@ def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:
 
     summary = payload["summary"]
     unsupported_resource_types = Counter(
-        _resource_type_from_address(address)
-        for address in payload["inventory"]["unsupported_resources"]
+        _resource_type_from_address(address) for address in payload["inventory"]["unsupported_resources"]
     )
     finding_counts_by_rule = Counter(
         str(finding["rule_id"])

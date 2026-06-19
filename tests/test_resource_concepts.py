@@ -313,23 +313,17 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))
         self.assertTrue(is_secret_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_db_instance")))
-        self.assertTrue(
-            is_control_plane_sensitive_data_store(_resource("aws_secretsmanager_secret"))
-        )
+        self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_secretsmanager_secret")))
         self.assertTrue(
             is_control_plane_sensitive_data_store(_resource("google_secret_manager_secret", provider="gcp"))
         )
         self.assertTrue(
-            is_object_storage_public_access_control_resource(
-                _resource("aws_s3_bucket_public_access_block")
-            )
+            is_object_storage_public_access_control_resource(_resource("aws_s3_bucket_public_access_block"))
         )
         self.assertTrue(is_key_management_resource(_resource("aws_kms_key")))
         self.assertTrue(is_key_management_resource(_resource("google_kms_crypto_key", provider="gcp")))
         self.assertTrue(
-            has_provider_managed_egress_without_vpc(
-                _resource("aws_lambda_function", metadata={"vpc_enabled": False})
-            )
+            has_provider_managed_egress_without_vpc(_resource("aws_lambda_function", metadata={"vpc_enabled": False}))
         )
         self.assertTrue(
             has_provider_managed_egress_without_vpc(
@@ -357,9 +351,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertFalse(is_object_storage_public_access_control_resource(subnet))
         self.assertFalse(is_key_management_resource(subnet))
         self.assertFalse(
-            has_provider_managed_egress_without_vpc(
-                _resource("aws_lambda_function", metadata={"vpc_enabled": True})
-            )
+            has_provider_managed_egress_without_vpc(_resource("aws_lambda_function", metadata={"vpc_enabled": True}))
         )
 
     def test_analysis_resource_type_selection_is_centralized(self) -> None:
@@ -382,13 +374,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_analysis_resource_concepts_do_not_embed_provider_type_literals(self) -> None:
-        path = (
-            Path(__file__).resolve().parents[1]
-            / "src"
-            / "tfstride"
-            / "analysis"
-            / "resource_concepts.py"
-        )
+        path = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis" / "resource_concepts.py"
         text = path.read_text(encoding="utf-8")
 
         self.assertNotIn("aws_", text)

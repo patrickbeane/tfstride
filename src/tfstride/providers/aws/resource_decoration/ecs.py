@@ -17,29 +17,19 @@ class ResolveEcsServiceRelationshipsStage:
             if cluster_ref:
                 cluster = context.index.ecs_clusters.get(cluster_ref)
                 if cluster is None:
-                    aws_facts(ecs_service_resource).add_unresolved_cluster_reference(
-                        str(cluster_ref)
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_cluster_reference(str(cluster_ref))
                 else:
-                    aws_facts(ecs_service_resource).add_resolved_cluster_address(
-                        cluster.address
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_cluster_address(cluster.address)
 
             task_definition_ref = aws_facts(ecs_service_resource).task_definition_reference
             if not task_definition_ref:
                 continue
             task_definition = context.index.ecs_task_definitions.get(task_definition_ref)
             if task_definition is None:
-                aws_facts(ecs_service_resource).add_unresolved_task_definition_reference(
-                    str(task_definition_ref)
-                )
+                aws_facts(ecs_service_resource).add_unresolved_task_definition_reference(str(task_definition_ref))
                 continue
-            aws_facts(ecs_service_resource).add_resolved_task_definition_address(
-                task_definition.address
-            )
-            aws_facts(ecs_service_resource).set_network_mode(
-                aws_facts(task_definition).network_mode
-            )
+            aws_facts(ecs_service_resource).add_resolved_task_definition_address(task_definition.address)
+            aws_facts(ecs_service_resource).set_network_mode(aws_facts(task_definition).network_mode)
             aws_facts(ecs_service_resource).set_requires_compatibilities(
                 aws_facts(task_definition).requires_compatibilities
             )
@@ -50,35 +40,25 @@ class ResolveEcsServiceRelationshipsStage:
                 aws_mutations(ecs_service_resource).attach_role_arn(task_role_arn)
                 task_role = context.index.role_index.get(task_role_arn)
                 if task_role is not None:
-                    aws_facts(ecs_service_resource).add_resolved_task_role_address(
-                        task_role.address
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_task_role_address(task_role.address)
                 else:
-                    aws_facts(ecs_service_resource).add_unresolved_task_role_arn(
-                        str(task_role_arn)
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_task_role_arn(str(task_role_arn))
             if execution_role_arn:
                 aws_facts(ecs_service_resource).set_execution_role_arn(execution_role_arn)
                 execution_role = context.index.role_index.get(execution_role_arn)
                 if execution_role is not None:
-                    aws_facts(ecs_service_resource).add_resolved_execution_role_address(
-                        execution_role.address
-                    )
+                    aws_facts(ecs_service_resource).add_resolved_execution_role_address(execution_role.address)
                 else:
-                    aws_facts(ecs_service_resource).add_unresolved_execution_role_arn(
-                        str(execution_role_arn)
-                    )
+                    aws_facts(ecs_service_resource).add_unresolved_execution_role_arn(str(execution_role_arn))
 
 
 class MarkEcsLoadBalancerExposureStage:
     name = "mark_ecs_services_fronted_by_internet_facing_load_balancers"
 
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
-        public_load_balancers_by_target_group = (
-            _internet_facing_load_balancer_addresses_by_target_group(context.index)
-        )
-        public_load_balancers_by_security_group = (
-            _internet_facing_load_balancer_addresses_by_security_group(context.index)
+        public_load_balancers_by_target_group = _internet_facing_load_balancer_addresses_by_target_group(context.index)
+        public_load_balancers_by_security_group = _internet_facing_load_balancer_addresses_by_security_group(
+            context.index
         )
 
         for resource in resources:
@@ -90,13 +70,9 @@ class MarkEcsLoadBalancerExposureStage:
                 public_load_balancers_by_target_group,
                 public_load_balancers_by_security_group,
             )
-            aws_facts(resource).set_fronted_by_internet_facing_load_balancer(
-                bool(fronting_load_balancers)
-            )
+            aws_facts(resource).set_fronted_by_internet_facing_load_balancer(bool(fronting_load_balancers))
             if fronting_load_balancers:
-                aws_facts(resource).set_internet_facing_load_balancer_addresses(
-                    fronting_load_balancers
-                )
+                aws_facts(resource).set_internet_facing_load_balancer_addresses(fronting_load_balancers)
 
 
 def _internet_facing_load_balancer_addresses_by_target_group(
@@ -165,11 +141,7 @@ def _fronting_load_balancers_for_ecs_service(
             index.load_balancer_target_groups,
             target_group_reference,
         )
-        references = (
-            _resource_reference_values(target_group)
-            if target_group is not None
-            else [target_group_reference]
-        )
+        references = _resource_reference_values(target_group) if target_group is not None else [target_group_reference]
         for reference in references:
             for load_balancer_address in public_load_balancers_by_target_group.get(
                 reference,
@@ -194,9 +166,7 @@ def _security_group_fronting_load_balancers(
 ) -> list[str]:
     fronting_load_balancers: list[str] = []
     attached_security_groups = [
-        index.security_groups[sg_id]
-        for sg_id in service.security_group_ids
-        if sg_id in index.security_groups
+        index.security_groups[sg_id] for sg_id in service.security_group_ids if sg_id in index.security_groups
     ]
     for security_group in attached_security_groups:
         for rule in security_group.network_rules:
@@ -221,11 +191,7 @@ def _append_load_balancer_target_group_references(
         index.load_balancer_target_groups,
         target_group_reference,
     )
-    references = (
-        _resource_reference_values(target_group)
-        if target_group is not None
-        else [target_group_reference]
-    )
+    references = _resource_reference_values(target_group) if target_group is not None else [target_group_reference]
     for reference in references:
         _append_unique(
             load_balancers_by_target_group.setdefault(reference, []),

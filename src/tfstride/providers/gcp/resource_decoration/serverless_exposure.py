@@ -46,19 +46,14 @@ def _serverless_public_access_reasons(
         target_reference = resource_iam_target_reference(iam_resource)
         if (
             not target_reference
-            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-            not in resource_references
+            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES) not in resource_references
         ):
             continue
         for binding in iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")
             if role not in _SERVERLESS_PUBLIC_INVOKER_ROLES:
                 continue
-            public_members = sorted(
-                member
-                for member in binding_members(binding)
-                if member in PUBLIC_GCP_IAM_MEMBERS
-            )
+            public_members = sorted(member for member in binding_members(binding) if member in PUBLIC_GCP_IAM_MEMBERS)
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
     return dedupe(reasons)

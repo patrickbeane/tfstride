@@ -38,10 +38,7 @@ def _build_sarif_log(result: AnalysisResult) -> dict[str, object]:
                         "rules": rules,
                     }
                 },
-                "results": [
-                    _build_result(finding, rule_indexes, result)
-                    for finding in result.findings
-                ],
+                "results": [_build_result(finding, rule_indexes, result) for finding in result.findings],
             }
         ],
     }

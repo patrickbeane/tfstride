@@ -82,9 +82,7 @@ class GcpComputeRuleDetectors:
                 lateral_movement=1,
                 blast_radius=1,
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", instance.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", instance.address))
             affected_resources = dedupe_addresses(
                 [instance.address, *[firewall.address for firewall, _ in risky_rules]]
             )
@@ -98,10 +96,7 @@ class GcpComputeRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item(
                             "firewall_rules",
-                            [
-                                describe_security_group_rule(firewall, rule)
-                                for firewall, rule in risky_rules
-                            ],
+                            [describe_security_group_rule(firewall, rule) for firewall, rule in risky_rules],
                         ),
                         evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
@@ -225,9 +220,7 @@ class GcpComputeRuleDetectors:
                 lateral_movement=1,
                 blast_radius=1,
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address))
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -275,9 +268,7 @@ class GcpComputeRuleDetectors:
                 lateral_movement=2,
                 blast_radius=1,
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", cluster.address))
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -461,12 +452,8 @@ class GcpComputeRuleDetectors:
                 lateral_movement=0,
                 blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", service.address)
-            )
-            affected_resources = dedupe_addresses(
-                [service.address, *[source for source, _, _, _ in public_invokers]]
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", service.address))
+            affected_resources = dedupe_addresses([service.address, *[source for source, _, _, _ in public_invokers]])
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -524,12 +511,8 @@ class GcpComputeRuleDetectors:
                 lateral_movement=0,
                 blast_radius=gcp_iam_condition_limited_score(1, condition, floor=0),
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", function.address)
-            )
-            affected_resources = dedupe_addresses(
-                [function.address, *[source for source, _, _, _ in public_invokers]]
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", function.address))
+            affected_resources = dedupe_addresses([function.address, *[source for source, _, _, _ in public_invokers]])
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,

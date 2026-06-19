@@ -118,9 +118,7 @@ class GcpResourceMetadata:
     FIREWALL_DISABLED = BoolMetadataField("firewall_disabled")
     FIREWALL_POLICY_DISABLED = BoolMetadataField("firewall_policy_disabled")
     FIREWALL_POLICY_ENABLE_LOGGING = BoolMetadataField("firewall_policy_enable_logging")
-    FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField(
-        "fronted_by_internet_facing_load_balancer"
-    )
+    FRONTED_BY_INTERNET_FACING_LOAD_BALANCER = BoolMetadataField("fronted_by_internet_facing_load_balancer")
     ORG_POLICY_ENFORCED = BoolMetadataField("org_policy_enforced")
     ORG_POLICY_INHERIT_FROM_PARENT = BoolMetadataField("org_policy_inherit_from_parent")
     ORG_POLICY_RESTORE_DEFAULT = BoolMetadataField("org_policy_restore_default")
@@ -142,9 +140,7 @@ class GcpResourceMetadata:
     FORWARDING_RULE_PORTS = StringListMetadataField("forwarding_rule_ports")
     FORWARDING_RULE_SOURCE_IP_RANGES = StringListMetadataField("forwarding_rule_source_ip_ranges")
     LOAD_BALANCER_SSL_CERTIFICATES = StringListMetadataField("load_balancer_ssl_certificates")
-    INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField(
-        "internet_facing_load_balancer_addresses"
-    )
+    INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField("internet_facing_load_balancer_addresses")
     GKE_NODE_OAUTH_SCOPES = StringListMetadataField("gke_node_oauth_scopes")
     ORG_POLICY_ALLOWED_VALUES = StringListMetadataField("org_policy_allowed_values")
     ORG_POLICY_DENIED_VALUES = StringListMetadataField("org_policy_denied_values")

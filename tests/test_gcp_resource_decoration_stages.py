@@ -71,9 +71,7 @@ def _subnetwork(address: str) -> NormalizedResource:
         vpc_id="google_compute_network.main.id",
         metadata={
             GcpResourceMetadata.NAME: name,
-            GcpResourceMetadata.SELF_LINK: (
-                f"projects/demo/regions/us-central1/subnetworks/{name}"
-            ),
+            GcpResourceMetadata.SELF_LINK: (f"projects/demo/regions/us-central1/subnetworks/{name}"),
         },
     )
 
@@ -124,12 +122,8 @@ def _compute_firewall(
 ) -> NormalizedResource:
     metadata: dict[Any, object] = {
         GcpResourceMetadata.FIREWALL_DIRECTION: "ingress",
-        GcpResourceMetadata.FIREWALL_ALLOW: (
-            [{"protocol": "tcp", "ports": ["22"]}] if action == "allow" else []
-        ),
-        GcpResourceMetadata.FIREWALL_DENY: (
-            [{"protocol": "tcp", "ports": ["22"]}] if action == "deny" else []
-        ),
+        GcpResourceMetadata.FIREWALL_ALLOW: ([{"protocol": "tcp", "ports": ["22"]}] if action == "allow" else []),
+        GcpResourceMetadata.FIREWALL_DENY: ([{"protocol": "tcp", "ports": ["22"]}] if action == "deny" else []),
     }
     if priority is not None:
         metadata[GcpResourceMetadata.FIREWALL_PRIORITY] = priority
@@ -157,14 +151,11 @@ def _firewall_policy_rule(
         ResourceCategory.NETWORK,
         network_rules=(
             [_public_ssh_rule()]
-            if internet_ingress
-            and action_key in {"allow", "deny", "goto_next", "go_to_next"}
+            if internet_ingress and action_key in {"allow", "deny", "goto_next", "go_to_next"}
             else []
         ),
         metadata={
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
-                "google_compute_firewall_policy.org.name"
-            ),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: ("google_compute_firewall_policy.org.name"),
             GcpResourceMetadata.FIREWALL_POLICY_ACTION: action,
             GcpResourceMetadata.FIREWALL_POLICY_DIRECTION: "ingress",
             GcpResourceMetadata.FIREWALL_POLICY_PRIORITY: priority,
@@ -181,9 +172,7 @@ def _firewall_policy_association(
         GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION,
         ResourceCategory.NETWORK,
         metadata={
-            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: (
-                "google_compute_firewall_policy.org.name"
-            ),
+            GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: ("google_compute_firewall_policy.org.name"),
             GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET: target,
         },
     )
@@ -197,9 +186,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             ResourceCategory.EDGE,
             public_access_configured=True,
             metadata={
-                GcpResourceMetadata.FORWARDING_RULE_TARGET: (
-                    "google_compute_target_https_proxy.web.id"
-                ),
+                GcpResourceMetadata.FORWARDING_RULE_TARGET: ("google_compute_target_https_proxy.web.id"),
                 GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME: "EXTERNAL",
                 GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS: "35.1.2.3",
             },
@@ -215,9 +202,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             GcpResourceType.COMPUTE_URL_MAP,
             ResourceCategory.EDGE,
             metadata={
-                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: (
-                    "google_compute_backend_service.api.id"
-                ),
+                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: ("google_compute_backend_service.api.id"),
                 GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS: [
                     {
                         "default_service": "google_compute_backend_service.api.id",
@@ -267,9 +252,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertEqual(
             [
                 entry["backend"]
-                for entry in forwarding_rule.get_metadata_field(
-                    GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS
-                )
+                for entry in forwarding_rule.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
             ],
             [
                 "google_compute_backend_service.api",
@@ -277,11 +260,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
                 "google_cloud_run_service.api",
             ],
         )
-        self.assertTrue(
-            cloud_run.get_metadata_field(
-                GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER
-            )
-        )
+        self.assertTrue(cloud_run.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER))
 
     def test_load_balancer_stage_marks_backend_buckets_and_neg_targets(self) -> None:
         forwarding_rule = _gcp_resource(
@@ -299,15 +278,9 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             GcpResourceType.COMPUTE_URL_MAP,
             ResourceCategory.EDGE,
             metadata={
-                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: (
-                    "google_compute_backend_bucket.assets.id"
-                ),
+                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: ("google_compute_backend_bucket.assets.id"),
                 GcpResourceMetadata.LOAD_BALANCER_PATH_MATCHERS: [
-                    {
-                        "path_rule": [
-                            {"service": "google_compute_backend_service.functions.id"}
-                        ]
-                    }
+                    {"path_rule": [{"service": "google_compute_backend_service.functions.id"}]}
                 ],
             },
         )
@@ -367,9 +340,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertEqual(
             [
                 entry["backend"]
-                for entry in forwarding_rule.get_metadata_field(
-                    GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS
-                )
+                for entry in forwarding_rule.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
             ],
             [
                 "google_compute_backend_bucket.assets",
@@ -380,11 +351,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             ],
         )
         for backend in (bucket, function):
-            self.assertTrue(
-                backend.get_metadata_field(
-                    GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER
-                )
-            )
+            self.assertTrue(backend.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER))
 
     def test_network_stage_applies_tagged_public_routes_to_matching_instances(self) -> None:
         network = _network()
@@ -471,9 +438,7 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
             metadata={
                 "source_subnetwork_ip_ranges_to_nat": "LIST_OF_SUBNETWORKS",
                 GcpResourceMetadata.ROUTER_REFERENCE: "google_compute_router.main.name",
-                GcpResourceMetadata.NAT_SUBNETWORKS: [
-                    {"name": "google_compute_subnetwork.app.id"}
-                ],
+                GcpResourceMetadata.NAT_SUBNETWORKS: [{"name": "google_compute_subnetwork.app.id"}],
             },
         )
         explicit_resources = [_network(), explicit_app, explicit_data, _router(), explicit_nat]
@@ -779,12 +744,10 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertEqual(
             bucket.public_exposure_reasons,
             [
-                "google_storage_bucket_iam_member.public_reader grants "
-                "roles/storage.objectViewer to allUsers",
+                "google_storage_bucket_iam_member.public_reader grants roles/storage.objectViewer to allUsers",
                 "google_storage_bucket_iam_binding.authenticated_readers grants "
                 "roles/storage.legacyBucketReader to allAuthenticatedUsers",
-                "google_storage_bucket_iam_policy.policy grants "
-                "roles/storage.objectViewer to allUsers",
+                "google_storage_bucket_iam_policy.policy grants roles/storage.objectViewer to allUsers",
             ],
         )
 

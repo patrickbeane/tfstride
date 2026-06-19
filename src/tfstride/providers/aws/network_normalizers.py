@@ -137,11 +137,7 @@ def normalize_nat_gateway(resource: TerraformResource) -> NormalizedResource:
 def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     internet_facing = not bool(values.get("internal", False))
-    public_access_reasons = (
-        ["load balancer is configured as internet-facing"]
-        if internet_facing
-        else []
-    )
+    public_access_reasons = ["load balancer is configured as internet-facing"] if internet_facing else []
     normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -176,9 +172,7 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
         arn=values.get("arn"),
         metadata={
             "load_balancer_arn": values.get("load_balancer_arn"),
-            "target_group_arns": _load_balancer_action_target_group_arns(
-                values.get("default_action")
-            ),
+            "target_group_arns": _load_balancer_action_target_group_arns(values.get("default_action")),
             "port": as_optional_int(values.get("port")),
             "protocol": values.get("protocol"),
         },
@@ -197,9 +191,7 @@ def normalize_load_balancer_listener_rule(resource: TerraformResource) -> Normal
         arn=values.get("arn"),
         metadata={
             "listener_arn": values.get("listener_arn"),
-            "target_group_arns": _load_balancer_action_target_group_arns(
-                values.get("action")
-            ),
+            "target_group_arns": _load_balancer_action_target_group_arns(values.get("action")),
             "listener_rule_priority": as_optional_int(values.get("priority")),
         },
     )

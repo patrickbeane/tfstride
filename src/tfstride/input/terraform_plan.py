@@ -123,7 +123,7 @@ def _required_string(
         raise TerraformPlanLoadError(f"`{resource_path}.{key}` must be a non-empty string in {plan_path}")
     return value
 
-	
+
 def _optional_string(
     payload: dict[str, Any],
     key: str,
@@ -137,4 +137,4 @@ def _optional_string(
         return default
     if not isinstance(value, str):
         raise TerraformPlanLoadError(f"`{resource_path}.{key}` must be a string in {plan_path}")
-    return value 
+    return value

@@ -110,9 +110,7 @@ def _normalize_provider_limitations(
         if not provider_name:
             continue
         normalized[provider_name] = tuple(
-            limitation
-            for limitation in (str(item).strip() for item in limitations)
-            if limitation
+            limitation for limitation in (str(item).strip() for item in limitations) if limitation
         )
     return normalized
 

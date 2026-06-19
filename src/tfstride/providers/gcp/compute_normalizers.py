@@ -21,11 +21,7 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
     instance_metadata = values.get(GcpAttr.METADATA)
     os_login_enabled = _os_login_enabled(instance_metadata)
     public_access_configured = has_external_access_config(resource.values)
-    public_access_reasons = (
-        ["compute instance has an external access config"]
-        if public_access_configured
-        else []
-    )
+    public_access_reasons = ["compute instance has an external access config"] if public_access_configured else []
     metadata = {
         GcpResourceMetadata.NAME: resource_name(resource),
         GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),

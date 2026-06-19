@@ -48,9 +48,7 @@ AWS_RESOURCE_CAPABILITIES = MappingProxyType(
                 "aws_secretsmanager_secret",
             }
         ),
-        ResourceCapability.OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL: frozenset(
-            {"aws_s3_bucket_public_access_block"}
-        ),
+        ResourceCapability.OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL: frozenset({"aws_s3_bucket_public_access_block"}),
         ResourceCapability.KEY_MANAGEMENT: frozenset({"aws_kms_key"}),
         ResourceCapability.SENSITIVE_RESOURCE_POLICY: frozenset(
             {
@@ -66,8 +64,6 @@ AWS_RESOURCE_CAPABILITIES = MappingProxyType(
                 "aws_sns_topic",
             }
         ),
-        ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: frozenset(
-            {"aws_lambda_function"}
-        ),
+        ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: frozenset({"aws_lambda_function"}),
     }
 )

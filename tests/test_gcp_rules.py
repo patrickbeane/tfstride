@@ -161,7 +161,9 @@ def _gke_cluster(
         "location": "us-central1",
         "network": "google_compute_network.main.id",
         "subnetwork": "google_compute_subnetwork.app.id",
-        "private_cluster_config": [{"enable_private_endpoint": private_endpoint, "enable_private_nodes": private_endpoint}],
+        "private_cluster_config": [
+            {"enable_private_endpoint": private_endpoint, "enable_private_nodes": private_endpoint}
+        ],
         "node_config": [node_config],
     }
     if endpoint is not None:
@@ -428,7 +430,9 @@ def _service_account_iam_policy(bindings: list[dict[str, object]]) -> TerraformR
     )
 
 
-def _project_iam_member(role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com") -> TerraformResource:
+def _project_iam_member(
+    role: str, member: str = "serviceAccount:deploy@example.iam.gserviceaccount.com"
+) -> TerraformResource:
     return TerraformResource(
         address="google_project_iam_member.binding",
         mode="managed",
@@ -973,10 +977,13 @@ class GcpRuleTests(unittest.TestCase):
             rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-load-balanced-workload"})),
         )
 
-        self.assertEqual([finding.rule_id for finding in findings], [
-            "gcp-public-load-balanced-workload",
-            "gcp-public-load-balanced-workload",
-        ])
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "gcp-public-load-balanced-workload",
+                "gcp-public-load-balanced-workload",
+            ],
+        )
         self.assertEqual(
             [finding.affected_resources for finding in findings],
             [
@@ -1140,9 +1147,7 @@ class GcpRuleTests(unittest.TestCase):
         )
         self.assertEqual(
             evidence["public_exposure_reasons"],
-            [
-                "compute instance has an external access config and matching firewall rules allow internet ingress"
-            ],
+            ["compute instance has an external access config and matching firewall rules allow internet ingress"],
         )
 
     def test_firewall_policy_project_association_produces_public_compute_finding(self) -> None:
@@ -1309,9 +1314,7 @@ class GcpRuleTests(unittest.TestCase):
         )
         evidence_by_instance = {finding.affected_resources[0]: finding.evidence for finding in findings}
         org_evidence = {item.key: item.values for item in evidence_by_instance["google_compute_instance.org_web"]}
-        folder_evidence = {
-            item.key: item.values for item in evidence_by_instance["google_compute_instance.folder_web"]
-        }
+        folder_evidence = {item.key: item.values for item in evidence_by_instance["google_compute_instance.folder_web"]}
         self.assertEqual(
             org_evidence["firewall_rules"],
             ["google_compute_firewall_policy_rule.org_admin ingress tcp 22 from 0.0.0.0/0"],
@@ -1628,10 +1631,7 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["public_exposure_reasons"],
-            [
-                "google_storage_bucket_iam_member.public_logs_reader grants "
-                "roles/storage.objectViewer to allUsers"
-            ],
+            ["google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers"],
         )
 
     def test_gcs_all_authenticated_users_bucket_iam_member_is_detected(self) -> None:
@@ -1682,9 +1682,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-uniform-bucket-level-access-disabled"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-uniform-bucket-level-access-disabled"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -1701,9 +1699,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -1728,9 +1724,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})),
         )
 
         finding = findings[0]
@@ -1755,9 +1749,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access-prevention-not-enforced"})),
         )
 
         self.assertEqual(findings, [])
@@ -1787,9 +1779,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -1808,9 +1798,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-customer-managed-encryption-missing"})),
         )
 
         self.assertEqual(findings, [])
@@ -1828,9 +1816,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             boundaries,
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-authorized-network"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-public-authorized-network"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -1894,16 +1880,13 @@ class GcpRuleTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
-
     def test_cloud_sql_public_ip_without_private_network_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_cloud_sql_instance(ipv4_enabled=True, private_network=None)])
 
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -1938,9 +1921,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-public-ip-without-private-network"})),
         )
 
         self.assertEqual(findings, [])
@@ -1965,9 +1946,7 @@ class GcpRuleTests(unittest.TestCase):
         )
 
     def test_cloud_sql_enforcing_ssl_mode_is_not_flagged(self) -> None:
-        inventory = GcpNormalizer().normalize(
-            [_cloud_sql_instance(require_ssl=False, ssl_mode="ENCRYPTED_ONLY")]
-        )
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(require_ssl=False, ssl_mode="ENCRYPTED_ONLY")])
 
         findings = StrideRuleEngine().evaluate(
             inventory,
@@ -1992,9 +1971,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-cloud-sql-point-in-time-recovery-disabled"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-point-in-time-recovery-disabled"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -2025,9 +2002,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-cloud-sql-deletion-protection-disabled"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-deletion-protection-disabled"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -2037,11 +2012,8 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(evidence["lifecycle_posture"], ["deletion_protection is false"])
 
-
     def test_sensitive_secret_public_iam_binding_is_detected(self) -> None:
-        inventory = GcpNormalizer().normalize(
-            [_secret_manager_secret(), _secret_manager_secret_iam_member()]
-        )
+        inventory = GcpNormalizer().normalize([_secret_manager_secret(), _secret_manager_secret_iam_member()])
 
         findings = StrideRuleEngine().evaluate(inventory, [])
 
@@ -2141,9 +2113,7 @@ class GcpRuleTests(unittest.TestCase):
         )
 
     def test_pubsub_broad_subscription_subscriber_is_detected(self) -> None:
-        inventory = GcpNormalizer().normalize(
-            [_pubsub_subscription(), _pubsub_subscription_iam_binding()]
-        )
+        inventory = GcpNormalizer().normalize([_pubsub_subscription(), _pubsub_subscription_iam_binding()])
 
         findings = StrideRuleEngine().evaluate(
             inventory,
@@ -2158,7 +2128,10 @@ class GcpRuleTests(unittest.TestCase):
 
     def test_pubsub_non_broad_member_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(
-            [_pubsub_topic(), _pubsub_topic_iam_member(member="serviceAccount:publisher@tfstride-demo.iam.gserviceaccount.com")]
+            [
+                _pubsub_topic(),
+                _pubsub_topic_iam_member(member="serviceAccount:publisher@tfstride-demo.iam.gserviceaccount.com"),
+            ]
         )
 
         findings = StrideRuleEngine().evaluate(
@@ -2190,9 +2163,7 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(evidence["trust_scope"], ["member is public GCP principal `allUsers`"])
 
     def test_bigquery_table_domain_owner_is_detected(self) -> None:
-        inventory = GcpNormalizer().normalize(
-            [_bigquery_table(), _bigquery_table_iam_binding()]
-        )
+        inventory = GcpNormalizer().normalize([_bigquery_table(), _bigquery_table_iam_binding()])
 
         findings = StrideRuleEngine().evaluate(
             inventory,
@@ -2222,16 +2193,13 @@ class GcpRuleTests(unittest.TestCase):
         inventory = GcpNormalizer().normalize(
             [
                 _kms_crypto_key(),
-                _kms_crypto_key_iam_member(
-                    member="serviceAccount:decryptor@tfstride-demo.iam.gserviceaccount.com"
-                ),
+                _kms_crypto_key_iam_member(member="serviceAccount:decryptor@tfstride-demo.iam.gserviceaccount.com"),
             ]
         )
 
         findings = StrideRuleEngine().evaluate(inventory, [])
 
         self.assertEqual(findings, [])
-
 
     def test_public_compute_service_account_secret_access_path_is_detected(self) -> None:
         service_account = "serviceAccount:tfstride-web@tfstride-demo.iam.gserviceaccount.com"
@@ -2337,10 +2305,7 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in finding.evidence}
         self.assertEqual(
             evidence["public_invoker_bindings"],
-            [
-                "source=google_cloud_run_v2_service_iam_member.public_invoker; "
-                "role=roles/run.invoker; member=allUsers"
-            ],
+            ["source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers"],
         )
         self.assertEqual(
             evidence["public_exposure_reasons"],
@@ -2354,7 +2319,7 @@ class GcpRuleTests(unittest.TestCase):
                 _cloud_run_service_iam_member(
                     condition={
                         "title": "expires_soon",
-                        'expression': 'request.time < timestamp("2026-07-01T00:00:00Z")',
+                        "expression": 'request.time < timestamp("2026-07-01T00:00:00Z")',
                     }
                 ),
             ]
@@ -2451,9 +2416,7 @@ class GcpRuleTests(unittest.TestCase):
         )
 
     def test_public_cloudfunctions2_binding_invoker_is_detected(self) -> None:
-        inventory = GcpNormalizer().normalize(
-            [_cloudfunctions2_function(), _cloudfunctions2_function_iam_binding()]
-        )
+        inventory = GcpNormalizer().normalize([_cloudfunctions2_function(), _cloudfunctions2_function_iam_binding()])
         boundaries = detect_trust_boundaries(inventory)
 
         findings = StrideRuleEngine().evaluate(
@@ -2952,9 +2915,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -3002,9 +2963,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})),
         )
 
         self.assertEqual(findings, [])
@@ -3022,9 +2981,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-service-account-key-effective-access"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -3049,7 +3006,6 @@ class GcpRuleTests(unittest.TestCase):
                 "risk=service account token minting and impersonation",
             ],
         )
-
 
     def test_service_account_iam_low_risk_group_binding_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(
@@ -3124,9 +3080,7 @@ class GcpRuleTests(unittest.TestCase):
     def test_folder_iam_policy_privileged_role_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
-                _organization_iam_policy(
-                    [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
-                ),
+                _organization_iam_policy([{"role": "roles/viewer", "members": ["group:ops@example.com"]}]),
                 TerraformResource(
                     address="google_folder_iam_policy.policy",
                     mode="managed",
@@ -3167,7 +3121,9 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in findings[0].evidence}
         self.assertEqual(
             evidence["role_risk"],
-            ["custom role includes high-impact permissions: iam.serviceAccounts.actAs, resourcemanager.projects.setIamPolicy"],
+            [
+                "custom role includes high-impact permissions: iam.serviceAccounts.actAs, resourcemanager.projects.setIamPolicy"
+            ],
         )
         self.assertEqual(
             evidence["custom_role_permissions"],
@@ -3316,7 +3272,9 @@ class GcpRuleTests(unittest.TestCase):
         evidence = {item.key: item.values for item in findings[0].evidence}
         self.assertEqual(
             evidence["role_risk"],
-            ["custom role includes high-impact permissions: cloudfunctions.functions.update, iam.serviceAccounts.actAs"],
+            [
+                "custom role includes high-impact permissions: cloudfunctions.functions.update, iam.serviceAccounts.actAs"
+            ],
         )
         self.assertEqual(
             evidence["custom_role_permissions"],
@@ -3355,9 +3313,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -3401,9 +3357,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})),
         )
 
         self.assertEqual(findings, [])
@@ -3435,9 +3389,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -3483,9 +3435,7 @@ class GcpRuleTests(unittest.TestCase):
         findings = StrideRuleEngine().evaluate(
             inventory,
             [],
-            rule_policy=RulePolicy(
-                enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})
-            ),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-inherited-iam-sensitive-resource-access"})),
         )
 
         self.assertEqual(len(findings), 1)
@@ -3543,10 +3493,7 @@ class GcpRuleTests(unittest.TestCase):
         self.assertEqual(evidence["role_risk"], ["broad write access across most project services"])
         self.assertEqual(
             evidence["trust_scope"],
-            [
-                "service account belongs to project `partner-project`, "
-                "outside resource project `tfstride-demo`"
-            ],
+            ["service account belongs to project `partner-project`, outside resource project `tfstride-demo`"],
         )
         self.assertEqual(
             evidence["descendant_scope"],
@@ -3626,7 +3573,6 @@ class GcpRuleTests(unittest.TestCase):
             evidence["descendant_scope"],
             ["scope=folder:12345", "descendant_count=2", "resource_type_count=2", "folders=folders/12345"],
         )
-
 
 
 if __name__ == "__main__":

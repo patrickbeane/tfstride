@@ -34,11 +34,7 @@ def _resource(provider: str) -> NormalizedResource:
 
 
 def _metadata_fields_by_name(namespace: type) -> dict[str, MetadataField[Any]]:
-    return {
-        name: value
-        for name, value in vars(namespace).items()
-        if isinstance(value, MetadataField)
-    }
+    return {name: value for name, value in vars(namespace).items() if isinstance(value, MetadataField)}
 
 
 def _sample_metadata_value(field: MetadataField[Any]) -> Any:

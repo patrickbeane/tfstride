@@ -149,20 +149,12 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
         engine = StrideRuleEngine()
 
         self.assertTrue(
-            all(
-                isinstance(rule, RuleDefinition)
-                for rule_group in engine._rule_groups()
-                for rule in rule_group
-            )
+            all(isinstance(rule, RuleDefinition) for rule_group in engine._rule_groups() for rule in rule_group)
         )
 
     def test_rule_engine_derives_default_registry_from_rule_definitions(self) -> None:
         engine = StrideRuleEngine()
-        definition_metadata = tuple(
-            rule.metadata
-            for rule_group in engine._rule_groups()
-            for rule in rule_group
-        )
+        definition_metadata = tuple(rule.metadata for rule_group in engine._rule_groups() for rule in rule_group)
 
         self.assertIsNot(engine._rule_registry, DEFAULT_RULE_REGISTRY)
         self.assertEqual(engine._rule_registry.rules(), definition_metadata)
@@ -868,7 +860,9 @@ class TFSAnalysisTests(unittest.TestCase):
             "Role trust relationship expands blast radius",
         }
         self.assertTrue(expected_titles.issubset(findings_by_title))
-        self.assertEqual(findings_by_title["Database is reachable from overly permissive sources"].severity, Severity.HIGH)
+        self.assertEqual(
+            findings_by_title["Database is reachable from overly permissive sources"].severity, Severity.HIGH
+        )
         self.assertEqual(findings_by_title["Workload role carries sensitive permissions"].severity, Severity.HIGH)
 
     def test_findings_include_structured_evidence_and_severity_reasoning(self) -> None:
@@ -1121,9 +1115,7 @@ class TFSAnalysisTests(unittest.TestCase):
             with self.subTest(scenario=name):
                 result = self.engine.analyze_plan(expected["fixture_path"])
                 blast_radius_findings = [
-                    finding
-                    for finding in result.findings
-                    if finding.rule_id == "gcp-inherited-iam-blast-radius"
+                    finding for finding in result.findings if finding.rule_id == "gcp-inherited-iam-blast-radius"
                 ]
 
                 self.assertEqual(len(blast_radius_findings), 1)
@@ -1261,9 +1253,7 @@ class TFSAnalysisTests(unittest.TestCase):
             ],
         )
         sensitive_iam_findings = [
-            finding
-            for finding in result.findings
-            if finding.rule_id == "gcp-sensitive-resource-iam-external-access"
+            finding for finding in result.findings if finding.rule_id == "gcp-sensitive-resource-iam-external-access"
         ]
         self.assertEqual(len(sensitive_iam_findings), 2)
         self.assertEqual(
@@ -1433,9 +1423,7 @@ class TFSAnalysisTests(unittest.TestCase):
         mixed_role = mixed_result.inventory.get_by_address("aws_iam_role.workload")
 
         self.assertIn("aws_iam_policy.artifact_read", safe_role.metadata.get("attached_policy_addresses", []))
-        self.assertTrue(
-            any("s3:GetObject" in statement.actions for statement in safe_role.policy_statements)
-        )
+        self.assertTrue(any("s3:GetObject" in statement.actions for statement in safe_role.policy_statements))
         self.assertIn("aws_iam_policy.admin_like", mixed_role.metadata.get("attached_policy_addresses", []))
 
     def test_analysis_surfaces_trust_statement_summaries_on_roles(self) -> None:
@@ -1469,10 +1457,16 @@ class TFSAnalysisTests(unittest.TestCase):
         safe_app_group = safe_result.inventory.get_by_address("aws_security_group.app")
         mixed_db_group = mixed_result.inventory.get_by_address("aws_security_group.db")
 
-        self.assertIn("aws_security_group_rule.app_from_lb", safe_app_group.metadata.get("standalone_rule_addresses", []))
+        self.assertIn(
+            "aws_security_group_rule.app_from_lb", safe_app_group.metadata.get("standalone_rule_addresses", [])
+        )
         self.assertEqual(len(safe_app_group.network_rules), 2)
-        self.assertIn("aws_security_group_rule.db_from_public_app", mixed_db_group.metadata.get("standalone_rule_addresses", []))
-        self.assertIn("aws_security_group_rule.db_from_internet", mixed_db_group.metadata.get("standalone_rule_addresses", []))
+        self.assertIn(
+            "aws_security_group_rule.db_from_public_app", mixed_db_group.metadata.get("standalone_rule_addresses", [])
+        )
+        self.assertIn(
+            "aws_security_group_rule.db_from_internet", mixed_db_group.metadata.get("standalone_rule_addresses", [])
+        )
         self.assertEqual(len(mixed_db_group.network_rules), 3)
 
     def test_route_table_associations_and_nat_gateways_refine_subnet_classification(self) -> None:
@@ -1567,7 +1561,9 @@ class TFSAnalysisTests(unittest.TestCase):
                                 "id": "sg-1",
                                 "vpc_id": "vpc-1",
                                 "ingress": [],
-                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                                "egress": [
+                                    {"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}
+                                ],
                             },
                         },
                         {
@@ -1597,8 +1593,7 @@ class TFSAnalysisTests(unittest.TestCase):
         internet_boundaries = [
             boundary
             for boundary in result.trust_boundaries
-            if boundary.boundary_type == BoundaryType.INTERNET_TO_SERVICE
-            and boundary.target == "aws_instance.web"
+            if boundary.boundary_type == BoundaryType.INTERNET_TO_SERVICE and boundary.target == "aws_instance.web"
         ]
 
         self.assertIsNotNone(instance)
@@ -1606,7 +1601,9 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertTrue(instance.metadata.get("in_public_subnet"))
         self.assertFalse(instance.metadata.get("internet_ingress_capable"))
         self.assertFalse(instance.public_exposure)
-        self.assertEqual(instance.metadata.get("public_access_reasons"), ["instance requests an associated public IP address"])
+        self.assertEqual(
+            instance.metadata.get("public_access_reasons"), ["instance requests an associated public IP address"]
+        )
         self.assertEqual(instance.metadata.get("public_exposure_reasons"), [])
         self.assertEqual(internet_boundaries, [])
         self.assertNotIn(
@@ -1631,8 +1628,7 @@ class TFSAnalysisTests(unittest.TestCase):
         internet_boundaries_to_db = [
             boundary
             for boundary in mixed_result.trust_boundaries
-            if boundary.boundary_type == BoundaryType.INTERNET_TO_SERVICE
-            and boundary.target == "aws_db_instance.app"
+            if boundary.boundary_type == BoundaryType.INTERNET_TO_SERVICE and boundary.target == "aws_db_instance.app"
         ]
 
         self.assertFalse(mixed_db.public_exposure)
@@ -1657,7 +1653,9 @@ class TFSAnalysisTests(unittest.TestCase):
     def test_realistic_ecs_fargate_fixture_models_private_workload_boundaries(self) -> None:
         result = self.engine.analyze_plan(ECS_FARGATE_FIXTURE_PATH)
         ecs_service = result.inventory.get_by_address("aws_ecs_service.app")
-        boundary_pairs = {(boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries}
+        boundary_pairs = {
+            (boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries
+        }
         findings_by_title = Counter(finding.title for finding in result.findings)
 
         self.assertIsNotNone(ecs_service)
@@ -1877,7 +1875,9 @@ class TFSAnalysisTests(unittest.TestCase):
                                         "cidr_blocks": ["0.0.0.0/0"],
                                     }
                                 ],
-                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                                "egress": [
+                                    {"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}
+                                ],
                             },
                         },
                         {
@@ -1890,7 +1890,9 @@ class TFSAnalysisTests(unittest.TestCase):
                                 "id": "sg-app-1",
                                 "vpc_id": "vpc-1",
                                 "ingress": [],
-                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                                "egress": [
+                                    {"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}
+                                ],
                             },
                         },
                         {
@@ -1919,7 +1921,9 @@ class TFSAnalysisTests(unittest.TestCase):
                                 "id": "sg-worker-1",
                                 "vpc_id": "vpc-1",
                                 "ingress": [],
-                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                                "egress": [
+                                    {"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}
+                                ],
                             },
                         },
                         {
@@ -1948,7 +1952,9 @@ class TFSAnalysisTests(unittest.TestCase):
                                 "id": "sg-db-1",
                                 "vpc_id": "vpc-1",
                                 "ingress": [],
-                                "egress": [{"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}],
+                                "egress": [
+                                    {"protocol": "-1", "from_port": 0, "to_port": 0, "cidr_blocks": ["0.0.0.0/0"]}
+                                ],
                             },
                         },
                         {
@@ -2101,9 +2107,7 @@ class TFSAnalysisTests(unittest.TestCase):
         result = engine.analyze_plan(FIXTURE_PATH)
         finding_titles = {finding.title for finding in result.findings}
         workload_finding = next(
-            finding
-            for finding in result.findings
-            if finding.rule_id == "aws-workload-role-sensitive-permissions"
+            finding for finding in result.findings if finding.rule_id == "aws-workload-role-sensitive-permissions"
         )
 
         self.assertNotIn("Database is reachable from overly permissive sources", finding_titles)
@@ -2179,9 +2183,7 @@ class TFSAnalysisTests(unittest.TestCase):
                                                 "Effect": "Allow",
                                                 "Action": "sts:AssumeRoleWithSAML",
                                                 "Principal": {
-                                                    "Federated": (
-                                                        "arn:aws:iam::111122223333:saml-provider/CorpSSO"
-                                                    )
+                                                    "Federated": ("arn:aws:iam::111122223333:saml-provider/CorpSSO")
                                                 },
                                             }
                                         ],
@@ -2237,14 +2239,10 @@ class TFSAnalysisTests(unittest.TestCase):
                                                 "Effect": "Allow",
                                                 "Action": "sts:AssumeRoleWithSAML",
                                                 "Principal": {
-                                                    "Federated": (
-                                                        "arn:aws:iam::111122223333:saml-provider/CorpSSO"
-                                                    )
+                                                    "Federated": ("arn:aws:iam::111122223333:saml-provider/CorpSSO")
                                                 },
                                                 "Condition": {
-                                                    "StringEquals": {
-                                                        "SAML:aud": "https://signin.aws.amazon.com/saml"
-                                                    }
+                                                    "StringEquals": {"SAML:aud": "https://signin.aws.amazon.com/saml"}
                                                 },
                                             }
                                         ],
@@ -2361,9 +2359,7 @@ class TFSAnalysisTests(unittest.TestCase):
                                             {
                                                 "Effect": "Allow",
                                                 "Action": "sts:AssumeRole",
-                                                "Principal": {
-                                                    "AWS": "arn:aws:iam::444455556666:role/ci-deployer"
-                                                },
+                                                "Principal": {"AWS": "arn:aws:iam::444455556666:role/ci-deployer"},
                                             },
                                             {
                                                 "Effect": "Allow",
@@ -2569,9 +2565,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                                 {
                                     "Effect": "Allow",
                                     "Action": "sts:AssumeRoleWithSAML",
-                                    "Principal": {
-                                        "Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"
-                                    },
+                                    "Principal": {"Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"},
                                 },
                                 {
                                     "Effect": "Allow",
@@ -2631,9 +2625,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                                 {
                                     "Effect": "Allow",
                                     "Action": "sts:AssumeRoleWithSAML",
-                                    "Principal": {
-                                        "Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"
-                                    },
+                                    "Principal": {"Federated": "arn:aws:iam::111122223333:saml-provider/CorpSSO"},
                                     "Condition": {
                                         "StringEquals": {
                                             "SAML:aud": "https://signin.aws.amazon.com/saml",
@@ -2655,9 +2647,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                                             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
                                             "aws:PrincipalArn": "arn:aws:iam::111122223333:role/ignored",
                                         },
-                                        "StringLike": {
-                                            "token.actions.githubusercontent.com:sub": "repo:example/app:*"
-                                        },
+                                        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:example/app:*"},
                                     },
                                 },
                             ],
@@ -2771,9 +2761,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                         {
                             "operator": "ArnLike",
                             "key": "aws:SourceArn",
-                            "values": [
-                                "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
-                            ],
+                            "values": ["arn:aws:codebuild:us-east-1:444455556666:project/release-*"],
                         },
                         {
                             "operator": "StringEquals",
@@ -2846,9 +2834,7 @@ class AwsNormalizerTrustConditionTests(unittest.TestCase):
                         {
                             "operator": "ArnLike",
                             "key": "aws:SourceArn",
-                            "values": [
-                                "arn:aws:codebuild:us-east-1:444455556666:project/release-*"
-                            ],
+                            "values": ["arn:aws:codebuild:us-east-1:444455556666:project/release-*"],
                         },
                         {
                             "operator": "StringLike",
@@ -3057,7 +3043,9 @@ class AwsCoverageExpansionTests(unittest.TestCase):
         instance = result.inventory.get_by_address("aws_instance.app")
         role = result.inventory.get_by_address("aws_iam_role.web")
         findings_by_title = Counter(finding.title for finding in result.findings)
-        boundary_pairs = {(boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries}
+        boundary_pairs = {
+            (boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries
+        }
 
         self.assertIsNotNone(instance)
         self.assertIsNotNone(role)
@@ -3177,8 +3165,12 @@ class AwsCoverageExpansionTests(unittest.TestCase):
         self.assertEqual(dict(severity_counts), {"high": 3})
         self.assertEqual(title_counts["Sensitive resource policy allows broad or cross-account access"], 2)
         self.assertEqual(title_counts["Service resource policy allows broad or cross-account access"], 1)
-        self.assertIn("aws_secretsmanager_secret_policy.app", secret.metadata.get("resource_policy_source_addresses", []))
-        self.assertIn("aws_lambda_permission.public_invoke", lambda_function.metadata.get("resource_policy_source_addresses", []))
+        self.assertIn(
+            "aws_secretsmanager_secret_policy.app", secret.metadata.get("resource_policy_source_addresses", [])
+        )
+        self.assertIn(
+            "aws_lambda_permission.public_invoke", lambda_function.metadata.get("resource_policy_source_addresses", [])
+        )
 
     def test_same_account_root_kms_policy_is_not_overstated_as_cross_account_exposure(self) -> None:
         result = self._analyze_payload(
@@ -3256,9 +3248,7 @@ class AwsCoverageExpansionTests(unittest.TestCase):
                                                     "ArnEquals": {
                                                         "aws:SourceArn": "arn:aws:sns:us-east-1:111122223333:events"
                                                     },
-                                                    "StringEquals": {
-                                                        "aws:SourceAccount": "111122223333"
-                                                    },
+                                                    "StringEquals": {"aws:SourceAccount": "111122223333"},
                                                 },
                                             }
                                         ],
@@ -3300,9 +3290,7 @@ class AwsCoverageExpansionTests(unittest.TestCase):
                                                 "Action": "sqs:SendMessage",
                                                 "Resource": "*",
                                                 "Condition": {
-                                                    "StringEquals": {
-                                                        "aws:SourceAccount": "111122223333"
-                                                    },
+                                                    "StringEquals": {"aws:SourceAccount": "111122223333"},
                                                 },
                                             }
                                         ],

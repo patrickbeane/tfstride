@@ -48,9 +48,7 @@ class ProviderMetadataWriteValidator:
         return cls(
             provider=provider_key,
             namespace_name=namespace.__name__,
-            _field_names_by_identity=MappingProxyType(
-                {id(field): name for name, field in fields_by_name.items()}
-            ),
+            _field_names_by_identity=MappingProxyType({id(field): name for name, field in fields_by_name.items()}),
         )
 
     def validate(self, field: MetadataField[Any]) -> None:
@@ -63,8 +61,4 @@ class ProviderMetadataWriteValidator:
 
 
 def _metadata_fields_by_name(namespace: type) -> dict[str, MetadataField[Any]]:
-    return {
-        name: value
-        for name, value in vars(namespace).items()
-        if isinstance(value, MetadataField)
-    }
+    return {name: value for name, value in vars(namespace).items() if isinstance(value, MetadataField)}

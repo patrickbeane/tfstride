@@ -14,9 +14,7 @@ from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
-GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset(
-    {"google_project_iam_custom_role", "google_organization_iam_custom_role"}
-)
+GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset({"google_project_iam_custom_role", "google_organization_iam_custom_role"})
 
 _PRIVILEGE_ESCALATION_PERMISSIONS = frozenset(
     {

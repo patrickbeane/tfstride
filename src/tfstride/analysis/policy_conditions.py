@@ -104,10 +104,7 @@ def trust_statement_principal_assessments(
     primary_account_id: str | None,
 ) -> list[PrincipalAssessment]:
     entries = _trust_statement_principal_entries(trust_statement)
-    return [
-        assess_principal(value, primary_account_id, principal_kind=kind)
-        for kind, value in entries
-    ]
+    return [assess_principal(value, primary_account_id, principal_kind=kind) for kind, value in entries]
 
 
 def policy_statement_principal_assessments(
@@ -115,10 +112,7 @@ def policy_statement_principal_assessments(
     primary_account_id: str | None,
 ) -> list[PrincipalAssessment]:
     entries = _policy_statement_principal_entries(statement)
-    return [
-        assess_principal(value, primary_account_id, principal_kind=kind)
-        for kind, value in entries
-    ]
+    return [assess_principal(value, primary_account_id, principal_kind=kind) for kind, value in entries]
 
 
 def trust_statement_narrowing_conditions(trust_statement: Mapping[str, Any]) -> list[IAMPolicyCondition]:
@@ -144,8 +138,7 @@ def trust_statement_narrowing_conditions(trust_statement: Mapping[str, Any]) -> 
             return parsed
 
     return [
-        IAMPolicyCondition(operator="", key=key, values=[])
-        for key in trust_statement_narrowing_keys(trust_statement)
+        IAMPolicyCondition(operator="", key=key, values=[]) for key in trust_statement_narrowing_keys(trust_statement)
     ]
 
 
@@ -392,8 +385,7 @@ def _trust_statement_principal_entries(trust_statement: Mapping[str, Any]) -> li
             return _dedupe_principal_entries(parsed_entries)
 
     return _dedupe_principal_entries(
-        (None, principal)
-        for principal in _coerce_string_list(trust_statement.get("principals"))
+        (None, principal) for principal in _coerce_string_list(trust_statement.get("principals"))
     )
 
 
@@ -411,8 +403,7 @@ def _policy_statement_principal_entries(statement: Any) -> list[tuple[str | None
             return _dedupe_principal_entries(parsed_entries)
 
     return _dedupe_principal_entries(
-        (None, principal)
-        for principal in _coerce_string_list(getattr(statement, "principals", []))
+        (None, principal) for principal in _coerce_string_list(getattr(statement, "principals", []))
     )
 
 

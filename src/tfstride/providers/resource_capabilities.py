@@ -55,9 +55,7 @@ class ProviderResourceCapabilityRegistry:
                 f"Provider capabilities already registered for `{provider_name}`."
             )
 
-        self._capabilities[provider_name] = MappingProxyType(
-            _normalize_capability_map(provider_name, capabilities)
-        )
+        self._capabilities[provider_name] = MappingProxyType(_normalize_capability_map(provider_name, capabilities))
 
     def providers(self) -> tuple[str, ...]:
         return tuple(self._capabilities)
@@ -85,10 +83,7 @@ class ProviderResourceCapabilityRegistry:
         resource: NormalizedResource,
         capability: ResourceCapability | str,
     ) -> bool:
-        return (
-            resource.resource_type
-            in self.resource_types_for_provider(resource.provider, capability)
-        )
+        return resource.resource_type in self.resource_types_for_provider(resource.provider, capability)
 
     def capabilities_for(self, resource: NormalizedResource) -> frozenset[ResourceCapability]:
         provider_name = _normalize_provider_name(resource.provider)
@@ -105,9 +100,7 @@ def _normalize_capability_map(
     capabilities: ResourceCapabilityMap,
 ) -> dict[ResourceCapability, frozenset[str]]:
     if not isinstance(capabilities, Mapping):
-        raise ProviderResourceCapabilityRegistryError(
-            f"Provider capabilities for `{provider_name}` must be a mapping."
-        )
+        raise ProviderResourceCapabilityRegistryError(f"Provider capabilities for `{provider_name}` must be a mapping.")
 
     normalized: dict[ResourceCapability, frozenset[str]] = {}
     for capability, resource_types in capabilities.items():
@@ -129,9 +122,7 @@ def _normalize_capability(capability: ResourceCapability | str) -> ResourceCapab
     try:
         return capability if isinstance(capability, ResourceCapability) else ResourceCapability(str(capability))
     except ValueError as exc:
-        raise ProviderResourceCapabilityRegistryError(
-            f"Unknown resource capability `{capability}`."
-        ) from exc
+        raise ProviderResourceCapabilityRegistryError(f"Unknown resource capability `{capability}`.") from exc
 
 
 def _normalize_provider_name(provider: str) -> str:

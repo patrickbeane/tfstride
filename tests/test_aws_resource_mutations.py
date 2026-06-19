@@ -137,11 +137,7 @@ class AwsResourceMutationsTests(unittest.TestCase):
             r"\.\s*direct_internet_reachable\s*=",
         )
 
-        offenders = [
-            pattern
-            for pattern in direct_mutation_patterns
-            if re.search(pattern, text)
-        ]
+        offenders = [pattern for pattern in direct_mutation_patterns if re.search(pattern, text)]
 
         self.assertEqual(offenders, [])
 

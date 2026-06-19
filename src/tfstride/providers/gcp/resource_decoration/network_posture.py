@@ -23,9 +23,7 @@ from tfstride.providers.gcp.resource_utils import (
 )
 
 _GCP_NETWORK_NAME_PATTERN = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
-_TERRAFORM_REFERENCE_TOKEN_CHARS = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]\"-"
-)
+_TERRAFORM_REFERENCE_TOKEN_CHARS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]"-')
 
 
 class DeriveNetworkPostureStage:
@@ -55,10 +53,7 @@ def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: GcpR
         and _same_network_reference(route.vpc_id, subnetwork.vpc_id, index)
         for route in index.routes
     )
-    has_nat_egress = any(
-        _nat_applies_to_subnetwork(router_nat, subnetwork, index)
-        for router_nat in index.router_nats
-    )
+    has_nat_egress = any(_nat_applies_to_subnetwork(router_nat, subnetwork, index) for router_nat in index.router_nats)
     gcp_mutations(subnetwork).set_subnetwork_route_posture(
         has_public_route=has_public_route,
         has_nat_gateway_egress=has_nat_egress,
@@ -232,11 +227,7 @@ def _canonical_network_reference(value: str, index: GcpResourceIndex | None) -> 
     reference_key = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
     network_key = gcp_network_reference_key(value)
     if index is not None:
-        return (
-            index.network_references.get(reference_key)
-            or index.network_references.get(network_key)
-            or network_key
-        )
+        return index.network_references.get(reference_key) or index.network_references.get(network_key) or network_key
     return network_key
 
 
@@ -261,7 +252,5 @@ def _is_terraform_network_reference(value: str) -> bool:
         if part != GcpResourceType.COMPUTE_NETWORK:
             continue
         resource_name = parts[index + 1]
-        return bool(resource_name) and all(
-            token and set(token) <= _TERRAFORM_REFERENCE_TOKEN_CHARS for token in parts
-        )
+        return bool(resource_name) and all(token and set(token) <= _TERRAFORM_REFERENCE_TOKEN_CHARS for token in parts)
     return False

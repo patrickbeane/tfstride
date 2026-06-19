@@ -15,11 +15,7 @@ from tfstride.providers.aws.resource_utils import ecs_task_definition_identifier
 def normalize_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     public_ip_requested = bool(values.get("associate_public_ip_address", False))
-    public_access_reasons = (
-        ["instance requests an associated public IP address"]
-        if public_ip_requested
-        else []
-    )
+    public_access_reasons = ["instance requests an associated public IP address"] if public_ip_requested else []
     normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -99,7 +95,9 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
         identifier=values.get("name") or values.get("id"),
         arn=values.get("arn"),
         subnet_ids=tuple(compact(network_configuration.get("subnets", []) if network_configuration else [])),
-        security_group_ids=tuple(compact(network_configuration.get("security_groups", []) if network_configuration else [])),
+        security_group_ids=tuple(
+            compact(network_configuration.get("security_groups", []) if network_configuration else [])
+        ),
         public_access_configured=assign_public_ip,
         metadata={
             "cluster": values.get("cluster"),

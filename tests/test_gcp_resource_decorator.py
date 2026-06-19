@@ -367,9 +367,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertTrue(instance.public_exposure)
 
     def test_firewall_policy_target_service_accounts_limit_compute_matches(self) -> None:
-        policy_rule = _policy_rule(
-            target_service_accounts=["tfstride-web@tfstride-demo.iam.gserviceaccount.com"]
-        )
+        policy_rule = _policy_rule(target_service_accounts=["tfstride-web@tfstride-demo.iam.gserviceaccount.com"])
         association = _policy_association(
             "google_compute_firewall_policy_association.folder",
             target="folders/12345",
@@ -460,9 +458,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
             ResourceCategory.EDGE,
             public_access_configured=True,
             metadata={
-                GcpResourceMetadata.FORWARDING_RULE_TARGET: (
-                    "google_compute_target_https_proxy.web.id"
-                ),
+                GcpResourceMetadata.FORWARDING_RULE_TARGET: ("google_compute_target_https_proxy.web.id"),
                 GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME: "EXTERNAL",
                 GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS: "35.1.2.3",
                 GcpResourceMetadata.FORWARDING_RULE_PORTS: ["443"],
@@ -478,20 +474,14 @@ class GcpResourceDecoratorTests(unittest.TestCase):
             "google_compute_url_map.web",
             GcpResourceType.COMPUTE_URL_MAP,
             ResourceCategory.EDGE,
-            metadata={
-                GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: (
-                    "google_compute_backend_service.api.id"
-                )
-            },
+            metadata={GcpResourceMetadata.LOAD_BALANCER_DEFAULT_SERVICE: ("google_compute_backend_service.api.id")},
         )
         backend_service = _gcp_resource(
             "google_compute_backend_service.api",
             GcpResourceType.COMPUTE_BACKEND_SERVICE,
             ResourceCategory.EDGE,
             metadata={
-                GcpResourceMetadata.LOAD_BALANCER_BACKENDS: [
-                    {"group": "google_compute_network_endpoint_group.api.id"}
-                ]
+                GcpResourceMetadata.LOAD_BALANCER_BACKENDS: [{"group": "google_compute_network_endpoint_group.api.id"}]
             },
         )
         network_endpoint_group = _gcp_resource(
@@ -511,42 +501,32 @@ class GcpResourceDecoratorTests(unittest.TestCase):
             "projects/demo/locations/us-central1/services/api",
         )
 
-        GcpResourceDecorator().decorate([
-            forwarding_rule,
-            target_proxy,
-            url_map,
-            backend_service,
-            network_endpoint_group,
-            cloud_run,
-        ])
+        GcpResourceDecorator().decorate(
+            [
+                forwarding_rule,
+                target_proxy,
+                url_map,
+                backend_service,
+                network_endpoint_group,
+                cloud_run,
+            ]
+        )
 
         self.assertTrue(
-            backend_service.get_metadata_field(
-                GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER
-            )
+            backend_service.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER)
         )
         self.assertTrue(
-            network_endpoint_group.get_metadata_field(
-                GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER
-            )
+            network_endpoint_group.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER)
         )
-        self.assertTrue(
-            cloud_run.get_metadata_field(
-                GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER
-            )
-        )
+        self.assertTrue(cloud_run.get_metadata_field(GcpResourceMetadata.FRONTED_BY_INTERNET_FACING_LOAD_BALANCER))
         self.assertEqual(
-            cloud_run.get_metadata_field(
-                GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES
-            ),
+            cloud_run.get_metadata_field(GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES),
             ["google_compute_global_forwarding_rule.web"],
         )
         self.assertEqual(
             [
                 entry["backend"]
-                for entry in forwarding_rule.get_metadata_field(
-                    GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS
-                )
+                for entry in forwarding_rule.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
             ],
             [
                 "google_compute_backend_service.api",
@@ -591,10 +571,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertTrue(bucket.public_access_configured)
         self.assertEqual(
             bucket.public_access_reasons,
-            [
-                "google_storage_bucket_iam_member.public_reader grants "
-                "roles/storage.objectViewer to allUsers"
-            ],
+            ["google_storage_bucket_iam_member.public_reader grants roles/storage.objectViewer to allUsers"],
         )
         self.assertFalse(bucket.public_exposure)
         self.assertEqual(bucket.public_exposure_reasons, [])
@@ -634,10 +611,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertTrue(cloud_run.public_exposure)
         self.assertEqual(
             cloud_run.public_exposure_reasons,
-            [
-                "google_cloud_run_service_iam_member.public_invoker grants "
-                "roles/run.invoker to allUsers"
-            ],
+            ["google_cloud_run_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
         )
         self.assertTrue(function.public_exposure)
         self.assertEqual(

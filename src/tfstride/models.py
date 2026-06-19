@@ -304,7 +304,6 @@ class NormalizedResource:
         ResourceMetadata.INTERNET_INGRESS_REASONS.set(self._metadata, values)
 
 
-
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
 NormalizedResource.metadata = property(
     NormalizedResource._metadata_view,
@@ -342,10 +341,7 @@ class ResourceInventory:
                     continue
                 resources_by_identifier.setdefault(key, resource)
 
-        self._resources_by_type = {
-            resource_type: tuple(group)
-            for resource_type, group in resources_by_type.items()
-        }
+        self._resources_by_type = {resource_type: tuple(group) for resource_type, group in resources_by_type.items()}
         self._resources_by_address = resources_by_address
         self._resources_by_identifier = resources_by_identifier
         self._resource_positions = resource_positions
@@ -374,11 +370,7 @@ class ResourceInventory:
             resource_type = next(iter(allowed))
             return list(self._resources_by_type.get(resource_type, ()))
 
-        matches = [
-            resource
-            for resource_type in allowed
-            for resource in self._resources_by_type.get(resource_type, ())
-        ]
+        matches = [resource for resource_type in allowed for resource in self._resources_by_type.get(resource_type, ())]
         matches.sort(key=lambda resource: self._resource_positions[id(resource)])
         return matches
 

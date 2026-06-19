@@ -54,9 +54,7 @@ class MergeResourcePolicyResourcesStage:
             function_name = aws_facts(lambda_permission_resource).function_name
             target_function = context.index.lambda_functions.get(function_name)
             if target_function is None:
-                aws_facts(lambda_permission_resource).add_unresolved_function_reference(
-                    function_name
-                )
+                aws_facts(lambda_permission_resource).add_unresolved_function_reference(function_name)
                 continue
             _merge_resource_policy(
                 target_function,
@@ -83,9 +81,7 @@ class ApplyS3PublicAccessBlocksStage:
                 "block_public_acls": aws_facts(access_block_resource).block_public_acls,
                 "block_public_policy": aws_facts(access_block_resource).block_public_policy,
                 "ignore_public_acls": aws_facts(access_block_resource).ignore_public_acls,
-                "restrict_public_buckets": aws_facts(
-                    access_block_resource
-                ).restrict_public_buckets,
+                "restrict_public_buckets": aws_facts(access_block_resource).restrict_public_buckets,
             }
             aws_facts(bucket).set_public_access_block(public_access_block)
             bucket_acl = aws_facts(bucket).bucket_acl
@@ -102,16 +98,12 @@ class ApplyS3PublicAccessBlocksStage:
             bucket_mutations.set_public_exposure(
                 (
                     public_via_acl
-                    and not (
-                        public_access_block["block_public_acls"]
-                        or public_access_block["ignore_public_acls"]
-                    )
+                    and not (public_access_block["block_public_acls"] or public_access_block["ignore_public_acls"])
                 )
                 or (
                     public_via_policy
                     and not (
-                        public_access_block["block_public_policy"]
-                        or public_access_block["restrict_public_buckets"]
+                        public_access_block["block_public_policy"] or public_access_block["restrict_public_buckets"]
                     )
                 )
             )
@@ -130,9 +122,7 @@ def _merge_resource_policy(
     policy_document: dict[str, Any],
     source_address: str,
 ) -> None:
-    aws_mutations(resource).merge_policy_statements(
-        clone_policy_statements(policy_statements)
-    )
+    aws_mutations(resource).merge_policy_statements(clone_policy_statements(policy_statements))
     resource_policy_source_addresses = aws_facts(resource).resource_policy_source_addresses
     if source_address not in resource_policy_source_addresses:
         aws_facts(resource).add_resource_policy_source_address(source_address)
@@ -150,9 +140,7 @@ def _merge_policy_documents(base_document: Any, extra_document: Any) -> dict[str
     base_statements = as_list(base.get("Statement"))
     extra_statements = as_list(extra.get("Statement"))
     merged_statements = [
-        statement
-        for statement in [*base_statements, *extra_statements]
-        if isinstance(statement, dict)
+        statement for statement in [*base_statements, *extra_statements] if isinstance(statement, dict)
     ]
     if not merged_statements:
         return base or extra

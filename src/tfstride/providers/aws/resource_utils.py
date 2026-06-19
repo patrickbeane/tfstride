@@ -30,14 +30,14 @@ def ecs_task_definition_identifier(family: Any, revision: Any) -> str | None:
 
 
 def route_table_has_internet_route(routes: list[dict[str, Any]]) -> bool:
-	    for route in routes:
-	        destination = route.get("cidr_block") or route.get("destination_cidr_block")
-	        gateway_id = route.get("gateway_id")
-	        if destination == "0.0.0.0/0" and isinstance(gateway_id, str) and gateway_id.startswith("igw-"):
-	            return True
-	    return False
-	
-	
+    for route in routes:
+        destination = route.get("cidr_block") or route.get("destination_cidr_block")
+        gateway_id = route.get("gateway_id")
+        if destination == "0.0.0.0/0" and isinstance(gateway_id, str) and gateway_id.startswith("igw-"):
+            return True
+    return False
+
+
 def route_table_has_nat_gateway_route(routes: list[dict[str, Any]], nat_gateway_ids: set[str]) -> bool:
     for route in routes:
         destination = route.get("cidr_block") or route.get("destination_cidr_block")
@@ -49,4 +49,4 @@ def route_table_has_nat_gateway_route(routes: list[dict[str, Any]], nat_gateway_
             return True
         if isinstance(gateway_id, str) and gateway_id in nat_gateway_ids:
             return True
-    return False 
+    return False

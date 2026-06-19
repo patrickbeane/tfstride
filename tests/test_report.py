@@ -41,8 +41,12 @@ GCP_LB_COMPUTE_SQL_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_lb_com
 GCP_SERVERLESS_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_serverless_plan.json"
 GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_cross_project_iam_plan.json"
 GCP_NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_nightmare_plan.json"
-CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
-CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
+CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
+    ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
+)
+CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
+    ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
+)
 EXAMPLES_DIR = ROOT / "examples"
 
 
@@ -92,9 +96,7 @@ class MarkdownReportTests(unittest.TestCase):
     def test_report_renders_controls_observed_section(self) -> None:
         engine = TfStride()
         safe_report = render_markdown(engine.analyze_plan(SAFE_FIXTURE_PATH))
-        constrained_trust_report = render_markdown(
-            engine.analyze_plan(CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH)
-        )
+        constrained_trust_report = render_markdown(engine.analyze_plan(CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH))
 
         self.assertIn("## Controls Observed", safe_report)
         self.assertIn("S3 public access is reduced by a public access block", safe_report)
@@ -119,8 +121,12 @@ class MarkdownReportTests(unittest.TestCase):
             ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_alb_ec2_rds_report.md",
             LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_lambda_deploy_role_report.md",
             ECS_FARGATE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_ecs_fargate_report.md",
-            CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_cross_account_trust_unconstrained_report.md",
-            CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_cross_account_trust_constrained_report.md",
+            CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR
+            / "aws"
+            / "aws_cross_account_trust_unconstrained_report.md",
+            CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR
+            / "aws"
+            / "aws_cross_account_trust_constrained_report.md",
             GCP_SAFE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_safe_report.md",
             GCP_BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_baseline_report.md",
             GCP_LB_COMPUTE_SQL_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_lb_compute_sql_report.md",
@@ -167,9 +173,7 @@ class MarkdownReportTests(unittest.TestCase):
         self.assertIn("- Baselined findings: `2`", report)
 
     def test_report_mentions_when_severity_is_overridden_by_config(self) -> None:
-        engine = TfStride(
-            rule_policy=RulePolicy(severity_overrides={"aws-iam-wildcard-permissions": Severity.LOW})
-        )
+        engine = TfStride(rule_policy=RulePolicy(severity_overrides={"aws-iam-wildcard-permissions": Severity.LOW}))
         result = engine.analyze_plan(BASELINE_FIXTURE_PATH)
         report = render_markdown(result)
 
@@ -199,7 +203,9 @@ class SarifReportTests(unittest.TestCase):
         )
         self.assertEqual(database_result["level"], "error")
         self.assertEqual(database_result["message"]["text"], "Database is reachable from overly permissive sources")
-        self.assertEqual(database_result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"], str(FIXTURE_PATH))
+        self.assertEqual(
+            database_result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"], str(FIXTURE_PATH)
+        )
         self.assertEqual(database_result["properties"]["severity"], "high")
         self.assertTrue(database_result["properties"]["evidence"])
         self.assertEqual(database_result["properties"]["severity_reasoning"]["final_score"], 6)
@@ -444,9 +450,7 @@ class JsonReportTests(unittest.TestCase):
         engine = TfStride()
         payload = json.loads(render_json(engine.analyze_plan(FIXTURE_PATH)))
         resources_with_policies = [
-            resource
-            for resource in payload["inventory"]["resources"]
-            if resource["policy_statements"]
+            resource for resource in payload["inventory"]["resources"] if resource["policy_statements"]
         ]
 
         self.assertTrue(resources_with_policies)

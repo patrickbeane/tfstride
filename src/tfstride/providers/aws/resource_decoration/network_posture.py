@@ -22,9 +22,7 @@ class DeriveSubnetPostureStage:
             route_table_id = aws_facts(association_resource).route_table_id
             if not subnet_id or not route_table_id:
                 continue
-            subnet_route_table_ids.setdefault(str(subnet_id), []).append(
-                str(route_table_id)
-            )
+            subnet_route_table_ids.setdefault(str(subnet_id), []).append(str(route_table_id))
 
         public_subnet_ids: set[str] = set()
         for subnet in context.index.subnets.values():
@@ -34,9 +32,7 @@ class DeriveSubnetPostureStage:
             )
             has_public_route = any(
                 route_table_id in context.index.route_tables
-                and route_table_has_internet_route(
-                    aws_facts(context.index.route_tables[route_table_id]).routes
-                )
+                and route_table_has_internet_route(aws_facts(context.index.route_tables[route_table_id]).routes)
                 for route_table_id in associated_route_table_ids
             )
             has_nat_route = any(
@@ -53,12 +49,10 @@ class DeriveSubnetPostureStage:
                 is_public = has_public_route
             else:
                 # Fall back to the original heuristic when route table associations are absent.
-                is_public = (
-                    aws_facts(subnet).map_public_ip_on_launch
-                    and subnet.vpc_id
-                    in context.index.vpcs_with_igw.intersection(
-                        context.index.vpcs_with_public_routes
-                    )
+                is_public = aws_facts(
+                    subnet
+                ).map_public_ip_on_launch and subnet.vpc_id in context.index.vpcs_with_igw.intersection(
+                    context.index.vpcs_with_public_routes
                 )
                 has_nat_route = False
             aws_mutations(subnet).set_subnet_posture(

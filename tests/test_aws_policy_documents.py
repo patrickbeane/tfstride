@@ -86,7 +86,9 @@ class AwsPolicyDocumentTests(unittest.TestCase):
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Principal": {"Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"},
+                    "Principal": {
+                        "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+                    },
                     "Action": "sts:AssumeRoleWithWebIdentity",
                     "Condition": {
                         "StringEquals": {
@@ -124,8 +126,12 @@ class AwsPolicyDocumentTests(unittest.TestCase):
         service_principal = lambda_permission_principal_entries("events.amazonaws.com")
         aws_principal = lambda_permission_principal_entries("arn:aws:iam::111122223333:role/app")
 
-        self.assertEqual([(entry.kind, entry.value) for entry in service_principal], [("Service", "events.amazonaws.com")])
-        self.assertEqual([(entry.kind, entry.value) for entry in aws_principal], [("AWS", "arn:aws:iam::111122223333:role/app")])
+        self.assertEqual(
+            [(entry.kind, entry.value) for entry in service_principal], [("Service", "events.amazonaws.com")]
+        )
+        self.assertEqual(
+            [(entry.kind, entry.value) for entry in aws_principal], [("AWS", "arn:aws:iam::111122223333:role/app")]
+        )
         self.assertEqual(
             compact_condition_entries(
                 [

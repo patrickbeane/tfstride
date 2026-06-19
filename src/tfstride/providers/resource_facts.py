@@ -541,6 +541,7 @@ class NeutralProviderResourceFacts(
 
     resource: NormalizedResource
 
+
 class ProviderResourceFactsRegistry:
     def __init__(
         self,
@@ -553,17 +554,13 @@ class ProviderResourceFactsRegistry:
     def register(self, provider: str, factory: ProviderResourceFactsFactory) -> None:
         provider_name = _normalize_provider_name(provider)
         if not provider_name:
-            raise ProviderResourceFactsRegistryError(
-                "Provider facts factories must define a non-empty provider name."
-            )
+            raise ProviderResourceFactsRegistryError("Provider facts factories must define a non-empty provider name.")
         if provider_name in self._factories:
             raise ProviderResourceFactsRegistryError(
                 f"Provider facts factory already registered for `{provider_name}`."
             )
         if not callable(factory):
-            raise ProviderResourceFactsRegistryError(
-                f"Provider facts factory for `{provider_name}` must be callable."
-            )
+            raise ProviderResourceFactsRegistryError(f"Provider facts factory for `{provider_name}` must be callable.")
         self._factories[provider_name] = factory
 
     def get(self, provider: str) -> ProviderResourceFactsFactory:

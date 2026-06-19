@@ -7,8 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 FASTAPI_DEPS_AVAILABLE = all(
-    importlib.util.find_spec(name) is not None
-    for name in ("fastapi", "httpx2", "jinja2", "multipart")
+    importlib.util.find_spec(name) is not None for name in ("fastapi", "httpx2", "jinja2", "multipart")
 )
 
 if FASTAPI_DEPS_AVAILABLE:
@@ -33,13 +32,17 @@ class DashboardAppTests(unittest.TestCase):
         self.client = TestClient(dashboard_app)
 
     def test_create_app_does_not_analyze_demo_fixtures_eagerly(self) -> None:
-        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(
+            dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")
+        ):
             app = dashboard_main.create_app()
 
         self.assertEqual(app.title, "tfSTRIDE Dashboard")
 
     def test_openapi_generation_does_not_analyze_demo_fixtures(self) -> None:
-        with mock.patch.object(dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")):
+        with mock.patch.object(
+            dashboard_main.TfStride, "analyze_plan", side_effect=AssertionError("unexpected analysis")
+        ):
             app = dashboard_main.create_app()
             payload = app.openapi()
 
@@ -157,12 +160,16 @@ class DashboardAppTests(unittest.TestCase):
             "Analyze Terraform plan JSON",
         )
         self.assertEqual(
-            payload["paths"]["/api/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]["kind"],
+            payload["paths"]["/api/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"][
+                "kind"
+            ],
             "tfstride-report",
         )
         self.assertIn("multipart/form-data", payload["paths"]["/api/analyze"]["post"]["requestBody"]["content"])
         self.assertEqual(
-            payload["paths"]["/api/analyze"]["post"]["responses"]["422"]["content"]["application/json"]["example"]["detail"][0]["loc"],
+            payload["paths"]["/api/analyze"]["post"]["responses"]["422"]["content"]["application/json"]["example"][
+                "detail"
+            ][0]["loc"],
             ["body", "plan"],
         )
         self.assertIn("ValidationErrorResponseModel", payload["components"]["schemas"])

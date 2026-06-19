@@ -27,9 +27,7 @@ GCP_RESOURCE_CAPABILITIES = MappingProxyType(
         ResourceCapability.DATABASE: frozenset({GcpResourceType.SQL_DATABASE_INSTANCE}),
         ResourceCapability.OBJECT_STORAGE: frozenset({GcpResourceType.STORAGE_BUCKET}),
         ResourceCapability.SECRET_STORE: frozenset({GcpResourceType.SECRET_MANAGER_SECRET}),
-        ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset(
-            {GcpResourceType.SECRET_MANAGER_SECRET}
-        ),
+        ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE: frozenset({GcpResourceType.SECRET_MANAGER_SECRET}),
         ResourceCapability.KEY_MANAGEMENT: frozenset({GcpResourceType.KMS_CRYPTO_KEY}),
         ResourceCapability.PROVIDER_MANAGED_EGRESS_WITHOUT_VPC: GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES,
         ResourceCapability.SENSITIVE_RESOURCE_POLICY: GCP_SENSITIVE_RESOURCE_POLICY_TYPES,

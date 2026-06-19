@@ -63,20 +63,14 @@ class NetworkDataRuleDetectors:
                 boundary = boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
             elif public_tier_rules:
                 first_public_workload = sorted(
-                    {
-                        workload.address
-                        for _, _, workloads in public_tier_rules
-                        for workload in workloads
-                    }
+                    {workload.address for _, _, workloads in public_tier_rules for workload in workloads}
                 )[0]
-                boundary = boundary_index.get((BoundaryType.WORKLOAD_TO_DATA_STORE, first_public_workload, database.address))
+                boundary = boundary_index.get(
+                    (BoundaryType.WORKLOAD_TO_DATA_STORE, first_public_workload, database.address)
+                )
             if boundary is None and database.vpc_id:
                 public_private_boundary = next(
-                    (
-                        item
-                        for item in boundary_index.values()
-                        if item.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE
-                    ),
+                    (item for item in boundary_index.values() if item.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE),
                     None,
                 )
                 boundary = public_private_boundary
@@ -158,7 +152,11 @@ class NetworkDataRuleDetectors:
         assert indexes is not None
         public_security_group_map = indexes.public_workloads_by_security_group
         public_private_boundary = next(
-            (boundary for boundary in boundary_index.values() if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE),
+            (
+                boundary
+                for boundary in boundary_index.values()
+                if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE
+            ),
             None,
         )
         for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):

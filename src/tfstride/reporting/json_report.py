@@ -112,8 +112,7 @@ def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayl
             "enabled_rules": list(coverage.rules.enabled_rules),
             "disabled_rules": list(coverage.rules.disabled_rules),
             "severity_overrides": {
-                rule_id: severity.value
-                for rule_id, severity in coverage.rules.severity_overrides.items()
+                rule_id: severity.value for rule_id, severity in coverage.rules.severity_overrides.items()
             },
             "finding_counts_by_rule": _finding_counts_by_rule(result),
         },
@@ -122,10 +121,7 @@ def _serialize_analysis_coverage(result: AnalysisResult) -> AnalysisCoveragePayl
             "unresolved_references": [
                 {
                     "resource": reference.resource,
-                    "references": {
-                        key: list(values)
-                        for key, values in sorted(reference.references.items())
-                    },
+                    "references": {key: list(values) for key, values in sorted(reference.references.items())},
                 }
                 for reference in coverage.references.unresolved_references
             ],
@@ -142,16 +138,9 @@ def _finding_counts_by_rule(result: AnalysisResult) -> dict[str, int]:
     counts = Counter(finding.rule_id for finding in all_findings)
     rule_ids = [
         *result.analysis_coverage.rules.enabled_rules,
-        *[
-            rule_id
-            for rule_id in sorted(counts)
-            if rule_id not in result.analysis_coverage.rules.enabled_rules
-        ],
+        *[rule_id for rule_id in sorted(counts) if rule_id not in result.analysis_coverage.rules.enabled_rules],
     ]
-    return {
-        rule_id: counts.get(rule_id, 0)
-        for rule_id in rule_ids
-    }
+    return {rule_id: counts.get(rule_id, 0) for rule_id in rule_ids}
 
 
 def _serialize_inventory(inventory: ResourceInventory) -> InventoryPayload:
@@ -159,7 +148,10 @@ def _serialize_inventory(inventory: ResourceInventory) -> InventoryPayload:
         "provider": inventory.provider,
         "unsupported_resources": list(inventory.unsupported_resources),
         "metadata": inventory.metadata_snapshot(),
-        "resources": [_serialize_resource(resource) for resource in sorted(inventory.resources, key=lambda resource: resource.address)],
+        "resources": [
+            _serialize_resource(resource)
+            for resource in sorted(inventory.resources, key=lambda resource: resource.address)
+        ],
     }
 
 

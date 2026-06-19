@@ -181,15 +181,12 @@ class GcpServiceAccountKeyDetectors:
         custom_roles = build_gcp_custom_role_index(inventory.resources)
         for key in inventory.by_type("google_service_account_key"):
             target = service_account_iam_target(key, inventory)
-            grants = _keyed_service_account_effective_access_grants(
-                key, target, inventory, custom_roles
-            )
+            grants = _keyed_service_account_effective_access_grants(key, target, inventory, custom_roles)
             if not grants:
                 continue
 
             identity_control_plane_access = any(
-                grant.scope == "service account IAM"
-                or grant.scope.startswith(("project", "organization", "folder"))
+                grant.scope == "service account IAM" or grant.scope.startswith(("project", "organization", "folder"))
                 for grant in grants
             )
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -238,10 +235,7 @@ class GcpServiceAccountKeyDetectors:
                         evidence_item("service_account_principals", principals),
                         evidence_item(
                             "effective_access",
-                            [
-                                _keyed_service_account_grant_evidence(grant)
-                                for grant in grants
-                            ],
+                            [_keyed_service_account_grant_evidence(grant) for grant in grants],
                         ),
                         organization_guardrail_evidence(
                             context.analysis_indexes.gcp_org_policy_guardrails,
@@ -349,9 +343,7 @@ def _keyed_service_account_effective_access_grants(
             )
 
     for resource in inventory.by_type(*tuple(_KEYED_SERVICE_ACCOUNT_DATA_RESOURCE_ACCESS)):
-        allowed_roles, scope, data_sensitivity = _KEYED_SERVICE_ACCOUNT_DATA_RESOURCE_ACCESS[
-            resource.resource_type
-        ]
+        allowed_roles, scope, data_sensitivity = _KEYED_SERVICE_ACCOUNT_DATA_RESOURCE_ACCESS[resource.resource_type]
         for source, role, member in _resource_iam_binding_members(resource):
             if not _member_matches_service_account_principal(member, principals):
                 continue
@@ -485,10 +477,8 @@ def _service_account_key_validity_evidence(
     validity_days: int | None,
 ) -> list[str]:
     values = [
-        "valid_after="
-        f"{resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_AFTER) or ''}",
-        "valid_before="
-        f"{resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_BEFORE) or ''}",
+        f"valid_after={resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_AFTER) or ''}",
+        f"valid_before={resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_BEFORE) or ''}",
     ]
     if validity_days is not None:
         values.append(f"validity_days={validity_days}")

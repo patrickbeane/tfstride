@@ -332,7 +332,6 @@ def _path_segment(value: str, marker: str) -> str | None:
     return parts[value_index] or None
 
 
-
 def _descendant_candidates(resources: list[NormalizedResource]) -> list[NormalizedResource]:
     return [resource for resource in resources if _is_descendant_candidate(resource)]
 

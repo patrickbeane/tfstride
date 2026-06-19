@@ -216,7 +216,6 @@ DEFAULT_RULE_METADATA = (
         tags=("aws", "iam", "trust", "cross-account"),
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
-
     RuleMetadata(
         rule_id="gcp-sensitive-resource-iam-external-access",
         title="Sensitive GCP resource IAM binding allows broad or external access",

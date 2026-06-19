@@ -234,8 +234,7 @@ def _context(
             metadata={"primary_account_id": "111122223333"},
         ),
         boundary_index={
-            (boundary.boundary_type, boundary.source, boundary.target): boundary
-            for boundary in boundaries
+            (boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries
         },
         rule_registry=RuleRegistry([]),
     )

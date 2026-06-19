@@ -265,8 +265,4 @@ def _optional_bool(value: Any) -> bool | None:
 
 
 def _compact_rule(rule: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in rule.items()
-        if value not in (None, "", [], {})
-    }
+    return {key: value for key, value in rule.items() if value not in (None, "", [], {})}

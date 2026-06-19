@@ -119,16 +119,11 @@ def resource_facts_registry_from_plugins(
 def resource_capability_registry_from_plugins(
     plugins: Iterable[ProviderPlugin],
 ) -> ProviderResourceCapabilityRegistry:
-    return ProviderResourceCapabilityRegistry(
-        plugin.capability_registry_entry() for plugin in plugins
-    )
+    return ProviderResourceCapabilityRegistry(plugin.capability_registry_entry() for plugin in plugins)
 
 
 def provider_limitations_from_plugins(plugins: Iterable[ProviderPlugin]) -> dict[str, tuple[str, ...]]:
-    return {
-        provider: limitations
-        for provider, limitations in (plugin.limitations_entry() for plugin in plugins)
-    }
+    return {provider: limitations for provider, limitations in (plugin.limitations_entry() for plugin in plugins)}
 
 
 def _normalize_resource_capabilities(
@@ -150,9 +145,7 @@ def _normalize_resource_capability(capability: ResourceCapability | str) -> Reso
     try:
         return capability if isinstance(capability, ResourceCapability) else ResourceCapability(str(capability))
     except ValueError as exc:
-        raise ProviderResourceCapabilityRegistryError(
-            f"Unknown resource capability `{capability}`."
-        ) from exc
+        raise ProviderResourceCapabilityRegistryError(f"Unknown resource capability `{capability}`.") from exc
 
 
 def _normalize_provider_name(provider: str) -> str:

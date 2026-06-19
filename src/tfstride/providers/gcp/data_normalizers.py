@@ -34,7 +34,9 @@ def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
                 GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
                 GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
                 GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS: as_bool(values.get(GcpAttr.UNIFORM_BUCKET_LEVEL_ACCESS)),
+                GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS: as_bool(
+                    values.get(GcpAttr.UNIFORM_BUCKET_LEVEL_ACCESS)
+                ),
                 GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION: values.get(GcpAttr.PUBLIC_ACCESS_PREVENTION),
                 GcpResourceMetadata.GCS_VERSIONING_ENABLED: as_bool(versioning.get(GcpAttr.ENABLED)),
                 GcpResourceMetadata.GCS_VERSIONING_CONFIGURATION: versioning_values,
@@ -165,7 +167,9 @@ def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResourc
                 GcpResourceMetadata.NAME: name,
                 GcpResourceMetadata.PROJECT: project,
                 GcpResourceMetadata.BIGQUERY_DATASET_ID: dataset_id,
-                GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE: first_non_empty(values.get(GcpAttr.ID), name, dataset_id),
+                GcpResourceMetadata.BIGQUERY_DATASET_REFERENCE: first_non_empty(
+                    values.get(GcpAttr.ID), name, dataset_id
+                ),
                 GcpResourceMetadata.BIGQUERY_DEFAULT_KMS_KEY_NAME: default_kms_key_name,
                 GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
                 "delete_contents_on_destroy": as_bool(values.get(GcpAttr.DELETE_CONTENTS_ON_DESTROY)),
@@ -186,7 +190,9 @@ def normalize_bigquery_table(resource: TerraformResource) -> NormalizedResource:
     dataset_id = first_non_empty(values.get(GcpAttr.DATASET_ID), values.get(GcpAttr.DATASET))
     table_id = first_non_empty(values.get(GcpAttr.TABLE_ID), values.get(GcpAttr.NAME), resource.name)
     project = first_non_empty(values.get(GcpAttr.PROJECT), _project_from_resource_path(values.get(GcpAttr.ID)))
-    name = first_non_empty(values.get(GcpAttr.ID), _bigquery_table_resource_name(project, dataset_id, table_id), table_id)
+    name = first_non_empty(
+        values.get(GcpAttr.ID), _bigquery_table_resource_name(project, dataset_id, table_id), table_id
+    )
     encryption = GcpValues(_first_block(values, GcpAttr.ENCRYPTION_CONFIGURATION))
     default_kms_key_name = first_non_empty(encryption.get(GcpAttr.KMS_KEY_NAME))
     return _with_storage_encrypted(

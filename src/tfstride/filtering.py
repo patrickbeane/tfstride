@@ -238,9 +238,7 @@ def _validate_format_version(
     if version is None:
         return
     if version != expected:
-        raise FindingFilterLoadError(
-            f"Unsupported {label} version `{version}` in {path}; expected `{expected}`."
-        )
+        raise FindingFilterLoadError(f"Unsupported {label} version `{version}` in {path}; expected `{expected}`.")
 
 
 def _as_optional_string(value: Any) -> str | None:

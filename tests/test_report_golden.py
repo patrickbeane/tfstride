@@ -29,16 +29,8 @@ def _sample_report_payload() -> dict[str, Any]:
 
 def _key_schema(payload: dict[str, Any]) -> dict[str, list[str]]:
     resources = payload["inventory"]["resources"]
-    policy_statements = [
-        statement
-        for resource in resources
-        for statement in resource["policy_statements"]
-    ]
-    network_rules = [
-        rule
-        for resource in resources
-        for rule in resource["network_rules"]
-    ]
+    policy_statements = [statement for resource in resources for statement in resource["policy_statements"]]
+    network_rules = [rule for resource in resources for rule in resource["network_rules"]]
     policy_statement_with_principal = next(
         statement for statement in policy_statements if statement["principal_entries"]
     )
@@ -54,9 +46,7 @@ def _key_schema(payload: dict[str, Any]) -> dict[str, list[str]]:
         "analysis_coverage.resources": list(payload["analysis_coverage"]["resources"]),
         "analysis_coverage.rules": list(payload["analysis_coverage"]["rules"]),
         "analysis_coverage.references": list(payload["analysis_coverage"]["references"]),
-        "analysis_coverage.references.unresolved_references[]": list(
-            UnresolvedReferencePayload.__annotations__
-        ),
+        "analysis_coverage.references.unresolved_references[]": list(UnresolvedReferencePayload.__annotations__),
         "inventory": list(payload["inventory"]),
         "inventory.resources[]": list(resources[0]),
         "inventory.resources[].network_rules[]": list(network_rules[0]),
@@ -64,9 +54,7 @@ def _key_schema(payload: dict[str, Any]) -> dict[str, list[str]]:
         "inventory.resources[].policy_statements[].principal_entries[]": list(
             policy_statement_with_principal["principal_entries"][0]
         ),
-        "inventory.resources[].policy_statements[].conditions[]": list(
-            PolicyConditionPayload.__annotations__
-        ),
+        "inventory.resources[].policy_statements[].conditions[]": list(PolicyConditionPayload.__annotations__),
         "trust_boundaries[]": list(payload["trust_boundaries"][0]),
         "findings[]": list(payload["findings"][0]),
         "findings[].evidence[]": list(finding_with_evidence["evidence"][0]),
@@ -103,12 +91,9 @@ def _report_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
             "provider": payload["inventory"]["provider"],
             "unsupported_resources": payload["inventory"]["unsupported_resources"],
             "metadata": payload["inventory"]["metadata"],
-            "resource_addresses": [
-                resource["address"] for resource in payload["inventory"]["resources"]
-            ],
+            "resource_addresses": [resource["address"] for resource in payload["inventory"]["resources"]],
             "resource_types_by_address": {
-                resource["address"]: resource["resource_type"]
-                for resource in payload["inventory"]["resources"]
+                resource["address"]: resource["resource_type"] for resource in payload["inventory"]["resources"]
             },
         },
         "trust_boundaries": [

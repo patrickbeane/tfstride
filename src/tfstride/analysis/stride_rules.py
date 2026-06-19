@@ -94,21 +94,14 @@ def _rule_definition(rule_id: str, detector: RuleDetector) -> RuleDefinition:
 
 
 def _default_rule_registry() -> RuleRegistry:
-    return RuleRegistry([
-        default_rule_metadata(rule_id)
-        for rule_group in _RULE_GROUP_IDS
-        for rule_id in rule_group
-    ])
+    return RuleRegistry([default_rule_metadata(rule_id) for rule_group in _RULE_GROUP_IDS for rule_id in rule_group])
 
 
 def _build_rule_groups(
     detectors_by_rule_id: Mapping[str, RuleDetector],
 ) -> tuple[tuple[RuleDefinition, ...], ...]:
     return tuple(
-        tuple(
-            _rule_definition(rule_id, detectors_by_rule_id[rule_id])
-            for rule_id in rule_group
-        )
+        tuple(_rule_definition(rule_id, detectors_by_rule_id[rule_id]) for rule_id in rule_group)
         for rule_group in _RULE_GROUP_IDS
     )
 
@@ -139,9 +132,7 @@ class StrideRuleEngine:
             "gcp-cloud-sql-point-in-time-recovery-disabled": (
                 gcp_detectors.detect_cloud_sql_point_in_time_recovery_disabled
             ),
-            "gcp-cloud-sql-deletion-protection-disabled": (
-                gcp_detectors.detect_cloud_sql_deletion_protection_disabled
-            ),
+            "gcp-cloud-sql-deletion-protection-disabled": (gcp_detectors.detect_cloud_sql_deletion_protection_disabled),
             "gcp-gcs-public-access": gcp_detectors.detect_gcs_public_access,
             "gcp-gcs-uniform-bucket-level-access-disabled": (
                 gcp_detectors.detect_gcs_uniform_bucket_level_access_disabled
@@ -159,9 +150,7 @@ class StrideRuleEngine:
             "gcp-gke-public-control-plane": gcp_detectors.detect_gke_public_control_plane,
             "gcp-gke-broad-authorized-networks": gcp_detectors.detect_gke_broad_authorized_networks,
             "gcp-gke-workload-identity-disabled": gcp_detectors.detect_gke_workload_identity_disabled,
-            "gcp-gke-legacy-metadata-endpoints-enabled": (
-                gcp_detectors.detect_gke_legacy_metadata_endpoints_enabled
-            ),
+            "gcp-gke-legacy-metadata-endpoints-enabled": (gcp_detectors.detect_gke_legacy_metadata_endpoints_enabled),
             "gcp-gke-broad-node-service-account": gcp_detectors.detect_gke_broad_node_service_account,
             "gcp-cloud-run-public-invoker": gcp_detectors.detect_cloud_run_public_invoker,
             "gcp-cloud-functions-public-invoker": gcp_detectors.detect_cloud_function_public_invoker,
@@ -175,16 +164,10 @@ class StrideRuleEngine:
             ),
             "aws-iam-wildcard-permissions": iam_detectors.detect_wildcard_permissions,
             "aws-workload-role-sensitive-permissions": iam_detectors.detect_workload_role_sensitive_permissions,
-            "gcp-service-account-iam-broad-principal": (
-                gcp_detectors.detect_service_account_iam_broad_principal
-            ),
-            "gcp-service-account-iam-privileged-role": (
-                gcp_detectors.detect_service_account_iam_privileged_role
-            ),
+            "gcp-service-account-iam-broad-principal": (gcp_detectors.detect_service_account_iam_broad_principal),
+            "gcp-service-account-iam-privileged-role": (gcp_detectors.detect_service_account_iam_privileged_role),
             "gcp-service-account-key-hygiene": gcp_detectors.detect_service_account_key_hygiene,
-            "gcp-service-account-key-effective-access": (
-                gcp_detectors.detect_service_account_key_effective_access
-            ),
+            "gcp-service-account-key-effective-access": (gcp_detectors.detect_service_account_key_effective_access),
             "gcp-org-folder-iam-broad-principal": gcp_detectors.detect_org_folder_iam_broad_principal,
             "gcp-org-folder-iam-privileged-role": gcp_detectors.detect_org_folder_iam_privileged_role,
             "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
@@ -206,11 +189,7 @@ class StrideRuleEngine:
         self._rule_groups_by_stage = _build_rule_groups(detectors_by_rule_id)
 
     def configured_rule_ids(self) -> set[str]:
-        return {
-            rule.metadata.rule_id
-            for rule_group in self._rule_groups()
-            for rule in rule_group
-        }
+        return {rule.metadata.rule_id for rule_group in self._rule_groups() for rule in rule_group}
 
     def evaluate(
         self,
@@ -221,11 +200,7 @@ class StrideRuleEngine:
         rule_policy: RulePolicy | None = None,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        resolved_indexes = (
-            analysis_indexes
-            if analysis_indexes is not None
-            else build_analysis_indexes(inventory)
-        )
+        resolved_indexes = analysis_indexes if analysis_indexes is not None else build_analysis_indexes(inventory)
         boundary_index: BoundaryIndex = {
             (boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries
         }

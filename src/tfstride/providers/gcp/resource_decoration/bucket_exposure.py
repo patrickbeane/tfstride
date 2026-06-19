@@ -33,19 +33,11 @@ def _bucket_public_access_reasons(bucket: NormalizedResource, index: GcpResource
     bucket_references = set(gcp_resource_references(bucket))
     for iam_resource in index.bucket_iam_resources:
         iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
-        if (
-            not iam_bucket
-            or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES)
-            not in bucket_references
-        ):
+        if not iam_bucket or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES) not in bucket_references:
             continue
         for binding in iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")
-            public_members = sorted(
-                member
-                for member in binding_members(binding)
-                if member in PUBLIC_GCP_IAM_MEMBERS
-            )
+            public_members = sorted(member for member in binding_members(binding) if member in PUBLIC_GCP_IAM_MEMBERS)
             for member in public_members:
                 reasons.append(f"{iam_resource.address} grants {role} to {member}")
     return dedupe(reasons)

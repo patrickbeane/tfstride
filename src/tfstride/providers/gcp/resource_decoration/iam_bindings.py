@@ -67,8 +67,7 @@ class DecorateSensitiveIamBindingsStage:
             elif resource.resource_type == GcpResourceType.KMS_CRYPTO_KEY:
                 _derive_sensitive_resource_iam_bindings(
                     resource,
-                    index.kms_crypto_key_iam_resources
-                    + index.kms_key_ring_iam_resources,
+                    index.kms_crypto_key_iam_resources + index.kms_key_ring_iam_resources,
                 )
             elif resource.resource_type == GcpResourceType.STORAGE_BUCKET:
                 _derive_sensitive_resource_iam_bindings(
@@ -88,8 +87,7 @@ def _derive_sensitive_resource_iam_bindings(
         target_reference = resource_iam_target_reference(iam_resource)
         if (
             not target_reference
-            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-            not in resource_references
+            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES) not in resource_references
         ):
             continue
         for binding in iam_bindings(iam_resource):

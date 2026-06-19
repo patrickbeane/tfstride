@@ -295,7 +295,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                     ("network_tags", "network_tags", ["web"]),
                     ("internet_ingress_firewalls", "internet_ingress_firewalls", ["google_compute_firewall.web"]),
                     ("fronted_by_internet_facing_load_balancer", "fronted_by_internet_facing_load_balancer", True),
-                    ("internet_facing_load_balancer_addresses", "internet_facing_load_balancer_addresses", ["lb-address"]),
+                    (
+                        "internet_facing_load_balancer_addresses",
+                        "internet_facing_load_balancer_addresses",
+                        ["lb-address"],
+                    ),
                     ("load_balancer_frontends", "load_balancer_frontends", [{"address": "lb-address"}]),
                     ("load_balancer_reachable_backends", "load_balancer_reachable_backends", [{"address": "backend"}]),
                 ),
@@ -557,9 +561,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         resource = _resource(
             {
                 GcpResourceMetadata.DATABASE_VERSION: "POSTGRES_15",
-                GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS: [
-                    {"name": "anywhere", "value": "0.0.0.0/0"}
-                ],
+                GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS: [{"name": "anywhere", "value": "0.0.0.0/0"}],
                 GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED: False,
                 GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED: True,
                 GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED: True,
@@ -583,7 +585,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertTrue(facts.sql.require_ssl)
         self.assertEqual(facts.sql.ssl_mode, "ENCRYPTED_ONLY")
         self.assertTrue(facts.sql.deletion_protection)
-
 
     def test_gcp_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
         resource = _resource(
@@ -740,7 +741,9 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.gke.endpoint, "35.1.2.3")
         self.assertFalse(facts.gke.private_endpoint_enabled)
         self.assertFalse(facts.gke.private_nodes_enabled)
-        self.assertEqual(facts.gke.master_authorized_networks, [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}])
+        self.assertEqual(
+            facts.gke.master_authorized_networks, [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}]
+        )
         self.assertFalse(facts.gke.workload_identity_enabled)
         self.assertIsNone(facts.gke.workload_identity_pool)
         self.assertEqual(facts.gke.node_service_account, "123456789-compute@developer.gserviceaccount.com")

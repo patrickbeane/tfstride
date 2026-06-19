@@ -22,7 +22,9 @@ def observe_controls(inventory: ResourceInventory) -> list[Observation]:
     observations.extend(_observe_bucket_public_access_blocks(inventory))
     observations.extend(_observe_narrowed_trust(inventory))
     observations.extend(_observe_private_encrypted_databases(inventory))
-    observations.sort(key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id))
+    observations.sort(
+        key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id)
+    )
     return observations
 
 
@@ -64,11 +66,7 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
                     evidence_item("mitigated_public_access", mitigation_signals),
                     evidence_item(
                         "control_posture",
-                        [
-                            f"{key} is {str(value).lower()}"
-                            for key, value in sorted(access_block.items())
-                            if value
-                        ],
+                        [f"{key} is {str(value).lower()}" for key, value in sorted(access_block.items()) if value],
                     ),
                 ),
             )

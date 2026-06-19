@@ -31,36 +31,25 @@ class DerivePublicExposureStage:
             )
             if resource.resource_type != "aws_subnet":
                 mutations.set_in_public_subnet(
-                    
-                        any(
-                            subnet_id in context.public_subnet_ids
-                            for subnet_id in resource.subnet_ids
-                        )
-                        if resource.subnet_ids
-                        else resource.in_public_subnet
-                    
+                    any(subnet_id in context.public_subnet_ids for subnet_id in resource.subnet_ids)
+                    if resource.subnet_ids
+                    else resource.in_public_subnet
                 )
             mutations.set_nat_gateway_egress(
-                
-                    any(
-                        context.index.subnets[subnet_id].has_nat_gateway_egress
-                        for subnet_id in resource.subnet_ids
-                        if subnet_id in context.index.subnets
-                    )
-                    if resource.subnet_ids
-                    else resource.has_nat_gateway_egress
-                
+                any(
+                    context.index.subnets[subnet_id].has_nat_gateway_egress
+                    for subnet_id in resource.subnet_ids
+                    if subnet_id in context.index.subnets
+                )
+                if resource.subnet_ids
+                else resource.has_nat_gateway_egress
             )
             # Public exposure is inferred conservatively from network placement and ingress
             # rules so later detectors can reason over a normalized signal instead of
             # provider-specific fields.
             if resource.resource_type == "aws_instance":
                 mutations.set_public_exposure(
-                    bool(
-                        resource.public_access_configured
-                        and resource.in_public_subnet
-                        and internet_ingress
-                    )
+                    bool(resource.public_access_configured and resource.in_public_subnet and internet_ingress)
                 )
                 if resource.public_exposure:
                     aws_facts(resource).add_public_exposure_reason(
@@ -68,11 +57,7 @@ class DerivePublicExposureStage:
                     )
             elif resource.resource_type == "aws_ecs_service":
                 mutations.set_public_exposure(
-                    bool(
-                        resource.public_access_configured
-                        and resource.in_public_subnet
-                        and internet_ingress
-                    )
+                    bool(resource.public_access_configured and resource.in_public_subnet and internet_ingress)
                 )
                 if resource.public_exposure:
                     aws_facts(resource).add_public_exposure_reason(
@@ -81,10 +66,7 @@ class DerivePublicExposureStage:
                     )
             elif resource.resource_type == "aws_db_instance":
                 mutations.set_public_exposure(
-                    bool(
-                        resource.public_access_configured
-                        and (internet_ingress or not attached_security_groups)
-                    )
+                    bool(resource.public_access_configured and (internet_ingress or not attached_security_groups))
                 )
                 if resource.public_exposure and internet_ingress:
                     aws_facts(resource).add_public_exposure_reason(
@@ -97,19 +79,14 @@ class DerivePublicExposureStage:
                     )
             elif resource.resource_type == "aws_lb":
                 mutations.set_public_exposure(
-                    bool(
-                        resource.public_access_configured
-                        and (internet_ingress or not attached_security_groups)
-                    )
+                    bool(resource.public_access_configured and (internet_ingress or not attached_security_groups))
                 )
                 if resource.public_exposure and internet_ingress:
                     aws_facts(resource).add_public_exposure_reason(
                         "load balancer is internet-facing and attached security groups allow internet ingress"
                     )
                 elif resource.public_exposure:
-                    aws_facts(resource).add_public_exposure_reason(
-                        "load balancer is configured as internet-facing"
-                    )
+                    aws_facts(resource).add_public_exposure_reason("load balancer is configured as internet-facing")
             mutations.sync_direct_internet_reachable()
 
 

@@ -20,9 +20,7 @@ class MergeRolePolicyResourcesStage:
             role = context.index.role_index.get(role_reference)
             if role is None:
                 continue
-            aws_mutations(role).merge_policy_statements(
-                clone_policy_statements(role_policy_resource.policy_statements)
-            )
+            aws_mutations(role).merge_policy_statements(clone_policy_statements(role_policy_resource.policy_statements))
             aws_facts(role).add_inline_policy_resource_address(role_policy_resource.address)
             aws_facts(role).add_inline_policy_name(aws_facts(role_policy_resource).policy_name)
 
@@ -40,12 +38,8 @@ class MergeRolePolicyResourcesStage:
             if policy is None:
                 aws_facts(role).add_unresolved_attached_policy_arn(str(policy_arn))
                 continue
-            aws_mutations(role).merge_policy_statements(
-                clone_policy_statements(policy.policy_statements)
-            )
-            aws_facts(role).add_attached_policy_arn(
-                policy.arn or policy.identifier or policy.address
-            )
+            aws_mutations(role).merge_policy_statements(clone_policy_statements(policy.policy_statements))
+            aws_facts(role).add_attached_policy_arn(policy.arn or policy.identifier or policy.address)
             aws_facts(role).add_attached_policy_address(policy.address)
 
 
@@ -70,15 +64,9 @@ class ResolveInstanceProfileRolesStage:
                 if resolved_role_ref:
                     resolved_role_refs.append(resolved_role_ref)
                 resolved_role_addresses.append(role.address)
-            aws_facts(instance_profile_resource).add_unresolved_role_references(
-                unresolved_role_refs
-            )
-            aws_facts(instance_profile_resource).add_resolved_role_addresses(
-                resolved_role_addresses
-            )
-            aws_facts(instance_profile_resource).set_resolved_role_references(
-                resolved_role_refs
-            )
+            aws_facts(instance_profile_resource).add_unresolved_role_references(unresolved_role_refs)
+            aws_facts(instance_profile_resource).add_resolved_role_addresses(resolved_role_addresses)
+            aws_facts(instance_profile_resource).set_resolved_role_references(resolved_role_refs)
 
         for workload_resource in resources:
             if workload_resource.resource_type != "aws_instance":
@@ -88,12 +76,8 @@ class ResolveInstanceProfileRolesStage:
                 continue
             instance_profile = context.index.instance_profile_index.get(instance_profile_ref)
             if instance_profile is None:
-                aws_facts(workload_resource).add_unresolved_instance_profile(
-                    str(instance_profile_ref)
-                )
+                aws_facts(workload_resource).add_unresolved_instance_profile(str(instance_profile_ref))
                 continue
-            aws_facts(workload_resource).add_resolved_instance_profile_address(
-                instance_profile.address
-            )
+            aws_facts(workload_resource).add_resolved_instance_profile_address(instance_profile.address)
             for resolved_role_ref in aws_facts(instance_profile).resolved_role_references:
                 aws_mutations(workload_resource).attach_role_arn(resolved_role_ref)

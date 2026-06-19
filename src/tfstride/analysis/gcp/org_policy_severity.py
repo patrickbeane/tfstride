@@ -25,9 +25,7 @@ def guardrail_adjusted_severity_reasoning(
     blast_radius: int,
 ) -> SeverityReasoning:
     active_constraints = {
-        constraint
-        for constraint in constraints
-        if _has_active_guardrail(index, resource, constraint)
+        constraint for constraint in constraints if _has_active_guardrail(index, resource, constraint)
     }
 
     if ORG_POLICY_ALLOWED_MEMBER_DOMAINS in active_constraints:

@@ -95,10 +95,7 @@ def extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, 
         if not principals:
             continue
         principal_entries = sorted(
-            (
-                {"kind": entry.kind, "value": entry.value}
-                for entry in statement.principal_entries
-            ),
+            ({"kind": entry.kind, "value": entry.value} for entry in statement.principal_entries),
             key=lambda entry: (entry["kind"], entry["value"]),
         )
         narrowing_conditions = extract_supported_trust_narrowing_conditions(statement.conditions)

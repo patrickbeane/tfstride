@@ -49,9 +49,7 @@ def _build_resource_coverage(inventory: ResourceInventory) -> ResourceCoverage:
 def _build_rule_coverage(rule_registry: RuleRegistry, rule_policy: RulePolicy | None) -> RuleCoverage:
     rules = rule_registry.rules()
     enabled_rules = [
-        rule.rule_id
-        for rule in rules
-        if rule_policy is None or rule_policy.is_enabled(rule.rule_id, rule_registry)
+        rule.rule_id for rule in rules if rule_policy is None or rule_policy.is_enabled(rule.rule_id, rule_registry)
     ]
     enabled_rule_ids = set(enabled_rules)
     disabled_rules = [rule.rule_id for rule in rules if rule.rule_id not in enabled_rule_ids]

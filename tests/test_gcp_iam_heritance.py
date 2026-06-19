@@ -195,9 +195,7 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             category=ResourceCategory.COMPUTE,
         )
 
-        index = build_analysis_indexes(
-            ResourceInventory(provider="aws", resources=[aws_resource])
-        ).gcp_iam_inheritance
+        index = build_analysis_indexes(ResourceInventory(provider="aws", resources=[aws_resource])).gcp_iam_inheritance
 
         self.assertEqual(index.resources_by_project, {})
         self.assertEqual(index.unresolved_iam_resources, ())

@@ -55,9 +55,7 @@ class PostureRuleDetectors:
                 lateral_movement=1,
                 blast_radius=1,
             )
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", resource.address))
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -145,9 +143,7 @@ class PostureRuleDetectors:
         for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
             if not bucket.public_exposure:
                 continue
-            boundary = context.boundary_index.get(
-                (BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address)
-            )
+            boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address))
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=0,

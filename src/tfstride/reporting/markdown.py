@@ -170,9 +170,7 @@ def _render_analysis_coverage(result: AnalysisResult) -> list[str]:
             lines.append(f"  - `{resource_type}`: `{count}`")
 
     nonzero_finding_counts = {
-        rule_id: finding_counts[rule_id]
-        for rule_id in coverage.rules.enabled_rules
-        if finding_counts[rule_id]
+        rule_id: finding_counts[rule_id] for rule_id in coverage.rules.enabled_rules if finding_counts[rule_id]
     }
     if nonzero_finding_counts:
         lines.append("- Findings by rule:")

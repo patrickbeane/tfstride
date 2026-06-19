@@ -231,9 +231,7 @@ class GcpNormalizer(ProviderNormalizer):
     def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
         gcp_resources = [resource for resource in resources if self.owns_resource(resource)]
         unsupported_resource_types = Counter(
-            resource.resource_type
-            for resource in gcp_resources
-            if resource.resource_type not in SUPPORTED_GCP_TYPES
+            resource.resource_type for resource in gcp_resources if resource.resource_type not in SUPPORTED_GCP_TYPES
         )
         unsupported = sorted(
             resource.address for resource in gcp_resources if resource.resource_type not in SUPPORTED_GCP_TYPES

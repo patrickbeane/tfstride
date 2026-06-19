@@ -13,11 +13,7 @@ from tfstride.resource_helpers import policy_allows_public_access
 def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     publicly_accessible = bool(values.get("publicly_accessible", False))
-    public_access_reasons = (
-        ["database instance is marked publicly_accessible"]
-        if publicly_accessible
-        else []
-    )
+    public_access_reasons = ["database instance is marked publicly_accessible"] if publicly_accessible else []
     normalized = NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,

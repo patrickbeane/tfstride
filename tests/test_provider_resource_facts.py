@@ -37,11 +37,7 @@ def _resource(provider: str = "aws") -> NormalizedResource:
 
 
 def _protocol_properties(protocol: type) -> set[str]:
-    return {
-        name
-        for name, value in vars(protocol).items()
-        if isinstance(value, property)
-    }
+    return {name for name, value in vars(protocol).items() if isinstance(value, property)}
 
 
 @dataclass(frozen=True, slots=True)

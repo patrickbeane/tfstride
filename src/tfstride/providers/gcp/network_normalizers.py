@@ -274,9 +274,7 @@ def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> Norma
             GcpResourceMetadata.FIREWALL_SOURCE_RANGES: _firewall_policy_source_ranges(match),
             GcpResourceMetadata.FIREWALL_DESTINATION_RANGES: _firewall_policy_destination_ranges(match),
             GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES: values.get(GcpAttr.TARGET_RESOURCES),
-            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS: values.get(
-                GcpAttr.TARGET_SERVICE_ACCOUNTS
-            ),
+            GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS: values.get(GcpAttr.TARGET_SERVICE_ACCOUNTS),
             GcpResourceMetadata.FIREWALL_POLICY_DISABLED: values.get(GcpAttr.DISABLED),
             GcpResourceMetadata.FIREWALL_POLICY_ENABLE_LOGGING: values.get(GcpAttr.ENABLE_LOGGING),
             "description": values.get(GcpAttr.DESCRIPTION),
@@ -384,9 +382,7 @@ def _normalize_network_endpoint_group(resource: TerraformResource) -> Normalized
                 GcpResourceMetadata.SUBNETWORK: values.get(GcpAttr.SUBNETWORK),
                 GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINT_TYPE: values.get(GcpAttr.NETWORK_ENDPOINT_TYPE),
                 GcpResourceMetadata.LOAD_BALANCER_SERVERLESS_ENDPOINTS: _serverless_neg_endpoints(values),
-                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS: _dict_list(
-                    values.get(GcpAttr.NETWORK_ENDPOINT)
-                ),
+                GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS: _dict_list(values.get(GcpAttr.NETWORK_ENDPOINT)),
             },
         ),
     )
@@ -421,8 +417,7 @@ def _serverless_neg_endpoints(values: GcpValues) -> list[dict[str, Any]]:
         for item in _dict_list(values.get(GcpAttr.CLOUD_FUNCTION_BLOCKS))
     )
     endpoints.extend(
-        _serverless_neg_endpoint("app_engine", item)
-        for item in _dict_list(values.get(GcpAttr.APP_ENGINE))
+        _serverless_neg_endpoint("app_engine", item) for item in _dict_list(values.get(GcpAttr.APP_ENGINE))
     )
     return [endpoint for endpoint in endpoints if len(endpoint) > 1]
 
@@ -443,11 +438,7 @@ def _serverless_neg_endpoint(platform: str, values: dict[str, Any]) -> dict[str,
 def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
     public_access_configured = _forwarding_rule_is_public(values)
-    public_reasons = (
-        ["forwarding rule uses an external load balancing scheme"]
-        if public_access_configured
-        else []
-    )
+    public_reasons = ["forwarding rule uses an external load balancing scheme"] if public_access_configured else []
     normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
