@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis import stride_rules
+from tfstride.analysis.rule_definitions import RuleContribution
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.analysis.stride_rules import StrideRuleEngine
 
@@ -85,6 +86,12 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
             _engine_rule_group_ids(StrideRuleEngine()),
             EXPECTED_DEFAULT_RULE_GROUP_IDS,
         )
+
+    def test_default_rule_groups_are_backed_by_rule_contribution(self) -> None:
+        engine = StrideRuleEngine()
+
+        self.assertIsInstance(engine._rule_contribution, RuleContribution)
+        self.assertIs(engine._rule_groups_by_stage, engine._rule_contribution.rule_groups)
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(stride_rules._RULE_GROUP_IDS), 6)

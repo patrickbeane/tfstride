@@ -3,10 +3,71 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis.indexes import build_analysis_indexes
-from tfstride.analysis.rule_definitions import ExecutableRule, RuleDefinition, RuleEvaluationContext
+from tfstride.analysis.rule_definitions import (
+    ExecutableRule,
+    RuleContribution,
+    RuleDefinition,
+    RuleEvaluationContext,
+    build_rule_contribution,
+)
 from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import Finding, ResourceInventory, StrideCategory
+
+
+def _metadata(rule_id: str) -> RuleMetadata:
+    return RuleMetadata(
+        rule_id=rule_id,
+        title=f"{rule_id} title",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation="Fix the test issue.",
+    )
+
+
+def _detector(received_context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
+    return []
+
+
+class RuleContributionTests(unittest.TestCase):
+    def test_build_rule_contribution_preserves_stage_and_rule_order(self) -> None:
+        registry = RuleRegistry([_metadata("rule-b"), _metadata("rule-a"), _metadata("rule-c")])
+
+        contribution = build_rule_contribution(
+            (
+                (("rule-b", _detector), ("rule-a", _detector)),
+                (("rule-c", _detector),),
+            ),
+            registry,
+        )
+
+        self.assertIsInstance(contribution, RuleContribution)
+        self.assertEqual(
+            tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups),
+            (("rule-b", "rule-a"), ("rule-c",)),
+        )
+        self.assertIs(contribution.rule_groups[0][0].metadata, registry.get("rule-b"))
+        self.assertIs(contribution.rule_groups[0][0].detector, _detector)
+
+    def test_build_rule_contribution_rejects_duplicate_rule_ids(self) -> None:
+        registry = RuleRegistry([_metadata("rule-a")])
+
+        with self.assertRaisesRegex(ValueError, "Duplicate rule contribution"):
+            build_rule_contribution(
+                ((("rule-a", _detector),), (("rule-a", _detector),)),
+                registry,
+            )
+
+    def test_build_rule_contribution_rejects_missing_metadata(self) -> None:
+        registry = RuleRegistry([])
+
+        with self.assertRaisesRegex(ValueError, "has no registered metadata"):
+            build_rule_contribution(((("rule-a", _detector),),), registry)
+
+    def test_build_rule_contribution_rejects_empty_rule_ids(self) -> None:
+        registry = RuleRegistry([])
+
+        with self.assertRaisesRegex(ValueError, "non-empty rule IDs"):
+            build_rule_contribution((((" ", _detector),),), registry)
 
 
 class ExecutableRuleTests(unittest.TestCase):

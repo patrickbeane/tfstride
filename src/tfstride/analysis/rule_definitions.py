@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -35,6 +36,39 @@ class RuleDetector(Protocol):
 class RuleDefinition:
     metadata: RuleMetadata
     detector: RuleDetector
+
+
+@dataclass(frozen=True, slots=True)
+class RuleContribution:
+    rule_groups: tuple[tuple[RuleDefinition, ...], ...]
+
+
+RuleContributionInput = Iterable[Iterable[tuple[str, RuleDetector]]]
+
+
+def build_rule_contribution(
+    rule_groups: RuleContributionInput,
+    rule_registry: RuleRegistry,
+) -> RuleContribution:
+    contribution_groups: list[tuple[RuleDefinition, ...]] = []
+    seen_rule_ids: set[str] = set()
+
+    for rule_group in rule_groups:
+        definitions: list[RuleDefinition] = []
+        for rule_id, detector in rule_group:
+            if not rule_id.strip():
+                raise ValueError("Rule contributions must define non-empty rule IDs.")
+            if rule_id in seen_rule_ids:
+                raise ValueError(f"Duplicate rule contribution for `{rule_id}`.")
+            seen_rule_ids.add(rule_id)
+            try:
+                metadata = rule_registry.get(rule_id)
+            except KeyError as exc:
+                raise ValueError(f"Rule contribution `{rule_id}` has no registered metadata.") from exc
+            definitions.append(RuleDefinition(metadata=metadata, detector=detector))
+        contribution_groups.append(tuple(definitions))
+
+    return RuleContribution(rule_groups=tuple(contribution_groups))
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,9 +14,11 @@ from tfstride.analysis.posture_rules import PostureRuleDetectors
 from tfstride.analysis.rule_definitions import (
     BoundaryIndex,
     ExecutableRule,
+    RuleContribution,
     RuleDefinition,
     RuleDetector,
     RuleEvaluationContext,
+    build_rule_contribution,
 )
 from tfstride.analysis.rule_registry import (
     RulePolicy,
@@ -89,20 +91,16 @@ _RULE_GROUP_IDS = (
 )
 
 
-def _rule_definition(rule_id: str, detector: RuleDetector) -> RuleDefinition:
-    return RuleDefinition(metadata=default_rule_metadata(rule_id), detector=detector)
-
-
 def _default_rule_registry() -> RuleRegistry:
     return RuleRegistry([default_rule_metadata(rule_id) for rule_group in _RULE_GROUP_IDS for rule_id in rule_group])
 
 
-def _build_rule_groups(
+def _build_rule_contribution(
     detectors_by_rule_id: Mapping[str, RuleDetector],
-) -> tuple[tuple[RuleDefinition, ...], ...]:
-    return tuple(
-        tuple(_rule_definition(rule_id, detectors_by_rule_id[rule_id]) for rule_id in rule_group)
-        for rule_group in _RULE_GROUP_IDS
+) -> RuleContribution:
+    return build_rule_contribution(
+        (tuple((rule_id, detectors_by_rule_id[rule_id]) for rule_id in rule_group) for rule_group in _RULE_GROUP_IDS),
+        _default_rule_registry(),
     )
 
 
@@ -186,7 +184,8 @@ class StrideRuleEngine:
             "aws-role-trust-expansion": policy_trust_detectors.detect_trust_expansion,
             "aws-role-trust-missing-narrowing": policy_trust_detectors.detect_unconstrained_trust,
         }
-        self._rule_groups_by_stage = _build_rule_groups(detectors_by_rule_id)
+        self._rule_contribution = _build_rule_contribution(detectors_by_rule_id)
+        self._rule_groups_by_stage = self._rule_contribution.rule_groups
 
     def configured_rule_ids(self) -> set[str]:
         return {rule.metadata.rule_id for rule_group in self._rule_groups() for rule in rule_group}
