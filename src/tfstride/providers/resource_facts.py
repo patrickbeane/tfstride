@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.names import normalize_provider_name
 
 
 class ProviderStorageFacts(Protocol):
@@ -552,7 +553,7 @@ class ProviderResourceFactsRegistry:
             self.register(provider, factory)
 
     def register(self, provider: str, factory: ProviderResourceFactsFactory) -> None:
-        provider_name = _normalize_provider_name(provider)
+        provider_name = normalize_provider_name(provider)
         if not provider_name:
             raise ProviderResourceFactsRegistryError("Provider facts factories must define a non-empty provider name.")
         if provider_name in self._factories:
@@ -564,7 +565,7 @@ class ProviderResourceFactsRegistry:
         self._factories[provider_name] = factory
 
     def get(self, provider: str) -> ProviderResourceFactsFactory:
-        provider_name = _normalize_provider_name(provider)
+        provider_name = normalize_provider_name(provider)
         try:
             return self._factories[provider_name]
         except KeyError as exc:
@@ -573,7 +574,7 @@ class ProviderResourceFactsRegistry:
             ) from exc
 
     def facts_for(self, resource: NormalizedResource) -> ProviderResourceFactDomains:
-        provider_name = _normalize_provider_name(resource.provider)
+        provider_name = normalize_provider_name(resource.provider)
         factory = self._factories.get(provider_name)
         if factory is None:
             return neutral_provider_resource_fact_domains(resource)
@@ -581,7 +582,3 @@ class ProviderResourceFactsRegistry:
 
     def providers(self) -> tuple[str, ...]:
         return tuple(self._factories)
-
-
-def _normalize_provider_name(provider: str) -> str:
-    return str(provider).strip().lower()

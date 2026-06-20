@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.registry import ProviderRegistry
 from tfstride.providers.resource_capabilities import (
     ProviderResourceCapabilityRegistry,
@@ -58,7 +59,7 @@ class ProviderPlugin:
     boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
 
     def __post_init__(self) -> None:
-        provider = _normalize_provider_name(self.provider)
+        provider = normalize_provider_name(self.provider)
         if not provider:
             raise ProviderPluginError("Provider plugins must define a non-empty provider name.")
         if not callable(self.normalizer_factory):
@@ -93,7 +94,7 @@ class ProviderPlugin:
 
     def create_normalizer(self) -> ProviderNormalizer:
         normalizer = self.normalizer_factory()
-        normalizer_provider = _normalize_provider_name(normalizer.provider)
+        normalizer_provider = normalize_provider_name(normalizer.provider)
         if normalizer_provider != self.provider:
             raise ProviderPluginError(
                 f"Provider plugin `{self.provider}` created normalizer for `{normalizer_provider}`."
@@ -165,7 +166,7 @@ def boundary_contributors_from_plugins(
     *,
     provider: str | None = None,
 ) -> tuple[BoundaryContributor, ...]:
-    normalized_provider = _normalize_provider_name(provider) if provider is not None else None
+    normalized_provider = normalize_provider_name(provider) if provider is not None else None
     return tuple(
         contributor
         for plugin in plugins
@@ -244,7 +245,3 @@ def _normalize_resource_capability(capability: ResourceCapability | str) -> Reso
         return capability if isinstance(capability, ResourceCapability) else ResourceCapability(str(capability))
     except ValueError as exc:
         raise ProviderResourceCapabilityRegistryError(f"Unknown resource capability `{capability}`.") from exc
-
-
-def _normalize_provider_name(provider: str) -> str:
-    return str(provider).strip().lower()

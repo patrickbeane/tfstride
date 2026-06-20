@@ -17,6 +17,7 @@ from tfstride.providers.catalog import (
     default_provider_limitations,
     default_provider_registry,
 )
+from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.plugin import ProviderBoundaryContributorFactory
 from tfstride.providers.registry import ProviderRegistry
 
@@ -109,14 +110,14 @@ class TfStride:
         return self._provider_registry.normalize_detected(resources, default_provider=DEFAULT_PROVIDER)
 
     def _boundary_contributors_for_provider(self, provider: str) -> tuple[BoundaryContributor, ...]:
-        provider_name = str(provider).strip().lower()
+        provider_name = normalize_provider_name(provider)
         return tuple(factory() for factory in self._provider_boundary_contributor_factories.get(provider_name, ()))
 
 
 def _normalize_requested_provider(provider: str | None) -> str | None:
     if provider is None:
         return None
-    normalized = str(provider).strip().lower()
+    normalized = normalize_provider_name(provider)
     if not normalized or normalized == AUTO_PROVIDER:
         return None
     return normalized
@@ -127,7 +128,7 @@ def _normalize_provider_limitations(
 ) -> dict[str, tuple[str, ...]]:
     normalized: dict[str, tuple[str, ...]] = {}
     for provider, limitations in provider_limitations.items():
-        provider_name = str(provider).strip().lower()
+        provider_name = normalize_provider_name(provider)
         if not provider_name:
             continue
         normalized[provider_name] = tuple(
@@ -141,7 +142,7 @@ def _normalize_provider_boundary_contributor_factories(
 ) -> dict[str, tuple[ProviderBoundaryContributorFactory, ...]]:
     normalized: dict[str, tuple[ProviderBoundaryContributorFactory, ...]] = {}
     for provider, factories in provider_boundary_contributor_factories.items():
-        provider_name = str(provider).strip().lower()
+        provider_name = normalize_provider_name(provider)
         if not provider_name:
             continue
         normalized[provider_name] = tuple(factories)
@@ -153,6 +154,6 @@ def _limitations_for_provider(
     provider_limitations: Mapping[str, tuple[str, ...]],
 ) -> list[str]:
     return [
-        *provider_limitations.get(str(provider).strip().lower(), ()),
+        *provider_limitations.get(normalize_provider_name(provider), ()),
         *SHARED_LIMITATIONS,
     ]

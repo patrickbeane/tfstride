@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from tfstride.models import ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.names import normalize_provider_name
 
 
 class ProviderRegistryError(ValueError):
@@ -25,7 +26,7 @@ class ProviderRegistry:
             self.register(normalizer)
 
     def register(self, normalizer: ProviderNormalizer) -> None:
-        provider = _normalize_provider_name(normalizer.provider)
+        provider = normalize_provider_name(normalizer.provider)
         if not provider:
             raise ProviderRegistryError("Provider normalizers must define a non-empty provider name.")
         if provider in self._normalizers:
@@ -33,7 +34,7 @@ class ProviderRegistry:
         self._normalizers[provider] = normalizer
 
     def get(self, provider: str) -> ProviderNormalizer:
-        provider_name = _normalize_provider_name(provider)
+        provider_name = normalize_provider_name(provider)
         try:
             return self._normalizers[provider_name]
         except KeyError as exc:
@@ -56,7 +57,7 @@ class ProviderRegistry:
                 f"{providers}. Pass an explicit provider to analyze one provider at a time."
             )
         if default_provider is not None:
-            normalized_default = _normalize_provider_name(default_provider)
+            normalized_default = normalize_provider_name(default_provider)
             if not normalized_default:
                 raise ProviderRegistryError("Default provider must be a non-empty provider name.")
             return normalized_default
@@ -82,7 +83,3 @@ class ProviderRegistry:
 
     def providers(self) -> tuple[str, ...]:
         return tuple(self._normalizers)
-
-
-def _normalize_provider_name(provider: str) -> str:
-    return str(provider).strip().lower()

@@ -5,6 +5,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.names import normalize_provider_name
 
 
 class ResourceCapability(str, Enum):
@@ -45,7 +46,7 @@ class ProviderResourceCapabilityRegistry:
             self.register(provider, capabilities)
 
     def register(self, provider: str, capabilities: ResourceCapabilityMap) -> None:
-        provider_name = _normalize_provider_name(provider)
+        provider_name = normalize_provider_name(provider)
         if not provider_name:
             raise ProviderResourceCapabilityRegistryError(
                 "Provider capabilities must define a non-empty provider name."
@@ -73,7 +74,7 @@ class ProviderResourceCapabilityRegistry:
         provider: str,
         capability: ResourceCapability | str,
     ) -> frozenset[str]:
-        provider_name = _normalize_provider_name(provider)
+        provider_name = normalize_provider_name(provider)
         normalized_capability = _normalize_capability(capability)
         provider_capabilities = self._capabilities.get(provider_name, {})
         return provider_capabilities.get(normalized_capability, frozenset())
@@ -86,7 +87,7 @@ class ProviderResourceCapabilityRegistry:
         return resource.resource_type in self.resource_types_for_provider(resource.provider, capability)
 
     def capabilities_for(self, resource: NormalizedResource) -> frozenset[ResourceCapability]:
-        provider_name = _normalize_provider_name(resource.provider)
+        provider_name = normalize_provider_name(resource.provider)
         provider_capabilities = self._capabilities.get(provider_name, {})
         return frozenset(
             capability
@@ -123,7 +124,3 @@ def _normalize_capability(capability: ResourceCapability | str) -> ResourceCapab
         return capability if isinstance(capability, ResourceCapability) else ResourceCapability(str(capability))
     except ValueError as exc:
         raise ProviderResourceCapabilityRegistryError(f"Unknown resource capability `{capability}`.") from exc
-
-
-def _normalize_provider_name(provider: str) -> str:
-    return str(provider).strip().lower()
