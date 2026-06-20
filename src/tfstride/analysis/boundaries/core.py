@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from tfstride.analysis.boundaries.shared import (
+    InternetToServiceBoundaryContributor,
+    PublicPrivateSubnetBoundaryContributor,
+)
 from tfstride.analysis.boundaries.types import (
     BoundaryAccumulator,
     BoundaryContributionContext,
@@ -19,7 +23,11 @@ class _LegacyBoundaryContributor:
 
 
 def default_boundary_contributors() -> tuple[BoundaryContributor, ...]:
-    return (_LegacyBoundaryContributor(),)
+    return (
+        InternetToServiceBoundaryContributor(),
+        PublicPrivateSubnetBoundaryContributor(),
+        _LegacyBoundaryContributor(),
+    )
 
 
 def detect_trust_boundaries(

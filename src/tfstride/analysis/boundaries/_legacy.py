@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from tfstride.analysis.boundaries.shared import contribute_control_to_workload_boundary
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.gcp.custom_roles import (
     GcpCustomRoleIndex,
@@ -26,9 +27,7 @@ from tfstride.analysis.resource_concepts import (
     is_identity_role_resource,
     is_key_management_resource,
     is_object_storage_resource,
-    is_public_edge_resource,
     is_secret_store_resource,
-    is_subnet_resource,
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.role_helpers import resolve_workload_role
@@ -59,32 +58,6 @@ def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
     analysis_indexes = context.indexes
     add_boundary = context.add_boundary
 
-    for resource in resources:
-        if resource.direct_internet_reachable and is_public_edge_resource(resource):
-            add_boundary(
-                BoundaryType.INTERNET_TO_SERVICE,
-                "internet",
-                resource.address,
-                f"Traffic can cross from the public internet to {resource.display_name}.",
-                "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
-            )
-
-    public_subnets = [resource for resource in resources if is_subnet_resource(resource) and resource.is_public_subnet]
-    private_subnets_by_vpc = _private_subnets_by_vpc(resources)
-    for public_subnet in public_subnets:
-        if not public_subnet.vpc_id:
-            continue
-        for private_subnet in private_subnets_by_vpc.get(public_subnet.vpc_id, ()):
-            # Model segmentation at the trust-zone level rather than every possible route;
-            # for review purposes, "public subnet can reach private subnet" is the key edge.
-            add_boundary(
-                BoundaryType.PUBLIC_TO_PRIVATE,
-                public_subnet.address,
-                private_subnet.address,
-                f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
-                "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
-            )
-
     workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
     data_store_candidates = _build_data_store_candidate_index(
         resources,
@@ -112,14 +85,7 @@ def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
                     f"{workload.display_name} can interact with {data_store.display_name}.",
                     reachability_rationale,
                 )
-        if attached_role is not None:
-            add_boundary(
-                BoundaryType.CONTROL_TO_WORKLOAD,
-                attached_role.address,
-                workload.address,
-                f"{attached_role.display_name} governs actions performed by {workload.display_name}.",
-                "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
-            )
+        contribute_control_to_workload_boundary(context, workload, attached_role)
 
     primary_account_id = inventory.primary_account_id
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
@@ -162,15 +128,6 @@ def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
                 description,
                 rationale,
             )
-
-
-def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str, tuple[NormalizedResource, ...]]:
-    grouped: dict[str, list[NormalizedResource]] = {}
-    for resource in resources:
-        if not is_subnet_resource(resource) or resource.is_public_subnet or not resource.vpc_id:
-            continue
-        grouped.setdefault(resource.vpc_id, []).append(resource)
-    return {vpc_id: tuple(subnets) for vpc_id, subnets in grouped.items()}
 
 
 def _build_data_store_candidate_index(
