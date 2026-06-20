@@ -14,6 +14,7 @@ if FASTAPI_DEPS_AVAILABLE:
     from fastapi.testclient import TestClient
 
     from apps.dashboard import main as dashboard_main
+    from apps.dashboard import view_models as dashboard_view_models
     from apps.dashboard.main import app as dashboard_app
 
 
@@ -126,7 +127,7 @@ class DashboardAppTests(unittest.TestCase):
             }
         ]
 
-        context = dashboard_main._coverage_context(payload)
+        context = dashboard_view_models._coverage_context(payload)
 
         self.assertEqual(
             context["unsupported_resource_types"],
