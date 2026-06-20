@@ -14,6 +14,7 @@ if FASTAPI_DEPS_AVAILABLE:
     from fastapi.testclient import TestClient
 
     from apps.dashboard import main as dashboard_main
+    from apps.dashboard import routes as dashboard_routes
     from apps.dashboard import uploads as dashboard_uploads
     from apps.dashboard import view_models as dashboard_view_models
     from apps.dashboard.main import app as dashboard_app
@@ -107,7 +108,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertTrue(payload["findings"])
 
     def test_coverage_context_derives_useful_fallback_from_legacy_payload(self) -> None:
-        payload = deepcopy(dashboard_main.API_REPORT_EXAMPLE)
+        payload = deepcopy(dashboard_routes.API_REPORT_EXAMPLE)
         payload.pop("analysis_coverage")
         payload["summary"]["normalized_resources"] = 23
         payload["summary"]["unsupported_resources"] = 1
