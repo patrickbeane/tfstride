@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
 
@@ -10,6 +11,7 @@ from tfstride.providers.aws.plugin import aws_provider_plugin
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.plugin import (
     ProviderPlugin,
+    boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -41,6 +43,10 @@ def default_resource_capability_registry() -> ProviderResourceCapabilityRegistry
 
 def default_provider_limitations() -> dict[str, tuple[str, ...]]:
     return provider_limitations_from_plugins(default_provider_plugins())
+
+
+def default_provider_boundary_contributors() -> tuple[BoundaryContributor, ...]:
+    return boundary_contributors_from_plugins(default_provider_plugins())
 
 
 def default_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:

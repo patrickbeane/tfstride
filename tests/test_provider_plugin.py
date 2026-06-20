@@ -19,6 +19,7 @@ from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
+    boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -92,6 +93,11 @@ class RecordingFacts:
         return []
 
 
+class RecordingBoundaryContributor:
+    def contribute(self, context) -> None:
+        return None
+
+
 class RecordingDecorator:
     def __init__(self) -> None:
         self.calls: list[list[NormalizedResource]] = []
@@ -128,6 +134,7 @@ def _plugin(
     normalizer_provider: str = "aws",
     limitations: tuple[str, ...] = (" limitation ",),
     rule_contribution_factory=_rule_contribution,
+    boundary_contributor_factory=RecordingBoundaryContributor,
 ) -> ProviderPlugin:
     return ProviderPlugin(
         provider=provider,
@@ -141,6 +148,7 @@ def _plugin(
         limitations=limitations,
         resource_decorator_factory=RecordingDecorator,
         rule_contribution_factory=rule_contribution_factory,
+        boundary_contributor_factory=boundary_contributor_factory,
     )
 
 
@@ -158,6 +166,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(plugin.limitations, ("limitation",))
         self.assertIs(plugin.facts_registry_entry()[1], _facts)
         self.assertIs(plugin.rule_contribution_factory, _rule_contribution)
+        self.assertIs(plugin.boundary_contributor_factory, RecordingBoundaryContributor)
 
     def test_plugin_creates_normalizer_and_resource_decorator(self) -> None:
         plugin = _plugin()
@@ -167,6 +176,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsInstance(normalizer, RecordingNormalizer)
         self.assertIsInstance(decorator, RecordingDecorator)
+
+    def test_plugin_creates_boundary_contributor_when_factory_is_configured(self) -> None:
+        plugin = _plugin()
+
+        self.assertIsInstance(plugin.create_boundary_contributor(), RecordingBoundaryContributor)
 
     def test_plugin_creates_rule_contribution_when_factory_is_configured(self) -> None:
         plugin = _plugin()
@@ -181,6 +195,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsNone(plugin.create_rule_contribution(FindingFactory(RuleRegistry([RULE_METADATA]))))
 
+    def test_plugin_allows_missing_boundary_contributor_factory(self) -> None:
+        plugin = _plugin(boundary_contributor_factory=None)
+
+        self.assertIsNone(plugin.create_boundary_contributor())
+
     def test_plugin_classifies_supported_resource_types(self) -> None:
         plugin = _plugin()
 
@@ -194,6 +213,7 @@ class ProviderPluginTests(unittest.TestCase):
         provider_registry = provider_registry_from_plugins([plugin])
         facts_registry = resource_facts_registry_from_plugins([plugin])
         limitation_registry = provider_limitations_from_plugins([plugin])
+        boundary_contributors = boundary_contributors_from_plugins([plugin])
         rule_contribution = rule_contribution_from_plugins(
             [plugin],
             FindingFactory(RuleRegistry([RULE_METADATA])),
@@ -202,6 +222,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(provider_registry.providers(), ("aws",))
         self.assertEqual(facts_registry.providers(), ("aws",))
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
+        self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
         self.assertEqual(rule_contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
         self.assertEqual(facts_registry.facts_for(resource).storage.bucket_name, "aws-bucket")
@@ -252,6 +273,17 @@ class ProviderPluginTests(unittest.TestCase):
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 rule_contribution_factory=object(),
+            )
+
+    def test_plugin_rejects_non_callable_boundary_contributor_factory(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            ProviderPlugin(
+                provider="aws",
+                normalizer_factory=lambda: RecordingNormalizer(),
+                resource_facts_factory=_facts,
+                metadata_namespace=FakeMetadata,
+                supported_resource_types=frozenset(),
+                boundary_contributor_factory=object(),
             )
 
     def test_plugin_rejects_non_type_metadata_namespace(self) -> None:

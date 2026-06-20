@@ -20,9 +20,11 @@ from tfstride.providers.resource_facts import (
 )
 
 if TYPE_CHECKING:
+    from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
 
+ProviderBoundaryContributorFactory = Callable[[], "BoundaryContributor"]
 ProviderRuleContributionFactory = Callable[["FindingFactory"], "RuleContribution"]
 
 
@@ -50,6 +52,7 @@ class ProviderPlugin:
     limitations: tuple[str, ...] = ()
     resource_decorator_factory: Callable[[], ProviderResourceDecorator] | None = None
     rule_contribution_factory: ProviderRuleContributionFactory | None = None
+    boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
 
     def __post_init__(self) -> None:
         provider = _normalize_provider_name(self.provider)
@@ -63,6 +66,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` decorator factory must be callable.")
         if self.rule_contribution_factory is not None and not callable(self.rule_contribution_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` rule contribution factory must be callable.")
+        if self.boundary_contributor_factory is not None and not callable(self.boundary_contributor_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` boundary contributor factory must be callable.")
         if not isinstance(self.metadata_namespace, type):
             raise ProviderPluginError(f"Provider plugin `{provider}` metadata namespace must be a type.")
 
@@ -99,6 +104,11 @@ class ProviderPlugin:
         if self.rule_contribution_factory is None:
             return None
         return self.rule_contribution_factory(finding_factory)
+
+    def create_boundary_contributor(self) -> BoundaryContributor | None:
+        if self.boundary_contributor_factory is None:
+            return None
+        return self.boundary_contributor_factory()
 
     def supports_resource_type(self, resource_type: str) -> bool:
         return str(resource_type).strip() in self.supported_resource_types
@@ -138,6 +148,10 @@ def resource_capability_registry_from_plugins(
 
 def provider_limitations_from_plugins(plugins: Iterable[ProviderPlugin]) -> dict[str, tuple[str, ...]]:
     return {provider: limitations for provider, limitations in (plugin.limitations_entry() for plugin in plugins)}
+
+
+def boundary_contributors_from_plugins(plugins: Iterable[ProviderPlugin]) -> tuple[BoundaryContributor, ...]:
+    return tuple(contributor for plugin in plugins if (contributor := plugin.create_boundary_contributor()) is not None)
 
 
 def rule_contribution_from_plugins(

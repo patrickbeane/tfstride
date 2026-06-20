@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.providers.aws.boundaries import AwsBoundaryContributor
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
@@ -15,6 +16,7 @@ from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsS
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
+    default_provider_boundary_contributors,
     default_provider_limitations,
     default_provider_plugins,
     default_provider_registry,
@@ -22,6 +24,7 @@ from tfstride.providers.catalog import (
     default_resource_facts_registry,
     default_rule_contribution,
 )
+from tfstride.providers.gcp.boundaries import GcpBoundaryContributor
 from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
@@ -68,6 +71,8 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(gcp_plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(gcp_plugin.create_normalizer(), GcpNormalizer)
         self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
+        self.assertIsInstance(aws_plugin.create_boundary_contributor(), AwsBoundaryContributor)
+        self.assertIsInstance(gcp_plugin.create_boundary_contributor(), GcpBoundaryContributor)
         self.assertEqual(
             tuple(
                 tuple(rule.metadata.rule_id for rule in rule_group)
@@ -75,6 +80,12 @@ class ProviderCatalogTests(unittest.TestCase):
             ),
             GCP_RULE_GROUP_IDS,
         )
+
+    def test_default_boundary_contributors_register_builtin_provider_contributors(self) -> None:
+        contributors = default_provider_boundary_contributors()
+
+        self.assertIsInstance(contributors[0], AwsBoundaryContributor)
+        self.assertIsInstance(contributors[1], GcpBoundaryContributor)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
         contribution = default_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))

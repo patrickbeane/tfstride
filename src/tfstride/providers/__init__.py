@@ -1,10 +1,12 @@
 """Provider adapters for tfstride."""
 
 from tfstride.providers.plugin import (
+    ProviderBoundaryContributorFactory,
     ProviderPlugin,
     ProviderPluginError,
     ProviderResourceDecorator,
     ProviderRuleContributionFactory,
+    boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -32,6 +34,7 @@ from tfstride.providers.resource_facts import (
 
 __all__ = [
     "NeutralProviderResourceFacts",
+    "ProviderBoundaryContributorFactory",
     "ProviderNotRegisteredError",
     "ProviderPlugin",
     "ProviderPluginError",
@@ -47,6 +50,7 @@ __all__ = [
     "ProviderResourceFactsRegistry",
     "ProviderResourceFactsRegistryError",
     "ResourceCapability",
+    "boundary_contributors_from_plugins",
     "provider_limitations_from_plugins",
     "provider_registry_from_plugins",
     "resource_capability_registry_from_plugins",

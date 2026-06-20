@@ -11,8 +11,15 @@ from tfstride.providers.aws.resource_facts import aws_fact_domains
 from tfstride.providers.plugin import ProviderPlugin
 
 if TYPE_CHECKING:
+    from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
+
+
+def _aws_boundary_contributor() -> BoundaryContributor:
+    from tfstride.providers.aws.boundaries import AwsBoundaryContributor
+
+    return AwsBoundaryContributor()
 
 
 def _aws_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:
@@ -32,4 +39,5 @@ def aws_provider_plugin() -> ProviderPlugin:
         limitations=AWS_LIMITATIONS,
         resource_decorator_factory=AwsResourceDecorator,
         rule_contribution_factory=_aws_rule_contribution,
+        boundary_contributor_factory=_aws_boundary_contributor,
     )

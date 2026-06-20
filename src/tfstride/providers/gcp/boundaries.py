@@ -29,7 +29,7 @@ from tfstride.providers.gcp.resource_utils import binding_members, dedupe
 
 
 @dataclass(frozen=True, slots=True)
-class _DataStoreCandidateIndex:
+class _GcpDataStoreCandidateIndex:
     data_store_positions: Mapping[int, int]
     object_storage: tuple[NormalizedResource, ...]
     secret_stores: tuple[NormalizedResource, ...]
@@ -44,42 +44,43 @@ class _DataStoreCandidateIndex:
     gcp_custom_roles: GcpCustomRoleIndex
 
 
-def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
-    if context.inventory.provider != "gcp":
-        return
+class GcpBoundaryContributor:
+    def contribute(self, context: BoundaryContributionContext) -> None:
+        if context.inventory.provider != "gcp":
+            return
 
-    inventory = context.inventory
-    resources = inventory.resources
-    analysis_indexes = context.indexes
+        inventory = context.inventory
+        resources = inventory.resources
+        analysis_indexes = context.indexes
 
-    data_store_candidates = _build_data_store_candidate_index(
-        resources,
-        analysis_indexes,
-    )
-    for workload in inventory.by_type(*WORKLOAD_RESOURCE_TYPES):
-        attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
-        for data_store in _candidate_data_stores_for_workload(workload, data_store_candidates):
-            reachability_rationale = _gcp_workload_reaches_data_store(
-                workload,
-                data_store,
-                analysis_indexes,
-                data_store_candidates,
-            )
-            if reachability_rationale:
-                context.add_boundary(
-                    BoundaryType.WORKLOAD_TO_DATA_STORE,
-                    workload.address,
-                    data_store.address,
-                    f"{workload.display_name} can interact with {data_store.display_name}.",
-                    reachability_rationale,
+        data_store_candidates = _build_data_store_candidate_index(
+            resources,
+            analysis_indexes,
+        )
+        for workload in inventory.by_type(*WORKLOAD_RESOURCE_TYPES):
+            attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
+            for data_store in _candidate_data_stores_for_workload(workload, data_store_candidates):
+                reachability_rationale = _gcp_workload_reaches_data_store(
+                    workload,
+                    data_store,
+                    analysis_indexes,
+                    data_store_candidates,
                 )
-        contribute_control_to_workload_boundary(context, workload, attached_role)
+                if reachability_rationale:
+                    context.add_boundary(
+                        BoundaryType.WORKLOAD_TO_DATA_STORE,
+                        workload.address,
+                        data_store.address,
+                        f"{workload.display_name} can interact with {data_store.display_name}.",
+                        reachability_rationale,
+                    )
+            contribute_control_to_workload_boundary(context, workload, attached_role)
 
 
 def _build_data_store_candidate_index(
     resources: Sequence[NormalizedResource],
     indexes: AnalysisIndexes,
-) -> _DataStoreCandidateIndex:
+) -> _GcpDataStoreCandidateIndex:
     candidate_types = set(DATA_STORE_RESOURCE_TYPES) | set(KEY_MANAGEMENT_RESOURCE_TYPES)
     data_stores = [resource for resource in resources if resource.resource_type in candidate_types]
     direct_internet_databases: list[NormalizedResource] = []
@@ -123,7 +124,7 @@ def _build_data_store_candidate_index(
         else:
             cloud_data_stores.append(data_store)
 
-    return _DataStoreCandidateIndex(
+    return _GcpDataStoreCandidateIndex(
         data_store_positions={id(resource): index for index, resource in enumerate(data_stores)},
         object_storage=tuple(object_storage),
         secret_stores=tuple(secret_stores),
@@ -145,7 +146,7 @@ def _build_data_store_candidate_index(
 
 def _candidate_data_stores_for_workload(
     workload: NormalizedResource,
-    index: _DataStoreCandidateIndex,
+    index: _GcpDataStoreCandidateIndex,
 ) -> tuple[NormalizedResource, ...]:
     candidates: dict[int, NormalizedResource] = {}
 
@@ -251,7 +252,7 @@ def _gcp_workload_reaches_data_store(
     workload: NormalizedResource,
     data_store: NormalizedResource,
     indexes: AnalysisIndexes,
-    candidate_index: _DataStoreCandidateIndex,
+    candidate_index: _GcpDataStoreCandidateIndex,
 ) -> str | None:
     iam_rationale = _gcp_iam_reachability_rationale(workload, data_store, candidate_index)
     if not is_database_resource(data_store):
@@ -266,7 +267,7 @@ def _gcp_workload_reaches_data_store(
 def _gcp_iam_reachability_rationale(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    candidate_index: _DataStoreCandidateIndex,
+    candidate_index: _GcpDataStoreCandidateIndex,
 ) -> str | None:
     if not _gcp_workload_scopes_allow_access(workload, data_store):
         return None
@@ -285,7 +286,7 @@ def _gcp_iam_reachability_rationale(
 def _gcp_matching_iam_access_grants(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    candidate_index: _DataStoreCandidateIndex,
+    candidate_index: _GcpDataStoreCandidateIndex,
 ) -> list[str]:
     workload_members = set(_gcp_workload_identity_members(workload))
     if not workload_members:
