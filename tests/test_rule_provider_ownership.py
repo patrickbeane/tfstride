@@ -9,13 +9,21 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
-from tfstride.providers.catalog import default_provider_plugins
+from tfstride.providers.catalog import default_provider_plugins, default_provider_rule_metadata
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "src" / "tfstride"
 TESTS_ROOT = REPO_ROOT / "tests"
 STRIDE_RULES_PATH = REPO_ROOT / "src" / "tfstride" / "analysis" / "stride_rules.py"
+SHARED_PROVIDER_NEUTRAL_PATHS = (
+    SOURCE_ROOT / "analysis" / "rule_registry.py",
+    SOURCE_ROOT / "analysis" / "trust_boundaries.py",
+    SOURCE_ROOT / "analysis" / "boundaries" / "__init__.py",
+    SOURCE_ROOT / "analysis" / "boundaries" / "core.py",
+    SOURCE_ROOT / "analysis" / "boundaries" / "shared.py",
+    SOURCE_ROOT / "analysis" / "boundaries" / "types.py",
+)
 
 
 def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> tuple[str, ...]:
@@ -54,6 +62,18 @@ def _imported_modules(path: Path) -> set[str]:
         elif isinstance(node, ast.ImportFrom) and node.module is not None:
             modules.add(node.module)
     return modules
+
+
+def _provider_source_markers() -> tuple[str, ...]:
+    return tuple(
+        marker
+        for plugin in default_provider_plugins()
+        for marker in (
+            f"{plugin.provider}-",
+            f"tfstride.analysis.{plugin.provider}",
+            f"tfstride.providers.{plugin.provider}",
+        )
+    )
 
 
 class ProviderRuleOwnershipTests(unittest.TestCase):
@@ -96,6 +116,50 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
         duplicate_rule_ids = sorted(rule_id for rule_id, count in Counter(contributed_rule_ids).items() if count > 1)
         self.assertEqual(duplicate_rule_ids, [])
         self.assertEqual(set(contributed_rule_ids), StrideRuleEngine().configured_rule_ids())
+
+    def test_provider_rule_metadata_ids_match_contributed_rule_ids(self) -> None:
+        for plugin in default_provider_plugins():
+            metadata_ids = {metadata.rule_id for metadata in plugin.create_rule_metadata()}
+            contribution = plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))
+
+            self.assertIsNotNone(contribution, f"Provider `{plugin.provider}` must contribute rules.")
+            contribution_ids = {rule.metadata.rule_id for rule_group in contribution.rule_groups for rule in rule_group}
+
+            self.assertEqual(metadata_ids, contribution_ids)
+
+    def test_provider_rule_metadata_ids_use_provider_prefix(self) -> None:
+        for plugin in default_provider_plugins():
+            expected_prefix = f"{plugin.provider}-"
+            violations = [
+                metadata.rule_id
+                for metadata in plugin.create_rule_metadata()
+                if not metadata.rule_id.startswith(expected_prefix)
+            ]
+
+            self.assertEqual(violations, [])
+
+    def test_default_provider_rule_metadata_order_follows_plugin_order(self) -> None:
+        expected_rule_ids = tuple(
+            metadata.rule_id for plugin in default_provider_plugins() for metadata in plugin.create_rule_metadata()
+        )
+        actual_rule_ids = tuple(metadata.rule_id for metadata in default_provider_rule_metadata())
+
+        self.assertEqual(actual_rule_ids, expected_rule_ids)
+
+    def test_shared_rule_registry_and_boundary_core_do_not_contain_provider_ids(self) -> None:
+        provider_rule_ids = {metadata.rule_id for metadata in default_provider_rule_metadata()}
+        provider_source_markers = _provider_source_markers()
+        violations: list[tuple[str, str]] = []
+
+        for path in SHARED_PROVIDER_NEUTRAL_PATHS:
+            source = path.read_text()
+            rule_id_markers = sorted(rule_id for rule_id in provider_rule_ids if rule_id in source)
+            source_markers = sorted(marker for marker in provider_source_markers if marker in source)
+            violations.extend(
+                (str(path.relative_to(REPO_ROOT)), marker) for marker in (*rule_id_markers, *source_markers)
+            )
+
+        self.assertEqual(violations, [])
 
 
 if __name__ == "__main__":
