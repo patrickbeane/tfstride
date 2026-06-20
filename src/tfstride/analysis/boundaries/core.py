@@ -13,6 +13,7 @@ from tfstride.analysis.boundaries.types import (
 )
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.models import ResourceInventory, TrustBoundary
+from tfstride.providers.aws.boundaries import AwsBoundaryContributor
 
 
 class _LegacyBoundaryContributor:
@@ -26,6 +27,7 @@ def default_boundary_contributors() -> tuple[BoundaryContributor, ...]:
     return (
         InternetToServiceBoundaryContributor(),
         PublicPrivateSubnetBoundaryContributor(),
+        AwsBoundaryContributor(),
         _LegacyBoundaryContributor(),
     )
 

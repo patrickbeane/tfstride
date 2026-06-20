@@ -11,20 +11,12 @@ from tfstride.analysis.gcp.custom_roles import (
     custom_role_allows_data_store_access,
 )
 from tfstride.analysis.indexes import AnalysisIndexes
-from tfstride.analysis.policy_conditions import (
-    PrincipalAssessment,
-    federated_provider_description,
-    policy_statement_principal_assessments,
-    trust_statement_principal_assessments,
-)
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
-    IDENTITY_ROLE_RESOURCE_TYPES,
     KEY_MANAGEMENT_RESOURCE_TYPES,
     WORKLOAD_RESOURCE_TYPES,
     has_provider_managed_egress_without_vpc,
     is_database_resource,
-    is_identity_role_resource,
     is_key_management_resource,
     is_object_storage_resource,
     is_secret_store_resource,
@@ -53,32 +45,28 @@ class _DataStoreCandidateIndex:
 
 
 def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
+    if context.inventory.provider != "gcp":
+        return
+
     inventory = context.inventory
     resources = inventory.resources
     analysis_indexes = context.indexes
-    add_boundary = context.add_boundary
 
-    workloads = inventory.by_type(*WORKLOAD_RESOURCE_TYPES)
     data_store_candidates = _build_data_store_candidate_index(
         resources,
         analysis_indexes,
     )
-    for workload in workloads:
+    for workload in inventory.by_type(*WORKLOAD_RESOURCE_TYPES):
         attached_role = resolve_workload_role(workload, analysis_indexes.role_index)
-        for data_store in _candidate_data_stores_for_workload(
-            workload,
-            attached_role,
-            data_store_candidates,
-        ):
-            reachability_rationale = _workload_reaches_data_store(
+        for data_store in _candidate_data_stores_for_workload(workload, data_store_candidates):
+            reachability_rationale = _gcp_workload_reaches_data_store(
                 workload,
                 data_store,
-                attached_role,
                 analysis_indexes,
                 data_store_candidates,
             )
             if reachability_rationale:
-                add_boundary(
+                context.add_boundary(
                     BoundaryType.WORKLOAD_TO_DATA_STORE,
                     workload.address,
                     data_store.address,
@@ -86,48 +74,6 @@ def contribute_trust_boundaries(context: BoundaryContributionContext) -> None:
                     reachability_rationale,
                 )
         contribute_control_to_workload_boundary(context, workload, attached_role)
-
-    primary_account_id = inventory.primary_account_id
-    for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-        seen_role_principals: set[tuple[str, str]] = set()
-        for trust_statement in analysis_facts(role).iam.trust_statements:
-            for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
-                principal_key = (assessment.principal_kind, assessment.principal)
-                if principal_key in seen_role_principals:
-                    continue
-                seen_role_principals.add(principal_key)
-                if assessment.is_service:
-                    continue
-                add_boundary(
-                    BoundaryType.CROSS_ACCOUNT_OR_ROLE,
-                    assessment.principal,
-                    role.address,
-                    _role_trust_description(role, assessment),
-                    _role_trust_rationale(assessment),
-                )
-
-    for resource in resources:
-        if is_identity_role_resource(resource):
-            continue
-        for assessment in _resource_policy_principals(resource, primary_account_id):
-            principal = assessment.principal
-            if assessment.is_service:
-                continue
-            if assessment.is_wildcard:
-                description = f"{resource.display_name} allows any principal through a resource policy."
-            else:
-                description = f"{resource.display_name} allows {principal} through a resource policy."
-            if assessment.is_wildcard or assessment.is_foreign_account:
-                rationale = "A broad or foreign AWS principal can cross into this resource's policy boundary."
-            else:
-                rationale = "An additional account-level principal can cross into this resource's policy boundary."
-            add_boundary(
-                BoundaryType.CROSS_ACCOUNT_OR_ROLE,
-                principal,
-                resource.address,
-                description,
-                rationale,
-            )
 
 
 def _build_data_store_candidate_index(
@@ -199,7 +145,6 @@ def _build_data_store_candidate_index(
 
 def _candidate_data_stores_for_workload(
     workload: NormalizedResource,
-    attached_role: NormalizedResource | None,
     index: _DataStoreCandidateIndex,
 ) -> tuple[NormalizedResource, ...]:
     candidates: dict[int, NormalizedResource] = {}
@@ -217,11 +162,6 @@ def _candidate_data_stores_for_workload(
             add_many(index.databases_missing_security_groups_by_vpc.get(workload.vpc_id, ()))
         else:
             add_many(index.databases_by_vpc.get(workload.vpc_id, ()))
-    if attached_role is not None:
-        if _role_allows_object_storage_access(attached_role):
-            add_many(index.object_storage)
-        if _role_allows_secret_read(attached_role):
-            add_many(index.secret_stores)
     if _gcp_workload_identity_members(workload):
         add_many(index.databases)
         add_many(index.object_storage)
@@ -256,72 +196,6 @@ def _freeze_resource_groups_by_key(
     grouped: dict[str, list[NormalizedResource]],
 ) -> Mapping[str, tuple[NormalizedResource, ...]]:
     return {key: tuple(resources) for key, resources in grouped.items()}
-
-
-def _role_allows_object_storage_access(role: NormalizedResource) -> bool:
-    return any(
-        statement.effect == "Allow" and any(action == "*" or action.startswith("s3:") for action in statement.actions)
-        for statement in role.policy_statements
-    )
-
-
-def _role_allows_secret_read(role: NormalizedResource) -> bool:
-    return any(
-        statement.effect == "Allow" and any(_allows_secret_read(action) for action in statement.actions)
-        for statement in role.policy_statements
-    )
-
-
-def _workload_reaches_data_store(
-    workload: NormalizedResource,
-    data_store: NormalizedResource,
-    attached_role: NormalizedResource | None,
-    indexes: AnalysisIndexes,
-    candidate_index: _DataStoreCandidateIndex,
-) -> str | None:
-    if workload.provider == "gcp" and data_store.provider == "gcp":
-        return _gcp_workload_reaches_data_store(workload, data_store, indexes, candidate_index)
-    if is_database_resource(data_store):
-        return _database_reachability_rationale(workload, data_store, indexes)
-    if is_object_storage_resource(data_store):
-        if attached_role is None:
-            return None
-        allowed_actions = sorted(
-            {
-                action
-                for statement in attached_role.policy_statements
-                if statement.effect == "Allow"
-                for action in statement.actions
-                if action == "*" or action.startswith("s3:")
-            }
-        )
-        if not allowed_actions:
-            return None
-        action_text = ", ".join(allowed_actions)
-        return (
-            "Application or function workloads cross into a higher-sensitivity data plane when their "
-            f"attached role allows S3 actions such as {action_text}."
-        )
-    if is_secret_store_resource(data_store):
-        if attached_role is None:
-            return None
-        allowed_actions = sorted(
-            {
-                action
-                for statement in attached_role.policy_statements
-                if statement.effect == "Allow"
-                for action in statement.actions
-                if _allows_secret_read(action)
-            }
-        )
-        if not allowed_actions:
-            return None
-        action_text = ", ".join(allowed_actions)
-        return (
-            "Application or function workloads cross into a higher-sensitivity secret plane when their "
-            f"attached role allows Secrets Manager retrieval actions such as {action_text}."
-        )
-    return None
 
 
 _GCP_BROAD_DATA_ACCESS_ROLES = frozenset({"roles/owner", "roles/editor"})
@@ -559,51 +433,3 @@ def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
     if has_provider_managed_egress_without_vpc(workload):
         return True
     return workload.in_public_subnet or workload.has_nat_gateway_egress
-
-
-def _resource_policy_principals(
-    resource: NormalizedResource,
-    primary_account_id: str | None,
-) -> list[PrincipalAssessment]:
-    principals: list[PrincipalAssessment] = []
-    seen_principals: set[str] = set()
-    for statement in resource.policy_statements:
-        if statement.effect != "Allow":
-            continue
-        for assessment in policy_statement_principal_assessments(statement, primary_account_id):
-            if assessment.is_service:
-                continue
-            if is_object_storage_resource(resource) and assessment.is_wildcard:
-                continue
-            if assessment.scope_description is None:
-                continue
-            if assessment.principal in seen_principals:
-                continue
-            seen_principals.add(assessment.principal)
-            principals.append(assessment)
-    return principals
-
-
-def _role_trust_description(role: NormalizedResource, assessment: PrincipalAssessment) -> str:
-    if assessment.is_wildcard:
-        return f"{role.display_name} trusts any principal."
-    if assessment.is_federated:
-        return (
-            f"{role.display_name} trusts {assessment.principal} as a "
-            f"{federated_provider_description(assessment.federated_provider_type)}."
-        )
-    return f"{role.display_name} trusts {assessment.principal}."
-
-
-def _role_trust_rationale(assessment: PrincipalAssessment) -> str:
-    if assessment.is_federated:
-        if assessment.is_foreign_account:
-            return "A foreign federated identity provider can cross into this role's trust boundary."
-        return "A federated identity provider can cross into this role's trust boundary."
-    if assessment.is_foreign_account:
-        return "A foreign AWS account can cross into this role's trust boundary."
-    return "An additional role or principal can cross into this role's trust boundary."
-
-
-def _allows_secret_read(action: str) -> bool:
-    return action == "*" or action == "secretsmanager:*" or action.startswith("secretsmanager:GetSecretValue")
