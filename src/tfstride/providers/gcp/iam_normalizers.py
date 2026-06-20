@@ -7,7 +7,8 @@ from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_list, compact
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
-from tfstride.providers.gcp.resource_utils import first_non_empty, load_json_document, service_account_member
+from tfstride.providers.gcp.resource_utils import first_non_empty, service_account_member
+from tfstride.providers.json_documents import load_json_document
 
 
 def normalize_project_iam_member(resource: TerraformResource) -> NormalizedResource:

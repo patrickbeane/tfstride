@@ -9,7 +9,6 @@ from tfstride.providers.aws.policy_documents import (
     extract_principals,
     extract_trust_statements,
     lambda_permission_principal_entries,
-    load_json_document,
     parse_policy_statements,
 )
 
@@ -30,12 +29,6 @@ class AwsCoercionTests(unittest.TestCase):
 
 
 class AwsPolicyDocumentTests(unittest.TestCase):
-    def test_load_json_document_accepts_dict_json_object_and_invalid_input(self) -> None:
-        self.assertEqual(load_json_document({"Statement": []}), {"Statement": []})
-        self.assertEqual(load_json_document('{"Statement": []}'), {"Statement": []})
-        self.assertEqual(load_json_document("[1, 2, 3]"), {})
-        self.assertEqual(load_json_document("{not json"), {})
-
     def test_parse_policy_statements_extracts_principals_and_conditions(self) -> None:
         policy = {
             "Statement": {

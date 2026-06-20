@@ -4,9 +4,10 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.aws.coercion import as_list
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
-from tfstride.providers.aws.policy_documents import load_json_document, parse_policy_statements
+from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
+from tfstride.providers.json_documents import load_json_document
 from tfstride.resource_helpers import policy_allows_public_access
 
 

@@ -7,9 +7,9 @@ from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import (
     extract_principals,
     extract_trust_statements,
-    load_json_document,
     parse_policy_statements,
 )
+from tfstride.providers.json_documents import load_json_document
 
 
 def normalize_iam_role(resource: TerraformResource) -> NormalizedResource:

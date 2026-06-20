@@ -10,11 +10,11 @@ from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     first_non_empty,
-    load_json_document,
     resource_identifier,
     resource_name,
     service_account_member,
 )
+from tfstride.providers.json_documents import load_json_document
 
 
 def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResource:

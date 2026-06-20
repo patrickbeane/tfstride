@@ -45,19 +45,6 @@ SUPPORTED_WEB_IDENTITY_TRUST_NARROWING_OPERATORS = frozenset(
 )
 
 
-def load_json_document(raw_document: Any) -> dict[str, Any]:
-    if isinstance(raw_document, dict):
-        return raw_document
-    if isinstance(raw_document, str) and raw_document.strip():
-        try:
-            loaded = json.loads(raw_document)
-        except json.JSONDecodeError:
-            return {}
-        if isinstance(loaded, dict):
-            return loaded
-    return {}
-
-
 def parse_policy_statements(policy_document: dict[str, Any]) -> list[IAMPolicyStatement]:
     statements: list[IAMPolicyStatement] = []
     for statement in as_list(policy_document.get("Statement")):
