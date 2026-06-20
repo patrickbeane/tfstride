@@ -5,6 +5,8 @@ from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
+from tfstride.analysis.boundaries.core import detect_trust_boundaries as detect_trust_boundaries_from_core
+from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.app import TfStride
@@ -183,6 +185,38 @@ class FixtureTrustBoundaryCharacterizationTests(unittest.TestCase):
                 self.assertEqual(actual_pairs, pairs)
 
 
+class RecordingBoundaryContributor:
+    def contribute(self, context: BoundaryContributionContext) -> None:
+        context.add_boundary(
+            BoundaryType.INTERNET_TO_SERVICE,
+            "internet",
+            "aws_lb.web",
+            "Traffic can cross from the public internet to aws_lb.web.",
+            "The resource is public.",
+        )
+        context.add_boundary(
+            BoundaryType.INTERNET_TO_SERVICE,
+            "internet",
+            "aws_lb.web",
+            "Duplicate edge with different wording.",
+            "Duplicate rationale.",
+        )
+
+
+class BoundaryCoreTests(unittest.TestCase):
+    def test_core_runs_contributors_and_dedupes_boundaries(self) -> None:
+        inventory = ResourceInventory(provider="aws", resources=[])
+
+        boundaries = detect_trust_boundaries_from_core(
+            inventory,
+            contributors=(RecordingBoundaryContributor(),),
+        )
+
+        self.assertEqual(len(boundaries), 1)
+        self.assertEqual(boundaries[0].identifier, "internet-to-service:internet->aws_lb.web")
+        self.assertEqual(boundaries[0].description, "Traffic can cross from the public internet to aws_lb.web.")
+
+
 class TrustBoundaryIndexTests(unittest.TestCase):
     def test_detect_trust_boundaries_uses_supplied_indexes(self) -> None:
         role = _resource(
@@ -233,7 +267,7 @@ class TrustBoundaryIndexTests(unittest.TestCase):
         )
         indexes = build_analysis_indexes(inventory)
 
-        with patch("tfstride.analysis.trust_boundaries.build_analysis_indexes") as build_indexes:
+        with patch("tfstride.analysis.boundaries.core.build_analysis_indexes") as build_indexes:
             boundaries = detect_trust_boundaries(inventory, indexes=indexes)
 
         build_indexes.assert_not_called()

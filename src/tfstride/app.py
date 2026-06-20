@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
+from tfstride.analysis.boundaries import detect_trust_boundaries
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
-from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult, ResourceInventory, TerraformResource
 from tfstride.providers.catalog import (
