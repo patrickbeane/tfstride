@@ -22,6 +22,7 @@ from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severit
 from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
@@ -150,7 +151,7 @@ class GcpDataRuleDetectors:
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", bucket.address))
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 bucket,
                 constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS, ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION),
                 internet_exposure=True,
@@ -172,7 +173,7 @@ class GcpDataRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             bucket,
                             ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                             ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
@@ -244,7 +245,7 @@ class GcpDataRuleDetectors:
             if _gcs_public_access_prevention_enforced(bucket_facts.storage.public_access_prevention):
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 bucket,
                 constraints=(ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,),
                 internet_exposure=bucket.public_exposure,
@@ -274,7 +275,7 @@ class GcpDataRuleDetectors:
                         ),
                         evidence_item("public_exposure_reasons", bucket.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             bucket,
                             ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
                         ),

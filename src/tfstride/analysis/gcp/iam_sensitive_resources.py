@@ -20,6 +20,7 @@ from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severit
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.resource_utils import binding_members
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
@@ -54,7 +55,7 @@ class GcpSensitiveResourceIamDetectors:
 
                     condition = binding.get("condition")
                     severity_reasoning = guardrail_adjusted_severity_reasoning(
-                        context.analysis_indexes.gcp_org_policy_guardrails,
+                        gcp_org_policy_guardrail_index(context.analysis_indexes),
                         resource,
                         constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                         internet_exposure=assessment.is_public,
@@ -96,7 +97,7 @@ class GcpSensitiveResourceIamDetectors:
                                     resource_facts.iam.resource_policy_source_addresses,
                                 ),
                                 organization_guardrail_evidence(
-                                    context.analysis_indexes.gcp_org_policy_guardrails,
+                                    gcp_org_policy_guardrail_index(context.analysis_indexes),
                                     resource,
                                     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                                 ),

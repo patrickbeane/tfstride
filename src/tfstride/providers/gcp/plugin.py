@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
+    from tfstride.models import ResourceInventory
+    from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
+
+
+def _gcp_analysis_indexes(inventory: ResourceInventory) -> GcpAnalysisIndexes:
+    from tfstride.providers.gcp.analysis_indexes import build_gcp_analysis_indexes
+
+    return build_gcp_analysis_indexes(inventory)
 
 
 def _gcp_rule_metadata() -> tuple[RuleMetadata, ...]:
@@ -48,4 +56,5 @@ def gcp_provider_plugin() -> ProviderPlugin:
         rule_metadata_factory=_gcp_rule_metadata,
         rule_contribution_factory=_gcp_rule_contribution,
         boundary_contributor_factory=_gcp_boundary_contributor,
+        analysis_index_factory=_gcp_analysis_indexes,
     )

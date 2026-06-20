@@ -42,6 +42,7 @@ from tfstride.analysis.gcp.iam_role_risk import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.gcp.analysis_indexes import gcp_iam_inheritance_index
 
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {
@@ -109,7 +110,7 @@ class GcpInheritedIamDetectors:
 
         findings: list[Finding] = []
         seen: set[tuple[str, str, str, str]] = set()
-        inheritance_index = context.analysis_indexes.gcp_iam_inheritance
+        inheritance_index = gcp_iam_inheritance_index(context.analysis_indexes)
         custom_roles = build_gcp_custom_role_index(context.inventory.resources)
 
         for scope, iam_resources in sorted(
@@ -218,7 +219,7 @@ class GcpInheritedIamDetectors:
 
         findings: list[Finding] = []
         seen: set[tuple[str, str, str, str]] = set()
-        inheritance_index = context.analysis_indexes.gcp_iam_inheritance
+        inheritance_index = gcp_iam_inheritance_index(context.analysis_indexes)
         custom_roles = build_gcp_custom_role_index(context.inventory.resources)
 
         for scope, iam_resources in sorted(

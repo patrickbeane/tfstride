@@ -21,6 +21,7 @@ from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severit
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.constants import GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES
 from tfstride.providers.gcp.resource_utils import gcp_reference_key
 
@@ -50,7 +51,7 @@ class GcpServiceAccountIamDetectors:
                     continue
                 condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = guardrail_adjusted_severity_reasoning(
-                    context.analysis_indexes.gcp_org_policy_guardrails,
+                    gcp_org_policy_guardrail_index(context.analysis_indexes),
                     binding,
                     constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                     internet_exposure=assessment.is_public,
@@ -87,7 +88,7 @@ class GcpServiceAccountIamDetectors:
                                 [analysis_facts(binding).iam.service_account_reference or ""],
                             ),
                             organization_guardrail_evidence(
-                                context.analysis_indexes.gcp_org_policy_guardrails,
+                                gcp_org_policy_guardrail_index(context.analysis_indexes),
                                 binding,
                                 ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                             ),

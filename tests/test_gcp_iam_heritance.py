@@ -11,6 +11,7 @@ from tfstride.analysis.gcp.iam_inheritance import (
 )
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_iam_inheritance_index
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 
 
@@ -34,7 +35,7 @@ def _gcp_resource(
 
 
 def _inheritance_index(resources: list[NormalizedResource]):
-    return build_analysis_indexes(ResourceInventory(provider="gcp", resources=resources)).gcp_iam_inheritance
+    return gcp_iam_inheritance_index(build_analysis_indexes(ResourceInventory(provider="gcp", resources=resources)))
 
 
 class GcpIamInheritanceIndexTests(unittest.TestCase):
@@ -195,7 +196,9 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             category=ResourceCategory.COMPUTE,
         )
 
-        index = build_analysis_indexes(ResourceInventory(provider="aws", resources=[aws_resource])).gcp_iam_inheritance
+        index = gcp_iam_inheritance_index(
+            build_analysis_indexes(ResourceInventory(provider="aws", resources=[aws_resource]))
+        )
 
         self.assertEqual(index.resources_by_project, {})
         self.assertEqual(index.unresolved_iam_resources, ())

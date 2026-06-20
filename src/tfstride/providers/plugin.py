@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
-from tfstride.models import NormalizedResource
+from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.registry import ProviderRegistry
@@ -23,6 +23,7 @@ from tfstride.providers.resource_facts import (
 if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
+    from tfstride.analysis.indexes import AnalysisIndexExtensionFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
 
@@ -57,6 +58,7 @@ class ProviderPlugin:
     rule_metadata_factory: ProviderRuleMetadataFactory | None = None
     rule_contribution_factory: ProviderRuleContributionFactory | None = None
     boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
+    analysis_index_factory: AnalysisIndexExtensionFactory | None = None
 
     def __post_init__(self) -> None:
         provider = normalize_provider_name(self.provider)
@@ -74,6 +76,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` rule contribution factory must be callable.")
         if self.boundary_contributor_factory is not None and not callable(self.boundary_contributor_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` boundary contributor factory must be callable.")
+        if self.analysis_index_factory is not None and not callable(self.analysis_index_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` analysis index factory must be callable.")
         if not isinstance(self.metadata_namespace, type):
             raise ProviderPluginError(f"Provider plugin `{provider}` metadata namespace must be a type.")
 
@@ -120,6 +124,11 @@ class ProviderPlugin:
         if self.boundary_contributor_factory is None:
             return None
         return self.boundary_contributor_factory()
+
+    def create_analysis_index_extension(self, inventory: ResourceInventory) -> object | None:
+        if self.analysis_index_factory is None:
+            return None
+        return self.analysis_index_factory(inventory)
 
     def supports_resource_type(self, resource_type: str) -> bool:
         return str(resource_type).strip() in self.supported_resource_types
@@ -196,6 +205,16 @@ def boundary_contributor_factories_by_provider_from_plugins(
             continue
         factories_by_provider.setdefault(plugin.provider, []).append(plugin.boundary_contributor_factory)
     return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
+
+
+def analysis_index_factories_by_provider_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> dict[str, AnalysisIndexExtensionFactory]:
+    return {
+        plugin.provider: plugin.analysis_index_factory
+        for plugin in plugins
+        if plugin.analysis_index_factory is not None
+    }
 
 
 def rule_metadata_from_plugins(plugins: Iterable[ProviderPlugin]) -> tuple[RuleMetadata, ...]:

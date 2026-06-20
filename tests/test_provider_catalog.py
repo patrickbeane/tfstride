@@ -6,7 +6,7 @@ from pathlib import Path
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.app import TfStride
-from tfstride.models import NormalizedResource, ResourceCategory
+from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.aws.boundaries import AwsBoundaryContributor
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
@@ -17,6 +17,8 @@ from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
+    default_provider_analysis_index_factories_by_provider,
+    default_provider_analysis_index_factory,
     default_provider_boundary_contributor_factories_by_provider,
     default_provider_boundary_contributors,
     default_provider_boundary_contributors_by_provider,
@@ -28,6 +30,7 @@ from tfstride.providers.catalog import (
     default_resource_facts_registry,
     default_rule_contribution,
 )
+from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
 from tfstride.providers.gcp.boundaries import GcpBoundaryContributor
 from tfstride.providers.gcp.limitations import GCP_LIMITATIONS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -79,7 +82,12 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
         self.assertEqual(gcp_plugin.create_rule_metadata(), GCP_RULE_METADATA)
         self.assertIsInstance(aws_plugin.create_boundary_contributor(), AwsBoundaryContributor)
+        self.assertIsNone(aws_plugin.create_analysis_index_extension(ResourceInventory(provider="aws", resources=[])))
         self.assertIsInstance(gcp_plugin.create_boundary_contributor(), GcpBoundaryContributor)
+        self.assertIsInstance(
+            gcp_plugin.create_analysis_index_extension(ResourceInventory(provider="gcp", resources=[])),
+            GcpAnalysisIndexes,
+        )
         self.assertEqual(
             tuple(
                 tuple(rule.metadata.rule_id for rule in rule_group)
@@ -90,6 +98,18 @@ class ProviderCatalogTests(unittest.TestCase):
 
     def test_default_provider_rule_metadata_merges_builtin_provider_catalogs(self) -> None:
         self.assertEqual(default_provider_rule_metadata(), AWS_RULE_METADATA + GCP_RULE_METADATA)
+
+    def test_default_analysis_index_factories_register_provider_extensions(self) -> None:
+        factories = default_provider_analysis_index_factories_by_provider()
+
+        self.assertEqual(tuple(factories), ("gcp",))
+        self.assertIs(default_provider_analysis_index_factory(" GCP "), factories["gcp"])
+        self.assertIsNone(default_provider_analysis_index_factory("aws"))
+        self.assertIsNone(default_provider_analysis_index_factory("azure"))
+        self.assertIsInstance(
+            factories["gcp"](ResourceInventory(provider="gcp", resources=[])),
+            GcpAnalysisIndexes,
+        )
 
     def test_default_boundary_contributors_register_builtin_provider_contributors(self) -> None:
         contributors = default_provider_boundary_contributors()

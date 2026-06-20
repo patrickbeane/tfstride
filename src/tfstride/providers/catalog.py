@@ -5,14 +5,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
+    from tfstride.analysis.indexes import AnalysisIndexExtensionFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
 
 from tfstride.providers.aws.plugin import aws_provider_plugin
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
+from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.plugin import (
     ProviderBoundaryContributorFactory,
     ProviderPlugin,
+    analysis_index_factories_by_provider_from_plugins,
     boundary_contributor_factories_by_provider_from_plugins,
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
@@ -52,6 +55,14 @@ def default_provider_limitations() -> dict[str, tuple[str, ...]]:
 
 def default_provider_rule_metadata() -> tuple[RuleMetadata, ...]:
     return rule_metadata_from_plugins(default_provider_plugins())
+
+
+def default_provider_analysis_index_factories_by_provider() -> dict[str, AnalysisIndexExtensionFactory]:
+    return analysis_index_factories_by_provider_from_plugins(default_provider_plugins())
+
+
+def default_provider_analysis_index_factory(provider: str) -> AnalysisIndexExtensionFactory | None:
+    return default_provider_analysis_index_factories_by_provider().get(normalize_provider_name(provider))
 
 
 def default_provider_boundary_contributors(provider: str | None = None) -> tuple[BoundaryContributor, ...]:

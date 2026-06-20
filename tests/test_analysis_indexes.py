@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 
-from tfstride.analysis.indexes import build_analysis_indexes
+from tfstride.analysis import indexes as analysis_indexes_module
+from tfstride.analysis.gcp.iam_inheritance import GcpIamInheritanceIndex
+from tfstride.analysis.gcp.org_policy_guardrails import GcpOrgPolicyGuardrailIndex
+from tfstride.analysis.indexes import AnalysisIndexExtensionError, build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
 
 
 def _resource(
@@ -119,6 +124,35 @@ class AnalysisIndexTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             indexes.role_index["aws_iam_role.other"] = role
+
+    def test_gcp_inventory_builds_both_provider_indexes(self) -> None:
+        indexes = build_analysis_indexes(ResourceInventory(provider="gcp", resources=[]))
+
+        extension = indexes.require_provider_extension(GcpAnalysisIndexes)
+        self.assertIsInstance(extension.iam_inheritance, GcpIamInheritanceIndex)
+        self.assertIsInstance(extension.org_policy_guardrails, GcpOrgPolicyGuardrailIndex)
+
+    def test_provider_extension_factory_receives_inventory(self) -> None:
+        inventory = ResourceInventory(provider="custom", resources=[])
+        extension = object()
+        calls: list[ResourceInventory] = []
+
+        indexes = build_analysis_indexes(
+            inventory,
+            provider_extension_factory=lambda value: calls.append(value) or extension,
+        )
+
+        self.assertEqual(calls, [inventory])
+        self.assertIs(indexes.provider_extension, extension)
+        with self.assertRaises(AnalysisIndexExtensionError):
+            indexes.require_provider_extension(dict)
+
+    def test_shared_index_module_has_no_provider_specific_dependencies(self) -> None:
+        source = inspect.getsource(analysis_indexes_module)
+
+        self.assertNotIn("tfstride.analysis.gcp", source)
+        self.assertNotIn("tfstride.providers.gcp", source)
+        self.assertNotIn("gcp_", source)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 
 
@@ -78,7 +79,9 @@ def _org_policy(
 
 
 def _guardrail_index(resources: list[NormalizedResource]):
-    return build_analysis_indexes(ResourceInventory(provider="gcp", resources=resources)).gcp_org_policy_guardrails
+    return gcp_org_policy_guardrail_index(
+        build_analysis_indexes(ResourceInventory(provider="gcp", resources=resources))
+    )
 
 
 class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
@@ -378,9 +381,9 @@ class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
             category=ResourceCategory.COMPUTE,
         )
 
-        index = build_analysis_indexes(
-            ResourceInventory(provider="aws", resources=[aws_resource])
-        ).gcp_org_policy_guardrails
+        index = gcp_org_policy_guardrail_index(
+            build_analysis_indexes(ResourceInventory(provider="aws", resources=[aws_resource]))
+        )
 
         self.assertEqual(index.guardrails_by_scope, {})
         self.assertEqual(index.unresolved_policy_resources, ())

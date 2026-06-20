@@ -19,6 +19,7 @@ from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
+    analysis_index_factories_by_provider_from_plugins,
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
@@ -99,6 +100,15 @@ class RecordingFacts:
         return []
 
 
+@dataclass(frozen=True, slots=True)
+class RecordingAnalysisIndexes:
+    provider: str
+
+
+def _analysis_indexes(inventory: ResourceInventory) -> RecordingAnalysisIndexes:
+    return RecordingAnalysisIndexes(inventory.provider)
+
+
 class RecordingBoundaryContributor:
     def contribute(self, context) -> None:
         return None
@@ -142,6 +152,7 @@ def _plugin(
     rule_metadata_factory=_rule_metadata,
     rule_contribution_factory=_rule_contribution,
     boundary_contributor_factory=RecordingBoundaryContributor,
+    analysis_index_factory=_analysis_indexes,
 ) -> ProviderPlugin:
     return ProviderPlugin(
         provider=provider,
@@ -157,6 +168,7 @@ def _plugin(
         rule_metadata_factory=rule_metadata_factory,
         rule_contribution_factory=rule_contribution_factory,
         boundary_contributor_factory=boundary_contributor_factory,
+        analysis_index_factory=analysis_index_factory,
     )
 
 
@@ -176,6 +188,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertIs(plugin.rule_metadata_factory, _rule_metadata)
         self.assertIs(plugin.rule_contribution_factory, _rule_contribution)
         self.assertIs(plugin.boundary_contributor_factory, RecordingBoundaryContributor)
+        self.assertIs(plugin.analysis_index_factory, _analysis_indexes)
 
     def test_plugin_creates_normalizer_and_resource_decorator(self) -> None:
         plugin = _plugin()
@@ -190,6 +203,15 @@ class ProviderPluginTests(unittest.TestCase):
         plugin = _plugin()
 
         self.assertIsInstance(plugin.create_boundary_contributor(), RecordingBoundaryContributor)
+
+    def test_plugin_creates_analysis_index_extension_when_factory_is_configured(self) -> None:
+        plugin = _plugin()
+        inventory = ResourceInventory(provider="aws", resources=[])
+
+        self.assertEqual(
+            plugin.create_analysis_index_extension(inventory),
+            RecordingAnalysisIndexes("aws"),
+        )
 
     def test_plugin_creates_rule_metadata_when_factory_is_configured(self) -> None:
         plugin = _plugin()
@@ -219,6 +241,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsNone(plugin.create_boundary_contributor())
 
+    def test_plugin_allows_missing_analysis_index_factory(self) -> None:
+        plugin = _plugin(analysis_index_factory=None)
+
+        self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="aws", resources=[])))
+
     def test_plugin_classifies_supported_resource_types(self) -> None:
         plugin = _plugin()
 
@@ -234,6 +261,7 @@ class ProviderPluginTests(unittest.TestCase):
         limitation_registry = provider_limitations_from_plugins([plugin])
         boundary_contributors = boundary_contributors_from_plugins([plugin])
         boundary_contributors_by_provider = boundary_contributors_by_provider_from_plugins([plugin])
+        analysis_index_factories = analysis_index_factories_by_provider_from_plugins([plugin])
         rule_contribution = rule_contribution_from_plugins(
             [plugin],
             FindingFactory(RuleRegistry([RULE_METADATA])),
@@ -245,6 +273,10 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
         self.assertIsInstance(boundary_contributors_by_provider["aws"][0], RecordingBoundaryContributor)
+        self.assertEqual(
+            analysis_index_factories["aws"](ResourceInventory(provider="aws", resources=[])),
+            RecordingAnalysisIndexes("aws"),
+        )
         self.assertEqual(rule_contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
         self.assertEqual(rule_metadata, (RULE_METADATA,))
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
@@ -327,6 +359,17 @@ class ProviderPluginTests(unittest.TestCase):
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 boundary_contributor_factory=object(),
+            )
+
+    def test_plugin_rejects_non_callable_analysis_index_factory(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            ProviderPlugin(
+                provider="aws",
+                normalizer_factory=lambda: RecordingNormalizer(),
+                resource_facts_factory=_facts,
+                metadata_namespace=FakeMetadata,
+                supported_resource_types=frozenset(),
+                analysis_index_factory=object(),
             )
 
     def test_plugin_rejects_non_type_metadata_namespace(self) -> None:

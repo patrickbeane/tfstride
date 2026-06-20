@@ -38,6 +38,7 @@ from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severit
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.constants import (
     GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
@@ -112,7 +113,7 @@ class GcpServiceAccountKeyDetectors:
                 risks.append("no Terraform keepers rotation trigger observed")
 
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 target or key,
                 constraints=(ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,),
                 internet_exposure=False,
@@ -158,7 +159,7 @@ class GcpServiceAccountKeyDetectors:
                         evidence_item("validity_window", validity_evidence),
                         evidence_item("rotation_control", rotation_evidence),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             target or key,
                             ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
                         ),
@@ -190,7 +191,7 @@ class GcpServiceAccountKeyDetectors:
                 for grant in grants
             )
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 target or key,
                 constraints=(ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,),
                 internet_exposure=False,
@@ -238,7 +239,7 @@ class GcpServiceAccountKeyDetectors:
                             [_keyed_service_account_grant_evidence(grant) for grant in grants],
                         ),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             target or key,
                             ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
                         ),

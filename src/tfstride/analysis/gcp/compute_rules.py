@@ -27,6 +27,7 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.constants import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
@@ -73,7 +74,7 @@ class GcpComputeRuleDetectors:
                 continue
 
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 instance,
                 constraints=(ORG_POLICY_VM_EXTERNAL_IP_ACCESS,),
                 internet_exposure=True,
@@ -102,7 +103,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             instance,
                             ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
                         ),
@@ -166,7 +167,7 @@ class GcpComputeRuleDetectors:
             if instance_facts.compute.os_login_enabled is not False:
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 instance,
                 constraints=(ORG_POLICY_REQUIRE_OS_LOGIN,),
                 internet_exposure=instance.public_exposure,
@@ -190,7 +191,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("os_login_posture", ["metadata.enable-oslogin is false"]),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             instance,
                             ORG_POLICY_REQUIRE_OS_LOGIN,
                         ),
@@ -443,7 +444,7 @@ class GcpComputeRuleDetectors:
                 continue
             condition = _public_invoker_condition(public_invokers)
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 service,
                 constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                 internet_exposure=True,
@@ -477,7 +478,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("public_access_reasons", service.public_access_reasons),
                         evidence_item("public_exposure_reasons", service.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             service,
                             ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                         ),
@@ -502,7 +503,7 @@ class GcpComputeRuleDetectors:
                 continue
             condition = _public_invoker_condition(public_invokers)
             severity_reasoning = guardrail_adjusted_severity_reasoning(
-                context.analysis_indexes.gcp_org_policy_guardrails,
+                gcp_org_policy_guardrail_index(context.analysis_indexes),
                 function,
                 constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                 internet_exposure=True,
@@ -536,7 +537,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("public_access_reasons", function.public_access_reasons),
                         evidence_item("public_exposure_reasons", function.public_exposure_reasons),
                         organization_guardrail_evidence(
-                            context.analysis_indexes.gcp_org_policy_guardrails,
+                            gcp_org_policy_guardrail_index(context.analysis_indexes),
                             function,
                             ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                         ),

@@ -25,6 +25,7 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.constants import (
     GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
@@ -48,7 +49,7 @@ class GcpScopedIamDetectors:
                     continue
                 condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = guardrail_adjusted_severity_reasoning(
-                    context.analysis_indexes.gcp_org_policy_guardrails,
+                    gcp_org_policy_guardrail_index(context.analysis_indexes),
                     binding,
                     constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                     internet_exposure=True,
@@ -72,7 +73,7 @@ class GcpScopedIamDetectors:
                             evidence_item("iam_binding", [f"member={member}", f"role={role}"]),
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             organization_guardrail_evidence(
-                                context.analysis_indexes.gcp_org_policy_guardrails,
+                                gcp_org_policy_guardrail_index(context.analysis_indexes),
                                 binding,
                                 ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                             ),
@@ -144,7 +145,7 @@ class GcpScopedIamDetectors:
                     continue
                 condition = iam_binding_condition(binding, role, member)
                 severity_reasoning = guardrail_adjusted_severity_reasoning(
-                    context.analysis_indexes.gcp_org_policy_guardrails,
+                    gcp_org_policy_guardrail_index(context.analysis_indexes),
                     binding,
                     constraints=(ORG_POLICY_ALLOWED_MEMBER_DOMAINS,),
                     internet_exposure=assessment.is_public,
@@ -170,7 +171,7 @@ class GcpScopedIamDetectors:
                             evidence_item("trust_scope", [assessment.scope_description]),
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             organization_guardrail_evidence(
-                                context.analysis_indexes.gcp_org_policy_guardrails,
+                                gcp_org_policy_guardrail_index(context.analysis_indexes),
                                 binding,
                                 ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
                             ),
