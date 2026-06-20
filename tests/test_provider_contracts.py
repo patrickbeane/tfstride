@@ -256,10 +256,42 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertTrue(any("Provider-owned metadata" in item for item in guidelines))
         self.assertTrue(any("provider facts" in item for item in guidelines))
 
+    def test_shared_boundary_core_does_not_import_provider_packages(self) -> None:
+        forbidden_imports = (
+            "tfstride.analysis.gcp",
+            "tfstride.providers.aws",
+            "tfstride.providers.gcp",
+            "tfstride.providers.catalog",
+        )
+        scanned_paths = (
+            _SOURCE_ROOT / "analysis" / "boundaries" / "core.py",
+            _SOURCE_ROOT / "analysis" / "boundaries" / "shared.py",
+            _SOURCE_ROOT / "analysis" / "boundaries" / "types.py",
+        )
+
+        violations = {
+            path.relative_to(_SOURCE_ROOT).as_posix(): forbidden
+            for path in scanned_paths
+            for forbidden in forbidden_imports
+            if forbidden in path.read_text(encoding="utf-8")
+        }
+
+        self.assertEqual(violations, {})
+
+    def test_provider_boundary_contributors_are_plugin_owned(self) -> None:
+        aws_plugin = (_SOURCE_ROOT / "providers" / "aws" / "plugin.py").read_text(encoding="utf-8")
+        gcp_plugin = (_SOURCE_ROOT / "providers" / "gcp" / "plugin.py").read_text(encoding="utf-8")
+
+        self.assertIn("boundary_contributor_factory=", aws_plugin)
+        self.assertIn("boundary_contributor_factory=", gcp_plugin)
+        self.assertTrue((_SOURCE_ROOT / "providers" / "aws" / "boundaries.py").exists())
+        self.assertTrue((_SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
+
     def test_provider_contract_documents_encapsulation_rules(self) -> None:
         guidelines = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.guidelines
 
-        self.assertTrue(any("Provider packages own provider-specific facts" in item for item in guidelines))
+        self.assertTrue(any("boundary contributors" in item for item in guidelines))
+        self.assertTrue(any("provider plugin contract" in item for item in guidelines))
         self.assertTrue(any("Do not add new provider-specific convenience accessors" in item for item in guidelines))
 
     def test_provider_normalizers_do_not_write_shared_posture_metadata_as_raw_keys(self) -> None:

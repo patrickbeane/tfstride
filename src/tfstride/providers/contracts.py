@@ -26,7 +26,8 @@ class ResourceMetadataOwnershipContract:
 
 PROVIDER_ENCAPSULATION_GUIDELINES = (
     "Core models expose normalized, provider-neutral facts used by shared analysis and reporting.",
-    "Provider packages own provider-specific facts, metadata keys, indexes, decorators, and relationship resolution.",
+    "Provider packages own provider-specific facts, metadata keys, indexes, decorators, boundary contributors, and relationship resolution.",
+    "Shared boundary orchestration should accept provider contributors through the provider plugin contract rather than importing provider packages directly.",
     "Shared analysis should prefer normalized fields or capability helpers over raw provider metadata keys.",
     "Do not add new provider-specific convenience accessors to NormalizedResource; put them behind a provider facts facade.",
 )

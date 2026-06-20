@@ -1,10 +1,10 @@
 # tfSTRIDE & Policy Gate
 
-`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for AWS infrastructure before deployment.
+`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for supported cloud providers before deployment.
 
 ## Overview
 
-This project turns Terraform plan JSON into a cloud threat model for AWS infrastructure before deployment. It normalizes supported resources, identifies trust boundaries, evaluates rule-based STRIDE checks, and produces evidence-backed findings plus observed protective controls for human review and CI gating.
+This project turns Terraform plan JSON into a cloud threat model for supported cloud infrastructure before deployment. It normalizes supported resources, identifies trust boundaries, evaluates rule-based STRIDE checks, and produces evidence-backed findings plus observed protective controls for human review and CI gating.
 
 The engine is intentionally small and explainable: no LLMs in the core path, no full graph engine, and no runtime cloud access. The goal is to make risky infrastructure patterns easier to review before `terraform apply`.
 
@@ -25,7 +25,7 @@ The engine is intentionally small and explainable: no LLMs in the core path, no 
 - repo-level TOML config for provider selection, default gating, rule selection, and severity overrides
 - automation-friendly `--quiet` mode and non-zero exit behavior
 - zero runtime dependencies for the core CLI engine, with optional dashboard dependencies
-- AWS-first analysis behind a provider registry with GCP inventory normalization, including core compute, storage, database, IAM, and serverless workloads
+- AWS and GCP analysis behind provider plugins for normalization, decoration, rules, facts, and trust-boundary contributors
 
 ## Quickstart
 
@@ -223,9 +223,9 @@ Input:
 Pipeline:
 
 1. Parse the Terraform plan into raw resource records.
-2. Auto-select the provider, normalize supported resources into a provider-agnostic internal model, and decorate in-plan AWS relationships such as role attachments, resource policies, route-table posture, and public-access blocks.
+2. Auto-select the provider, normalize supported resources into a provider-agnostic internal model, and run provider-owned decoration such as role attachments, resource policies, route or NAT posture, public exposure, and workload identity relationships.
 3. Build shared analysis indexes for role lookup, security-group membership, public workloads by security group, and attached security groups.
-4. Detect trust boundaries such as internet-to-service, public-to-private segmentation, workload-to-data-store access, control-plane-to-workload relationships, and cross-account trust.
+4. Detect trust boundaries by running shared neutral contributors plus the selected provider's boundary contributor from the provider plugin. Boundary types include internet-to-service, public-to-private segmentation, workload-to-data-store access, control-plane-to-workload relationships, and cross-account trust.
 5. Evaluate rule-based STRIDE checks through a `RuleEvaluationContext` that carries the inventory, boundary index, rule registry, rule policy, and shared analysis indexes.
 6. Observe clear risk-reducing controls.
 7. Render markdown and optionally JSON or SARIF output.
@@ -281,6 +281,9 @@ Outputs include:
 - New provider-specific or decorator-derived facts should usually be added as typed metadata fields and accessed through `get_metadata_field()`, `set_metadata_field()`, or `append_metadata_field()`.
 - `NormalizedResource` properties are reserved for stable, broadly used normalized concepts such as network posture, public exposure, identity relationships, and data sensitivity.
 - `AnalysisIndexes` is computed once from the inventory and reused by trust-boundary detection and rule detectors. Add shared lookup needs there instead of rebuilding detector-local maps.
+- `analysis/boundaries/` owns shared boundary orchestration, the accumulator/dedupe behavior, contributor protocols, and provider-neutral contributors. It should not import AWS, GCP, or future provider-specific helpers directly.
+- Provider-specific boundary logic lives in `providers/{provider}/boundaries.py` and is exposed through `ProviderPlugin.boundary_contributor_factory`. `TFS.analyze_plan()` normalizes first, then instantiates only the selected provider's boundary contributor.
+- New providers should follow the same package shape: `providers/{provider}/plugin.py`, `normalizer.py`, `boundaries.py`, and `rules.py`, with shared orchestration unchanged.
 - `resource_concepts.py` centralizes conceptual resource groups and predicates such as workloads, data stores, public edges, identity roles, and security groups. Prefer those helpers over scattered hard-coded resource-type sets when the semantics match exactly.
 
 ## JSON Contract
@@ -472,6 +475,10 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 │   └── tfstride/
 │       ├── __init__.py
 │       ├── analysis/
+│       │   ├── boundaries/
+│       │   │   ├── core.py
+│       │   │   ├── shared.py
+│       │   │   └── types.py
 │       │   ├── control_observations.py
 │       │   ├── coverage.py
 │       │   ├── iam_rules.py
@@ -491,16 +498,20 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 │       ├── providers/
 │       │   ├── base.py
 │       │   ├── catalog.py
+│       │   ├── plugin.py
 │       │   ├── registry.py
-│       │   └── aws/
-│       │       ├── compute_normalizers.py
-│       │       ├── data_normalizers.py
-│       │       ├── iam_normalizers.py
-│       │       ├── network_normalizers.py
+│       │   ├── aws/
+│       │   │   ├── boundaries.py
+│       │   │   ├── normalizer.py
+│       │   │   ├── plugin.py
+│       │   │   ├── resource_decorator.py
+│       │   │   └── rules.py
+│       │   └── gcp/
+│       │       ├── boundaries.py
 │       │       ├── normalizer.py
+│       │       ├── plugin.py
 │       │       ├── resource_decorator.py
-│       │       ├── resource_decoration_stages.py
-│       │       └── resource_index.py
+│       │       └── rules.py
 │       ├── reporting/
 │       │   ├── json_report.py
 │       │   ├── markdown.py
@@ -516,15 +527,15 @@ GCP trust-boundary detection currently covers internet-to-service exposure for p
 
 ## Limitations
 
-- AWS remains the deepest provider implementation and the only provider with control-observation coverage today
-- GCP support is limited to inventory normalization, internet-to-service, route/NAT posture, workload-to-sensitive-data trust-boundary detection, and first-pass GCP STRIDE rules for selected core, GKE, and serverless resource types
-- Azure provider support is not registered yet
-- deliberately incomplete Terraform resource coverage
-- subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case
-- IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full attachment graph
-- supported condition narrowing is intentionally focused on keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition
-- no runtime validation, cloud API calls, or drift detection
-- no architecture diagrams or graph visualization
+- AWS is currently the deepest provider implementation and the only provider with control-observation coverage.
+- GCP support is narrower than AWS today and does not include control-observation coverage yet.
+- Azure support is not registered yet, but the provider plugin architecture is intended to support Azure without changing shared trust-boundary orchestration.
+- Terraform resource coverage is intentionally scoped to security-relevant resources, relationships, and threat paths rather than exhaustive provider parity.
+- Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
+- IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
+- Condition narrowing focuses on high-signal keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition.
+- The analyzer works from Terraform plan data only; it does not perform runtime validation, cloud API calls, or drift detection.
+- Architecture diagrams and graph visualization are not generated yet.
 
 ## Sample Assets
 

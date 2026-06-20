@@ -1,3 +1,5 @@
+"""Compatibility import path for provider-aware trust-boundary detection."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
