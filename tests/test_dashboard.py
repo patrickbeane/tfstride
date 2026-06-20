@@ -14,6 +14,7 @@ if FASTAPI_DEPS_AVAILABLE:
     from fastapi.testclient import TestClient
 
     from apps.dashboard import main as dashboard_main
+    from apps.dashboard import uploads as dashboard_uploads
     from apps.dashboard import view_models as dashboard_view_models
     from apps.dashboard.main import app as dashboard_app
 
@@ -269,7 +270,7 @@ class DashboardAppTests(unittest.TestCase):
             response.json(),
             {
                 "kind": "tfstride-error",
-                "message": dashboard_main.INVALID_PLAN_UPLOAD_MESSAGE,
+                "message": dashboard_uploads.INVALID_PLAN_UPLOAD_MESSAGE,
             },
         )
         self.assertNotIn("tfstride-dashboard", response.text)
@@ -283,7 +284,7 @@ class DashboardAppTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn(dashboard_main.INVALID_PLAN_UPLOAD_MESSAGE, response.text)
+        self.assertIn(dashboard_uploads.INVALID_PLAN_UPLOAD_MESSAGE, response.text)
         self.assertNotIn("tfstride-dashboard", response.text)
         self.assertNotIn("Expecting", response.text)
 
