@@ -65,14 +65,12 @@
       <section class="coverage-detail">
         <h3>Resource coverage</h3>
         <dl class="coverage-definition-list">
-          <div>
-            <dt>Provider resources considered</dt>
-            <dd>{{ payload.analysis_coverage.resources.provider_resources }}</dd>
-          </div>
-          <div>
-            <dt>Normalized resources</dt>
-            <dd>{{ payload.analysis_coverage.resources.normalized_resources }}</dd>
-          </div>
+          {% for item in coverage_resource_stats %}
+            <div>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          {% endfor %}
         </dl>
         {% if unsupported_resource_types %}
           <ul class="coverage-list">
@@ -81,21 +79,19 @@
             {% endfor %}
           </ul>
         {% else %}
-          <p class="empty-state">No unsupported AWS resource types were encountered.</p>
+          <p class="empty-state">{{ unsupported_resource_types_empty_message }}</p>
         {% endif %}
       </section>
 
       <section class="coverage-detail">
         <h3>Rule coverage</h3>
         <dl class="coverage-definition-list">
-          <div>
-            <dt>Registered rules</dt>
-            <dd>{{ payload.analysis_coverage.rules.registered_rule_count }}</dd>
-          </div>
-          <div>
-            <dt>Disabled rules</dt>
-            <dd>{{ payload.analysis_coverage.rules.disabled_rules|length }}</dd>
-          </div>
+          {% for item in coverage_rule_stats %}
+            <div>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          {% endfor %}
         </dl>
         {% if finding_counts_by_rule %}
           <ul class="coverage-list">
@@ -109,7 +105,7 @@
       </section>
     </div>
 
-    {% if unresolved_references or payload.analysis_coverage.rules.disabled_rules or severity_overrides %}
+    {% if unresolved_references or disabled_rule_ids or severity_overrides %}
       <div class="coverage-detail-grid coverage-detail-grid-secondary">
         {% if unresolved_references %}
           <section class="coverage-detail">
@@ -120,7 +116,7 @@
                   <span>
                     {{ reference.resource }}
                     {% for detail in reference.details %}
-                      <small>{{ detail.key }}: {{ detail.values | join(", ") }}</small>
+                      <small>{{ detail.key }}: {{ detail.value_text }}</small>
                     {% endfor %}
                   </span>
                 </li>
@@ -129,11 +125,11 @@
           </section>
         {% endif %}
 
-        {% if payload.analysis_coverage.rules.disabled_rules %}
+        {% if disabled_rule_ids %}
           <section class="coverage-detail">
             <h3>Disabled rules</h3>
             <ul class="coverage-list">
-              {% for rule_id in payload.analysis_coverage.rules.disabled_rules %}
+              {% for rule_id in disabled_rule_ids %}
                 <li><span>{{ rule_id }}</span></li>
               {% endfor %}
             </ul>

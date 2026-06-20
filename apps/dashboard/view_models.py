@@ -9,6 +9,11 @@ from fastapi import Request
 
 from tfstride.reporting.report_contract import TFSReportPayload
 
+_PROVIDER_DISPLAY_NAMES = {
+    "aws": "AWS",
+    "gcp": "GCP",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class DashboardAnalysis:
@@ -125,6 +130,7 @@ def _coverage_context(payload: TFSReportPayload) -> dict[str, object]:
             {"resource_type": resource_type, "count": count}
             for resource_type, count in sorted(analysis_coverage["resources"]["unsupported_resource_types"].items())
         ],
+        "unsupported_resource_types_empty_message": _unsupported_resource_types_empty_message(payload),
         "finding_counts_by_rule": [
             {"rule_id": rule_id, "count": count}
             for rule_id, count in analysis_coverage["rules"]["finding_counts_by_rule"].items()
@@ -134,6 +140,14 @@ def _coverage_context(payload: TFSReportPayload) -> dict[str, object]:
         "severity_overrides": severity_overrides,
         "unresolved_references": unresolved_references,
     }
+
+
+def _unsupported_resource_types_empty_message(payload: TFSReportPayload) -> str:
+    provider = str(payload["inventory"].get("provider", "")).strip().lower()
+    provider_display_name = _PROVIDER_DISPLAY_NAMES.get(provider)
+    if provider_display_name is None:
+        return "No unsupported resource types were encountered."
+    return f"No unsupported {provider_display_name} resource types were encountered."
 
 
 def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:

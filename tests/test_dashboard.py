@@ -140,6 +140,24 @@ class DashboardAppTests(unittest.TestCase):
             [{"rule_id": "aws-database-permissive-ingress", "count": 1}],
         )
 
+    def test_coverage_context_uses_provider_specific_unsupported_empty_message(self) -> None:
+        payload = deepcopy(dashboard_routes.API_REPORT_EXAMPLE)
+
+        payload["inventory"]["provider"] = "gcp"
+        gcp_context = dashboard_view_models._coverage_context(payload)
+
+        payload["inventory"]["provider"] = "custom"
+        custom_context = dashboard_view_models._coverage_context(payload)
+
+        self.assertEqual(
+            gcp_context["unsupported_resource_types_empty_message"],
+            "No unsupported GCP resource types were encountered.",
+        )
+        self.assertEqual(
+            custom_context["unsupported_resource_types_empty_message"],
+            "No unsupported resource types were encountered.",
+        )
+
     def test_api_docs_hide_topbar_and_schema_models(self) -> None:
         response = self.client.get("/api/docs")
 
@@ -229,6 +247,13 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("google_compute_instance.web", response.text)
         self.assertIn("Internet-exposed GCP compute instance permits broad ingress", response.text)
         self.assertIn("GCP support currently provides initial inventory normalization", response.text)
+
+    def test_gcp_safe_demo_uses_provider_specific_unsupported_empty_state(self) -> None:
+        response = self.client.get("/demo/gcp-safe")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("No unsupported GCP resource types were encountered.", response.text)
+        self.assertNotIn("No unsupported AWS resource types were encountered.", response.text)
 
     def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:
         response = self.client.get("/demo/ecs-fargate")
