@@ -12,12 +12,96 @@ from tfstride.analysis.rule_registry import (
     default_rule_metadata,
     default_rule_registry,
 )
+from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import Finding, Severity, SeverityReasoning, StrideCategory
+from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
+from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
+
+EXPECTED_DEFAULT_RULE_METADATA_IDS = (
+    "aws-public-compute-broad-ingress",
+    "aws-database-permissive-ingress",
+    "aws-rds-storage-encryption-disabled",
+    "aws-s3-public-access",
+    "aws-sensitive-resource-policy-external-access",
+    "aws-service-resource-policy-external-access",
+    "aws-iam-wildcard-permissions",
+    "aws-workload-role-sensitive-permissions",
+    "aws-missing-tier-segmentation",
+    "aws-private-data-transitive-exposure",
+    "aws-control-plane-sensitive-workload-chain",
+    "aws-role-trust-expansion",
+    "aws-role-trust-missing-narrowing",
+    "gcp-sensitive-resource-iam-external-access",
+    "gcp-pubsub-public-access",
+    "gcp-bigquery-public-access",
+    "gcp-public-workload-sensitive-data-access",
+    "gcp-cloud-sql-public-authorized-network",
+    "gcp-cloud-sql-backup-disabled",
+    "gcp-cloud-sql-public-ip-without-private-network",
+    "gcp-cloud-sql-ssl-not-required",
+    "gcp-cloud-sql-point-in-time-recovery-disabled",
+    "gcp-cloud-sql-deletion-protection-disabled",
+    "gcp-gcs-public-access",
+    "gcp-gcs-uniform-bucket-level-access-disabled",
+    "gcp-gcs-public-access-prevention-not-enforced",
+    "gcp-gcs-versioning-disabled",
+    "gcp-gcs-customer-managed-encryption-missing",
+    "gcp-public-compute-broad-ingress",
+    "gcp-public-load-balanced-workload",
+    "gcp-compute-os-login-disabled",
+    "gcp-gke-public-control-plane",
+    "gcp-gke-broad-authorized-networks",
+    "gcp-gke-workload-identity-disabled",
+    "gcp-gke-legacy-metadata-endpoints-enabled",
+    "gcp-gke-broad-node-service-account",
+    "gcp-cloud-run-public-invoker",
+    "gcp-cloud-functions-public-invoker",
+    "gcp-service-account-iam-broad-principal",
+    "gcp-service-account-iam-privileged-role",
+    "gcp-service-account-key-hygiene",
+    "gcp-service-account-key-effective-access",
+    "gcp-org-folder-iam-broad-principal",
+    "gcp-org-folder-iam-privileged-role",
+    "gcp-project-iam-broad-principal",
+    "gcp-project-iam-privileged-role",
+    "gcp-inherited-iam-sensitive-resource-access",
+    "gcp-inherited-iam-blast-radius",
+)
+
+
+def _flatten_rule_groups(rule_groups: tuple[tuple[str, ...], ...]) -> tuple[str, ...]:
+    return tuple(rule_id for rule_group in rule_groups for rule_id in rule_group)
 
 
 class RuleRegistryTests(unittest.TestCase):
     def test_default_registry_is_derived_from_shared_metadata(self) -> None:
         self.assertEqual(DEFAULT_RULE_REGISTRY.rules(), DEFAULT_RULE_METADATA)
+
+    def test_default_rule_metadata_ids_match_locked_order(self) -> None:
+        self.assertEqual(
+            tuple(metadata.rule_id for metadata in DEFAULT_RULE_METADATA),
+            EXPECTED_DEFAULT_RULE_METADATA_IDS,
+        )
+        self.assertEqual(len(DEFAULT_RULE_METADATA), 48)
+
+    def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
+        metadata_ids = tuple(metadata.rule_id for metadata in DEFAULT_RULE_METADATA)
+        aws_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("aws-"))
+        gcp_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("gcp-"))
+
+        self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids)
+        self.assertEqual(len(aws_metadata_ids), 13)
+        self.assertEqual(len(gcp_metadata_ids), 35)
+        self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
+        self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
+        self.assertEqual(set(metadata_ids), set(aws_metadata_ids) | set(gcp_metadata_ids))
+
+    def test_default_registry_rule_ids_match_configured_rules(self) -> None:
+        self.assertEqual(DEFAULT_RULE_REGISTRY.known_rule_ids(), StrideRuleEngine().configured_rule_ids())
+
+    def test_provider_rule_ids_have_default_metadata(self) -> None:
+        for rule_id in _flatten_rule_groups(AWS_RULE_GROUP_IDS) + _flatten_rule_groups(GCP_RULE_GROUP_IDS):
+            self.assertIs(DEFAULT_RULE_REGISTRY.get(rule_id), default_rule_metadata(rule_id))
 
     def test_default_registry_factory_returns_distinct_registry_from_same_metadata(self) -> None:
         registry = default_rule_registry()
