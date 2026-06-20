@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from collections import Counter
+from pathlib import Path
 from unittest.mock import patch
 
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
+from tfstride.app import TfStride
 from tfstride.models import (
     BoundaryType,
     IAMPolicyStatement,
@@ -13,6 +16,9 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = ROOT / "fixtures"
 
 
 def _resource(
@@ -40,6 +46,141 @@ def _resource(
         attached_role_arns=attached_role_arns or [],
         network_rules=network_rules or [],
     )
+
+
+class FixtureTrustBoundaryCharacterizationTests(unittest.TestCase):
+    FIXTURE_EXPECTATIONS = {
+        "aws-mixed": {
+            "path": FIXTURES / "aws" / "sample_aws_plan.json",
+            "provider": "aws",
+            "counts": {
+                BoundaryType.INTERNET_TO_SERVICE: 3,
+                BoundaryType.PUBLIC_TO_PRIVATE: 1,
+                BoundaryType.WORKLOAD_TO_DATA_STORE: 3,
+                BoundaryType.CONTROL_TO_WORKLOAD: 1,
+                BoundaryType.CROSS_ACCOUNT_OR_ROLE: 1,
+            },
+            "identifiers": [
+                "internet-to-service:internet->aws_lb.web",
+                "internet-to-service:internet->aws_instance.app",
+                "internet-to-service:internet->aws_s3_bucket.assets",
+                "public-subnet-to-private-subnet:aws_subnet.public_app->aws_subnet.private_data",
+                "workload-to-data-store:aws_instance.app->aws_db_instance.app",
+                "workload-to-data-store:aws_lambda_function.processor->aws_db_instance.app",
+                "workload-to-data-store:aws_lambda_function.processor->aws_s3_bucket.assets",
+                "admin-to-workload-plane:aws_iam_role.workload->aws_lambda_function.processor",
+                "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload",
+            ],
+        },
+        "aws-ecs-fargate": {
+            "path": FIXTURES / "aws" / "sample_aws_ecs_fargate_plan.json",
+            "provider": "aws",
+            "counts": {
+                BoundaryType.INTERNET_TO_SERVICE: 1,
+                BoundaryType.PUBLIC_TO_PRIVATE: 2,
+                BoundaryType.WORKLOAD_TO_DATA_STORE: 2,
+                BoundaryType.CONTROL_TO_WORKLOAD: 1,
+            },
+            "identifiers": [
+                "internet-to-service:internet->aws_lb.web",
+                "public-subnet-to-private-subnet:aws_subnet.public_a->aws_subnet.private_app",
+                "public-subnet-to-private-subnet:aws_subnet.public_b->aws_subnet.private_app",
+                "workload-to-data-store:aws_ecs_service.app->aws_db_instance.app",
+                "workload-to-data-store:aws_ecs_service.app->aws_secretsmanager_secret.app",
+                "admin-to-workload-plane:aws_iam_role.task->aws_ecs_service.app",
+            ],
+        },
+        "gcp-mixed": {
+            "path": FIXTURES / "gcp" / "sample_gcp_plan.json",
+            "provider": "gcp",
+            "counts": {
+                BoundaryType.INTERNET_TO_SERVICE: 3,
+                BoundaryType.WORKLOAD_TO_DATA_STORE: 1,
+            },
+            "identifiers": [
+                "internet-to-service:internet->google_compute_instance.web",
+                "internet-to-service:internet->google_sql_database_instance.app",
+                "internet-to-service:internet->google_storage_bucket.logs",
+                "workload-to-data-store:google_compute_instance.web->google_bigquery_dataset.analytics",
+            ],
+        },
+        "gcp-serverless": {
+            "path": FIXTURES / "gcp" / "sample_gcp_serverless_plan.json",
+            "provider": "gcp",
+            "counts": {
+                BoundaryType.INTERNET_TO_SERVICE: 2,
+                BoundaryType.WORKLOAD_TO_DATA_STORE: 2,
+            },
+            "identifiers": [
+                "internet-to-service:internet->google_cloud_run_v2_service.api",
+                "internet-to-service:internet->google_cloudfunctions_function.worker",
+                "workload-to-data-store:google_cloud_run_v2_service.api->google_secret_manager_secret.api_key",
+                "workload-to-data-store:google_cloudfunctions_function.worker->google_secret_manager_secret.api_key",
+            ],
+        },
+    }
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        engine = TfStride()
+        cls.results = {
+            scenario_id: engine.analyze_plan(expectation["path"])
+            for scenario_id, expectation in cls.FIXTURE_EXPECTATIONS.items()
+        }
+
+    def test_fixture_boundary_ids_types_and_counts_match_current_output(self) -> None:
+        for scenario_id, expectation in self.FIXTURE_EXPECTATIONS.items():
+            with self.subTest(scenario=scenario_id):
+                result = self.results[scenario_id]
+
+                self.assertEqual(result.inventory.provider, expectation["provider"])
+                self.assertEqual(
+                    [boundary.identifier for boundary in result.trust_boundaries],
+                    expectation["identifiers"],
+                )
+                self.assertEqual(
+                    dict(Counter(boundary.boundary_type for boundary in result.trust_boundaries)),
+                    expectation["counts"],
+                )
+
+    def test_fixture_boundary_ids_are_deduped_and_ordered(self) -> None:
+        for scenario_id, result in self.results.items():
+            with self.subTest(scenario=scenario_id):
+                identifiers = [boundary.identifier for boundary in result.trust_boundaries]
+                logical_edges = [
+                    (boundary.boundary_type, boundary.source, boundary.target) for boundary in result.trust_boundaries
+                ]
+
+                self.assertEqual(identifiers, self.FIXTURE_EXPECTATIONS[scenario_id]["identifiers"])
+                self.assertEqual(len(identifiers), len(set(identifiers)))
+                self.assertEqual(len(logical_edges), len(set(logical_edges)))
+
+    def test_fixture_workload_to_data_store_boundaries_cover_aws_and_gcp_paths(self) -> None:
+        expected_pairs = {
+            "aws-mixed": {
+                ("aws_instance.app", "aws_db_instance.app"),
+                ("aws_lambda_function.processor", "aws_db_instance.app"),
+                ("aws_lambda_function.processor", "aws_s3_bucket.assets"),
+            },
+            "gcp-mixed": {
+                ("google_compute_instance.web", "google_bigquery_dataset.analytics"),
+            },
+            "gcp-serverless": {
+                ("google_cloud_run_v2_service.api", "google_secret_manager_secret.api_key"),
+                ("google_cloudfunctions_function.worker", "google_secret_manager_secret.api_key"),
+            },
+        }
+
+        for scenario_id, pairs in expected_pairs.items():
+            with self.subTest(scenario=scenario_id):
+                result = self.results[scenario_id]
+                actual_pairs = {
+                    (boundary.source, boundary.target)
+                    for boundary in result.trust_boundaries
+                    if boundary.boundary_type == BoundaryType.WORKLOAD_TO_DATA_STORE
+                }
+
+                self.assertEqual(actual_pairs, pairs)
 
 
 class TrustBoundaryIndexTests(unittest.TestCase):
