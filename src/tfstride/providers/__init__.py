@@ -6,6 +6,7 @@ from tfstride.providers.plugin import (
     ProviderPluginError,
     ProviderResourceDecorator,
     ProviderRuleContributionFactory,
+    ProviderRuleMetadataFactory,
     boundary_contributor_factories_by_provider_from_plugins,
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
@@ -14,6 +15,7 @@ from tfstride.providers.plugin import (
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
     rule_contribution_from_plugins,
+    rule_metadata_from_plugins,
 )
 from tfstride.providers.registry import (
     ProviderNotRegisteredError,
@@ -46,6 +48,7 @@ __all__ = [
     "ProviderResourceCapabilityRegistryError",
     "ProviderResourceDecorator",
     "ProviderRuleContributionFactory",
+    "ProviderRuleMetadataFactory",
     "ProviderResourceFactDomains",
     "ProviderSelectionError",
     "ProviderResourceFactsNotRegisteredError",
@@ -60,4 +63,5 @@ __all__ = [
     "resource_capability_registry_from_plugins",
     "resource_facts_registry_from_plugins",
     "rule_contribution_from_plugins",
+    "rule_metadata_from_plugins",
 ]

@@ -13,6 +13,7 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsStorageFacts
+from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
@@ -22,6 +23,7 @@ from tfstride.providers.catalog import (
     default_provider_limitations,
     default_provider_plugins,
     default_provider_registry,
+    default_provider_rule_metadata,
     default_resource_capability_registry,
     default_resource_facts_registry,
     default_rule_contribution,
@@ -33,6 +35,7 @@ from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts
+from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 from tfstride.providers.resource_capabilities import ResourceCapability
 
@@ -60,6 +63,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(aws_plugin.limitations, AWS_LIMITATIONS)
         self.assertIsInstance(aws_plugin.create_normalizer(), AwsNormalizer)
         self.assertIsInstance(aws_plugin.create_resource_decorator(), AwsResourceDecorator)
+        self.assertEqual(aws_plugin.create_rule_metadata(), AWS_RULE_METADATA)
         self.assertEqual(
             tuple(
                 tuple(rule.metadata.rule_id for rule in rule_group)
@@ -73,6 +77,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(gcp_plugin.limitations, GCP_LIMITATIONS)
         self.assertIsInstance(gcp_plugin.create_normalizer(), GcpNormalizer)
         self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
+        self.assertEqual(gcp_plugin.create_rule_metadata(), GCP_RULE_METADATA)
         self.assertIsInstance(aws_plugin.create_boundary_contributor(), AwsBoundaryContributor)
         self.assertIsInstance(gcp_plugin.create_boundary_contributor(), GcpBoundaryContributor)
         self.assertEqual(
@@ -82,6 +87,9 @@ class ProviderCatalogTests(unittest.TestCase):
             ),
             GCP_RULE_GROUP_IDS,
         )
+
+    def test_default_provider_rule_metadata_merges_builtin_provider_catalogs(self) -> None:
+        self.assertEqual(default_provider_rule_metadata(), AWS_RULE_METADATA + GCP_RULE_METADATA)
 
     def test_default_boundary_contributors_register_builtin_provider_contributors(self) -> None:
         contributors = default_provider_boundary_contributors()

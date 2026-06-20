@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
+    from tfstride.analysis.rule_registry import RuleMetadata
+
+
+def _aws_rule_metadata() -> tuple[RuleMetadata, ...]:
+    from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
+
+    return AWS_RULE_METADATA
 
 
 def _aws_boundary_contributor() -> BoundaryContributor:
@@ -38,6 +45,7 @@ def aws_provider_plugin() -> ProviderPlugin:
         resource_capabilities=AWS_RESOURCE_CAPABILITIES,
         limitations=AWS_LIMITATIONS,
         resource_decorator_factory=AwsResourceDecorator,
+        rule_metadata_factory=_aws_rule_metadata,
         rule_contribution_factory=_aws_rule_contribution,
         boundary_contributor_factory=_aws_boundary_contributor,
     )

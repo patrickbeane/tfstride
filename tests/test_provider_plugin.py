@@ -26,6 +26,7 @@ from tfstride.providers.plugin import (
     resource_capability_registry_from_plugins,
     resource_facts_registry_from_plugins,
     rule_contribution_from_plugins,
+    rule_metadata_from_plugins,
 )
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.providers.resource_facts import ProviderResourceFactDomains
@@ -45,6 +46,10 @@ RULE_METADATA = RuleMetadata(
 
 def _detector(context: RuleEvaluationContext, rule_id: str) -> list[Finding]:
     return []
+
+
+def _rule_metadata() -> tuple[RuleMetadata, ...]:
+    return (RULE_METADATA,)
 
 
 def _rule_contribution(finding_factory: FindingFactory) -> RuleContribution:
@@ -134,6 +139,7 @@ def _plugin(
     provider: str = " AWS ",
     normalizer_provider: str = "aws",
     limitations: tuple[str, ...] = (" limitation ",),
+    rule_metadata_factory=_rule_metadata,
     rule_contribution_factory=_rule_contribution,
     boundary_contributor_factory=RecordingBoundaryContributor,
 ) -> ProviderPlugin:
@@ -148,6 +154,7 @@ def _plugin(
         },
         limitations=limitations,
         resource_decorator_factory=RecordingDecorator,
+        rule_metadata_factory=rule_metadata_factory,
         rule_contribution_factory=rule_contribution_factory,
         boundary_contributor_factory=boundary_contributor_factory,
     )
@@ -166,6 +173,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertIs(plugin.metadata_namespace, FakeMetadata)
         self.assertEqual(plugin.limitations, ("limitation",))
         self.assertIs(plugin.facts_registry_entry()[1], _facts)
+        self.assertIs(plugin.rule_metadata_factory, _rule_metadata)
         self.assertIs(plugin.rule_contribution_factory, _rule_contribution)
         self.assertIs(plugin.boundary_contributor_factory, RecordingBoundaryContributor)
 
@@ -183,6 +191,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsInstance(plugin.create_boundary_contributor(), RecordingBoundaryContributor)
 
+    def test_plugin_creates_rule_metadata_when_factory_is_configured(self) -> None:
+        plugin = _plugin()
+
+        self.assertEqual(plugin.create_rule_metadata(), (RULE_METADATA,))
+
     def test_plugin_creates_rule_contribution_when_factory_is_configured(self) -> None:
         plugin = _plugin()
 
@@ -190,6 +203,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsNotNone(contribution)
         self.assertEqual(contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
+
+    def test_plugin_allows_missing_rule_metadata_factory(self) -> None:
+        plugin = _plugin(rule_metadata_factory=None)
+
+        self.assertEqual(plugin.create_rule_metadata(), ())
 
     def test_plugin_allows_missing_rule_contribution_factory(self) -> None:
         plugin = _plugin(rule_contribution_factory=None)
@@ -220,6 +238,7 @@ class ProviderPluginTests(unittest.TestCase):
             [plugin],
             FindingFactory(RuleRegistry([RULE_METADATA])),
         )
+        rule_metadata = rule_metadata_from_plugins([plugin])
 
         self.assertEqual(provider_registry.providers(), ("aws",))
         self.assertEqual(facts_registry.providers(), ("aws",))
@@ -227,6 +246,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
         self.assertIsInstance(boundary_contributors_by_provider["aws"][0], RecordingBoundaryContributor)
         self.assertEqual(rule_contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
+        self.assertEqual(rule_metadata, (RULE_METADATA,))
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
         self.assertEqual(facts_registry.facts_for(resource).storage.bucket_name, "aws-bucket")
 
@@ -274,6 +294,17 @@ class ProviderPluginTests(unittest.TestCase):
                 resource_facts_factory=None,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
+            )
+
+    def test_plugin_rejects_non_callable_rule_metadata_factory(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            ProviderPlugin(
+                provider="aws",
+                normalizer_factory=lambda: RecordingNormalizer(),
+                resource_facts_factory=_facts,
+                metadata_namespace=FakeMetadata,
+                supported_resource_types=frozenset(),
+                rule_metadata_factory=object(),
             )
 
     def test_plugin_rejects_non_callable_rule_contribution_factory(self) -> None:

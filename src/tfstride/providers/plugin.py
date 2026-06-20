@@ -23,9 +23,11 @@ if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
+    from tfstride.analysis.rule_registry import RuleMetadata
 
 ProviderBoundaryContributorFactory = Callable[[], "BoundaryContributor"]
 ProviderRuleContributionFactory = Callable[["FindingFactory"], "RuleContribution"]
+ProviderRuleMetadataFactory = Callable[[], tuple["RuleMetadata", ...]]
 
 
 class ProviderPluginError(ValueError):
@@ -51,6 +53,7 @@ class ProviderPlugin:
     resource_capabilities: ResourceCapabilityMap = field(default_factory=dict)
     limitations: tuple[str, ...] = ()
     resource_decorator_factory: Callable[[], ProviderResourceDecorator] | None = None
+    rule_metadata_factory: ProviderRuleMetadataFactory | None = None
     rule_contribution_factory: ProviderRuleContributionFactory | None = None
     boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
 
@@ -64,6 +67,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` facts factory must be callable.")
         if self.resource_decorator_factory is not None and not callable(self.resource_decorator_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` decorator factory must be callable.")
+        if self.rule_metadata_factory is not None and not callable(self.rule_metadata_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` rule metadata factory must be callable.")
         if self.rule_contribution_factory is not None and not callable(self.rule_contribution_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` rule contribution factory must be callable.")
         if self.boundary_contributor_factory is not None and not callable(self.boundary_contributor_factory):
@@ -99,6 +104,11 @@ class ProviderPlugin:
         if self.resource_decorator_factory is None:
             return None
         return self.resource_decorator_factory()
+
+    def create_rule_metadata(self) -> tuple[RuleMetadata, ...]:
+        if self.rule_metadata_factory is None:
+            return ()
+        return self.rule_metadata_factory()
 
     def create_rule_contribution(self, finding_factory: FindingFactory) -> RuleContribution | None:
         if self.rule_contribution_factory is None:
@@ -185,6 +195,18 @@ def boundary_contributor_factories_by_provider_from_plugins(
             continue
         factories_by_provider.setdefault(plugin.provider, []).append(plugin.boundary_contributor_factory)
     return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
+
+
+def rule_metadata_from_plugins(plugins: Iterable[ProviderPlugin]) -> tuple[RuleMetadata, ...]:
+    metadata: list[RuleMetadata] = []
+    seen_rule_ids: set[str] = set()
+    for plugin in plugins:
+        for rule_metadata in plugin.create_rule_metadata():
+            if rule_metadata.rule_id in seen_rule_ids:
+                raise ProviderPluginError(f"Duplicate rule metadata for `{rule_metadata.rule_id}`.")
+            seen_rule_ids.add(rule_metadata.rule_id)
+            metadata.append(rule_metadata)
+    return tuple(metadata)
 
 
 def rule_contribution_from_plugins(

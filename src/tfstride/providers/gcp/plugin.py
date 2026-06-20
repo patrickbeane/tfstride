@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
+    from tfstride.analysis.rule_registry import RuleMetadata
+
+
+def _gcp_rule_metadata() -> tuple[RuleMetadata, ...]:
+    from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
+
+    return GCP_RULE_METADATA
 
 
 def _gcp_boundary_contributor() -> BoundaryContributor:
@@ -38,6 +45,7 @@ def gcp_provider_plugin() -> ProviderPlugin:
         resource_capabilities=GCP_RESOURCE_CAPABILITIES,
         limitations=GCP_LIMITATIONS,
         resource_decorator_factory=GcpResourceDecorator,
+        rule_metadata_factory=_gcp_rule_metadata,
         rule_contribution_factory=_gcp_rule_contribution,
         boundary_contributor_factory=_gcp_boundary_contributor,
     )

@@ -15,7 +15,6 @@ from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "src" / "tfstride"
 TESTS_ROOT = REPO_ROOT / "tests"
-SHARED_RULE_METADATA_PATH = REPO_ROOT / "src" / "tfstride" / "analysis" / "rule_registry.py"
 STRIDE_RULES_PATH = REPO_ROOT / "src" / "tfstride" / "analysis" / "stride_rules.py"
 
 
@@ -42,8 +41,6 @@ def _rule_id_occurrences(rule_ids: set[str]) -> list[tuple[Path, str]]:
 
 def _is_allowed_rule_id_location(path: Path, provider: str) -> bool:
     if path.is_relative_to(TESTS_ROOT):
-        return True
-    if path == SHARED_RULE_METADATA_PATH:
         return True
     return path.is_relative_to(REPO_ROOT / "src" / "tfstride" / "providers" / provider)
 

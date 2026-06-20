@@ -1,0 +1,419 @@
+from __future__ import annotations
+
+from tfstride.analysis.rule_registry import RuleMetadata
+from tfstride.models import StrideCategory
+
+GCP_RULE_METADATA = (
+    RuleMetadata(
+        rule_id="gcp-sensitive-resource-iam-external-access",
+        title="Sensitive GCP resource IAM binding allows broad or external access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant Secret Manager and Cloud KMS IAM roles only to specific in-project service accounts or groups, "
+            "remove public principals, and require explicit cross-project access reviews for partner identities."
+        ),
+        tags=("gcp", "iam", "secret-manager", "kms", "resource-policy"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-pubsub-public-access",
+        title="Pub/Sub IAM binding allows public or broad data access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant Pub/Sub publisher and subscriber roles only to specific service accounts or groups, "
+            "remove public principals, and separate publish and consume permissions by workload."
+        ),
+        tags=("gcp", "pubsub", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-bigquery-public-access",
+        title="BigQuery IAM binding allows public or broad data access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant BigQuery dataset and table access only to specific in-project identities or reviewed "
+            "analytics groups, remove public principals, and prefer least-privilege data roles."
+        ),
+        tags=("gcp", "bigquery", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-public-workload-sensitive-data-access",
+        title="Internet-exposed GCP workload can access sensitive data services",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Run public GCP workloads with narrowly scoped service accounts, remove direct Secret Manager, "
+            "Cloud KMS, GCS, or Cloud SQL grants from internet-facing instances, and broker sensitive data "
+            "access through private services where possible."
+        ),
+        tags=("gcp", "compute", "iam", "data", "transitive-path"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-public-authorized-network",
+        title="Cloud SQL instance accepts public authorized network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public IPv4 access where possible, use private IP connectivity or the Cloud SQL Auth Proxy, "
+            "and restrict authorized networks to narrow CIDRs when public client access is required."
+        ),
+        tags=("gcp", "cloud-sql", "database", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-backup-disabled",
+        title="Cloud SQL automated backups are disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable automated backups for Cloud SQL instances, configure retention appropriate to the workload, "
+            "and enable point-in-time recovery where supported."
+        ),
+        tags=("gcp", "cloud-sql", "database", "backup"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-public-ip-without-private-network",
+        title="Cloud SQL public IPv4 is enabled without private network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public IPv4 where possible, attach the instance to a private network, and route clients "
+            "through private IP, the Cloud SQL Auth Proxy, or tightly controlled connectivity paths."
+        ),
+        tags=("gcp", "cloud-sql", "database", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-ssl-not-required",
+        title="Cloud SQL public client access does not require SSL",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Require encrypted Cloud SQL client connections with `require_ssl` or an enforcing `ssl_mode`, "
+            "and prefer private IP or the Cloud SQL Auth Proxy for application connectivity."
+        ),
+        tags=("gcp", "cloud-sql", "database", "tls"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-point-in-time-recovery-disabled",
+        title="Cloud SQL point-in-time recovery is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable point-in-time recovery for Cloud SQL engines that support it, tune retention to recovery "
+            "objectives, and test restore workflows for destructive-write scenarios."
+        ),
+        tags=("gcp", "cloud-sql", "database", "backup", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-deletion-protection-disabled",
+        title="Cloud SQL deletion protection is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable Cloud SQL deletion protection for persistent environments and require explicit review "
+            "before disabling it during planned database retirement."
+        ),
+        tags=("gcp", "cloud-sql", "database", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-public-access",
+        title="GCS bucket is publicly accessible",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from bucket-level IAM grants, enforce "
+            "GCS Public Access Prevention, and use signed URLs, CDN origins, or narrow identities when "
+            "objects must be distributed."
+        ),
+        tags=("gcp", "gcs", "storage", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-uniform-bucket-level-access-disabled",
+        title="GCS bucket does not enforce uniform bucket-level access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable uniform bucket-level access so object ACLs cannot bypass bucket IAM, and migrate "
+            "legacy object ACL permissions into explicit bucket-level IAM bindings."
+        ),
+        tags=("gcp", "gcs", "storage", "iam"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-public-access-prevention-not-enforced",
+        title="GCS bucket does not enforce Public Access Prevention",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set GCS Public Access Prevention to `enforced` on sensitive buckets and rely on explicit "
+            "non-public identities or signed access patterns when objects must be shared."
+        ),
+        tags=("gcp", "gcs", "storage", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-versioning-disabled",
+        title="GCS sensitive bucket versioning is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable bucket versioning for sensitive GCS buckets and pair it with lifecycle retention rules "
+            "that match recovery objectives and storage cost constraints."
+        ),
+        tags=("gcp", "gcs", "storage", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gcs-customer-managed-encryption-missing",
+        title="GCS sensitive bucket does not use customer-managed encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure a Cloud KMS customer-managed key for sensitive GCS buckets, assign the GCS service "
+            "agent only the key roles it needs, and manage key rotation separately from bucket IAM."
+        ),
+        tags=("gcp", "gcs", "storage", "kms", "encryption"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-public-compute-broad-ingress",
+        title="Internet-exposed GCP compute instance permits broad ingress",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Restrict GCP firewall source ranges and exposed ports, remove external IP access where possible, "
+            "and use Identity-Aware Proxy, VPN, or a controlled bastion for administration."
+        ),
+        tags=("gcp", "network", "compute", "internet"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-public-load-balanced-workload",
+        title="GCP workload is exposed through a public load balancer",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Review public forwarding rules, URL maps, backend services, backend buckets, and NEGs that route "
+            "to this resource. Require authentication or edge policy controls where public access is intended, "
+            "and restrict or remove public load balancer frontends where it is not."
+        ),
+        tags=("gcp", "load-balancer", "compute", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-compute-os-login-disabled",
+        title="GCP compute instance disables OS Login",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable OS Login on GCE instances and manage SSH access through IAM roles, "
+            "two-factor enforcement, and centralized audit logs instead of metadata SSH keys."
+        ),
+        tags=("gcp", "compute", "iam", "ssh"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-public-control-plane",
+        title="GKE cluster exposes a public control plane",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Use private GKE control-plane endpoints where possible, or restrict master authorized networks "
+            "to narrow administrator CIDRs and enforce IAM plus Kubernetes RBAC for cluster administration."
+        ),
+        tags=("gcp", "gke", "kubernetes", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-broad-authorized-networks",
+        title="GKE control plane allows broad authorized networks",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Configure GKE master authorized networks with narrow trusted CIDRs, avoid internet-wide ranges, "
+            "and prefer private control-plane access for administrative paths."
+        ),
+        tags=("gcp", "gke", "kubernetes", "network", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-workload-identity-disabled",
+        title="GKE cluster does not enable Workload Identity",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable GKE Workload Identity, bind Kubernetes service accounts to narrow Google service accounts, "
+            "and avoid relying on node service-account credentials for pod-level cloud API access."
+        ),
+        tags=("gcp", "gke", "kubernetes", "iam"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-legacy-metadata-endpoints-enabled",
+        title="GKE node metadata exposure is not hardened",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, "
+            "and prevent pods from reaching broad node credentials."
+        ),
+        tags=("gcp", "gke", "kubernetes", "metadata", "iam"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-broad-node-service-account",
+        title="GKE node pool uses broad node identity settings",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Attach a dedicated least-privilege node service account, remove cloud-platform or full-control "
+            "OAuth scopes, and shift workload permissions to Workload Identity bindings."
+        ),
+        tags=("gcp", "gke", "kubernetes", "iam", "node-pool"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-run-public-invoker",
+        title="Cloud Run service is publicly invokable",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from Cloud Run invoker bindings unless "
+            "anonymous access is intentional, and front public services with authentication, IAP, "
+            "API Gateway, or a controlled edge policy."
+        ),
+        tags=("gcp", "cloud-run", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-functions-public-invoker",
+        title="Cloud Functions function is publicly invokable",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from Cloud Functions invoker bindings unless "
+            "anonymous access is intentional, and require authentication, IAP, API Gateway, or a controlled "
+            "edge policy for public HTTP functions."
+        ),
+        tags=("gcp", "cloud-functions", "serverless", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-service-account-iam-broad-principal",
+        title="GCP service account IAM grants access to broad principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove `allUsers`, `allAuthenticatedUsers`, and broad domain grants from service-account IAM; "
+            "grant impersonation roles only to narrowly scoped groups, workloads, or automation identities."
+        ),
+        tags=("gcp", "iam", "service-account", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-service-account-iam-privileged-role",
+        title="GCP service account IAM grants a high-risk impersonation role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Restrict service-account user, token creator, and admin roles to narrowly scoped principals, "
+            "prefer workload-specific service accounts, and review impersonation paths before deployment."
+        ),
+        tags=("gcp", "iam", "service-account", "privilege"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-service-account-key-hygiene",
+        title="GCP service account user-managed key lacks rotation hygiene",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Avoid user-managed service account keys where Workload Identity Federation, workload identity, "
+            "or service-account impersonation can be used; when keys are unavoidable, keep lifetimes short, "
+            "configure explicit rotation triggers, and store private material outside Terraform state."
+        ),
+        tags=("gcp", "iam", "service-account", "credential"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-service-account-key-effective-access",
+        title="GCP service account key can exercise sensitive or privileged access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove sensitive data and high-impact IAM grants from service accounts that still have "
+            "user-managed keys, replace keys with workload identity or service-account impersonation, "
+            "and revoke or rotate existing keys after privilege reduction."
+        ),
+        tags=("gcp", "iam", "service-account", "credential", "effective-access"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-org-folder-iam-broad-principal",
+        title="GCP organization or folder IAM grants access to broad principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove public and broad-domain principals from organization and folder IAM, grant high-level "
+            "access only to tightly controlled groups, and prefer project- or resource-scoped bindings where possible."
+        ),
+        tags=("gcp", "iam", "organization", "folder", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-org-folder-iam-privileged-role",
+        title="GCP organization or folder IAM grants a high-privilege role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace high-impact organization and folder roles with narrowly scoped custom or predefined roles, "
+            "assign them only to controlled break-glass or platform groups, and review descendant project blast radius."
+        ),
+        tags=("gcp", "iam", "organization", "folder", "privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-project-iam-broad-principal",
+        title="GCP project IAM binding grants access to public principals",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove `allUsers` and `allAuthenticatedUsers` from project-level IAM bindings, grant access to "
+            "specific groups or service accounts, and scope permissions to the smallest project or resource needed."
+        ),
+        tags=("gcp", "iam", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-project-iam-privileged-role",
+        title="GCP project IAM binding grants a high-privilege role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace Owner, Editor, IAM admin, service-account impersonation, and admin-class project roles "
+            "with narrowly scoped predefined or custom roles assigned to specific groups or service accounts."
+        ),
+        tags=("gcp", "iam", "privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-inherited-iam-sensitive-resource-access",
+        title="Inherited GCP IAM grant reaches sensitive resources",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Move sensitive data access off organization, folder, and project-level IAM where possible; "
+            "grant Secret Manager, KMS, GCS, Cloud SQL, BigQuery, and Pub/Sub permissions at the narrowest "
+            "resource scope with reviewed principals and custom roles."
+        ),
+        tags=("gcp", "iam", "inheritance", "data"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
+        rule_id="gcp-inherited-iam-blast-radius",
+        title="Inherited GCP IAM grant expands descendant blast radius",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Avoid broad or high-impact IAM grants at organization, folder, and project scope when narrower "
+            "resource-level or workload-specific bindings are possible; split inherited roles by service and "
+            "review descendant resources before assigning public, external, or administrator principals."
+        ),
+        tags=("gcp", "iam", "inheritance", "blast-radius"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+)
