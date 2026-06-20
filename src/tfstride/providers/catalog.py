@@ -10,7 +10,10 @@ if TYPE_CHECKING:
 from tfstride.providers.aws.plugin import aws_provider_plugin
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.plugin import (
+    ProviderBoundaryContributorFactory,
     ProviderPlugin,
+    boundary_contributor_factories_by_provider_from_plugins,
+    boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
@@ -45,8 +48,18 @@ def default_provider_limitations() -> dict[str, tuple[str, ...]]:
     return provider_limitations_from_plugins(default_provider_plugins())
 
 
-def default_provider_boundary_contributors() -> tuple[BoundaryContributor, ...]:
-    return boundary_contributors_from_plugins(default_provider_plugins())
+def default_provider_boundary_contributors(provider: str | None = None) -> tuple[BoundaryContributor, ...]:
+    return boundary_contributors_from_plugins(default_provider_plugins(), provider=provider)
+
+
+def default_provider_boundary_contributors_by_provider() -> dict[str, tuple[BoundaryContributor, ...]]:
+    return boundary_contributors_by_provider_from_plugins(default_provider_plugins())
+
+
+def default_provider_boundary_contributor_factories_by_provider() -> dict[
+    str, tuple[ProviderBoundaryContributorFactory, ...]
+]:
+    return boundary_contributor_factories_by_provider_from_plugins(default_provider_plugins())
 
 
 def default_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:

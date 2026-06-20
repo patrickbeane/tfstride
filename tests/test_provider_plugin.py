@@ -19,6 +19,7 @@ from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.plugin import (
     ProviderPlugin,
     ProviderPluginError,
+    boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
@@ -214,6 +215,7 @@ class ProviderPluginTests(unittest.TestCase):
         facts_registry = resource_facts_registry_from_plugins([plugin])
         limitation_registry = provider_limitations_from_plugins([plugin])
         boundary_contributors = boundary_contributors_from_plugins([plugin])
+        boundary_contributors_by_provider = boundary_contributors_by_provider_from_plugins([plugin])
         rule_contribution = rule_contribution_from_plugins(
             [plugin],
             FindingFactory(RuleRegistry([RULE_METADATA])),
@@ -223,9 +225,19 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(facts_registry.providers(), ("aws",))
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
+        self.assertIsInstance(boundary_contributors_by_provider["aws"][0], RecordingBoundaryContributor)
         self.assertEqual(rule_contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
         self.assertEqual(facts_registry.facts_for(resource).storage.bucket_name, "aws-bucket")
+
+    def test_boundary_contributor_helper_can_filter_by_provider(self) -> None:
+        aws_plugin = _plugin(provider="aws")
+        gcp_plugin = _plugin(provider="gcp")
+
+        contributors = boundary_contributors_from_plugins([aws_plugin, gcp_plugin], provider=" GCP ")
+
+        self.assertEqual(len(contributors), 1)
+        self.assertIsInstance(contributors[0], RecordingBoundaryContributor)
 
     def test_plugin_helper_builds_resource_capability_registry(self) -> None:
         plugin = _plugin()

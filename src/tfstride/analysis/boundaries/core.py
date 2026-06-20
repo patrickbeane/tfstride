@@ -13,14 +13,15 @@ from tfstride.analysis.boundaries.types import (
 )
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.models import ResourceInventory, TrustBoundary
-from tfstride.providers.catalog import default_provider_boundary_contributors
 
 
-def default_boundary_contributors() -> tuple[BoundaryContributor, ...]:
+def default_boundary_contributors(
+    provider_contributors: Sequence[BoundaryContributor] | None = None,
+) -> tuple[BoundaryContributor, ...]:
     return (
         InternetToServiceBoundaryContributor(),
         PublicPrivateSubnetBoundaryContributor(),
-        *default_provider_boundary_contributors(),
+        *(provider_contributors or ()),
     )
 
 

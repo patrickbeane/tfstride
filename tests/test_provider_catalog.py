@@ -16,7 +16,9 @@ from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsS
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
+    default_provider_boundary_contributor_factories_by_provider,
     default_provider_boundary_contributors,
+    default_provider_boundary_contributors_by_provider,
     default_provider_limitations,
     default_provider_plugins,
     default_provider_registry,
@@ -83,9 +85,18 @@ class ProviderCatalogTests(unittest.TestCase):
 
     def test_default_boundary_contributors_register_builtin_provider_contributors(self) -> None:
         contributors = default_provider_boundary_contributors()
+        contributors_by_provider = default_provider_boundary_contributors_by_provider()
+        factories_by_provider = default_provider_boundary_contributor_factories_by_provider()
 
         self.assertIsInstance(contributors[0], AwsBoundaryContributor)
         self.assertIsInstance(contributors[1], GcpBoundaryContributor)
+        self.assertIsInstance(default_provider_boundary_contributors("aws")[0], AwsBoundaryContributor)
+        self.assertIsInstance(default_provider_boundary_contributors("gcp")[0], GcpBoundaryContributor)
+        self.assertEqual(default_provider_boundary_contributors("azure"), ())
+        self.assertIsInstance(contributors_by_provider["aws"][0], AwsBoundaryContributor)
+        self.assertIsInstance(contributors_by_provider["gcp"][0], GcpBoundaryContributor)
+        self.assertIsInstance(factories_by_provider["aws"][0](), AwsBoundaryContributor)
+        self.assertIsInstance(factories_by_provider["gcp"][0](), GcpBoundaryContributor)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
         contribution = default_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))

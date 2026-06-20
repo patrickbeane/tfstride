@@ -150,8 +150,41 @@ def provider_limitations_from_plugins(plugins: Iterable[ProviderPlugin]) -> dict
     return {provider: limitations for provider, limitations in (plugin.limitations_entry() for plugin in plugins)}
 
 
-def boundary_contributors_from_plugins(plugins: Iterable[ProviderPlugin]) -> tuple[BoundaryContributor, ...]:
-    return tuple(contributor for plugin in plugins if (contributor := plugin.create_boundary_contributor()) is not None)
+def boundary_contributors_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+    *,
+    provider: str | None = None,
+) -> tuple[BoundaryContributor, ...]:
+    normalized_provider = _normalize_provider_name(provider) if provider is not None else None
+    return tuple(
+        contributor
+        for plugin in plugins
+        if normalized_provider is None or plugin.provider == normalized_provider
+        if (contributor := plugin.create_boundary_contributor()) is not None
+    )
+
+
+def boundary_contributors_by_provider_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> dict[str, tuple[BoundaryContributor, ...]]:
+    contributors_by_provider: dict[str, list[BoundaryContributor]] = {}
+    for plugin in plugins:
+        contributor = plugin.create_boundary_contributor()
+        if contributor is None:
+            continue
+        contributors_by_provider.setdefault(plugin.provider, []).append(contributor)
+    return {provider: tuple(contributors) for provider, contributors in contributors_by_provider.items()}
+
+
+def boundary_contributor_factories_by_provider_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> dict[str, tuple[ProviderBoundaryContributorFactory, ...]]:
+    factories_by_provider: dict[str, list[ProviderBoundaryContributorFactory]] = {}
+    for plugin in plugins:
+        if plugin.boundary_contributor_factory is None:
+            continue
+        factories_by_provider.setdefault(plugin.provider, []).append(plugin.boundary_contributor_factory)
+    return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
 
 
 def rule_contribution_from_plugins(

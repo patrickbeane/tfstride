@@ -738,6 +738,50 @@ class TFSAnalysisTests(unittest.TestCase):
         self.assertEqual(result.inventory.resources, ())
         self.assertEqual(result.findings, [])
 
+    def test_analysis_selects_boundary_contributors_for_normalized_provider(self) -> None:
+        class RecordingNormalizer(ProviderNormalizer):
+            def __init__(self, provider: str) -> None:
+                self.provider = provider
+
+            def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
+                return ResourceInventory(provider=self.provider, resources=[])
+
+        class RecordingBoundaryContributor:
+            def __init__(self, provider: str) -> None:
+                self.provider = provider
+                self.calls = 0
+
+            def contribute(self, context) -> None:
+                self.calls += 1
+                context.add_boundary(
+                    BoundaryType.CROSS_ACCOUNT_OR_ROLE,
+                    f"{self.provider}:source",
+                    f"{self.provider}:target",
+                    f"{self.provider} contributor selected.",
+                    "Selected after provider normalization.",
+                )
+
+        aws_contributor = RecordingBoundaryContributor("aws")
+        gcp_contributor = RecordingBoundaryContributor("gcp")
+        engine = TfStride(
+            provider="gcp",
+            provider_registry=ProviderRegistry([RecordingNormalizer("gcp")]),
+            provider_boundary_contributor_factories={
+                " AWS ": (lambda: aws_contributor,),
+                " GCP ": (lambda: gcp_contributor,),
+            },
+        )
+
+        result = engine.analyze_plan(FIXTURE_PATH)
+
+        self.assertEqual(result.inventory.provider, "gcp")
+        self.assertEqual(aws_contributor.calls, 0)
+        self.assertEqual(gcp_contributor.calls, 1)
+        self.assertEqual(
+            [boundary.identifier for boundary in result.trust_boundaries],
+            ["cross-account-or-role-access:gcp:source->gcp:target"],
+        )
+
     def test_analysis_raises_when_default_provider_is_not_registered(self) -> None:
         engine = TfStride(provider_registry=ProviderRegistry())
 
