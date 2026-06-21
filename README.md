@@ -1,31 +1,28 @@
 # tfSTRIDE & Policy Gate
 
-`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls for supported cloud providers before deployment.
+`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls before deployment.
 
-## Overview
+It is built for local review and CI gating: no LLMs in the core path, no runtime cloud access, and no full graph engine. The goal is to make risky infrastructure relationships easier to see before `terraform apply`.
 
-This project turns Terraform plan JSON into a cloud threat model for supported cloud infrastructure before deployment. It normalizes supported resources, identifies trust boundaries, evaluates rule-based STRIDE checks, and produces evidence-backed findings plus observed protective controls for human review and CI gating.
+## What It Does
 
-The engine is intentionally small and explainable: no LLMs in the core path, no full graph engine, and no runtime cloud access. The goal is to make risky infrastructure patterns easier to review before `terraform apply`.
+`tfstride` analyzes Terraform plan JSON and produces evidence-backed reports for supported cloud providers.
 
-## Features
+It currently supports AWS and GCP through provider plugins for normalization, decoration, rule contribution, metadata, resource facts, and trust-boundary analysis. Azure support is planned and the provider architecture is prepared for it.
 
-- offline Terraform plan analysis with no LLM in the core pipeline
-- trust-boundary detection plus STRIDE-oriented findings
-- IAM graph resolution for inline policies, role attachments, and EC2 instance profiles present in the plan
-- initial ECS/Fargate workload modeling via ECS service and task definition normalization
-- resource-policy analysis for sensitive data services and invoke/publish/queue surfaces
-- condition-aware narrowing for trust and resource policies using supported source constraints
-- informational controls observed for clear mitigating signals
-- machine-readable JSON output with stable finding fingerprints
-- markdown and SARIF 2.1.0 output
-- CLI rule registry listing in text and JSON for reviewable rule IDs, STRIDE categories, tags, and mitigations
-- CI policy gating with `--fail-on low|medium|high`
-- suppressions and baselines to focus gating on active new findings
-- repo-level TOML config for provider selection, default gating, rule selection, and severity overrides
-- automation-friendly `--quiet` mode and non-zero exit behavior
-- zero runtime dependencies for the core CLI engine, with optional dashboard dependencies
-- AWS and GCP analysis behind provider plugins for normalization, decoration, rules, facts, and trust-boundary contributors
+Core capabilities:
+
+* Offline Terraform plan analysis
+* Provider-aware normalization for supported cloud resources
+* Trust-boundary detection
+* STRIDE-oriented security findings
+* Stable finding fingerprints
+* Markdown, JSON, and SARIF 2.1.0 output
+* CI policy gating with `--fail-on low|medium|high`
+* Suppressions and baselines for incremental adoption
+* Repo-level TOML configuration
+* Optional FastAPI dashboard
+* Zero runtime dependencies for the core CLI engine
 
 ## Quickstart
 
@@ -35,101 +32,56 @@ Run directly from source:
 PYTHONPATH=src python3 -m tfstride fixtures/aws/sample_aws_plan.json
 ```
 
-Install the CLI locally:
+Install locally:
 
 ```bash
 python3 -m pip install -e .
 tfstride fixtures/aws/sample_aws_plan.json --output threat-model.md
 ```
 
-Generate a Terraform plan JSON from an infrastructure repo:
+Generate Terraform plan JSON:
 
 ```bash
 terraform plan -out tfplan
 terraform show -json tfplan > tfplan.json
 ```
 
-Gate a plan in CI and emit SARIF alongside the markdown report:
+Analyze a plan:
 
 ```bash
-tfstride tfplan.json --quiet --fail-on high --output threat-model.md --sarif-output threat-model.sarif
+tfstride tfplan.json --quiet --output threat-model.md
 ```
 
-Emit a machine-readable JSON report:
+Emit JSON and SARIF:
 
 ```bash
-tfstride tfplan.json --quiet --json-output threat-model.json
+tfstride tfplan.json \
+  --quiet \
+  --json-output threat-model.json \
+  --sarif-output threat-model.sarif
 ```
 
-Provider detection defaults to `auto`. For mixed-provider plans, select one provider explicitly:
+Gate a plan in CI:
+
+```bash
+tfstride tfplan.json --quiet --fail-on high
+```
+
+Provider detection defaults to `auto`. For mixed-provider plans, select a provider explicitly:
 
 ```bash
 tfstride tfplan.json --provider aws --quiet
-tfstride tfplan.json --provider gcp --quiet --json-output threat-model.json
+tfstride tfplan.json --provider gcp --quiet
 ```
 
-List the registered rules and their metadata without analyzing a plan:
+List registered rules:
 
 ```bash
 tfstride --list-rules
 tfstride --list-rules --json
 ```
 
-The JSON report contract is versioned for downstream consumers. The current report payload uses:
-
-- `kind: "tfstride-report"`
-- `version: "1.1"`
-
-Capture the current unsuppressed findings as a baseline and later gate only on new findings:
-
-```bash
-tfstride tfplan.json --quiet --baseline-output baseline.json
-tfstride tfplan.json --quiet --fail-on high --baseline baseline.json
-```
-
-Use a checked-in repo config so CI and local runs share the same defaults:
-
-```bash
-tfstride tfplan.json --quiet
-tfstride tfplan.json --config ./tfstride.toml --json-output threat-model.json
-```
-
-## Dashboard
-
-The repo also includes a thin FastAPI dashboard in `apps/dashboard/`. It reuses the same engine, findings, and JSON contract as the CLI rather than adding a second analysis path.
-
-Install the web dependencies:
-
-```bash
-python3 -m pip install -e '.[dashboard]'
-```
-
-Run the dashboard locally from the repo root:
-
-```bash
-uvicorn apps.dashboard.main:app --reload --port 8001
-```
-
-Useful routes:
-
-- `/`: upload form for plan analysis
-- `/scenarios`: built-in fixture gallery page
-- `/demo/{scenario_id}`: built-in fixture scenarios such as `safe`, `mixed`, and `nightmare`
-- `/analyze`: upload form POST target that renders an HTML report
-- `/api/analyze`: multipart upload endpoint that returns the JSON report contract
-- `/api/docs`: OpenAPI docs for the dashboard API
-- `/healthz`: simple health endpoint for process and proxy checks
-
-Deployment notes:
-
-- a repo-tracked `systemd` unit example lives at `apps/dashboard/deploy/tfstride-dashboard.service`
-- the checked-in example assumes the app lives at `/home/fleet/tfstride`, runs as user `fleet`, binds `uvicorn` to `127.0.0.1:8001`, and sets `PYTHONPATH` to the repo `src/` directory
-- copy that unit to `/etc/systemd/system/tfstride-dashboard.service` on the host, then run `sudo systemctl daemon-reload && sudo systemctl enable --now tfstride-dashboard`
-- a simple Caddy reverse-proxy example lives at `apps/dashboard/deploy/Caddyfile.example`
-
-## Example Output
-
-Example finding excerpt:
+## Example Finding
 
 ```markdown
 #### Database is reachable from overly permissive sources
@@ -142,17 +94,204 @@ Example finding excerpt:
   - network path: database trusts security groups attached to internet-exposed workloads
 ```
 
-Expected outcome on a failing plan:
+Expected policy-gate failure:
 
 ```text
 Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 ```
 
+## Provider Support
+
+| Provider | Status          | Coverage Summary                                                                                                                                     |
+| -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations.     |
+| GCP      | Active support  | Compute, GKE, Cloud SQL, GCS, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
+| Azure    | Planned         | Provider architecture is prepared; Azure support is not registered yet.                                                                              |
+
+Unsupported resources are skipped and called out in the report.
+
+<details>
+<summary>Detailed AWS resource coverage</summary>
+
+AWS support currently includes:
+
+* `aws_instance`
+* `aws_ecs_service`
+* `aws_ecs_task_definition`
+* `aws_ecs_cluster`
+* `aws_security_group`
+* `aws_security_group_rule`
+* `aws_nat_gateway`
+* `aws_lb`
+* `aws_db_instance`
+* `aws_s3_bucket`
+* `aws_s3_bucket_policy`
+* `aws_s3_bucket_public_access_block`
+* `aws_iam_role`
+* `aws_iam_policy`
+* `aws_iam_role_policy`
+* `aws_iam_role_policy_attachment`
+* `aws_iam_instance_profile`
+* `aws_lambda_function`
+* `aws_lambda_permission`
+* `aws_kms_key`
+* `aws_sns_topic`
+* `aws_sqs_queue`
+* `aws_secretsmanager_secret`
+* `aws_secretsmanager_secret_policy`
+* `aws_subnet`
+* `aws_vpc`
+* `aws_internet_gateway`
+* `aws_route_table`
+* `aws_route_table_association`
+
+</details>
+
+<details>
+<summary>Detailed GCP resource coverage</summary>
+
+GCP support currently includes normalization and analysis for:
+
+* `google_compute_instance`
+* `google_container_cluster`
+* `google_container_node_pool`
+* `google_compute_network`
+* `google_compute_subnetwork`
+* `google_compute_firewall`
+* GCP firewall policy, rule, and association resources
+* `google_compute_route`
+* `google_compute_router`
+* `google_compute_router_nat`
+* `google_compute_forwarding_rule`
+* `google_compute_global_forwarding_rule`
+* `google_cloud_run_service`
+* `google_cloud_run_v2_service`
+* Cloud Run IAM member, binding, and policy resources
+* `google_cloudfunctions_function`
+* `google_cloudfunctions2_function`
+* Cloud Functions IAM member, binding, and policy resources
+* Organization, folder, and project IAM member, binding, and policy resources
+* Project and organization custom IAM roles
+* `google_service_account`
+* `google_service_account_key`
+* GCP service-account IAM member, binding, and policy resources
+* `google_pubsub_topic`
+* `google_pubsub_subscription`
+* Pub/Sub IAM member, binding, and policy resources
+* `google_bigquery_dataset`
+* `google_bigquery_table`
+* BigQuery dataset and table IAM member, binding, and policy resources
+* `google_sql_database_instance`
+* `google_secret_manager_secret`
+* Secret Manager secret IAM member, binding, and policy resources
+* `google_kms_crypto_key`
+* Cloud KMS crypto-key and key-ring IAM member, binding, and policy resources
+* `google_storage_bucket`
+* GCS bucket IAM member, binding, and policy resources
+
+GCP trust-boundary coverage includes public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, GCS buckets, Cloud NAT posture, and workload-to-sensitive-data paths through GCE, Cloud Run, and Cloud Functions service accounts.
+
+GCP rule coverage includes public compute ingress, GKE posture, Cloud SQL exposure and recovery posture, GCS public-access posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
+
+GCP control observations are not implemented yet.
+
+</details>
+
+## Output Formats
+
+`tfstride` can produce:
+
+* Markdown reports for human review
+* JSON reports for automation and dashboards
+* SARIF 2.1.0 for scanner-compatible integrations
+
+The JSON report contract is versioned for downstream consumers.
+
+Current report identity:
+
+```text
+kind: "tfstride-report"
+version: "1.1"
+```
+
+Top-level JSON sections include:
+
+* `summary`
+* `filtering`
+* `analysis_coverage`
+* `inventory`
+* `trust_boundaries`
+* `findings`
+* `suppressed_findings`
+* `baselined_findings`
+* `observations`
+* `limitations`
+
+## Suppressions, Baselines, and Config
+
+Suppressions are explicit, reviewable exceptions. Selectors can include fields such as `rule_id`, `resource`, `trust_boundary_id`, `severity`, `title`, or `fingerprint`.
+
+Example suppression file:
+
+```json
+{
+  "version": "1.0",
+  "suppressions": [
+    {
+      "id": "accept-cross-account-trust",
+      "rule_id": "aws-role-trust-expansion",
+      "reason": "Tracked in SEC-123 until the deploy role is narrowed."
+    }
+  ]
+}
+```
+
+Capture a baseline and gate only on new findings:
+
+```bash
+tfstride tfplan.json --quiet --baseline-output baseline.json
+tfstride tfplan.json --quiet --baseline baseline.json --fail-on high
+```
+
+Use repo config:
+
+```bash
+tfstride tfplan.json --config ./tfstride.toml --json-output threat-model.json
+```
+
+Example `tfstride.toml`:
+
+```toml
+version = "1.0"
+title = "Platform Threat Model"
+provider = "auto"
+fail_on = "high"
+baseline = ".tfstride/baseline.json"
+suppressions = ".tfstride/suppressions.json"
+
+[rules]
+disable = ["aws-role-trust-expansion"]
+
+[rules.severity_overrides]
+aws-iam-wildcard-permissions = "low"
+```
+
+CLI flags override config values when both are present.
+
 ## CI Usage
 
-GitHub Actions example with SARIF upload and high-severity gating:
-
 Policy gating returns exit code `3` when findings meet or exceed the requested threshold.
+
+Minimal pre-apply gate:
+
+```bash
+terraform plan -out tfplan
+terraform show -json tfplan > tfplan.json
+tfstride tfplan.json --quiet --fail-on medium --output threat-model.md --sarif-output threat-model.sarif
+terraform apply tfplan
+```
+
+GitHub Actions example:
 
 ```yaml
 name: threat-model
@@ -184,428 +323,151 @@ jobs:
           sarif_file: tfstride.sarif
 ```
 
-Pre-apply gating example:
+## Dashboard
+
+The repo includes an optional FastAPI dashboard in `apps/dashboard/`. It reuses the same engine, findings, and JSON contract as the CLI.
+
+Install dashboard dependencies:
 
 ```bash
-terraform plan -out tfplan
-terraform show -json tfplan > tfplan.json
-tfstride tfplan.json --quiet --fail-on medium --output threat-model.md --sarif-output threat-model.sarif
-terraform apply tfplan
+python3 -m pip install -e '.[dashboard]'
 ```
 
-## Demo Scenarios
+Run locally:
 
-The repo includes several ready-to-run Terraform plan fixtures:
+```bash
+uvicorn apps.dashboard.main:app --reload --port 8001
+```
 
-- `sample_aws_alb_ec2_rds_plan.json`: public ALB, private EC2 app tier, and private encrypted RDS to demonstrate a composed transitive data-path finding on a common web architecture
-- `sample_aws_baseline_plan.json`: mostly segmented environment with a deliberate IAM hygiene issue and a non-obvious private-data path to demonstrate the baseline detector surface
-- `sample_aws_cross_account_trust_unconstrained_plan.json`: minimal cross-account assume-role trust without narrowing conditions to exercise the IAM trust finding path
-- `sample_aws_cross_account_trust_constrained_plan.json`: similar cross-account trust narrowed by `ExternalId`, `SourceArn`, and `SourceAccount` so the report surfaces the control instead of the finding
-- `sample_aws_ecs_fargate_plan.json`: ECS service and task definition coverage for Fargate-style workloads, task roles, execution roles, and private data access
-- `sample_aws_lambda_deploy_role_plan.json`: private Lambda deployment path with scoped S3 access and deliberate cross-account trust to exercise IAM and trust findings without public-network noise
-- `sample_aws_safe_plan.json`: private-by-default reference environment with protected storage, private database access, and no active findings
-- `sample_aws_plan.json`: mixed case with public exposure, permissive database reachability, risky IAM, and cross-account trust
-- `sample_aws_nightmare_plan.json`: deliberately broken environment with stacked public access, public storage, wildcard IAM, risky workload roles, and blast-radius expansion
-- `sample_gcp_safe_plan.json`: private-by-default GCP reference with hardened GCS, private Cloud SQL, scoped service account access, Secret Manager, and Cloud KMS
-- `sample_gcp_baseline_plan.json`: mostly segmented GCP baseline with a custom-role IAM concern and Cloud SQL recovery hygiene finding
-- `sample_gcp_lb_compute_sql_plan.json`: external load-balancing edge, private compute, NAT egress posture, and private Cloud SQL without active findings
-- `sample_gcp_serverless_plan.json`: Cloud Run and Cloud Functions public invoker paths with serverless service-account access to Secret Manager
-- `sample_gcp_cross_project_iam_plan.json`: focused cross-project IAM blast-radius fixture for project, Secret Manager, and Cloud KMS grants
-- `sample_gcp_plan.json`: mixed GCP inventory fixture covering compute, network, IAM, Pub/Sub, BigQuery, Cloud SQL, Secret Manager, Cloud KMS, GCS, and one unsupported resource callout
-- `sample_gcp_nightmare_plan.json`: deliberately broken GCP environment with stacked compute, GKE, serverless, data, org/folder/project IAM, and unsupported-resource coverage
+Useful routes:
+
+* `/`: upload form for plan analysis
+* `/scenarios`: built-in fixture gallery
+* `/demo/{scenario_id}`: built-in demo scenarios
+* `/analyze`: upload form POST target
+* `/api/analyze`: multipart upload endpoint returning the JSON report contract
+* `/api/docs`: OpenAPI docs
+* `/healthz`: health endpoint
+
+Deployment examples are included under `apps/dashboard/deploy/`.
 
 ## Architecture
 
-Input:
-
-- Terraform plan JSON generated by `terraform show -json`
+`tfstride` is intentionally simple and explainable.
 
 Pipeline:
 
-1. Parse the Terraform plan into raw resource records.
-2. Auto-select the provider, normalize supported resources into a provider-agnostic internal model, and run provider-owned decoration such as role attachments, resource policies, route or NAT posture, public exposure, and workload identity relationships.
-3. Build shared analysis indexes for role lookup, security-group membership, public workloads by security group, and attached security groups.
-4. Detect trust boundaries by running shared neutral contributors plus the selected provider's boundary contributor from the provider plugin. Boundary types include internet-to-service, public-to-private segmentation, workload-to-data-store access, control-plane-to-workload relationships, and cross-account trust.
-5. Evaluate rule-based STRIDE checks through a `RuleEvaluationContext` that carries the inventory, boundary index, rule registry, rule policy, and shared analysis indexes.
-6. Observe clear risk-reducing controls.
-7. Render markdown and optionally JSON or SARIF output.
-
-The engine is intentionally simple and explainable:
-
-- trust boundaries model crossings that matter for review rather than a full graph engine
-- rules operate on normalized infrastructure facts, not raw Terraform JSON
-- severity uses a small additive model across internet exposure, privilege breadth, data sensitivity, lateral movement, and blast radius
+1. Parse Terraform plan JSON into raw resource records.
+2. Auto-select the provider.
+3. Normalize supported resources into a provider-agnostic internal model.
+4. Run provider-owned decoration for relationships such as role attachments, resource policies, route or NAT posture, public exposure, and workload identities.
+5. Build shared analysis indexes.
+6. Detect trust boundaries through shared neutral contributors plus the selected provider's boundary contributor.
+7. Evaluate STRIDE-oriented rules through the rule registry and provider rule contributions.
+8. Observe clear risk-reducing controls.
+9. Render Markdown, JSON, or SARIF output.
 
 Current trust boundary types:
 
-- `internet-to-service`
-- `public-subnet-to-private-subnet`
-- `workload-to-data-store`
-- `cross-account-or-role-access`
-- `admin-to-workload-plane`
+* `internet-to-service`
+* `public-subnet-to-private-subnet`
+* `workload-to-data-store`
+* `cross-account-or-role-access`
+* `admin-to-workload-plane`
 
-Current rules include:
+Provider-specific behavior is exposed through plugin contribution points for:
 
-- internet-exposed compute with overly broad ingress
-- databases reachable from public or otherwise permissive sources
-- unencrypted RDS storage
-- public S3 exposure
-- sensitive resource policies that allow public or cross-account access
-- service resource policies that allow public or cross-account access
-- wildcard IAM privileges
-- workload roles with sensitive permissions
-- missing segmentation between public workloads and private data tiers
-- sensitive data tiers transitively reachable from internet-exposed paths
-- broad or cross-account control-plane paths that reach workloads with private database or secret access
-- trust relationships that expand blast radius
-- cross-account or broad trust without narrowing conditions
-- public and high-privilege GCP organization, folder, and project IAM principals
-- GKE public control planes, broad master authorized networks, disabled Workload Identity, legacy metadata exposure, and broad node identities
-- public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backups, point-in-time recovery, and deletion protection
-- broad or external GCP IAM access to Secret Manager secrets, Cloud KMS keys, Pub/Sub topics/subscriptions, and BigQuery datasets/tables
-- internet-exposed GCP compute, Cloud Run, and Cloud Functions workloads whose service accounts can access GCS, Secret Manager, Cloud KMS, Cloud SQL, Pub/Sub, or BigQuery
+* normalization
+* resource capabilities
+* resource facts
+* rule contributions
+* rule metadata catalogs
+* trust-boundary contributors
+* provider-specific analysis index extensions
 
-Outputs include:
+## Repo Layout
 
-- summary counts and discovered trust boundaries
-- findings grouped by severity with rationale, mitigation, evidence, and severity reasoning
-- controls observed when the engine sees clear mitigating signals such as S3 public access blocks, narrowed trust, or private encrypted RDS
-- analysis coverage showing resource coverage, unsupported types, rule posture, finding counts, and unresolved in-plan references
-- JSON output with normalized resources, findings, observations, fingerprints, and filtering summary
-- markdown for human review
-- SARIF 2.1.0 for scanner-compatible integrations
+* `src/tfstride/`: CLI, analysis engine, provider plugins, filtering, config, and models
+* `src/tfstride/analysis/`: shared rule evaluation, trust-boundary detection, indexes, concepts, coverage, and observations
+* `src/tfstride/providers/aws/`: AWS normalization, decoration, rules, facts, metadata, and boundaries
+* `src/tfstride/providers/gcp/`: GCP normalization, decoration, rules, facts, metadata, and boundaries
+* `src/tfstride/reporting/`: Markdown, JSON, and SARIF rendering
+* `fixtures/`: Terraform plan JSON samples
+* `examples/`: generated example reports
+* `apps/dashboard/`: optional FastAPI dashboard
+* `tests/`: unit, provider, integration, and golden-report coverage
 
-### Internal Modeling Notes
+## Demo Assets
 
-- `ResourceMetadata` and `InventoryMetadata` define typed metadata fields for normalized and inventory-level enrichment.
-- New provider-specific or decorator-derived facts should usually be added as typed metadata fields and accessed through `get_metadata_field()`, `set_metadata_field()`, or `append_metadata_field()`.
-- `NormalizedResource` properties are reserved for stable, broadly used normalized concepts such as network posture, public exposure, identity relationships, and data sensitivity.
-- `AnalysisIndexes` is computed once from the inventory and reused by trust-boundary detection and rule detectors. Add shared lookup needs there instead of rebuilding detector-local maps.
-- `analysis/boundaries/` owns shared boundary orchestration, the accumulator/dedupe behavior, contributor protocols, and provider-neutral contributors. It should not import AWS, GCP, or future provider-specific helpers directly.
-- Provider-specific boundary logic lives in `providers/{provider}/boundaries.py` and is exposed through `ProviderPlugin.boundary_contributor_factory`. `TFS.analyze_plan()` normalizes first, then instantiates only the selected provider's boundary contributor.
-- New providers should follow the same package shape: `providers/{provider}/plugin.py`, `normalizer.py`, `boundaries.py`, and `rules.py`, with shared orchestration unchanged.
-- `resource_concepts.py` centralizes conceptual resource groups and predicates such as workloads, data stores, public edges, identity roles, and security groups. Prefer those helpers over scattered hard-coded resource-type sets when the semantics match exactly.
+The repo includes ready-to-run Terraform plan fixtures and generated example reports.
 
-## JSON Contract
+<details>
+<summary>AWS demo assets</summary>
 
-The JSON report is intended to be the stable machine interface for future dashboards and automation.
+| Scenario                           | Plan                                                                  | Report                                                         |
+| ---------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Safe                               | `fixtures/aws/sample_aws_safe_plan.json`                              | `examples/aws/aws_safe_report.md`                              |
+| Baseline                           | `fixtures/aws/sample_aws_baseline_plan.json`                          | `examples/aws/aws_baseline_report.md`                          |
+| Realistic ALB / EC2 / RDS          | `fixtures/aws/sample_aws_alb_ec2_rds_plan.json`                       | `examples/aws/aws_alb_ec2_rds_report.md`                       |
+| ECS / Fargate                      | `fixtures/aws/sample_aws_ecs_fargate_plan.json`                       | `examples/aws/aws_ecs_fargate_report.md`                       |
+| Cross-account trust, unconstrained | `fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json` | `examples/aws/aws_cross_account_trust_unconstrained_report.md` |
+| Cross-account trust, narrowed      | `fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json`   | `examples/aws/aws_cross_account_trust_constrained_report.md`   |
+| Lambda deploy-role                 | `fixtures/aws/sample_aws_lambda_deploy_role_plan.json`                | `examples/aws/aws_lambda_deploy_role_report.md`                |
+| Mixed inventory                    | `fixtures/aws/sample_aws_plan.json`                                   | `examples/aws/aws_inventory_report.md`                         |
+| Nightmare                          | `fixtures/aws/sample_aws_nightmare_plan.json`                         | `examples/aws/aws_nightmare_report.md`                         |
 
-Top-level sections:
+</details>
 
-- `kind`
-- `version`
-- `tool`
-- `title`
-- `analyzed_file`
-- `analyzed_path`
-- `summary`
-- `filtering`
-- `analysis_coverage`
-- `inventory`
-- `trust_boundaries`
-- `findings`
-- `suppressed_findings`
-- `baselined_findings`
-- `observations`
-- `limitations`
+<details>
+<summary>GCP demo assets</summary>
 
-Contract notes:
+| Scenario                            | Plan                                                  | Report                                         |
+| ----------------------------------- | ----------------------------------------------------- | ---------------------------------------------- |
+| Safe                                | `fixtures/gcp/sample_gcp_safe_plan.json`              | `examples/gcp/gcp_safe_report.md`              |
+| Baseline                            | `fixtures/gcp/sample_gcp_baseline_plan.json`          | `examples/gcp/gcp_baseline_report.md`          |
+| Load balancer / compute / Cloud SQL | `fixtures/gcp/sample_gcp_lb_compute_sql_plan.json`    | `examples/gcp/gcp_lb_compute_sql_report.md`    |
+| Serverless                          | `fixtures/gcp/sample_gcp_serverless_plan.json`        | `examples/gcp/gcp_serverless_report.md`        |
+| Cross-project IAM                   | `fixtures/gcp/sample_gcp_cross_project_iam_plan.json` | `examples/gcp/gcp_cross_project_iam_report.md` |
+| Mixed inventory                     | `fixtures/gcp/sample_gcp_plan.json`                   | `examples/gcp/gcp_inventory_report.md`         |
+| Nightmare                           | `fixtures/gcp/sample_gcp_nightmare_plan.json`         | `examples/gcp/gcp_nightmare_report.md`         |
 
-- additive fields may appear within the same major version
-- breaking structural changes should increment the major version
-- `inventory.resources` and `trust_boundaries` are serialized in stable sorted order for downstream consumers
-- `analysis_coverage` summarizes parsed resource coverage, enabled rules, severity overrides, finding counts by rule, and unresolved in-plan references
+</details>
 
-## Suppressions And Baselines
+## Development Checks
 
-Suppressions are explicit, reviewable exceptions. The CLI accepts a JSON file with one or more selectors such as `rule_id`, `resource`, `trust_boundary_id`, `severity`, `title`, or `fingerprint`.
-
-```json
-{
-  "version": "1.0",
-  "suppressions": [
-    {
-      "id": "accept-cross-account-trust",
-      "rule_id": "aws-role-trust-expansion",
-      "reason": "Tracked in SEC-123 until the deploy role is narrowed."
-    }
-  ]
-}
-```
-
-Baselines are generated by the tool and keyed by stable finding fingerprints so CI can focus on newly introduced findings:
+Install the development extras, then run the full test suite and quality gates:
 
 ```bash
-tfstride tfplan.json --quiet --baseline-output baseline.json
-tfstride tfplan.json --quiet --baseline baseline.json --fail-on high
+python3 -m pip install -e '.[dev]'
+python3 -m pytest
+ruff check .
+ruff format --check .
+vulture src tests --min-confidence 100
 ```
 
-## Repo Config
-
-The CLI auto-discovers `tfstride.toml` from the current working directory or the plan file directory. You can also pass it explicitly with `--config`.
-
-CLI flags still win over config values when both are present.
-
-Example:
-
-```toml
-version = "1.0"
-title = "Platform Threat Model"
-provider = "auto"
-fail_on = "high"
-baseline = ".tfstride/baseline.json"
-suppressions = ".tfstride/suppressions.json"
-
-[rules]
-disable = ["aws-role-trust-expansion"]
-
-[rules.severity_overrides]
-aws-iam-wildcard-permissions = "low"
-```
-
-Supported config keys:
-
-- `title`
-- `provider`
-- `fail_on`
-- `baseline`
-- `suppressions`
-- `rules.enable`
-- `rules.disable`
-- `rules.severity_overrides`
-
-## Supported AWS Resources
-
-AWS support is gradually expanding:
-
-- `aws_instance`
-- `aws_ecs_service`
-- `aws_ecs_task_definition`
-- `aws_ecs_cluster`
-- `aws_security_group`
-- `aws_security_group_rule`
-- `aws_nat_gateway`
-- `aws_lb`
-- `aws_db_instance`
-- `aws_s3_bucket`
-- `aws_s3_bucket_policy`
-- `aws_s3_bucket_public_access_block`
-- `aws_iam_role`
-- `aws_iam_policy`
-- `aws_iam_role_policy`
-- `aws_iam_role_policy_attachment`
-- `aws_iam_instance_profile`
-- `aws_lambda_function`
-- `aws_lambda_permission`
-- `aws_kms_key`
-- `aws_sns_topic`
-- `aws_sqs_queue`
-- `aws_secretsmanager_secret`
-- `aws_secretsmanager_secret_policy`
-- `aws_subnet`
-- `aws_vpc`
-- `aws_internet_gateway`
-- `aws_route_table`
-- `aws_route_table_association`
-
-Unsupported resources are skipped and called out in the report.
-
-## GCP Support
-
-The GCP provider is registered for provider detection and supports inventory normalization for `google_compute_instance`, `google_container_cluster`, `google_container_node_pool`, `google_compute_network`, `google_compute_subnetwork`, `google_compute_firewall`, GCP firewall policy/rule/association resources, `google_compute_route`, `google_compute_router`, `google_compute_router_nat`, `google_compute_forwarding_rule`, `google_compute_global_forwarding_rule`, `google_cloud_run_service`, `google_cloud_run_v2_service`, Cloud Run IAM member/binding/policy resources, `google_cloudfunctions_function`, `google_cloudfunctions2_function`, Cloud Functions IAM member/binding/policy resources, organization, folder, and project IAM member/binding/policy resources, project and organization custom IAM roles, `google_service_account`, `google_service_account_key`, GCP service-account IAM member/binding/policy resources, `google_pubsub_topic`, `google_pubsub_subscription`, Pub/Sub IAM member/binding/policy resources, `google_bigquery_dataset`, `google_bigquery_table`, BigQuery dataset/table IAM member/binding/policy resources, `google_sql_database_instance`, `google_secret_manager_secret`, Secret Manager secret IAM member/binding/policy resources, `google_kms_crypto_key`, Cloud KMS crypto-key and key-ring IAM member/binding/policy resources, `google_storage_bucket`, and GCS bucket IAM member/binding/policy resources.
-
-GCP trust-boundary detection currently covers internet-to-service exposure for public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, and GCS buckets, network route and Cloud NAT subnet posture, plus workload-to-sensitive-data paths from GCE, Cloud Run, and Cloud Functions service accounts to GCS, Secret Manager, Cloud KMS, Cloud SQL, Pub/Sub, and BigQuery. GCP STRIDE rule coverage currently includes public compute broad ingress, GKE public control-plane posture, broad master authorized networks, disabled Workload Identity, legacy metadata exposure, broad node service accounts/scopes, public Cloud SQL authorized networks, public IPv4/private-network posture, SSL enforcement, backup and recovery posture, deletion protection, public GCS bucket access, GCS uniform access, Public Access Prevention, versioning, and customer-managed encryption posture, broad or external IAM access to Secret Manager secrets, Cloud KMS keys, Pub/Sub topics/subscriptions, and BigQuery datasets/tables, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, predefined high-privilege organization/folder/project role bindings, service-account key hygiene, keyed service-account effective-access correlation, and custom-role permission expansion for privileged IAM and data-access paths; GCP controls observed are not implemented yet.
-
-## Repo Layout (Abridged)
-
-```text
-.
-├── fixtures/
-│   ├── aws/
-│   │   ├── sample_aws_alb_ec2_rds_plan.json
-│   │   ├── sample_aws_baseline_plan.json
-│   │   ├── sample_aws_cross_account_trust_constrained_plan.json
-│   │   ├── sample_aws_cross_account_trust_unconstrained_plan.json
-│   │   ├── sample_aws_ecs_fargate_plan.json
-│   │   ├── sample_aws_lambda_deploy_role_plan.json
-│   │   ├── sample_aws_nightmare_plan.json
-│   │   ├── sample_aws_plan.json
-│   │   └── sample_aws_safe_plan.json
-│   └── gcp/
-│       ├── sample_gcp_baseline_plan.json
-│       ├── sample_gcp_cross_project_iam_plan.json
-│       ├── sample_gcp_lb_compute_sql_plan.json
-│       ├── sample_gcp_nightmare_plan.json
-│       ├── sample_gcp_plan.json
-│       ├── sample_gcp_safe_plan.json
-│       └── sample_gcp_serverless_plan.json
-├── examples/
-│   ├── aws/
-│   │   ├── aws_alb_ec2_rds_report.md
-│   │   ├── aws_baseline_report.md
-│   │   ├── aws_cross_account_trust_constrained_report.md
-│   │   ├── aws_cross_account_trust_unconstrained_report.md
-│   │   ├── aws_ecs_fargate_report.md
-│   │   ├── aws_inventory_report.md
-│   │   ├── aws_lambda_deploy_role_report.md
-│   │   ├── aws_nightmare_report.md
-│   │   └── aws_safe_report.md
-│   └── gcp/
-│       ├── gcp_baseline_report.md
-│       ├── gcp_cross_project_iam_report.md
-│       ├── gcp_inventory_report.md
-│       ├── gcp_lb_compute_sql_report.md
-│       ├── gcp_nightmare_report.md
-│       ├── gcp_safe_report.md
-│       └── gcp_serverless_report.md
-├── apps/
-│   └── dashboard/
-│       ├── api_models.py
-│       ├── deploy/
-│       │   ├── Caddyfile.example
-│       │   └── tfstride-dashboard.service
-│       ├── static/dashboard.css
-│       ├── templates/
-│       │   ├── base.html
-│       │   ├── index.html
-│       │   ├── report.html
-│       │   └── scenarios.html
-│       └── main.py
-├── src/
-│   └── tfstride/
-│       ├── __init__.py
-│       ├── analysis/
-│       │   ├── boundaries/
-│       │   │   ├── core.py
-│       │   │   ├── shared.py
-│       │   │   └── types.py
-│       │   ├── control_observations.py
-│       │   ├── coverage.py
-│       │   ├── iam_rules.py
-│       │   ├── indexes.py
-│       │   ├── network_data_rules.py
-│       │   ├── path_chain_rules.py
-│       │   ├── policy_conditions.py
-│       │   ├── policy_trust_rules.py
-│       │   ├── posture_rules.py
-│       │   ├── resource_concepts.py
-│       │   ├── rule_definitions.py
-│       │   ├── rule_registry.py
-│       │   ├── stride_rules.py
-│       │   └── trust_boundaries.py
-│       ├── input/
-│       │   └── terraform_plan.py
-│       ├── providers/
-│       │   ├── base.py
-│       │   ├── catalog.py
-│       │   ├── plugin.py
-│       │   ├── registry.py
-│       │   ├── aws/
-│       │   │   ├── boundaries.py
-│       │   │   ├── normalizer.py
-│       │   │   ├── plugin.py
-│       │   │   ├── resource_decorator.py
-│       │   │   └── rules.py
-│       │   └── gcp/
-│       │       ├── boundaries.py
-│       │       ├── normalizer.py
-│       │       ├── plugin.py
-│       │       ├── resource_decorator.py
-│       │       └── rules.py
-│       ├── reporting/
-│       │   ├── json_report.py
-│       │   ├── markdown.py
-│       │   └── sarif.py
-│       ├── app.py
-│       ├── cli.py
-│       ├── config.py
-│       ├── filtering.py
-│       ├── models.py
-│       └── resource_metadata.py
-└── tests/
-```
-
-## Limitations
-
-- AWS is currently the deepest provider implementation and the only provider with control-observation coverage.
-- GCP support is narrower than AWS today and does not include control-observation coverage yet.
-- Azure support is not registered yet, but the provider plugin architecture is intended to support Azure without changing shared trust-boundary orchestration.
-- Terraform resource coverage is intentionally scoped to security-relevant resources, relationships, and threat paths rather than exhaustive provider parity.
-- Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
-- IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
-- Condition narrowing focuses on high-signal keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition.
-- The analyzer works from Terraform plan data only; it does not perform runtime validation, cloud API calls, or drift detection.
-- Architecture diagrams and graph visualization are not generated yet.
-
-## Sample Assets
-
-### AWS
-
-- Safe:
-  [`fixtures/aws/sample_aws_safe_plan.json`](fixtures/aws/sample_aws_safe_plan.json),
-  [`examples/aws/aws_safe_report.md`](examples/aws/aws_safe_report.md)
-- Baseline:
-  [`fixtures/aws/sample_aws_baseline_plan.json`](fixtures/aws/sample_aws_baseline_plan.json),
-  [`examples/aws/aws_baseline_report.md`](examples/aws/aws_baseline_report.md)
-- Realistic ALB / EC2 / RDS:
-  [`fixtures/aws/sample_aws_alb_ec2_rds_plan.json`](fixtures/aws/sample_aws_alb_ec2_rds_plan.json),
-  [`examples/aws/aws_alb_ec2_rds_report.md`](examples/aws/aws_alb_ec2_rds_report.md)
-- ECS / Fargate:
-  [`fixtures/aws/sample_aws_ecs_fargate_plan.json`](fixtures/aws/sample_aws_ecs_fargate_plan.json),
-  [`examples/aws/aws_ecs_fargate_report.md`](examples/aws/aws_ecs_fargate_report.md)
-- Cross-account trust, unconstrained:
-  [`fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json`](fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json),
-  [`examples/aws/aws_cross_account_trust_unconstrained_report.md`](examples/aws/aws_cross_account_trust_unconstrained_report.md)
-- Cross-account trust, narrowed:
-  [`fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json`](fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json),
-  [`examples/aws/aws_cross_account_trust_constrained_report.md`](examples/aws/aws_cross_account_trust_constrained_report.md)
-- Lambda deploy-role:
-  [`fixtures/aws/sample_aws_lambda_deploy_role_plan.json`](fixtures/aws/sample_aws_lambda_deploy_role_plan.json),
-  [`examples/aws/aws_lambda_deploy_role_report.md`](examples/aws/aws_lambda_deploy_role_report.md)
-- Mixed:
-  [`fixtures/aws/sample_aws_plan.json`](fixtures/aws/sample_aws_plan.json),
-  [`examples/aws/aws_inventory_report.md`](examples/aws/aws_inventory_report.md)
-- Nightmare:
-  [`fixtures/aws/sample_aws_nightmare_plan.json`](fixtures/aws/sample_aws_nightmare_plan.json),
-  [`examples/aws/aws_nightmare_report.md`](examples/aws/aws_nightmare_report.md)
-
-### GCP
-
-- Safe:
-  [`fixtures/gcp/sample_gcp_safe_plan.json`](fixtures/gcp/sample_gcp_safe_plan.json),
-  [`examples/gcp/gcp_safe_report.md`](examples/gcp/gcp_safe_report.md)
-- Baseline:
-  [`fixtures/gcp/sample_gcp_baseline_plan.json`](fixtures/gcp/sample_gcp_baseline_plan.json),
-  [`examples/gcp/gcp_baseline_report.md`](examples/gcp/gcp_baseline_report.md)
-- Load balancer / compute / Cloud SQL:
-  [`fixtures/gcp/sample_gcp_lb_compute_sql_plan.json`](fixtures/gcp/sample_gcp_lb_compute_sql_plan.json),
-  [`examples/gcp/gcp_lb_compute_sql_report.md`](examples/gcp/gcp_lb_compute_sql_report.md)
-- Serverless:
-  [`fixtures/gcp/sample_gcp_serverless_plan.json`](fixtures/gcp/sample_gcp_serverless_plan.json),
-  [`examples/gcp/gcp_serverless_report.md`](examples/gcp/gcp_serverless_report.md)
-- Cross-project IAM:
-  [`fixtures/gcp/sample_gcp_cross_project_iam_plan.json`](fixtures/gcp/sample_gcp_cross_project_iam_plan.json),
-  [`examples/gcp/gcp_cross_project_iam_report.md`](examples/gcp/gcp_cross_project_iam_report.md)
-- Mixed inventory:
-  [`fixtures/gcp/sample_gcp_plan.json`](fixtures/gcp/sample_gcp_plan.json),
-  [`examples/gcp/gcp_inventory_report.md`](examples/gcp/gcp_inventory_report.md)
-- Nightmare:
-  [`fixtures/gcp/sample_gcp_nightmare_plan.json`](fixtures/gcp/sample_gcp_nightmare_plan.json),
-  [`examples/gcp/gcp_nightmare_report.md`](examples/gcp/gcp_nightmare_report.md)
-
-## Testing
-
-Run the unit tests:
+The suite is also compatible with stdlib discovery:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
+## Limitations
+
+* AWS is currently the deepest provider implementation and the only provider with control-observation coverage.
+* GCP support is narrower than AWS today and does not include control-observation coverage yet.
+* Azure support is not registered yet.
+* Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
+* Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
+* IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
+* Condition narrowing focuses on high-signal keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition.
+* The analyzer works from Terraform plan data only; it does not perform runtime validation, cloud API calls, or drift detection.
+* Architecture diagrams and graph visualization are not generated yet.
+
 ## Why This Project Exists
 
-Terraform plans are readable, but they are still easy to misjudge when network posture, IAM trust, and data-tier exposure interact. This project exists to make those paths explicit with repeatable analysis, concrete evidence, and CI-friendly outputs.
+Terraform plans are readable, but they are still easy to misjudge when network posture, IAM trust, and data-tier exposure interact.
 
-It is intentionally scoped to a small AWS-first surface area so the output stays understandable and stable rather than pretending to be a full cloud policy engine.
+`tfstride` exists to make those paths explicit with repeatable analysis, concrete evidence, and CI-friendly outputs. It is intentionally scoped to security-relevant resources, relationships, and trust paths across each supported provider rather than pretending to be a full cloud policy engine.
 
 ## License
 
