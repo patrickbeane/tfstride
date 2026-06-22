@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 import unittest
-from pathlib import Path
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCategory, SecurityGroupRule
 from tfstride.providers.aws.resource_mutations import AwsResourceMutations, aws_mutations
 
@@ -111,14 +111,7 @@ class AwsResourceMutationsTests(unittest.TestCase):
         self.assertTrue(resource.direct_internet_reachable)
 
     def test_aws_decoration_resource_mutations_are_centralized(self) -> None:
-        stages_path = (
-            Path(__file__).resolve().parents[1]
-            / "src"
-            / "tfstride"
-            / "providers"
-            / "aws"
-            / "resource_decoration_stages.py"
-        )
+        stages_path = SOURCE_ROOT / "providers" / "aws" / "resource_decoration_stages.py"
         text = stages_path.read_text(encoding="utf-8")
         direct_mutation_patterns = (
             r"\.extend_network_rules\(",

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_facts
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
@@ -769,7 +769,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
 
     def test_analysis_metadata_reads_are_centralized_in_facts_facade(self) -> None:
-        analysis_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis"
+        analysis_root = SOURCE_ROOT / "analysis"
         offenders: list[str] = []
 
         for path in sorted(analysis_root.glob("*.py")):
@@ -780,7 +780,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_analysis_resource_facts_does_not_import_aws_directly(self) -> None:
-        analysis_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis"
+        analysis_root = SOURCE_ROOT / "analysis"
         text = (analysis_root / "resource_facts.py").read_text(encoding="utf-8")
 
         self.assertNotIn("tfstride.providers.aws", text)

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import unittest
-from pathlib import Path
 
+from tests.helpers.paths import FIXTURES_DIR
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.gcp.coercion import as_bool, as_list, as_optional_int, compact, first_item
@@ -87,7 +87,7 @@ from tfstride.providers.gcp.serverless_normalizers import (
     normalize_cloudfunctions_function_iam_member,
 )
 
-FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "gcp" / "sample_gcp_plan.json"
+FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
 
 
 def _fixture_resources_by_address():

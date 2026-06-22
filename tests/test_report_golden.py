@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from tests.helpers.paths import FIXTURES_DIR, GOLDEN_DIR
 from tfstride.app import TfStride
 from tfstride.reporting.json_report import render_json
 from tfstride.reporting.report_contract import (
@@ -16,9 +17,7 @@ from tfstride.reporting.report_contract import (
     UnresolvedReferencePayload,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
-GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
+FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 REPORT_SCHEMA_PATH = GOLDEN_DIR / "sample_aws_report_schema.json"
 REPORT_SNAPSHOT_PATH = GOLDEN_DIR / "sample_aws_report_snapshot.json"
 

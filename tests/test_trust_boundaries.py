@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import unittest
 from collections import Counter
-from pathlib import Path
 from unittest.mock import patch
 
+from tests.helpers.paths import FIXTURES_DIR
 from tfstride.analysis.boundaries.core import detect_trust_boundaries as detect_trust_boundaries_from_core
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.indexes import build_analysis_indexes
@@ -19,8 +19,7 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = ROOT / "fixtures"
+FIXTURES = FIXTURES_DIR
 
 
 def _resource(

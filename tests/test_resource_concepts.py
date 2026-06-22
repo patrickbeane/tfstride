@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 import unittest
-from pathlib import Path
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.analysis.resource_concepts import (
     CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
     DATA_STORE_RESOURCE_TYPES,
@@ -355,7 +355,7 @@ class ResourceConceptTests(unittest.TestCase):
         )
 
     def test_analysis_resource_type_selection_is_centralized(self) -> None:
-        analysis_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis"
+        analysis_root = SOURCE_ROOT / "analysis"
         direct_type_patterns = (
             re.compile(r"by_type\([^\n)]*['\"]aws_"),
             re.compile(r"resource_type\s*(?:==|!=)\s*['\"]aws_"),
@@ -374,7 +374,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_analysis_resource_concepts_do_not_embed_provider_type_literals(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "analysis" / "resource_concepts.py"
+        path = SOURCE_ROOT / "analysis" / "resource_concepts.py"
         text = path.read_text(encoding="utf-8")
 
         self.assertNotIn("aws_", text)

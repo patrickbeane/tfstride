@@ -5,6 +5,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT, TESTS_ROOT
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -12,10 +13,7 @@ from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import default_provider_plugins, default_provider_rule_metadata
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOT = REPO_ROOT / "src" / "tfstride"
-TESTS_ROOT = REPO_ROOT / "tests"
-STRIDE_RULES_PATH = REPO_ROOT / "src" / "tfstride" / "analysis" / "stride_rules.py"
+STRIDE_RULES_PATH = SOURCE_ROOT / "analysis" / "stride_rules.py"
 SHARED_PROVIDER_NEUTRAL_PATHS = (
     SOURCE_ROOT / "analysis" / "rule_registry.py",
     SOURCE_ROOT / "analysis" / "trust_boundaries.py",
@@ -50,7 +48,7 @@ def _rule_id_occurrences(rule_ids: set[str]) -> list[tuple[Path, str]]:
 def _is_allowed_rule_id_location(path: Path, provider: str) -> bool:
     if path.is_relative_to(TESTS_ROOT):
         return True
-    return path.is_relative_to(REPO_ROOT / "src" / "tfstride" / "providers" / provider)
+    return path.is_relative_to(SOURCE_ROOT / "providers" / provider)
 
 
 def _imported_modules(path: Path) -> set[str]:

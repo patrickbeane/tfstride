@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.helpers.paths import EXAMPLES_DIR, FIXTURES_DIR
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.filtering import apply_finding_filters, render_baseline
@@ -26,28 +27,26 @@ from tfstride.reporting.json_report import (
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.sarif import render_sarif
 
-ROOT = Path(__file__).resolve().parents[1]
-BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
-FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_plan.json"
-SAFE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_safe_plan.json"
-NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_nightmare_plan.json"
-ALB_EC2_RDS_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_alb_ec2_rds_plan.json"
-LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_lambda_deploy_role_plan.json"
-ECS_FARGATE_FIXTURE_PATH = ROOT / "fixtures" / "aws" / "sample_aws_ecs_fargate_plan.json"
-GCP_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_plan.json"
-GCP_SAFE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_safe_plan.json"
-GCP_BASELINE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_baseline_plan.json"
-GCP_LB_COMPUTE_SQL_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_lb_compute_sql_plan.json"
-GCP_SERVERLESS_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_serverless_plan.json"
-GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_cross_project_iam_plan.json"
-GCP_NIGHTMARE_FIXTURE_PATH = ROOT / "fixtures" / "gcp" / "sample_gcp_nightmare_plan.json"
+BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
+FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
+SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
+NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
+ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_alb_ec2_rds_plan.json"
+LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_lambda_deploy_role_plan.json"
+ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_ecs_fargate_plan.json"
+GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
+GCP_SAFE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_safe_plan.json"
+GCP_BASELINE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_baseline_plan.json"
+GCP_LB_COMPUTE_SQL_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_lb_compute_sql_plan.json"
+GCP_SERVERLESS_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_serverless_plan.json"
+GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_project_iam_plan.json"
+GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
-    ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
+    FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
 CROSS_ACCOUNT_TRUST_CONSTRAINED_FIXTURE_PATH = (
-    ROOT / "fixtures" / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
+    FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_constrained_plan.json"
 )
-EXAMPLES_DIR = ROOT / "examples"
 
 
 class MarkdownReportTests(unittest.TestCase):

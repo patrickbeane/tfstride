@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from tests.helpers.paths import FIXTURES_DIR
 from tfstride.cli import (
     INPUT_ERROR_EXIT_CODE,
     POLICY_VIOLATION_EXIT_CODE,
@@ -22,12 +23,12 @@ from tfstride.filtering import (
     load_suppressions,
 )
 
-FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_plan.json"
-BASELINE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_baseline_plan.json"
-SAFE_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_safe_plan.json"
-GCP_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "gcp" / "sample_gcp_plan.json"
+FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
+BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
+SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
+GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
+    FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
 
 

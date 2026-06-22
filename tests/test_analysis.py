@@ -6,6 +6,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
+from tests.helpers.paths import FIXTURES_DIR
 from tfstride.analysis.rule_definitions import RuleDefinition
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RulePolicy, RuleRegistry
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -27,7 +28,6 @@ from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry, ProviderSelectionError
 
-FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
 FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"

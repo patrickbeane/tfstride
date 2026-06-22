@@ -5,6 +5,7 @@ import unittest
 from dataclasses import fields
 from pathlib import Path
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.contracts import (
@@ -14,7 +15,6 @@ from tfstride.providers.contracts import (
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.resource_metadata import MetadataField, ResourceMetadata
 
-_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "tfstride"
 _NORMALIZED_RESOURCE_WRITE_PATTERNS = (
     re.compile(r"\.\s*(?:set_metadata_field|append_metadata_field|extend_metadata_field)\("),
     re.compile(r"\.\s*(?:extend_network_rules|extend_policy_statements|add_attached_role_arn)\("),
@@ -171,7 +171,7 @@ def _reads_rule_facing_metadata_key_as_raw_string(line: str) -> bool:
 
 
 def _writes_rule_facing_metadata_key_as_raw_string(path: Path, line: str) -> bool:
-    if not path.relative_to(_SOURCE_ROOT).as_posix().startswith("providers/"):
+    if not path.relative_to(SOURCE_ROOT).as_posix().startswith("providers/"):
         return False
     return bool(_RULE_FACING_METADATA_RAW_WRITE_PATTERN.search(line))
 
@@ -264,13 +264,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
             "tfstride.providers.catalog",
         )
         scanned_paths = (
-            _SOURCE_ROOT / "analysis" / "boundaries" / "core.py",
-            _SOURCE_ROOT / "analysis" / "boundaries" / "shared.py",
-            _SOURCE_ROOT / "analysis" / "boundaries" / "types.py",
+            SOURCE_ROOT / "analysis" / "boundaries" / "core.py",
+            SOURCE_ROOT / "analysis" / "boundaries" / "shared.py",
+            SOURCE_ROOT / "analysis" / "boundaries" / "types.py",
         )
 
         violations = {
-            path.relative_to(_SOURCE_ROOT).as_posix(): forbidden
+            path.relative_to(SOURCE_ROOT).as_posix(): forbidden
             for path in scanned_paths
             for forbidden in forbidden_imports
             if forbidden in path.read_text(encoding="utf-8")
@@ -279,13 +279,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertEqual(violations, {})
 
     def test_provider_boundary_contributors_are_plugin_owned(self) -> None:
-        aws_plugin = (_SOURCE_ROOT / "providers" / "aws" / "plugin.py").read_text(encoding="utf-8")
-        gcp_plugin = (_SOURCE_ROOT / "providers" / "gcp" / "plugin.py").read_text(encoding="utf-8")
+        aws_plugin = (SOURCE_ROOT / "providers" / "aws" / "plugin.py").read_text(encoding="utf-8")
+        gcp_plugin = (SOURCE_ROOT / "providers" / "gcp" / "plugin.py").read_text(encoding="utf-8")
 
         self.assertIn("boundary_contributor_factory=", aws_plugin)
         self.assertIn("boundary_contributor_factory=", gcp_plugin)
-        self.assertTrue((_SOURCE_ROOT / "providers" / "aws" / "boundaries.py").exists())
-        self.assertTrue((_SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
+        self.assertTrue((SOURCE_ROOT / "providers" / "aws" / "boundaries.py").exists())
+        self.assertTrue((SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
 
     def test_provider_contract_documents_encapsulation_rules(self) -> None:
         guidelines = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.guidelines
@@ -297,11 +297,11 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
     def test_provider_normalizers_do_not_write_shared_posture_metadata_as_raw_keys(self) -> None:
         raw_writes: set[tuple[str, str]] = set()
 
-        for provider_root in sorted((_SOURCE_ROOT / "providers").iterdir()):
+        for provider_root in sorted((SOURCE_ROOT / "providers").iterdir()):
             if not provider_root.is_dir():
                 continue
             for path in sorted(provider_root.glob("*_normalizers.py")):
-                relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+                relative_path = path.relative_to(SOURCE_ROOT).as_posix()
                 for line in path.read_text(encoding="utf-8").splitlines():
                     stripped = line.strip()
                     for key in _PROVIDER_NORMALIZER_RAW_SHARED_POSTURE_KEYS:
@@ -312,8 +312,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
     def test_gcp_network_normalizers_do_not_write_network_posture_as_raw_keys(self) -> None:
         raw_writes: set[tuple[str, str]] = set()
-        path = _SOURCE_ROOT / "providers" / "gcp" / "network_normalizers.py"
-        relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+        path = SOURCE_ROOT / "providers" / "gcp" / "network_normalizers.py"
+        relative_path = path.relative_to(SOURCE_ROOT).as_posix()
 
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
@@ -325,8 +325,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
     def test_gcp_data_normalizers_do_not_write_encryption_posture_as_raw_keys(self) -> None:
         raw_writes: set[tuple[str, str]] = set()
-        path = _SOURCE_ROOT / "providers" / "gcp" / "data_normalizers.py"
-        relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+        path = SOURCE_ROOT / "providers" / "gcp" / "data_normalizers.py"
+        relative_path = path.relative_to(SOURCE_ROOT).as_posix()
 
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
@@ -339,13 +339,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
     def test_rule_facing_metadata_keys_are_not_used_as_raw_metadata_strings(self) -> None:
         raw_uses: set[tuple[str, int, str]] = set()
         scanned_roots = (
-            _SOURCE_ROOT / "analysis",
-            _SOURCE_ROOT / "providers",
+            SOURCE_ROOT / "analysis",
+            SOURCE_ROOT / "providers",
         )
 
         for root in scanned_roots:
             for path in sorted(root.rglob("*.py")):
-                relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+                relative_path = path.relative_to(SOURCE_ROOT).as_posix()
                 if relative_path in _RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES:
                     continue
                 for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
@@ -358,13 +358,13 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
     def test_normalized_resource_write_paths_are_centralized(self) -> None:
         direct_writes: set[tuple[str, str]] = set()
         scanned_roots = (
-            _SOURCE_ROOT / "analysis",
-            _SOURCE_ROOT / "providers",
+            SOURCE_ROOT / "analysis",
+            SOURCE_ROOT / "providers",
         )
 
         for root in scanned_roots:
             for path in sorted(root.rglob("*.py")):
-                relative_path = path.relative_to(_SOURCE_ROOT).as_posix()
+                relative_path = path.relative_to(SOURCE_ROOT).as_posix()
                 if relative_path in _NORMALIZED_RESOURCE_WRITE_FACADES:
                     continue
                 for line in path.read_text(encoding="utf-8").splitlines():

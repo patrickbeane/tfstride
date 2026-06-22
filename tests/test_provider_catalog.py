@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
 
+from tests.helpers.paths import FIXTURES_DIR
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
 from tfstride.app import TfStride
@@ -42,7 +42,6 @@ from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 from tfstride.providers.resource_capabilities import ResourceCapability
 
-FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 
 

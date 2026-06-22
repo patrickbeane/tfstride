@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 import unittest
-from pathlib import Path
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts import (
@@ -171,7 +171,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(domains.workload.workload_identity_members, [])
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
-        aws_provider_root = Path(__file__).resolve().parents[1] / "src" / "tfstride" / "providers" / "aws"
+        aws_provider_root = SOURCE_ROOT / "providers" / "aws"
         resource_metadata_reference = re.compile(r"\bResourceMetadata\b")
         offenders: list[str] = []
 
