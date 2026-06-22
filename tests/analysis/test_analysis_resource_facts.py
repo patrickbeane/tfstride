@@ -62,19 +62,19 @@ class FakeProviderFacts:
         return {"block_public_acls": True}
 
     @property
-    def gcs_uniform_bucket_level_access(self) -> bool | None:
+    def uniform_bucket_level_access(self) -> bool | None:
         return True
 
     @property
-    def gcs_public_access_prevention(self) -> str | None:
+    def public_access_prevention(self) -> str | None:
         return "enforced"
 
     @property
-    def gcs_versioning_enabled(self) -> bool | None:
+    def versioning_enabled(self) -> bool | None:
         return True
 
     @property
-    def gcs_default_kms_key_name(self) -> str | None:
+    def default_kms_key_name(self) -> str | None:
         return "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
 
     @property
@@ -134,31 +134,31 @@ class FakeProviderFacts:
         return "folders/12345"
 
     @property
-    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+    def authorized_networks(self) -> list[dict[str, Any]]:
         return [{"name": "anywhere", "value": "0.0.0.0/0"}]
 
     @property
-    def cloud_sql_backup_enabled(self) -> bool | None:
+    def backup_enabled(self) -> bool | None:
         return False
 
     @property
-    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+    def point_in_time_recovery_enabled(self) -> bool | None:
         return True
 
     @property
-    def cloud_sql_ipv4_enabled(self) -> bool | None:
+    def ipv4_enabled(self) -> bool | None:
         return True
 
     @property
-    def cloud_sql_private_network(self) -> str | None:
+    def private_network(self) -> str | None:
         return "google_compute_network.main.id"
 
     @property
-    def cloud_sql_require_ssl(self) -> bool | None:
+    def require_ssl(self) -> bool | None:
         return True
 
     @property
-    def cloud_sql_ssl_mode(self) -> str | None:
+    def ssl_mode(self) -> str | None:
         return "ENCRYPTED_ONLY"
 
     @property
@@ -185,46 +185,6 @@ class FakeProviderFacts:
     def workload_identity_scopes(self) -> list[str]:
         return ["https://www.googleapis.com/auth/cloud-platform"]
 
-    @property
-    def gke_endpoint(self) -> str | None:
-        return "35.1.2.3"
-
-    @property
-    def gke_private_endpoint_enabled(self) -> bool | None:
-        return False
-
-    @property
-    def gke_private_nodes_enabled(self) -> bool | None:
-        return False
-
-    @property
-    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
-        return [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}]
-
-    @property
-    def gke_workload_identity_enabled(self) -> bool | None:
-        return False
-
-    @property
-    def gke_workload_identity_pool(self) -> str | None:
-        return None
-
-    @property
-    def gke_node_service_account(self) -> str | None:
-        return "123456789-compute@developer.gserviceaccount.com"
-
-    @property
-    def gke_node_oauth_scopes(self) -> list[str]:
-        return ["https://www.googleapis.com/auth/cloud-platform"]
-
-    @property
-    def gke_node_metadata_mode(self) -> str | None:
-        return "GCE_METADATA"
-
-    @property
-    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
-        return True
-
 
 class AnalysisResourceFactsTests(unittest.TestCase):
     def test_analysis_fact_facades_read_only_their_provider_fact_domain(self) -> None:
@@ -234,10 +194,10 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                     ("bucket_name", "bucket_name", "logs"),
                     ("bucket_acl", "bucket_acl", "private"),
                     ("public_access_block", "public_access_block", {"block_public_acls": True}),
-                    ("uniform_bucket_level_access", "gcs_uniform_bucket_level_access", True),
-                    ("public_access_prevention", "gcs_public_access_prevention", "enforced"),
-                    ("versioning_enabled", "gcs_versioning_enabled", True),
-                    ("default_kms_key_name", "gcs_default_kms_key_name", "projects/demo/keyRings/app/keys/gcs"),
+                    ("uniform_bucket_level_access", "uniform_bucket_level_access", True),
+                    ("public_access_prevention", "public_access_prevention", "enforced"),
+                    ("versioning_enabled", "versioning_enabled", True),
+                    ("default_kms_key_name", "default_kms_key_name", "projects/demo/keyRings/app/keys/gcs"),
                     ("customer_managed_encryption", "customer_managed_encryption", True),
                 ),
             ),
@@ -265,28 +225,14 @@ class AnalysisResourceFactsTests(unittest.TestCase):
             "sql": (
                 (
                     ("engine", "engine", "POSTGRES_15"),
-                    ("authorized_networks", "cloud_sql_authorized_networks", [{"value": "0.0.0.0/0"}]),
-                    ("backup_enabled", "cloud_sql_backup_enabled", False),
-                    ("point_in_time_recovery_enabled", "cloud_sql_point_in_time_recovery_enabled", True),
-                    ("ipv4_enabled", "cloud_sql_ipv4_enabled", True),
-                    ("private_network", "cloud_sql_private_network", "google_compute_network.main.id"),
-                    ("require_ssl", "cloud_sql_require_ssl", True),
-                    ("ssl_mode", "cloud_sql_ssl_mode", "ENCRYPTED_ONLY"),
+                    ("authorized_networks", "authorized_networks", [{"value": "0.0.0.0/0"}]),
+                    ("backup_enabled", "backup_enabled", False),
+                    ("point_in_time_recovery_enabled", "point_in_time_recovery_enabled", True),
+                    ("ipv4_enabled", "ipv4_enabled", True),
+                    ("private_network", "private_network", "google_compute_network.main.id"),
+                    ("require_ssl", "require_ssl", True),
+                    ("ssl_mode", "ssl_mode", "ENCRYPTED_ONLY"),
                     ("deletion_protection", "deletion_protection", True),
-                ),
-            ),
-            "gke": (
-                (
-                    ("endpoint", "gke_endpoint", "35.1.2.3"),
-                    ("private_endpoint_enabled", "gke_private_endpoint_enabled", False),
-                    ("private_nodes_enabled", "gke_private_nodes_enabled", False),
-                    ("master_authorized_networks", "gke_master_authorized_networks", [{"cidr_block": "0.0.0.0/0"}]),
-                    ("workload_identity_enabled", "gke_workload_identity_enabled", False),
-                    ("workload_identity_pool", "gke_workload_identity_pool", "tfstride-demo.svc.id.goog"),
-                    ("node_service_account", "gke_node_service_account", "node@example.iam.gserviceaccount.com"),
-                    ("node_oauth_scopes", "gke_node_oauth_scopes", ["https://www.googleapis.com/auth/cloud-platform"]),
-                    ("node_metadata_mode", "gke_node_metadata_mode", "GCE_METADATA"),
-                    ("legacy_metadata_endpoints_enabled", "gke_legacy_metadata_endpoints_enabled", True),
                 ),
             ),
             "compute": (
@@ -321,7 +267,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 "storage": fallback,
                 "iam": fallback,
                 "sql": fallback,
-                "gke": fallback,
                 "compute": fallback,
                 "workload": fallback,
             }
@@ -390,16 +335,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.iam.service_account_reference)
         self.assertEqual(facts.workload.identity_members, [])
         self.assertEqual(facts.workload.identity_scopes, [])
-        self.assertIsNone(facts.gke.endpoint)
-        self.assertIsNone(facts.gke.private_endpoint_enabled)
-        self.assertIsNone(facts.gke.private_nodes_enabled)
-        self.assertEqual(facts.gke.master_authorized_networks, [])
-        self.assertIsNone(facts.gke.workload_identity_enabled)
-        self.assertIsNone(facts.gke.workload_identity_pool)
-        self.assertIsNone(facts.gke.node_service_account)
-        self.assertEqual(facts.gke.node_oauth_scopes, [])
-        self.assertIsNone(facts.gke.node_metadata_mode)
-        self.assertIsNone(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_gcp_resources_return_provider_owned_bucket_facts_with_neutral_defaults(self) -> None:
         resource = _resource(
@@ -452,16 +387,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.iam.service_account_reference)
         self.assertEqual(facts.workload.identity_members, [])
         self.assertEqual(facts.workload.identity_scopes, [])
-        self.assertIsNone(facts.gke.endpoint)
-        self.assertIsNone(facts.gke.private_endpoint_enabled)
-        self.assertIsNone(facts.gke.private_nodes_enabled)
-        self.assertEqual(facts.gke.master_authorized_networks, [])
-        self.assertIsNone(facts.gke.workload_identity_enabled)
-        self.assertIsNone(facts.gke.workload_identity_pool)
-        self.assertIsNone(facts.gke.node_service_account)
-        self.assertEqual(facts.gke.node_oauth_scopes, [])
-        self.assertIsNone(facts.gke.node_metadata_mode)
-        self.assertIsNone(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_gcp_storage_bucket_facts_read_provider_owned_posture_metadata(self) -> None:
         resource = _resource(
@@ -586,42 +511,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.sql.ssl_mode, "ENCRYPTED_ONLY")
         self.assertTrue(facts.sql.deletion_protection)
 
-    def test_gcp_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
-        resource = _resource(
-            {
-                GcpResourceMetadata.GKE_ENDPOINT: "35.1.2.3",
-                GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED: False,
-                GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED: False,
-                GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS: [
-                    {"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}
-                ],
-                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED: False,
-                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL: None,
-                GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT: "123456789-compute@developer.gserviceaccount.com",
-                GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES: ["https://www.googleapis.com/auth/cloud-platform"],
-                GcpResourceMetadata.GKE_NODE_METADATA_MODE: "GCE_METADATA",
-                GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED: True,
-            },
-            provider="gcp",
-            resource_type="google_container_cluster",
-        )
-
-        facts = analysis_facts(resource)
-
-        self.assertEqual(facts.gke.endpoint, "35.1.2.3")
-        self.assertFalse(facts.gke.private_endpoint_enabled)
-        self.assertFalse(facts.gke.private_nodes_enabled)
-        self.assertEqual(
-            facts.gke.master_authorized_networks,
-            [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}],
-        )
-        self.assertFalse(facts.gke.workload_identity_enabled)
-        self.assertIsNone(facts.gke.workload_identity_pool)
-        self.assertEqual(facts.gke.node_service_account, "123456789-compute@developer.gserviceaccount.com")
-        self.assertEqual(facts.gke.node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke.node_metadata_mode, "GCE_METADATA")
-        self.assertTrue(facts.gke.legacy_metadata_endpoints_enabled)
-
     def test_gcp_compute_facts_read_workload_identity_metadata(self) -> None:
         resource = _resource(
             {
@@ -693,7 +582,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 storage=facts,
                 iam=facts,
                 sql=facts,
-                gke=facts,
                 compute=facts,
                 workload=facts,
             )
@@ -738,18 +626,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam.service_account_reference, "google_service_account.fake.email")
         self.assertEqual(facts.workload.identity_members, ["serviceAccount:fake@example.iam.gserviceaccount.com"])
         self.assertEqual(facts.workload.identity_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke.endpoint, "35.1.2.3")
-        self.assertFalse(facts.gke.private_endpoint_enabled)
-        self.assertFalse(facts.gke.private_nodes_enabled)
-        self.assertEqual(
-            facts.gke.master_authorized_networks, [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}]
-        )
-        self.assertFalse(facts.gke.workload_identity_enabled)
-        self.assertIsNone(facts.gke.workload_identity_pool)
-        self.assertEqual(facts.gke.node_service_account, "123456789-compute@developer.gserviceaccount.com")
-        self.assertEqual(facts.gke.node_oauth_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-        self.assertEqual(facts.gke.node_metadata_mode, "GCE_METADATA")
-        self.assertTrue(facts.gke.legacy_metadata_endpoints_enabled)
 
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
@@ -775,6 +651,17 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         for path in sorted(analysis_root.glob("*.py")):
             text = path.read_text(encoding="utf-8")
             if "ResourceMetadata" in text or "get_metadata_field(" in text:
+                offenders.append(path.name)
+
+        self.assertEqual(offenders, [])
+
+    def test_gcp_analysis_uses_provider_owned_resource_facts(self) -> None:
+        gcp_analysis_root = SOURCE_ROOT / "analysis" / "gcp"
+        offenders: list[str] = []
+
+        for path in sorted(gcp_analysis_root.glob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            if "tfstride.analysis.resource_facts" in text or "analysis_facts(" in text:
                 offenders.append(path.name)
 
         self.assertEqual(offenders, [])

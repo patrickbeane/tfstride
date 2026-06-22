@@ -7,14 +7,12 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.resource_facts import (
     NeutralProviderComputeFacts,
-    NeutralProviderGkeFacts,
     NeutralProviderIamFacts,
     NeutralProviderResourceFacts,
     NeutralProviderSqlFacts,
     NeutralProviderStorageFacts,
     NeutralProviderWorkloadFacts,
     ProviderComputeFacts,
-    ProviderGkeFacts,
     ProviderIamFacts,
     ProviderResourceFactDomains,
     ProviderResourceFactsNotRegisteredError,
@@ -78,7 +76,6 @@ def _fact_domains(facts: RecordingFacts) -> ProviderResourceFactDomains:
         storage=facts,
         iam=facts,
         sql=facts,
-        gke=facts,
         compute=facts,
         workload=facts,
     )
@@ -91,10 +88,10 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "bucket_name",
                 "bucket_acl",
                 "public_access_block",
-                "gcs_uniform_bucket_level_access",
-                "gcs_public_access_prevention",
-                "gcs_versioning_enabled",
-                "gcs_default_kms_key_name",
+                "uniform_bucket_level_access",
+                "public_access_prevention",
+                "versioning_enabled",
+                "default_kms_key_name",
                 "customer_managed_encryption",
             },
             "iam": {
@@ -118,26 +115,14 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
             },
             "sql": {
                 "engine",
-                "cloud_sql_authorized_networks",
-                "cloud_sql_backup_enabled",
-                "cloud_sql_point_in_time_recovery_enabled",
-                "cloud_sql_ipv4_enabled",
-                "cloud_sql_private_network",
-                "cloud_sql_require_ssl",
-                "cloud_sql_ssl_mode",
+                "authorized_networks",
+                "backup_enabled",
+                "point_in_time_recovery_enabled",
+                "ipv4_enabled",
+                "private_network",
+                "require_ssl",
+                "ssl_mode",
                 "deletion_protection",
-            },
-            "gke": {
-                "gke_endpoint",
-                "gke_private_endpoint_enabled",
-                "gke_private_nodes_enabled",
-                "gke_master_authorized_networks",
-                "gke_workload_identity_enabled",
-                "gke_workload_identity_pool",
-                "gke_node_service_account",
-                "gke_node_oauth_scopes",
-                "gke_node_metadata_mode",
-                "gke_legacy_metadata_endpoints_enabled",
             },
             "compute": {
                 "os_login_enabled",
@@ -157,10 +142,14 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
             "storage": ProviderStorageFacts,
             "iam": ProviderIamFacts,
             "sql": ProviderSqlFacts,
-            "gke": ProviderGkeFacts,
             "compute": ProviderComputeFacts,
             "workload": ProviderWorkloadFacts,
         }
+
+        self.assertEqual(
+            tuple(ProviderResourceFactDomains.__dataclass_fields__),
+            ("storage", "iam", "sql", "compute", "workload"),
+        )
 
         for domain, expected_properties in domains.items():
             with self.subTest(domain=domain):
@@ -179,13 +168,11 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsInstance(facts, NeutralProviderStorageFacts)
         self.assertIsInstance(facts, NeutralProviderIamFacts)
         self.assertIsInstance(facts, NeutralProviderSqlFacts)
-        self.assertIsInstance(facts, NeutralProviderGkeFacts)
         self.assertIsInstance(facts, NeutralProviderComputeFacts)
         self.assertIsInstance(facts, NeutralProviderWorkloadFacts)
         self.assertEqual(facts.bucket_acl, "")
         self.assertEqual(facts.policy_document, {})
         self.assertIsNone(facts.engine)
-        self.assertEqual(facts.gke_master_authorized_networks, [])
         self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
         self.assertEqual(facts.workload_identity_members, [])
 
@@ -213,7 +200,6 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsInstance(facts.storage, RecordingFacts)
         self.assertIs(facts.iam, facts.storage)
         self.assertIs(facts.sql, facts.storage)
-        self.assertIs(facts.gke, facts.storage)
         self.assertIs(facts.compute, facts.storage)
         self.assertIs(facts.workload, facts.storage)
         self.assertEqual(facts.storage.bucket_name, "aws-bucket")
@@ -227,7 +213,6 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
             storage=storage,
             iam=iam,
             sql=neutral,
-            gke=neutral,
             compute=neutral,
             workload=neutral,
         )
@@ -250,16 +235,15 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsInstance(facts.storage, NeutralProviderResourceFacts)
         self.assertIs(facts.iam, facts.storage)
         self.assertIs(facts.sql, facts.storage)
-        self.assertIs(facts.gke, facts.storage)
         self.assertIs(facts.compute, facts.storage)
         self.assertIs(facts.workload, facts.storage)
         self.assertIsNone(facts.storage.bucket_name)
         self.assertEqual(facts.storage.bucket_acl, "")
         self.assertIsNone(facts.storage.public_access_block)
-        self.assertIsNone(facts.storage.gcs_uniform_bucket_level_access)
-        self.assertIsNone(facts.storage.gcs_public_access_prevention)
-        self.assertIsNone(facts.storage.gcs_versioning_enabled)
-        self.assertIsNone(facts.storage.gcs_default_kms_key_name)
+        self.assertIsNone(facts.storage.uniform_bucket_level_access)
+        self.assertIsNone(facts.storage.public_access_prevention)
+        self.assertIsNone(facts.storage.versioning_enabled)
+        self.assertIsNone(facts.storage.default_kms_key_name)
         self.assertIsNone(facts.storage.customer_managed_encryption)
         self.assertEqual(facts.iam.policy_document, {})
         self.assertEqual(facts.iam.trust_statements, [])
@@ -279,24 +263,14 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsNone(facts.iam.iam_role)
         self.assertIsNone(facts.iam.iam_member)
         self.assertIsNone(facts.sql.engine)
-        self.assertEqual(facts.sql.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.sql.cloud_sql_backup_enabled)
-        self.assertIsNone(facts.sql.cloud_sql_point_in_time_recovery_enabled)
-        self.assertIsNone(facts.sql.cloud_sql_ipv4_enabled)
-        self.assertIsNone(facts.sql.cloud_sql_private_network)
-        self.assertIsNone(facts.sql.cloud_sql_require_ssl)
-        self.assertIsNone(facts.sql.cloud_sql_ssl_mode)
+        self.assertEqual(facts.sql.authorized_networks, [])
+        self.assertIsNone(facts.sql.backup_enabled)
+        self.assertIsNone(facts.sql.point_in_time_recovery_enabled)
+        self.assertIsNone(facts.sql.ipv4_enabled)
+        self.assertIsNone(facts.sql.private_network)
+        self.assertIsNone(facts.sql.require_ssl)
+        self.assertIsNone(facts.sql.ssl_mode)
         self.assertIsNone(facts.sql.deletion_protection)
-        self.assertIsNone(facts.gke.gke_endpoint)
-        self.assertIsNone(facts.gke.gke_private_endpoint_enabled)
-        self.assertIsNone(facts.gke.gke_private_nodes_enabled)
-        self.assertEqual(facts.gke.gke_master_authorized_networks, [])
-        self.assertIsNone(facts.gke.gke_workload_identity_enabled)
-        self.assertIsNone(facts.gke.gke_workload_identity_pool)
-        self.assertIsNone(facts.gke.gke_node_service_account)
-        self.assertEqual(facts.gke.gke_node_oauth_scopes, [])
-        self.assertIsNone(facts.gke.gke_node_metadata_mode)
-        self.assertIsNone(facts.gke.gke_legacy_metadata_endpoints_enabled)
         self.assertIsNone(facts.compute.os_login_enabled)
         self.assertEqual(facts.compute.network_tags, [])
         self.assertEqual(facts.compute.internet_ingress_firewalls, [])

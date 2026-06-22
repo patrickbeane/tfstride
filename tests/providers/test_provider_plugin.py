@@ -128,7 +128,6 @@ def _facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
         storage=facts,
         iam=facts,
         sql=facts,
-        gke=facts,
         compute=facts,
         workload=facts,
     )

@@ -18,11 +18,11 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
 from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.constants import GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import gcp_reference_key
 
 HIGH_RISK_SERVICE_ACCOUNT_ROLES: dict[str, str] = {
@@ -85,7 +85,7 @@ class GcpServiceAccountIamDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "service_account_reference",
-                                [analysis_facts(binding).iam.service_account_reference or ""],
+                                [gcp_facts(binding).service_account_reference or ""],
                             ),
                             organization_guardrail_evidence(
                                 gcp_org_policy_guardrail_index(context.analysis_indexes),
@@ -148,7 +148,7 @@ class GcpServiceAccountIamDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "service_account_reference",
-                                [analysis_facts(binding).iam.service_account_reference or ""],
+                                [gcp_facts(binding).service_account_reference or ""],
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -168,7 +168,7 @@ def service_account_iam_target(
     iam_resource: NormalizedResource,
     inventory: ResourceInventory,
 ) -> NormalizedResource | None:
-    target_reference = analysis_facts(iam_resource).iam.service_account_reference
+    target_reference = gcp_facts(iam_resource).service_account_reference
     if not target_reference:
         return None
     target_key = gcp_reference_key(target_reference)
@@ -179,16 +179,16 @@ def service_account_iam_target(
 
 
 def _service_account_reference_keys(resource: NormalizedResource) -> set[str]:
-    facts = analysis_facts(resource)
+    facts = gcp_facts(resource)
     values = [
         resource.address,
         f"{resource.address}.id",
         f"{resource.address}.name",
         f"{resource.address}.email",
         resource.identifier,
-        facts.iam.service_account_email,
-        facts.iam.service_account_member,
-        facts.iam.resource_name,
+        facts.service_account_email,
+        facts.service_account_member,
+        facts.resource_name,
     ]
     keys: set[str] = set()
     for value in values:

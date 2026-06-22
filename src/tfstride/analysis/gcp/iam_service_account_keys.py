@@ -35,7 +35,6 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
 from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
@@ -45,6 +44,7 @@ from tfstride.providers.gcp.constants import (
     GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
 
 _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
@@ -97,7 +97,7 @@ class GcpServiceAccountKeyDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         for key in inventory.by_type("google_service_account_key"):
-            service_account_reference = analysis_facts(key).iam.service_account_reference
+            service_account_reference = gcp_facts(key).service_account_reference
             target = service_account_iam_target(key, inventory)
             validity_days = _service_account_key_validity_days(key)
             keepers = key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS)
@@ -200,7 +200,7 @@ class GcpServiceAccountKeyDetectors:
                 lateral_movement=2 if identity_control_plane_access else 1,
                 blast_radius=2,
             )
-            service_account_reference = analysis_facts(key).iam.service_account_reference
+            service_account_reference = gcp_facts(key).service_account_reference
             target_label = (
                 target.address if target is not None else service_account_reference or "unknown service account"
             )
@@ -378,18 +378,18 @@ def _service_account_key_principals(
 ) -> set[str]:
     values: list[object] = []
     if target is not None:
-        target_facts = analysis_facts(target)
+        target_facts = gcp_facts(target)
         values.extend(
             [
-                target_facts.iam.service_account_email,
-                target_facts.iam.service_account_member,
-                target_facts.iam.resource_name,
+                target_facts.service_account_email,
+                target_facts.service_account_member,
+                target_facts.resource_name,
             ]
         )
-    key_facts = analysis_facts(key)
+    key_facts = gcp_facts(key)
     values.extend(
         [
-            key_facts.iam.service_account_reference,
+            key_facts.service_account_reference,
             key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE),
             key.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_ID),
             key.get_metadata_field(GcpResourceMetadata.NAME),
@@ -432,7 +432,7 @@ def _member_matches_service_account_principal(member: str, principals: set[str])
 def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     members: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str, str]] = set()
-    for binding in analysis_facts(resource).iam.bindings:
+    for binding in gcp_facts(resource).iam_bindings:
         role = str(binding.get("role") or "unknown role").strip()
         source = str(binding.get("source") or "").strip()
         for member in binding_members(binding):

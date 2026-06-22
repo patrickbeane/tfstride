@@ -17,10 +17,10 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
@@ -38,14 +38,14 @@ class GcpSensitiveResourceIamDetectors:
         findings: list[Finding] = []
         seen: set[tuple[str, str, str]] = set()
         for resource in context.inventory.by_type(*_SENSITIVE_GCP_RESOURCE_TYPES):
-            resource_facts = analysis_facts(resource)
-            for binding in resource_facts.iam.bindings:
+            resource_facts = gcp_facts(resource)
+            for binding in resource_facts.iam_bindings:
                 role = str(binding.get("role") or "unknown role")
                 if not _is_sensitive_gcp_resource_role(resource, role):
                     continue
                 source = str(binding.get("source") or "").strip()
                 for member in binding_members(binding):
-                    assessment = assess_gcp_sensitive_iam_member(member, resource_facts.iam.project)
+                    assessment = assess_gcp_sensitive_iam_member(member, resource_facts.project)
                     if assessment is None:
                         continue
                     finding_key = (resource.address, role, assessment.member)
@@ -94,7 +94,7 @@ class GcpSensitiveResourceIamDetectors:
                                 evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                                 evidence_item(
                                     "resource_policy_sources",
-                                    resource_facts.iam.resource_policy_source_addresses,
+                                    resource_facts.resource_policy_source_addresses,
                                 ),
                                 organization_guardrail_evidence(
                                     gcp_org_policy_guardrail_index(context.analysis_indexes),

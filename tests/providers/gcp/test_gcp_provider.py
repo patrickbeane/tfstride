@@ -281,9 +281,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.resource_policy_source_addresses, [])
         self.assertIsNone(facts.project)
         self.assertEqual(facts.iam_bindings, [])
-        self.assertEqual(facts.cloud_sql_authorized_networks, [])
-        self.assertIsNone(facts.cloud_sql_backup_enabled)
-        self.assertIsNone(facts.cloud_sql_point_in_time_recovery_enabled)
+        self.assertEqual(facts.authorized_networks, [])
+        self.assertIsNone(facts.backup_enabled)
+        self.assertIsNone(facts.point_in_time_recovery_enabled)
         self.assertEqual(facts.network_tags, [])
         self.assertEqual(facts.internet_ingress_firewalls, [])
         self.assertIsNone(facts.iam_role)
@@ -308,6 +308,51 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.gke_node_oauth_scopes, [])
         self.assertIsNone(facts.gke_node_metadata_mode)
         self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
+
+    def test_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
+        resource = NormalizedResource(
+            address="google_container_cluster.app",
+            provider="gcp",
+            resource_type=GcpResourceType.CONTAINER_CLUSTER,
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                GcpResourceMetadata.GKE_ENDPOINT: "35.1.2.3",
+                GcpResourceMetadata.GKE_PRIVATE_ENDPOINT_ENABLED: False,
+                GcpResourceMetadata.GKE_PRIVATE_NODES_ENABLED: False,
+                GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS: [
+                    {"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}
+                ],
+                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED: False,
+                GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL: None,
+                GcpResourceMetadata.GKE_NODE_SERVICE_ACCOUNT: ("123456789-compute@developer.gserviceaccount.com"),
+                GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES: ["https://www.googleapis.com/auth/cloud-platform"],
+                GcpResourceMetadata.GKE_NODE_METADATA_MODE: "GCE_METADATA",
+                GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED: True,
+            },
+        )
+
+        facts = gcp_facts(resource)
+
+        self.assertEqual(facts.gke_endpoint, "35.1.2.3")
+        self.assertFalse(facts.gke_private_endpoint_enabled)
+        self.assertFalse(facts.gke_private_nodes_enabled)
+        self.assertEqual(
+            facts.gke_master_authorized_networks,
+            [{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}],
+        )
+        self.assertFalse(facts.gke_workload_identity_enabled)
+        self.assertIsNone(facts.gke_workload_identity_pool)
+        self.assertEqual(
+            facts.gke_node_service_account,
+            "123456789-compute@developer.gserviceaccount.com",
+        )
+        self.assertEqual(
+            facts.gke_node_oauth_scopes,
+            ["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        self.assertEqual(facts.gke_node_metadata_mode, "GCE_METADATA")
+        self.assertTrue(facts.gke_legacy_metadata_endpoints_enabled)
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()

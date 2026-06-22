@@ -25,19 +25,19 @@ class NeutralProviderStorageFacts:
         return None
 
     @property
-    def gcs_uniform_bucket_level_access(self) -> bool | None:
+    def uniform_bucket_level_access(self) -> bool | None:
         return None
 
     @property
-    def gcs_public_access_prevention(self) -> str | None:
+    def public_access_prevention(self) -> str | None:
         return None
 
     @property
-    def gcs_versioning_enabled(self) -> bool | None:
+    def versioning_enabled(self) -> bool | None:
         return None
 
     @property
-    def gcs_default_kms_key_name(self) -> str | None:
+    def default_kms_key_name(self) -> str | None:
         return None
 
     @property
@@ -129,81 +129,35 @@ class NeutralProviderSqlFacts:
         return None
 
     @property
-    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+    def authorized_networks(self) -> list[dict[str, Any]]:
         return []
 
     @property
-    def cloud_sql_backup_enabled(self) -> bool | None:
+    def backup_enabled(self) -> bool | None:
         return None
 
     @property
-    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+    def point_in_time_recovery_enabled(self) -> bool | None:
         return None
 
     @property
-    def cloud_sql_ipv4_enabled(self) -> bool | None:
+    def ipv4_enabled(self) -> bool | None:
         return None
 
     @property
-    def cloud_sql_private_network(self) -> str | None:
+    def private_network(self) -> str | None:
         return None
 
     @property
-    def cloud_sql_require_ssl(self) -> bool | None:
+    def require_ssl(self) -> bool | None:
         return None
 
     @property
-    def cloud_sql_ssl_mode(self) -> str | None:
+    def ssl_mode(self) -> str | None:
         return None
 
     @property
     def deletion_protection(self) -> bool | None:
-        return None
-
-
-class NeutralProviderGkeFacts:
-    """Neutral GKE facts for providers without GKE cluster signals."""
-
-    __slots__ = ()
-
-    @property
-    def gke_endpoint(self) -> str | None:
-        return None
-
-    @property
-    def gke_private_endpoint_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_private_nodes_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
-        return []
-
-    @property
-    def gke_workload_identity_enabled(self) -> bool | None:
-        return None
-
-    @property
-    def gke_workload_identity_pool(self) -> str | None:
-        return None
-
-    @property
-    def gke_node_service_account(self) -> str | None:
-        return None
-
-    @property
-    def gke_node_oauth_scopes(self) -> list[str]:
-        return []
-
-    @property
-    def gke_node_metadata_mode(self) -> str | None:
-        return None
-
-    @property
-    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
         return None
 
 
@@ -260,7 +214,6 @@ class NeutralProviderResourceFacts(
     NeutralProviderStorageFacts,
     NeutralProviderIamFacts,
     NeutralProviderSqlFacts,
-    NeutralProviderGkeFacts,
     NeutralProviderComputeFacts,
     NeutralProviderWorkloadFacts,
 ):
@@ -277,7 +230,6 @@ def neutral_provider_resource_fact_domains(resource: NormalizedResource) -> Prov
         storage=neutral,
         iam=neutral,
         sql=neutral,
-        gke=neutral,
         compute=neutral,
         workload=neutral,
     )

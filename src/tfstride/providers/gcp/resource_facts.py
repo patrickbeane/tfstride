@@ -88,19 +88,19 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.POLICY_DOCUMENT)
 
     @property
-    def gcs_uniform_bucket_level_access(self) -> bool | None:
+    def uniform_bucket_level_access(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS)
 
     @property
-    def gcs_public_access_prevention(self) -> str | None:
+    def public_access_prevention(self) -> str | None:
         return self.get(GcpResourceMetadata.PUBLIC_ACCESS_PREVENTION)
 
     @property
-    def gcs_versioning_enabled(self) -> bool | None:
+    def versioning_enabled(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.GCS_VERSIONING_ENABLED)
 
     @property
-    def gcs_default_kms_key_name(self) -> str | None:
+    def default_kms_key_name(self) -> str | None:
         return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
 
     @property
@@ -108,7 +108,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         value = self.optional_bool(GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION)
         if value is not None:
             return value
-        if self.gcs_default_kms_key_name:
+        if self.default_kms_key_name:
             return True
         return None
 
@@ -167,31 +167,31 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.DATABASE_VERSION)
 
     @property
-    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+    def authorized_networks(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.CLOUD_SQL_AUTHORIZED_NETWORKS)
 
     @property
-    def cloud_sql_backup_enabled(self) -> bool | None:
+    def backup_enabled(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED)
 
     @property
-    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+    def point_in_time_recovery_enabled(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED)
 
     @property
-    def cloud_sql_ipv4_enabled(self) -> bool | None:
+    def ipv4_enabled(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED)
 
     @property
-    def cloud_sql_private_network(self) -> str | None:
+    def private_network(self) -> str | None:
         return self.get(GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK)
 
     @property
-    def cloud_sql_require_ssl(self) -> bool | None:
+    def require_ssl(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_REQUIRE_SSL)
 
     @property
-    def cloud_sql_ssl_mode(self) -> str | None:
+    def ssl_mode(self) -> str | None:
         return self.get(GcpResourceMetadata.CLOUD_SQL_SSL_MODE)
 
     @property
@@ -322,7 +322,6 @@ def gcp_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomain
         storage=facts,
         iam=facts,
         sql=facts,
-        gke=facts,
         compute=facts,
         workload=facts,
     )

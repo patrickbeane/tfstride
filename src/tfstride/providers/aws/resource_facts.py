@@ -9,7 +9,6 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import (
     NeutralProviderComputeFacts,
-    NeutralProviderGkeFacts,
     NeutralProviderIamFacts,
     NeutralProviderSqlFacts,
     NeutralProviderStorageFacts,
@@ -315,7 +314,6 @@ def aws_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomain
         storage=AwsStorageFacts(resource),
         iam=AwsIamFacts(resource),
         sql=AwsSqlFacts(resource),
-        gke=NeutralProviderGkeFacts(),
         compute=NeutralProviderComputeFacts(),
         workload=NeutralProviderWorkloadFacts(),
     )

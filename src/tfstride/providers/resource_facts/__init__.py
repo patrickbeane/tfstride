@@ -2,7 +2,6 @@
 
 from tfstride.providers.resource_facts.contracts import (
     ProviderComputeFacts,
-    ProviderGkeFacts,
     ProviderIamFacts,
     ProviderResourceFactDomains,
     ProviderResourceFactsFactory,
@@ -12,7 +11,6 @@ from tfstride.providers.resource_facts.contracts import (
 )
 from tfstride.providers.resource_facts.neutral import (
     NeutralProviderComputeFacts,
-    NeutralProviderGkeFacts,
     NeutralProviderIamFacts,
     NeutralProviderResourceFacts,
     NeutralProviderSqlFacts,
@@ -28,14 +26,12 @@ from tfstride.providers.resource_facts.registry import (
 
 __all__ = [
     "NeutralProviderComputeFacts",
-    "NeutralProviderGkeFacts",
     "NeutralProviderIamFacts",
     "NeutralProviderResourceFacts",
     "NeutralProviderSqlFacts",
     "NeutralProviderStorageFacts",
     "NeutralProviderWorkloadFacts",
     "ProviderComputeFacts",
-    "ProviderGkeFacts",
     "ProviderIamFacts",
     "ProviderResourceFactDomains",
     "ProviderResourceFactsFactory",

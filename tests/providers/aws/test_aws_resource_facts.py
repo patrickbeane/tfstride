@@ -16,7 +16,6 @@ from tfstride.providers.aws.resource_facts import (
 )
 from tfstride.providers.resource_facts import (
     NeutralProviderComputeFacts,
-    NeutralProviderGkeFacts,
     NeutralProviderWorkloadFacts,
 )
 
@@ -87,10 +86,10 @@ class AwsResourceFactsTests(unittest.TestCase):
     def test_raw_aws_facts_expose_only_aws_owned_fact_properties(self) -> None:
         facts = aws_facts(_resource())
         unsupported_defaults = {
-            "gcs_uniform_bucket_level_access",
-            "gcs_public_access_prevention",
-            "gcs_versioning_enabled",
-            "gcs_default_kms_key_name",
+            "uniform_bucket_level_access",
+            "public_access_prevention",
+            "versioning_enabled",
+            "default_kms_key_name",
             "customer_managed_encryption",
             "project",
             "reference_values",
@@ -105,13 +104,13 @@ class AwsResourceFactsTests(unittest.TestCase):
             "service_account_reference",
             "iam_role",
             "iam_member",
-            "cloud_sql_authorized_networks",
-            "cloud_sql_backup_enabled",
-            "cloud_sql_point_in_time_recovery_enabled",
-            "cloud_sql_ipv4_enabled",
-            "cloud_sql_private_network",
-            "cloud_sql_require_ssl",
-            "cloud_sql_ssl_mode",
+            "authorized_networks",
+            "backup_enabled",
+            "point_in_time_recovery_enabled",
+            "ipv4_enabled",
+            "private_network",
+            "require_ssl",
+            "ssl_mode",
             "deletion_protection",
             "os_login_enabled",
             "network_tags",
@@ -154,19 +153,17 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsInstance(domains.storage, AwsStorageFacts)
         self.assertIsInstance(domains.iam, AwsIamFacts)
         self.assertIsInstance(domains.sql, AwsSqlFacts)
-        self.assertIsInstance(domains.gke, NeutralProviderGkeFacts)
         self.assertIsInstance(domains.compute, NeutralProviderComputeFacts)
         self.assertIsInstance(domains.workload, NeutralProviderWorkloadFacts)
         self.assertEqual(domains.storage.bucket_name, "logs")
         self.assertEqual(domains.storage.bucket_acl, "private")
-        self.assertIsNone(domains.storage.gcs_uniform_bucket_level_access)
+        self.assertIsNone(domains.storage.uniform_bucket_level_access)
         self.assertEqual(domains.iam.policy_document, {"Statement": []})
         self.assertEqual(domains.iam.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(domains.iam.reference_values, [])
         self.assertIsNone(domains.iam.service_account_email)
         self.assertEqual(domains.sql.engine, "postgres")
-        self.assertEqual(domains.sql.cloud_sql_authorized_networks, [])
-        self.assertIsNone(domains.gke.gke_endpoint)
+        self.assertEqual(domains.sql.authorized_networks, [])
         self.assertFalse(domains.compute.fronted_by_internet_facing_load_balancer)
         self.assertEqual(domains.workload.workload_identity_members, [])
 

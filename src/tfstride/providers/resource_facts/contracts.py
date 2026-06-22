@@ -23,19 +23,19 @@ class ProviderStorageFacts(Protocol):
         raise NotImplementedError
 
     @property
-    def gcs_uniform_bucket_level_access(self) -> bool | None:
+    def uniform_bucket_level_access(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def gcs_public_access_prevention(self) -> str | None:
+    def public_access_prevention(self) -> str | None:
         raise NotImplementedError
 
     @property
-    def gcs_versioning_enabled(self) -> bool | None:
+    def versioning_enabled(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def gcs_default_kms_key_name(self) -> str | None:
+    def default_kms_key_name(self) -> str | None:
         raise NotImplementedError
 
     @property
@@ -123,79 +123,35 @@ class ProviderSqlFacts(Protocol):
         raise NotImplementedError
 
     @property
-    def cloud_sql_authorized_networks(self) -> list[dict[str, Any]]:
+    def authorized_networks(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
     @property
-    def cloud_sql_backup_enabled(self) -> bool | None:
+    def backup_enabled(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def cloud_sql_point_in_time_recovery_enabled(self) -> bool | None:
+    def point_in_time_recovery_enabled(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def cloud_sql_ipv4_enabled(self) -> bool | None:
+    def ipv4_enabled(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def cloud_sql_private_network(self) -> str | None:
+    def private_network(self) -> str | None:
         raise NotImplementedError
 
     @property
-    def cloud_sql_require_ssl(self) -> bool | None:
+    def require_ssl(self) -> bool | None:
         raise NotImplementedError
 
     @property
-    def cloud_sql_ssl_mode(self) -> str | None:
+    def ssl_mode(self) -> str | None:
         raise NotImplementedError
 
     @property
     def deletion_protection(self) -> bool | None:
-        raise NotImplementedError
-
-
-class ProviderGkeFacts(Protocol):
-    """GKE cluster and node posture facts from provider adapters."""
-
-    @property
-    def gke_endpoint(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def gke_private_endpoint_enabled(self) -> bool | None:
-        raise NotImplementedError
-
-    @property
-    def gke_private_nodes_enabled(self) -> bool | None:
-        raise NotImplementedError
-
-    @property
-    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
-        raise NotImplementedError
-
-    @property
-    def gke_workload_identity_enabled(self) -> bool | None:
-        raise NotImplementedError
-
-    @property
-    def gke_workload_identity_pool(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def gke_node_service_account(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def gke_node_oauth_scopes(self) -> list[str]:
-        raise NotImplementedError
-
-    @property
-    def gke_node_metadata_mode(self) -> str | None:
-        raise NotImplementedError
-
-    @property
-    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
         raise NotImplementedError
 
 
@@ -250,7 +206,6 @@ class ProviderResourceFactDomains:
     storage: ProviderStorageFacts
     iam: ProviderIamFacts
     sql: ProviderSqlFacts
-    gke: ProviderGkeFacts
     compute: ProviderComputeFacts
     workload: ProviderWorkloadFacts
 
