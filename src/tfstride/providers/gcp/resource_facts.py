@@ -65,9 +65,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         self.resource.set_metadata_field(field, value)
 
     def optional_bool(self, field: MetadataField[bool]) -> bool | None:
-        if not self.resource.has_metadata_field(field):
-            return None
-        if self.resource.metadata_snapshot().get(field.key) is None:
+        if not self.resource.has_metadata_value(field):
             return None
         return self.get(field)
 

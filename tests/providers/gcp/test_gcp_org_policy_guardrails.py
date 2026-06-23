@@ -85,6 +85,28 @@ def _guardrail_index(resources: list[NormalizedResource]):
 
 
 class GcpOrgPolicyGuardrailIndexTests(unittest.TestCase):
+    def test_optional_boolean_guardrails_preserve_none_and_false(self) -> None:
+        guardrail = _gcp_resource(
+            "google_org_policy_policy.disable_keys",
+            "google_org_policy_policy",
+            ResourceCategory.IAM,
+            metadata={
+                GcpResourceMetadata.ORG_POLICY_CONSTRAINT.key: "constraints/iam.disableServiceAccountKeyCreation",
+                GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE.key: GCP_ORG_POLICY_SCOPE_PROJECT,
+                GcpResourceMetadata.ORG_POLICY_SCOPE.key: "projects/tfstride-demo",
+                GcpResourceMetadata.PROJECT.key: "projects/tfstride-demo",
+                GcpResourceMetadata.ORG_POLICY_ENFORCED.key: None,
+                GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT: False,
+            },
+        )
+
+        indexed = _guardrail_index([guardrail]).direct_guardrails_for_scope(
+            GcpOrgPolicyScopeKey(GCP_ORG_POLICY_SCOPE_PROJECT, "tfstride-demo")
+        )
+
+        self.assertIsNone(indexed[0].enforced)
+        self.assertFalse(indexed[0].inherit_from_parent)
+
     def test_indexes_direct_guardrails_by_scope_and_constraint(self) -> None:
         guardrail = _org_policy(
             "google_org_policy_policy.storage_pap",

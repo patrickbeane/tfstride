@@ -270,6 +270,24 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
             {"public_access_configured": True, "raw": {"items": ["value"]}},
         )
 
+    def test_metadata_value_presence_distinguishes_none_from_false(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                ResourceMetadata.STORAGE_ENCRYPTED.key: None,
+                ResourceMetadata.PUBLIC_ACCESS_CONFIGURED.key: False,
+            },
+        )
+
+        self.assertTrue(resource.has_metadata_field(ResourceMetadata.STORAGE_ENCRYPTED))
+        self.assertFalse(resource.has_metadata_value(ResourceMetadata.STORAGE_ENCRYPTED))
+        self.assertTrue(resource.has_metadata_value(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertFalse(resource.has_metadata_value(ResourceMetadata.VPC_ENABLED))
+
     def test_metadata_view_is_read_only_and_detached(self) -> None:
         source_metadata = {"tags": {"env": "prod"}}
         resource = NormalizedResource(

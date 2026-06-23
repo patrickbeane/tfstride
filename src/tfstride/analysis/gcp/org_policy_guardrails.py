@@ -306,9 +306,7 @@ def _path_segment(value: object, marker: str) -> str | None:
 
 
 def _optional_bool_metadata(resource: NormalizedResource, field: MetadataField[bool]) -> bool | None:
-    if not resource.has_metadata_field(field):
-        return None
-    if resource.metadata_snapshot().get(field.key) is None:
+    if not resource.has_metadata_value(field):
         return None
     return resource.get_metadata_field(field)
 

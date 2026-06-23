@@ -309,6 +309,24 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.gke_node_metadata_mode)
         self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
 
+    def test_optional_boolean_facts_preserve_none_and_false(self) -> None:
+        resource = NormalizedResource(
+            address="google_sql_database_instance.app",
+            provider="gcp",
+            resource_type=GcpResourceType.SQL_DATABASE_INSTANCE,
+            name="app",
+            category=ResourceCategory.DATA,
+            metadata={
+                GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED.key: None,
+                GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED: False,
+            },
+        )
+
+        facts = gcp_facts(resource)
+
+        self.assertIsNone(facts.backup_enabled)
+        self.assertFalse(facts.point_in_time_recovery_enabled)
+
     def test_gke_facts_read_provider_owned_cluster_metadata(self) -> None:
         resource = NormalizedResource(
             address="google_container_cluster.app",

@@ -184,6 +184,9 @@ class NormalizedResource:
     def has_metadata_field(self, field: MetadataField[Any]) -> bool:
         return field.key in self._metadata
 
+    def has_metadata_value(self, field: MetadataField[Any]) -> bool:
+        return self._metadata.get(field.key) is not None
+
     def set_metadata_field(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
         field.set(self._metadata, value)
 
