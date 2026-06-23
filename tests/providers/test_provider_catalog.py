@@ -54,6 +54,32 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(registry.get(DEFAULT_PROVIDER), AwsNormalizer)
         self.assertIsInstance(registry.get("gcp"), GcpNormalizer)
 
+    def test_default_provider_plugins_are_cached(self) -> None:
+        first = default_provider_plugins()
+        second = default_provider_plugins()
+
+        self.assertIs(first, second)
+        self.assertEqual(tuple(plugin.provider for plugin in first), ("aws", "gcp"))
+        for first_plugin, second_plugin in zip(first, second, strict=True):
+            self.assertIs(first_plugin, second_plugin)
+
+    def test_cached_plugins_build_fresh_runtime_registries(self) -> None:
+        first_provider_registry = default_provider_registry()
+        second_provider_registry = default_provider_registry()
+        first_facts_registry = default_resource_facts_registry()
+        second_facts_registry = default_resource_facts_registry()
+        first_capability_registry = default_resource_capability_registry()
+        second_capability_registry = default_resource_capability_registry()
+
+        self.assertIsNot(first_provider_registry, second_provider_registry)
+        self.assertIsNot(first_provider_registry.get("aws"), second_provider_registry.get("aws"))
+        self.assertIsNot(first_provider_registry.get("gcp"), second_provider_registry.get("gcp"))
+        self.assertIsNot(first_facts_registry, second_facts_registry)
+        self.assertIs(first_facts_registry.get("aws"), second_facts_registry.get("aws"))
+        self.assertIs(first_facts_registry.get("gcp"), second_facts_registry.get("gcp"))
+        self.assertIsNot(first_capability_registry, second_capability_registry)
+        self.assertEqual(first_capability_registry.providers(), second_capability_registry.providers())
+
     def test_default_provider_plugins_describe_builtin_provider_contracts(self) -> None:
         registry = default_rule_registry()
         plugins = {plugin.provider: plugin for plugin in default_provider_plugins()}

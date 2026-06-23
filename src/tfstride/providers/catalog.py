@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ from tfstride.providers.resource_facts import ProviderResourceFactsRegistry
 DEFAULT_PROVIDER = "aws"
 
 
+@cache
 def default_provider_plugins() -> tuple[ProviderPlugin, ...]:
     return (aws_provider_plugin(), gcp_provider_plugin())
 
