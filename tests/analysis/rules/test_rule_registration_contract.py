@@ -6,7 +6,7 @@ import unittest
 from tfstride.analysis import stride_rules
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
+from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws import rules as aws_rules
 from tfstride.providers.gcp import rules as gcp_rules
@@ -120,9 +120,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         self.assertTrue(all(rule_id.startswith("gcp-") for rule_id in _flatten(gcp_rules.GCP_RULE_GROUP_IDS)))
 
     def test_aws_rule_contribution_matches_provider_rule_groups(self) -> None:
+        registry = default_rule_registry()
         contribution = aws_rules.build_aws_rule_contribution(
-            FindingFactory(DEFAULT_RULE_REGISTRY),
-            DEFAULT_RULE_REGISTRY,
+            FindingFactory(registry),
+            registry,
         )
 
         self.assertEqual(
@@ -131,9 +132,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         )
 
     def test_gcp_rule_contribution_matches_provider_rule_groups(self) -> None:
+        registry = default_rule_registry()
         contribution = gcp_rules.build_gcp_rule_contribution(
-            FindingFactory(DEFAULT_RULE_REGISTRY),
-            DEFAULT_RULE_REGISTRY,
+            FindingFactory(registry),
+            registry,
         )
 
         self.assertEqual(
@@ -182,12 +184,12 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_configured_rule_ids_exist_in_default_registry(self) -> None:
         configured_rule_ids = set(_flatten(_engine_rule_group_ids(StrideRuleEngine())))
 
-        self.assertLessEqual(configured_rule_ids, DEFAULT_RULE_REGISTRY.known_rule_ids())
+        self.assertLessEqual(configured_rule_ids, default_rule_registry().known_rule_ids())
 
     def test_default_configured_rule_ids_match_default_registry(self) -> None:
         self.assertEqual(
             StrideRuleEngine().configured_rule_ids(),
-            DEFAULT_RULE_REGISTRY.known_rule_ids(),
+            default_rule_registry().known_rule_ids(),
         )
 
 

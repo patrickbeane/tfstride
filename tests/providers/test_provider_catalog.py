@@ -4,7 +4,7 @@ import unittest
 
 from tests.helpers.paths import FIXTURES_DIR
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
+from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.aws.boundaries import AwsBoundaryContributor
@@ -55,6 +55,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(registry.get("gcp"), GcpNormalizer)
 
     def test_default_provider_plugins_describe_builtin_provider_contracts(self) -> None:
+        registry = default_rule_registry()
         plugins = {plugin.provider: plugin for plugin in default_provider_plugins()}
         aws_plugin = plugins["aws"]
         gcp_plugin = plugins["gcp"]
@@ -69,7 +70,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(
             tuple(
                 tuple(rule.metadata.rule_id for rule in rule_group)
-                for rule_group in aws_plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY)).rule_groups
+                for rule_group in aws_plugin.create_rule_contribution(FindingFactory(registry)).rule_groups
             ),
             AWS_RULE_GROUP_IDS,
         )
@@ -90,7 +91,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(
             tuple(
                 tuple(rule.metadata.rule_id for rule in rule_group)
-                for rule_group in gcp_plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY)).rule_groups
+                for rule_group in gcp_plugin.create_rule_contribution(FindingFactory(registry)).rule_groups
             ),
             GCP_RULE_GROUP_IDS,
         )
@@ -126,13 +127,14 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(factories_by_provider["gcp"][0](), GcpBoundaryContributor)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
-        contribution = default_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))
+        registry = default_rule_registry()
+        contribution = default_rule_contribution(FindingFactory(registry))
         rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
 
         self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (27, 2, 2, 12, 3, 2))
         self.assertEqual(
             {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
-            DEFAULT_RULE_REGISTRY.known_rule_ids(),
+            registry.known_rule_ids(),
         )
 
     def test_default_provider_limitations_register_builtin_provider_caveats(self) -> None:

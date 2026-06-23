@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 import unittest
 
+from tfstride.analysis import rule_registry as rule_registry_module
 from tfstride.analysis.rule_registry import (
-    DEFAULT_RULE_METADATA,
-    DEFAULT_RULE_REGISTRY,
     RuleMetadata,
     RulePolicy,
     RuleRegistry,
@@ -74,18 +75,48 @@ def _flatten_rule_groups(rule_groups: tuple[tuple[str, ...], ...]) -> tuple[str,
 
 
 class RuleRegistryTests(unittest.TestCase):
+    def test_import_does_not_load_provider_catalog(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; "
+                    "import tfstride.analysis.rule_registry; "
+                    "assert 'tfstride.providers.catalog' not in sys.modules"
+                ),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_eager_default_rule_singletons_are_not_exposed(self) -> None:
+        self.assertFalse(hasattr(rule_registry_module, "DEFAULT_RULE_METADATA"))
+        self.assertFalse(hasattr(rule_registry_module, "DEFAULT_RULE_METADATA_BY_ID"))
+        self.assertFalse(hasattr(rule_registry_module, "DEFAULT_RULE_REGISTRY"))
+
     def test_default_registry_is_derived_from_shared_metadata(self) -> None:
-        self.assertEqual(DEFAULT_RULE_REGISTRY.rules(), DEFAULT_RULE_METADATA)
+        registry = default_rule_registry()
+
+        self.assertEqual(
+            registry.rules(),
+            tuple(default_rule_metadata(rule_id) for rule_id in EXPECTED_DEFAULT_RULE_METADATA_IDS),
+        )
 
     def test_default_rule_metadata_ids_match_locked_order(self) -> None:
+        metadata = default_rule_registry().rules()
+
         self.assertEqual(
-            tuple(metadata.rule_id for metadata in DEFAULT_RULE_METADATA),
+            tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(DEFAULT_RULE_METADATA), 48)
+        self.assertEqual(len(metadata), 48)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
-        metadata_ids = tuple(metadata.rule_id for metadata in DEFAULT_RULE_METADATA)
+        metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
         aws_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("aws-"))
         gcp_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("gcp-"))
 
@@ -97,22 +128,29 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(set(metadata_ids), set(aws_metadata_ids) | set(gcp_metadata_ids))
 
     def test_default_registry_rule_ids_match_configured_rules(self) -> None:
-        self.assertEqual(DEFAULT_RULE_REGISTRY.known_rule_ids(), StrideRuleEngine().configured_rule_ids())
+        self.assertEqual(default_rule_registry().known_rule_ids(), StrideRuleEngine().configured_rule_ids())
 
     def test_provider_rule_ids_have_default_metadata(self) -> None:
-        for rule_id in _flatten_rule_groups(AWS_RULE_GROUP_IDS) + _flatten_rule_groups(GCP_RULE_GROUP_IDS):
-            self.assertIs(DEFAULT_RULE_REGISTRY.get(rule_id), default_rule_metadata(rule_id))
-
-    def test_default_registry_factory_returns_distinct_registry_from_same_metadata(self) -> None:
         registry = default_rule_registry()
 
-        self.assertIsNot(registry, DEFAULT_RULE_REGISTRY)
-        self.assertEqual(registry.rules(), DEFAULT_RULE_METADATA)
+        for rule_id in _flatten_rule_groups(AWS_RULE_GROUP_IDS) + _flatten_rule_groups(GCP_RULE_GROUP_IDS):
+            self.assertIs(registry.get(rule_id), default_rule_metadata(rule_id))
 
-    def test_default_rule_metadata_uses_shared_metadata_lookup(self) -> None:
-        metadata = default_rule_metadata("aws-s3-public-access")
+    def test_default_registry_factory_returns_distinct_registries_from_cached_metadata(self) -> None:
+        first_registry = default_rule_registry()
+        second_registry = default_rule_registry()
 
-        self.assertIs(metadata, DEFAULT_RULE_REGISTRY.get("aws-s3-public-access"))
+        self.assertIsNot(first_registry, second_registry)
+        self.assertEqual(first_registry.rules(), second_registry.rules())
+        for first, second in zip(first_registry.rules(), second_registry.rules(), strict=True):
+            self.assertIs(first, second)
+
+    def test_default_rule_metadata_lookup_is_cached(self) -> None:
+        first = default_rule_metadata("aws-s3-public-access")
+        second = default_rule_metadata("aws-s3-public-access")
+
+        self.assertIs(first, second)
+        self.assertIs(first, default_rule_registry().get("aws-s3-public-access"))
 
     def test_rules_preserves_registry_order(self) -> None:
         first = RuleMetadata(

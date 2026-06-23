@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from functools import cache
 from types import MappingProxyType
 
 from tfstride.models import Finding, Severity, StrideCategory
@@ -59,28 +60,25 @@ class RuleRegistry:
         return self._rules
 
 
+@cache
 def _default_rule_metadata() -> tuple[RuleMetadata, ...]:
     from tfstride.providers.catalog import default_provider_rule_metadata
 
     return default_provider_rule_metadata()
 
 
-DEFAULT_RULE_METADATA = _default_rule_metadata()
-
-
-DEFAULT_RULE_METADATA_BY_ID = {rule.rule_id: rule for rule in DEFAULT_RULE_METADATA}
+@cache
+def _default_rule_metadata_by_id() -> Mapping[str, RuleMetadata]:
+    return MappingProxyType({rule.rule_id: rule for rule in _default_rule_metadata()})
 
 
 def default_rule_registry() -> RuleRegistry:
-    return RuleRegistry(list(DEFAULT_RULE_METADATA))
-
-
-DEFAULT_RULE_REGISTRY = default_rule_registry()
+    return RuleRegistry(list(_default_rule_metadata()))
 
 
 def default_rule_metadata(rule_id: str) -> RuleMetadata:
     try:
-        return DEFAULT_RULE_METADATA_BY_ID[rule_id]
+        return _default_rule_metadata_by_id()[rule_id]
     except KeyError as exc:
         raise KeyError(f"Unknown rule ID `{rule_id}`.") from exc
 

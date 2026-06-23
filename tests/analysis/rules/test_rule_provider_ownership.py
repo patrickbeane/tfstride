@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT, TESTS_ROOT
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY
+from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.catalog import default_provider_plugins, default_provider_rule_metadata
@@ -102,23 +102,26 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
 
     def test_plugin_contributed_rules_are_unique_and_have_metadata(self) -> None:
         contributed_rule_ids: list[str] = []
+        registry = default_rule_registry()
 
         for plugin in default_provider_plugins():
-            contribution = plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))
+            contribution = plugin.create_rule_contribution(FindingFactory(registry))
             self.assertIsNotNone(contribution, f"Provider `{plugin.provider}` must contribute rules.")
             for rule_group in contribution.rule_groups:
                 for rule in rule_group:
                     contributed_rule_ids.append(rule.metadata.rule_id)
-                    self.assertEqual(rule.metadata, DEFAULT_RULE_REGISTRY.get(rule.metadata.rule_id))
+                    self.assertEqual(rule.metadata, registry.get(rule.metadata.rule_id))
 
         duplicate_rule_ids = sorted(rule_id for rule_id, count in Counter(contributed_rule_ids).items() if count > 1)
         self.assertEqual(duplicate_rule_ids, [])
         self.assertEqual(set(contributed_rule_ids), StrideRuleEngine().configured_rule_ids())
 
     def test_provider_rule_metadata_ids_match_contributed_rule_ids(self) -> None:
+        registry = default_rule_registry()
+
         for plugin in default_provider_plugins():
             metadata_ids = {metadata.rule_id for metadata in plugin.create_rule_metadata()}
-            contribution = plugin.create_rule_contribution(FindingFactory(DEFAULT_RULE_REGISTRY))
+            contribution = plugin.create_rule_contribution(FindingFactory(registry))
 
             self.assertIsNotNone(contribution, f"Provider `{plugin.provider}` must contribute rules.")
             contribution_ids = {rule.metadata.rule_id for rule_group in contribution.rule_groups for rule in rule_group}

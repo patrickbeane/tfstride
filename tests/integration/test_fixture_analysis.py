@@ -17,7 +17,7 @@ from tests.integration.analysis_support import (
     SAFE_FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RulePolicy
+from tfstride.analysis.rule_registry import RulePolicy, default_rule_registry
 from tfstride.app import TfStride
 from tfstride.models import (
     BoundaryType,
@@ -524,7 +524,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertNotIn("Object storage is publicly accessible", finding_titles)
 
     def test_rule_policy_can_disable_rules_and_override_severity(self) -> None:
-        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
         enabled_rule_ids.remove("aws-database-permissive-ingress")
         engine = TfStride(
             rule_policy=RulePolicy(

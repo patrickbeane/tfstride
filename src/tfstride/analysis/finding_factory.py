@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleRegistry
+from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.models import EvidenceItem, Finding, Severity, SeverityReasoning
 
 
 class FindingFactory:
-    def __init__(self, rule_registry: RuleRegistry = DEFAULT_RULE_REGISTRY) -> None:
-        self._rule_registry = rule_registry
+    def __init__(self, rule_registry: RuleRegistry | None = None) -> None:
+        self._rule_registry = rule_registry if rule_registry is not None else default_rule_registry()
 
     def build(
         self,

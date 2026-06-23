@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis.rule_definitions import RuleDefinition
-from tfstride.analysis.rule_registry import DEFAULT_RULE_REGISTRY, RuleMetadata, RulePolicy, RuleRegistry
+from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry, default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import (
     BoundaryType,
@@ -27,15 +27,16 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
 
     def test_rule_engine_derives_default_registry_from_rule_definitions(self) -> None:
         engine = StrideRuleEngine()
+        second_engine = StrideRuleEngine()
         definition_metadata = tuple(rule.metadata for rule_group in engine._rule_groups() for rule in rule_group)
 
-        self.assertIsNot(engine._rule_registry, DEFAULT_RULE_REGISTRY)
+        self.assertIsNot(engine._rule_registry, second_engine._rule_registry)
         self.assertEqual(engine._rule_registry.rules(), definition_metadata)
 
     def test_rule_registry_matches_configured_executable_rules(self) -> None:
         self.assertEqual(
             StrideRuleEngine().configured_rule_ids(),
-            DEFAULT_RULE_REGISTRY.known_rule_ids(),
+            default_rule_registry().known_rule_ids(),
         )
 
     def test_rule_engine_uses_injected_registry_metadata_for_findings(self) -> None:
@@ -209,7 +210,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             attached_role_arns=["arn:aws:iam::111122223333:role/worker"],
         )
         inventory = ResourceInventory(provider="aws", resources=[wildcard_policy, role, workload])
-        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
         enabled_rule_ids.difference_update(
             {
                 "aws-iam-wildcard-permissions",
@@ -261,7 +262,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             resources=[sensitive_secret, service_queue],
             metadata={"primary_account_id": "111122223333"},
         )
-        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
         enabled_rule_ids.remove("aws-sensitive-resource-policy-external-access")
 
         findings = StrideRuleEngine().evaluate(
@@ -298,7 +299,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             resources=[role],
             metadata={"primary_account_id": "111122223333"},
         )
-        enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+        enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
         enabled_rule_ids.remove("aws-role-trust-expansion")
 
         findings = StrideRuleEngine().evaluate(
@@ -369,7 +370,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
 
         for disabled_rule_id in posture_rule_ids:
             with self.subTest(disabled_rule_id=disabled_rule_id):
-                enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+                enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
                 enabled_rule_ids.remove(disabled_rule_id)
 
                 findings = StrideRuleEngine().evaluate(
@@ -438,7 +439,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
 
         for disabled_rule_id in network_data_rule_ids:
             with self.subTest(disabled_rule_id=disabled_rule_id):
-                enabled_rule_ids = DEFAULT_RULE_REGISTRY.default_enabled_rule_ids()
+                enabled_rule_ids = default_rule_registry().default_enabled_rule_ids()
                 enabled_rule_ids.remove(disabled_rule_id)
 
                 findings = StrideRuleEngine().evaluate(
