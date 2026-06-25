@@ -221,6 +221,18 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="balanced",
     ),
     DemoScenarioDefinition(
+        scenario_id="azure-nightmare",
+        title="Azure Nightmare Plan",
+        report_title="Azure Nightmare Plan Demo",
+        fixture_name="azure/sample_azure_nightmare_plan.json",
+        description=(
+            "Stacked Azure Storage exposure and public Linux and Windows administration paths, "
+            "with explicit unsupported-resource coverage."
+        ),
+        emphasis="Stress-case fixture",
+        theme="nightmare",
+    ),
+    DemoScenarioDefinition(
         scenario_id="trust-unconstrained",
         title="Cross-Account Trust",
         report_title="Cross-Account Trust Demo",

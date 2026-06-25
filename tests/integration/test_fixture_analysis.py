@@ -6,6 +6,7 @@ from collections import Counter
 from tests.integration.analysis_support import (
     AZURE_COMPUTE_FIXTURE_PATH,
     AZURE_FIXTURE_PATH,
+    AZURE_NIGHTMARE_FIXTURE_PATH,
     AZURE_SAFE_FIXTURE_PATH,
     AZURE_STORAGE_FIXTURE_PATH,
     BASELINE_FIXTURE_PATH,
@@ -108,6 +109,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-inventory": (AZURE_FIXTURE_PATH, 6, {"high": 2, "medium": 4}),
+            "azure-nightmare": (AZURE_NIGHTMARE_FIXTURE_PATH, 13, {"high": 4, "medium": 9}),
             "azure-storage": (AZURE_STORAGE_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
         }
 
@@ -219,6 +221,14 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Azure Storage account allows unrestricted public network access": 1,
                 "Azure Storage container is publicly accessible": 1,
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
+            },
+            "azure-nightmare": {
+                "Azure Storage account permits Shared Key authorization": 2,
+                "Azure Storage account permits nested public blob access": 2,
+                "Azure Storage account allows TLS below 1.2": 2,
+                "Azure Storage account allows unrestricted public network access": 2,
+                "Azure Storage container is publicly accessible": 3,
+                "Internet-exposed Azure virtual machine permits broad ingress": 2,
             },
             "azure-storage": {
                 "Azure Storage account permits Shared Key authorization": 1,

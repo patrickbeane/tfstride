@@ -29,6 +29,7 @@ GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
+AZURE_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nightmare_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
 
@@ -107,6 +108,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Safe Azure Storage", response.text)
         self.assertIn("Azure Storage Exposure", response.text)
         self.assertIn("Mixed Azure Inventory", response.text)
+        self.assertIn("Azure Nightmare Plan", response.text)
         self.assertNotIn("Mixed AWS Plan", response.text)
         self.assertNotIn("GCP Serverless", response.text)
 
@@ -319,6 +321,17 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Azure Inventory Demo", response.text)
         self.assertIn(AZURE_FIXTURE_PATH.name, response.text)
         self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", response.text)
+        self.assertIn("Azure Storage container is publicly accessible", response.text)
+        self.assertIn("azurerm_key_vault", response.text)
+        self.assertIn("azurerm_kubernetes_cluster", response.text)
+
+    def test_demo_route_renders_azure_nightmare_fixture(self) -> None:
+        response = self.client.get("/demo/azure-nightmare")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Azure Nightmare Plan Demo", response.text)
+        self.assertIn(AZURE_NIGHTMARE_FIXTURE_PATH.name, response.text)
+        self.assertIn("azurerm_windows_virtual_machine.admin", response.text)
         self.assertIn("Azure Storage container is publicly accessible", response.text)
         self.assertIn("azurerm_key_vault", response.text)
         self.assertIn("azurerm_kubernetes_cluster", response.text)
