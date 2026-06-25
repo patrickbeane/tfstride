@@ -71,12 +71,21 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_cloudfunctions_function",
                     "google_cloudfunctions2_function",
                     "google_compute_instance",
+                    "azurerm_linux_virtual_machine",
+                    "azurerm_windows_virtual_machine",
                 }
             ),
         )
         self.assertEqual(
             SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
-            frozenset({"aws_instance", "aws_ecs_service"}),
+            frozenset(
+                {
+                    "aws_instance",
+                    "aws_ecs_service",
+                    "azurerm_linux_virtual_machine",
+                    "azurerm_windows_virtual_machine",
+                }
+            ),
         )
         self.assertEqual(
             PUBLIC_COMPUTE_RESOURCE_TYPES,
@@ -88,6 +97,8 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_cloudfunctions_function",
                     "google_cloudfunctions2_function",
                     "google_compute_instance",
+                    "azurerm_linux_virtual_machine",
+                    "azurerm_windows_virtual_machine",
                 }
             ),
         )
@@ -128,6 +139,8 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_sql_database_instance",
                     "google_storage_bucket",
                     "azurerm_storage_account",
+                    "azurerm_linux_virtual_machine",
+                    "azurerm_windows_virtual_machine",
                 }
             ),
         )
@@ -199,10 +212,14 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_compute_firewall",
                     "google_compute_firewall_policy",
                     "google_compute_firewall_policy_rule",
+                    "azurerm_network_security_group",
                 }
             ),
         )
-        self.assertEqual(SUBNET_RESOURCE_TYPES, frozenset({"aws_subnet", "google_compute_subnetwork"}))
+        self.assertEqual(
+            SUBNET_RESOURCE_TYPES,
+            frozenset({"aws_subnet", "google_compute_subnetwork", "azurerm_subnet"}),
+        )
         self.assertEqual(DATABASE_RESOURCE_TYPES, frozenset({"aws_db_instance", "google_sql_database_instance"}))
         self.assertEqual(
             CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
@@ -254,12 +271,17 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_workload_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
         self.assertTrue(is_workload_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_workload_resource(_resource("google_compute_instance", provider="gcp")))
+        self.assertTrue(is_workload_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_ecs_service")))
+        self.assertTrue(
+            is_security_group_backed_workload_resource(_resource("azurerm_linux_virtual_machine", provider="azure"))
+        )
         self.assertTrue(is_public_compute_resource(_resource("aws_instance")))
         self.assertTrue(is_public_compute_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
         self.assertTrue(is_public_compute_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_public_compute_resource(_resource("google_compute_instance", provider="gcp")))
+        self.assertTrue(is_public_compute_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
         self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
         self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
@@ -280,6 +302,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("google_container_cluster", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("azurerm_storage_account", provider="azure")))
+        self.assertTrue(is_public_edge_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
@@ -308,8 +331,12 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(
             is_network_security_group_resource(_resource("google_compute_firewall_policy_rule", provider="gcp"))
         )
+        self.assertTrue(
+            is_network_security_group_resource(_resource("azurerm_network_security_group", provider="azure"))
+        )
         self.assertTrue(is_subnet_resource(_resource("aws_subnet")))
         self.assertTrue(is_subnet_resource(_resource("google_compute_subnetwork", provider="gcp")))
+        self.assertTrue(is_subnet_resource(_resource("azurerm_subnet", provider="azure")))
         self.assertTrue(is_database_resource(_resource("aws_db_instance")))
         self.assertTrue(is_database_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_object_storage_resource(_resource("aws_s3_bucket")))

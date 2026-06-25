@@ -262,7 +262,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(report["inventory"]["resources"]), 3)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 0)
-        self.assertIn("covers AzureRM storage accounts", report["limitations"][0])
+        self.assertIn("covers AzureRM storage posture", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:
         payload = {

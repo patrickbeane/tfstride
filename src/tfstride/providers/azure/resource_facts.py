@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
-from tfstride.models import NormalizedResource
+from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts, ProviderResourceFactDomains
@@ -19,7 +19,7 @@ _AZURE_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 
 @dataclass(frozen=True, slots=True)
 class AzureResourceFacts(NeutralProviderResourceFacts):
-    """Azure-owned view over storage metadata and normalized posture."""
+    """Azure-owned view over normalized metadata and relationship posture."""
 
     def get(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return self.resource.get_metadata_field(field)
@@ -37,9 +37,17 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         _AZURE_METADATA_WRITE_VALIDATOR.validate(field)
         self.resource.append_metadata_field(field, value)
 
+    def extend(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
+        _AZURE_METADATA_WRITE_VALIDATOR.validate(field)
+        self.resource.extend_metadata_field(field, values)
+
+    @property
+    def name(self) -> str | None:
+        return self.get(AzureResourceMetadata.NAME)
+
     @property
     def bucket_name(self) -> str | None:
-        return self.get(AzureResourceMetadata.NAME)
+        return self.name
 
     @property
     def storage_account_id(self) -> str | None:
@@ -85,6 +93,66 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     def public_container_addresses(self) -> list[str]:
         return self.get(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES)
 
+    @property
+    def virtual_network_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.VIRTUAL_NETWORK_REFERENCE)
+
+    @property
+    def network_security_group_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_SECURITY_GROUP_REFERENCE)
+
+    @property
+    def subnet_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.SUBNET_REFERENCE)
+
+    @property
+    def network_interface_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_INTERFACE_REFERENCE)
+
+    @property
+    def network_interface_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.NETWORK_INTERFACE_REFERENCES)
+
+    @property
+    def public_ip_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.PUBLIC_IP_REFERENCES)
+
+    @property
+    def ip_configurations(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.IP_CONFIGURATIONS)
+
+    @property
+    def network_security_rules(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.NETWORK_SECURITY_RULES)
+
+    @property
+    def resolved_subnet_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.RESOLVED_SUBNET_ADDRESSES)
+
+    @property
+    def resolved_network_security_group_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.RESOLVED_NETWORK_SECURITY_GROUP_ADDRESSES)
+
+    @property
+    def resolved_network_interface_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.RESOLVED_NETWORK_INTERFACE_ADDRESSES)
+
+    @property
+    def resolved_public_ip_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.RESOLVED_PUBLIC_IP_ADDRESSES)
+
+    @property
+    def public_ip_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.PUBLIC_IP_ADDRESS)
+
+    @property
+    def vm_size(self) -> str | None:
+        return self.get(AzureResourceMetadata.VM_SIZE)
+
+    @property
+    def os_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.OS_TYPE)
+
     def set_resolved_storage_account_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_STORAGE_ACCOUNT_ADDRESS, address)
 
@@ -92,18 +160,75 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         self.set(AzureResourceMetadata.NETWORK_DEFAULT_ACTION, default_action)
         self.set(AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS, source_address)
 
+    def set_resolved_virtual_network_address(self, address: str) -> None:
+        self.set(AzureResourceMetadata.RESOLVED_VIRTUAL_NETWORK_ADDRESS, address)
+        self.resource.vpc_id = address
+
+    def add_resolved_subnet_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.RESOLVED_SUBNET_ADDRESSES, address)
+
+    def add_resolved_network_security_group_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.RESOLVED_NETWORK_SECURITY_GROUP_ADDRESSES, address)
+
+    def add_resolved_network_interface_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.RESOLVED_NETWORK_INTERFACE_ADDRESSES, address)
+
+    def add_resolved_public_ip_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.RESOLVED_PUBLIC_IP_ADDRESSES, address)
+
+    def add_associated_resource_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.ASSOCIATED_RESOURCE_ADDRESSES, address)
+
+    def add_standalone_rule_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.STANDALONE_RULE_ADDRESSES, address)
+
+    def add_unresolved_resource_reference(self, kind: str, reference: str | None) -> None:
+        self.append(
+            AzureResourceMetadata.UNRESOLVED_RESOURCE_REFERENCES,
+            f"{kind}:{reference}" if reference else kind,
+        )
+
+    def merge_network_security_rules(
+        self,
+        rules: Sequence[SecurityGroupRule],
+        records: Sequence[dict],
+    ) -> None:
+        self.resource.extend_network_rules(rules)
+        self.set(
+            AzureResourceMetadata.NETWORK_SECURITY_RULES,
+            [*self.network_security_rules, *records],
+        )
+
+    def add_security_group_reference(self, reference: str) -> None:
+        if reference not in self.resource.security_group_ids:
+            self.resource.security_group_ids = (*self.resource.security_group_ids, reference)
+
+    def add_subnet_reference(self, reference: str) -> None:
+        if reference not in self.resource.subnet_ids:
+            self.resource.subnet_ids = (*self.resource.subnet_ids, reference)
+
+    def set_subnet_references(self, references: Sequence[str]) -> None:
+        self.resource.subnet_ids = tuple(dict.fromkeys(reference for reference in references if reference))
+
+    def inherit_network_relationships(self, resource: NormalizedResource) -> None:
+        for subnet_id in resource.subnet_ids:
+            self.add_subnet_reference(subnet_id)
+        for security_group_id in resource.security_group_ids:
+            self.add_security_group_reference(security_group_id)
+        if not self.resource.vpc_id and resource.vpc_id:
+            self.resource.vpc_id = resource.vpc_id
+
+    def set_public_ip_attachment(self, *, configured: bool, reasons: Sequence[str]) -> None:
+        self.resource.public_access_configured = configured
+        self.resource.public_access_reasons = list(reasons)
+
     def add_public_container_address(self, address: str) -> None:
         self.append(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES, address)
 
     def add_unresolved_storage_account_reference(self, reference: str | None) -> None:
         self.append(AzureResourceMetadata.UNRESOLVED_STORAGE_ACCOUNT_REFERENCES, reference)
 
-    def set_public_endpoint_posture(
-        self,
-        *,
-        reachable: bool,
-        reasons: Sequence[str],
-    ) -> None:
+    def set_public_endpoint_posture(self, *, reachable: bool, reasons: Sequence[str]) -> None:
         self.resource.public_access_configured = reachable
         self.resource.direct_internet_reachable = reachable
         self.resource.internet_ingress_capable = reachable
@@ -136,10 +261,4 @@ def azure_facts(resource: NormalizedResource) -> AzureResourceFacts:
 
 def azure_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
     facts = azure_facts(resource)
-    return ProviderResourceFactDomains(
-        storage=facts,
-        iam=facts,
-        sql=facts,
-        compute=facts,
-        workload=facts,
-    )
+    return ProviderResourceFactDomains(storage=facts, iam=facts, sql=facts, compute=facts, workload=facts)

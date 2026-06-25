@@ -262,6 +262,20 @@ class ProviderCatalogTests(unittest.TestCase):
             name="logs",
             category=ResourceCategory.DATA,
         )
+        azure_virtual_machine = NormalizedResource(
+            address="azurerm_linux_virtual_machine.web",
+            provider="azure",
+            resource_type="azurerm_linux_virtual_machine",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+        )
+        azure_network_security_group = NormalizedResource(
+            address="azurerm_network_security_group.web",
+            provider="azure",
+            resource_type="azurerm_network_security_group",
+            name="web",
+            category=ResourceCategory.NETWORK,
+        )
 
         self.assertEqual(registry.providers(), ("aws", "gcp", "azure"))
         self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
@@ -277,6 +291,21 @@ class ProviderCatalogTests(unittest.TestCase):
                     ResourceCapability.OBJECT_STORAGE,
                 }
             ),
+        )
+        self.assertEqual(
+            registry.capabilities_for(azure_virtual_machine),
+            frozenset(
+                {
+                    ResourceCapability.WORKLOAD,
+                    ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD,
+                    ResourceCapability.PUBLIC_COMPUTE,
+                    ResourceCapability.PUBLIC_EDGE,
+                }
+            ),
+        )
+        self.assertEqual(
+            registry.capabilities_for(azure_network_security_group),
+            frozenset({ResourceCapability.NETWORK_SECURITY_GROUP}),
         )
 
     def test_app_uses_catalog_default_provider(self) -> None:

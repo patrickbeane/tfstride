@@ -4,10 +4,24 @@ from collections import Counter
 from typing import Any
 
 from tfstride.models import ResourceInventory, TerraformResource
+from tfstride.providers.azure.compute_normalizers import (
+    normalize_linux_virtual_machine,
+    normalize_windows_virtual_machine,
+)
 from tfstride.providers.azure.data_normalizers import (
     normalize_storage_account,
     normalize_storage_account_network_rules,
     normalize_storage_container,
+)
+from tfstride.providers.azure.network_normalizers import (
+    normalize_network_interface,
+    normalize_network_interface_security_group_association,
+    normalize_network_security_group,
+    normalize_network_security_rule,
+    normalize_public_ip,
+    normalize_subnet,
+    normalize_subnet_network_security_group_association,
+    normalize_virtual_network,
 )
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_types import AzureResourceType
@@ -18,12 +32,24 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.STORAGE_ACCOUNT: normalize_storage_account,
     AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES: normalize_storage_account_network_rules,
     AzureResourceType.STORAGE_CONTAINER: normalize_storage_container,
+    AzureResourceType.VIRTUAL_NETWORK: normalize_virtual_network,
+    AzureResourceType.SUBNET: normalize_subnet,
+    AzureResourceType.NETWORK_SECURITY_GROUP: normalize_network_security_group,
+    AzureResourceType.NETWORK_SECURITY_RULE: normalize_network_security_rule,
+    AzureResourceType.SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION: normalize_subnet_network_security_group_association,
+    AzureResourceType.NETWORK_INTERFACE: normalize_network_interface,
+    AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION: (
+        normalize_network_interface_security_group_association
+    ),
+    AzureResourceType.PUBLIC_IP: normalize_public_ip,
+    AzureResourceType.LINUX_VIRTUAL_MACHINE: normalize_linux_virtual_machine,
+    AzureResourceType.WINDOWS_VIRTUAL_MACHINE: normalize_windows_virtual_machine,
 }
 SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 
 
 class AzureNormalizer(ProviderNormalizer):
-    """Normalize the initial AzureRM storage resource set."""
+    """Normalize the supported AzureRM storage, network, and compute resource set."""
 
     provider = "azure"
 

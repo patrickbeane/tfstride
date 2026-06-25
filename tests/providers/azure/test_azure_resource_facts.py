@@ -71,6 +71,31 @@ class AzureResourceFactsTests(unittest.TestCase):
         self.assertTrue(resource.direct_internet_reachable)
         self.assertEqual(resource.public_access_reasons, ["public network"])
 
+    def test_network_relationship_mutations_use_provider_facade(self) -> None:
+        resource = _resource()
+        related = NormalizedResource(
+            address="azurerm_network_interface.web",
+            provider="azure",
+            resource_type=AzureResourceType.NETWORK_INTERFACE,
+            name="web",
+            category=ResourceCategory.NETWORK,
+            vpc_id="azurerm_virtual_network.main",
+            subnet_ids=("azurerm_subnet.app",),
+            security_group_ids=("azurerm_network_security_group.web",),
+        )
+        facts = azure_facts(resource)
+
+        facts.inherit_network_relationships(related)
+        facts.add_resolved_network_interface_address(related.address)
+        facts.set_public_ip_attachment(configured=True, reasons=["attached public IP"])
+
+        self.assertEqual(resource.vpc_id, "azurerm_virtual_network.main")
+        self.assertEqual(resource.subnet_ids, ("azurerm_subnet.app",))
+        self.assertEqual(resource.security_group_ids, ("azurerm_network_security_group.web",))
+        self.assertEqual(facts.resolved_network_interface_addresses, [related.address])
+        self.assertTrue(resource.public_access_configured)
+        self.assertFalse(resource.public_exposure)
+
     def test_rejects_foreign_provider_metadata_writes(self) -> None:
         facts = azure_facts(_resource())
 

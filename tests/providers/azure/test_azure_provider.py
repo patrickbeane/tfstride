@@ -12,7 +12,7 @@ from tfstride.providers.azure.plugin import azure_provider_plugin
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_facts import AzureResourceFacts
-from tfstride.providers.azure.resource_types import AZURE_STORAGE_RESOURCE_TYPES, AzureResourceType
+from tfstride.providers.azure.resource_types import AZURE_SUPPORTED_RESOURCE_TYPES, AzureResourceType
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.resource_metadata import InventoryMetadata
 
@@ -35,14 +35,14 @@ def _terraform_resource(
 
 
 class AzureProviderTests(unittest.TestCase):
-    def test_plugin_describes_azure_storage_contract(self) -> None:
+    def test_plugin_describes_azure_storage_network_and_compute_contract(self) -> None:
         plugin = azure_provider_plugin()
         registry = default_rule_registry()
         contribution = plugin.create_rule_contribution(FindingFactory(registry))
 
         self.assertEqual(plugin.provider, "azure")
         self.assertIs(plugin.metadata_namespace, AzureResourceMetadata)
-        self.assertEqual(plugin.supported_resource_types, AZURE_STORAGE_RESOURCE_TYPES)
+        self.assertEqual(plugin.supported_resource_types, AZURE_SUPPORTED_RESOURCE_TYPES)
         self.assertEqual(plugin.supported_resource_types, SUPPORTED_AZURE_TYPES)
         self.assertEqual(dict(plugin.resource_capabilities), dict(AZURE_RESOURCE_CAPABILITIES))
         self.assertEqual(plugin.limitations, AZURE_LIMITATIONS)
@@ -58,6 +58,19 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
+        )
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),
+            frozenset(
+                {
+                    AzureResourceType.LINUX_VIRTUAL_MACHINE,
+                    AzureResourceType.WINDOWS_VIRTUAL_MACHINE,
+                }
+            ),
+        )
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.NETWORK_SECURITY_GROUP),
+            frozenset({AzureResourceType.NETWORK_SECURITY_GROUP}),
         )
 
     def test_plugin_uses_azure_resource_facts(self) -> None:
@@ -127,7 +140,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(inventory.unsupported_resources, ["azurerm_key_vault.example"])
         self.assertEqual(
             InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
-            sorted(AZURE_STORAGE_RESOURCE_TYPES),
+            sorted(AZURE_SUPPORTED_RESOURCE_TYPES),
         )
         self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 3)
         self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 2)

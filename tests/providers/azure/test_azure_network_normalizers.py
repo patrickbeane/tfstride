@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+import unittest
+
+from tfstride.models import ResourceCategory, TerraformResource
+from tfstride.providers.azure.network_normalizers import (
+    normalize_network_interface,
+    normalize_network_interface_security_group_association,
+    normalize_network_security_group,
+    normalize_network_security_rule,
+    normalize_public_ip,
+    normalize_subnet,
+    normalize_subnet_network_security_group_association,
+    normalize_virtual_network,
+)
+from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_types import AzureResourceType
+
+
+def _resource(resource_type: str, values: dict[str, object], *, name: str = "example") -> TerraformResource:
+    return TerraformResource(
+        address=f"{resource_type}.{name}",
+        mode="managed",
+        resource_type=resource_type,
+        name=name,
+        provider_name="registry.terraform.io/hashicorp/azurerm",
+        values=values,
+    )
+
+
+class AzureNetworkNormalizerTests(unittest.TestCase):
+    def test_virtual_network_and_subnet_normalize_graph_references(self) -> None:
+        virtual_network = normalize_virtual_network(
+            _resource(
+                AzureResourceType.VIRTUAL_NETWORK,
+                {"id": "/subscriptions/example/virtualNetworks/main", "name": "main", "address_space": ["10.0.0.0/16"]},
+                name="main",
+            )
+        )
+        subnet = normalize_subnet(
+            _resource(
+                AzureResourceType.SUBNET,
+                {
+                    "id": "/subscriptions/example/subnets/app",
+                    "name": "app",
+                    "virtual_network_name": "azurerm_virtual_network.main.name",
+                    "address_prefixes": ["10.0.1.0/24"],
+                },
+                name="app",
+            )
+        )
+
+        self.assertEqual(virtual_network.category, ResourceCategory.NETWORK)
+        self.assertEqual(azure_facts(virtual_network).name, "main")
+        self.assertEqual(azure_facts(subnet).virtual_network_reference, "azurerm_virtual_network.main.name")
+        self.assertEqual(subnet.vpc_id, "azurerm_virtual_network.main.name")
+
+    def test_network_security_group_preserves_allow_and_deny_records(self) -> None:
+        network_security_group = normalize_network_security_group(
+            _resource(
+                AzureResourceType.NETWORK_SECURITY_GROUP,
+                {
+                    "name": "web",
+                    "security_rule": [
+                        {
+                            "name": "allow-web",
+                            "priority": 200,
+                            "direction": "Inbound",
+                            "access": "Allow",
+                            "protocol": "Tcp",
+                            "source_address_prefix": "*",
+                            "destination_port_range": "443",
+                        },
+                        {
+                            "name": "deny-ssh",
+                            "priority": 100,
+                            "direction": "Inbound",
+                            "access": "Deny",
+                            "protocol": "Tcp",
+                            "source_address_prefix": "*",
+                            "destination_port_range": "22",
+                        },
+                    ],
+                },
+                name="web",
+            )
+        )
+
+        self.assertEqual(len(network_security_group.network_rules), 1)
+        self.assertTrue(network_security_group.network_rules[0].allows_internet())
+        self.assertEqual(
+            [record["access"] for record in azure_facts(network_security_group).network_security_rules],
+            ["allow", "deny"],
+        )
+
+    def test_standalone_rule_and_associations_normalize_references(self) -> None:
+        rule = normalize_network_security_rule(
+            _resource(
+                AzureResourceType.NETWORK_SECURITY_RULE,
+                {
+                    "name": "allow-web",
+                    "network_security_group_name": "azurerm_network_security_group.web.name",
+                    "priority": 200,
+                    "direction": "Inbound",
+                    "access": "Allow",
+                    "protocol": "Tcp",
+                    "source_address_prefix": "Internet",
+                    "destination_port_range": "80",
+                },
+                name="allow_web",
+            )
+        )
+        subnet_association = normalize_subnet_network_security_group_association(
+            _resource(
+                AzureResourceType.SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION,
+                {
+                    "subnet_id": "azurerm_subnet.app.id",
+                    "network_security_group_id": "azurerm_network_security_group.web.id",
+                },
+            )
+        )
+        nic_association = normalize_network_interface_security_group_association(
+            _resource(
+                AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION,
+                {
+                    "network_interface_id": "azurerm_network_interface.web.id",
+                    "network_security_group_id": "azurerm_network_security_group.web.id",
+                },
+            )
+        )
+
+        self.assertEqual(azure_facts(rule).network_security_group_reference, "azurerm_network_security_group.web.name")
+        self.assertEqual(azure_facts(subnet_association).subnet_reference, "azurerm_subnet.app.id")
+        self.assertEqual(azure_facts(nic_association).network_interface_reference, "azurerm_network_interface.web.id")
+
+    def test_network_interface_and_public_ip_normalize_public_ip_relationship(self) -> None:
+        network_interface = normalize_network_interface(
+            _resource(
+                AzureResourceType.NETWORK_INTERFACE,
+                {
+                    "name": "web",
+                    "ip_configuration": [
+                        {
+                            "name": "primary",
+                            "subnet_id": "azurerm_subnet.app.id",
+                            "public_ip_address_id": "azurerm_public_ip.web.id",
+                        }
+                    ],
+                },
+                name="web",
+            )
+        )
+        public_ip = normalize_public_ip(
+            _resource(AzureResourceType.PUBLIC_IP, {"name": "web", "ip_address": "203.0.113.10"}, name="web")
+        )
+
+        self.assertEqual(network_interface.subnet_ids, ("azurerm_subnet.app.id",))
+        self.assertEqual(azure_facts(network_interface).public_ip_references, ["azurerm_public_ip.web.id"])
+        self.assertTrue(network_interface.public_access_configured)
+        self.assertEqual(public_ip.category, ResourceCategory.EDGE)
+        self.assertEqual(azure_facts(public_ip).public_ip_address, "203.0.113.10")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -45,5 +45,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage accounts, storage containers, and storage account network rules; broader Azure compute, network, identity, database, and platform-service modeling is not implemented yet.
+- Azure support currently covers AzureRM storage posture and normalizes the initial VNet, subnet, NSG, NIC, public-IP, and virtual-machine relationship graph; Azure compute exposure findings, identity, database, and broader platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

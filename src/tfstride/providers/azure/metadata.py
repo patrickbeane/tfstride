@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tfstride.resource_metadata import (
     BoolMetadataField,
+    DictListMetadataField,
     OptionalStringMetadataField,
     StringListMetadataField,
 )
@@ -18,10 +19,35 @@ class AzureResourceMetadata:
     MIN_TLS_VERSION = OptionalStringMetadataField("min_tls_version")
     NETWORK_DEFAULT_ACTION = OptionalStringMetadataField("network_default_action")
     NETWORK_RULE_SOURCE_ADDRESS = OptionalStringMetadataField("network_rule_source_address")
+    LOCATION = OptionalStringMetadataField("location")
+    VIRTUAL_NETWORK_REFERENCE = OptionalStringMetadataField("virtual_network_reference")
+    RESOLVED_VIRTUAL_NETWORK_ADDRESS = OptionalStringMetadataField("resolved_virtual_network_address")
+    NETWORK_SECURITY_GROUP_REFERENCE = OptionalStringMetadataField("network_security_group_reference")
+    SUBNET_REFERENCE = OptionalStringMetadataField("subnet_reference")
+    NETWORK_INTERFACE_REFERENCE = OptionalStringMetadataField("network_interface_reference")
+    PUBLIC_IP_ADDRESS = OptionalStringMetadataField("public_ip_address")
+    VM_SIZE = OptionalStringMetadataField("vm_size")
+    OS_TYPE = OptionalStringMetadataField("os_type")
 
     ALLOW_NESTED_ITEMS_TO_BE_PUBLIC = BoolMetadataField("allow_nested_items_to_be_public")
     SHARED_ACCESS_KEY_ENABLED = BoolMetadataField("shared_access_key_enabled")
     PUBLIC_NETWORK_ACCESS_ENABLED = BoolMetadataField("public_network_access_enabled")
+    DEFAULT_OUTBOUND_ACCESS_ENABLED = BoolMetadataField("default_outbound_access_enabled", default=True)
+    IP_FORWARDING_ENABLED = BoolMetadataField("ip_forwarding_enabled")
 
     PUBLIC_CONTAINER_ADDRESSES = StringListMetadataField("public_container_addresses")
     UNRESOLVED_STORAGE_ACCOUNT_REFERENCES = StringListMetadataField("unresolved_storage_account_references")
+    ADDRESS_SPACE = StringListMetadataField("address_space")
+    ADDRESS_PREFIXES = StringListMetadataField("address_prefixes")
+    NETWORK_INTERFACE_REFERENCES = StringListMetadataField("network_interface_references")
+    PUBLIC_IP_REFERENCES = StringListMetadataField("public_ip_references")
+    RESOLVED_SUBNET_ADDRESSES = StringListMetadataField("resolved_subnet_addresses")
+    RESOLVED_NETWORK_SECURITY_GROUP_ADDRESSES = StringListMetadataField("resolved_network_security_group_addresses")
+    RESOLVED_NETWORK_INTERFACE_ADDRESSES = StringListMetadataField("resolved_network_interface_addresses")
+    RESOLVED_PUBLIC_IP_ADDRESSES = StringListMetadataField("resolved_public_ip_addresses")
+    ASSOCIATED_RESOURCE_ADDRESSES = StringListMetadataField("associated_resource_addresses")
+    STANDALONE_RULE_ADDRESSES = StringListMetadataField("standalone_rule_addresses")
+    UNRESOLVED_RESOURCE_REFERENCES = StringListMetadataField("unresolved_resource_references")
+
+    IP_CONFIGURATIONS = DictListMetadataField("ip_configurations")
+    NETWORK_SECURITY_RULES = DictListMetadataField("network_security_rules")
