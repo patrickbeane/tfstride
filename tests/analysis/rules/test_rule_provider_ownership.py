@@ -10,6 +10,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
+from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 from tfstride.providers.catalog import default_provider_plugins, default_provider_rule_metadata
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
@@ -93,6 +94,17 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
             (str(path.relative_to(REPO_ROOT)), rule_id)
             for path, rule_id in _rule_id_occurrences(gcp_rule_ids)
             if not _is_allowed_rule_id_location(path, "gcp")
+        ]
+
+        self.assertEqual(violations, [])
+
+    def test_azure_rule_ids_only_appear_in_azure_provider_or_tests(self) -> None:
+        azure_rule_ids = set(_flatten(AZURE_RULE_GROUP_IDS))
+
+        violations = [
+            (str(path.relative_to(REPO_ROOT)), rule_id)
+            for path, rule_id in _rule_id_occurrences(azure_rule_ids)
+            if not _is_allowed_rule_id_location(path, "azure")
         ]
 
         self.assertEqual(violations, [])

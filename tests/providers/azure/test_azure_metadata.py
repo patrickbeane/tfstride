@@ -17,18 +17,34 @@ def _metadata_fields_by_name(namespace: type) -> dict[str, MetadataField[Any]]:
 
 
 class AzureResourceMetadataTests(unittest.TestCase):
-    def test_azure_metadata_namespace_matches_empty_ownership_contract(self) -> None:
+    def test_azure_metadata_namespace_matches_ownership_contract(self) -> None:
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        expected_fields = {
+            "NAME",
+            "STORAGE_ACCOUNT_ID",
+            "STORAGE_ACCOUNT_REFERENCE",
+            "RESOLVED_STORAGE_ACCOUNT_ADDRESS",
+            "CONTAINER_ACCESS_TYPE",
+            "MIN_TLS_VERSION",
+            "NETWORK_DEFAULT_ACTION",
+            "NETWORK_RULE_SOURCE_ADDRESS",
+            "ALLOW_NESTED_ITEMS_TO_BE_PUBLIC",
+            "SHARED_ACCESS_KEY_ENABLED",
+            "PUBLIC_NETWORK_ACCESS_ENABLED",
+            "PUBLIC_CONTAINER_ADDRESSES",
+            "UNRESOLVED_STORAGE_ACCOUNT_REFERENCES",
+        }
 
-        self.assertEqual(contract.provider_owned_fields["azure"], frozenset())
-        self.assertEqual(_metadata_fields_by_name(AzureResourceMetadata), {})
+        self.assertEqual(contract.provider_owned_fields["azure"], frozenset(expected_fields))
+        self.assertEqual(set(_metadata_fields_by_name(AzureResourceMetadata)), expected_fields)
 
-    def test_azure_metadata_namespace_builds_an_empty_write_validator(self) -> None:
+    def test_azure_metadata_namespace_builds_write_validator(self) -> None:
         validator = ProviderMetadataWriteValidator.build(
             provider="azure",
             namespace=AzureResourceMetadata,
         )
 
+        validator.validate(AzureResourceMetadata.STORAGE_ACCOUNT_ID)
         with self.assertRaisesRegex(
             ProviderMetadataOwnershipError,
             "use a field from AzureResourceMetadata",

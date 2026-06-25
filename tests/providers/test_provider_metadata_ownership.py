@@ -6,6 +6,8 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.contracts import DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_facts import gcp_facts
@@ -86,6 +88,19 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
             ["google_secret_manager_secret_iam_member.public"],
         )
 
+    def test_azure_facts_accept_azure_owned_metadata_writes(self) -> None:
+        resource = _resource("azure")
+        facts = azure_facts(resource)
+
+        facts.set(AzureResourceMetadata.STORAGE_ACCOUNT_ID, "/subscriptions/example/storageAccounts/app")
+        facts.set(AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED, False)
+
+        self.assertEqual(
+            facts.storage_account_id,
+            "/subscriptions/example/storageAccounts/app",
+        )
+        self.assertFalse(facts.public_network_access_enabled)
+
     def test_aws_facts_reject_gcp_owned_metadata_writes(self) -> None:
         resource = _resource("aws")
 
@@ -114,6 +129,7 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
         provider_cases = (
             ("aws", AwsResourceMetadata, aws_facts),
             ("gcp", GcpResourceMetadata, gcp_facts),
+            ("azure", AzureResourceMetadata, azure_facts),
         )
 
         for provider, namespace, facts_factory in provider_cases:
@@ -129,7 +145,11 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
         provider_cases = (
             ("aws", aws_facts, AwsResourceMetadata, "gcp", GcpResourceMetadata),
+            ("aws", aws_facts, AwsResourceMetadata, "azure", AzureResourceMetadata),
             ("gcp", gcp_facts, GcpResourceMetadata, "aws", AwsResourceMetadata),
+            ("gcp", gcp_facts, GcpResourceMetadata, "azure", AzureResourceMetadata),
+            ("azure", azure_facts, AzureResourceMetadata, "aws", AwsResourceMetadata),
+            ("azure", azure_facts, AzureResourceMetadata, "gcp", GcpResourceMetadata),
         )
 
         for provider, facts_factory, own_namespace, foreign_provider, foreign_namespace in provider_cases:

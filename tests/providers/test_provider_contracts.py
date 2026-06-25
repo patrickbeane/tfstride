@@ -42,6 +42,7 @@ _NORMALIZED_RESOURCE_WRITE_FACADES = frozenset(
         "providers/aws/resource_mutations.py",
         "providers/gcp/resource_facts.py",
         "providers/gcp/resource_mutations.py",
+        "providers/azure/resource_facts.py",
     }
 )
 _NORMALIZED_RESOURCE_DIRECT_WRITE_EXCEPTIONS = frozenset()
@@ -65,6 +66,14 @@ _GCP_NETWORK_NORMALIZER_RAW_POSTURE_KEYS = frozenset(
     }
 )
 _GCP_DATA_NORMALIZER_RAW_POSTURE_KEYS = frozenset({"customer_managed_encryption"})
+_AZURE_STORAGE_RULE_FACING_METADATA_FIELDS = (
+    AzureResourceMetadata.ALLOW_NESTED_ITEMS_TO_BE_PUBLIC,
+    AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED,
+    AzureResourceMetadata.MIN_TLS_VERSION,
+    AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED,
+    AzureResourceMetadata.NETWORK_DEFAULT_ACTION,
+    AzureResourceMetadata.CONTAINER_ACCESS_TYPE,
+)
 _PROVIDER_STORAGE_SQL_METADATA_FIELDS = (
     AwsResourceMetadata.BUCKET_NAME,
     AwsResourceMetadata.BUCKET_ACL,
@@ -124,12 +133,14 @@ _RULE_FACING_METADATA_RAW_KEYS = (
     | frozenset(field.key for field in _PROVIDER_STORAGE_SQL_METADATA_FIELDS)
     | frozenset(field.key for field in _PROVIDER_IAM_POLICY_METADATA_FIELDS)
     | frozenset(field.key for field in _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS)
+    | frozenset(field.key for field in _AZURE_STORAGE_RULE_FACING_METADATA_FIELDS)
 )
 _RULE_FACING_METADATA_RAW_STRING_EXCLUDED_FILES = frozenset(
     {
         "providers/contracts.py",
         "providers/aws/metadata.py",
         "providers/gcp/metadata.py",
+        "providers/azure/metadata.py",
     }
 )
 _RULE_FACING_METADATA_RAW_KEY_PATTERN = "|".join(
@@ -231,7 +242,9 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         gcp_owned = contract.provider_owned_fields["gcp"]
         azure_owned = contract.provider_owned_fields["azure"]
 
-        self.assertEqual(azure_owned, frozenset())
+        self.assertIn("STORAGE_ACCOUNT_ID", azure_owned)
+        self.assertIn("ALLOW_NESTED_ITEMS_TO_BE_PUBLIC", azure_owned)
+        self.assertIn("NETWORK_DEFAULT_ACTION", azure_owned)
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)

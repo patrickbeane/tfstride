@@ -63,7 +63,12 @@
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role",
         "gcp-inherited-iam-sensitive-resource-access",
-        "gcp-inherited-iam-blast-radius"
+        "gcp-inherited-iam-blast-radius",
+        "azure-storage-container-public-access",
+        "azure-storage-account-nested-public-access-enabled",
+        "azure-storage-account-shared-key-enabled",
+        "azure-storage-account-minimum-tls-below-1-2",
+        "azure-storage-account-public-network-unrestricted"
       ],
       "finding_counts_by_rule": {
         "aws-control-plane-sensitive-workload-chain": 0,
@@ -79,6 +84,11 @@
         "aws-sensitive-resource-policy-external-access": 0,
         "aws-service-resource-policy-external-access": 0,
         "aws-workload-role-sensitive-permissions": 1,
+        "azure-storage-account-minimum-tls-below-1-2": 0,
+        "azure-storage-account-nested-public-access-enabled": 0,
+        "azure-storage-account-public-network-unrestricted": 0,
+        "azure-storage-account-shared-key-enabled": 0,
+        "azure-storage-container-public-access": 0,
         "gcp-bigquery-public-access": 0,
         "gcp-cloud-functions-public-invoker": 0,
         "gcp-cloud-run-public-invoker": 0,
@@ -115,7 +125,7 @@
         "gcp-service-account-key-effective-access": 0,
         "gcp-service-account-key-hygiene": 0
       },
-      "registered_rule_count": 48,
+      "registered_rule_count": 53,
       "severity_overrides": {}
     }
   },

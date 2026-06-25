@@ -19,6 +19,10 @@ from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
+from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
+from tfstride.providers.azure.resource_facts import AzureResourceFacts
+from tfstride.providers.azure.rule_catalog import AZURE_RULE_METADATA
+from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_analysis_index_factories_by_provider,
@@ -45,7 +49,6 @@ from tfstride.providers.gcp.resource_facts import GcpResourceFacts
 from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 from tfstride.providers.resource_capabilities import ResourceCapability
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 
 FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 
@@ -135,16 +138,25 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(dict(azure_plugin.resource_capabilities), dict(AZURE_RESOURCE_CAPABILITIES))
         self.assertEqual(azure_plugin.limitations, AZURE_LIMITATIONS)
         self.assertIsInstance(azure_plugin.create_normalizer(), AzureNormalizer)
-        self.assertIsNone(azure_plugin.create_resource_decorator())
-        self.assertEqual(azure_plugin.create_rule_metadata(), ())
-        self.assertIsNone(azure_plugin.create_rule_contribution(FindingFactory(registry)))
+        self.assertIsInstance(azure_plugin.create_resource_decorator(), AzureResourceDecorator)
+        self.assertEqual(azure_plugin.create_rule_metadata(), AZURE_RULE_METADATA)
+        self.assertEqual(
+            tuple(
+                tuple(rule.metadata.rule_id for rule in rule_group)
+                for rule_group in azure_plugin.create_rule_contribution(FindingFactory(registry)).rule_groups
+            ),
+            AZURE_RULE_GROUP_IDS,
+        )
         self.assertIsNone(azure_plugin.create_boundary_contributor())
         self.assertIsNone(
             azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[]))
         )
 
     def test_default_provider_rule_metadata_merges_builtin_provider_catalogs(self) -> None:
-        self.assertEqual(default_provider_rule_metadata(), AWS_RULE_METADATA + GCP_RULE_METADATA)
+        self.assertEqual(
+            default_provider_rule_metadata(),
+            AWS_RULE_METADATA + GCP_RULE_METADATA + AZURE_RULE_METADATA,
+        )
 
     def test_default_analysis_index_factories_register_provider_extensions(self) -> None:
         factories = default_provider_analysis_index_factories_by_provider()
@@ -180,7 +192,7 @@ class ProviderCatalogTests(unittest.TestCase):
         contribution = default_rule_contribution(FindingFactory(registry))
         rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
 
-        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (27, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (32, 2, 2, 12, 3, 2))
         self.assertEqual(
             {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
             registry.known_rule_ids(),
@@ -218,7 +230,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(aws_facts.iam, AwsIamFacts)
         self.assertIsInstance(aws_facts.sql, AwsSqlFacts)
         self.assertIsInstance(registry.facts_for(gcp_resource).storage, GcpResourceFacts)
-        self.assertIsInstance(registry.facts_for(azure_resource).storage, NeutralProviderResourceFacts)
+        self.assertIsInstance(registry.facts_for(azure_resource).storage, AzureResourceFacts)
 
     def test_default_resource_capability_registry_registers_builtin_providers(self) -> None:
         registry = default_resource_capability_registry()
@@ -256,7 +268,16 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.WORKLOAD))
         self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.PUBLIC_COMPUTE))
         self.assertTrue(registry.has_capability(gcp_bucket, ResourceCapability.OBJECT_STORAGE))
-        self.assertEqual(registry.capabilities_for(azure_resource), frozenset())
+        self.assertEqual(
+            registry.capabilities_for(azure_resource),
+            frozenset(
+                {
+                    ResourceCapability.DATA_STORE,
+                    ResourceCapability.PUBLIC_EDGE,
+                    ResourceCapability.OBJECT_STORAGE,
+                }
+            ),
+        )
 
     def test_app_uses_catalog_default_provider(self) -> None:
         result = TfStride().analyze_plan(FIXTURE_PATH)

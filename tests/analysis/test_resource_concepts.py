@@ -105,6 +105,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_secret_manager_secret",
                     "google_sql_database_instance",
                     "google_storage_bucket",
+                    "azurerm_storage_account",
                 }
             ),
         )
@@ -126,6 +127,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_container_cluster",
                     "google_sql_database_instance",
                     "google_storage_bucket",
+                    "azurerm_storage_account",
                 }
             ),
         )
@@ -268,6 +270,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
+        self.assertTrue(is_data_store_resource(_resource("azurerm_storage_account", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloudfunctions_function", provider="gcp")))
@@ -276,6 +279,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_container_cluster", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_sql_database_instance", provider="gcp")))
+        self.assertTrue(is_public_edge_resource(_resource("azurerm_storage_account", provider="azure")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
@@ -310,6 +314,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_database_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_object_storage_resource(_resource("aws_s3_bucket")))
         self.assertTrue(is_object_storage_resource(_resource("google_storage_bucket", provider="gcp")))
+        self.assertTrue(is_object_storage_resource(_resource("azurerm_storage_account", provider="azure")))
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))
         self.assertTrue(is_secret_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_db_instance")))
@@ -379,6 +384,7 @@ class ResourceConceptTests(unittest.TestCase):
 
         self.assertNotIn("aws_", text)
         self.assertNotIn("google_", text)
+        self.assertNotIn("azurerm_", text)
 
 
 if __name__ == "__main__":

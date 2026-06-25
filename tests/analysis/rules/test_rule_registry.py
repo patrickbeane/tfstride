@@ -16,6 +16,7 @@ from tfstride.analysis.rule_registry import (
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import Finding, Severity, SeverityReasoning, StrideCategory
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
+from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
 EXPECTED_DEFAULT_RULE_METADATA_IDS = (
@@ -67,6 +68,11 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "gcp-project-iam-privileged-role",
     "gcp-inherited-iam-sensitive-resource-access",
     "gcp-inherited-iam-blast-radius",
+    "azure-storage-container-public-access",
+    "azure-storage-account-nested-public-access-enabled",
+    "azure-storage-account-shared-key-enabled",
+    "azure-storage-account-minimum-tls-below-1-2",
+    "azure-storage-account-public-network-unrestricted",
 )
 
 
@@ -113,19 +119,25 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 48)
+        self.assertEqual(len(metadata), 53)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
         aws_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("aws-"))
         gcp_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("gcp-"))
+        azure_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("azure-"))
 
-        self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids)
+        self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 13)
         self.assertEqual(len(gcp_metadata_ids), 35)
+        self.assertEqual(len(azure_metadata_ids), 5)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
-        self.assertEqual(set(metadata_ids), set(aws_metadata_ids) | set(gcp_metadata_ids))
+        self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))
+        self.assertEqual(
+            set(metadata_ids),
+            set(aws_metadata_ids) | set(gcp_metadata_ids) | set(azure_metadata_ids),
+        )
 
     def test_default_registry_rule_ids_match_configured_rules(self) -> None:
         self.assertEqual(default_rule_registry().known_rule_ids(), StrideRuleEngine().configured_rule_ids())
@@ -133,7 +145,12 @@ class RuleRegistryTests(unittest.TestCase):
     def test_provider_rule_ids_have_default_metadata(self) -> None:
         registry = default_rule_registry()
 
-        for rule_id in _flatten_rule_groups(AWS_RULE_GROUP_IDS) + _flatten_rule_groups(GCP_RULE_GROUP_IDS):
+        provider_rule_ids = (
+            _flatten_rule_groups(AWS_RULE_GROUP_IDS)
+            + _flatten_rule_groups(GCP_RULE_GROUP_IDS)
+            + _flatten_rule_groups(AZURE_RULE_GROUP_IDS)
+        )
+        for rule_id in provider_rule_ids:
             self.assertIs(registry.get(rule_id), default_rule_metadata(rule_id))
 
     def test_default_registry_factory_returns_distinct_registries_from_cached_metadata(self) -> None:

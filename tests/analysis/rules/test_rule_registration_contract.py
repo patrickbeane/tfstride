@@ -9,6 +9,7 @@ from tfstride.analysis.rule_definitions import RuleContribution
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.aws import rules as aws_rules
+from tfstride.providers.azure import rules as azure_rules
 from tfstride.providers.gcp import rules as gcp_rules
 
 EXPECTED_AWS_RULE_GROUP_IDS = (
@@ -37,6 +38,21 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-role-trust-expansion",
         "aws-role-trust-missing-narrowing",
     ),
+)
+
+EXPECTED_AZURE_RULE_GROUP_IDS = (
+    (
+        "azure-storage-container-public-access",
+        "azure-storage-account-nested-public-access-enabled",
+        "azure-storage-account-shared-key-enabled",
+        "azure-storage-account-minimum-tls-below-1-2",
+        "azure-storage-account-public-network-unrestricted",
+    ),
+    (),
+    (),
+    (),
+    (),
+    (),
 )
 
 EXPECTED_GCP_RULE_GROUP_IDS = (
@@ -103,6 +119,7 @@ def _merge_stage_rule_groups(*rule_group_sets: tuple[tuple[str, ...], ...]) -> t
 EXPECTED_DEFAULT_RULE_GROUP_IDS = _merge_stage_rule_groups(
     EXPECTED_AWS_RULE_GROUP_IDS,
     EXPECTED_GCP_RULE_GROUP_IDS,
+    EXPECTED_AZURE_RULE_GROUP_IDS,
 )
 
 
@@ -114,10 +131,12 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_provider_rule_group_ids_match_locked_stage_order(self) -> None:
         self.assertEqual(aws_rules.AWS_RULE_GROUP_IDS, EXPECTED_AWS_RULE_GROUP_IDS)
         self.assertEqual(gcp_rules.GCP_RULE_GROUP_IDS, EXPECTED_GCP_RULE_GROUP_IDS)
+        self.assertEqual(azure_rules.AZURE_RULE_GROUP_IDS, EXPECTED_AZURE_RULE_GROUP_IDS)
 
     def test_provider_rule_ids_stay_in_provider_domains(self) -> None:
         self.assertTrue(all(rule_id.startswith("aws-") for rule_id in _flatten(aws_rules.AWS_RULE_GROUP_IDS)))
         self.assertTrue(all(rule_id.startswith("gcp-") for rule_id in _flatten(gcp_rules.GCP_RULE_GROUP_IDS)))
+        self.assertTrue(all(rule_id.startswith("azure-") for rule_id in _flatten(azure_rules.AZURE_RULE_GROUP_IDS)))
 
     def test_aws_rule_contribution_matches_provider_rule_groups(self) -> None:
         registry = default_rule_registry()
@@ -143,6 +162,18 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
             EXPECTED_GCP_RULE_GROUP_IDS,
         )
 
+    def test_azure_rule_contribution_matches_provider_rule_groups(self) -> None:
+        registry = default_rule_registry()
+        contribution = azure_rules.build_azure_rule_contribution(
+            FindingFactory(registry),
+            registry,
+        )
+
+        self.assertEqual(
+            tuple(tuple(rule.metadata.rule_id for rule in rule_group) for rule_group in contribution.rule_groups),
+            EXPECTED_AZURE_RULE_GROUP_IDS,
+        )
+
     def test_stride_rule_engine_does_not_own_provider_rule_ids_or_detector_maps(self) -> None:
         source = inspect.getsource(stride_rules)
 
@@ -150,6 +181,7 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
         self.assertNotIn("detectors_by_rule_id", source)
         self.assertNotIn("aws-", source)
         self.assertNotIn("gcp-", source)
+        self.assertNotIn("azure-", source)
 
     def test_default_rule_group_ids_match_locked_stage_order(self) -> None:
         self.assertEqual(
@@ -172,9 +204,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (27, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (32, 2, 2, 12, 3, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (3, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (5, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)
