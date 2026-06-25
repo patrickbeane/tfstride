@@ -8,7 +8,7 @@ It is built for local review and CI gating: no LLMs in the core path, no runtime
 
 `tfstride` analyzes Terraform plan JSON and produces evidence-backed reports for supported cloud providers.
 
-It currently supports AWS and GCP through provider plugins for normalization, decoration, rule contribution, metadata, resource facts, and trust-boundary analysis. Azure support is planned and the provider architecture is prepared for it.
+It currently supports AWS, GCP, and AzureRM through provider plugins for normalization, decoration, rule contribution, metadata, resource facts, and trust-boundary analysis.
 
 Core capabilities:
 
@@ -72,6 +72,7 @@ Provider detection defaults to `auto`. For mixed-provider plans, select a provid
 ```bash
 tfstride tfplan.json --provider aws --quiet
 tfstride tfplan.json --provider gcp --quiet
+tfstride tfplan.json --provider azure --quiet
 ```
 
 List registered rules:
@@ -106,7 +107,7 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations.     |
 | GCP      | Active support  | Compute, GKE, Cloud SQL, GCS, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Planned         | Provider architecture is prepared; Azure support is not registered yet.                                                                              |
+| Azure    | Active support  | Azure Storage posture plus VNet, subnet, NSG, NIC, public-IP, and Linux/Windows VM relationships and public compute exposure.                        |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -194,6 +195,37 @@ GCP trust-boundary coverage includes public compute, GKE control planes, Cloud R
 GCP rule coverage includes public compute ingress, GKE posture, Cloud SQL exposure and recovery posture, GCS public-access posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
 
 GCP control observations are not implemented yet.
+
+</details>
+
+<details>
+<summary>Detailed Azure resource coverage</summary>
+
+Azure support currently includes normalization and analysis for AzureRM resources:
+
+* `azurerm_storage_account`
+* `azurerm_storage_account_network_rules`
+* `azurerm_storage_container`
+* `azurerm_virtual_network`
+* `azurerm_subnet`
+* `azurerm_network_security_group`
+* `azurerm_network_security_rule`
+* `azurerm_subnet_network_security_group_association`
+* `azurerm_network_interface`
+* `azurerm_network_interface_security_group_association`
+* `azurerm_public_ip`
+* `azurerm_linux_virtual_machine`
+* `azurerm_windows_virtual_machine`
+
+AzureRM provider detection uses provider source paths ending in `/azurerm` and Terraform resource types prefixed with `azurerm_`. Adjacent providers such as AzAPI, AzureAD, and Azure DevOps are not claimed as AzureRM support.
+
+Azure trust-boundary coverage includes public storage endpoints and virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
+
+Azure rule coverage includes public container access, account-level nested public blob access, Shared Key authorization, minimum TLS versions below 1.2, unrestricted public storage network access, and public virtual machines with broad administrative or all-port ingress.
+
+Azure support does not currently model identity, databases, load balancers, private endpoints, AKS, Key Vault, or broader platform services. These AzureRM resources are reported as unsupported rather than silently treated as analyzed.
+
+Azure control observations are not implemented yet.
 
 </details>
 
@@ -391,6 +423,7 @@ Provider-specific behavior is exposed through plugin contribution points for:
 * `src/tfstride/analysis/`: shared rule evaluation, trust-boundary detection, indexes, concepts, coverage, and observations
 * `src/tfstride/providers/aws/`: AWS normalization, decoration, rules, facts, metadata, and boundaries
 * `src/tfstride/providers/gcp/`: GCP normalization, decoration, rules, facts, metadata, and boundaries
+* `src/tfstride/providers/azure/`: AzureRM normalization, decoration, rules, facts, metadata, and boundaries
 * `src/tfstride/reporting/`: Markdown, JSON, and SARIF rendering
 * `fixtures/`: Terraform plan JSON samples
 * `examples/`: generated example reports
@@ -433,6 +466,19 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 
 </details>
 
+<details>
+<summary>Azure demo assets</summary>
+
+| Scenario        | Plan                                              | Report                                     |
+| --------------- | ------------------------------------------------- | ------------------------------------------ |
+| Safe storage    | `fixtures/azure/sample_azure_safe_plan.json`      | `examples/azure/azure_safe_report.md`      |
+| Storage posture | `fixtures/azure/sample_azure_storage_plan.json`   | `examples/azure/azure_storage_report.md`   |
+| Public compute  | `fixtures/azure/sample_azure_compute_plan.json`   | `examples/azure/azure_compute_report.md`   |
+| Mixed inventory | `fixtures/azure/sample_azure_plan.json`           | `examples/azure/azure_inventory_report.md` |
+| Nightmare       | `fixtures/azure/sample_azure_nightmare_plan.json` | `examples/azure/azure_nightmare_report.md` |
+
+</details>
+
 ## Development Checks
 
 Install the development extras, then run the full test suite and quality gates:
@@ -455,7 +501,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 * AWS is currently the deepest provider implementation and the only provider with control-observation coverage.
 * GCP support is narrower than AWS today and does not include control-observation coverage yet.
-* Azure support is not registered yet.
+* Azure support is narrower than AWS and GCP today and focuses on Azure Storage posture and public virtual-machine exposure.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
