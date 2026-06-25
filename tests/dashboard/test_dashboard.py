@@ -28,6 +28,7 @@ FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
+AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
 
@@ -105,6 +106,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertNotIn('data-provider="gcp"', response.text)
         self.assertIn("Safe Azure Storage", response.text)
         self.assertIn("Azure Storage Exposure", response.text)
+        self.assertIn("Mixed Azure Inventory", response.text)
         self.assertNotIn("Mixed AWS Plan", response.text)
         self.assertNotIn("GCP Serverless", response.text)
 
@@ -309,6 +311,17 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Azure Storage container is publicly accessible", response.text)
         self.assertIn("azurerm_storage_share", response.text)
         self.assertIn("Unsupported resource skipped: azurerm_storage_share.legacy", response.text)
+
+    def test_demo_route_renders_mixed_azure_inventory_and_coverage(self) -> None:
+        response = self.client.get("/demo/azure-inventory")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Azure Inventory Demo", response.text)
+        self.assertIn(AZURE_FIXTURE_PATH.name, response.text)
+        self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", response.text)
+        self.assertIn("Azure Storage container is publicly accessible", response.text)
+        self.assertIn("azurerm_key_vault", response.text)
+        self.assertIn("azurerm_kubernetes_cluster", response.text)
 
     def test_azure_safe_demo_uses_provider_specific_unsupported_empty_state(self) -> None:
         response = self.client.get("/demo/azure-safe")

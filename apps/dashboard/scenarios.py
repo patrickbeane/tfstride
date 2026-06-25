@@ -209,6 +209,18 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="mixed",
     ),
     DemoScenarioDefinition(
+        scenario_id="azure-inventory",
+        title="Mixed Azure Inventory",
+        report_title="Azure Inventory Demo",
+        fixture_name="azure/sample_azure_plan.json",
+        description=(
+            "Azure Storage and public VM exposure alongside unsupported AKS and Key Vault resources "
+            "for explicit coverage reporting."
+        ),
+        emphasis="Provider coverage",
+        theme="balanced",
+    ),
+    DemoScenarioDefinition(
         scenario_id="trust-unconstrained",
         title="Cross-Account Trust",
         report_title="Cross-Account Trust Demo",

@@ -43,6 +43,7 @@ GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_pr
 GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_COMPUTE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_compute_plan.json"
+AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
@@ -138,6 +139,7 @@ class MarkdownReportTests(unittest.TestCase):
             GCP_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_nightmare_report.md",
             AZURE_SAFE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_safe_report.md",
             AZURE_COMPUTE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_compute_report.md",
+            AZURE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_inventory_report.md",
             AZURE_STORAGE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_storage_report.md",
         }
 

@@ -5,6 +5,7 @@ from collections import Counter
 
 from tests.integration.analysis_support import (
     AZURE_COMPUTE_FIXTURE_PATH,
+    AZURE_FIXTURE_PATH,
     AZURE_SAFE_FIXTURE_PATH,
     AZURE_STORAGE_FIXTURE_PATH,
     BASELINE_FIXTURE_PATH,
@@ -106,6 +107,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 33, {"high": 14, "medium": 19}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
+            "azure-inventory": (AZURE_FIXTURE_PATH, 6, {"high": 2, "medium": 4}),
             "azure-storage": (AZURE_STORAGE_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
         }
 
@@ -208,6 +210,14 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             },
             "azure-safe": {},
             "azure-compute": {
+                "Internet-exposed Azure virtual machine permits broad ingress": 1,
+            },
+            "azure-inventory": {
+                "Azure Storage account permits Shared Key authorization": 1,
+                "Azure Storage account permits nested public blob access": 1,
+                "Azure Storage account allows TLS below 1.2": 1,
+                "Azure Storage account allows unrestricted public network access": 1,
+                "Azure Storage container is publicly accessible": 1,
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
             },
             "azure-storage": {
