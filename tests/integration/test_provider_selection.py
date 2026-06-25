@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.integration.analysis_support import (
+    AZURE_SAFE_FIXTURE_PATH,
     FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
@@ -172,6 +173,14 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.trust_boundaries, [])
         self.assertEqual(result.findings, [])
         self.assertIn("covers AzureRM storage accounts", result.limitations[0])
+
+    def test_analysis_accepts_explicit_azure_provider_for_fixture(self) -> None:
+        result = TfStride(provider="azure").analyze_plan(AZURE_SAFE_FIXTURE_PATH)
+
+        self.assertEqual(result.inventory.provider, "azure")
+        self.assertEqual(len(result.inventory.resources), 3)
+        self.assertEqual(result.inventory.unsupported_resources, [])
+        self.assertEqual(result.findings, [])
 
     def test_analysis_rejects_mixed_provider_plans_without_explicit_provider(self) -> None:
         payload = {

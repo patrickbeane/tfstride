@@ -41,6 +41,8 @@ GCP_LB_COMPUTE_SQL_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_lb_compute_
 GCP_SERVERLESS_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_serverless_plan.json"
 GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_project_iam_plan.json"
 GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
+AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
+AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
@@ -133,6 +135,8 @@ class MarkdownReportTests(unittest.TestCase):
             GCP_CROSS_PROJECT_IAM_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_cross_project_iam_report.md",
             GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_inventory_report.md",
             GCP_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_nightmare_report.md",
+            AZURE_SAFE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_safe_report.md",
+            AZURE_STORAGE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_storage_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():

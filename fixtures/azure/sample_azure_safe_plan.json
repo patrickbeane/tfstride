@@ -1,0 +1,53 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_storage_account.logs",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Storage/storageAccounts/tfstridesafelogs",
+            "name": "tfstridesafelogs",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": true
+          }
+        },
+        {
+          "address": "azurerm_storage_account_network_rules.logs",
+          "mode": "managed",
+          "type": "azurerm_storage_account_network_rules",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "storage_account_id": "azurerm_storage_account.logs.id",
+            "default_action": "Deny",
+            "bypass": [
+              "AzureServices"
+            ],
+            "ip_rules": [],
+            "virtual_network_subnet_ids": []
+          }
+        },
+        {
+          "address": "azurerm_storage_container.private",
+          "mode": "managed",
+          "type": "azurerm_storage_container",
+          "name": "private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "name": "private",
+            "storage_account_id": "azurerm_storage_account.logs.id",
+            "container_access_type": "private"
+          }
+        }
+      ]
+    }
+  }
+}

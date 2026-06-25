@@ -27,6 +27,7 @@ FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
 GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
+AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
 )
@@ -238,6 +239,30 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
         self.assertEqual(report["summary"]["active_findings"], 19)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
+
+    def test_cli_provider_option_can_select_azure_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            json_output_path = Path(tmp_dir) / "report.json"
+
+            exit_code = main(
+                [
+                    str(AZURE_SAFE_FIXTURE_PATH),
+                    "--provider",
+                    "azure",
+                    "--quiet",
+                    "--json-output",
+                    str(json_output_path),
+                ]
+            )
+
+            report = json.loads(json_output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["inventory"]["provider"], "azure")
+        self.assertEqual(len(report["inventory"]["resources"]), 3)
+        self.assertEqual(report["inventory"]["unsupported_resources"], [])
+        self.assertEqual(report["summary"]["active_findings"], 0)
+        self.assertIn("covers AzureRM storage accounts", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:
         payload = {

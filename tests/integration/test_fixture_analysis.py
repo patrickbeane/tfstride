@@ -4,6 +4,8 @@ import unittest
 from collections import Counter
 
 from tests.integration.analysis_support import (
+    AZURE_SAFE_FIXTURE_PATH,
+    AZURE_STORAGE_FIXTURE_PATH,
     BASELINE_FIXTURE_PATH,
     FIXTURE_PATH,
     GCP_BASELINE_FIXTURE_PATH,
@@ -101,6 +103,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 5, {"high": 3, "medium": 2}),
             "gcp-inventory": (GCP_FIXTURE_PATH, 19, {"high": 6, "medium": 13}),
             "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 33, {"high": 14, "medium": 19}),
+            "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
+            "azure-storage": (AZURE_STORAGE_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
         }
 
         expected_titles = {
@@ -199,6 +203,14 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
+            },
+            "azure-safe": {},
+            "azure-storage": {
+                "Azure Storage account permits Shared Key authorization": 1,
+                "Azure Storage account permits nested public blob access": 1,
+                "Azure Storage account allows TLS below 1.2": 1,
+                "Azure Storage account allows unrestricted public network access": 1,
+                "Azure Storage container is publicly accessible": 1,
             },
         }
 
