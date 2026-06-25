@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
+from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
@@ -48,11 +49,11 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(plugin.limitations, AZURE_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), AzureNormalizer)
         self.assertIsInstance(plugin.create_resource_decorator(), AzureResourceDecorator)
-        self.assertEqual(len(plugin.create_rule_metadata()), 5)
+        self.assertEqual(len(plugin.create_rule_metadata()), 6)
         self.assertIsNotNone(contribution)
         assert contribution is not None
-        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (5, 0, 0, 0, 0, 0))
-        self.assertIsNone(plugin.create_boundary_contributor())
+        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (6, 0, 0, 0, 0, 0))
+        self.assertIsInstance(plugin.create_boundary_contributor(), AzureBoundaryContributor)
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertEqual(

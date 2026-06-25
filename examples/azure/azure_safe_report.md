@@ -19,8 +19,8 @@ This run identified **0 trust boundaries** and **0 findings** across **3 normali
 - Provider resources considered: `3`
 - Normalized resources: `3`
 - Unsupported resources: `0`
-- Registered rules: `53`
-- Enabled rules: `53`
+- Registered rules: `54`
+- Enabled rules: `54`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -45,5 +45,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture and normalizes the initial VNet, subnet, NSG, NIC, public-IP, and virtual-machine relationship graph; Azure compute exposure findings, identity, database, and broader platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; Azure identity, database, load-balancer, private-endpoint, and broader platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

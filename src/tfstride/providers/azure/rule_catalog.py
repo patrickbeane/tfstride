@@ -5,6 +5,17 @@ from tfstride.models import StrideCategory
 
 AZURE_RULE_METADATA = (
     RuleMetadata(
+        rule_id="azure-public-compute-broad-ingress",
+        title="Internet-exposed Azure virtual machine permits broad ingress",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Remove the public IP where possible, restrict subnet and NIC NSG rules to expected client "
+            "CIDRs and service ports, and use Azure Bastion, VPN, or Just-In-Time VM access for administration."
+        ),
+        tags=("azure", "network", "compute", "nsg", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-storage-container-public-access",
         title="Azure Storage container is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -15,6 +15,7 @@ from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsStorageFacts
 from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
+from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
@@ -147,7 +148,7 @@ class ProviderCatalogTests(unittest.TestCase):
             ),
             AZURE_RULE_GROUP_IDS,
         )
-        self.assertIsNone(azure_plugin.create_boundary_contributor())
+        self.assertIsInstance(azure_plugin.create_boundary_contributor(), AzureBoundaryContributor)
         self.assertIsNone(
             azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[]))
         )
@@ -177,22 +178,23 @@ class ProviderCatalogTests(unittest.TestCase):
 
         self.assertIsInstance(contributors[0], AwsBoundaryContributor)
         self.assertIsInstance(contributors[1], GcpBoundaryContributor)
+        self.assertIsInstance(contributors[2], AzureBoundaryContributor)
         self.assertIsInstance(default_provider_boundary_contributors("aws")[0], AwsBoundaryContributor)
         self.assertIsInstance(default_provider_boundary_contributors("gcp")[0], GcpBoundaryContributor)
-        self.assertEqual(default_provider_boundary_contributors("azure"), ())
+        self.assertIsInstance(default_provider_boundary_contributors("azure")[0], AzureBoundaryContributor)
         self.assertIsInstance(contributors_by_provider["aws"][0], AwsBoundaryContributor)
         self.assertIsInstance(contributors_by_provider["gcp"][0], GcpBoundaryContributor)
+        self.assertIsInstance(contributors_by_provider["azure"][0], AzureBoundaryContributor)
         self.assertIsInstance(factories_by_provider["aws"][0](), AwsBoundaryContributor)
         self.assertIsInstance(factories_by_provider["gcp"][0](), GcpBoundaryContributor)
-        self.assertNotIn("azure", contributors_by_provider)
-        self.assertNotIn("azure", factories_by_provider)
+        self.assertIsInstance(factories_by_provider["azure"][0](), AzureBoundaryContributor)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
         registry = default_rule_registry()
         contribution = default_rule_contribution(FindingFactory(registry))
         rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
 
-        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (32, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (33, 2, 2, 12, 3, 2))
         self.assertEqual(
             {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
             registry.known_rule_ids(),

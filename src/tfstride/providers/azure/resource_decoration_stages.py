@@ -12,6 +12,7 @@ from tfstride.providers.azure.resource_decoration.network_security import (
     MergeNetworkSecurityRulesStage,
     ResolveNetworkSecurityAssociationsStage,
 )
+from tfstride.providers.azure.resource_decoration.public_exposure import DerivePublicComputeExposureStage
 from tfstride.providers.azure.resource_decoration.storage import DecorateStorageRelationshipsStage
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 
@@ -31,5 +32,6 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         ResolveNetworkSecurityAssociationsStage(),
         ResolveNetworkInterfaceRelationshipsStage(),
         ResolveVirtualMachineRelationshipsStage(),
+        DerivePublicComputeExposureStage(),
         DecorateStorageRelationshipsStage(),
     )

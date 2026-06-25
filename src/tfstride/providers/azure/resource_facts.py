@@ -126,6 +126,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.NETWORK_SECURITY_RULES)
 
     @property
+    def public_compute_exposure_paths(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.PUBLIC_COMPUTE_EXPOSURE_PATHS)
+
+    @property
     def resolved_subnet_addresses(self) -> list[str]:
         return self.get(AzureResourceMetadata.RESOLVED_SUBNET_ADDRESSES)
 
@@ -221,6 +225,18 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     def set_public_ip_attachment(self, *, configured: bool, reasons: Sequence[str]) -> None:
         self.resource.public_access_configured = configured
         self.resource.public_access_reasons = list(reasons)
+
+    def set_public_compute_exposure(self, paths: list[dict], reasons: Sequence[str]) -> None:
+        exposed = bool(paths)
+        self.set(AzureResourceMetadata.PUBLIC_COMPUTE_EXPOSURE_PATHS, paths)
+        self.resource.internet_ingress_capable = exposed
+        self.resource.public_exposure = exposed
+        self.resource.publicly_accessible = exposed
+        self.resource.direct_internet_reachable = exposed
+        self.resource.internet_ingress_reasons = [
+            rule for path in paths for rule in path.get("network_security_rules", []) if rule
+        ]
+        self.resource.public_exposure_reasons = list(reasons) if exposed else []
 
     def add_public_container_address(self, address: str) -> None:
         self.append(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES, address)

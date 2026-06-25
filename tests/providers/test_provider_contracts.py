@@ -245,6 +245,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("STORAGE_ACCOUNT_ID", azure_owned)
         self.assertIn("ALLOW_NESTED_ITEMS_TO_BE_PUBLIC", azure_owned)
         self.assertIn("NETWORK_DEFAULT_ACTION", azure_owned)
+        self.assertIn("PUBLIC_COMPUTE_EXPOSURE_PATHS", azure_owned)
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)
@@ -303,9 +304,10 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
         self.assertIn("boundary_contributor_factory=", aws_plugin)
         self.assertIn("boundary_contributor_factory=", gcp_plugin)
-        self.assertNotIn("boundary_contributor_factory=", azure_plugin)
+        self.assertIn("boundary_contributor_factory=", azure_plugin)
         self.assertTrue((SOURCE_ROOT / "providers" / "aws" / "boundaries.py").exists())
         self.assertTrue((SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
+        self.assertTrue((SOURCE_ROOT / "providers" / "azure" / "boundaries.py").exists())
 
     def test_provider_contract_documents_encapsulation_rules(self) -> None:
         guidelines = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.guidelines

@@ -115,7 +115,7 @@ class AzureResourceDecoratorTests(unittest.TestCase):
             account.address,
         )
 
-    def test_compute_network_graph_is_resolved_end_to_end_without_exposure(self) -> None:
+    def test_compute_network_graph_resolves_narrow_public_exposure_without_a_finding(self) -> None:
         resources = [
             _resource(
                 AzureResourceType.VIRTUAL_NETWORK,
@@ -209,10 +209,18 @@ class AzureResourceDecoratorTests(unittest.TestCase):
         self.assertIn("azurerm_network_security_group.web", virtual_machine.security_group_ids)
         self.assertEqual(virtual_machine.vpc_id, "azurerm_virtual_network.main")
         self.assertTrue(virtual_machine.public_access_configured)
-        self.assertFalse(virtual_machine.public_exposure)
-        self.assertFalse(virtual_machine.direct_internet_reachable)
+        self.assertTrue(virtual_machine.public_exposure)
+        self.assertTrue(virtual_machine.direct_internet_reachable)
+        self.assertEqual(
+            [
+                (path["protocol"], path["from_port"], path["to_port"])
+                for path in azure_facts(virtual_machine).public_compute_exposure_paths
+            ],
+            [("tcp", 443, 443)],
+        )
         boundaries = detect_trust_boundaries(inventory)
-        self.assertEqual(boundaries, [])
+        self.assertEqual(len(boundaries), 1)
+        self.assertEqual(boundaries[0].target, virtual_machine.address)
         self.assertEqual(StrideRuleEngine().evaluate(inventory, boundaries), [])
 
     def test_unresolved_storage_account_references_are_recorded(self) -> None:

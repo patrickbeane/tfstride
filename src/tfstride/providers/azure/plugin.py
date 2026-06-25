@@ -11,9 +11,16 @@ from tfstride.providers.azure.resource_facts import azure_fact_domains
 from tfstride.providers.plugin import ProviderPlugin
 
 if TYPE_CHECKING:
+    from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
+
+
+def _azure_boundary_contributor() -> BoundaryContributor:
+    from tfstride.providers.azure.boundaries import AzureBoundaryContributor
+
+    return AzureBoundaryContributor()
 
 
 def _azure_rule_metadata() -> tuple[RuleMetadata, ...]:
@@ -40,4 +47,5 @@ def azure_provider_plugin() -> ProviderPlugin:
         resource_decorator_factory=AzureResourceDecorator,
         rule_metadata_factory=_azure_rule_metadata,
         rule_contribution_factory=_azure_rule_contribution,
+        boundary_contributor_factory=_azure_boundary_contributor,
     )

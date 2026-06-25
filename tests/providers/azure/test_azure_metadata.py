@@ -57,6 +57,7 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "UNRESOLVED_RESOURCE_REFERENCES",
             "IP_CONFIGURATIONS",
             "NETWORK_SECURITY_RULES",
+            "PUBLIC_COMPUTE_EXPOSURE_PATHS",
         }
 
         self.assertEqual(contract.provider_owned_fields["azure"], frozenset(expected_fields))

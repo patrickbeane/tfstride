@@ -51,3 +51,4 @@ class AzureResourceMetadata:
 
     IP_CONFIGURATIONS = DictListMetadataField("ip_configurations")
     NETWORK_SECURITY_RULES = DictListMetadataField("network_security_rules")
+    PUBLIC_COMPUTE_EXPOSURE_PATHS = DictListMetadataField("public_compute_exposure_paths")
