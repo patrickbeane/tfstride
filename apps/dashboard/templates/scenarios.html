@@ -5,15 +5,16 @@
     <div class="panel-header">
       <p class="eyebrow scenario-provider-heading">
         <span>Built-in scenarios</span>
-        <span class="scenario-provider-inline" aria-label="Provider scenarios">(<a
-          class="scenario-provider-link{% if selected_provider == 'aws' %} scenario-provider-link-active{% endif %}"
-          href="{{ request.url_for('scenarios_page') }}?provider=aws"
-          {% if selected_provider == 'aws' %}aria-current="page"{% endif %}
-        >AWS</a>/<a
-          class="scenario-provider-link{% if selected_provider == 'gcp' %} scenario-provider-link-active{% endif %}"
-          href="{{ request.url_for('scenarios_page') }}?provider=gcp"
-          {% if selected_provider == 'gcp' %}aria-current="page"{% endif %}
-        >GCP</a>)</span>
+        <span class="scenario-provider-inline" aria-label="Provider scenarios">(
+          {%- for provider in scenario_providers -%}
+            {%- if not loop.first %}/{% endif -%}
+            <a
+              class="scenario-provider-link{% if selected_provider == provider.provider %} scenario-provider-link-active{% endif %}"
+              href="{{ request.url_for('scenarios_page') }}?provider={{ provider.provider }}"
+              {% if selected_provider == provider.provider %}aria-current="page"{% endif %}
+            >{{ provider.display_name }}</a>
+          {%- endfor -%}
+        )</span>
       </p>
       <h1>Run the curated fixture catalog in one click.</h1>
     </div>

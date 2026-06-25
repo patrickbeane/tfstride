@@ -14,6 +14,12 @@ APP_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = APP_ROOT.parents[1]
 FIXTURES_DIR = REPO_ROOT / "fixtures"
 
+PROVIDER_DISPLAY_NAMES = {
+    "aws": "AWS",
+    "gcp": "GCP",
+    "azure": "Azure",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class DemoScenarioDefinition:
@@ -43,6 +49,12 @@ class DemoScenario:
     high_findings: int
     medium_findings: int
     low_findings: int
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioProvider:
+    provider: str
+    display_name: str
 
 
 DEMO_SCENARIO_DEFINITIONS = (
@@ -173,6 +185,30 @@ DEMO_SCENARIO_DEFINITIONS = (
         theme="nightmare",
     ),
     DemoScenarioDefinition(
+        scenario_id="azure-safe",
+        title="Safe Azure Storage",
+        report_title="Safe Azure Storage Demo",
+        fixture_name="azure/sample_azure_safe_plan.json",
+        description=(
+            "Hardened Azure Storage with private container access, Shared Key disabled, TLS 1.2, "
+            "and effective default-deny network rules."
+        ),
+        emphasis="Quiet reference architecture",
+        theme="safe",
+    ),
+    DemoScenarioDefinition(
+        scenario_id="azure-storage",
+        title="Azure Storage Exposure",
+        report_title="Azure Storage Exposure Demo",
+        fixture_name="azure/sample_azure_storage_plan.json",
+        description=(
+            "Public blob access, Shared Key authorization, legacy TLS, unrestricted network access, "
+            "and explicit unsupported-resource coverage."
+        ),
+        emphasis="Storage posture",
+        theme="mixed",
+    ),
+    DemoScenarioDefinition(
         scenario_id="trust-unconstrained",
         title="Cross-Account Trust",
         report_title="Cross-Account Trust Demo",
@@ -241,3 +277,19 @@ def get_demo_scenarios_by_id(app: FastAPI, engine: TfStride) -> dict[str, DemoSc
         cached = {scenario.scenario_id: scenario for scenario in get_demo_scenarios(app, engine)}
         app.state.demo_scenarios_by_id = cached
     return cast(dict[str, DemoScenario], cached)
+
+
+def scenario_providers(scenarios: tuple[DemoScenario, ...]) -> tuple[ScenarioProvider, ...]:
+    providers: list[ScenarioProvider] = []
+    seen: set[str] = set()
+    for scenario in scenarios:
+        if scenario.provider in seen:
+            continue
+        seen.add(scenario.provider)
+        providers.append(
+            ScenarioProvider(
+                provider=scenario.provider,
+                display_name=PROVIDER_DISPLAY_NAMES.get(scenario.provider, scenario.provider.upper()),
+            )
+        )
+    return tuple(providers)

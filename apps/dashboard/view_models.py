@@ -7,12 +7,8 @@ from typing import Any
 
 from fastapi import Request
 
+from apps.dashboard.scenarios import PROVIDER_DISPLAY_NAMES
 from tfstride.reporting.report_contract import TFSReportPayload
-
-_PROVIDER_DISPLAY_NAMES = {
-    "aws": "AWS",
-    "gcp": "GCP",
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +34,7 @@ def _base_context(
     form_title: str = "tfSTRIDE Report",
     demo_scenarios: tuple[object, ...] = (),
     selected_provider: str = "aws",
+    scenario_providers: tuple[object, ...] = (),
 ) -> dict[str, object]:
     return {
         "request": request,
@@ -47,6 +44,7 @@ def _base_context(
         "max_upload_mebibytes": max_upload_bytes // (1024 * 1024),
         "demo_scenarios": demo_scenarios,
         "selected_provider": selected_provider,
+        "scenario_providers": scenario_providers,
     }
 
 
@@ -144,7 +142,7 @@ def _coverage_context(payload: TFSReportPayload) -> dict[str, object]:
 
 def _unsupported_resource_types_empty_message(payload: TFSReportPayload) -> str:
     provider = str(payload["inventory"].get("provider", "")).strip().lower()
-    provider_display_name = _PROVIDER_DISPLAY_NAMES.get(provider)
+    provider_display_name = PROVIDER_DISPLAY_NAMES.get(provider)
     if provider_display_name is None:
         return "No unsupported resource types were encountered."
     return f"No unsupported {provider_display_name} resource types were encountered."
@@ -193,6 +191,6 @@ def _analysis_coverage_payload(payload: TFSReportPayload) -> dict[str, Any]:
 
 def _resource_type_from_address(address: str) -> str:
     for segment in reversed(str(address).split(".")):
-        if segment.startswith("aws_"):
+        if segment.startswith(("aws_", "google_", "azurerm_")):
             return segment
     return str(address)

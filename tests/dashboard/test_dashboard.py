@@ -16,6 +16,7 @@ if FASTAPI_DEPS_AVAILABLE:
 
     from apps.dashboard import main as dashboard_main
     from apps.dashboard import routes as dashboard_routes
+    from apps.dashboard import scenarios as dashboard_scenarios
     from apps.dashboard import uploads as dashboard_uploads
     from apps.dashboard import view_models as dashboard_view_models
     from apps.dashboard.main import app as dashboard_app
@@ -25,6 +26,8 @@ BASELINE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_baseline_plan.json"
 ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_ecs_fargate_plan.json"
 FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_plan.json"
 GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
+AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
+AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
 
@@ -67,9 +70,11 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("Built-in scenarios", response.text)
         self.assertIn('href="http://testserver/scenarios?provider=aws"', response.text)
         self.assertIn('href="http://testserver/scenarios?provider=gcp"', response.text)
+        self.assertIn("provider=azure", response.text)
         self.assertIn('class="scenario-provider-link scenario-provider-link-active"', response.text)
         self.assertIn('data-provider="aws"', response.text)
         self.assertNotIn('data-provider="gcp"', response.text)
+        self.assertNotIn('data-provider="azure"', response.text)
         self.assertIn("ECS / Fargate", response.text)
         self.assertIn("Nightmare Plan", response.text)
         self.assertNotIn("Mixed GCP Inventory", response.text)
@@ -84,10 +89,42 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn('class="scenario-provider-link scenario-provider-link-active"', response.text)
         self.assertIn('data-provider="gcp"', response.text)
         self.assertNotIn('data-provider="aws"', response.text)
+        self.assertNotIn('data-provider="azure"', response.text)
         self.assertIn("Mixed GCP Inventory", response.text)
         self.assertIn("GCP Serverless", response.text)
         self.assertNotIn("ECS / Fargate", response.text)
         self.assertNotIn("Mixed AWS Plan", response.text)
+
+    def test_scenarios_page_filters_to_azure_demo_gallery(self) -> None:
+        response = self.client.get("/scenarios?provider=azure")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="scenario-provider-link scenario-provider-link-active"', response.text)
+        self.assertIn('data-provider="azure"', response.text)
+        self.assertNotIn('data-provider="aws"', response.text)
+        self.assertNotIn('data-provider="gcp"', response.text)
+        self.assertIn("Safe Azure Storage", response.text)
+        self.assertIn("Azure Storage Exposure", response.text)
+        self.assertNotIn("Mixed AWS Plan", response.text)
+        self.assertNotIn("GCP Serverless", response.text)
+
+    def test_scenarios_page_falls_back_to_catalog_default_for_unknown_provider(self) -> None:
+        response = self.client.get("/scenarios?provider=not-registered")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-provider="aws"', response.text)
+        self.assertNotIn('data-provider="azure"', response.text)
+
+    def test_scenario_provider_navigation_is_derived_from_catalog_data(self) -> None:
+        scenarios = dashboard_scenarios.get_demo_scenarios(dashboard_app, dashboard_app.state.engine)
+
+        self.assertEqual(
+            [
+                (provider.provider, provider.display_name)
+                for provider in dashboard_scenarios.scenario_providers(scenarios)
+            ],
+            [("aws", "AWS"), ("gcp", "GCP"), ("azure", "Azure")],
+        )
 
     def test_api_analyze_returns_versioned_json_contract(self) -> None:
         with FIXTURE_PATH.open("rb") as fixture_file:
@@ -146,12 +183,19 @@ class DashboardAppTests(unittest.TestCase):
         payload["inventory"]["provider"] = "gcp"
         gcp_context = dashboard_view_models._coverage_context(payload)
 
+        payload["inventory"]["provider"] = "azure"
+        azure_context = dashboard_view_models._coverage_context(payload)
+
         payload["inventory"]["provider"] = "custom"
         custom_context = dashboard_view_models._coverage_context(payload)
 
         self.assertEqual(
             gcp_context["unsupported_resource_types_empty_message"],
             "No unsupported GCP resource types were encountered.",
+        )
+        self.assertEqual(
+            azure_context["unsupported_resource_types_empty_message"],
+            "No unsupported Azure resource types were encountered.",
         )
         self.assertEqual(
             custom_context["unsupported_resource_types_empty_message"],
@@ -254,6 +298,38 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("No unsupported GCP resource types were encountered.", response.text)
         self.assertNotIn("No unsupported AWS resource types were encountered.", response.text)
+
+    def test_demo_route_renders_azure_storage_findings_and_unsupported_resource(self) -> None:
+        response = self.client.get("/demo/azure-storage")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Azure Storage Exposure Demo", response.text)
+        self.assertIn(AZURE_STORAGE_FIXTURE_PATH.name, response.text)
+        self.assertIn("Azure Storage account permits Shared Key authorization", response.text)
+        self.assertIn("Azure Storage container is publicly accessible", response.text)
+        self.assertIn("azurerm_storage_share", response.text)
+        self.assertIn("Unsupported resource skipped: azurerm_storage_share.legacy", response.text)
+
+    def test_azure_safe_demo_uses_provider_specific_unsupported_empty_state(self) -> None:
+        response = self.client.get("/demo/azure-safe")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(AZURE_SAFE_FIXTURE_PATH.name, response.text)
+        self.assertIn("No unsupported Azure resource types were encountered.", response.text)
+        self.assertNotIn("No unsupported AWS resource types were encountered.", response.text)
+
+    def test_html_upload_auto_detects_and_renders_azure_plan(self) -> None:
+        with AZURE_STORAGE_FIXTURE_PATH.open("rb") as fixture_file:
+            response = self.client.post(
+                "/analyze",
+                data={"title": "Azure Upload Test"},
+                files={"plan": (AZURE_STORAGE_FIXTURE_PATH.name, fixture_file, "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Azure Upload Test", response.text)
+        self.assertIn("Azure Storage account allows unrestricted public network access", response.text)
+        self.assertIn("azurerm_storage_share", response.text)
 
     def test_demo_route_renders_ecs_fargate_fixture_report(self) -> None:
         response = self.client.get("/demo/ecs-fargate")

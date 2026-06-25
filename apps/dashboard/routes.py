@@ -17,6 +17,7 @@ from apps.dashboard.scenarios import (
     KNOWN_DEMO_SCENARIO_IDS,
     get_demo_scenarios,
     get_demo_scenarios_by_id,
+    scenario_providers,
 )
 from apps.dashboard.uploads import (
     DEFAULT_REPORT_TITLE,
@@ -175,9 +176,11 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
     @app.get("/scenarios", response_class=HTMLResponse, include_in_schema=False)
     async def scenarios_page(request: Request) -> HTMLResponse:
         demo_scenarios = get_demo_scenarios(request.app, _engine(request.app))
-        selected_provider = request.query_params.get("provider", "aws").lower()
-        if selected_provider not in {"aws", "gcp"}:
-            selected_provider = "aws"
+        providers = scenario_providers(demo_scenarios)
+        default_provider = providers[0].provider if providers else ""
+        selected_provider = request.query_params.get("provider", default_provider).strip().lower()
+        if selected_provider not in {provider.provider for provider in providers}:
+            selected_provider = default_provider
         visible_scenarios = tuple(scenario for scenario in demo_scenarios if scenario.provider == selected_provider)
         return template_response(
             request,
@@ -188,6 +191,7 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
                 page_title="tfSTRIDE Scenarios",
                 demo_scenarios=visible_scenarios,
                 selected_provider=selected_provider,
+                scenario_providers=providers,
             ),
         )
 
