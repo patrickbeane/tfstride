@@ -8,6 +8,7 @@ from pathlib import Path
 from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.contracts import (
     DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT,
     DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT,
@@ -212,6 +213,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         provider_namespaces = {
             "aws": AwsResourceMetadata,
             "gcp": GcpResourceMetadata,
+            "azure": AzureResourceMetadata,
         }
 
         for provider, namespace in provider_namespaces.items():
@@ -227,7 +229,9 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
         aws_owned = contract.provider_owned_fields["aws"]
         gcp_owned = contract.provider_owned_fields["gcp"]
+        azure_owned = contract.provider_owned_fields["azure"]
 
+        self.assertEqual(azure_owned, frozenset())
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)
@@ -261,6 +265,7 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
             "tfstride.analysis.gcp",
             "tfstride.providers.aws",
             "tfstride.providers.gcp",
+            "tfstride.providers.azure",
             "tfstride.providers.catalog",
         )
         scanned_paths = (
@@ -281,9 +286,11 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
     def test_provider_boundary_contributors_are_plugin_owned(self) -> None:
         aws_plugin = (SOURCE_ROOT / "providers" / "aws" / "plugin.py").read_text(encoding="utf-8")
         gcp_plugin = (SOURCE_ROOT / "providers" / "gcp" / "plugin.py").read_text(encoding="utf-8")
+        azure_plugin = (SOURCE_ROOT / "providers" / "azure" / "plugin.py").read_text(encoding="utf-8")
 
         self.assertIn("boundary_contributor_factory=", aws_plugin)
         self.assertIn("boundary_contributor_factory=", gcp_plugin)
+        self.assertNotIn("boundary_contributor_factory=", azure_plugin)
         self.assertTrue((SOURCE_ROOT / "providers" / "aws" / "boundaries.py").exists())
         self.assertTrue((SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
 

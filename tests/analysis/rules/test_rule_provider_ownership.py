@@ -106,7 +106,9 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
 
         for plugin in default_provider_plugins():
             contribution = plugin.create_rule_contribution(FindingFactory(registry))
-            self.assertIsNotNone(contribution, f"Provider `{plugin.provider}` must contribute rules.")
+            if contribution is None:
+                self.assertEqual(plugin.create_rule_metadata(), ())
+                continue
             for rule_group in contribution.rule_groups:
                 for rule in rule_group:
                     contributed_rule_ids.append(rule.metadata.rule_id)
@@ -122,9 +124,11 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
         for plugin in default_provider_plugins():
             metadata_ids = {metadata.rule_id for metadata in plugin.create_rule_metadata()}
             contribution = plugin.create_rule_contribution(FindingFactory(registry))
-
-            self.assertIsNotNone(contribution, f"Provider `{plugin.provider}` must contribute rules.")
-            contribution_ids = {rule.metadata.rule_id for rule_group in contribution.rule_groups for rule in rule_group}
+            contribution_ids = (
+                {rule.metadata.rule_id for rule_group in contribution.rule_groups for rule in rule_group}
+                if contribution is not None
+                else set()
+            )
 
             self.assertEqual(metadata_ids, contribution_ids)
 

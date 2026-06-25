@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from tfstride.analysis.rule_registry import RuleMetadata
 
 from tfstride.providers.aws.plugin import aws_provider_plugin
+from tfstride.providers.azure.plugin import azure_provider_plugin
 from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.plugin import (
@@ -36,7 +37,7 @@ DEFAULT_PROVIDER = "aws"
 
 @cache
 def default_provider_plugins() -> tuple[ProviderPlugin, ...]:
-    return (aws_provider_plugin(), gcp_provider_plugin())
+    return (aws_provider_plugin(), gcp_provider_plugin(), azure_provider_plugin())
 
 
 def default_provider_registry() -> ProviderRegistry:

@@ -130,6 +130,45 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.findings, [])
         self.assertIn("GCP support currently provides initial inventory normalization", result.limitations[0])
 
+    def test_analysis_auto_selects_azure_and_reports_unsupported_inventory(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "azurerm_storage_account.logs",
+                            "mode": "managed",
+                            "type": "azurerm_storage_account",
+                            "name": "logs",
+                            "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                            "values": {},
+                        }
+                    ]
+                }
+            },
+        }
+
+        result = self._analyze_payload(payload)
+
+        self.assertEqual(result.inventory.provider, "azure")
+        self.assertEqual(result.inventory.resources, ())
+        self.assertEqual(
+            result.inventory.unsupported_resources,
+            ["azurerm_storage_account.logs"],
+        )
+        self.assertEqual(result.analysis_coverage.resources.total_resources, 1)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 1)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 0)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 1)
+        self.assertEqual(
+            result.analysis_coverage.resources.unsupported_resource_types,
+            {"azurerm_storage_account": 1},
+        )
+        self.assertEqual(result.trust_boundaries, [])
+        self.assertEqual(result.findings, [])
+        self.assertIn("reports them as unsupported", result.limitations[0])
+
     def test_analysis_rejects_mixed_provider_plans_without_explicit_provider(self) -> None:
         payload = {
             "terraform_version": "1.8.5",
