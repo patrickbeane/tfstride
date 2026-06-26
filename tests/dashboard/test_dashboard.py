@@ -322,6 +322,8 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn(AZURE_FIXTURE_PATH.name, response.text)
         self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", response.text)
         self.assertIn("Azure Storage container is publicly accessible", response.text)
+        self.assertIn("Azure Key Vault allows unrestricted public network access", response.text)
+        self.assertIn("Azure Key Vault purge protection is disabled", response.text)
         self.assertIn("azurerm_key_vault", response.text)
         self.assertIn("azurerm_kubernetes_cluster", response.text)
 

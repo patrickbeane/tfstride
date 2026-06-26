@@ -18,6 +18,8 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
             [
                 "azure-storage-account-shared-key-enabled",
                 "azure-storage-account-nested-public-access-enabled",
+                "azure-key-vault-public-network-access",
+                "azure-key-vault-purge-protection-disabled",
                 "azure-storage-account-minimum-tls-below-1-2",
                 "azure-storage-account-public-network-unrestricted",
                 "azure-storage-container-public-access",
@@ -26,13 +28,14 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 4, "high": 2}),
+            Counter({"medium": 6, "high": 2}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],
             [
                 "internet-to-service:internet->azurerm_storage_account.assets",
                 "internet-to-service:internet->azurerm_linux_virtual_machine.web",
+                "internet-to-service:internet->azurerm_key_vault.application",
             ],
         )
         self.assertTrue(
@@ -68,6 +71,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("azurerm_kubernetes_cluster", first)
         self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", first)
         self.assertIn("Azure Storage container is publicly accessible", first)
+        self.assertIn("Azure Key Vault allows unrestricted public network access", first)
 
 
 if __name__ == "__main__":

@@ -117,6 +117,10 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_sql_database_instance",
                     "google_storage_bucket",
                     "azurerm_storage_account",
+                    "azurerm_key_vault",
+                    "azurerm_key_vault_secret",
+                    "azurerm_key_vault_key",
+                    "azurerm_key_vault_certificate",
                 }
             ),
         )
@@ -139,6 +143,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_sql_database_instance",
                     "google_storage_bucket",
                     "azurerm_storage_account",
+                    "azurerm_key_vault",
                     "azurerm_linux_virtual_machine",
                     "azurerm_windows_virtual_machine",
                 }
@@ -201,6 +206,8 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_storage_bucket_iam_binding",
                     "google_storage_bucket_iam_member",
                     "google_storage_bucket_iam_policy",
+                    "azurerm_key_vault_access_policy",
+                    "azurerm_role_assignment",
                 }
             ),
         )
@@ -223,13 +230,33 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertEqual(DATABASE_RESOURCE_TYPES, frozenset({"aws_db_instance", "google_sql_database_instance"}))
         self.assertEqual(
             CONTROL_PLANE_SENSITIVE_DATA_STORE_TYPES,
-            frozenset({"aws_db_instance", "aws_secretsmanager_secret", "google_secret_manager_secret"}),
+            frozenset(
+                {
+                    "aws_db_instance",
+                    "aws_secretsmanager_secret",
+                    "google_secret_manager_secret",
+                    "azurerm_key_vault",
+                    "azurerm_key_vault_secret",
+                    "azurerm_key_vault_key",
+                    "azurerm_key_vault_certificate",
+                }
+            ),
         )
         self.assertEqual(
             OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES,
             frozenset({"aws_s3_bucket_public_access_block"}),
         )
-        self.assertEqual(KEY_MANAGEMENT_RESOURCE_TYPES, frozenset({"aws_kms_key", "google_kms_crypto_key"}))
+        self.assertEqual(
+            KEY_MANAGEMENT_RESOURCE_TYPES,
+            frozenset(
+                {
+                    "aws_kms_key",
+                    "google_kms_crypto_key",
+                    "azurerm_key_vault",
+                    "azurerm_key_vault_key",
+                }
+            ),
+        )
         self.assertEqual(
             SENSITIVE_RESOURCE_POLICY_RESOURCE_TYPES,
             frozenset(
@@ -244,6 +271,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_pubsub_topic",
                     "google_secret_manager_secret",
                     "google_storage_bucket",
+                    "azurerm_key_vault",
                 }
             ),
         )
@@ -293,7 +321,9 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
         self.assertTrue(is_data_store_resource(_resource("azurerm_storage_account", provider="azure")))
+        self.assertTrue(is_data_store_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
+        self.assertTrue(is_public_edge_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("google_compute_forwarding_rule", provider="gcp")))
@@ -344,6 +374,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_object_storage_resource(_resource("azurerm_storage_account", provider="azure")))
         self.assertTrue(is_secret_store_resource(_resource("aws_secretsmanager_secret")))
         self.assertTrue(is_secret_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
+        self.assertTrue(is_secret_store_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_db_instance")))
         self.assertTrue(is_control_plane_sensitive_data_store(_resource("aws_secretsmanager_secret")))
         self.assertTrue(
@@ -354,6 +385,7 @@ class ResourceConceptTests(unittest.TestCase):
         )
         self.assertTrue(is_key_management_resource(_resource("aws_kms_key")))
         self.assertTrue(is_key_management_resource(_resource("google_kms_crypto_key", provider="gcp")))
+        self.assertTrue(is_key_management_resource(_resource("azurerm_key_vault_key", provider="azure")))
         self.assertTrue(
             has_provider_managed_egress_without_vpc(_resource("aws_lambda_function", metadata={"vpc_enabled": False}))
         )

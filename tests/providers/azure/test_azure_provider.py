@@ -36,7 +36,7 @@ def _terraform_resource(
 
 
 class AzureProviderTests(unittest.TestCase):
-    def test_plugin_describes_azure_storage_network_and_compute_contract(self) -> None:
+    def test_plugin_describes_azure_storage_key_vault_network_and_compute_contract(self) -> None:
         plugin = azure_provider_plugin()
         registry = default_rule_registry()
         contribution = plugin.create_rule_contribution(FindingFactory(registry))
@@ -49,10 +49,10 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(plugin.limitations, AZURE_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), AzureNormalizer)
         self.assertIsInstance(plugin.create_resource_decorator(), AzureResourceDecorator)
-        self.assertEqual(len(plugin.create_rule_metadata()), 6)
+        self.assertEqual(len(plugin.create_rule_metadata()), 9)
         self.assertIsNotNone(contribution)
         assert contribution is not None
-        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (6, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (9, 0, 0, 0, 0, 0))
         self.assertIsInstance(plugin.create_boundary_contributor(), AzureBoundaryContributor)
         self.assertEqual(
             plugin.create_observations(ResourceInventory(provider="azure", resources=[])),
@@ -60,6 +60,7 @@ class AzureProviderTests(unittest.TestCase):
         )
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
@@ -134,25 +135,28 @@ class AzureProviderTests(unittest.TestCase):
                 AzureResourceType.STORAGE_ACCOUNT,
                 values={"name": "tfstridelogs"},
             ),
-            _terraform_resource("azurerm_key_vault"),
+            _terraform_resource(AzureResourceType.KEY_VAULT),
             _terraform_resource("azapi_resource", provider_name="registry.terraform.io/azure/azapi"),
         ]
 
         inventory = AzureNormalizer().normalize(resources)
 
         self.assertEqual(inventory.provider, "azure")
-        self.assertEqual([resource.address for resource in inventory.resources], ["azurerm_storage_account.example"])
-        self.assertEqual(inventory.unsupported_resources, ["azurerm_key_vault.example"])
+        self.assertEqual(
+            [resource.address for resource in inventory.resources],
+            ["azurerm_storage_account.example", "azurerm_key_vault.example"],
+        )
+        self.assertEqual(inventory.unsupported_resources, [])
         self.assertEqual(
             InventoryMetadata.SUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
             sorted(AZURE_SUPPORTED_RESOURCE_TYPES),
         )
         self.assertEqual(InventoryMetadata.TOTAL_INPUT_RESOURCES.get(inventory.metadata), 3)
         self.assertEqual(InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(inventory.metadata), 2)
-        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 1)
+        self.assertEqual(InventoryMetadata.NORMALIZED_RESOURCE_COUNT.get(inventory.metadata), 2)
         self.assertEqual(
             InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(inventory.metadata),
-            {"azurerm_key_vault": 1},
+            {},
         )
 
 

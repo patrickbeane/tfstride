@@ -18,6 +18,7 @@ from tfstride.analysis.rule_definitions import (
 )
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.resource_decoration.public_exposure import is_risky_public_compute_path
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
@@ -30,6 +31,9 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-storage-account-shared-key-enabled",
         "azure-storage-account-minimum-tls-below-1-2",
         "azure-storage-account-public-network-unrestricted",
+        "azure-key-vault-public-network-access",
+        "azure-key-vault-privileged-access",
+        "azure-key-vault-purge-protection-disabled",
     ),
     (),
     (),
@@ -341,6 +345,7 @@ def build_azure_rule_contribution(
 ) -> RuleContribution:
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
+    key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "azure-public-compute-broad-ingress": compute_detectors.detect_public_compute_broad_ingress,
         "azure-storage-container-public-access": storage_detectors.detect_public_container_access,
@@ -348,6 +353,9 @@ def build_azure_rule_contribution(
         "azure-storage-account-shared-key-enabled": storage_detectors.detect_shared_key_enabled,
         "azure-storage-account-minimum-tls-below-1-2": storage_detectors.detect_minimum_tls_below_1_2,
         "azure-storage-account-public-network-unrestricted": (storage_detectors.detect_unrestricted_public_network),
+        "azure-key-vault-public-network-access": key_vault_detectors.detect_public_network_access,
+        "azure-key-vault-privileged-access": key_vault_detectors.detect_privileged_access,
+        "azure-key-vault-purge-protection-disabled": (key_vault_detectors.detect_purge_protection_disabled),
     }
     resolved_metadata_registry = metadata_registry if metadata_registry is not None else default_rule_registry()
     return build_rule_contribution(

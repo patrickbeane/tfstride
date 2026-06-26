@@ -45,6 +45,7 @@ AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_COMPUTE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_compute_plan.json"
 AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 AZURE_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nightmare_plan.json"
+AZURE_KEY_VAULT_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_key_vault_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
@@ -81,7 +82,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `54`", report)
+        self.assertIn("- Registered rules: `57`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -143,6 +144,7 @@ class MarkdownReportTests(unittest.TestCase):
             AZURE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_inventory_report.md",
             AZURE_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_nightmare_report.md",
             AZURE_STORAGE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_storage_report.md",
+            AZURE_KEY_VAULT_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_key_vault_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():
@@ -494,7 +496,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 54)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 57)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})

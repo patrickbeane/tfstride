@@ -69,4 +69,37 @@ AZURE_RULE_METADATA = (
         tags=("azure", "storage", "network", "public-access"),
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="azure-key-vault-public-network-access",
+        title="Azure Key Vault allows unrestricted public network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public network access where possible, or configure Key Vault network ACLs with a "
+            "default action of `Deny` and use reviewed subnets, IP ranges, or private endpoints."
+        ),
+        tags=("azure", "key-vault", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-key-vault-privileged-access",
+        title="Azure Key Vault grants privileged identity access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace broad Key Vault access policies and privileged vault-scoped roles with least-privilege "
+            "RBAC assignments, narrow principals, and separate administrative from data-plane duties."
+        ),
+        tags=("azure", "key-vault", "identity", "authorization", "least-privilege"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-key-vault-purge-protection-disabled",
+        title="Azure Key Vault purge protection is disabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable purge protection and retain soft-deleted vault objects long enough to recover from "
+            "accidental or malicious deletion."
+        ),
+        tags=("azure", "key-vault", "recovery", "purge-protection"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
 )

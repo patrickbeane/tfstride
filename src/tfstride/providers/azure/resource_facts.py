@@ -62,6 +62,18 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.RESOLVED_STORAGE_ACCOUNT_ADDRESS)
 
     @property
+    def key_vault_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ID)
+
+    @property
+    def key_vault_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_REFERENCE)
+
+    @property
+    def resolved_key_vault_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS)
+
+    @property
     def container_access_type(self) -> str | None:
         return self.get(AzureResourceMetadata.CONTAINER_ACCESS_TYPE)
 
@@ -96,6 +108,66 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     @property
     def storage_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES)
+
+    @property
+    def purge_protection_enabled(self) -> bool | None:
+        return self.optional_bool(AzureResourceMetadata.PURGE_PROTECTION_ENABLED)
+
+    @property
+    def rbac_authorization_enabled(self) -> bool | None:
+        return self.optional_bool(AzureResourceMetadata.RBAC_AUTHORIZATION_ENABLED)
+
+    @property
+    def key_vault_access_policies(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ACCESS_POLICIES)
+
+    @property
+    def key_vault_role_assignments(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS)
+
+    @property
+    def key_vault_related_resource_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_RELATED_RESOURCE_ADDRESSES)
+
+    @property
+    def key_vault_network_ip_rules(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_NETWORK_IP_RULES)
+
+    @property
+    def key_vault_network_subnet_ids(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_NETWORK_SUBNET_IDS)
+
+    @property
+    def key_vault_network_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_NETWORK_UNCERTAINTIES)
+
+    @property
+    def key_vault_authorization_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES)
+
+    @property
+    def key_vault_recovery_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_RECOVERY_UNCERTAINTIES)
+
+    @property
+    def role_assignment_scope(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE)
+
+    @property
+    def role_definition_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_NAME)
+
+    @property
+    def role_definition_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_ID)
+
+    @property
+    def principal_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRINCIPAL_ID)
+
+    @property
+    def principal_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRINCIPAL_TYPE)
 
     @property
     def virtual_network_reference(self) -> str | None:
@@ -163,6 +235,9 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
 
     def set_resolved_storage_account_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_STORAGE_ACCOUNT_ADDRESS, address)
+
+    def set_resolved_key_vault_address(self, address: str) -> None:
+        self.set(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS, address)
 
     def set_effective_network_rule(self, default_action: str | None, source_address: str | None) -> None:
         self.set(AzureResourceMetadata.NETWORK_DEFAULT_ACTION, default_action)
@@ -250,6 +325,30 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
 
     def add_public_container_address(self, address: str) -> None:
         self.append(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES, address)
+
+    def add_key_vault_related_resource_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.KEY_VAULT_RELATED_RESOURCE_ADDRESSES, address)
+
+    def add_key_vault_access_policy(self, policy: dict) -> None:
+        policies = self.key_vault_access_policies
+        if policy not in policies:
+            policies.append(policy)
+            self.set(AzureResourceMetadata.KEY_VAULT_ACCESS_POLICIES, policies)
+
+    def add_key_vault_role_assignment(self, assignment: dict) -> None:
+        assignments = self.key_vault_role_assignments
+        if assignment not in assignments:
+            assignments.append(assignment)
+            self.set(AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS, assignments)
+
+    def extend_key_vault_network_uncertainties(self, uncertainties: Sequence[str | None]) -> None:
+        self.extend(AzureResourceMetadata.KEY_VAULT_NETWORK_UNCERTAINTIES, uncertainties)
+
+    def extend_key_vault_authorization_uncertainties(
+        self,
+        uncertainties: Sequence[str | None],
+    ) -> None:
+        self.extend(AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES, uncertainties)
 
     def add_unresolved_storage_account_reference(self, reference: str | None) -> None:
         self.append(AzureResourceMetadata.UNRESOLVED_STORAGE_ACCOUNT_REFERENCES, reference)

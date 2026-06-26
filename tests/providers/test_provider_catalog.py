@@ -19,7 +19,7 @@ from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
-from tfstride.providers.azure.observations import observe_azure_storage_uncertainty
+from tfstride.providers.azure.observations import observe_azure_posture
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_facts import AzureResourceFacts
@@ -151,7 +151,7 @@ class ProviderCatalogTests(unittest.TestCase):
             AZURE_RULE_GROUP_IDS,
         )
         self.assertIsInstance(azure_plugin.create_boundary_contributor(), AzureBoundaryContributor)
-        self.assertIs(azure_plugin.observation_factory, observe_azure_storage_uncertainty)
+        self.assertIs(azure_plugin.observation_factory, observe_azure_posture)
         self.assertIsNone(
             azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[]))
         )
@@ -196,14 +196,14 @@ class ProviderCatalogTests(unittest.TestCase):
         factories = default_provider_observation_factories_by_provider()
 
         self.assertEqual(tuple(factories), ("azure",))
-        self.assertIs(factories["azure"][0], observe_azure_storage_uncertainty)
+        self.assertIs(factories["azure"][0], observe_azure_posture)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
         registry = default_rule_registry()
         contribution = default_rule_contribution(FindingFactory(registry))
         rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
 
-        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (33, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (36, 2, 2, 12, 3, 2))
         self.assertEqual(
             {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
             registry.known_rule_ids(),
@@ -287,6 +287,13 @@ class ProviderCatalogTests(unittest.TestCase):
             name="web",
             category=ResourceCategory.NETWORK,
         )
+        azure_key_vault = NormalizedResource(
+            address="azurerm_key_vault.application",
+            provider="azure",
+            resource_type="azurerm_key_vault",
+            name="application",
+            category=ResourceCategory.DATA,
+        )
 
         self.assertEqual(registry.providers(), ("aws", "gcp", "azure"))
         self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
@@ -311,6 +318,19 @@ class ProviderCatalogTests(unittest.TestCase):
                     ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD,
                     ResourceCapability.PUBLIC_COMPUTE,
                     ResourceCapability.PUBLIC_EDGE,
+                }
+            ),
+        )
+        self.assertEqual(
+            registry.capabilities_for(azure_key_vault),
+            frozenset(
+                {
+                    ResourceCapability.DATA_STORE,
+                    ResourceCapability.PUBLIC_EDGE,
+                    ResourceCapability.SECRET_STORE,
+                    ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE,
+                    ResourceCapability.KEY_MANAGEMENT,
+                    ResourceCapability.SENSITIVE_RESOURCE_POLICY,
                 }
             ),
         )

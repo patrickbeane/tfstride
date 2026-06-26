@@ -247,6 +247,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("NETWORK_DEFAULT_ACTION", azure_owned)
         self.assertIn("PUBLIC_COMPUTE_EXPOSURE_PATHS", azure_owned)
         self.assertIn("STORAGE_POSTURE_UNCERTAINTIES", azure_owned)
+        self.assertIn("KEY_VAULT_ACCESS_POLICIES", azure_owned)
+        self.assertIn("KEY_VAULT_ROLE_ASSIGNMENTS", azure_owned)
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)

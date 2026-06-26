@@ -2,30 +2,29 @@
 
 - Analyzed file: `sample_azure_plan.json`
 - Provider: `azure`
-- Normalized resources: `13`
-- Unsupported resources: `2`
+- Normalized resources: `14`
+- Unsupported resources: `1`
 
 ## Summary
 
-This run identified **2 trust boundaries** and **6 findings** across **13 normalized resources**.
+This run identified **3 trust boundaries** and **8 findings** across **14 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `4`
+- Medium severity findings: `6`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
 - Terraform resources seen: `15`
 - Provider resources considered: `15`
-- Normalized resources: `13`
-- Unsupported resources: `2`
-- Registered rules: `54`
-- Enabled rules: `54`
+- Normalized resources: `14`
+- Unsupported resources: `1`
+- Registered rules: `57`
+- Enabled rules: `57`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Unsupported resource types:
-  - `azurerm_key_vault`: `1`
   - `azurerm_kubernetes_cluster`: `1`
 - Findings by rule:
   - `azure-public-compute-broad-ingress`: `1`
@@ -34,6 +33,8 @@ This run identified **2 trust boundaries** and **6 findings** across **13 normal
   - `azure-storage-account-shared-key-enabled`: `1`
   - `azure-storage-account-minimum-tls-below-1-2`: `1`
   - `azure-storage-account-public-network-unrestricted`: `1`
+  - `azure-key-vault-public-network-access`: `1`
+  - `azure-key-vault-purge-protection-disabled`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -49,6 +50,13 @@ This run identified **2 trust boundaries** and **6 findings** across **13 normal
 - Source: `internet`
 - Target: `azurerm_linux_virtual_machine.web`
 - Description: Traffic can cross from the public internet to azurerm_linux_virtual_machine.web.
+- Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
+
+### `internet-to-service`
+
+- Source: `internet`
+- Target: `azurerm_key_vault.application`
+- Description: Traffic can cross from the public internet to azurerm_key_vault.application.
 - Rationale: The resource is directly reachable or intentionally exposed to unauthenticated network clients.
 
 ## Findings
@@ -78,6 +86,28 @@ This run identified **2 trust boundaries** and **6 findings** across **13 normal
   - public access posture: allow_nested_items_to_be_public is true
 
 ### Medium
+
+#### Azure Key Vault allows unrestricted public network access
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_key_vault.application`
+- Trust boundary: `internet-to-service:internet->azurerm_key_vault.application`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_key_vault.application enables its public endpoint with an effective `Allow` network ACL default action. Network reachability does not itself grant data access, but it exposes the sensitive service endpoint to internet clients.
+- Recommended mitigation: Disable public network access where possible, or configure Key Vault network ACLs with a default action of `Deny` and use reviewed subnets, IP ranges, or private endpoints.
+- Evidence:
+  - network exposure: public_network_access_enabled is true; effective network_acls.default_action is Allow; network exposure is evaluated separately from identity authorization
+
+#### Azure Key Vault purge protection is disabled
+
+- STRIDE category: Tampering
+- Affected resources: `azurerm_key_vault.application`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault.application does not enable purge protection. A principal with sufficient deletion authority could permanently remove vault contents during the retention window.
+- Recommended mitigation: Enable purge protection and retain soft-deleted vault objects long enough to recover from accidental or malicious deletion.
+- Evidence:
+  - recovery posture: purge_protection_enabled is false
 
 #### Azure Storage account allows TLS below 1.2
 
@@ -132,7 +162,6 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; Azure identity, database, load-balancer, private-endpoint, and broader platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure identity, database, load-balancer, private-endpoint, and platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
-- Unsupported resource skipped: `azurerm_key_vault.application`
 - Unsupported resource skipped: `azurerm_kubernetes_cluster.platform`

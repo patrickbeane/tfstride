@@ -1,0 +1,137 @@
+{
+    "format_version": "1.2",
+    "terraform_version": "1.8.5",
+    "planned_values": {
+        "root_module": {
+            "resources": [
+                {
+                    "address": "azurerm_key_vault.private",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault",
+                    "name": "private",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {
+                        "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-private",
+                        "name": "tfstride-private",
+                        "location": "eastus",
+                        "tenant_id": "00000000-0000-0000-0000-000000000001",
+                        "public_network_access_enabled": false,
+                        "purge_protection_enabled": true,
+                        "enable_rbac_authorization": false,
+                        "network_acls": [
+                            {
+                                "bypass": "None",
+                                "default_action": "Deny",
+                                "ip_rules": [],
+                                "virtual_network_subnet_ids": []
+                            }
+                        ],
+                        "access_policy": [
+                            {
+                                "tenant_id": "00000000-0000-0000-0000-000000000001",
+                                "object_id": "00000000-0000-0000-0000-000000000010",
+                                "secret_permissions": ["Get", "List"],
+                                "key_permissions": [],
+                                "certificate_permissions": [],
+                                "storage_permissions": []
+                            }
+                        ]
+                    }
+                },
+                {
+                    "address": "azurerm_key_vault.restricted",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault",
+                    "name": "restricted",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {
+                        "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-restricted",
+                        "name": "tfstride-restricted",
+                        "location": "eastus",
+                        "tenant_id": "00000000-0000-0000-0000-000000000001",
+                        "public_network_access_enabled": true,
+                        "purge_protection_enabled": true,
+                        "enable_rbac_authorization": true,
+                        "network_acls": [
+                            {
+                                "bypass": "AzureServices",
+                                "default_action": "Deny",
+                                "ip_rules": ["198.51.100.10"],
+                                "virtual_network_subnet_ids": ["azurerm_subnet.app.id"]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "address": "azurerm_key_vault.public",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault",
+                    "name": "public",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {
+                        "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-public",
+                        "name": "tfstride-public",
+                        "location": "eastus",
+                        "tenant_id": "00000000-0000-0000-0000-000000000001",
+                        "public_network_access_enabled": true,
+                        "purge_protection_enabled": false,
+                        "enable_rbac_authorization": true
+                    }
+                },
+                {
+                    "address": "azurerm_key_vault_access_policy.operators",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault_access_policy",
+                    "name": "operators",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {
+                        "key_vault_id": "azurerm_key_vault.public.id",
+                        "tenant_id": "00000000-0000-0000-0000-000000000001",
+                        "object_id": "00000000-0000-0000-0000-000000000020",
+                        "secret_permissions": ["Get", "List", "Set", "Delete", "Purge", "Recover"],
+                        "key_permissions": [],
+                        "certificate_permissions": [],
+                        "storage_permissions": []
+                    }
+                },
+                {
+                    "address": "azurerm_role_assignment.key_vault_admin",
+                    "mode": "managed",
+                    "type": "azurerm_role_assignment",
+                    "name": "key_vault_admin",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {
+                        "scope": "azurerm_key_vault.public.id",
+                        "role_definition_name": "Key Vault Administrator",
+                        "principal_id": "00000000-0000-0000-0000-000000000030",
+                        "principal_type": "ServicePrincipal"
+                    }
+                },
+                {
+                    "address": "azurerm_key_vault_secret.api_key",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault_secret",
+                    "name": "api_key",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {"name": "api-key", "key_vault_id": "azurerm_key_vault.public.id"}
+                },
+                {
+                    "address": "azurerm_key_vault_key.signing",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault_key",
+                    "name": "signing",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {"name": "signing", "key_vault_id": "azurerm_key_vault.public.id", "key_type": "RSA"}
+                },
+                {
+                    "address": "azurerm_key_vault_certificate.tls",
+                    "mode": "managed",
+                    "type": "azurerm_key_vault_certificate",
+                    "name": "tls",
+                    "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                    "values": {"name": "tls", "key_vault_id": "azurerm_key_vault.public.id"}
+                }
+            ]
+        }
+    }
+}

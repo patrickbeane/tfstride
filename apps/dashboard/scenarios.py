@@ -214,8 +214,8 @@ DEMO_SCENARIO_DEFINITIONS = (
         report_title="Azure Inventory Demo",
         fixture_name="azure/sample_azure_plan.json",
         description=(
-            "Azure Storage and public VM exposure alongside unsupported AKS and Key Vault resources "
-            "for explicit coverage reporting."
+            "Azure Storage, public VM, and Key Vault posture alongside unsupported AKS coverage "
+            "for explicit supported and unsupported reporting."
         ),
         emphasis="Provider coverage",
         theme="balanced",
@@ -226,8 +226,8 @@ DEMO_SCENARIO_DEFINITIONS = (
         report_title="Azure Nightmare Plan Demo",
         fixture_name="azure/sample_azure_nightmare_plan.json",
         description=(
-            "Stacked Azure Storage exposure and public Linux and Windows administration paths, "
-            "with explicit unsupported-resource coverage."
+            "Stacked Azure Storage, public Linux and Windows administration paths, and Key Vault "
+            "exposure with explicit unsupported-resource coverage."
         ),
         emphasis="Stress-case fixture",
         theme="nightmare",

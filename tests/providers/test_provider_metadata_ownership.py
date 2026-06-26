@@ -94,12 +94,14 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
 
         facts.set(AzureResourceMetadata.STORAGE_ACCOUNT_ID, "/subscriptions/example/storageAccounts/app")
         facts.set(AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED, False)
+        facts.set(AzureResourceMetadata.KEY_VAULT_ID, "/subscriptions/example/vaults/app")
 
         self.assertEqual(
             facts.storage_account_id,
             "/subscriptions/example/storageAccounts/app",
         )
         self.assertFalse(facts.public_network_access_enabled)
+        self.assertEqual(facts.key_vault_id, "/subscriptions/example/vaults/app")
 
     def test_aws_facts_reject_gcp_owned_metadata_writes(self) -> None:
         resource = _resource("aws")

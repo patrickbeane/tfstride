@@ -9,6 +9,12 @@ class AzureResourceType:
     STORAGE_ACCOUNT = "azurerm_storage_account"
     STORAGE_ACCOUNT_NETWORK_RULES = "azurerm_storage_account_network_rules"
     STORAGE_CONTAINER = "azurerm_storage_container"
+    KEY_VAULT = "azurerm_key_vault"
+    KEY_VAULT_ACCESS_POLICY = "azurerm_key_vault_access_policy"
+    KEY_VAULT_SECRET = "azurerm_key_vault_secret"
+    KEY_VAULT_KEY = "azurerm_key_vault_key"
+    KEY_VAULT_CERTIFICATE = "azurerm_key_vault_certificate"
+    ROLE_ASSIGNMENT = "azurerm_role_assignment"
     VIRTUAL_NETWORK = "azurerm_virtual_network"
     SUBNET = "azurerm_subnet"
     NETWORK_SECURITY_GROUP = "azurerm_network_security_group"
@@ -26,6 +32,17 @@ AZURE_STORAGE_RESOURCE_TYPES = frozenset(
         AzureResourceType.STORAGE_ACCOUNT,
         AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES,
         AzureResourceType.STORAGE_CONTAINER,
+    }
+)
+
+AZURE_KEY_VAULT_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.KEY_VAULT,
+        AzureResourceType.KEY_VAULT_ACCESS_POLICY,
+        AzureResourceType.KEY_VAULT_SECRET,
+        AzureResourceType.KEY_VAULT_KEY,
+        AzureResourceType.KEY_VAULT_CERTIFICATE,
+        AzureResourceType.ROLE_ASSIGNMENT,
     }
 )
 
@@ -50,5 +67,8 @@ AZURE_COMPUTE_RESOURCE_TYPES = frozenset(
 )
 
 AZURE_SUPPORTED_RESOURCE_TYPES = (
-    AZURE_STORAGE_RESOURCE_TYPES | AZURE_NETWORK_RESOURCE_TYPES | AZURE_COMPUTE_RESOURCE_TYPES
+    AZURE_STORAGE_RESOURCE_TYPES
+    | AZURE_KEY_VAULT_RESOURCE_TYPES
+    | AZURE_NETWORK_RESOURCE_TYPES
+    | AZURE_COMPUTE_RESOURCE_TYPES
 )
