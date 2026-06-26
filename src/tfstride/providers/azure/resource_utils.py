@@ -63,6 +63,8 @@ def azure_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.get_metadata_field(AzureResourceMetadata.NAME),
         resource.get_metadata_field(AzureResourceMetadata.STORAGE_ACCOUNT_ID),
         resource.get_metadata_field(AzureResourceMetadata.KEY_VAULT_ID),
+        resource.get_metadata_field(AzureResourceMetadata.CLIENT_ID),
+        resource.get_metadata_field(AzureResourceMetadata.PRINCIPAL_ID),
         resource.get_metadata_field(AzureResourceMetadata.PUBLIC_IP_ADDRESS),
     ):
         if value:

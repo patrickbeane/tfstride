@@ -149,7 +149,10 @@ class ResourceConceptTests(unittest.TestCase):
                 }
             ),
         )
-        self.assertEqual(IDENTITY_ROLE_RESOURCE_TYPES, frozenset({"aws_iam_role", "google_service_account"}))
+        self.assertEqual(
+            IDENTITY_ROLE_RESOURCE_TYPES,
+            frozenset({"aws_iam_role", "google_service_account", "azurerm_user_assigned_identity"}),
+        )
         self.assertEqual(
             IAM_POLICY_RESOURCE_TYPES,
             frozenset(
@@ -335,6 +338,7 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
+        self.assertTrue(is_identity_role_resource(_resource("azurerm_user_assigned_identity", provider="azure")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
         self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
         self.assertTrue(is_iam_policy_resource(_resource("google_bigquery_dataset_iam_member", provider="gcp")))

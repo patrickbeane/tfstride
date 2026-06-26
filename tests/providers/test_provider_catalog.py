@@ -294,6 +294,13 @@ class ProviderCatalogTests(unittest.TestCase):
             name="application",
             category=ResourceCategory.DATA,
         )
+        azure_managed_identity = NormalizedResource(
+            address="azurerm_user_assigned_identity.deploy",
+            provider="azure",
+            resource_type="azurerm_user_assigned_identity",
+            name="deploy",
+            category=ResourceCategory.IAM,
+        )
 
         self.assertEqual(registry.providers(), ("aws", "gcp", "azure"))
         self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
@@ -333,6 +340,10 @@ class ProviderCatalogTests(unittest.TestCase):
                     ResourceCapability.SENSITIVE_RESOURCE_POLICY,
                 }
             ),
+        )
+        self.assertEqual(
+            registry.capabilities_for(azure_managed_identity),
+            frozenset({ResourceCapability.IDENTITY_ROLE}),
         )
         self.assertEqual(
             registry.capabilities_for(azure_network_security_group),

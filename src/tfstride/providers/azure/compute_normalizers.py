@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.azure.identity_normalizers import managed_identity_metadata
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.resource_utils import as_list, compact_strings, first_non_empty
 
@@ -20,6 +21,15 @@ def _normalize_virtual_machine(resource: TerraformResource, *, os_type: str) -> 
     network_interface_references = compact_strings(as_list(values.get("network_interface_ids")))
     public_ip_address = first_non_empty(values.get("public_ip_address"))
     public_access_configured = bool(public_ip_address)
+    metadata = {
+        AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
+        AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
+        AzureResourceMetadata.VM_SIZE: first_non_empty(values.get("size")),
+        AzureResourceMetadata.OS_TYPE: os_type,
+        AzureResourceMetadata.NETWORK_INTERFACE_REFERENCES: network_interface_references,
+        AzureResourceMetadata.PUBLIC_IP_ADDRESS: public_ip_address,
+    }
+    metadata.update(managed_identity_metadata(resource))
     return NormalizedResource(
         address=resource.address,
         provider=AZURE_PROVIDER,
@@ -28,12 +38,5 @@ def _normalize_virtual_machine(resource: TerraformResource, *, os_type: str) -> 
         category=ResourceCategory.COMPUTE,
         identifier=first_non_empty(values.get("id"), values.get("name"), resource.address),
         public_access_configured=public_access_configured,
-        metadata={
-            AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
-            AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
-            AzureResourceMetadata.VM_SIZE: first_non_empty(values.get("size")),
-            AzureResourceMetadata.OS_TYPE: os_type,
-            AzureResourceMetadata.NETWORK_INTERFACE_REFERENCES: network_interface_references,
-            AzureResourceMetadata.PUBLIC_IP_ADDRESS: public_ip_address,
-        },
+        metadata=metadata,
     )

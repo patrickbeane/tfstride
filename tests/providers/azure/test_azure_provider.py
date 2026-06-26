@@ -61,6 +61,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
@@ -73,6 +74,10 @@ class AzureProviderTests(unittest.TestCase):
                     AzureResourceType.WINDOWS_VIRTUAL_MACHINE,
                 }
             ),
+        )
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.IDENTITY_ROLE),
+            frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY}),
         )
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.NETWORK_SECURITY_GROUP),

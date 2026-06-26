@@ -13,6 +13,7 @@ from tfstride.providers.azure.data_normalizers import (
     normalize_storage_account_network_rules,
     normalize_storage_container,
 )
+from tfstride.providers.azure.identity_normalizers import normalize_user_assigned_identity
 from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
@@ -46,6 +47,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.KEY_VAULT_KEY: normalize_key_vault_key,
     AzureResourceType.KEY_VAULT_CERTIFICATE: normalize_key_vault_certificate,
     AzureResourceType.ROLE_ASSIGNMENT: normalize_role_assignment,
+    AzureResourceType.USER_ASSIGNED_IDENTITY: normalize_user_assigned_identity,
     AzureResourceType.VIRTUAL_NETWORK: normalize_virtual_network,
     AzureResourceType.SUBNET: normalize_subnet,
     AzureResourceType.NETWORK_SECURITY_GROUP: normalize_network_security_group,
@@ -63,7 +65,7 @@ SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 
 
 class AzureNormalizer(ProviderNormalizer):
-    """Normalize the supported AzureRM storage, Key Vault, network, and compute resource set."""
+    """Normalize supported AzureRM storage, identity, Key Vault, network, and compute resources."""
 
     provider = "azure"
 

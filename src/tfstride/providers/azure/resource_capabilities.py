@@ -24,6 +24,7 @@ AZURE_RESOURCE_CAPABILITIES: ResourceCapabilityMap = MappingProxyType(
         ResourceCapability.PUBLIC_COMPUTE: _VIRTUAL_MACHINES,
         ResourceCapability.DATA_STORE: _STORAGE_ACCOUNTS | _KEY_VAULT_DATA,
         ResourceCapability.PUBLIC_EDGE: _STORAGE_ACCOUNTS | _KEY_VAULTS | _VIRTUAL_MACHINES,
+        ResourceCapability.IDENTITY_ROLE: frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY}),
         ResourceCapability.IAM_POLICY: frozenset(
             {AzureResourceType.KEY_VAULT_ACCESS_POLICY, AzureResourceType.ROLE_ASSIGNMENT}
         ),

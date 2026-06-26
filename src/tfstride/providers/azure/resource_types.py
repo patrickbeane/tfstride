@@ -15,6 +15,7 @@ class AzureResourceType:
     KEY_VAULT_KEY = "azurerm_key_vault_key"
     KEY_VAULT_CERTIFICATE = "azurerm_key_vault_certificate"
     ROLE_ASSIGNMENT = "azurerm_role_assignment"
+    USER_ASSIGNED_IDENTITY = "azurerm_user_assigned_identity"
     VIRTUAL_NETWORK = "azurerm_virtual_network"
     SUBNET = "azurerm_subnet"
     NETWORK_SECURITY_GROUP = "azurerm_network_security_group"
@@ -46,6 +47,8 @@ AZURE_KEY_VAULT_RESOURCE_TYPES = frozenset(
     }
 )
 
+AZURE_IDENTITY_RESOURCE_TYPES = frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY})
+
 AZURE_NETWORK_RESOURCE_TYPES = frozenset(
     {
         AzureResourceType.VIRTUAL_NETWORK,
@@ -69,6 +72,7 @@ AZURE_COMPUTE_RESOURCE_TYPES = frozenset(
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
+    | AZURE_IDENTITY_RESOURCE_TYPES
     | AZURE_NETWORK_RESOURCE_TYPES
     | AZURE_COMPUTE_RESOURCE_TYPES
 )

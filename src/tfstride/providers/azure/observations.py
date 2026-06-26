@@ -3,7 +3,7 @@ from __future__ import annotations
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
 
 _STORAGE_POSTURE_RESOURCE_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
@@ -15,11 +15,60 @@ def observe_azure_posture(inventory: ResourceInventory) -> list[Observation]:
     if inventory.provider != "azure":
         return []
     return [
+        *_observe_managed_identity_principals(inventory),
         *observe_azure_storage_uncertainty(inventory),
         *_observe_key_vault_network_posture(inventory),
         *_observe_key_vault_authorization_posture(inventory),
         *_observe_key_vault_recovery_posture(inventory),
     ]
+
+
+def _observe_managed_identity_principals(inventory: ResourceInventory) -> list[Observation]:
+    observations: list[Observation] = []
+    resource_types = (*AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType.USER_ASSIGNED_IDENTITY)
+    for resource in inventory.by_type(*resource_types):
+        facts = azure_facts(resource)
+        if facts.identity_type:
+            observations.append(
+                Observation(
+                    title="Azure managed identity principal is modeled",
+                    observation_id="azure-managed-identity-principal-observed",
+                    category="iam",
+                    affected_resources=[resource.address],
+                    rationale=(
+                        f"{resource.display_name} exposes a `{facts.identity_type}` managed identity principal. "
+                        "This models principal identity only and does not imply a role assignment or effective access."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("identity_type", [facts.identity_type]),
+                        evidence_item("principal_id", [facts.principal_id] if facts.principal_id else []),
+                        evidence_item("client_id", [facts.client_id] if facts.client_id else []),
+                        evidence_item("tenant_id", [facts.tenant_id] if facts.tenant_id else []),
+                        evidence_item("attached_identity_references", facts.attached_identity_references),
+                        evidence_item(
+                            "analysis_scope",
+                            ["managed identity principal is not connected to Azure role assignments"],
+                        ),
+                    ),
+                )
+            )
+        if facts.managed_identity_uncertainties:
+            observations.append(
+                Observation(
+                    title="Azure managed identity principal contains unresolved plan values",
+                    observation_id="azure-managed-identity-principal-unknown",
+                    category="analysis-uncertainty",
+                    affected_resources=[resource.address],
+                    rationale=(
+                        f"{resource.display_name} has computed managed identity attributes. tfSTRIDE preserves "
+                        "the known principal shape without inferring unresolved identifiers or attachments."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("unknown_identity_posture", facts.managed_identity_uncertainties),
+                    ),
+                )
+            )
+    return observations
 
 
 def observe_azure_storage_uncertainty(inventory: ResourceInventory) -> list[Observation]:

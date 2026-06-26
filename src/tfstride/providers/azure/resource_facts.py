@@ -170,6 +170,34 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.PRINCIPAL_TYPE)
 
     @property
+    def client_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.CLIENT_ID)
+
+    @property
+    def tenant_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.TENANT_ID)
+
+    @property
+    def identity_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.IDENTITY_TYPE)
+
+    @property
+    def attached_identity_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ATTACHED_IDENTITY_REFERENCES)
+
+    @property
+    def managed_identity_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.MANAGED_IDENTITY_UNCERTAINTIES)
+
+    @property
+    def has_system_assigned_identity(self) -> bool:
+        return _identity_type_includes(self.identity_type, "SystemAssigned")
+
+    @property
+    def has_user_assigned_identity(self) -> bool:
+        return _identity_type_includes(self.identity_type, "UserAssigned")
+
+    @property
     def virtual_network_reference(self) -> str | None:
         return self.get(AzureResourceMetadata.VIRTUAL_NETWORK_REFERENCE)
 
@@ -387,3 +415,12 @@ def azure_facts(resource: NormalizedResource) -> AzureResourceFacts:
 def azure_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
     facts = azure_facts(resource)
     return ProviderResourceFactDomains(storage=facts, iam=facts, sql=facts, compute=facts, workload=facts)
+
+
+def _identity_type_includes(identity_type: str | None, expected: str) -> bool:
+    if identity_type is None:
+        return False
+    normalized_expected = expected.strip().lower()
+    return any(
+        part.strip().lower() == normalized_expected for part in identity_type.replace(",", " ").split() if part.strip()
+    )

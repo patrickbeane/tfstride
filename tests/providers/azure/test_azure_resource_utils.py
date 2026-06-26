@@ -39,6 +39,28 @@ class AzureResourceUtilsTests(unittest.TestCase):
         self.assertIn("/subscriptions/example/virtualnetworks/main", references)
         self.assertIn("tfstride-main", references)
 
+    def test_managed_identity_references_include_client_and_principal_ids(self) -> None:
+        identity = NormalizedResource(
+            address="azurerm_user_assigned_identity.deploy",
+            provider="azure",
+            resource_type="azurerm_user_assigned_identity",
+            name="deploy",
+            category=ResourceCategory.IAM,
+            identifier="/subscriptions/example/userAssignedIdentities/deploy",
+            metadata={
+                AzureResourceMetadata.NAME: "deploy",
+                AzureResourceMetadata.CLIENT_ID: "client-id",
+                AzureResourceMetadata.PRINCIPAL_ID: "principal-id",
+            },
+        )
+
+        references = azure_resource_references(identity)
+
+        self.assertIn("azurerm_user_assigned_identity.deploy", references)
+        self.assertIn("/subscriptions/example/userassignedidentities/deploy", references)
+        self.assertIn("client-id", references)
+        self.assertIn("principal-id", references)
+
     def test_network_security_rule_parser_preserves_decision_data_and_allow_rules(self) -> None:
         allow_rules, records = parse_network_security_rules(
             {

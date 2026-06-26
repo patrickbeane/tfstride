@@ -39,6 +39,8 @@ class AzureResourceMetadata:
     ROLE_DEFINITION_ID = OptionalStringMetadataField("role_definition_id")
     PRINCIPAL_ID = OptionalStringMetadataField("principal_id")
     PRINCIPAL_TYPE = OptionalStringMetadataField("principal_type")
+    CLIENT_ID = OptionalStringMetadataField("client_id")
+    IDENTITY_TYPE = OptionalStringMetadataField("identity_type")
 
     ALLOW_NESTED_ITEMS_TO_BE_PUBLIC = BoolMetadataField("allow_nested_items_to_be_public")
     SHARED_ACCESS_KEY_ENABLED = BoolMetadataField("shared_access_key_enabled")
@@ -57,6 +59,8 @@ class AzureResourceMetadata:
     KEY_VAULT_NETWORK_UNCERTAINTIES = StringListMetadataField("key_vault_network_uncertainties")
     KEY_VAULT_AUTHORIZATION_UNCERTAINTIES = StringListMetadataField("key_vault_authorization_uncertainties")
     KEY_VAULT_RECOVERY_UNCERTAINTIES = StringListMetadataField("key_vault_recovery_uncertainties")
+    ATTACHED_IDENTITY_REFERENCES = StringListMetadataField("attached_identity_references")
+    MANAGED_IDENTITY_UNCERTAINTIES = StringListMetadataField("managed_identity_uncertainties")
     ADDRESS_SPACE = StringListMetadataField("address_space")
     ADDRESS_PREFIXES = StringListMetadataField("address_prefixes")
     NETWORK_INTERFACE_REFERENCES = StringListMetadataField("network_interface_references")
