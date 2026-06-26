@@ -10,15 +10,16 @@ from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.input.terraform_plan import load_terraform_plan
-from tfstride.models import AnalysisResult, ResourceInventory, TerraformResource
+from tfstride.models import AnalysisResult, Observation, ResourceInventory, TerraformResource
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
     default_provider_boundary_contributor_factories_by_provider,
     default_provider_limitations,
+    default_provider_observation_factories_by_provider,
     default_provider_registry,
 )
 from tfstride.providers.names import normalize_provider_name
-from tfstride.providers.plugin import ProviderBoundaryContributorFactory
+from tfstride.providers.plugin import ProviderBoundaryContributorFactory, ProviderObservationFactory
 from tfstride.providers.registry import ProviderRegistry
 
 AUTO_PROVIDER = "auto"
@@ -42,6 +43,7 @@ class TfStride:
         provider_boundary_contributor_factories: (
             Mapping[str, Iterable[ProviderBoundaryContributorFactory]] | None
         ) = None,
+        provider_observation_factories: Mapping[str, Iterable[ProviderObservationFactory]] | None = None,
     ) -> None:
         self._provider_registry = provider_registry or default_provider_registry()
         self._provider = _normalize_requested_provider(provider)
@@ -52,6 +54,11 @@ class TfStride:
             provider_boundary_contributor_factories
             if provider_boundary_contributor_factories is not None
             else default_provider_boundary_contributor_factories_by_provider()
+        )
+        self._provider_observation_factories = _normalize_provider_observation_factories(
+            provider_observation_factories
+            if provider_observation_factories is not None
+            else default_provider_observation_factories_by_provider()
         )
         self._rule_engine = StrideRuleEngine()
         self._rule_policy = rule_policy
@@ -88,7 +95,13 @@ class TfStride:
             ),
             self._rule_policy,
         )
-        observations = self._rule_engine.observe_controls(inventory)
+        observations = [
+            *self._rule_engine.observe_controls(inventory),
+            *self._observations_for_provider(inventory),
+        ]
+        observations.sort(
+            key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id)
+        )
         return AnalysisResult(
             title=title,
             analyzed_file=Path(terraform_plan.source_path).name,
@@ -112,6 +125,14 @@ class TfStride:
     def _boundary_contributors_for_provider(self, provider: str) -> tuple[BoundaryContributor, ...]:
         provider_name = normalize_provider_name(provider)
         return tuple(factory() for factory in self._provider_boundary_contributor_factories.get(provider_name, ()))
+
+    def _observations_for_provider(self, inventory: ResourceInventory) -> list[Observation]:
+        provider_name = normalize_provider_name(inventory.provider)
+        return [
+            observation
+            for factory in self._provider_observation_factories.get(provider_name, ())
+            for observation in factory(inventory)
+        ]
 
 
 def _normalize_requested_provider(provider: str | None) -> str | None:
@@ -142,6 +163,18 @@ def _normalize_provider_boundary_contributor_factories(
 ) -> dict[str, tuple[ProviderBoundaryContributorFactory, ...]]:
     normalized: dict[str, tuple[ProviderBoundaryContributorFactory, ...]] = {}
     for provider, factories in provider_boundary_contributor_factories.items():
+        provider_name = normalize_provider_name(provider)
+        if not provider_name:
+            continue
+        normalized[provider_name] = tuple(factories)
+    return normalized
+
+
+def _normalize_provider_observation_factories(
+    provider_observation_factories: Mapping[str, Iterable[ProviderObservationFactory]],
+) -> dict[str, tuple[ProviderObservationFactory, ...]]:
+    normalized: dict[str, tuple[ProviderObservationFactory, ...]] = {}
+    for provider, factories in provider_observation_factories.items():
         provider_name = normalize_provider_name(provider)
         if not provider_name:
             continue

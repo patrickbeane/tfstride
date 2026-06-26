@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
+from tfstride.providers.azure.observations import observe_azure_storage_uncertainty
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_facts import azure_fact_domains
@@ -48,4 +49,5 @@ def azure_provider_plugin() -> ProviderPlugin:
         rule_metadata_factory=_azure_rule_metadata,
         rule_contribution_factory=_azure_rule_contribution,
         boundary_contributor_factory=_azure_boundary_contributor,
+        observation_factory=observe_azure_storage_uncertainty,
     )

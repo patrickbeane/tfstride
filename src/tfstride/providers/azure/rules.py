@@ -248,8 +248,12 @@ class AzureStorageRuleDetectors:
         findings: list[Finding] = []
         for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
             facts = azure_facts(account)
-            default_action = facts.network_default_action or "Allow"
-            if facts.public_network_access_enabled is not True or default_action.strip().lower() == "deny":
+            default_action = facts.network_default_action
+            if (
+                facts.public_network_access_enabled is not True
+                or default_action is None
+                or default_action.strip().lower() != "allow"
+            ):
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", account.address))
             severity_reasoning = build_severity_reasoning(

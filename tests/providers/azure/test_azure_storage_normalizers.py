@@ -17,6 +17,7 @@ def _resource(
     values: dict[str, object],
     *,
     name: str = "example",
+    unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     return TerraformResource(
         address=f"{resource_type}.{name}",
@@ -25,6 +26,7 @@ def _resource(
         name=name,
         provider_name="registry.terraform.io/hashicorp/azurerm",
         values=values,
+        unknown_values=unknown_values or {},
     )
 
 
@@ -73,6 +75,45 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.network_default_action, "Allow")
         self.assertIsNone(facts.network_rule_source_address)
 
+    def test_storage_account_preserves_computed_posture_as_unknown(self) -> None:
+        normalized = normalize_storage_account(
+            _resource(
+                AzureResourceType.STORAGE_ACCOUNT,
+                {
+                    "name": "tfstridelogs",
+                    "allow_nested_items_to_be_public": None,
+                    "shared_access_key_enabled": None,
+                    "min_tls_version": None,
+                    "public_network_access_enabled": None,
+                    "network_rules": [{"default_action": None}],
+                },
+                unknown_values={
+                    "allow_nested_items_to_be_public": True,
+                    "shared_access_key_enabled": True,
+                    "min_tls_version": True,
+                    "public_network_access_enabled": True,
+                    "network_rules": [{"default_action": True}],
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertIsNone(facts.allow_nested_items_to_be_public)
+        self.assertIsNone(facts.shared_access_key_enabled)
+        self.assertIsNone(facts.min_tls_version)
+        self.assertIsNone(facts.public_network_access_enabled)
+        self.assertIsNone(facts.network_default_action)
+        self.assertEqual(
+            facts.storage_posture_uncertainties,
+            [
+                "network_rules.default_action is unknown after planning",
+                "allow_nested_items_to_be_public is unknown after planning",
+                "shared_access_key_enabled is unknown after planning",
+                "public_network_access_enabled is unknown after planning",
+                "min_tls_version is unknown after planning",
+            ],
+        )
+
     def test_storage_container_normalizes_account_reference_and_private_default(self) -> None:
         normalized = normalize_storage_container(
             _resource(
@@ -91,6 +132,26 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.storage_account_reference, "azurerm_storage_account.logs.id")
         self.assertEqual(facts.container_access_type, "private")
         self.assertTrue(normalized.storage_encrypted)
+
+    def test_storage_container_preserves_computed_access_type_as_unknown(self) -> None:
+        normalized = normalize_storage_container(
+            _resource(
+                AzureResourceType.STORAGE_CONTAINER,
+                {
+                    "name": "pending",
+                    "storage_account_id": "azurerm_storage_account.logs.id",
+                    "container_access_type": None,
+                },
+                unknown_values={"container_access_type": True},
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertIsNone(facts.container_access_type)
+        self.assertEqual(
+            facts.storage_posture_uncertainties,
+            ["container_access_type is unknown after planning"],
+        )
 
     def test_storage_container_accepts_deprecated_account_name_reference(self) -> None:
         normalized = normalize_storage_container(

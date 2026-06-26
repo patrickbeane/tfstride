@@ -28,8 +28,11 @@ class DecorateStorageRelationshipsStage:
                 facts.add_unresolved_storage_account_reference(facts.storage_account_reference)
                 continue
             facts.set_resolved_storage_account_address(account.address)
-            default_action = facts.network_default_action or "Allow"
-            azure_facts(account).set_effective_network_rule(default_action, network_rules.address)
+            account_facts = azure_facts(account)
+            account_facts.set_effective_network_rule(facts.network_default_action, network_rules.address)
+            account_facts.extend_storage_posture_uncertainties(
+                [f"{network_rules.address}: {uncertainty}" for uncertainty in facts.storage_posture_uncertainties]
+            )
 
     def _derive_account_network_posture(self, resources: list[NormalizedResource]) -> None:
         for account in resources:
@@ -37,8 +40,10 @@ class DecorateStorageRelationshipsStage:
                 continue
             facts = azure_facts(account)
             public_network_enabled = facts.public_network_access_enabled is True
-            default_action = (facts.network_default_action or "Allow").strip()
-            reachable = public_network_enabled and default_action.lower() != "deny"
+            default_action = facts.network_default_action
+            reachable = (
+                public_network_enabled and default_action is not None and default_action.strip().lower() == "allow"
+            )
             reasons = []
             if reachable:
                 reasons = [
@@ -57,14 +62,18 @@ class DecorateStorageRelationshipsStage:
                 continue
             facts = azure_facts(container)
             account = context.index.resolve(facts.storage_account_reference)
-            public_access_type = (facts.container_access_type or "private").strip().lower()
-            configured_public = public_access_type in {"blob", "container"}
+            public_access_type = facts.container_access_type
+            configured_public = public_access_type is not None and public_access_type.strip().lower() in {
+                "blob",
+                "container",
+            }
+            normalized_access_type = public_access_type.strip().lower() if public_access_type is not None else None
             if account is None:
                 facts.add_unresolved_storage_account_reference(facts.storage_account_reference)
                 facts.set_public_container_posture(
                     configured=configured_public,
                     exposed=False,
-                    reasons=[f"container_access_type is {public_access_type}"] if configured_public else [],
+                    reasons=[f"container_access_type is {normalized_access_type}"] if configured_public else [],
                 )
                 continue
 
@@ -75,7 +84,7 @@ class DecorateStorageRelationshipsStage:
                 and account_facts.allow_nested_items_to_be_public is True
                 and account.direct_internet_reachable
             )
-            reasons = [f"container_access_type is {public_access_type}"] if configured_public else []
+            reasons = [f"container_access_type is {normalized_access_type}"] if configured_public else []
             if exposed:
                 reasons.extend(
                     [

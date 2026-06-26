@@ -13,10 +13,64 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
     values = resource.values
     name = _optional_string(values.get("name")) or resource.name
     account_id = _optional_string(values.get("id"))
+    uncertainties: list[str] = []
     inline_network_rules = _first_mapping(values.get("network_rules"))
-    network_default_action = (
-        _optional_string(inline_network_rules.get("default_action")) if inline_network_rules is not None else "Allow"
+    network_rules_unknown = _attribute_unknown(resource, "network_rules")
+    default_action_unknown = network_rules_unknown or _first_block_attribute_unknown(
+        resource,
+        "network_rules",
+        "default_action",
     )
+    if default_action_unknown:
+        network_default_action = None
+        uncertainties.append("network_rules.default_action is unknown after planning")
+    elif inline_network_rules is not None:
+        network_default_action = _optional_string(inline_network_rules.get("default_action")) or "Allow"
+    else:
+        network_default_action = "Allow"
+
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: name,
+        AzureResourceMetadata.STORAGE_ACCOUNT_ID: account_id,
+        AzureResourceMetadata.NETWORK_DEFAULT_ACTION: network_default_action,
+        AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: (
+            resource.address if inline_network_rules is not None or network_rules_unknown else None
+        ),
+    }
+    _set_bool_posture(
+        metadata,
+        resource,
+        values,
+        key="allow_nested_items_to_be_public",
+        field=AzureResourceMetadata.ALLOW_NESTED_ITEMS_TO_BE_PUBLIC,
+        default=True,
+        uncertainties=uncertainties,
+    )
+    _set_bool_posture(
+        metadata,
+        resource,
+        values,
+        key="shared_access_key_enabled",
+        field=AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED,
+        default=True,
+        uncertainties=uncertainties,
+    )
+    _set_bool_posture(
+        metadata,
+        resource,
+        values,
+        key="public_network_access_enabled",
+        field=AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED,
+        default=True,
+        uncertainties=uncertainties,
+    )
+    if _attribute_unknown(resource, "min_tls_version"):
+        uncertainties.append("min_tls_version is unknown after planning")
+    else:
+        metadata[AzureResourceMetadata.MIN_TLS_VERSION] = _optional_string(values.get("min_tls_version")) or "TLS1_2"
+    if uncertainties:
+        metadata[AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES] = uncertainties
+
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -26,30 +80,7 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
             category=ResourceCategory.DATA,
             identifier=account_id or name or resource.address,
             data_sensitivity="sensitive",
-            metadata={
-                AzureResourceMetadata.NAME: name,
-                AzureResourceMetadata.STORAGE_ACCOUNT_ID: account_id,
-                AzureResourceMetadata.ALLOW_NESTED_ITEMS_TO_BE_PUBLIC: _bool_with_default(
-                    values,
-                    "allow_nested_items_to_be_public",
-                    True,
-                ),
-                AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED: _bool_with_default(
-                    values,
-                    "shared_access_key_enabled",
-                    True,
-                ),
-                AzureResourceMetadata.MIN_TLS_VERSION: _optional_string(values.get("min_tls_version")) or "TLS1_2",
-                AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED: _bool_with_default(
-                    values,
-                    "public_network_access_enabled",
-                    True,
-                ),
-                AzureResourceMetadata.NETWORK_DEFAULT_ACTION: network_default_action or "Allow",
-                AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: (
-                    resource.address if inline_network_rules is not None else None
-                ),
-            },
+            metadata=metadata,
         )
     )
 
@@ -57,6 +88,23 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
 def normalize_storage_container(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     name = _optional_string(values.get("name")) or resource.name
+    uncertainties: list[str] = []
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: name,
+        AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: _first_non_empty(
+            values.get("storage_account_id"),
+            values.get("storage_account_name"),
+        ),
+    }
+    if _attribute_unknown(resource, "container_access_type"):
+        uncertainties.append("container_access_type is unknown after planning")
+    else:
+        metadata[AzureResourceMetadata.CONTAINER_ACCESS_TYPE] = (
+            _optional_string(values.get("container_access_type")) or "private"
+        )
+    if uncertainties:
+        metadata[AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES] = uncertainties
+
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -66,15 +114,7 @@ def normalize_storage_container(resource: TerraformResource) -> NormalizedResour
             category=ResourceCategory.DATA,
             identifier=_optional_string(values.get("id")) or name or resource.address,
             data_sensitivity="sensitive",
-            metadata={
-                AzureResourceMetadata.NAME: name,
-                AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: _first_non_empty(
-                    values.get("storage_account_id"),
-                    values.get("storage_account_name"),
-                ),
-                AzureResourceMetadata.CONTAINER_ACCESS_TYPE: _optional_string(values.get("container_access_type"))
-                or "private",
-            },
+            metadata=metadata,
         )
     )
 
@@ -82,6 +122,18 @@ def normalize_storage_container(resource: TerraformResource) -> NormalizedResour
 def normalize_storage_account_network_rules(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     storage_account_reference = _optional_string(values.get("storage_account_id"))
+    uncertainties: list[str] = []
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: storage_account_reference,
+        AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: resource.address,
+    }
+    if _attribute_unknown(resource, "default_action"):
+        uncertainties.append("default_action is unknown after planning")
+    else:
+        metadata[AzureResourceMetadata.NETWORK_DEFAULT_ACTION] = _optional_string(values.get("default_action"))
+    if uncertainties:
+        metadata[AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES] = uncertainties
+
     return NormalizedResource(
         address=resource.address,
         provider=AZURE_PROVIDER,
@@ -89,12 +141,40 @@ def normalize_storage_account_network_rules(resource: TerraformResource) -> Norm
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=_optional_string(values.get("id")) or storage_account_reference or resource.address,
-        metadata={
-            AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: storage_account_reference,
-            AzureResourceMetadata.NETWORK_DEFAULT_ACTION: _optional_string(values.get("default_action")),
-            AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: resource.address,
-        },
+        metadata=metadata,
     )
+
+
+def _set_bool_posture(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    *,
+    key: str,
+    field: Any,
+    default: bool,
+    uncertainties: list[str],
+) -> None:
+    if _attribute_unknown(resource, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return
+    metadata[field] = _bool_with_default(values, key, default)
+
+
+def _attribute_unknown(resource: TerraformResource, key: str) -> bool:
+    return resource.unknown_values.get(key) is True
+
+
+def _first_block_attribute_unknown(resource: TerraformResource, block: str, key: str) -> bool:
+    unknown_block = resource.unknown_values.get(block)
+    if unknown_block is True:
+        return True
+    if isinstance(unknown_block, Mapping):
+        return unknown_block.get(key) is True
+    if isinstance(unknown_block, list) and unknown_block:
+        first = unknown_block[0]
+        return first is True or (isinstance(first, Mapping) and first.get(key) is True)
+    return False
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:

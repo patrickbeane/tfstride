@@ -54,6 +54,10 @@ class AzureProviderTests(unittest.TestCase):
         assert contribution is not None
         self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (6, 0, 0, 0, 0, 0))
         self.assertIsInstance(plugin.create_boundary_contributor(), AzureBoundaryContributor)
+        self.assertEqual(
+            plugin.create_observations(ResourceInventory(provider="azure", resources=[])),
+            [],
+        )
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertEqual(

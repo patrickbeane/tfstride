@@ -31,7 +31,9 @@
             "bypass": [
               "AzureServices"
             ],
-            "ip_rules": [],
+            "ip_rules": [
+              "198.51.100.10"
+            ],
             "virtual_network_subnet_ids": []
           }
         },

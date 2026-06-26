@@ -41,10 +41,12 @@ def load_terraform_plan(path: str | Path) -> TerraformPlan:
             f"Input is not a Terraform plan JSON document: missing `planned_values.root_module` in {plan_path}"
         )
 
+    unknown_values_by_address = _collect_unknown_values_by_address(payload, plan_path)
     resources = _collect_module_resources(
         root_module,
         plan_path=plan_path,
         module_path="planned_values.root_module",
+        unknown_values_by_address=unknown_values_by_address,
     )
     return TerraformPlan(
         source_path=str(plan_path),
@@ -58,6 +60,7 @@ def _collect_module_resources(
     *,
     plan_path: Path,
     module_path: str,
+    unknown_values_by_address: dict[str, dict[str, Any]],
 ) -> list[TerraformResource]:
     resources: list[TerraformResource] = []
     raw_resources = module.get("resources", [])
@@ -88,6 +91,7 @@ def _collect_module_resources(
                 name=name,
                 provider_name=provider_name,
                 values=values,
+                unknown_values=dict(unknown_values_by_address.get(address, {})),
             )
         )
     # Terraform nests resources under child modules recursively; flatten them here so
@@ -107,9 +111,42 @@ def _collect_module_resources(
                 child_module,
                 plan_path=plan_path,
                 module_path=child_module_path,
+                unknown_values_by_address=unknown_values_by_address,
             )
         )
     return resources
+
+
+def _collect_unknown_values_by_address(
+    payload: dict[str, Any],
+    plan_path: Path,
+) -> dict[str, dict[str, Any]]:
+    raw_changes = payload.get("resource_changes", [])
+    if raw_changes is None:
+        return {}
+    if not isinstance(raw_changes, list):
+        raise TerraformPlanLoadError(f"`resource_changes` must be an array in {plan_path}")
+
+    unknown_values_by_address: dict[str, dict[str, Any]] = {}
+    for index, raw_change in enumerate(raw_changes):
+        change_path = f"resource_changes[{index}]"
+        if not isinstance(raw_change, dict):
+            raise TerraformPlanLoadError(f"`{change_path}` must be an object in {plan_path}")
+        address = raw_change.get("address")
+        if not isinstance(address, str) or not address.strip():
+            raise TerraformPlanLoadError(f"`{change_path}.address` must be a non-empty string in {plan_path}")
+        change = raw_change.get("change", {})
+        if change is None:
+            change = {}
+        if not isinstance(change, dict):
+            raise TerraformPlanLoadError(f"`{change_path}.change` must be an object in {plan_path}")
+        after_unknown = change.get("after_unknown", {})
+        if after_unknown is None:
+            after_unknown = {}
+        if not isinstance(after_unknown, dict):
+            raise TerraformPlanLoadError(f"`{change_path}.change.after_unknown` must be an object in {plan_path}")
+        unknown_values_by_address[address] = after_unknown
+    return unknown_values_by_address
 
 
 def _required_string(

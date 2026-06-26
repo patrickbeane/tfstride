@@ -94,6 +94,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES)
 
     @property
+    def storage_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES)
+
+    @property
     def virtual_network_reference(self) -> str | None:
         return self.get(AzureResourceMetadata.VIRTUAL_NETWORK_REFERENCE)
 
@@ -160,7 +164,7 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     def set_resolved_storage_account_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_STORAGE_ACCOUNT_ADDRESS, address)
 
-    def set_effective_network_rule(self, default_action: str, source_address: str | None) -> None:
+    def set_effective_network_rule(self, default_action: str | None, source_address: str | None) -> None:
         self.set(AzureResourceMetadata.NETWORK_DEFAULT_ACTION, default_action)
         self.set(AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS, source_address)
 
@@ -237,6 +241,12 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
             rule for path in paths for rule in path.get("network_security_rules", []) if rule
         ]
         self.resource.public_exposure_reasons = list(reasons) if exposed else []
+
+    def add_storage_posture_uncertainty(self, uncertainty: str | None) -> None:
+        self.append(AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES, uncertainty)
+
+    def extend_storage_posture_uncertainties(self, uncertainties: Sequence[str | None]) -> None:
+        self.extend(AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES, uncertainties)
 
     def add_public_container_address(self, address: str) -> None:
         self.append(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES, address)

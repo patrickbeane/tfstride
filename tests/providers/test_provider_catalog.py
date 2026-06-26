@@ -19,6 +19,7 @@ from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNormalizer
+from tfstride.providers.azure.observations import observe_azure_storage_uncertainty
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_facts import AzureResourceFacts
@@ -32,6 +33,7 @@ from tfstride.providers.catalog import (
     default_provider_boundary_contributors,
     default_provider_boundary_contributors_by_provider,
     default_provider_limitations,
+    default_provider_observation_factories_by_provider,
     default_provider_plugins,
     default_provider_registry,
     default_provider_rule_metadata,
@@ -149,6 +151,7 @@ class ProviderCatalogTests(unittest.TestCase):
             AZURE_RULE_GROUP_IDS,
         )
         self.assertIsInstance(azure_plugin.create_boundary_contributor(), AzureBoundaryContributor)
+        self.assertIs(azure_plugin.observation_factory, observe_azure_storage_uncertainty)
         self.assertIsNone(
             azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[]))
         )
@@ -188,6 +191,12 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(factories_by_provider["aws"][0](), AwsBoundaryContributor)
         self.assertIsInstance(factories_by_provider["gcp"][0](), GcpBoundaryContributor)
         self.assertIsInstance(factories_by_provider["azure"][0](), AzureBoundaryContributor)
+
+    def test_default_observation_factories_register_only_contributing_providers(self) -> None:
+        factories = default_provider_observation_factories_by_provider()
+
+        self.assertEqual(tuple(factories), ("azure",))
+        self.assertIs(factories["azure"][0], observe_azure_storage_uncertainty)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:
         registry = default_rule_registry()

@@ -24,6 +24,7 @@ GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_pr
 GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
+AZURE_STORAGE_UNKNOWN_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_unknown_plan.json"
 AZURE_COMPUTE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_compute_plan.json"
 AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 AZURE_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nightmare_plan.json"

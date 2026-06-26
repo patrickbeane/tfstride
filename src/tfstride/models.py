@@ -78,6 +78,7 @@ class TerraformResource:
     name: str
     provider_name: str
     values: dict[str, Any]
+    unknown_values: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

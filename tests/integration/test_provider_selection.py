@@ -11,6 +11,7 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.models import (
     BoundaryType,
+    Observation,
     ResourceInventory,
     TerraformResource,
 )
@@ -84,6 +85,43 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
             [boundary.identifier for boundary in result.trust_boundaries],
             ["cross-account-or-role-access:gcp:source->gcp:target"],
         )
+
+    def test_analysis_selects_observation_factories_for_normalized_provider(self) -> None:
+        class RecordingNormalizer(ProviderNormalizer):
+            provider = "gcp"
+
+            def normalize(self, resources: list[TerraformResource]) -> ResourceInventory:
+                return ResourceInventory(provider=self.provider, resources=[])
+
+        calls: list[str] = []
+
+        def observation_factory(provider: str):
+            def build(inventory: ResourceInventory) -> list[Observation]:
+                calls.append(provider)
+                return [
+                    Observation(
+                        title=f"{provider} observation",
+                        observation_id=f"{provider}-observation",
+                        affected_resources=[inventory.provider],
+                        rationale="Selected after provider normalization.",
+                    )
+                ]
+
+            return build
+
+        engine = TfStride(
+            provider="gcp",
+            provider_registry=ProviderRegistry([RecordingNormalizer()]),
+            provider_observation_factories={
+                " AWS ": (observation_factory("aws"),),
+                " GCP ": (observation_factory("gcp"),),
+            },
+        )
+
+        result = engine.analyze_plan(FIXTURE_PATH)
+
+        self.assertEqual(calls, ["gcp"])
+        self.assertEqual([observation.observation_id for observation in result.observations], ["gcp-observation"])
 
     def test_analysis_raises_when_default_provider_is_not_registered(self) -> None:
         engine = TfStride(provider_registry=ProviderRegistry())

@@ -50,6 +50,48 @@ class TerraformPlanParserTests(unittest.TestCase):
         self.assertEqual(len(plan.resources), 2)
         self.assertEqual(plan.resources[1].address, "module.app.aws_instance.web")
 
+    def test_parser_preserves_resource_after_unknown_values(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "azurerm_storage_account.logs",
+                            "mode": "managed",
+                            "type": "azurerm_storage_account",
+                            "name": "logs",
+                            "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                            "values": {"public_network_access_enabled": None},
+                        }
+                    ]
+                }
+            },
+            "resource_changes": [
+                {
+                    "address": "azurerm_storage_account.logs",
+                    "change": {
+                        "after_unknown": {
+                            "public_network_access_enabled": True,
+                            "network_rules": [{"default_action": True}],
+                        }
+                    },
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            plan = load_terraform_plan(plan_path)
+
+        self.assertEqual(
+            plan.resources[0].unknown_values,
+            {
+                "public_network_access_enabled": True,
+                "network_rules": [{"default_action": True}],
+            },
+        )
+
     def test_parser_rejects_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             plan_path = Path(tmp_dir) / "plan.json"
@@ -142,6 +184,21 @@ class TerraformPlanParserTests(unittest.TestCase):
                         load_terraform_plan(plan_path)
 
                 self.assertIn(expected_message, str(context.exception))
+
+    def test_parser_rejects_malformed_resource_changes(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {"root_module": {"resources": []}},
+            "resource_changes": {},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(TerraformPlanLoadError) as context:
+                load_terraform_plan(plan_path)
+
+        self.assertIn("`resource_changes` must be an array", str(context.exception))
 
     def test_parser_rejects_malformed_module_collections(self) -> None:
         malformed_payloads = [

@@ -162,13 +162,23 @@ class AzureStorageRuleTests(unittest.TestCase):
             ],
         )
 
-    def test_standalone_default_deny_suppresses_public_network_finding(self) -> None:
+    def test_disabled_public_network_suppresses_public_network_finding(self) -> None:
+        _, boundaries, findings = _evaluate(
+            [_account(public_network=False, default_action="Allow")],
+            "azure-storage-account-public-network-unrestricted",
+        )
+
+        self.assertEqual(boundaries, [])
+        self.assertEqual(findings, [])
+
+    def test_restricted_standalone_default_deny_suppresses_public_network_finding(self) -> None:
         network_rules = _resource(
             AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES,
             "logs",
             {
                 "storage_account_id": "azurerm_storage_account.logs.id",
                 "default_action": "Deny",
+                "ip_rules": ["198.51.100.10"],
             },
         )
         _, _, findings = _evaluate(

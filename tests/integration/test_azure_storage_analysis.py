@@ -6,6 +6,7 @@ from collections import Counter
 from tests.integration.analysis_support import (
     AZURE_SAFE_FIXTURE_PATH,
     AZURE_STORAGE_FIXTURE_PATH,
+    AZURE_STORAGE_UNKNOWN_FIXTURE_PATH,
 )
 from tfstride.app import TfStride
 from tfstride.models import BoundaryType
@@ -64,10 +65,44 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
         self.assertEqual(coverage.unsupported_resources, 1)
         self.assertEqual(coverage.unsupported_resource_types, {"azurerm_storage_share": 1})
 
+    def test_unknown_storage_posture_is_observed_without_exposure_findings(self) -> None:
+        result = TfStride().analyze_plan(AZURE_STORAGE_UNKNOWN_FIXTURE_PATH)
+
+        self.assertEqual(result.inventory.provider, "azure")
+        self.assertEqual(result.trust_boundaries, [])
+        self.assertEqual(result.findings, [])
+        self.assertEqual(len(result.observations), 2)
+        observations_by_resource = {
+            observation.affected_resources[0]: observation for observation in result.observations
+        }
+        account_observation = observations_by_resource["azurerm_storage_account.pending"]
+        container_observation = observations_by_resource["azurerm_storage_container.pending"]
+        account_evidence = {item.key: item.values for item in account_observation.evidence}
+        container_evidence = {item.key: item.values for item in container_observation.evidence}
+
+        self.assertEqual(account_observation.observation_id, "azure-storage-exposure-posture-unknown")
+        self.assertEqual(account_observation.category, "analysis-uncertainty")
+        self.assertIn(
+            "public_network_access_enabled is unknown after planning",
+            account_evidence["unknown_storage_posture"],
+        )
+        self.assertIn(
+            "azurerm_storage_account_network_rules.pending: default_action is unknown after planning",
+            account_evidence["unknown_storage_posture"],
+        )
+        self.assertEqual(
+            container_evidence["unknown_storage_posture"],
+            ["container_access_type is unknown after planning"],
+        )
+
     def test_azure_storage_reports_are_deterministic(self) -> None:
         engine = TfStride()
 
-        for fixture_path in (AZURE_SAFE_FIXTURE_PATH, AZURE_STORAGE_FIXTURE_PATH):
+        for fixture_path in (
+            AZURE_SAFE_FIXTURE_PATH,
+            AZURE_STORAGE_FIXTURE_PATH,
+            AZURE_STORAGE_UNKNOWN_FIXTURE_PATH,
+        ):
             with self.subTest(fixture=fixture_path.name):
                 first = render_markdown(engine.analyze_plan(fixture_path))
                 second = render_markdown(engine.analyze_plan(fixture_path))

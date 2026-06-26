@@ -16,11 +16,13 @@ from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.plugin import (
     ProviderBoundaryContributorFactory,
+    ProviderObservationFactory,
     ProviderPlugin,
     analysis_index_factories_by_provider_from_plugins,
     boundary_contributor_factories_by_provider_from_plugins,
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
+    observation_factories_by_provider_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -80,6 +82,10 @@ def default_provider_boundary_contributor_factories_by_provider() -> dict[
     str, tuple[ProviderBoundaryContributorFactory, ...]
 ]:
     return boundary_contributor_factories_by_provider_from_plugins(default_provider_plugins())
+
+
+def default_provider_observation_factories_by_provider() -> dict[str, tuple[ProviderObservationFactory, ...]]:
+    return observation_factories_by_provider_from_plugins(default_provider_plugins())
 
 
 def default_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:

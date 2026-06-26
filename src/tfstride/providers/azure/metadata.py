@@ -37,6 +37,7 @@ class AzureResourceMetadata:
 
     PUBLIC_CONTAINER_ADDRESSES = StringListMetadataField("public_container_addresses")
     UNRESOLVED_STORAGE_ACCOUNT_REFERENCES = StringListMetadataField("unresolved_storage_account_references")
+    STORAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("storage_posture_uncertainties")
     ADDRESS_SPACE = StringListMetadataField("address_space")
     ADDRESS_PREFIXES = StringListMetadataField("address_prefixes")
     NETWORK_INTERFACE_REFERENCES = StringListMetadataField("network_interface_references")

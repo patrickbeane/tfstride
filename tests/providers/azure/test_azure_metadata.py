@@ -33,6 +33,7 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "PUBLIC_NETWORK_ACCESS_ENABLED",
             "PUBLIC_CONTAINER_ADDRESSES",
             "UNRESOLVED_STORAGE_ACCOUNT_REFERENCES",
+            "STORAGE_POSTURE_UNCERTAINTIES",
             "LOCATION",
             "VIRTUAL_NETWORK_REFERENCE",
             "RESOLVED_VIRTUAL_NETWORK_ADDRESS",

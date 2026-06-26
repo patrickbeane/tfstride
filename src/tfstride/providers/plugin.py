@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
-from tfstride.models import NormalizedResource, ResourceInventory
+from tfstride.models import NormalizedResource, Observation, ResourceInventory
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.names import normalize_provider_name
 from tfstride.providers.registry import ProviderRegistry
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 ProviderBoundaryContributorFactory = Callable[[], "BoundaryContributor"]
 ProviderRuleContributionFactory = Callable[["FindingFactory"], "RuleContribution"]
 ProviderRuleMetadataFactory = Callable[[], tuple["RuleMetadata", ...]]
+ProviderObservationFactory = Callable[[ResourceInventory], list[Observation]]
 
 
 class ProviderPluginError(ValueError):
@@ -58,6 +59,7 @@ class ProviderPlugin:
     rule_metadata_factory: ProviderRuleMetadataFactory | None = None
     rule_contribution_factory: ProviderRuleContributionFactory | None = None
     boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
+    observation_factory: ProviderObservationFactory | None = None
     analysis_index_factory: AnalysisIndexExtensionFactory | None = None
 
     def __post_init__(self) -> None:
@@ -76,6 +78,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` rule contribution factory must be callable.")
         if self.boundary_contributor_factory is not None and not callable(self.boundary_contributor_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` boundary contributor factory must be callable.")
+        if self.observation_factory is not None and not callable(self.observation_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` observation factory must be callable.")
         if self.analysis_index_factory is not None and not callable(self.analysis_index_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` analysis index factory must be callable.")
         if not isinstance(self.metadata_namespace, type):
@@ -124,6 +128,11 @@ class ProviderPlugin:
         if self.boundary_contributor_factory is None:
             return None
         return self.boundary_contributor_factory()
+
+    def create_observations(self, inventory: ResourceInventory) -> list[Observation]:
+        if self.observation_factory is None:
+            return []
+        return self.observation_factory(inventory)
 
     def create_analysis_index_extension(self, inventory: ResourceInventory) -> object | None:
         if self.analysis_index_factory is None:
@@ -204,6 +213,17 @@ def boundary_contributor_factories_by_provider_from_plugins(
         if plugin.boundary_contributor_factory is None:
             continue
         factories_by_provider.setdefault(plugin.provider, []).append(plugin.boundary_contributor_factory)
+    return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
+
+
+def observation_factories_by_provider_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> dict[str, tuple[ProviderObservationFactory, ...]]:
+    factories_by_provider: dict[str, list[ProviderObservationFactory]] = {}
+    for plugin in plugins:
+        if plugin.observation_factory is None:
+            continue
+        factories_by_provider.setdefault(plugin.provider, []).append(plugin.observation_factory)
     return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
 
 

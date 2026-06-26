@@ -1,0 +1,77 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_storage_account.pending",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "pending",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/example/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/pending",
+            "name": "tfstridepending",
+            "allow_nested_items_to_be_public": null,
+            "shared_access_key_enabled": null,
+            "min_tls_version": null,
+            "public_network_access_enabled": null
+          }
+        },
+        {
+          "address": "azurerm_storage_account_network_rules.pending",
+          "mode": "managed",
+          "type": "azurerm_storage_account_network_rules",
+          "name": "pending",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "storage_account_id": "azurerm_storage_account.pending.id",
+            "default_action": null
+          }
+        },
+        {
+          "address": "azurerm_storage_container.pending",
+          "mode": "managed",
+          "type": "azurerm_storage_container",
+          "name": "pending",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "name": "pending",
+            "storage_account_id": "azurerm_storage_account.pending.id",
+            "container_access_type": null
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "azurerm_storage_account.pending",
+      "change": {
+        "after_unknown": {
+          "allow_nested_items_to_be_public": true,
+          "shared_access_key_enabled": true,
+          "min_tls_version": true,
+          "public_network_access_enabled": true
+        }
+      }
+    },
+    {
+      "address": "azurerm_storage_account_network_rules.pending",
+      "change": {
+        "after_unknown": {
+          "default_action": true
+        }
+      }
+    },
+    {
+      "address": "azurerm_storage_container.pending",
+      "change": {
+        "after_unknown": {
+          "container_access_type": true
+        }
+      }
+    }
+  ]
+}

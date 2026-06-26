@@ -10,6 +10,7 @@ from tfstride.analysis.rule_registry import RuleMetadata, RuleRegistry
 from tfstride.models import (
     Finding,
     NormalizedResource,
+    Observation,
     ResourceCategory,
     ResourceInventory,
     StrideCategory,
@@ -22,6 +23,7 @@ from tfstride.providers.plugin import (
     analysis_index_factories_by_provider_from_plugins,
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
+    observation_factories_by_provider_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -105,6 +107,17 @@ class RecordingAnalysisIndexes:
     provider: str
 
 
+def _observations(inventory: ResourceInventory) -> list[Observation]:
+    return [
+        Observation(
+            title="Provider observation",
+            observation_id="test-provider-observation",
+            affected_resources=[inventory.provider],
+            rationale="Test provider observation.",
+        )
+    ]
+
+
 def _analysis_indexes(inventory: ResourceInventory) -> RecordingAnalysisIndexes:
     return RecordingAnalysisIndexes(inventory.provider)
 
@@ -151,6 +164,7 @@ def _plugin(
     rule_metadata_factory=_rule_metadata,
     rule_contribution_factory=_rule_contribution,
     boundary_contributor_factory=RecordingBoundaryContributor,
+    observation_factory=_observations,
     analysis_index_factory=_analysis_indexes,
 ) -> ProviderPlugin:
     return ProviderPlugin(
@@ -167,6 +181,7 @@ def _plugin(
         rule_metadata_factory=rule_metadata_factory,
         rule_contribution_factory=rule_contribution_factory,
         boundary_contributor_factory=boundary_contributor_factory,
+        observation_factory=observation_factory,
         analysis_index_factory=analysis_index_factory,
     )
 
@@ -187,6 +202,7 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertIs(plugin.rule_metadata_factory, _rule_metadata)
         self.assertIs(plugin.rule_contribution_factory, _rule_contribution)
         self.assertIs(plugin.boundary_contributor_factory, RecordingBoundaryContributor)
+        self.assertIs(plugin.observation_factory, _observations)
         self.assertIs(plugin.analysis_index_factory, _analysis_indexes)
 
     def test_plugin_creates_normalizer_and_resource_decorator(self) -> None:
@@ -202,6 +218,13 @@ class ProviderPluginTests(unittest.TestCase):
         plugin = _plugin()
 
         self.assertIsInstance(plugin.create_boundary_contributor(), RecordingBoundaryContributor)
+
+    def test_plugin_creates_observations_when_factory_is_configured(self) -> None:
+        plugin = _plugin()
+
+        observations = plugin.create_observations(ResourceInventory(provider="aws", resources=[]))
+
+        self.assertEqual([observation.observation_id for observation in observations], ["test-provider-observation"])
 
     def test_plugin_creates_analysis_index_extension_when_factory_is_configured(self) -> None:
         plugin = _plugin()
@@ -240,6 +263,11 @@ class ProviderPluginTests(unittest.TestCase):
 
         self.assertIsNone(plugin.create_boundary_contributor())
 
+    def test_plugin_allows_missing_observation_factory(self) -> None:
+        plugin = _plugin(observation_factory=None)
+
+        self.assertEqual(plugin.create_observations(ResourceInventory(provider="aws", resources=[])), [])
+
     def test_plugin_allows_missing_analysis_index_factory(self) -> None:
         plugin = _plugin(analysis_index_factory=None)
 
@@ -260,6 +288,7 @@ class ProviderPluginTests(unittest.TestCase):
         limitation_registry = provider_limitations_from_plugins([plugin])
         boundary_contributors = boundary_contributors_from_plugins([plugin])
         boundary_contributors_by_provider = boundary_contributors_by_provider_from_plugins([plugin])
+        observation_factories = observation_factories_by_provider_from_plugins([plugin])
         analysis_index_factories = analysis_index_factories_by_provider_from_plugins([plugin])
         rule_contribution = rule_contribution_from_plugins(
             [plugin],
@@ -272,6 +301,10 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
         self.assertIsInstance(boundary_contributors_by_provider["aws"][0], RecordingBoundaryContributor)
+        self.assertEqual(
+            observation_factories["aws"][0](ResourceInventory(provider="aws", resources=[]))[0].observation_id,
+            "test-provider-observation",
+        )
         self.assertEqual(
             analysis_index_factories["aws"](ResourceInventory(provider="aws", resources=[])),
             RecordingAnalysisIndexes("aws"),
@@ -358,6 +391,17 @@ class ProviderPluginTests(unittest.TestCase):
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 boundary_contributor_factory=object(),
+            )
+
+    def test_plugin_rejects_non_callable_observation_factory(self) -> None:
+        with self.assertRaises(ProviderPluginError):
+            ProviderPlugin(
+                provider="aws",
+                normalizer_factory=lambda: RecordingNormalizer(),
+                resource_facts_factory=_facts,
+                metadata_namespace=FakeMetadata,
+                supported_resource_types=frozenset(),
+                observation_factory=object(),
             )
 
     def test_plugin_rejects_non_callable_analysis_index_factory(self) -> None:

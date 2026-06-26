@@ -60,6 +60,13 @@ class AzureResourceFactsTests(unittest.TestCase):
 
         facts.set_effective_network_rule("Allow", "azurerm_storage_account_network_rules.logs")
         facts.add_public_container_address("azurerm_storage_container.public")
+        facts.add_storage_posture_uncertainty("default_action is unknown after planning")
+        facts.extend_storage_posture_uncertainties(
+            [
+                "public_network_access_enabled is unknown after planning",
+                "default_action is unknown after planning",
+            ]
+        )
         facts.set_public_endpoint_posture(reachable=True, reasons=["public network"])
 
         self.assertEqual(facts.network_default_action, "Allow")
@@ -68,6 +75,13 @@ class AzureResourceFactsTests(unittest.TestCase):
             "azurerm_storage_account_network_rules.logs",
         )
         self.assertEqual(facts.public_container_addresses, ["azurerm_storage_container.public"])
+        self.assertEqual(
+            facts.storage_posture_uncertainties,
+            [
+                "default_action is unknown after planning",
+                "public_network_access_enabled is unknown after planning",
+            ],
+        )
         self.assertTrue(resource.direct_internet_reachable)
         self.assertEqual(resource.public_access_reasons, ["public network"])
 
