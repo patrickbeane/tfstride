@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -37,7 +39,7 @@ def _observe_managed_identity_principals(inventory: ResourceInventory) -> list[O
                     affected_resources=[resource.address],
                     rationale=(
                         f"{resource.display_name} exposes a `{facts.identity_type}` managed identity principal. "
-                        "This models principal identity only and does not imply a role assignment or effective access."
+                        "Role assignments are connected only when principal IDs are known in the Terraform plan."
                     ),
                     evidence=collect_evidence(
                         evidence_item("identity_type", [facts.identity_type]),
@@ -47,7 +49,37 @@ def _observe_managed_identity_principals(inventory: ResourceInventory) -> list[O
                         evidence_item("attached_identity_references", facts.attached_identity_references),
                         evidence_item(
                             "analysis_scope",
-                            ["managed identity principal is not connected to Azure role assignments"],
+                            [
+                                "managed identity role assignments are connected when principal IDs are deterministic",
+                                "transitive access findings are not emitted from managed identity assignments yet",
+                            ],
+                        ),
+                    ),
+                )
+            )
+        if facts.managed_identity_role_assignments:
+            assignments = facts.managed_identity_role_assignments
+            observations.append(
+                Observation(
+                    title="Azure managed identity role assignment is connected",
+                    observation_id="azure-managed-identity-role-assignment-observed",
+                    category="iam",
+                    affected_resources=_dedupe_strings([resource.address, *_record_sources(assignments)]),
+                    rationale=(
+                        f"{resource.display_name} has Azure role assignments whose `principal_id` matches this "
+                        "managed identity. Scope breadth is reported separately from any downstream exposure rule."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("role_assignment_sources", _record_sources(assignments)),
+                        evidence_item("role_definition_names", _record_values(assignments, "role_definition_name")),
+                        evidence_item("role_definition_ids", _record_values(assignments, "role_definition_id")),
+                        evidence_item("scopes", _record_values(assignments, "scope")),
+                        evidence_item("scope_kinds", _record_values(assignments, "scope_kind")),
+                        evidence_item("target_resources", _record_values(assignments, "target_resource_address")),
+                        evidence_item("breadth_signals", _record_breadth_signals(assignments)),
+                        evidence_item(
+                            "analysis_scope",
+                            ["identity-to-role connection is modeled without inferring transitive data exposure"],
                         ),
                     ),
                 )
@@ -223,4 +255,23 @@ def _observe_key_vault_recovery_posture(inventory: ResourceInventory) -> list[Ob
 
 
 def _record_sources(records: list[dict]) -> list[str]:
-    return [str(record["source"]) for record in records if record.get("source")]
+    return _record_values(records, "source")
+
+
+def _record_values(records: list[dict], key: str) -> list[str]:
+    return _dedupe_strings(str(record[key]) for record in records if record.get(key))
+
+
+def _record_breadth_signals(records: list[dict]) -> list[str]:
+    return _dedupe_strings(str(signal) for record in records for signal in record.get("breadth_signals", []) if signal)
+
+
+def _dedupe_strings(values: Iterable[object]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value).strip()
+        if text and text not in seen:
+            deduped.append(text)
+            seen.add(text)
+    return deduped

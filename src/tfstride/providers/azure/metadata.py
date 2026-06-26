@@ -39,6 +39,10 @@ class AzureResourceMetadata:
     ROLE_DEFINITION_ID = OptionalStringMetadataField("role_definition_id")
     PRINCIPAL_ID = OptionalStringMetadataField("principal_id")
     PRINCIPAL_TYPE = OptionalStringMetadataField("principal_type")
+    RESOLVED_MANAGED_IDENTITY_ADDRESS = OptionalStringMetadataField("resolved_managed_identity_address")
+    ROLE_ASSIGNMENT_SCOPE_KIND = OptionalStringMetadataField("role_assignment_scope_kind")
+    ROLE_ASSIGNMENT_TARGET_RESOURCE_ADDRESS = OptionalStringMetadataField("role_assignment_target_resource_address")
+    ROLE_ASSIGNMENT_TARGET_RESOURCE_TYPE = OptionalStringMetadataField("role_assignment_target_resource_type")
     CLIENT_ID = OptionalStringMetadataField("client_id")
     IDENTITY_TYPE = OptionalStringMetadataField("identity_type")
 
@@ -61,6 +65,7 @@ class AzureResourceMetadata:
     KEY_VAULT_RECOVERY_UNCERTAINTIES = StringListMetadataField("key_vault_recovery_uncertainties")
     ATTACHED_IDENTITY_REFERENCES = StringListMetadataField("attached_identity_references")
     MANAGED_IDENTITY_UNCERTAINTIES = StringListMetadataField("managed_identity_uncertainties")
+    ROLE_ASSIGNMENT_BREADTH_SIGNALS = StringListMetadataField("role_assignment_breadth_signals")
     ADDRESS_SPACE = StringListMetadataField("address_space")
     ADDRESS_PREFIXES = StringListMetadataField("address_prefixes")
     NETWORK_INTERFACE_REFERENCES = StringListMetadataField("network_interface_references")
@@ -78,3 +83,4 @@ class AzureResourceMetadata:
     PUBLIC_COMPUTE_EXPOSURE_PATHS = DictListMetadataField("public_compute_exposure_paths")
     KEY_VAULT_ACCESS_POLICIES = DictListMetadataField("key_vault_access_policies")
     KEY_VAULT_ROLE_ASSIGNMENTS = DictListMetadataField("key_vault_role_assignments")
+    MANAGED_IDENTITY_ROLE_ASSIGNMENTS = DictListMetadataField("managed_identity_role_assignments")

@@ -144,7 +144,7 @@ def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource
     principal_type = first_non_empty(values.get("principal_type"))
     uncertainties = [
         f"{field} is unknown after planning"
-        for field in ("role_definition_name", "role_definition_id", "principal_id", "principal_type")
+        for field in ("scope", "role_definition_name", "role_definition_id", "principal_id", "principal_type")
         if resource.unknown_values.get(field) is True
     ]
     assignment = {

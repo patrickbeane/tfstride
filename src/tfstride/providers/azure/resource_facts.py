@@ -170,6 +170,30 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.PRINCIPAL_TYPE)
 
     @property
+    def resolved_managed_identity_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.RESOLVED_MANAGED_IDENTITY_ADDRESS)
+
+    @property
+    def role_assignment_scope_kind(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE_KIND)
+
+    @property
+    def role_assignment_breadth_signals(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_SIGNALS)
+
+    @property
+    def role_assignment_target_resource_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_ADDRESS)
+
+    @property
+    def role_assignment_target_resource_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_TYPE)
+
+    @property
+    def managed_identity_role_assignments(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.MANAGED_IDENTITY_ROLE_ASSIGNMENTS)
+
+    @property
     def client_id(self) -> str | None:
         return self.get(AzureResourceMetadata.CLIENT_ID)
 
@@ -266,6 +290,22 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
 
     def set_resolved_key_vault_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS, address)
+
+    def set_resolved_managed_identity_address(self, address: str) -> None:
+        self.set(AzureResourceMetadata.RESOLVED_MANAGED_IDENTITY_ADDRESS, address)
+
+    def set_role_assignment_scope_context(
+        self,
+        *,
+        scope_kind: str | None,
+        breadth_signals: Sequence[str],
+        target_resource_address: str | None,
+        target_resource_type: str | None,
+    ) -> None:
+        self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE_KIND, scope_kind)
+        self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_SIGNALS, list(breadth_signals))
+        self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_ADDRESS, target_resource_address)
+        self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_TYPE, target_resource_type)
 
     def set_effective_network_rule(self, default_action: str | None, source_address: str | None) -> None:
         self.set(AzureResourceMetadata.NETWORK_DEFAULT_ACTION, default_action)
@@ -368,6 +408,12 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         if assignment not in assignments:
             assignments.append(assignment)
             self.set(AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS, assignments)
+
+    def add_managed_identity_role_assignment(self, assignment: dict) -> None:
+        assignments = self.managed_identity_role_assignments
+        if assignment not in assignments:
+            assignments.append(assignment)
+            self.set(AzureResourceMetadata.MANAGED_IDENTITY_ROLE_ASSIGNMENTS, assignments)
 
     def extend_key_vault_network_uncertainties(self, uncertainties: Sequence[str | None]) -> None:
         self.extend(AzureResourceMetadata.KEY_VAULT_NETWORK_UNCERTAINTIES, uncertainties)

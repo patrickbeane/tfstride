@@ -208,7 +208,7 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.attached_identity_references, [])
         self.assertEqual(facts.managed_identity_uncertainties, ["identity is unknown after planning"])
 
-    def test_identity_principals_are_observed_without_authorization_connections(self) -> None:
+    def test_identity_principals_connect_role_assignments_without_transitive_findings(self) -> None:
         resources = [
             _resource(
                 AzureResourceType.USER_ASSIGNED_IDENTITY,
@@ -263,13 +263,32 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
         self.assertIsNone(resolve_workload_role(virtual_machine, indexes.role_index))
         self.assertEqual(virtual_machine.attached_role_arns, [])
         self.assertIsNone(azure_facts(role_assignment).resolved_key_vault_address)
+        self.assertEqual(azure_facts(role_assignment).resolved_managed_identity_address, identity.address)
         self.assertEqual(azure_facts(identity).key_vault_role_assignments, [])
+        self.assertEqual(
+            azure_facts(identity).managed_identity_role_assignments,
+            [
+                {
+                    "source": "azurerm_role_assignment.deploy_contributor",
+                    "scope": "azurerm_user_assigned_identity.deploy.id",
+                    "role_definition_name": "Contributor",
+                    "role_definition_id": None,
+                    "principal_id": "principal-id",
+                    "principal_type": "ServicePrincipal",
+                    "scope_kind": "resource",
+                    "target_resource_address": "azurerm_user_assigned_identity.deploy",
+                    "target_resource_type": AzureResourceType.USER_ASSIGNED_IDENTITY,
+                    "breadth_signals": ["broad_builtin_role"],
+                }
+            ],
+        )
         self.assertEqual(detect_trust_boundaries(inventory), [])
         self.assertEqual(StrideRuleEngine().evaluate(inventory, []), [])
         self.assertEqual(
             [observation.observation_id for observation in observations],
             [
                 "azure-managed-identity-principal-observed",
+                "azure-managed-identity-role-assignment-observed",
                 "azure-managed-identity-principal-observed",
                 "azure-managed-identity-principal-unknown",
             ],
@@ -283,7 +302,10 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
         }
         self.assertEqual(
             observed_evidence["analysis_scope"],
-            ["managed identity principal is not connected to Azure role assignments"],
+            [
+                "managed identity role assignments are connected when principal IDs are deterministic",
+                "transitive access findings are not emitted from managed identity assignments yet",
+            ],
         )
 
 
