@@ -89,9 +89,9 @@ def _effective_nsg_ingress(network_security_group: NormalizedResource) -> list[_
         (
             record
             for record in azure_facts(network_security_group).network_security_rules
-            if record.get("rule_direction") == "ingress" and _is_public_source(record)
+            if _is_deterministic_public_ingress_record(record)
         ),
-        key=lambda record: (_int_value(record.get("rule_priority")) or 65500, str(record.get("name") or "")),
+        key=lambda record: (_int_value(record.get("rule_priority")), str(record.get("name") or "")),
     )
     decisions: list[_EffectiveIngress] = []
     for protocol in _PROTOCOLS:
@@ -179,6 +179,18 @@ def _merge_adjacent_decisions(decisions: list[_EffectiveIngress]) -> list[_Effec
         else:
             merged.append(decision)
     return merged
+
+
+def _is_deterministic_public_ingress_record(record: dict[str, Any]) -> bool:
+    if record.get("unknown_decision_fields") or record.get("unsupported_decision_fields"):
+        return False
+    if _int_value(record.get("rule_priority")) is None:
+        return False
+    if record.get("rule_direction") != "ingress":
+        return False
+    if str(record.get("access") or "").lower() not in {"allow", "deny"}:
+        return False
+    return _is_public_source(record) and bool(_record_port_ranges(record))
 
 
 def _exposure_path_record(

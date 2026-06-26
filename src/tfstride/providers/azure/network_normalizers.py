@@ -49,7 +49,7 @@ def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_network_security_group(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    rules, records = parse_network_security_rules(values)
+    rules, records = parse_network_security_rules(values, resource.unknown_values)
     return _network_resource(
         resource,
         identifier=first_non_empty(values.get("id"), values.get("name"), resource.address),
@@ -64,7 +64,7 @@ def normalize_network_security_group(resource: TerraformResource) -> NormalizedR
 
 def normalize_network_security_rule(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    rules, records = parse_network_security_rules(values)
+    rules, records = parse_network_security_rules(values, resource.unknown_values)
     return _network_resource(
         resource,
         identifier=first_non_empty(values.get("id"), values.get("name"), resource.address),

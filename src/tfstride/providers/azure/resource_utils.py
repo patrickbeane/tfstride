@@ -72,13 +72,16 @@ def azure_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
     return tuple(sorted({azure_reference_key(reference) for reference in references if reference}))
 
 
-def parse_network_security_rules(values: Mapping[str, Any]) -> tuple[list[SecurityGroupRule], list[dict[str, Any]]]:
+def parse_network_security_rules(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None = None,
+) -> tuple[list[SecurityGroupRule], list[dict[str, Any]]]:
     records: list[dict[str, Any]] = []
     allow_rules: list[SecurityGroupRule] = []
-    for raw_rule in _rule_mappings(values):
-        record = normalize_network_security_rule_record(raw_rule)
+    for raw_rule, raw_unknown in _rule_mappings(values, unknown_values):
+        record = normalize_network_security_rule_record(raw_rule, raw_unknown)
         records.append(record)
-        if record["access"] != "allow":
+        if record["access"] != "allow" or not _has_known_rule_decision(record):
             continue
         for from_port, to_port in _port_ranges(record["destination_port_ranges"]):
             allow_rules.append(
@@ -94,7 +97,10 @@ def parse_network_security_rules(values: Mapping[str, Any]) -> tuple[list[Securi
     return allow_rules, records
 
 
-def normalize_network_security_rule_record(values: Mapping[str, Any]) -> dict[str, Any]:
+def normalize_network_security_rule_record(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | bool | None = None,
+) -> dict[str, Any]:
     source_prefixes = compact_strings(
         [values.get("source_address_prefix"), *as_list(values.get("source_address_prefixes"))]
     )
@@ -104,7 +110,7 @@ def normalize_network_security_rule_record(values: Mapping[str, Any]) -> dict[st
     destination_ports = compact_strings(
         [values.get("destination_port_range"), *as_list(values.get("destination_port_ranges"))]
     ) or ["*"]
-    return {
+    record = {
         "name": first_non_empty(values.get("name")),
         "rule_priority": _optional_int(values.get("priority")),
         "rule_direction": _direction(values.get("direction")),
@@ -126,6 +132,13 @@ def normalize_network_security_rule_record(values: Mapping[str, Any]) -> dict[st
         ),
         "description": first_non_empty(values.get("description")),
     }
+    unknown_fields = _unknown_decision_fields(unknown_values)
+    if unknown_fields:
+        record["unknown_decision_fields"] = unknown_fields
+    unsupported_fields = _unsupported_decision_fields(record)
+    if unsupported_fields:
+        record["unsupported_decision_fields"] = unsupported_fields
+    return record
 
 
 def clone_security_group_rules(rules: Iterable[SecurityGroupRule]) -> list[SecurityGroupRule]:
@@ -144,10 +157,73 @@ def clone_security_group_rules(rules: Iterable[SecurityGroupRule]) -> list[Secur
     ]
 
 
-def _rule_mappings(values: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _has_known_rule_decision(record: Mapping[str, Any]) -> bool:
+    return (
+        not record.get("unknown_decision_fields")
+        and not record.get("unsupported_decision_fields")
+        and record.get("rule_priority") is not None
+    )
+
+
+def _rule_mappings(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None = None,
+) -> list[tuple[Mapping[str, Any], Mapping[str, Any] | bool | None]]:
+    unknown_values = unknown_values or {}
     if "security_rule" in values:
-        return [rule for rule in as_list(values.get("security_rule")) if isinstance(rule, Mapping)]
-    return [values]
+        unknown_rules = unknown_values.get("security_rule") if isinstance(unknown_values, Mapping) else None
+        return [
+            (rule, _unknown_rule_at(unknown_rules, index))
+            for index, rule in enumerate(as_list(values.get("security_rule")))
+            if isinstance(rule, Mapping)
+        ]
+    return [(values, unknown_values if isinstance(unknown_values, Mapping) else None)]
+
+
+def _unknown_rule_at(value: Any, index: int) -> Mapping[str, Any] | bool | None:
+    if value is True:
+        return True
+    if isinstance(value, list) and index < len(value):
+        item = value[index]
+        return item if isinstance(item, Mapping) or item is True else None
+    return None
+
+
+def _unknown_decision_fields(unknown_values: Mapping[str, Any] | bool | None) -> list[str]:
+    decision_fields = (
+        "priority",
+        "direction",
+        "access",
+        "protocol",
+        "source_address_prefix",
+        "source_address_prefixes",
+        "destination_address_prefix",
+        "destination_address_prefixes",
+        "destination_port_range",
+        "destination_port_ranges",
+    )
+    if unknown_values is True:
+        return list(decision_fields)
+    if not isinstance(unknown_values, Mapping):
+        return []
+    return [field for field in decision_fields if _value_is_unknown(unknown_values.get(field))]
+
+
+def _unsupported_decision_fields(record: Mapping[str, Any]) -> list[str]:
+    unsupported: list[str] = []
+    if record.get("destination_application_security_group_ids"):
+        unsupported.append("destination_application_security_group_ids")
+    return unsupported
+
+
+def _value_is_unknown(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, Mapping):
+        return any(_value_is_unknown(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_value_is_unknown(item) for item in value)
+    return False
 
 
 def _direction(value: Any) -> str:
