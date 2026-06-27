@@ -227,6 +227,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_storage_bucket_iam_policy",
                     "azurerm_key_vault_access_policy",
                     "azurerm_role_assignment",
+                    "azurerm_role_definition",
                 }
             ),
         )

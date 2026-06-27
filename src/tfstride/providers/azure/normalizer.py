@@ -20,7 +20,7 @@ from tfstride.providers.azure.data_normalizers import (
     normalize_storage_account_network_rules,
     normalize_storage_container,
 )
-from tfstride.providers.azure.identity_normalizers import normalize_user_assigned_identity
+from tfstride.providers.azure.identity_normalizers import normalize_role_definition, normalize_user_assigned_identity
 from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
@@ -68,6 +68,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.KEY_VAULT_KEY: normalize_key_vault_key,
     AzureResourceType.KEY_VAULT_CERTIFICATE: normalize_key_vault_certificate,
     AzureResourceType.ROLE_ASSIGNMENT: normalize_role_assignment,
+    AzureResourceType.ROLE_DEFINITION: normalize_role_definition,
     AzureResourceType.USER_ASSIGNED_IDENTITY: normalize_user_assigned_identity,
     AzureResourceType.VIRTUAL_NETWORK: normalize_virtual_network,
     AzureResourceType.SUBNET: normalize_subnet,

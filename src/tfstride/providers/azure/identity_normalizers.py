@@ -40,6 +40,38 @@ def normalize_user_assigned_identity(resource: TerraformResource) -> NormalizedR
     )
 
 
+def normalize_role_definition(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    role_name = _known_string(resource, values, "name", uncertainties)
+    scope = _known_string(resource, values, "scope", uncertainties)
+    assignable_scopes = _known_string_list(resource, values, "assignable_scopes", uncertainties)
+    permissions = _role_definition_permission_records(resource, values, uncertainties)
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: role_name,
+        AzureResourceMetadata.ROLE_DEFINITION_SCOPE: scope,
+        AzureResourceMetadata.ROLE_DEFINITION_ASSIGNABLE_SCOPES: assignable_scopes,
+        AzureResourceMetadata.ROLE_DEFINITION_ACTIONS: _permission_values(permissions, "actions"),
+        AzureResourceMetadata.ROLE_DEFINITION_NOT_ACTIONS: _permission_values(permissions, "not_actions"),
+        AzureResourceMetadata.ROLE_DEFINITION_DATA_ACTIONS: _permission_values(permissions, "data_actions"),
+        AzureResourceMetadata.ROLE_DEFINITION_NOT_DATA_ACTIONS: _permission_values(permissions, "not_data_actions"),
+        AzureResourceMetadata.ROLE_DEFINITION_PERMISSIONS: permissions,
+        AzureResourceMetadata.CUSTOM_ROLE_DEFINITION: True,
+    }
+    if uncertainties:
+        metadata[AzureResourceMetadata.ROLE_DEFINITION_UNCERTAINTIES] = uncertainties
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AZURE_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("role_definition_id"), values.get("id"), role_name, resource.address),
+        metadata=metadata,
+    )
+
+
 def managed_identity_metadata(resource: TerraformResource) -> dict[Any, Any]:
     identity = _first_mapping(resource.values.get("identity"))
     identity_unknown = resource.unknown_values.get("identity")
@@ -82,6 +114,82 @@ def _known_string(
         uncertainties.append(f"{key} is unknown after planning")
         return None
     return first_non_empty(values.get(key))
+
+
+def _known_string_list(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    key: str,
+    uncertainties: list[str],
+) -> list[str]:
+    if _value_is_unknown(resource.unknown_values.get(key)):
+        uncertainties.append(f"{key} is unknown after planning")
+        return []
+    return compact_strings(as_list(values.get(key)))
+
+
+def _role_definition_permission_records(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    raw_unknown = resource.unknown_values.get("permissions")
+    if raw_unknown is True:
+        uncertainties.append("permissions is unknown after planning")
+        return []
+
+    permission_values = as_list(values.get("permissions"))
+    unknown_values = as_list(raw_unknown) if raw_unknown is not None else []
+    records: list[dict[str, Any]] = []
+    for index, permission in enumerate(permission_values):
+        if not isinstance(permission, Mapping):
+            if permission is not None:
+                uncertainties.append(f"permissions[{index}] has an unrecognized value shape")
+            continue
+        unknown_permission = unknown_values[index] if index < len(unknown_values) else None
+        if unknown_permission is True:
+            uncertainties.append(f"permissions[{index}] is unknown after planning")
+            continue
+        records.append(
+            {
+                "actions": _permission_strings(permission, unknown_permission, "actions", index, uncertainties),
+                "not_actions": _permission_strings(permission, unknown_permission, "not_actions", index, uncertainties),
+                "data_actions": _permission_strings(
+                    permission, unknown_permission, "data_actions", index, uncertainties
+                ),
+                "not_data_actions": _permission_strings(
+                    permission,
+                    unknown_permission,
+                    "not_data_actions",
+                    index,
+                    uncertainties,
+                ),
+            }
+        )
+    return records
+
+
+def _permission_strings(
+    permission: Mapping[str, Any],
+    unknown_permission: Any,
+    key: str,
+    index: int,
+    uncertainties: list[str],
+) -> list[str]:
+    if _permission_field_unknown(unknown_permission, key):
+        uncertainties.append(f"permissions[{index}].{key} is unknown after planning")
+        return []
+    return compact_strings(as_list(permission.get(key)))
+
+
+def _permission_field_unknown(unknown_permission: Any, key: str) -> bool:
+    if isinstance(unknown_permission, Mapping):
+        return _value_is_unknown(unknown_permission.get(key))
+    return False
+
+
+def _permission_values(permissions: list[dict[str, Any]], key: str) -> list[str]:
+    return compact_strings(value for permission in permissions for value in permission.get(key, []))
 
 
 def _block_known_string(

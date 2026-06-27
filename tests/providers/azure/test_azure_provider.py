@@ -62,6 +62,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.ROLE_DEFINITION))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_WEB_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_FUNCTION_APP))
@@ -86,6 +87,16 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.IDENTITY_ROLE),
             frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY}),
+        )
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.IAM_POLICY),
+            frozenset(
+                {
+                    AzureResourceType.KEY_VAULT_ACCESS_POLICY,
+                    AzureResourceType.ROLE_ASSIGNMENT,
+                    AzureResourceType.ROLE_DEFINITION,
+                }
+            ),
         )
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.NETWORK_SECURITY_GROUP),

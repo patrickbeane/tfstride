@@ -8,7 +8,7 @@ from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.azure.compute_normalizers import normalize_linux_virtual_machine
-from tfstride.providers.azure.identity_normalizers import normalize_user_assigned_identity
+from tfstride.providers.azure.identity_normalizers import normalize_role_definition, normalize_user_assigned_identity
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.observations import observe_azure_posture
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -31,6 +31,175 @@ def _resource(
         values=values,
         unknown_values=unknown_values or {},
     )
+
+
+class AzureRoleDefinitionNormalizerTests(unittest.TestCase):
+    def test_role_definition_normalizes_custom_rbac_permissions(self) -> None:
+        role_definition = normalize_role_definition(
+            _resource(
+                AzureResourceType.ROLE_DEFINITION,
+                {
+                    "id": ("/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role-id"),
+                    "name": "Storage Operator",
+                    "scope": "/subscriptions/sub-0001",
+                    "assignable_scopes": [
+                        "/subscriptions/sub-0001",
+                        "/subscriptions/sub-0001/resourceGroups/app",
+                    ],
+                    "permissions": [
+                        {
+                            "actions": [
+                                "*",
+                                "Microsoft.Authorization/*",
+                                "Microsoft.Resources/subscriptions/resourceGroups/*",
+                            ],
+                            "not_actions": ["Microsoft.Authorization/elevateAccess/Action"],
+                            "data_actions": ["*"],
+                            "not_data_actions": [
+                                "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"
+                            ],
+                        }
+                    ],
+                },
+                name="storage_operator",
+            )
+        )
+        facts = azure_facts(role_definition)
+
+        self.assertEqual(role_definition.category, ResourceCategory.IAM)
+        self.assertEqual(
+            role_definition.identifier,
+            "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role-id",
+        )
+        self.assertTrue(facts.is_custom_role_definition)
+        self.assertEqual(facts.name, "Storage Operator")
+        self.assertEqual(facts.role_definition_scope, "/subscriptions/sub-0001")
+        self.assertEqual(
+            facts.role_definition_assignable_scopes,
+            [
+                "/subscriptions/sub-0001",
+                "/subscriptions/sub-0001/resourceGroups/app",
+            ],
+        )
+        self.assertEqual(
+            facts.role_definition_actions,
+            [
+                "*",
+                "Microsoft.Authorization/*",
+                "Microsoft.Resources/subscriptions/resourceGroups/*",
+            ],
+        )
+        self.assertEqual(facts.role_definition_not_actions, ["Microsoft.Authorization/elevateAccess/Action"])
+        self.assertEqual(facts.role_definition_data_actions, ["*"])
+        self.assertEqual(
+            facts.role_definition_not_data_actions,
+            ["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"],
+        )
+        self.assertEqual(
+            facts.role_definition_permissions,
+            [
+                {
+                    "actions": [
+                        "*",
+                        "Microsoft.Authorization/*",
+                        "Microsoft.Resources/subscriptions/resourceGroups/*",
+                    ],
+                    "not_actions": ["Microsoft.Authorization/elevateAccess/Action"],
+                    "data_actions": ["*"],
+                    "not_data_actions": ["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"],
+                }
+            ],
+        )
+        self.assertEqual(facts.role_definition_uncertainties, [])
+
+    def test_role_definition_preserves_computed_permission_uncertainty(self) -> None:
+        role_definition = normalize_role_definition(
+            _resource(
+                AzureResourceType.ROLE_DEFINITION,
+                {
+                    "name": None,
+                    "scope": None,
+                    "assignable_scopes": [],
+                    "permissions": [
+                        {
+                            "actions": [],
+                            "not_actions": ["Microsoft.Authorization/*/Delete"],
+                            "data_actions": [],
+                            "not_data_actions": [],
+                        }
+                    ],
+                },
+                name="pending",
+                unknown_values={
+                    "name": True,
+                    "scope": True,
+                    "assignable_scopes": True,
+                    "permissions": [{"actions": True, "data_actions": True}],
+                },
+            )
+        )
+        facts = azure_facts(role_definition)
+
+        self.assertEqual(role_definition.identifier, "azurerm_role_definition.pending")
+        self.assertTrue(facts.is_custom_role_definition)
+        self.assertIsNone(facts.name)
+        self.assertIsNone(facts.role_definition_scope)
+        self.assertEqual(facts.role_definition_assignable_scopes, [])
+        self.assertEqual(facts.role_definition_actions, [])
+        self.assertEqual(facts.role_definition_not_actions, ["Microsoft.Authorization/*/Delete"])
+        self.assertEqual(facts.role_definition_data_actions, [])
+        self.assertEqual(facts.role_definition_not_data_actions, [])
+        self.assertEqual(
+            facts.role_definition_permissions,
+            [
+                {
+                    "actions": [],
+                    "not_actions": ["Microsoft.Authorization/*/Delete"],
+                    "data_actions": [],
+                    "not_data_actions": [],
+                }
+            ],
+        )
+        self.assertEqual(
+            facts.role_definition_uncertainties,
+            [
+                "name is unknown after planning",
+                "scope is unknown after planning",
+                "assignable_scopes is unknown after planning",
+                "permissions[0].actions is unknown after planning",
+                "permissions[0].data_actions is unknown after planning",
+            ],
+        )
+
+    def test_azure_normalizer_supports_role_definition_without_findings(self) -> None:
+        inventory = AzureNormalizer().normalize(
+            [
+                _resource(
+                    AzureResourceType.ROLE_DEFINITION,
+                    {
+                        "name": "Resource Group Operator",
+                        "scope": "/subscriptions/sub-0001/resourceGroups/app",
+                        "assignable_scopes": ["/subscriptions/sub-0001/resourceGroups/app"],
+                        "permissions": [
+                            {
+                                "actions": ["Microsoft.Resources/subscriptions/resourceGroups/*"],
+                                "not_actions": [],
+                                "data_actions": [],
+                                "not_data_actions": [],
+                            }
+                        ],
+                    },
+                    name="resource_group_operator",
+                )
+            ]
+        )
+
+        self.assertEqual(inventory.unsupported_resources, [])
+        self.assertEqual(
+            [resource.address for resource in inventory.resources],
+            ["azurerm_role_definition.resource_group_operator"],
+        )
+        self.assertEqual(StrideRuleEngine().evaluate(inventory, []), [])
 
 
 class AzureManagedIdentityNormalizerTests(unittest.TestCase):

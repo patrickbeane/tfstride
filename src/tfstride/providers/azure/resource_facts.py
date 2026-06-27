@@ -187,6 +187,42 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.ROLE_DEFINITION_ID)
 
     @property
+    def role_definition_scope(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_SCOPE)
+
+    @property
+    def role_definition_assignable_scopes(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_ASSIGNABLE_SCOPES)
+
+    @property
+    def role_definition_actions(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_ACTIONS)
+
+    @property
+    def role_definition_not_actions(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_NOT_ACTIONS)
+
+    @property
+    def role_definition_data_actions(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_DATA_ACTIONS)
+
+    @property
+    def role_definition_not_data_actions(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_NOT_DATA_ACTIONS)
+
+    @property
+    def role_definition_permissions(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_PERMISSIONS)
+
+    @property
+    def role_definition_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_UNCERTAINTIES)
+
+    @property
+    def is_custom_role_definition(self) -> bool:
+        return self.get(AzureResourceMetadata.CUSTOM_ROLE_DEFINITION)
+
+    @property
     def principal_id(self) -> str | None:
         return self.get(AzureResourceMetadata.PRINCIPAL_ID)
 

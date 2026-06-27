@@ -42,7 +42,11 @@ AZURE_RESOURCE_CAPABILITIES: ResourceCapabilityMap = MappingProxyType(
         | _POSTGRESQL_SERVERS,
         ResourceCapability.IDENTITY_ROLE: frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY}),
         ResourceCapability.IAM_POLICY: frozenset(
-            {AzureResourceType.KEY_VAULT_ACCESS_POLICY, AzureResourceType.ROLE_ASSIGNMENT}
+            {
+                AzureResourceType.KEY_VAULT_ACCESS_POLICY,
+                AzureResourceType.ROLE_ASSIGNMENT,
+                AzureResourceType.ROLE_DEFINITION,
+            }
         ),
         ResourceCapability.NETWORK_SECURITY_GROUP: frozenset({AzureResourceType.NETWORK_SECURITY_GROUP}),
         ResourceCapability.SUBNET: frozenset({AzureResourceType.SUBNET}),
