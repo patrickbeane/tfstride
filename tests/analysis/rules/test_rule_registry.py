@@ -74,15 +74,19 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "azure-storage-account-shared-key-enabled",
     "azure-storage-account-minimum-tls-below-1-2",
     "azure-storage-account-public-network-unrestricted",
+    "azure-storage-account-missing-private-endpoint",
     "azure-key-vault-public-network-access",
+    "azure-key-vault-missing-private-endpoint",
     "azure-key-vault-privileged-access",
     "azure-key-vault-purge-protection-disabled",
     "azure-managed-identity-broad-rbac",
     "azure-public-workload-sensitive-resource-access",
     "azure-sql-public-network-access-enabled",
+    "azure-sql-missing-private-endpoint",
     "azure-sql-firewall-broad-public-access",
     "azure-sql-minimum-tls-below-1-2",
     "azure-sql-security-alert-policy-disabled",
+    "azure-private-endpoint-public-fallback",
     "azure-postgresql-public-network-access-enabled",
     "azure-postgresql-firewall-broad-public-access",
     "azure-postgresql-weak-tls-or-ssl",
@@ -133,7 +137,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 67)
+        self.assertEqual(len(metadata), 71)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -144,7 +148,7 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 13)
         self.assertEqual(len(gcp_metadata_ids), 35)
-        self.assertEqual(len(azure_metadata_ids), 19)
+        self.assertEqual(len(azure_metadata_ids), 23)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
         self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))

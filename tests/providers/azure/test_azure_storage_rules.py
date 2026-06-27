@@ -196,7 +196,7 @@ class AzureStorageRuleTests(unittest.TestCase):
                     allow_public=False,
                     shared_key=False,
                     min_tls="TLS1_2",
-                    public_network=True,
+                    public_network=False,
                     default_action="Deny",
                 ),
                 _container("private"),

@@ -39,12 +39,13 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-nested-public-access-enabled",
                 "azure-storage-account-minimum-tls-below-1-2",
                 "azure-storage-account-public-network-unrestricted",
+                "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 3, "high": 2}),
+            Counter({"medium": 4, "high": 2}),
         )
         self.assertEqual(len(result.trust_boundaries), 1)
         self.assertEqual(result.trust_boundaries[0].boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -70,7 +71,14 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(result.trust_boundaries, [])
-        self.assertEqual(result.findings, [])
+        self.assertEqual(
+            [finding.rule_id for finding in result.findings], ["azure-storage-account-missing-private-endpoint"]
+        )
+        finding_evidence = {item.key: item.values for item in result.findings[0].evidence}
+        self.assertEqual(
+            finding_evidence["fallback_uncertainty"],
+            ["public_network_access_enabled is unknown after planning"],
+        )
         self.assertEqual(len(result.observations), 2)
         observations_by_resource = {
             observation.affected_resources[0]: observation for observation in result.observations

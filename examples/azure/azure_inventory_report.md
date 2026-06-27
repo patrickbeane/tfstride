@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **8 findings** across **14 normalized resources**.
+This run identified **3 trust boundaries** and **10 findings** across **14 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `6`
+- Medium severity findings: `8`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **8 findings** across **14 normal
 - Provider resources considered: `15`
 - Normalized resources: `14`
 - Unsupported resources: `1`
-- Registered rules: `67`
-- Enabled rules: `67`
+- Registered rules: `71`
+- Enabled rules: `71`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -33,7 +33,9 @@ This run identified **3 trust boundaries** and **8 findings** across **14 normal
   - `azure-storage-account-shared-key-enabled`: `1`
   - `azure-storage-account-minimum-tls-below-1-2`: `1`
   - `azure-storage-account-public-network-unrestricted`: `1`
+  - `azure-storage-account-missing-private-endpoint`: `1`
   - `azure-key-vault-public-network-access`: `1`
+  - `azure-key-vault-missing-private-endpoint`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
 
 ## Discovered Trust Boundaries
@@ -98,6 +100,20 @@ This run identified **3 trust boundaries** and **8 findings** across **14 normal
 - Evidence:
   - network exposure: public_network_access_enabled is true; effective network_acls.default_action is Allow; network exposure is evaluated separately from identity authorization
 
+#### Azure Key Vault lacks resolved private endpoint coverage
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_key_vault.application`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_key_vault.application does not have a resolved private endpoint and may allow public Key Vault data-plane access depending on firewall settings. This finding does not claim secret exposure; identity authorization is evaluated separately.
+- Recommended mitigation: Add a Private Endpoint for the vault, verify data-plane clients use the private path, and explicitly disable public network access where possible.
+- Evidence:
+  - target resource: address=azurerm_key_vault.application; type=azurerm_key_vault
+  - public network fallback: public_network_fallback_state=enabled; public_network_access_enabled is true
+  - private endpoint coverage: no resolved private endpoint targets this resource
+  - network acl posture: effective default_action is Allow
+
 #### Azure Key Vault purge protection is disabled
 
 - STRIDE category: Tampering
@@ -131,6 +147,20 @@ This run identified **3 trust boundaries** and **8 findings** across **14 normal
 - Evidence:
   - network posture: public_network_access_enabled is true; effective default_action is Allow; network rule source is azurerm_storage_account_network_rules.assets
 
+#### Azure Storage account lacks resolved private endpoint coverage
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_storage_account.assets`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_storage_account.assets does not have a resolved private endpoint and may remain reachable through public Azure Storage data-plane endpoints. Network rules can reduce exposure, but they are not equivalent to private-endpoint-only access unless public network fallback is disabled.
+- Recommended mitigation: Add a Private Endpoint for the required storage subresources, verify clients use private paths, and explicitly disable public network access where possible.
+- Evidence:
+  - target resource: address=azurerm_storage_account.assets; type=azurerm_storage_account
+  - public network fallback: public_network_fallback_state=enabled; public_network_access_enabled is true
+  - private endpoint coverage: no resolved private endpoint targets this resource
+  - network acl posture: effective default_action is Allow; network rule source is azurerm_storage_account_network_rules.assets
+
 #### Azure Storage container is publicly accessible
 
 - STRIDE category: Information Disclosure
@@ -162,6 +192,6 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint, load-balancer, and platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
 - Unsupported resource skipped: `azurerm_kubernetes_cluster.platform`

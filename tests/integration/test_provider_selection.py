@@ -186,7 +186,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                                 "allow_nested_items_to_be_public": False,
                                 "shared_access_key_enabled": False,
                                 "min_tls_version": "TLS1_2",
-                                "public_network_access_enabled": True,
+                                "public_network_access_enabled": False,
                                 "network_rules": [{"default_action": "Deny"}],
                             },
                         }

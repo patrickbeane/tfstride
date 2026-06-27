@@ -49,10 +49,10 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(plugin.limitations, AZURE_LIMITATIONS)
         self.assertIsInstance(plugin.create_normalizer(), AzureNormalizer)
         self.assertIsInstance(plugin.create_resource_decorator(), AzureResourceDecorator)
-        self.assertEqual(len(plugin.create_rule_metadata()), 19)
+        self.assertEqual(len(plugin.create_rule_metadata()), 23)
         self.assertIsNotNone(contribution)
         assert contribution is not None
-        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (19, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(group) for group in contribution.rule_groups), (23, 0, 0, 0, 0, 0))
         self.assertIsInstance(plugin.create_boundary_contributor(), AzureBoundaryContributor)
         self.assertEqual(
             plugin.create_observations(ResourceInventory(provider="azure", resources=[])),

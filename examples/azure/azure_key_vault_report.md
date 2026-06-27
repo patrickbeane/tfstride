@@ -7,11 +7,11 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **3 findings** across **8 normalized resources**.
+This run identified **1 trust boundaries** and **5 findings** across **8 normalized resources**.
 
 - High severity findings: `1`
-- Medium severity findings: `2`
-- Low severity findings: `0`
+- Medium severity findings: `3`
+- Low severity findings: `1`
 
 ## Analysis Coverage
 
@@ -19,13 +19,14 @@ This run identified **1 trust boundaries** and **3 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `67`
-- Enabled rules: `67`
+- Registered rules: `71`
+- Enabled rules: `71`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `azure-key-vault-public-network-access`: `1`
+  - `azure-key-vault-missing-private-endpoint`: `2`
   - `azure-key-vault-privileged-access`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
 
@@ -68,6 +69,20 @@ This run identified **1 trust boundaries** and **3 findings** across **8 normali
 - Evidence:
   - network exposure: public_network_access_enabled is true; effective network_acls.default_action is Allow; network exposure is evaluated separately from identity authorization
 
+#### Azure Key Vault lacks resolved private endpoint coverage
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_key_vault.public`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_key_vault.public does not have a resolved private endpoint and may allow public Key Vault data-plane access depending on firewall settings. This finding does not claim secret exposure; identity authorization is evaluated separately.
+- Recommended mitigation: Add a Private Endpoint for the vault, verify data-plane clients use the private path, and explicitly disable public network access where possible.
+- Evidence:
+  - target resource: address=azurerm_key_vault.public; type=azurerm_key_vault
+  - public network fallback: public_network_fallback_state=enabled; public_network_access_enabled is true
+  - private endpoint coverage: no resolved private endpoint targets this resource
+  - network acl posture: effective default_action is Allow
+
 #### Azure Key Vault purge protection is disabled
 
 - STRIDE category: Tampering
@@ -81,7 +96,19 @@ This run identified **1 trust boundaries** and **3 findings** across **8 normali
 
 ### Low
 
-No findings in this severity band.
+#### Azure Key Vault lacks resolved private endpoint coverage
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_key_vault.restricted`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +1, lateral_movement +0, blast_radius +0, final_score 1 => low
+- Rationale: azurerm_key_vault.restricted does not have a resolved private endpoint and may allow public Key Vault data-plane access depending on firewall settings. This finding does not claim secret exposure; identity authorization is evaluated separately.
+- Recommended mitigation: Add a Private Endpoint for the vault, verify data-plane clients use the private path, and explicitly disable public network access where possible.
+- Evidence:
+  - target resource: address=azurerm_key_vault.restricted; type=azurerm_key_vault
+  - public network fallback: public_network_fallback_state=enabled; public_network_access_enabled is true
+  - private endpoint coverage: no resolved private endpoint targets this resource
+  - network acl posture: effective default_action is Deny; network rule source is azurerm_key_vault.restricted
 
 ## Controls Observed
 
@@ -122,5 +149,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint, load-balancer, and platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

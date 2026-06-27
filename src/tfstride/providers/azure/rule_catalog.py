@@ -70,6 +70,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-storage-account-missing-private-endpoint",
+        title="Azure Storage account lacks resolved private endpoint coverage",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a Private Endpoint for the required storage subresources, verify clients use private paths, "
+            "and explicitly disable public network access where possible."
+        ),
+        tags=("azure", "storage", "private-endpoint", "public-fallback"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-key-vault-public-network-access",
         title="Azure Key Vault allows unrestricted public network access",
         category=StrideCategory.INFORMATION_DISCLOSURE,
@@ -78,6 +89,17 @@ AZURE_RULE_METADATA = (
             "default action of `Deny` and use reviewed subnets, IP ranges, or private endpoints."
         ),
         tags=("azure", "key-vault", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-key-vault-missing-private-endpoint",
+        title="Azure Key Vault lacks resolved private endpoint coverage",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a Private Endpoint for the vault, verify data-plane clients use the private path, and "
+            "explicitly disable public network access where possible."
+        ),
+        tags=("azure", "key-vault", "private-endpoint", "public-fallback"),
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
@@ -136,6 +158,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-sql-missing-private-endpoint",
+        title="Azure SQL server lacks resolved private endpoint coverage",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a Private Endpoint for the SQL server, verify clients use private connectivity, and explicitly "
+            "disable public network access where possible."
+        ),
+        tags=("azure", "sql", "private-endpoint", "public-fallback"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-sql-firewall-broad-public-access",
         title="Azure SQL firewall rule allows broad public IP access",
         category=StrideCategory.INFORMATION_DISCLOSURE,
@@ -165,6 +198,17 @@ AZURE_RULE_METADATA = (
         ),
         tags=("azure", "sql", "security-alerting"),
         severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-private-endpoint-public-fallback",
+        title="Azure resource has private endpoint coverage with public fallback",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Keep the Private Endpoint, verify clients use the private path, and explicitly disable public "
+            "network access when public data-plane fallback is not required."
+        ),
+        tags=("azure", "private-endpoint", "public-fallback", "network"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
         rule_id="azure-postgresql-public-network-access-enabled",

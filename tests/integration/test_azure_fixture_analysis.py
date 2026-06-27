@@ -19,16 +19,18 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-shared-key-enabled",
                 "azure-storage-account-nested-public-access-enabled",
                 "azure-key-vault-public-network-access",
+                "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
                 "azure-storage-account-minimum-tls-below-1-2",
                 "azure-storage-account-public-network-unrestricted",
+                "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
                 "azure-public-compute-broad-ingress",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 6, "high": 2}),
+            Counter({"medium": 8, "high": 2}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],

@@ -21,6 +21,7 @@ from tfstride.models import BoundaryType, Finding
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
+from tfstride.providers.azure.private_endpoint_rules import AzurePrivateEndpointPostureRuleDetectors
 from tfstride.providers.azure.resource_decoration.public_exposure import is_risky_public_compute_path
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
@@ -34,15 +35,19 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-storage-account-shared-key-enabled",
         "azure-storage-account-minimum-tls-below-1-2",
         "azure-storage-account-public-network-unrestricted",
+        "azure-storage-account-missing-private-endpoint",
         "azure-key-vault-public-network-access",
+        "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-sql-public-network-access-enabled",
+        "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
         "azure-sql-minimum-tls-below-1-2",
         "azure-sql-security-alert-policy-disabled",
+        "azure-private-endpoint-public-fallback",
         "azure-postgresql-public-network-access-enabled",
         "azure-postgresql-firewall-broad-public-access",
         "azure-postgresql-weak-tls-or-ssl",
@@ -477,6 +482,7 @@ def build_azure_rule_contribution(
     managed_identity_detectors = AzureManagedIdentityRuleDetectors(finding_factory)
     mssql_detectors = AzureMssqlRuleDetectors(finding_factory)
     postgresql_detectors = AzurePostgresqlRuleDetectors(finding_factory)
+    private_endpoint_detectors = AzurePrivateEndpointPostureRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "azure-public-compute-broad-ingress": compute_detectors.detect_public_compute_broad_ingress,
         "azure-storage-container-public-access": storage_detectors.detect_public_container_access,
@@ -484,7 +490,13 @@ def build_azure_rule_contribution(
         "azure-storage-account-shared-key-enabled": storage_detectors.detect_shared_key_enabled,
         "azure-storage-account-minimum-tls-below-1-2": storage_detectors.detect_minimum_tls_below_1_2,
         "azure-storage-account-public-network-unrestricted": (storage_detectors.detect_unrestricted_public_network),
+        "azure-storage-account-missing-private-endpoint": (
+            private_endpoint_detectors.detect_storage_account_missing_private_endpoint
+        ),
         "azure-key-vault-public-network-access": key_vault_detectors.detect_public_network_access,
+        "azure-key-vault-missing-private-endpoint": (
+            private_endpoint_detectors.detect_key_vault_missing_private_endpoint
+        ),
         "azure-key-vault-privileged-access": key_vault_detectors.detect_privileged_access,
         "azure-key-vault-purge-protection-disabled": (key_vault_detectors.detect_purge_protection_disabled),
         "azure-managed-identity-broad-rbac": managed_identity_detectors.detect_broad_rbac,
@@ -492,9 +504,11 @@ def build_azure_rule_contribution(
             managed_identity_detectors.detect_public_workload_sensitive_resource_access
         ),
         "azure-sql-public-network-access-enabled": mssql_detectors.detect_public_network_access_enabled,
+        "azure-sql-missing-private-endpoint": (private_endpoint_detectors.detect_sql_server_missing_private_endpoint),
         "azure-sql-firewall-broad-public-access": mssql_detectors.detect_broad_firewall_access,
         "azure-sql-minimum-tls-below-1-2": mssql_detectors.detect_minimum_tls_below_1_2,
         "azure-sql-security-alert-policy-disabled": mssql_detectors.detect_security_alert_policy_disabled,
+        "azure-private-endpoint-public-fallback": (private_endpoint_detectors.detect_private_endpoint_public_fallback),
         "azure-postgresql-public-network-access-enabled": postgresql_detectors.detect_public_network_access_enabled,
         "azure-postgresql-firewall-broad-public-access": postgresql_detectors.detect_broad_firewall_access,
         "azure-postgresql-weak-tls-or-ssl": postgresql_detectors.detect_weak_tls_or_ssl,

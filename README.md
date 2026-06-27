@@ -223,14 +223,15 @@ Azure support currently includes normalization and analysis for AzureRM resource
 * `azurerm_public_ip`
 * `azurerm_linux_virtual_machine`
 * `azurerm_windows_virtual_machine`
+* `azurerm_private_endpoint`
 
 AzureRM provider detection uses provider source paths ending in `/azurerm` and Terraform resource types prefixed with `azurerm_`. Adjacent providers such as AzAPI, AzureAD, and Azure DevOps are not claimed as AzureRM support.
 
 Azure trust-boundary coverage includes public storage and Key Vault endpoints plus virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
 
-Azure rule coverage includes public container access, account-level nested public blob access, Shared Key authorization, minimum TLS versions below 1.2, unrestricted public storage network access, Key Vault public endpoints, purge protection, privileged access policies and vault-scoped role assignments, managed identity broad RBAC assignments, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
+Azure rule coverage includes public container access, account-level nested public blob access, Shared Key authorization, minimum TLS versions below 1.2, unrestricted public storage network access, missing Private Endpoint coverage for supported data-plane resources, public fallback when a Private Endpoint exists, Key Vault public endpoints, purge protection, privileged access policies and vault-scoped role assignments, managed identity broad RBAC assignments, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
 
-Azure identity analysis is currently scoped to Key Vault access policies and vault-scoped role assignments. Databases, load balancers, private endpoints, AKS, and broader platform services are not yet modeled and are reported as unsupported rather than silently treated as analyzed.
+Azure identity analysis is currently scoped to Key Vault access policies and vault-scoped role assignments. Private Endpoint analysis is scoped to deterministic coverage and public-fallback posture for supported Storage, Key Vault, and SQL resources; DNS correctness, load balancers, AKS, and broader platform services are not yet modeled and are reported as unsupported rather than silently treated as analyzed.
 
 Azure observations distinguish restricted Key Vault network posture, identity authorization posture, and unresolved storage or Key Vault plan values.
 
@@ -512,7 +513,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 * AWS is currently the deepest provider implementation.
 * GCP support is narrower than AWS today and does not include control-observation coverage yet.
 * Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, managed identity/RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
-* Azure SQL, AKS, App Service, Private Endpoint, load balancers, and broader Azure RBAC hierarchy modeling are not covered yet.
+* Azure Private Endpoint DNS correctness, AKS, App Service, load balancers, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.

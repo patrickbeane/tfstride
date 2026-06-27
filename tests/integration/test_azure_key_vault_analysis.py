@@ -43,7 +43,9 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
             [
                 "azure-key-vault-privileged-access",
                 "azure-key-vault-public-network-access",
+                "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
+                "azure-key-vault-missing-private-endpoint",
             ],
         )
         self.assertEqual(

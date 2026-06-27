@@ -381,6 +381,7 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
                 "azure-storage-account-shared-key-enabled",
                 "azure-storage-account-minimum-tls-below-1-2",
                 "azure-storage-account-public-network-unrestricted",
+                "azure-storage-account-missing-private-endpoint",
             ],
         )
 
