@@ -1,0 +1,282 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_storage_account.public_no_pe",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "public_no_pe",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsapublicnope",
+            "name": "publicnope",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": true,
+            "network_rules": [
+              {
+                "default_action": "Allow"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_storage_account.pe_public",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "pe_public",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsapepublic",
+            "name": "pepublic",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": true,
+            "network_rules": [
+              {
+                "default_action": "Allow"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_private_endpoint.storage_pe_public",
+          "mode": "managed",
+          "type": "azurerm_private_endpoint",
+          "name": "storage_pe_public",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Network/privateEndpoints/storage-pe-public",
+            "name": "storage-pe-public",
+            "location": "eastus",
+            "private_service_connection": [
+              {
+                "name": "storage-pe-public-connection",
+                "private_connection_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsapepublic",
+                "subresource_names": [
+                  "blob"
+                ],
+                "is_manual_connection": false
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_storage_account.pe_private",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "pe_private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsapeprivate",
+            "name": "peprivate",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": false,
+            "network_rules": [
+              {
+                "default_action": "Allow"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_private_endpoint.storage_pe_private",
+          "mode": "managed",
+          "type": "azurerm_private_endpoint",
+          "name": "storage_pe_private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Network/privateEndpoints/storage-pe-private",
+            "name": "storage-pe-private",
+            "location": "eastus",
+            "private_service_connection": [
+              {
+                "name": "storage-pe-private-connection",
+                "private_connection_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsapeprivate",
+                "subresource_names": [
+                  "blob"
+                ],
+                "is_manual_connection": false
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_key_vault.public_no_pe",
+          "mode": "managed",
+          "type": "azurerm_key_vault",
+          "name": "public_no_pe",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.KeyVault/vaults/tfkv-public-nope",
+            "name": "public-no-pe",
+            "location": "eastus",
+            "tenant_id": "00000000-0000-0000-0000-000000000001",
+            "public_network_access_enabled": true,
+            "network_acls": [
+              {
+                "default_action": "Allow",
+                "ip_rules": []
+              }
+            ],
+            "purge_protection_enabled": true,
+            "enable_rbac_authorization": true
+          }
+        },
+        {
+          "address": "azurerm_key_vault.pe_unknown",
+          "mode": "managed",
+          "type": "azurerm_key_vault",
+          "name": "pe_unknown",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.KeyVault/vaults/tfkv-pe-unknown",
+            "name": "pe-unknown",
+            "location": "eastus",
+            "tenant_id": "00000000-0000-0000-0000-000000000001",
+            "public_network_access_enabled": null,
+            "network_acls": [
+              {
+                "default_action": "Deny",
+                "ip_rules": []
+              }
+            ],
+            "purge_protection_enabled": true,
+            "enable_rbac_authorization": true
+          }
+        },
+        {
+          "address": "azurerm_private_endpoint.key_vault_pe_unknown",
+          "mode": "managed",
+          "type": "azurerm_private_endpoint",
+          "name": "key_vault_pe_unknown",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Network/privateEndpoints/key-vault-pe-unknown",
+            "name": "key-vault-pe-unknown",
+            "location": "eastus",
+            "private_service_connection": [
+              {
+                "name": "key-vault-pe-unknown-connection",
+                "private_connection_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.KeyVault/vaults/tfkv-pe-unknown",
+                "subresource_names": [
+                  "vault"
+                ],
+                "is_manual_connection": false
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_mssql_server.public_no_pe",
+          "mode": "managed",
+          "type": "azurerm_mssql_server",
+          "name": "public_no_pe",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Sql/servers/tfsql-public-nope",
+            "name": "public-no-pe",
+            "location": "eastus",
+            "public_network_access_enabled": true,
+            "minimum_tls_version": "1.2"
+          }
+        },
+        {
+          "address": "azurerm_mssql_server.pe_private",
+          "mode": "managed",
+          "type": "azurerm_mssql_server",
+          "name": "pe_private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Sql/servers/tfsql-pe-private",
+            "name": "pe-private",
+            "location": "eastus",
+            "public_network_access_enabled": false,
+            "minimum_tls_version": "1.2"
+          }
+        },
+        {
+          "address": "azurerm_private_endpoint.sql_pe_private",
+          "mode": "managed",
+          "type": "azurerm_private_endpoint",
+          "name": "sql_pe_private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Network/privateEndpoints/sql-pe-private",
+            "name": "sql-pe-private",
+            "location": "eastus",
+            "private_service_connection": [
+              {
+                "name": "sql-pe-private-connection",
+                "private_connection_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Sql/servers/tfsql-pe-private",
+                "subresource_names": [
+                  "sqlServer"
+                ],
+                "is_manual_connection": false
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_storage_account.unresolved_target",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "unresolved_target",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Storage/storageAccounts/tfsaunresolved",
+            "name": "unresolvedtarget",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": true,
+            "network_rules": [
+              {
+                "default_action": "Allow"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_private_endpoint.unresolved_target",
+          "mode": "managed",
+          "type": "azurerm_private_endpoint",
+          "name": "unresolved_target",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride-private-link/providers/Microsoft.Network/privateEndpoints/unresolved-target",
+            "name": "unresolved-target",
+            "location": "eastus",
+            "private_service_connection": [
+              {
+                "name": "unresolved-target-connection",
+                "private_connection_resource_id": "${data.azurerm_storage_account.external.id}",
+                "subresource_names": [
+                  "blob"
+                ],
+                "is_manual_connection": false
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "azurerm_key_vault.pe_unknown",
+      "change": {
+        "after_unknown": {
+          "public_network_access_enabled": true
+        }
+      }
+    }
+  ]
+}

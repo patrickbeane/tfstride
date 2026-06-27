@@ -25,6 +25,7 @@ GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.j
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 AZURE_STORAGE_UNKNOWN_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_unknown_plan.json"
+AZURE_PRIVATE_LINK_POSTURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_private_link_posture_plan.json"
 AZURE_KEY_VAULT_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_key_vault_plan.json"
 AZURE_IDENTITY_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_identity_plan.json"
 AZURE_COMPUTE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_compute_plan.json"
