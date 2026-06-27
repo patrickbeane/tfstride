@@ -36,14 +36,31 @@ _NORMALIZED_RESOURCE_WRITE_PATTERNS = (
         r")\s*(?<![=!<>])=(?!=)"
     ),
 )
+
+
+def _provider_resource_fact_facade_paths(provider: str) -> set[str]:
+    provider_root = SOURCE_ROOT / "providers" / provider
+    paths: set[str] = set()
+
+    module_path = provider_root / "resource_facts.py"
+    if module_path.exists():
+        paths.add(module_path.relative_to(SOURCE_ROOT).as_posix())
+
+    package_path = provider_root / "resource_facts"
+    if package_path.exists():
+        paths.update(path.relative_to(SOURCE_ROOT).as_posix() for path in package_path.rglob("*.py"))
+
+    return paths
+
+
 _NORMALIZED_RESOURCE_WRITE_FACADES = frozenset(
     {
-        "providers/aws/resource_facts.py",
         "providers/aws/resource_mutations.py",
-        "providers/gcp/resource_facts.py",
         "providers/gcp/resource_mutations.py",
-        "providers/azure/resource_facts.py",
     }
+    | _provider_resource_fact_facade_paths("aws")
+    | _provider_resource_fact_facade_paths("gcp")
+    | _provider_resource_fact_facade_paths("azure")
 )
 _NORMALIZED_RESOURCE_DIRECT_WRITE_EXCEPTIONS = frozenset()
 
