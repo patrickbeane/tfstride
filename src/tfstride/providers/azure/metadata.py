@@ -94,6 +94,8 @@ class AzureResourceMetadata:
     ROLE_DEFINITION_NOT_ACTIONS = StringListMetadataField("role_definition_not_actions")
     ROLE_DEFINITION_DATA_ACTIONS = StringListMetadataField("role_definition_data_actions")
     ROLE_DEFINITION_NOT_DATA_ACTIONS = StringListMetadataField("role_definition_not_data_actions")
+    ROLE_DEFINITION_BREADTH_SIGNALS = StringListMetadataField("role_definition_breadth_signals")
+    ROLE_DEFINITION_BREADTH_MITIGATIONS = StringListMetadataField("role_definition_breadth_mitigations")
     ROLE_DEFINITION_UNCERTAINTIES = StringListMetadataField("role_definition_uncertainties")
     MSSQL_POSTURE_UNCERTAINTIES = StringListMetadataField("mssql_posture_uncertainties")
     MSSQL_FIREWALL_RULE_ADDRESSES = StringListMetadataField("mssql_firewall_rule_addresses")

@@ -211,6 +211,14 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.ROLE_DEFINITION_NOT_DATA_ACTIONS)
 
     @property
+    def role_definition_breadth_signals(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_BREADTH_SIGNALS)
+
+    @property
+    def role_definition_breadth_mitigations(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_DEFINITION_BREADTH_MITIGATIONS)
+
+    @property
     def role_definition_permissions(self) -> list[dict]:
         return self.get(AzureResourceMetadata.ROLE_DEFINITION_PERMISSIONS)
 

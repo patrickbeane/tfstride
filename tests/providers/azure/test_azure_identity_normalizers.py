@@ -11,6 +11,12 @@ from tfstride.providers.azure.compute_normalizers import normalize_linux_virtual
 from tfstride.providers.azure.identity_normalizers import normalize_role_definition, normalize_user_assigned_identity
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.observations import observe_azure_posture
+from tfstride.providers.azure.rbac_breadth import (
+    AUTHORIZATION_MANAGEMENT,
+    OWNER_LIKE_OR_WILDCARD,
+    RESOURCE_GROUP_SUBSCRIPTION_WIDE_MANAGEMENT,
+    ROLE_ASSIGNMENT_CAPABLE,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -96,6 +102,22 @@ class AzureRoleDefinitionNormalizerTests(unittest.TestCase):
             ["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"],
         )
         self.assertEqual(
+            facts.role_definition_breadth_signals,
+            [
+                OWNER_LIKE_OR_WILDCARD,
+                AUTHORIZATION_MANAGEMENT,
+                ROLE_ASSIGNMENT_CAPABLE,
+                RESOURCE_GROUP_SUBSCRIPTION_WIDE_MANAGEMENT,
+            ],
+        )
+        self.assertEqual(
+            facts.role_definition_breadth_mitigations,
+            [
+                "not_action=Microsoft.Authorization/elevateAccess/Action",
+                "not_data_action=Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+            ],
+        )
+        self.assertEqual(
             facts.role_definition_permissions,
             [
                 {
@@ -149,6 +171,8 @@ class AzureRoleDefinitionNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.role_definition_not_actions, ["Microsoft.Authorization/*/Delete"])
         self.assertEqual(facts.role_definition_data_actions, [])
         self.assertEqual(facts.role_definition_not_data_actions, [])
+        self.assertEqual(facts.role_definition_breadth_signals, [])
+        self.assertEqual(facts.role_definition_breadth_mitigations, ["not_action=Microsoft.Authorization/*/Delete"])
         self.assertEqual(
             facts.role_definition_permissions,
             [

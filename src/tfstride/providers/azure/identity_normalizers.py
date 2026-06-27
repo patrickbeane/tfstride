@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.rbac_breadth import classify_role_definition_breadth
 from tfstride.providers.azure.resource_utils import as_list, compact_strings, first_non_empty
 
 AZURE_PROVIDER = "azure"
@@ -47,14 +48,26 @@ def normalize_role_definition(resource: TerraformResource) -> NormalizedResource
     scope = _known_string(resource, values, "scope", uncertainties)
     assignable_scopes = _known_string_list(resource, values, "assignable_scopes", uncertainties)
     permissions = _role_definition_permission_records(resource, values, uncertainties)
+    actions = _permission_values(permissions, "actions")
+    not_actions = _permission_values(permissions, "not_actions")
+    data_actions = _permission_values(permissions, "data_actions")
+    not_data_actions = _permission_values(permissions, "not_data_actions")
+    breadth = classify_role_definition_breadth(
+        actions=actions,
+        not_actions=not_actions,
+        data_actions=data_actions,
+        not_data_actions=not_data_actions,
+    )
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: role_name,
         AzureResourceMetadata.ROLE_DEFINITION_SCOPE: scope,
         AzureResourceMetadata.ROLE_DEFINITION_ASSIGNABLE_SCOPES: assignable_scopes,
-        AzureResourceMetadata.ROLE_DEFINITION_ACTIONS: _permission_values(permissions, "actions"),
-        AzureResourceMetadata.ROLE_DEFINITION_NOT_ACTIONS: _permission_values(permissions, "not_actions"),
-        AzureResourceMetadata.ROLE_DEFINITION_DATA_ACTIONS: _permission_values(permissions, "data_actions"),
-        AzureResourceMetadata.ROLE_DEFINITION_NOT_DATA_ACTIONS: _permission_values(permissions, "not_data_actions"),
+        AzureResourceMetadata.ROLE_DEFINITION_ACTIONS: actions,
+        AzureResourceMetadata.ROLE_DEFINITION_NOT_ACTIONS: not_actions,
+        AzureResourceMetadata.ROLE_DEFINITION_DATA_ACTIONS: data_actions,
+        AzureResourceMetadata.ROLE_DEFINITION_NOT_DATA_ACTIONS: not_data_actions,
+        AzureResourceMetadata.ROLE_DEFINITION_BREADTH_SIGNALS: list(breadth.signals),
+        AzureResourceMetadata.ROLE_DEFINITION_BREADTH_MITIGATIONS: list(breadth.mitigations),
         AzureResourceMetadata.ROLE_DEFINITION_PERMISSIONS: permissions,
         AzureResourceMetadata.CUSTOM_ROLE_DEFINITION: True,
     }
