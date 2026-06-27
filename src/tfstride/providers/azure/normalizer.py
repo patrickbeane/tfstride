@@ -20,14 +20,17 @@ from tfstride.providers.azure.data_normalizers import (
     normalize_storage_account_network_rules,
     normalize_storage_container,
 )
-from tfstride.providers.azure.identity_normalizers import normalize_role_definition, normalize_user_assigned_identity
+from tfstride.providers.azure.identity_normalizers import (
+    normalize_role_assignment,
+    normalize_role_definition,
+    normalize_user_assigned_identity,
+)
 from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
     normalize_key_vault_certificate,
     normalize_key_vault_key,
     normalize_key_vault_secret,
-    normalize_role_assignment,
 )
 from tfstride.providers.azure.mssql_normalizers import (
     normalize_mssql_database,

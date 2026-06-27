@@ -3,8 +3,15 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import TerraformResource
+from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.observations import observe_azure_posture
+from tfstride.providers.azure.rbac_breadth import (
+    AUTHORIZATION_MANAGEMENT,
+    OWNER_LIKE_OR_WILDCARD,
+    ROLE_ASSIGNMENT_CAPABLE,
+    STORAGE_DATA_PLANE,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -87,6 +94,36 @@ def _role_assignment(
         },
         name=name,
         unknown_values=unknown_values,
+    )
+
+
+def _role_definition(
+    *,
+    role_definition_id: object = "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role",
+    name: str = "custom_role",
+    role_name: object = "Custom Storage Operator",
+    actions: list[str] | None = None,
+    not_actions: list[str] | None = None,
+    data_actions: list[str] | None = None,
+    not_data_actions: list[str] | None = None,
+) -> TerraformResource:
+    return _resource(
+        AzureResourceType.ROLE_DEFINITION,
+        {
+            "id": role_definition_id,
+            "name": role_name,
+            "scope": "/subscriptions/sub-0001",
+            "assignable_scopes": ["/subscriptions/sub-0001"],
+            "permissions": [
+                {
+                    "actions": actions or [],
+                    "not_actions": not_actions or [],
+                    "data_actions": data_actions or [],
+                    "not_data_actions": not_data_actions or [],
+                }
+            ],
+        },
+        name=name,
     )
 
 
@@ -256,6 +293,144 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             azure_facts(identity).managed_identity_role_assignments[0]["target_resource_address"],
             "azurerm_storage_account.logs",
         )
+
+    def test_role_assignment_resolves_custom_role_definition_by_role_definition_id(self) -> None:
+        role_definition_id = "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role"
+        inventory = AzureNormalizer().normalize(
+            [
+                _user_assigned_identity(principal_id="managed-principal-id"),
+                _role_definition(
+                    role_definition_id=role_definition_id,
+                    actions=["Microsoft.Authorization/roleAssignments/write"],
+                    not_actions=["Microsoft.Authorization/elevateAccess/Action"],
+                    data_actions=["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/*"],
+                    not_data_actions=["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"],
+                ),
+                _role_assignment(
+                    role_definition_name=None,
+                    role_definition_id=role_definition_id,
+                    name="custom_storage_operator",
+                ),
+            ]
+        )
+        identity = inventory.get_by_address("azurerm_user_assigned_identity.deploy")
+        role_assignment = inventory.get_by_address("azurerm_role_assignment.custom_storage_operator")
+        assert identity is not None
+        assert role_assignment is not None
+
+        assignment_facts = azure_facts(role_assignment)
+        self.assertEqual(
+            assignment_facts.resolved_role_definition_address,
+            "azurerm_role_definition.custom_role",
+        )
+        self.assertEqual(assignment_facts.resolved_managed_identity_address, identity.address)
+        self.assertEqual(
+            assignment_facts.role_assignment_breadth_signals,
+            [
+                "subscription_scope",
+                AUTHORIZATION_MANAGEMENT,
+                ROLE_ASSIGNMENT_CAPABLE,
+                STORAGE_DATA_PLANE,
+            ],
+        )
+        self.assertEqual(
+            assignment_facts.role_assignment_breadth_mitigations,
+            [
+                "not_action=Microsoft.Authorization/elevateAccess/Action",
+                "not_data_action=Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+            ],
+        )
+        self.assertEqual(
+            azure_facts(identity).managed_identity_role_assignments[0],
+            {
+                "source": "azurerm_role_assignment.custom_storage_operator",
+                "scope": "/subscriptions/sub-0001",
+                "role_definition_name": None,
+                "role_definition_id": role_definition_id,
+                "principal_id": "managed-principal-id",
+                "principal_type": "ServicePrincipal",
+                "scope_kind": "subscription",
+                "target_resource_address": None,
+                "target_resource_type": None,
+                "breadth_signals": [
+                    "subscription_scope",
+                    AUTHORIZATION_MANAGEMENT,
+                    ROLE_ASSIGNMENT_CAPABLE,
+                    STORAGE_DATA_PLANE,
+                ],
+                "resolved_role_definition_address": "azurerm_role_definition.custom_role",
+                "breadth_mitigations": [
+                    "not_action=Microsoft.Authorization/elevateAccess/Action",
+                    "not_data_action=Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+                ],
+                "role_definition_breadth_signals": [
+                    AUTHORIZATION_MANAGEMENT,
+                    ROLE_ASSIGNMENT_CAPABLE,
+                    STORAGE_DATA_PLANE,
+                ],
+                "role_definition_breadth_mitigations": [
+                    "not_action=Microsoft.Authorization/elevateAccess/Action",
+                    "not_data_action=Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+                ],
+            },
+        )
+
+    def test_role_assignment_resolves_custom_role_definition_by_terraform_reference(self) -> None:
+        inventory = AzureNormalizer().normalize(
+            [
+                _user_assigned_identity(principal_id="managed-principal-id"),
+                _role_definition(
+                    role_definition_id=None,
+                    actions=["*"],
+                ),
+                _role_assignment(
+                    role_definition_name=None,
+                    role_definition_id="azurerm_role_definition.custom_role.role_definition_resource_id",
+                    name="custom_owner",
+                ),
+            ]
+        )
+        role_assignment = inventory.get_by_address("azurerm_role_assignment.custom_owner")
+        assert role_assignment is not None
+
+        assignment_facts = azure_facts(role_assignment)
+        self.assertEqual(
+            assignment_facts.resolved_role_definition_address,
+            "azurerm_role_definition.custom_role",
+        )
+        self.assertEqual(
+            assignment_facts.role_assignment_breadth_signals,
+            ["subscription_scope", OWNER_LIKE_OR_WILDCARD],
+        )
+
+    def test_unresolved_custom_role_definition_reference_is_preserved_without_relationship(self) -> None:
+        inventory = AzureNormalizer().normalize(
+            [
+                _user_assigned_identity(principal_id="managed-principal-id"),
+                _role_assignment(
+                    role_definition_name=None,
+                    role_definition_id="azurerm_role_definition.missing.role_definition_resource_id",
+                    name="unresolved_custom_role",
+                ),
+            ]
+        )
+        identity = inventory.get_by_address("azurerm_user_assigned_identity.deploy")
+        role_assignment = inventory.get_by_address("azurerm_role_assignment.unresolved_custom_role")
+        assert identity is not None
+        assert role_assignment is not None
+
+        assignment_facts = azure_facts(role_assignment)
+        self.assertIsNone(assignment_facts.resolved_role_definition_address)
+        self.assertEqual(assignment_facts.resolved_managed_identity_address, identity.address)
+        self.assertEqual(assignment_facts.role_assignment_breadth_signals, ["subscription_scope"])
+        self.assertEqual(assignment_facts.role_assignment_breadth_mitigations, [])
+        self.assertEqual(
+            role_assignment.get_metadata_field(AzureResourceMetadata.UNRESOLVED_RESOURCE_REFERENCES),
+            ["role_definition:azurerm_role_definition.missing.role_definition_resource_id"],
+        )
+        assignment = azure_facts(identity).managed_identity_role_assignments[0]
+        self.assertNotIn("resolved_role_definition_address", assignment)
+        self.assertNotIn("role_definition_breadth_signals", assignment)
 
 
 if __name__ == "__main__":

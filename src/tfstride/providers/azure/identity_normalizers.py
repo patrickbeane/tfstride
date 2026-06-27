@@ -45,6 +45,11 @@ def normalize_role_definition(resource: TerraformResource) -> NormalizedResource
     values = resource.values
     uncertainties: list[str] = []
     role_name = _known_string(resource, values, "name", uncertainties)
+    role_definition_id = (
+        _known_string(resource, values, "role_definition_id", uncertainties)
+        or _known_string(resource, values, "role_definition_resource_id", uncertainties)
+        or _known_string(resource, values, "id", uncertainties)
+    )
     scope = _known_string(resource, values, "scope", uncertainties)
     assignable_scopes = _known_string_list(resource, values, "assignable_scopes", uncertainties)
     permissions = _role_definition_permission_records(resource, values, uncertainties)
@@ -60,6 +65,7 @@ def normalize_role_definition(resource: TerraformResource) -> NormalizedResource
     )
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: role_name,
+        AzureResourceMetadata.ROLE_DEFINITION_ID: role_definition_id,
         AzureResourceMetadata.ROLE_DEFINITION_SCOPE: scope,
         AzureResourceMetadata.ROLE_DEFINITION_ASSIGNABLE_SCOPES: assignable_scopes,
         AzureResourceMetadata.ROLE_DEFINITION_ACTIONS: actions,
@@ -80,8 +86,43 @@ def normalize_role_definition(resource: TerraformResource) -> NormalizedResource
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.IAM,
-        identifier=first_non_empty(values.get("role_definition_id"), values.get("id"), role_name, resource.address),
+        identifier=first_non_empty(role_definition_id, role_name, resource.address),
         metadata=metadata,
+    )
+
+
+def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    scope = _known_string(resource, values, "scope", uncertainties)
+    role_definition_name = _known_string(resource, values, "role_definition_name", uncertainties)
+    role_definition_id = _known_string(resource, values, "role_definition_id", uncertainties)
+    principal_id = _known_string(resource, values, "principal_id", uncertainties)
+    principal_type = _known_string(resource, values, "principal_type", uncertainties)
+    assignment = {
+        "source": resource.address,
+        "scope": scope,
+        "role_definition_name": role_definition_name,
+        "role_definition_id": role_definition_id,
+        "principal_id": principal_id,
+        "principal_type": principal_type,
+    }
+    return NormalizedResource(
+        address=resource.address,
+        provider=AZURE_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(values.get("id"), resource.address),
+        metadata={
+            AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE: scope,
+            AzureResourceMetadata.ROLE_DEFINITION_NAME: role_definition_name,
+            AzureResourceMetadata.ROLE_DEFINITION_ID: role_definition_id,
+            AzureResourceMetadata.PRINCIPAL_ID: principal_id,
+            AzureResourceMetadata.PRINCIPAL_TYPE: principal_type,
+            AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS: [assignment],
+            AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES: uncertainties,
+        },
     )
 
 

@@ -243,12 +243,20 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.RESOLVED_MANAGED_IDENTITY_ADDRESS)
 
     @property
+    def resolved_role_definition_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.RESOLVED_ROLE_DEFINITION_ADDRESS)
+
+    @property
     def role_assignment_scope_kind(self) -> str | None:
         return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE_KIND)
 
     @property
     def role_assignment_breadth_signals(self) -> list[str]:
         return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_SIGNALS)
+
+    @property
+    def role_assignment_breadth_mitigations(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_MITIGATIONS)
 
     @property
     def role_assignment_target_resource_address(self) -> str | None:
@@ -459,16 +467,21 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     def set_resolved_managed_identity_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_MANAGED_IDENTITY_ADDRESS, address)
 
+    def set_resolved_role_definition_address(self, address: str) -> None:
+        self.set(AzureResourceMetadata.RESOLVED_ROLE_DEFINITION_ADDRESS, address)
+
     def set_role_assignment_scope_context(
         self,
         *,
         scope_kind: str | None,
         breadth_signals: Sequence[str],
-        target_resource_address: str | None,
-        target_resource_type: str | None,
+        breadth_mitigations: Sequence[str] = (),
+        target_resource_address: str | None = None,
+        target_resource_type: str | None = None,
     ) -> None:
         self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE_KIND, scope_kind)
         self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_SIGNALS, list(breadth_signals))
+        self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_BREADTH_MITIGATIONS, list(breadth_mitigations))
         self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_ADDRESS, target_resource_address)
         self.set(AzureResourceMetadata.ROLE_ASSIGNMENT_TARGET_RESOURCE_TYPE, target_resource_type)
 
@@ -567,6 +580,9 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         if policy not in policies:
             policies.append(policy)
             self.set(AzureResourceMetadata.KEY_VAULT_ACCESS_POLICIES, policies)
+
+    def set_key_vault_role_assignments(self, assignments: Sequence[dict]) -> None:
+        self.set(AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS, list(assignments))
 
     def add_key_vault_role_assignment(self, assignment: dict) -> None:
         assignments = self.key_vault_role_assignments

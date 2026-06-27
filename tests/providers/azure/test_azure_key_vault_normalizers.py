@@ -3,11 +3,11 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import TerraformResource
+from tfstride.providers.azure.identity_normalizers import normalize_role_assignment
 from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
     normalize_key_vault_secret,
-    normalize_role_assignment,
 )
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType

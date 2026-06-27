@@ -41,31 +41,52 @@ class DecorateManagedIdentityRoleAssignmentsStage:
 
     def apply(self, resources: list[NormalizedResource], context: AzureDecorationContext) -> None:
         principal_index = _managed_identities_by_principal_id(resources)
+        role_definition_index = _custom_role_definitions_by_reference(resources)
         for role_assignment in resources:
             if role_assignment.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
                 continue
-            self._decorate_role_assignment(role_assignment, context, principal_index)
+            self._decorate_role_assignment(role_assignment, context, principal_index, role_definition_index)
 
     def _decorate_role_assignment(
         self,
         role_assignment: NormalizedResource,
         context: AzureDecorationContext,
         principal_index: dict[str, list[NormalizedResource]],
+        role_definition_index: dict[str, list[NormalizedResource]],
     ) -> None:
         facts = azure_facts(role_assignment)
         scope = facts.role_assignment_scope
         target_resource = context.index.resolve(scope)
         scope_kind = _classify_scope(scope)
+        role_definition = _resolve_custom_role_definition(facts.role_definition_id, role_definition_index)
+        if role_definition is not None:
+            facts.set_resolved_role_definition_address(role_definition.address)
+        elif _looks_like_role_definition_reference(facts.role_definition_id):
+            facts.add_unresolved_resource_reference("role_definition", facts.role_definition_id)
         breadth_signals = _breadth_signals(
             role_definition_name=facts.role_definition_name,
             scope_kind=scope_kind,
             target_resource=target_resource,
+            role_definition=role_definition,
         )
+        breadth_mitigations = _custom_role_breadth_mitigations(role_definition)
         facts.set_role_assignment_scope_context(
             scope_kind=scope_kind,
             breadth_signals=breadth_signals,
+            breadth_mitigations=breadth_mitigations,
             target_resource_address=target_resource.address if target_resource else None,
             target_resource_type=target_resource.resource_type if target_resource else None,
+        )
+        facts.set_key_vault_role_assignments(
+            [
+                _role_assignment_record(
+                    role_assignment,
+                    scope_kind=scope_kind,
+                    breadth_signals=breadth_signals,
+                    target_resource=target_resource,
+                    role_definition=role_definition,
+                )
+            ]
         )
 
         principal_id = facts.principal_id
@@ -83,6 +104,7 @@ class DecorateManagedIdentityRoleAssignmentsStage:
                 scope_kind=scope_kind,
                 breadth_signals=breadth_signals,
                 target_resource=target_resource,
+                role_definition=role_definition,
             )
         )
 
@@ -120,6 +142,7 @@ def _breadth_signals(
     role_definition_name: str | None,
     scope_kind: str | None,
     target_resource: NormalizedResource | None,
+    role_definition: NormalizedResource | None,
 ) -> list[str]:
     signals: list[str] = []
     if scope_kind == "subscription":
@@ -130,7 +153,9 @@ def _breadth_signals(
         signals.append("broad_builtin_role")
     if target_resource is not None and target_resource.resource_type in _SENSITIVE_SCOPE_RESOURCE_TYPES:
         signals.append("sensitive_resource_scope")
-    return signals
+    if role_definition is not None:
+        signals.extend(azure_facts(role_definition).role_definition_breadth_signals)
+    return list(dict.fromkeys(signals))
 
 
 def _is_broad_builtin_role(role_definition_name: str | None) -> bool:
@@ -145,9 +170,10 @@ def _role_assignment_record(
     scope_kind: str | None,
     breadth_signals: list[str],
     target_resource: NormalizedResource | None,
+    role_definition: NormalizedResource | None,
 ) -> dict[str, object]:
     facts = azure_facts(role_assignment)
-    return {
+    record: dict[str, object] = {
         "source": role_assignment.address,
         "scope": facts.role_assignment_scope,
         "role_definition_name": facts.role_definition_name,
@@ -159,6 +185,84 @@ def _role_assignment_record(
         "target_resource_type": target_resource.resource_type if target_resource else None,
         "breadth_signals": list(breadth_signals),
     }
+    if facts.resolved_role_definition_address:
+        record["resolved_role_definition_address"] = facts.resolved_role_definition_address
+    if facts.role_assignment_breadth_mitigations:
+        record["breadth_mitigations"] = facts.role_assignment_breadth_mitigations
+    if role_definition is not None:
+        role_definition_facts = azure_facts(role_definition)
+        record["role_definition_breadth_signals"] = role_definition_facts.role_definition_breadth_signals
+        if role_definition_facts.role_definition_breadth_mitigations:
+            record["role_definition_breadth_mitigations"] = role_definition_facts.role_definition_breadth_mitigations
+    return record
+
+
+def _custom_role_breadth_mitigations(role_definition: NormalizedResource | None) -> list[str]:
+    if role_definition is None:
+        return []
+    return azure_facts(role_definition).role_definition_breadth_mitigations
+
+
+def _custom_role_definitions_by_reference(
+    resources: Iterable[NormalizedResource],
+) -> dict[str, list[NormalizedResource]]:
+    definitions: dict[str, list[NormalizedResource]] = {}
+    for resource in resources:
+        if resource.resource_type != AzureResourceType.ROLE_DEFINITION:
+            continue
+        seen: set[str] = set()
+        for reference in _role_definition_references(resource):
+            key = _role_definition_reference_key(reference)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            definitions.setdefault(key, []).append(resource)
+    return definitions
+
+
+def _resolve_custom_role_definition(
+    reference: str | None,
+    definitions: dict[str, list[NormalizedResource]],
+) -> NormalizedResource | None:
+    key = _role_definition_reference_key(reference)
+    if not key:
+        return None
+    matches = definitions.get(key, [])
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _role_definition_references(role_definition: NormalizedResource) -> tuple[str, ...]:
+    facts = azure_facts(role_definition)
+    references = [
+        role_definition.address,
+        f"{role_definition.address}.id",
+        f"{role_definition.address}.role_definition_id",
+        f"{role_definition.address}.role_definition_resource_id",
+        role_definition.identifier,
+        facts.role_definition_id,
+    ]
+    return tuple(reference for reference in references if reference)
+
+
+def _looks_like_role_definition_reference(reference: str | None) -> bool:
+    if not reference:
+        return False
+    normalized = reference.strip().lower()
+    return normalized.startswith("azurerm_role_definition.")
+
+
+def _role_definition_reference_key(reference: str | None) -> str:
+    if not reference:
+        return ""
+    text = reference.strip().lower()
+    if text.startswith("${") and text.endswith("}"):
+        text = text[2:-1].strip()
+    for suffix in (".role_definition_resource_id", ".role_definition_id", ".id"):
+        if text.endswith(suffix):
+            return text[: -len(suffix)]
+    return text
 
 
 def _principal_key(principal_id: str) -> str:

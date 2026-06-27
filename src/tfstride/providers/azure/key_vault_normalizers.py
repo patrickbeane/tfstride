@@ -138,45 +138,6 @@ def normalize_key_vault_certificate(resource: TerraformResource) -> NormalizedRe
     return _normalize_key_vault_child(resource)
 
 
-def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource:
-    values = resource.values
-    scope = first_non_empty(values.get("scope"))
-    role_definition_name = first_non_empty(values.get("role_definition_name"))
-    role_definition_id = first_non_empty(values.get("role_definition_id"))
-    principal_id = first_non_empty(values.get("principal_id"))
-    principal_type = first_non_empty(values.get("principal_type"))
-    uncertainties = [
-        f"{field} is unknown after planning"
-        for field in ("scope", "role_definition_name", "role_definition_id", "principal_id", "principal_type")
-        if resource.unknown_values.get(field) is True
-    ]
-    assignment = {
-        "source": resource.address,
-        "scope": scope,
-        "role_definition_name": role_definition_name,
-        "role_definition_id": role_definition_id,
-        "principal_id": principal_id,
-        "principal_type": principal_type,
-    }
-    return NormalizedResource(
-        address=resource.address,
-        provider=AZURE_PROVIDER,
-        resource_type=resource.resource_type,
-        name=resource.name,
-        category=ResourceCategory.IAM,
-        identifier=first_non_empty(values.get("id"), resource.address),
-        metadata={
-            AzureResourceMetadata.ROLE_ASSIGNMENT_SCOPE: scope,
-            AzureResourceMetadata.ROLE_DEFINITION_NAME: role_definition_name,
-            AzureResourceMetadata.ROLE_DEFINITION_ID: role_definition_id,
-            AzureResourceMetadata.PRINCIPAL_ID: principal_id,
-            AzureResourceMetadata.PRINCIPAL_TYPE: principal_type,
-            AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS: [assignment],
-            AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES: uncertainties,
-        },
-    )
-
-
 def _normalize_key_vault_child(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     name = first_non_empty(values.get("name"), resource.name)

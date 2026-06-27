@@ -79,6 +79,10 @@ class AzureRoleDefinitionNormalizerTests(unittest.TestCase):
         )
         self.assertTrue(facts.is_custom_role_definition)
         self.assertEqual(facts.name, "Storage Operator")
+        self.assertEqual(
+            facts.role_definition_id,
+            "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role-id",
+        )
         self.assertEqual(facts.role_definition_scope, "/subscriptions/sub-0001")
         self.assertEqual(
             facts.role_definition_assignable_scopes,
