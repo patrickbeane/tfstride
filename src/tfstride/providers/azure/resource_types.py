@@ -31,6 +31,10 @@ class AzureResourceType:
     MSSQL_FIREWALL_RULE = "azurerm_mssql_firewall_rule"
     MSSQL_VIRTUAL_NETWORK_RULE = "azurerm_mssql_virtual_network_rule"
     MSSQL_SERVER_SECURITY_ALERT_POLICY = "azurerm_mssql_server_security_alert_policy"
+    POSTGRESQL_FLEXIBLE_SERVER = "azurerm_postgresql_flexible_server"
+    POSTGRESQL_FLEXIBLE_SERVER_DATABASE = "azurerm_postgresql_flexible_server_database"
+    POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE = "azurerm_postgresql_flexible_server_firewall_rule"
+    POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION = "azurerm_postgresql_flexible_server_configuration"
 
 
 AZURE_STORAGE_RESOURCE_TYPES = frozenset(
@@ -84,6 +88,15 @@ AZURE_SQL_RESOURCE_TYPES = frozenset(
     }
 )
 
+AZURE_POSTGRESQL_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER,
+        AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_DATABASE,
+        AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE,
+        AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION,
+    }
+)
+
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
@@ -91,4 +104,5 @@ AZURE_SUPPORTED_RESOURCE_TYPES = (
     | AZURE_NETWORK_RESOURCE_TYPES
     | AZURE_COMPUTE_RESOURCE_TYPES
     | AZURE_SQL_RESOURCE_TYPES
+    | AZURE_POSTGRESQL_RESOURCE_TYPES
 )

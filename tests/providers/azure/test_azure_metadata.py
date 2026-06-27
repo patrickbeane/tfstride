@@ -98,6 +98,16 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "MSSQL_POSTURE_UNCERTAINTIES",
             "MSSQL_FIREWALL_RULE_ADDRESSES",
             "MSSQL_VNET_RULE_ADDRESSES",
+            "POSTGRESQL_SERVER_ID",
+            "POSTGRESQL_FIREWALL_START_IP",
+            "POSTGRESQL_FIREWALL_END_IP",
+            "POSTGRESQL_SSL_MIN_PROTOCOL_VERSION",
+            "POSTGRESQL_GEO_REDUNDANT_BACKUP_ENABLED",
+            "POSTGRESQL_DELEGATED_SUBNET_ID",
+            "POSTGRESQL_POSTURE_UNCERTAINTIES",
+            "POSTGRESQL_CONFIG_NAME",
+            "POSTGRESQL_CONFIG_VALUE",
+            "POSTGRESQL_CONFIG_SERVER_ID",
         }
 
         self.assertEqual(contract.provider_owned_fields["azure"], frozenset(expected_fields))

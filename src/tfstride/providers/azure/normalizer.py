@@ -39,6 +39,12 @@ from tfstride.providers.azure.network_normalizers import (
     normalize_subnet_network_security_group_association,
     normalize_virtual_network,
 )
+from tfstride.providers.azure.postgresql_normalizers import (
+    normalize_postgresql_flexible_server,
+    normalize_postgresql_flexible_server_configuration,
+    normalize_postgresql_flexible_server_database,
+    normalize_postgresql_flexible_server_firewall_rule,
+)
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.base import ProviderNormalizer
@@ -72,6 +78,10 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.MSSQL_FIREWALL_RULE: normalize_mssql_firewall_rule,
     AzureResourceType.MSSQL_VIRTUAL_NETWORK_RULE: normalize_mssql_virtual_network_rule,
     AzureResourceType.MSSQL_SERVER_SECURITY_ALERT_POLICY: normalize_mssql_server_security_alert_policy,
+    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER: normalize_postgresql_flexible_server,
+    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_DATABASE: normalize_postgresql_flexible_server_database,
+    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE: normalize_postgresql_flexible_server_firewall_rule,
+    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION: normalize_postgresql_flexible_server_configuration,
 }
 SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 

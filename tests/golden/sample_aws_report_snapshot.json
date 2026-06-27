@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 63,
+      "registered_rule_count": 67,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -101,7 +101,11 @@
         "azure-sql-public-network-access-enabled",
         "azure-sql-firewall-broad-public-access",
         "azure-sql-minimum-tls-below-1-2",
-        "azure-sql-security-alert-policy-disabled"
+        "azure-sql-security-alert-policy-disabled",
+        "azure-postgresql-public-network-access-enabled",
+        "azure-postgresql-firewall-broad-public-access",
+        "azure-postgresql-weak-tls-or-ssl",
+        "azure-postgresql-geo-backup-disabled"
       ],
       "disabled_rules": [],
       "severity_overrides": {},
@@ -168,7 +172,11 @@
         "azure-sql-public-network-access-enabled": 0,
         "azure-sql-firewall-broad-public-access": 0,
         "azure-sql-minimum-tls-below-1-2": 0,
-        "azure-sql-security-alert-policy-disabled": 0
+        "azure-sql-security-alert-policy-disabled": 0,
+        "azure-postgresql-public-network-access-enabled": 0,
+        "azure-postgresql-firewall-broad-public-access": 0,
+        "azure-postgresql-weak-tls-or-ssl": 0,
+        "azure-postgresql-geo-backup-disabled": 0
       }
     },
     "references": {

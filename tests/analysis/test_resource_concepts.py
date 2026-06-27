@@ -123,6 +123,8 @@ class ResourceConceptTests(unittest.TestCase):
                     "azurerm_key_vault_certificate",
                     "azurerm_mssql_server",
                     "azurerm_mssql_database",
+                    "azurerm_postgresql_flexible_server",
+                    "azurerm_postgresql_flexible_server_database",
                 }
             ),
         )
@@ -149,6 +151,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "azurerm_linux_virtual_machine",
                     "azurerm_windows_virtual_machine",
                     "azurerm_mssql_server",
+                    "azurerm_postgresql_flexible_server",
                 }
             ),
         )

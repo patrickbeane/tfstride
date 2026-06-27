@@ -166,4 +166,42 @@ AZURE_RULE_METADATA = (
         tags=("azure", "sql", "security-alerting"),
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="azure-postgresql-public-network-access-enabled",
+        title="Azure PostgreSQL Flexible Server has public network access enabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public network access on the PostgreSQL Flexible Server and use Private Link or "
+            "VNet integration for all client connections."
+        ),
+        tags=("azure", "postgresql", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-postgresql-firewall-broad-public-access",
+        title="Azure PostgreSQL Flexible Server firewall rule allows broad public IP access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Replace broad IP ranges (0.0.0.0 to 255.255.255.255) with specific trusted client CIDRs, use "
+            "Private Link, or rely on VNet integration instead of IP-based firewall rules."
+        ),
+        tags=("azure", "postgresql", "firewall", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-postgresql-weak-tls-or-ssl",
+        title="Azure PostgreSQL Flexible Server has weak TLS or SSL posture",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=("Set a minimum TLS version of 1.2 and ensure `require_secure_transport` is enabled."),
+        tags=("azure", "postgresql", "tls", "ssl"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-postgresql-geo-backup-disabled",
+        title="Azure PostgreSQL Flexible Server geo-redundant backup is disabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=("Enable geo-redundant backup to protect against regional data loss."),
+        tags=("azure", "postgresql", "backup", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
 )

@@ -7,6 +7,7 @@ from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_COMPUTE_RESOURCE_TYPES,
+    AZURE_POSTGRESQL_RESOURCE_TYPES,
     AZURE_SQL_RESOURCE_TYPES,
     AzureResourceType,
 )
@@ -28,6 +29,8 @@ def observe_azure_posture(inventory: ResourceInventory) -> list[Observation]:
         *_observe_key_vault_recovery_posture(inventory),
         *_observe_mssql_uncertainties(inventory),
         *_observe_mssql_vnet_posture(inventory),
+        *_observe_postgresql_uncertainties(inventory),
+        *_observe_postgresql_delegated_subnet(inventory),
     ]
 
 
@@ -312,6 +315,59 @@ def _observe_mssql_vnet_posture(inventory: ResourceInventory) -> list[Observatio
                 ),
                 evidence=collect_evidence(
                     evidence_item("vnet_rules", vnet_rules),
+                ),
+            )
+        )
+    return observations
+
+
+def _observe_postgresql_uncertainties(inventory: ResourceInventory) -> list[Observation]:
+    observations: list[Observation] = []
+    for resource in inventory.by_type(*AZURE_POSTGRESQL_RESOURCE_TYPES):
+        uncertainties = azure_facts(resource).postgresql_posture_uncertainties
+        if not uncertainties:
+            continue
+        observations.append(
+            Observation(
+                title="Azure PostgreSQL posture contains unresolved plan values",
+                observation_id="azure-postgresql-posture-unknown",
+                category="analysis-uncertainty",
+                affected_resources=[resource.address],
+                rationale=(
+                    f"{resource.display_name} has computed PostgreSQL posture attributes. tfSTRIDE does not "
+                    "infer insecure posture from unresolved values."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("unknown_postgresql_posture", uncertainties),
+                    evidence_item(
+                        "analysis_effect",
+                        ["posture findings are emitted only for known-positive posture signals"],
+                    ),
+                ),
+            )
+        )
+    return observations
+
+
+def _observe_postgresql_delegated_subnet(inventory: ResourceInventory) -> list[Observation]:
+    observations: list[Observation] = []
+    for server in inventory.by_type(AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER):
+        facts = azure_facts(server)
+        delegated_subnet = facts.postgresql_delegated_subnet_id
+        if not delegated_subnet:
+            continue
+        observations.append(
+            Observation(
+                title="Azure PostgreSQL Flexible Server delegated subnet is modeled",
+                observation_id="azure-postgresql-delegated-subnet-observed",
+                category="data-protection",
+                affected_resources=[server.address],
+                rationale=(
+                    f"{server.display_name} uses a delegated subnet for VNet integration. "
+                    "Private network posture is evaluated separately from public endpoint and firewall rules."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("delegated_subnet", [delegated_subnet]),
                 ),
             )
         )
