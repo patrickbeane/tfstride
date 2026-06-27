@@ -102,4 +102,26 @@ AZURE_RULE_METADATA = (
         tags=("azure", "key-vault", "recovery", "purge-protection"),
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
+    RuleMetadata(
+        rule_id="azure-managed-identity-broad-rbac",
+        title="Azure managed identity has broad RBAC authority",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace broad managed identity role assignments with least-privilege resource-scoped roles, "
+            "split deployment and runtime identities, and avoid subscription or resource-group scope unless required."
+        ),
+        tags=("azure", "managed-identity", "rbac", "least-privilege"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-public-workload-sensitive-resource-access",
+        title="Internet-exposed Azure workload can access sensitive resources",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Remove direct internet exposure from the workload, restrict NSG ingress to trusted paths, and narrow "
+            "the managed identity role assignment to the minimum sensitive resource operations required."
+        ),
+        tags=("azure", "managed-identity", "sensitive-data", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
+    ),
 )

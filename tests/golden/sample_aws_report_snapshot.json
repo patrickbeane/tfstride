@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 57,
+      "registered_rule_count": 59,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -95,7 +95,9 @@
         "azure-storage-account-public-network-unrestricted",
         "azure-key-vault-public-network-access",
         "azure-key-vault-privileged-access",
-        "azure-key-vault-purge-protection-disabled"
+        "azure-key-vault-purge-protection-disabled",
+        "azure-managed-identity-broad-rbac",
+        "azure-public-workload-sensitive-resource-access"
       ],
       "disabled_rules": [],
       "severity_overrides": {},
@@ -156,7 +158,9 @@
         "azure-storage-account-public-network-unrestricted": 0,
         "azure-key-vault-public-network-access": 0,
         "azure-key-vault-privileged-access": 0,
-        "azure-key-vault-purge-protection-disabled": 0
+        "azure-key-vault-purge-protection-disabled": 0,
+        "azure-managed-identity-broad-rbac": 0,
+        "azure-public-workload-sensitive-resource-access": 0
       }
     },
     "references": {

@@ -241,7 +241,7 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
                 AzureResourceType.ROLE_ASSIGNMENT,
                 {
                     "scope": "azurerm_user_assigned_identity.deploy.id",
-                    "role_definition_name": "Contributor",
+                    "role_definition_name": "Reader",
                     "principal_id": "principal-id",
                     "principal_type": "ServicePrincipal",
                 },
@@ -271,14 +271,14 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
                 {
                     "source": "azurerm_role_assignment.deploy_contributor",
                     "scope": "azurerm_user_assigned_identity.deploy.id",
-                    "role_definition_name": "Contributor",
+                    "role_definition_name": "Reader",
                     "role_definition_id": None,
                     "principal_id": "principal-id",
                     "principal_type": "ServicePrincipal",
                     "scope_kind": "resource",
                     "target_resource_address": "azurerm_user_assigned_identity.deploy",
                     "target_resource_type": AzureResourceType.USER_ASSIGNED_IDENTITY,
-                    "breadth_signals": ["broad_builtin_role"],
+                    "breadth_signals": [],
                 }
             ],
         )
