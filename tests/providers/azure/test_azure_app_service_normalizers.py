@@ -43,6 +43,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
                     "name": "api",
                     "location": "eastus",
                     "service_plan_id": "azurerm_service_plan.apps.id",
+                    "virtual_network_subnet_id": "azurerm_subnet.integration.id",
                     "public_network_access_enabled": True,
                     "site_config": [{"minimum_tls_version": "1.2", "ftps_state": "FtpsOnly"}],
                     "identity": [
@@ -71,6 +72,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
             facts.app_service_id, "/subscriptions/example/resourceGroups/app/providers/Microsoft.Web/sites/api"
         )
         self.assertEqual(facts.app_service_plan_reference, "azurerm_service_plan.apps.id")
+        self.assertEqual(facts.app_service_vnet_integration_subnet_id, "azurerm_subnet.integration.id")
         self.assertEqual(facts.os_type, "linux")
         self.assertTrue(facts.public_network_access_enabled)
         self.assertEqual(facts.public_network_fallback_state, "enabled")
@@ -176,6 +178,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
                     "id": None,
                     "name": "pending",
                     "service_plan_id": None,
+                    "virtual_network_subnet_id": None,
                     "public_network_access_enabled": None,
                     "site_config": [{"minimum_tls_version": None, "ftps_state": None}],
                     "identity": None,
@@ -184,6 +187,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
                 unknown_values={
                     "id": True,
                     "service_plan_id": True,
+                    "virtual_network_subnet_id": True,
                     "public_network_access_enabled": True,
                     "site_config": [{"minimum_tls_version": True, "ftps_state": True}],
                     "identity": True,
@@ -195,6 +199,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
         self.assertEqual(web_app.identifier, "pending")
         self.assertIsNone(facts.app_service_id)
         self.assertIsNone(facts.app_service_plan_reference)
+        self.assertIsNone(facts.app_service_vnet_integration_subnet_id)
         self.assertIsNone(facts.public_network_access_enabled)
         self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIsNone(facts.min_tls_version)
@@ -204,6 +209,7 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
             [
                 "id is unknown after planning",
                 "service_plan_id is unknown after planning",
+                "virtual_network_subnet_id is unknown after planning",
                 "public_network_access_enabled is unknown after planning",
                 "site_config.minimum_tls_version is unknown after planning",
                 "site_config.ftps_state is unknown after planning",

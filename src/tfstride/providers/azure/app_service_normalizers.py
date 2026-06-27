@@ -38,6 +38,7 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
     site_config = _first_mapping(values.get("site_config"))
     app_service_id = _known_string(resource, values, "id", uncertainties)
     service_plan_reference = _known_service_plan_reference(resource, values, uncertainties)
+    vnet_integration_subnet_id = _known_string(resource, values, "virtual_network_subnet_id", uncertainties)
     public_network_access_enabled = _known_bool(resource, values, "public_network_access_enabled", uncertainties)
     min_tls_version = _known_site_config_string(
         resource,
@@ -64,6 +65,8 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
             public_network_access_enabled
         ),
     }
+    if vnet_integration_subnet_id is not None:
+        metadata[AzureResourceMetadata.APP_SERVICE_VNET_INTEGRATION_SUBNET_ID] = vnet_integration_subnet_id
     if public_network_access_enabled is not None:
         metadata[AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED] = public_network_access_enabled
     if min_tls_version is not None:

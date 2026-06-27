@@ -75,6 +75,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.APP_SERVICE_PLAN_REFERENCE)
 
     @property
+    def app_service_vnet_integration_subnet_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.APP_SERVICE_VNET_INTEGRATION_SUBNET_ID)
+
+    @property
     def key_vault_reference(self) -> str | None:
         return self.get(AzureResourceMetadata.KEY_VAULT_REFERENCE)
 

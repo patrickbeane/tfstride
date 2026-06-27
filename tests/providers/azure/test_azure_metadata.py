@@ -27,6 +27,7 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "KEY_VAULT_ID",
             "APP_SERVICE_ID",
             "APP_SERVICE_PLAN_REFERENCE",
+            "APP_SERVICE_VNET_INTEGRATION_SUBNET_ID",
             "KEY_VAULT_REFERENCE",
             "RESOLVED_KEY_VAULT_ADDRESS",
             "TENANT_ID",

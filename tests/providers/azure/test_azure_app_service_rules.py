@@ -14,6 +14,7 @@ _APP_RULE_IDS = (
     "azure-app-service-minimum-tls-below-1-2",
     "azure-app-service-minimum-tls-unknown",
     "azure-app-service-managed-identity-missing",
+    "azure-app-service-vnet-integration-missing",
 )
 _MISSING = object()
 
@@ -43,6 +44,7 @@ def _app(
     public_network: object = False,
     tls_version: object = "1.2",
     identity: object = _MISSING,
+    vnet_subnet: object = _MISSING,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -57,6 +59,8 @@ def _app(
         values["site_config"] = [{"minimum_tls_version": tls_version}]
     if identity is not _MISSING:
         values["identity"] = identity
+    if vnet_subnet is not _MISSING:
+        values["virtual_network_subnet_id"] = vnet_subnet
     return _resource(resource_type, name, values, unknown_values=unknown_values)
 
 
@@ -205,6 +209,68 @@ class AzureAppServiceTlsRuleTests(unittest.TestCase):
         )
 
 
+class AzureAppServiceVnetIntegrationRuleTests(unittest.TestCase):
+    def test_missing_vnet_integration_emits_finding(self) -> None:
+        findings = _evaluate(
+            [_app(public_network=False, identity=_system_identity(), vnet_subnet=_MISSING)],
+            "azure-app-service-vnet-integration-missing",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-app-service-vnet-integration-missing"])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "low")
+        self.assertIn(
+            "does not have VNet integration configured",
+            finding.rationale,
+        )
+        self.assertIn(
+            "may rely on public endpoints or service-level firewall exceptions",
+            finding.rationale,
+        )
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(evidence["vnet_integration"], ["virtual_network_subnet_id is not configured"])
+        self.assertEqual(
+            evidence["network_posture"],
+            ["public_network_fallback_state=disabled", "public_network_access_enabled is false"],
+        )
+
+    def test_missing_vnet_integration_with_public_access_enabled_raises_severity(self) -> None:
+        findings = _evaluate(
+            [_app(public_network=True, identity=_system_identity(), vnet_subnet=_MISSING)],
+            "azure-app-service-vnet-integration-missing",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-app-service-vnet-integration-missing"])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["network_posture"],
+            ["public_network_fallback_state=enabled", "public_network_access_enabled is true"],
+        )
+
+    def test_configured_vnet_integration_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [_app(vnet_subnet="azurerm_subnet.integration.id")],
+            "azure-app-service-vnet-integration-missing",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unknown_vnet_integration_does_not_overclaim_missing_integration(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    vnet_subnet=None,
+                    unknown_values={"virtual_network_subnet_id": True},
+                )
+            ],
+            "azure-app-service-vnet-integration-missing",
+        )
+
+        self.assertEqual(findings, [])
+
+
 class AzureAppServiceManagedIdentityRuleTests(unittest.TestCase):
     def test_missing_managed_identity_emits_finding(self) -> None:
         findings = _evaluate(
@@ -261,6 +327,7 @@ class AzureAppServiceManagedIdentityRuleTests(unittest.TestCase):
                     public_network=False,
                     tls_version="1.2",
                     identity=_system_identity(),
+                    vnet_subnet="azurerm_subnet.integration.id",
                 )
             ],
             *rule_ids,

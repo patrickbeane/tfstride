@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 75,
+      "registered_rule_count": 76,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -104,6 +104,7 @@
         "azure-app-service-minimum-tls-below-1-2",
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
+        "azure-app-service-vnet-integration-missing",
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
@@ -183,6 +184,7 @@
         "azure-app-service-minimum-tls-below-1-2": 0,
         "azure-app-service-minimum-tls-unknown": 0,
         "azure-app-service-managed-identity-missing": 0,
+        "azure-app-service-vnet-integration-missing": 0,
         "azure-sql-public-network-access-enabled": 0,
         "azure-sql-missing-private-endpoint": 0,
         "azure-sql-firewall-broad-public-access": 0,

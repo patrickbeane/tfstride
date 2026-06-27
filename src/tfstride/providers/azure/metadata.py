@@ -18,6 +18,7 @@ class AzureResourceMetadata:
     KEY_VAULT_ID = OptionalStringMetadataField("key_vault_id")
     APP_SERVICE_ID = OptionalStringMetadataField("app_service_id")
     APP_SERVICE_PLAN_REFERENCE = OptionalStringMetadataField("app_service_plan_reference")
+    APP_SERVICE_VNET_INTEGRATION_SUBNET_ID = OptionalStringMetadataField("app_service_vnet_integration_subnet_id")
     KEY_VAULT_REFERENCE = OptionalStringMetadataField("key_vault_reference")
     RESOLVED_KEY_VAULT_ADDRESS = OptionalStringMetadataField("resolved_key_vault_address")
     CONTAINER_ACCESS_TYPE = OptionalStringMetadataField("container_access_type")

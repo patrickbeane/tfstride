@@ -183,6 +183,49 @@ class AzureAppServiceRuleDetectors:
             )
         return findings
 
+    def detect_vnet_integration_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            if facts.app_service_vnet_integration_subnet_id:
+                continue
+            if _vnet_integration_is_unknown(facts):
+                continue
+            public_enabled = facts.public_network_access_enabled is True
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=public_enabled,
+                privilege_breadth=0,
+                data_sensitivity=1,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} does not have VNet integration configured, so outbound access to "
+                        "private Azure resources may rely on public endpoints or service-level firewall exceptions."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("vnet_integration", _vnet_integration_evidence(facts)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _target_resource_evidence(app) -> list[str]:
     return [f"address={app.address}", f"type={app.resource_type}"]
@@ -233,6 +276,16 @@ def _identity_posture_evidence(facts: AzureResourceFacts) -> list[str]:
 
 def _identity_is_unknown(facts: AzureResourceFacts) -> bool:
     return any("identity" in uncertainty for uncertainty in facts.managed_identity_uncertainties)
+
+
+def _vnet_integration_evidence(facts: AzureResourceFacts) -> list[str]:
+    if facts.app_service_vnet_integration_subnet_id:
+        return [f"virtual_network_subnet_id is {facts.app_service_vnet_integration_subnet_id}"]
+    return ["virtual_network_subnet_id is not configured"]
+
+
+def _vnet_integration_is_unknown(facts: AzureResourceFacts) -> bool:
+    return any("virtual_network_subnet_id" in uncertainty for uncertainty in facts.app_service_posture_uncertainties)
 
 
 def _tls_version_below_1_2(value: str | None) -> bool:

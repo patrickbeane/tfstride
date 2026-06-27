@@ -191,6 +191,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-vnet-integration-missing",
+        title="Azure App Service does not configure VNet integration",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure regional VNet integration for App Service workloads that call private Azure resources, "
+            "then prefer private endpoints, service endpoints, or tightly scoped service firewalls for outbound "
+            "dependencies."
+        ),
+        tags=("azure", "app-service", "function-app", "network", "vnet-integration"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-sql-public-network-access-enabled",
         title="Azure SQL Database has public network access enabled",
         category=StrideCategory.INFORMATION_DISCLOSURE,
