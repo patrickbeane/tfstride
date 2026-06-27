@@ -107,7 +107,7 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations.     |
 | GCP      | Active support  | Compute, GKE, Cloud SQL, GCS, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Active support  | Azure Storage and Key Vault posture plus VNet, subnet, NSG, NIC, public-IP, and Linux/Windows VM relationships and public compute exposure.       |
+| Azure    | Active support  | Azure Storage, Key Vault, managed identity/RBAC posture, VNet/subnet/NSG/NIC/public-IP/VM relationships, NSG precedence-aware public ingress, public compute exposure, and workload-to-sensitive-resource paths. |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -211,7 +211,8 @@ Azure support currently includes normalization and analysis for AzureRM resource
 * `azurerm_key_vault_secret`
 * `azurerm_key_vault_key`
 * `azurerm_key_vault_certificate`
-* `azurerm_role_assignment` (vault-scoped authorization analysis)
+* `azurerm_user_assigned_identity`
+* `azurerm_role_assignment` (managed identity and vault-scoped authorization analysis)
 * `azurerm_virtual_network`
 * `azurerm_subnet`
 * `azurerm_network_security_group`
@@ -227,7 +228,7 @@ AzureRM provider detection uses provider source paths ending in `/azurerm` and T
 
 Azure trust-boundary coverage includes public storage and Key Vault endpoints plus virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
 
-Azure rule coverage includes public container access, account-level nested public blob access, Shared Key authorization, minimum TLS versions below 1.2, unrestricted public storage network access, Key Vault public endpoints, purge protection, privileged access policies and vault-scoped role assignments, and public virtual machines with broad administrative or all-port ingress.
+Azure rule coverage includes public container access, account-level nested public blob access, Shared Key authorization, minimum TLS versions below 1.2, unrestricted public storage network access, Key Vault public endpoints, purge protection, privileged access policies and vault-scoped role assignments, managed identity broad RBAC assignments, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
 
 Azure identity analysis is currently scoped to Key Vault access policies and vault-scoped role assignments. Databases, load balancers, private endpoints, AKS, and broader platform services are not yet modeled and are reported as unsupported rather than silently treated as analyzed.
 
@@ -481,6 +482,8 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 | Storage posture | `fixtures/azure/sample_azure_storage_plan.json`   | `examples/azure/azure_storage_report.md`   |
 | Public compute  | `fixtures/azure/sample_azure_compute_plan.json`   | `examples/azure/azure_compute_report.md`   |
 | Key Vault       | `fixtures/azure/sample_azure_key_vault_plan.json` | `examples/azure/azure_key_vault_report.md` |
+| Managed identity | `fixtures/azure/sample_azure_identity_plan.json` | `examples/azure/azure_identity_report.md` |
+| NSG precedence | `fixtures/azure/sample_azure_nsg_precedence_plan.json` | `examples/azure/azure_nsg_precedence_report.md` |
 | Mixed inventory | `fixtures/azure/sample_azure_plan.json`           | `examples/azure/azure_inventory_report.md` |
 | Nightmare       | `fixtures/azure/sample_azure_nightmare_plan.json` | `examples/azure/azure_nightmare_report.md` |
 
@@ -491,7 +494,7 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 Install the development extras, then run the full test suite and quality gates:
 
 ```bash
-python3 -m pip install -e '.[dev]'
+python3 -m pip install -e '.[dev,dashboard]'
 python3 -m pytest
 ruff check .
 ruff format --check .
@@ -506,9 +509,10 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 ## Limitations
 
-* AWS is currently the deepest provider implementation; Azure also emits focused storage and Key Vault posture observations.
+* AWS is currently the deepest provider implementation.
 * GCP support is narrower than AWS today and does not include control-observation coverage yet.
-* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault posture, and public virtual-machine exposure.
+* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, managed identity/RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
+* Azure SQL, AKS, App Service, Private Endpoint, load balancers, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
