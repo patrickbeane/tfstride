@@ -31,6 +31,7 @@ class AzureResourceFactsTests(unittest.TestCase):
                 AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED: False,
                 AzureResourceMetadata.MIN_TLS_VERSION: "TLS1_2",
                 AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED: True,
+                AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: "enabled",
                 AzureResourceMetadata.NETWORK_DEFAULT_ACTION: "Deny",
             }
         )
@@ -43,6 +44,7 @@ class AzureResourceFactsTests(unittest.TestCase):
         self.assertFalse(facts.shared_access_key_enabled)
         self.assertEqual(facts.min_tls_version, "TLS1_2")
         self.assertTrue(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Deny")
 
     def test_fact_domains_share_provider_owned_facade(self) -> None:

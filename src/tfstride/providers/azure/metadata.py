@@ -22,6 +22,7 @@ class AzureResourceMetadata:
     MIN_TLS_VERSION = OptionalStringMetadataField("min_tls_version")
     NETWORK_DEFAULT_ACTION = OptionalStringMetadataField("network_default_action")
     NETWORK_RULE_SOURCE_ADDRESS = OptionalStringMetadataField("network_rule_source_address")
+    PUBLIC_NETWORK_FALLBACK_STATE = OptionalStringMetadataField("public_network_fallback_state")
     LOCATION = OptionalStringMetadataField("location")
     VIRTUAL_NETWORK_REFERENCE = OptionalStringMetadataField("virtual_network_reference")
     RESOLVED_VIRTUAL_NETWORK_ADDRESS = OptionalStringMetadataField("resolved_virtual_network_address")

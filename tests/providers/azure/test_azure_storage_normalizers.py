@@ -61,6 +61,7 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertFalse(facts.shared_access_key_enabled)
         self.assertEqual(facts.min_tls_version, "TLS1_2")
         self.assertTrue(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Deny")
         self.assertEqual(facts.network_rule_source_address, "azurerm_storage_account.logs")
 
@@ -71,9 +72,25 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertTrue(facts.allow_nested_items_to_be_public)
         self.assertTrue(facts.shared_access_key_enabled)
         self.assertEqual(facts.min_tls_version, "TLS1_2")
-        self.assertTrue(facts.public_network_access_enabled)
+        self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertEqual(facts.network_default_action, "Allow")
         self.assertIsNone(facts.network_rule_source_address)
+
+    def test_storage_account_normalizes_disabled_public_network_fallback(self) -> None:
+        normalized = normalize_storage_account(
+            _resource(
+                AzureResourceType.STORAGE_ACCOUNT,
+                {
+                    "name": "tfstridelogs",
+                    "public_network_access_enabled": False,
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertFalse(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "disabled")
 
     def test_storage_account_preserves_computed_posture_as_unknown(self) -> None:
         normalized = normalize_storage_account(
@@ -102,6 +119,7 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertIsNone(facts.shared_access_key_enabled)
         self.assertIsNone(facts.min_tls_version)
         self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIsNone(facts.network_default_action)
         self.assertEqual(
             facts.storage_posture_uncertainties,

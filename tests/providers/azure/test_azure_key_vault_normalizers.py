@@ -50,6 +50,7 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
 
         self.assertEqual(facts.key_vault_id, normalized.identifier)
         self.assertTrue(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Allow")
         self.assertFalse(facts.purge_protection_enabled)
         self.assertTrue(facts.rbac_authorization_enabled)
@@ -76,10 +77,41 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         )
         facts = azure_facts(normalized)
 
+        self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Deny")
         self.assertEqual(facts.key_vault_network_ip_rules, ["198.51.100.10"])
         self.assertEqual(facts.key_vault_network_subnet_ids, ["azurerm_subnet.app.id"])
         self.assertTrue(facts.purge_protection_enabled)
+
+    def test_key_vault_normalizes_disabled_public_network_fallback(self) -> None:
+        normalized = normalize_key_vault(
+            _resource(
+                AzureResourceType.KEY_VAULT,
+                {
+                    "name": "private",
+                    "public_network_access_enabled": False,
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertFalse(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "disabled")
+
+    def test_key_vault_missing_public_network_fallback_is_unknown(self) -> None:
+        normalized = normalize_key_vault(
+            _resource(
+                AzureResourceType.KEY_VAULT,
+                {
+                    "name": "unset",
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
+        self.assertEqual(facts.network_default_action, "Allow")
 
     def test_key_vault_preserves_computed_network_and_authorization_values_as_unknown(self) -> None:
         normalized = normalize_key_vault(
@@ -105,6 +137,7 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIsNone(facts.network_default_action)
         self.assertIsNone(facts.purge_protection_enabled)
         self.assertIsNone(facts.rbac_authorization_enabled)

@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.public_network import public_network_fallback_state
 from tfstride.providers.azure.resource_utils import as_list, compact_strings, first_non_empty
 
 AZURE_PROVIDER = "azure"
@@ -25,11 +26,10 @@ def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
     authorization_uncertainties: list[str] = []
     recovery_uncertainties: list[str] = []
 
-    public_network_access_enabled = _known_bool(
+    public_network_access_enabled = _known_optional_bool(
         resource,
         values,
         "public_network_access_enabled",
-        default=True,
         uncertainties=network_uncertainties,
     )
     network_default_action = _network_default_action(
@@ -61,6 +61,9 @@ def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
         AzureResourceMetadata.TENANT_ID: first_non_empty(values.get("tenant_id")),
         AzureResourceMetadata.NETWORK_DEFAULT_ACTION: network_default_action,
         AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: resource.address if network_acls is not None else None,
+        AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: public_network_fallback_state(
+            public_network_access_enabled
+        ),
         AzureResourceMetadata.KEY_VAULT_NETWORK_IP_RULES: compact_strings(
             as_list(network_acls.get("ip_rules")) if network_acls is not None else []
         ),
@@ -235,6 +238,31 @@ def _network_default_action(
     if default_action is None:
         uncertainties.append("network_acls.default_action is not represented in planned values")
     return default_action
+
+
+def _known_optional_bool(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    key: str,
+    *,
+    uncertainties: list[str],
+) -> bool | None:
+    if _attribute_unknown(resource, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    if key not in values or values[key] is None:
+        return None
+    value = values[key]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "enabled", "yes", "on"}:
+            return True
+        if normalized in {"false", "disabled", "no", "off"}:
+            return False
+    uncertainties.append(f"{key} has an unrecognized value shape")
+    return None
 
 
 def _known_bool(

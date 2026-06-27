@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.public_network import public_network_fallback_state
 from tfstride.providers.azure.resource_utils import first_non_empty
 
 AZURE_PROVIDER = "azure"
@@ -33,6 +34,9 @@ def normalize_mssql_server(resource: TerraformResource) -> NormalizedResource:
         AzureResourceMetadata.NAME: name,
         AzureResourceMetadata.MSSQL_SERVER_ID: server_id,
         AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
+        AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: public_network_fallback_state(
+            public_network_access_enabled
+        ),
     }
     if public_network_access_enabled is not None:
         metadata[AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED] = public_network_access_enabled

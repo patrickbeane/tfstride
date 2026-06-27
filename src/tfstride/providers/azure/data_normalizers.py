@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.public_network import public_network_fallback_state
 
 AZURE_PROVIDER = "azure"
 
@@ -55,15 +56,17 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
         default=True,
         uncertainties=uncertainties,
     )
-    _set_bool_posture(
-        metadata,
-        resource,
-        values,
-        key="public_network_access_enabled",
-        field=AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED,
-        default=True,
+    public_network_access_enabled = _known_bool(
+        metadata_key="public_network_access_enabled",
+        resource=resource,
+        values=values,
         uncertainties=uncertainties,
     )
+    metadata[AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE] = public_network_fallback_state(
+        public_network_access_enabled
+    )
+    if public_network_access_enabled is not None:
+        metadata[AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED] = public_network_access_enabled
     if _attribute_unknown(resource, "min_tls_version"):
         uncertainties.append("min_tls_version is unknown after planning")
     else:
@@ -159,6 +162,31 @@ def _set_bool_posture(
         uncertainties.append(f"{key} is unknown after planning")
         return
     metadata[field] = _bool_with_default(values, key, default)
+
+
+def _known_bool(
+    *,
+    metadata_key: str,
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> bool | None:
+    if _attribute_unknown(resource, metadata_key):
+        uncertainties.append(f"{metadata_key} is unknown after planning")
+        return None
+    if metadata_key not in values or values[metadata_key] is None:
+        return None
+    value = values[metadata_key]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "enabled", "yes", "on"}:
+            return True
+        if normalized in {"false", "disabled", "no", "off"}:
+            return False
+    uncertainties.append(f"{metadata_key} has an unrecognized value shape")
+    return None
 
 
 def _attribute_unknown(resource: TerraformResource, key: str) -> bool:

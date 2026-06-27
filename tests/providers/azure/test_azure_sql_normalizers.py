@@ -49,6 +49,7 @@ class AzureMssqlServerNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertTrue(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.min_tls_version, "1.0")
         self.assertEqual(facts.mssql_server_id, normalized.identifier)
         self.assertFalse(normalized.storage_encrypted)
@@ -70,6 +71,7 @@ class AzureMssqlServerNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertFalse(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "disabled")
         self.assertEqual(facts.min_tls_version, "1.2")
 
     def test_mssql_server_preserves_computed_values_as_unknown(self) -> None:
@@ -90,6 +92,7 @@ class AzureMssqlServerNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIsNone(facts.min_tls_version)
         self.assertEqual(
             facts.mssql_posture_uncertainties,
@@ -255,6 +258,7 @@ class AzureMssqlSecurityAlertPolicyNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIn(
             "public_network_access_enabled has an unrecognized value shape",
             facts.mssql_posture_uncertainties,
@@ -272,6 +276,7 @@ class AzureMssqlSecurityAlertPolicyNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertIsNone(facts.public_network_access_enabled)
+        self.assertEqual(facts.public_network_fallback_state, "unknown")
         self.assertIsNone(facts.min_tls_version)
         self.assertEqual(facts.mssql_posture_uncertainties, [])
 

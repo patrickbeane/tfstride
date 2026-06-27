@@ -6,6 +6,7 @@ from typing import TypeVar
 
 from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_UNKNOWN
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts, ProviderResourceFactDomains
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
@@ -92,6 +93,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     @property
     def public_network_access_enabled(self) -> bool | None:
         return self.optional_bool(AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED)
+
+    @property
+    def public_network_fallback_state(self) -> str:
+        return self.get(AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE) or PUBLIC_NETWORK_FALLBACK_UNKNOWN
 
     @property
     def network_default_action(self) -> str | None:

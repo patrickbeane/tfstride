@@ -62,6 +62,7 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "ALLOW_NESTED_ITEMS_TO_BE_PUBLIC",
             "SHARED_ACCESS_KEY_ENABLED",
             "PUBLIC_NETWORK_ACCESS_ENABLED",
+            "PUBLIC_NETWORK_FALLBACK_STATE",
             "PUBLIC_CONTAINER_ADDRESSES",
             "UNRESOLVED_STORAGE_ACCOUNT_REFERENCES",
             "STORAGE_POSTURE_UNCERTAINTIES",
