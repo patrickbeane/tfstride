@@ -181,6 +181,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("privilege_breadth", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-custom-role-assignment-blast-radius",
+        title="Azure principal is assigned broad custom RBAC role",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove or narrow broad custom-role assignments, prefer built-in least-privilege roles where possible, "
+            "scope assignments to the target resource or smallest resource group, and reserve authorization-management "
+            "or wildcard roles for tightly controlled deployment identities."
+        ),
+        tags=("azure", "rbac", "custom-role", "role-assignment", "blast-radius"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-managed-identity-broad-rbac",
         title="Azure managed identity has broad RBAC authority",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

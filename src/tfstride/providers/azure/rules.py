@@ -47,6 +47,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-custom-role-broad-management-plane",
         "azure-custom-role-broad-data-plane",
         "azure-custom-role-subscription-assignable-scope",
+        "azure-custom-role-assignment-blast-radius",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
@@ -518,6 +519,7 @@ def build_azure_rule_contribution(
         "azure-custom-role-broad-management-plane": custom_role_detectors.detect_broad_management_plane,
         "azure-custom-role-broad-data-plane": custom_role_detectors.detect_broad_data_plane,
         "azure-custom-role-subscription-assignable-scope": (custom_role_detectors.detect_subscription_assignable_scope),
+        "azure-custom-role-assignment-blast-radius": (custom_role_detectors.detect_assigned_custom_role_blast_radius),
         "azure-managed-identity-broad-rbac": managed_identity_detectors.detect_broad_rbac,
         "azure-public-workload-sensitive-resource-access": (
             managed_identity_detectors.detect_public_workload_sensitive_resource_access

@@ -136,6 +136,70 @@ class AzureCustomRoleRuleDetectors:
             lateral_movement=0,
         )
 
+    def detect_assigned_custom_role_blast_radius(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        resources_by_address = {resource.address: resource for resource in context.inventory.resources}
+        findings: list[Finding] = []
+        for assignment in context.inventory.by_type(AzureResourceType.ROLE_ASSIGNMENT):
+            assignment_facts = azure_facts(assignment)
+            if not assignment_facts.principal_id:
+                continue
+            role = resources_by_address.get(assignment_facts.resolved_role_definition_address or "")
+            if role is None or role.resource_type != AzureResourceType.ROLE_DEFINITION:
+                continue
+            role_facts = azure_facts(role)
+            breadth_reasons = _assigned_custom_role_breadth_reasons(role_facts)
+            if not breadth_reasons:
+                continue
+            principal = resources_by_address.get(assignment_facts.resolved_managed_identity_address or "")
+            scope_kind = assignment_facts.role_assignment_scope_kind
+            severity_reasoning = _assigned_custom_role_severity(
+                role_facts=role_facts,
+                assignment_facts=assignment_facts,
+                principal=principal,
+                breadth_reasons=breadth_reasons,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=_assigned_custom_role_affected_resources(
+                        role=role,
+                        assignment=assignment,
+                        assignment_facts=assignment_facts,
+                        principal=principal,
+                    ),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{_principal_subject(assignment_facts, principal)} is assigned {role.display_name}, "
+                        f"a custom Azure role with {_assigned_custom_role_reason_summary(breadth_reasons)} "
+                        f"at {_scope_label(scope_kind)} scope. This is active RBAC blast-radius evidence because "
+                        "the role definition and role assignment resolve deterministically in the Terraform plan."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("custom_role", _custom_role_evidence(role, role_facts)),
+                        evidence_item("role_assignment", _role_assignment_evidence(assignment, assignment_facts)),
+                        evidence_item("assigned_principal", _assigned_principal_evidence(assignment_facts, principal)),
+                        evidence_item("breadth_reasons", breadth_reasons),
+                        evidence_item("role_breadth_signals", role_facts.role_definition_breadth_signals),
+                        evidence_item("assignment_breadth_signals", assignment_facts.role_assignment_breadth_signals),
+                        evidence_item("management_actions", _management_wildcard_action_evidence(role_facts)),
+                        evidence_item("authorization_actions", _authorization_action_evidence(role_facts)),
+                        evidence_item("data_plane_actions", _data_plane_action_evidence(role_facts)),
+                        evidence_item("assignable_scopes", _assignable_scope_evidence(role_facts)),
+                        evidence_item("mitigating_exclusions", role_facts.role_definition_breadth_mitigations),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def _detect_custom_role_posture(
         self,
         context: RuleEvaluationContext,
@@ -189,6 +253,151 @@ class AzureCustomRoleRuleDetectors:
                 )
             )
         return findings
+
+
+def _assigned_custom_role_breadth_reasons(facts: AzureResourceFacts) -> list[str]:
+    reasons: list[str] = []
+    if _has_exact_wildcard(facts.role_definition_actions):
+        reasons.append("wildcard_management_plane")
+    if _has_exact_wildcard(facts.role_definition_data_actions):
+        reasons.append("wildcard_data_plane")
+    if ROLE_ASSIGNMENT_CAPABLE in facts.role_definition_breadth_signals:
+        reasons.append("authorization_management")
+    if _has_broad_management_plane_wildcard(facts):
+        reasons.append("broad_management_plane")
+    if not _has_exact_wildcard(facts.role_definition_data_actions) and _has_broad_data_plane_wildcard(facts):
+        reasons.append("broad_data_plane")
+    return list(dict.fromkeys(reasons))
+
+
+def _assigned_custom_role_severity(
+    *,
+    role_facts: AzureResourceFacts,
+    assignment_facts: AzureResourceFacts,
+    principal: NormalizedResource | None,
+    breadth_reasons: list[str],
+):
+    scope_kind = assignment_facts.role_assignment_scope_kind
+    privilege_breadth = 3 if _assigned_custom_role_is_high_privilege(role_facts, breadth_reasons) else 2
+    data_sensitivity = 2 if _assigned_custom_role_has_data_plane_breadth(breadth_reasons) else 0
+    lateral_movement = 1 if principal is not None or _principal_type_is_service_identity(assignment_facts) else 0
+    if "authorization_management" in breadth_reasons:
+        lateral_movement = max(lateral_movement, 2 if scope_kind in {"subscription", "resource_group"} else 1)
+    elif "broad_management_plane" in breadth_reasons:
+        lateral_movement = max(lateral_movement, 1)
+    return build_severity_reasoning(
+        internet_exposure=False,
+        privilege_breadth=privilege_breadth,
+        data_sensitivity=data_sensitivity,
+        lateral_movement=lateral_movement,
+        blast_radius=_assignment_scope_blast_radius(scope_kind),
+    )
+
+
+def _principal_type_is_service_identity(facts: AzureResourceFacts) -> bool:
+    principal_type = (facts.principal_type or "").replace("_", "").replace(" ", "").lower()
+    return principal_type in {"serviceprincipal", "managedidentity"}
+
+
+def _assigned_custom_role_is_high_privilege(facts: AzureResourceFacts, breadth_reasons: list[str]) -> bool:
+    signals = set(facts.role_definition_breadth_signals)
+    return bool(
+        OWNER_LIKE_OR_WILDCARD in signals
+        or ROLE_ASSIGNMENT_CAPABLE in signals
+        or "wildcard_management_plane" in breadth_reasons
+        or "wildcard_data_plane" in breadth_reasons
+    )
+
+
+def _assigned_custom_role_has_data_plane_breadth(breadth_reasons: list[str]) -> bool:
+    return bool({"wildcard_data_plane", "broad_data_plane"} & set(breadth_reasons))
+
+
+def _assignment_scope_blast_radius(scope_kind: str | None) -> int:
+    if scope_kind == "subscription":
+        return 2
+    if scope_kind == "resource_group":
+        return 1
+    return 0
+
+
+def _assigned_custom_role_affected_resources(
+    *,
+    role: NormalizedResource,
+    assignment: NormalizedResource,
+    assignment_facts: AzureResourceFacts,
+    principal: NormalizedResource | None,
+) -> list[str]:
+    return _dedupe_strings(
+        value
+        for value in (
+            principal.address if principal is not None else None,
+            assignment.address,
+            role.address,
+            assignment_facts.role_assignment_target_resource_address,
+        )
+        if value
+    )
+
+
+def _role_assignment_evidence(assignment: NormalizedResource, facts: AzureResourceFacts) -> list[str]:
+    return [
+        value
+        for value in (
+            f"address={assignment.address}",
+            f"scope={facts.role_assignment_scope}" if facts.role_assignment_scope else None,
+            f"scope_kind={facts.role_assignment_scope_kind}" if facts.role_assignment_scope_kind else None,
+            f"role_definition_id={facts.role_definition_id}" if facts.role_definition_id else None,
+            f"resolved_role_definition={facts.resolved_role_definition_address}"
+            if facts.resolved_role_definition_address
+            else None,
+            f"target_resource={facts.role_assignment_target_resource_address}"
+            if facts.role_assignment_target_resource_address
+            else None,
+        )
+        if value
+    ]
+
+
+def _assigned_principal_evidence(facts: AzureResourceFacts, principal: NormalizedResource | None) -> list[str]:
+    return [
+        value
+        for value in (
+            f"principal_id={facts.principal_id}" if facts.principal_id else None,
+            f"principal_type={facts.principal_type}" if facts.principal_type else None,
+            f"resolved_managed_identity={principal.address}" if principal is not None else None,
+        )
+        if value
+    ]
+
+
+def _principal_subject(facts: AzureResourceFacts, principal: NormalizedResource | None) -> str:
+    if principal is not None:
+        return principal.display_name
+    if facts.principal_type and facts.principal_id:
+        return f"Azure {facts.principal_type} principal `{facts.principal_id}`"
+    if facts.principal_id:
+        return f"Azure principal `{facts.principal_id}`"
+    return "An Azure principal"
+
+
+def _assigned_custom_role_reason_summary(reasons: list[str]) -> str:
+    labels = {
+        "wildcard_management_plane": "wildcard management-plane permissions",
+        "wildcard_data_plane": "wildcard data-plane permissions",
+        "authorization_management": "authorization-management permissions",
+        "broad_management_plane": "broad management-plane permissions",
+        "broad_data_plane": "broad data-plane permissions",
+    }
+    return ", ".join(labels.get(reason, reason) for reason in reasons)
+
+
+def _scope_label(scope_kind: str | None) -> str:
+    return scope_kind or "unknown"
+
+
+def _dedupe_strings(values: Iterable[str]) -> list[str]:
+    return list(dict.fromkeys(value for value in values if value))
 
 
 def _custom_role_definitions(resources: Iterable[NormalizedResource]) -> list[NormalizedResource]:

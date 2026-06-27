@@ -14,6 +14,7 @@ _CUSTOM_ROLE_RULE_IDS = (
     "azure-custom-role-broad-management-plane",
     "azure-custom-role-broad-data-plane",
     "azure-custom-role-subscription-assignable-scope",
+    "azure-custom-role-assignment-blast-radius",
 )
 
 
@@ -66,6 +67,61 @@ def _role_definition(
         },
         unknown_values=unknown_values,
     )
+
+
+def _role_assignment(
+    *,
+    name: str = "assignment",
+    role_definition_id: object = "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom",
+    principal_id: object = "principal-id",
+    principal_type: object = "ServicePrincipal",
+    scope: object = "/subscriptions/sub-0001",
+    unknown_values: dict[str, object] | None = None,
+) -> TerraformResource:
+    return _resource(
+        AzureResourceType.ROLE_ASSIGNMENT,
+        name,
+        {
+            "scope": scope,
+            "role_definition_id": role_definition_id,
+            "principal_id": principal_id,
+            "principal_type": principal_type,
+        },
+        unknown_values=unknown_values,
+    )
+
+
+def _user_assigned_identity() -> TerraformResource:
+    return _resource(
+        AzureResourceType.USER_ASSIGNED_IDENTITY,
+        "deploy",
+        {
+            "name": "deploy",
+            "principal_id": "principal-id",
+            "client_id": "client-id",
+            "tenant_id": "tenant-id",
+        },
+    )
+
+
+def _storage_account() -> TerraformResource:
+    return _resource(
+        AzureResourceType.STORAGE_ACCOUNT,
+        "logs",
+        {
+            "id": "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs",
+            "name": "logs",
+            "allow_nested_items_to_be_public": False,
+            "shared_access_key_enabled": False,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": False,
+            "network_rules": [{"default_action": "Deny"}],
+        },
+    )
+
+
+def _role_definition_id(name: str = "custom") -> str:
+    return f"/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/{name}"
 
 
 def _evaluate(resources: list[TerraformResource], *rule_ids: str):
@@ -220,6 +276,173 @@ class AzureCustomRoleRuleTests(unittest.TestCase):
                 )
             ],
             *_CUSTOM_ROLE_RULE_IDS,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_assigned_custom_authorization_role_to_managed_identity_is_high_confidence(self) -> None:
+        findings = _evaluate(
+            [
+                _user_assigned_identity(),
+                _role_definition(
+                    name="role_admin",
+                    role_name="Role Admin",
+                    actions=["Microsoft.Authorization/roleAssignments/write"],
+                    assignable_scopes=["/subscriptions/sub-0001"],
+                ),
+                _role_assignment(role_definition_id=_role_definition_id("role_admin")),
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-custom-role-assignment-blast-radius"])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_user_assigned_identity.deploy",
+                "azurerm_role_assignment.assignment",
+                "azurerm_role_definition.role_admin",
+            ],
+        )
+        self.assertIn("azurerm_user_assigned_identity.deploy is assigned", finding.rationale)
+        self.assertIn("authorization-management permissions", finding.rationale)
+        self.assertIn("subscription scope", finding.rationale)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["breadth_reasons"], ["authorization_management"])
+        self.assertEqual(evidence["authorization_actions"], ["Microsoft.Authorization/roleAssignments/write"])
+        self.assertIn("resolved_managed_identity=azurerm_user_assigned_identity.deploy", evidence["assigned_principal"])
+        self.assertIn("scope_kind=subscription", evidence["role_assignment"])
+
+    def test_assigned_custom_data_plane_role_to_service_principal_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _role_definition(
+                    name="secret_reader",
+                    role_name="Secret Reader",
+                    data_actions=["Microsoft.KeyVault/vaults/secrets/*"],
+                    assignable_scopes=["/subscriptions/sub-0001/resourceGroups/app"],
+                ),
+                _role_assignment(
+                    role_definition_id=_role_definition_id("secret_reader"),
+                    principal_id="service-principal-id",
+                    principal_type="ServicePrincipal",
+                    scope="/subscriptions/sub-0001/resourceGroups/app",
+                ),
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-custom-role-assignment-blast-radius"])
+        self.assertEqual(findings[0].severity.value, "high")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["breadth_reasons"], ["broad_data_plane"])
+        self.assertEqual(evidence["data_plane_actions"], ["Microsoft.KeyVault/vaults/secrets/*"])
+        self.assertEqual(
+            evidence["assigned_principal"], ["principal_id=service-principal-id", "principal_type=ServicePrincipal"]
+        )
+
+    def test_assigned_custom_data_plane_role_to_managed_identity_at_sensitive_scope_includes_target(self) -> None:
+        findings = _evaluate(
+            [
+                _storage_account(),
+                _user_assigned_identity(),
+                _role_definition(
+                    name="storage_data",
+                    role_name="Storage Data Operator",
+                    data_actions=["Microsoft.Storage/storageAccounts/blobServices/containers/*"],
+                    assignable_scopes=["/subscriptions/sub-0001/resourceGroups/app"],
+                ),
+                _role_assignment(
+                    role_definition_id=_role_definition_id("storage_data"),
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-custom-role-assignment-blast-radius"])
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_user_assigned_identity.deploy",
+                "azurerm_role_assignment.assignment",
+                "azurerm_role_definition.storage_data",
+                "azurerm_storage_account.logs",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["breadth_reasons"], ["broad_data_plane"])
+        self.assertEqual(
+            evidence["data_plane_actions"], ["Microsoft.Storage/storageAccounts/blobServices/containers/*"]
+        )
+        self.assertIn("target_resource=azurerm_storage_account.logs", evidence["role_assignment"])
+        self.assertEqual(evidence["assignment_breadth_signals"], ["sensitive_resource_scope", "storage_data_plane"])
+
+    def test_unknown_principal_id_does_not_invent_assigned_blast_radius(self) -> None:
+        findings = _evaluate(
+            [
+                _role_definition(
+                    name="role_admin",
+                    role_name="Role Admin",
+                    actions=["Microsoft.Authorization/roleAssignments/write"],
+                    assignable_scopes=["/subscriptions/sub-0001"],
+                ),
+                _role_assignment(
+                    role_definition_id=_role_definition_id("role_admin"),
+                    principal_id=None,
+                    unknown_values={"principal_id": True},
+                ),
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unassigned_broad_custom_role_does_not_trigger_assigned_blast_radius(self) -> None:
+        findings = _evaluate(
+            [
+                _role_definition(
+                    actions=["*"],
+                    assignable_scopes=["/subscriptions/sub-0001"],
+                )
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_assigned_least_privilege_custom_role_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _user_assigned_identity(),
+                _role_definition(
+                    name="reader",
+                    role_name="Reader",
+                    actions=["Microsoft.Storage/storageAccounts/blobServices/containers/read"],
+                    assignable_scopes=["/subscriptions/sub-0001/resourceGroups/app"],
+                ),
+                _role_assignment(
+                    role_definition_id=_role_definition_id("reader"),
+                    scope="/subscriptions/sub-0001/resourceGroups/app",
+                ),
+            ],
+            "azure-custom-role-assignment-blast-radius",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unresolved_custom_role_assignment_does_not_invent_blast_radius(self) -> None:
+        findings = _evaluate(
+            [
+                _user_assigned_identity(),
+                _role_assignment(
+                    role_definition_id="azurerm_role_definition.missing.role_definition_resource_id",
+                ),
+            ],
+            "azure-custom-role-assignment-blast-radius",
         )
 
         self.assertEqual(findings, [])

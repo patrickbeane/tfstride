@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 81,
+      "registered_rule_count": 82,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -103,6 +103,7 @@
         "azure-custom-role-broad-management-plane",
         "azure-custom-role-broad-data-plane",
         "azure-custom-role-subscription-assignable-scope",
+        "azure-custom-role-assignment-blast-radius",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
@@ -188,6 +189,7 @@
         "azure-custom-role-broad-management-plane": 0,
         "azure-custom-role-broad-data-plane": 0,
         "azure-custom-role-subscription-assignable-scope": 0,
+        "azure-custom-role-assignment-blast-radius": 0,
         "azure-managed-identity-broad-rbac": 0,
         "azure-public-workload-sensitive-resource-access": 0,
         "azure-app-service-public-network-access-not-disabled": 0,
