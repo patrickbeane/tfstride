@@ -74,7 +74,7 @@ HTML_REPORT_EXAMPLE = "<!doctype html><html><body><main>tfSTRIDE report page</ma
 API_REPORT_EXAMPLE: TFSReportPayload = {
     "kind": "tfstride-report",
     "version": REPORT_FORMAT_VERSION,
-    "tool": {"name": "tfstride", "version": "0.4.0"},
+    "tool": {"name": "tfstride", "version": "0.4.1"},
     "title": "tfSTRIDE Report",
     "analyzed_file": "tfplan.json",
     "analyzed_path": "tfplan.json",
