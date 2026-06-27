@@ -210,7 +210,7 @@ class AzureRoleDefinitionNormalizerTests(unittest.TestCase):
                         "assignable_scopes": ["/subscriptions/sub-0001/resourceGroups/app"],
                         "permissions": [
                             {
-                                "actions": ["Microsoft.Resources/subscriptions/resourceGroups/*"],
+                                "actions": ["Microsoft.Resources/subscriptions/resourceGroups/read"],
                                 "not_actions": [],
                                 "data_actions": [],
                                 "not_data_actions": [],

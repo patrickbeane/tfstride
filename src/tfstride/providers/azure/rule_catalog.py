@@ -125,6 +125,62 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-custom-role-wildcard-management-plane",
+        title="Custom Azure role grants wildcard management-plane permissions",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            'Replace `actions = ["*"]` with the smallest Azure control-plane actions required, keep '
+            "NotActions as defense-in-depth only, and constrain assignable scopes to the narrowest resource group "
+            "or resource scope possible."
+        ),
+        tags=("azure", "rbac", "custom-role", "least-privilege", "wildcard"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-custom-role-authorization-management",
+        title="Custom Azure role grants broad authorization-management permissions",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove authorization-management wildcard or role-assignment capabilities unless the custom role is "
+            "strictly for delegated RBAC administration, then restrict assignable scopes and monitor assignments."
+        ),
+        tags=("azure", "rbac", "custom-role", "authorization", "least-privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-custom-role-broad-management-plane",
+        title="Custom Azure role grants broad management-plane wildcard permissions",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace service-level wildcard actions with specific create, update, read, or delete permissions, and "
+            "split deployment duties by service area where practical."
+        ),
+        tags=("azure", "rbac", "custom-role", "management-plane", "least-privilege"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-custom-role-broad-data-plane",
+        title="Custom Azure role grants broad data-plane permissions",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Replace broad storage or Key Vault data-plane wildcards with task-specific data actions, separate "
+            "read/write/delete duties, and keep assignable scopes close to the target resource."
+        ),
+        tags=("azure", "rbac", "custom-role", "data-plane", "least-privilege"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-custom-role-subscription-assignable-scope",
+        title="Custom Azure role is assignable at subscription scope",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Avoid subscription-wide assignable scopes for custom roles unless required; prefer resource-group or "
+            "resource scopes and review existing role assignments before broadening assignable scopes."
+        ),
+        tags=("azure", "rbac", "custom-role", "assignable-scope", "blast-radius"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-managed-identity-broad-rbac",
         title="Azure managed identity has broad RBAC authority",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

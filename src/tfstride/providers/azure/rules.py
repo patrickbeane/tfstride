@@ -23,6 +23,7 @@ from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
 from tfstride.providers.azure.private_endpoint_rules import AzurePrivateEndpointPostureRuleDetectors
+from tfstride.providers.azure.rbac_rules import AzureCustomRoleRuleDetectors
 from tfstride.providers.azure.resource_decoration.public_exposure import is_risky_public_compute_path
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
@@ -41,6 +42,11 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
+        "azure-custom-role-wildcard-management-plane",
+        "azure-custom-role-authorization-management",
+        "azure-custom-role-broad-management-plane",
+        "azure-custom-role-broad-data-plane",
+        "azure-custom-role-subscription-assignable-scope",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
@@ -486,6 +492,7 @@ def build_azure_rule_contribution(
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
+    custom_role_detectors = AzureCustomRoleRuleDetectors(finding_factory)
     managed_identity_detectors = AzureManagedIdentityRuleDetectors(finding_factory)
     mssql_detectors = AzureMssqlRuleDetectors(finding_factory)
     postgresql_detectors = AzurePostgresqlRuleDetectors(finding_factory)
@@ -506,6 +513,11 @@ def build_azure_rule_contribution(
         ),
         "azure-key-vault-privileged-access": key_vault_detectors.detect_privileged_access,
         "azure-key-vault-purge-protection-disabled": (key_vault_detectors.detect_purge_protection_disabled),
+        "azure-custom-role-wildcard-management-plane": (custom_role_detectors.detect_wildcard_management_plane),
+        "azure-custom-role-authorization-management": custom_role_detectors.detect_authorization_management,
+        "azure-custom-role-broad-management-plane": custom_role_detectors.detect_broad_management_plane,
+        "azure-custom-role-broad-data-plane": custom_role_detectors.detect_broad_data_plane,
+        "azure-custom-role-subscription-assignable-scope": (custom_role_detectors.detect_subscription_assignable_scope),
         "azure-managed-identity-broad-rbac": managed_identity_detectors.detect_broad_rbac,
         "azure-public-workload-sensitive-resource-access": (
             managed_identity_detectors.detect_public_workload_sensitive_resource_access
