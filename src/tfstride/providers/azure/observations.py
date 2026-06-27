@@ -5,7 +5,11 @@ from collections.abc import Iterable
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
+from tfstride.providers.azure.resource_types import (
+    AZURE_COMPUTE_RESOURCE_TYPES,
+    AZURE_SQL_RESOURCE_TYPES,
+    AzureResourceType,
+)
 
 _STORAGE_POSTURE_RESOURCE_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
@@ -22,6 +26,8 @@ def observe_azure_posture(inventory: ResourceInventory) -> list[Observation]:
         *_observe_key_vault_network_posture(inventory),
         *_observe_key_vault_authorization_posture(inventory),
         *_observe_key_vault_recovery_posture(inventory),
+        *_observe_mssql_uncertainties(inventory),
+        *_observe_mssql_vnet_posture(inventory),
     ]
 
 
@@ -249,6 +255,64 @@ def _observe_key_vault_recovery_posture(inventory: ResourceInventory) -> list[Ob
                     "protection posture from unresolved values."
                 ),
                 evidence=collect_evidence(evidence_item("unknown_recovery_posture", uncertainties)),
+            )
+        )
+    return observations
+
+
+def _observe_mssql_uncertainties(inventory: ResourceInventory) -> list[Observation]:
+    observations: list[Observation] = []
+    for resource in inventory.by_type(*AZURE_SQL_RESOURCE_TYPES):
+        uncertainties = azure_facts(resource).mssql_posture_uncertainties
+        if not uncertainties:
+            continue
+        observations.append(
+            Observation(
+                title="Azure SQL posture contains unresolved plan values",
+                observation_id="azure-sql-posture-unknown",
+                category="analysis-uncertainty",
+                affected_resources=[resource.address],
+                rationale=(
+                    f"{resource.display_name} has computed SQL posture attributes. tfSTRIDE does not "
+                    "infer insecure posture from unresolved values."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("unknown_sql_posture", uncertainties),
+                    evidence_item(
+                        "analysis_effect",
+                        ["posture findings are emitted only for known-positive posture signals"],
+                    ),
+                ),
+            )
+        )
+    return observations
+
+
+def _observe_mssql_vnet_posture(inventory: ResourceInventory) -> list[Observation]:
+    observations: list[Observation] = []
+    for server in inventory.by_type(AzureResourceType.MSSQL_SERVER):
+        facts = azure_facts(server)
+        vnet_rules = [
+            vnet_rule.address
+            for vnet_rule in inventory.by_type(AzureResourceType.MSSQL_VIRTUAL_NETWORK_RULE)
+            if azure_facts(vnet_rule).mssql_server_id
+            and azure_facts(vnet_rule).mssql_server_id == facts.mssql_server_id
+        ]
+        if not vnet_rules:
+            continue
+        observations.append(
+            Observation(
+                title="Azure SQL Database VNet restriction is modeled",
+                observation_id="azure-sql-vnet-restricted",
+                category="data-protection",
+                affected_resources=[server.address, *vnet_rules],
+                rationale=(
+                    f"{server.display_name} has VNet service endpoint rules that restrict network access. "
+                    "VNet rules are evaluated separately from firewall and public network access posture."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("vnet_rules", vnet_rules),
+                ),
             )
         )
     return observations

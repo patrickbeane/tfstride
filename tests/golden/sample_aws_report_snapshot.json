@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 59,
+      "registered_rule_count": 63,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -97,7 +97,11 @@
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
         "azure-managed-identity-broad-rbac",
-        "azure-public-workload-sensitive-resource-access"
+        "azure-public-workload-sensitive-resource-access",
+        "azure-sql-public-network-access-enabled",
+        "azure-sql-firewall-broad-public-access",
+        "azure-sql-minimum-tls-below-1-2",
+        "azure-sql-security-alert-policy-disabled"
       ],
       "disabled_rules": [],
       "severity_overrides": {},
@@ -160,7 +164,11 @@
         "azure-key-vault-privileged-access": 0,
         "azure-key-vault-purge-protection-disabled": 0,
         "azure-managed-identity-broad-rbac": 0,
-        "azure-public-workload-sensitive-resource-access": 0
+        "azure-public-workload-sensitive-resource-access": 0,
+        "azure-sql-public-network-access-enabled": 0,
+        "azure-sql-firewall-broad-public-access": 0,
+        "azure-sql-minimum-tls-below-1-2": 0,
+        "azure-sql-security-alert-policy-disabled": 0
       }
     },
     "references": {

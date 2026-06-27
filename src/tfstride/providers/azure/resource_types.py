@@ -26,6 +26,11 @@ class AzureResourceType:
     PUBLIC_IP = "azurerm_public_ip"
     LINUX_VIRTUAL_MACHINE = "azurerm_linux_virtual_machine"
     WINDOWS_VIRTUAL_MACHINE = "azurerm_windows_virtual_machine"
+    MSSQL_SERVER = "azurerm_mssql_server"
+    MSSQL_DATABASE = "azurerm_mssql_database"
+    MSSQL_FIREWALL_RULE = "azurerm_mssql_firewall_rule"
+    MSSQL_VIRTUAL_NETWORK_RULE = "azurerm_mssql_virtual_network_rule"
+    MSSQL_SERVER_SECURITY_ALERT_POLICY = "azurerm_mssql_server_security_alert_policy"
 
 
 AZURE_STORAGE_RESOURCE_TYPES = frozenset(
@@ -69,10 +74,21 @@ AZURE_COMPUTE_RESOURCE_TYPES = frozenset(
     }
 )
 
+AZURE_SQL_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.MSSQL_SERVER,
+        AzureResourceType.MSSQL_DATABASE,
+        AzureResourceType.MSSQL_FIREWALL_RULE,
+        AzureResourceType.MSSQL_VIRTUAL_NETWORK_RULE,
+        AzureResourceType.MSSQL_SERVER_SECURITY_ALERT_POLICY,
+    }
+)
+
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
     | AZURE_IDENTITY_RESOURCE_TYPES
     | AZURE_NETWORK_RESOURCE_TYPES
     | AZURE_COMPUTE_RESOURCE_TYPES
+    | AZURE_SQL_RESOURCE_TYPES
 )

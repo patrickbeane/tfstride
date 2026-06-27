@@ -90,6 +90,14 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "IP_CONFIGURATIONS",
             "NETWORK_SECURITY_RULES",
             "PUBLIC_COMPUTE_EXPOSURE_PATHS",
+            "MSSQL_SERVER_ID",
+            "MSSQL_FIREWALL_START_IP",
+            "MSSQL_FIREWALL_END_IP",
+            "MSSQL_VNET_SUBNET_ID",
+            "MSSQL_SECURITY_ALERT_STATE",
+            "MSSQL_POSTURE_UNCERTAINTIES",
+            "MSSQL_FIREWALL_RULE_ADDRESSES",
+            "MSSQL_VNET_RULE_ADDRESSES",
         }
 
         self.assertEqual(contract.provider_owned_fields["azure"], frozenset(expected_fields))

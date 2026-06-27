@@ -214,6 +214,38 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.MANAGED_IDENTITY_UNCERTAINTIES)
 
     @property
+    def mssql_server_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_SERVER_ID)
+
+    @property
+    def mssql_firewall_start_ip(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_FIREWALL_START_IP)
+
+    @property
+    def mssql_firewall_end_ip(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_FIREWALL_END_IP)
+
+    @property
+    def mssql_vnet_subnet_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_VNET_SUBNET_ID)
+
+    @property
+    def mssql_security_alert_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_SECURITY_ALERT_STATE)
+
+    @property
+    def mssql_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.MSSQL_POSTURE_UNCERTAINTIES)
+
+    @property
+    def mssql_firewall_rule_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.MSSQL_FIREWALL_RULE_ADDRESSES)
+
+    @property
+    def mssql_vnet_rule_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.MSSQL_VNET_RULE_ADDRESSES)
+
+    @property
     def has_system_assigned_identity(self) -> bool:
         return _identity_type_includes(self.identity_type, "SystemAssigned")
 
@@ -426,6 +458,15 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
 
     def add_unresolved_storage_account_reference(self, reference: str | None) -> None:
         self.append(AzureResourceMetadata.UNRESOLVED_STORAGE_ACCOUNT_REFERENCES, reference)
+
+    def add_mssql_firewall_rule_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.MSSQL_FIREWALL_RULE_ADDRESSES, address)
+
+    def add_mssql_vnet_rule_address(self, address: str) -> None:
+        self.append(AzureResourceMetadata.MSSQL_VNET_RULE_ADDRESSES, address)
+
+    def extend_mssql_posture_uncertainties(self, uncertainties: Sequence[str | None]) -> None:
+        self.extend(AzureResourceMetadata.MSSQL_POSTURE_UNCERTAINTIES, uncertainties)
 
     def set_public_endpoint_posture(self, *, reachable: bool, reasons: Sequence[str]) -> None:
         self.resource.public_access_configured = reachable

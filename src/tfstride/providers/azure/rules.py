@@ -19,6 +19,7 @@ from tfstride.analysis.rule_definitions import (
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
+from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
 from tfstride.providers.azure.resource_decoration.public_exposure import is_risky_public_compute_path
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
@@ -37,6 +38,10 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-key-vault-purge-protection-disabled",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
+        "azure-sql-public-network-access-enabled",
+        "azure-sql-firewall-broad-public-access",
+        "azure-sql-minimum-tls-below-1-2",
+        "azure-sql-security-alert-policy-disabled",
     ),
     (),
     (),
@@ -465,6 +470,7 @@ def build_azure_rule_contribution(
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     managed_identity_detectors = AzureManagedIdentityRuleDetectors(finding_factory)
+    mssql_detectors = AzureMssqlRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "azure-public-compute-broad-ingress": compute_detectors.detect_public_compute_broad_ingress,
         "azure-storage-container-public-access": storage_detectors.detect_public_container_access,
@@ -479,6 +485,10 @@ def build_azure_rule_contribution(
         "azure-public-workload-sensitive-resource-access": (
             managed_identity_detectors.detect_public_workload_sensitive_resource_access
         ),
+        "azure-sql-public-network-access-enabled": mssql_detectors.detect_public_network_access_enabled,
+        "azure-sql-firewall-broad-public-access": mssql_detectors.detect_broad_firewall_access,
+        "azure-sql-minimum-tls-below-1-2": mssql_detectors.detect_minimum_tls_below_1_2,
+        "azure-sql-security-alert-policy-disabled": mssql_detectors.detect_security_alert_policy_disabled,
     }
     resolved_metadata_registry = metadata_registry if metadata_registry is not None else default_rule_registry()
     return build_rule_contribution(

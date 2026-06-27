@@ -124,4 +124,46 @@ AZURE_RULE_METADATA = (
         tags=("azure", "managed-identity", "sensitive-data", "public-access"),
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
     ),
+    RuleMetadata(
+        rule_id="azure-sql-public-network-access-enabled",
+        title="Azure SQL Database has public network access enabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public network access on the Azure SQL server and use Private Link or VNet service endpoints "
+            "for all client connections."
+        ),
+        tags=("azure", "sql", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-sql-firewall-broad-public-access",
+        title="Azure SQL firewall rule allows broad public IP access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Replace broad IP ranges (0.0.0.0 to 255.255.255.255) with specific trusted client CIDRs, use "
+            "Private Link, or rely on VNet service endpoints instead of IP-based firewall rules."
+        ),
+        tags=("azure", "sql", "firewall", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-sql-minimum-tls-below-1-2",
+        title="Azure SQL Database allows TLS below 1.2",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set `minimum_tls_version` to `1.2` and remove clients that require deprecated TLS versions."
+        ),
+        tags=("azure", "sql", "tls"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-sql-security-alert-policy-disabled",
+        title="Azure SQL Database security alert policy is disabled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable the security alert policy and configure email notifications for the DBA or security team."
+        ),
+        tags=("azure", "sql", "security-alerting"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
 )

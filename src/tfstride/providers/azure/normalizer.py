@@ -22,6 +22,13 @@ from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault_secret,
     normalize_role_assignment,
 )
+from tfstride.providers.azure.mssql_normalizers import (
+    normalize_mssql_database,
+    normalize_mssql_firewall_rule,
+    normalize_mssql_server,
+    normalize_mssql_server_security_alert_policy,
+    normalize_mssql_virtual_network_rule,
+)
 from tfstride.providers.azure.network_normalizers import (
     normalize_network_interface,
     normalize_network_interface_security_group_association,
@@ -60,6 +67,11 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.PUBLIC_IP: normalize_public_ip,
     AzureResourceType.LINUX_VIRTUAL_MACHINE: normalize_linux_virtual_machine,
     AzureResourceType.WINDOWS_VIRTUAL_MACHINE: normalize_windows_virtual_machine,
+    AzureResourceType.MSSQL_SERVER: normalize_mssql_server,
+    AzureResourceType.MSSQL_DATABASE: normalize_mssql_database,
+    AzureResourceType.MSSQL_FIREWALL_RULE: normalize_mssql_firewall_rule,
+    AzureResourceType.MSSQL_VIRTUAL_NETWORK_RULE: normalize_mssql_virtual_network_rule,
+    AzureResourceType.MSSQL_SERVER_SECURITY_ALERT_POLICY: normalize_mssql_server_security_alert_policy,
 }
 SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 
