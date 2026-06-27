@@ -6,7 +6,17 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
-from tfstride.providers.azure.resource_utils import as_list, compact_strings, first_non_empty
+from tfstride.providers.azure.resource_utils import (
+    as_list,
+    attribute_unknown,
+    compact_strings,
+    first_block_attribute_unknown,
+    first_mapping,
+    first_non_empty,
+)
+from tfstride.providers.azure.resource_utils import (
+    known_bool as known_optional_bool,
+)
 
 AZURE_PROVIDER = "azure"
 _PERMISSION_FIELDS = (
@@ -21,16 +31,13 @@ def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     vault_id = first_non_empty(values.get("id"))
     name = first_non_empty(values.get("name"), resource.name)
-    network_acls = _first_mapping(values.get("network_acls"))
+    network_acls = first_mapping(values.get("network_acls"))
     network_uncertainties: list[str] = []
     authorization_uncertainties: list[str] = []
     recovery_uncertainties: list[str] = []
 
-    public_network_access_enabled = _known_optional_bool(
-        resource,
-        values,
-        "public_network_access_enabled",
-        uncertainties=network_uncertainties,
+    public_network_access_enabled = known_optional_bool(
+        values, resource.unknown_values, "public_network_access_enabled", network_uncertainties
     )
     network_default_action = _network_default_action(
         resource,
@@ -186,8 +193,8 @@ def _network_default_action(
     *,
     uncertainties: list[str],
 ) -> str | None:
-    if _attribute_unknown(resource, "network_acls") or _first_block_attribute_unknown(
-        resource,
+    if attribute_unknown(resource.unknown_values, "network_acls") or first_block_attribute_unknown(
+        resource.unknown_values,
         "network_acls",
         "default_action",
     ):
@@ -201,31 +208,6 @@ def _network_default_action(
     return default_action
 
 
-def _known_optional_bool(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    *,
-    uncertainties: list[str],
-) -> bool | None:
-    if _attribute_unknown(resource, key):
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    if key not in values or values[key] is None:
-        return None
-    value = values[key]
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "enabled", "yes", "on"}:
-            return True
-        if normalized in {"false", "disabled", "no", "off"}:
-            return False
-    uncertainties.append(f"{key} has an unrecognized value shape")
-    return None
-
-
 def _known_bool(
     resource: TerraformResource,
     values: Mapping[str, Any],
@@ -234,26 +216,10 @@ def _known_bool(
     default: bool,
     uncertainties: list[str],
 ) -> bool | None:
-    if _attribute_unknown(resource, key):
+    if attribute_unknown(resource.unknown_values, key):
         uncertainties.append(f"{key} is unknown after planning")
         return None
     return _bool_with_default(values, key, default)
-
-
-def _attribute_unknown(resource: TerraformResource, key: str) -> bool:
-    return resource.unknown_values.get(key) is True
-
-
-def _first_block_attribute_unknown(resource: TerraformResource, block: str, key: str) -> bool:
-    unknown_block = resource.unknown_values.get(block)
-    if unknown_block is True:
-        return True
-    if isinstance(unknown_block, Mapping):
-        return unknown_block.get(key) is True
-    if isinstance(unknown_block, list) and unknown_block:
-        first = unknown_block[0]
-        return first is True or (isinstance(first, Mapping) and first.get(key) is True)
-    return False
 
 
 def _bool_with_default(values: Mapping[str, Any], key: str, default: bool) -> bool:
@@ -269,14 +235,6 @@ def _bool_with_default(values: Mapping[str, Any], key: str, default: bool) -> bo
         if normalized in {"false", "disabled", "no", "off"}:
             return False
     return bool(value)
-
-
-def _first_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    if isinstance(value, list) and value and isinstance(value[0], Mapping):
-        return value[0]
-    return None
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:

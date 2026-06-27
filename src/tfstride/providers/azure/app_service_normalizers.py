@@ -7,7 +7,13 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.azure.identity_normalizers import managed_identity_metadata
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
-from tfstride.providers.azure.resource_utils import first_non_empty
+from tfstride.providers.azure.resource_utils import (
+    first_mapping,
+    first_non_empty,
+    known_bool,
+    known_string,
+    value_is_unknown,
+)
 
 AZURE_PROVIDER = "azure"
 
@@ -35,11 +41,15 @@ def normalize_windows_function_app(resource: TerraformResource) -> NormalizedRes
 def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) -> NormalizedResource:
     values = resource.values
     uncertainties: list[str] = []
-    site_config = _first_mapping(values.get("site_config"))
-    app_service_id = _known_string(resource, values, "id", uncertainties)
+    site_config = first_mapping(values.get("site_config"))
+    app_service_id = known_string(values, resource.unknown_values, "id", uncertainties)
     service_plan_reference = _known_service_plan_reference(resource, values, uncertainties)
-    vnet_integration_subnet_id = _known_string(resource, values, "virtual_network_subnet_id", uncertainties)
-    public_network_access_enabled = _known_bool(resource, values, "public_network_access_enabled", uncertainties)
+    vnet_integration_subnet_id = known_string(
+        values, resource.unknown_values, "virtual_network_subnet_id", uncertainties
+    )
+    public_network_access_enabled = known_bool(
+        values, resource.unknown_values, "public_network_access_enabled", uncertainties, allow_string=False
+    )
     min_tls_version = _known_site_config_string(
         resource,
         site_config,
@@ -95,40 +105,10 @@ def _known_service_plan_reference(
     uncertainties: list[str],
 ) -> str | None:
     for key in ("service_plan_id", "app_service_plan_id", "server_farm_id"):
-        reference = _known_string(resource, values, key, uncertainties)
+        reference = known_string(values, resource.unknown_values, key, uncertainties)
         if reference:
             return reference
     return None
-
-
-def _known_bool(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    uncertainties: list[str],
-) -> bool | None:
-    if _value_is_unknown(resource.unknown_values.get(key)):
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    if key not in values or values[key] is None:
-        return None
-    value = values[key]
-    if isinstance(value, bool):
-        return value
-    uncertainties.append(f"{key} has an unrecognized value shape")
-    return None
-
-
-def _known_string(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    uncertainties: list[str],
-) -> str | None:
-    if _value_is_unknown(resource.unknown_values.get(key)):
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    return first_non_empty(values.get(key))
 
 
 def _known_site_config_string(
@@ -145,9 +125,9 @@ def _known_site_config_string(
         if uncertainty not in uncertainties:
             uncertainties.append(uncertainty)
         return None
-    unknown_block = _first_mapping(raw_unknown)
+    unknown_block = first_mapping(raw_unknown)
     for key in keys:
-        if _value_is_unknown(unknown_block.get(key) if unknown_block else None):
+        if value_is_unknown(unknown_block.get(key) if unknown_block else None):
             uncertainties.append(f"site_config.{display_key} is unknown after planning")
             return None
     if site_config is None:
@@ -157,21 +137,3 @@ def _known_site_config_string(
         if value:
             return value
     return None
-
-
-def _first_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    if isinstance(value, list) and value and isinstance(value[0], Mapping):
-        return value[0]
-    return None
-
-
-def _value_is_unknown(value: Any) -> bool:
-    if value is True:
-        return True
-    if isinstance(value, Mapping):
-        return any(_value_is_unknown(item) for item in value.values())
-    if isinstance(value, list):
-        return any(_value_is_unknown(item) for item in value)
-    return False

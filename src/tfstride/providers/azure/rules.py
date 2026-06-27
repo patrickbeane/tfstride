@@ -27,7 +27,11 @@ from tfstride.providers.azure.rbac_rules import AzureCustomRoleRuleDetectors
 from tfstride.providers.azure.resource_decoration.public_exposure import is_risky_public_compute_path
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
-from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
+from tfstride.providers.azure.resource_utils import (
+    azure_reference_key,
+    azure_resource_references,
+    tls_version_below_1_2,
+)
 
 AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
@@ -360,7 +364,7 @@ class AzureStorageRuleDetectors:
         for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
             facts = azure_facts(account)
             tls_version = facts.min_tls_version
-            if not _tls_version_below_1_2(tls_version):
+            if not tls_version_below_1_2(tls_version):
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=account.direct_internet_reachable,
@@ -748,10 +752,3 @@ def _network_security_path_evidence(
         f"{virtual_machine_address} -> {nic_text} -> {network_security_group}"
         for network_security_group in network_security_groups
     ]
-
-
-def _tls_version_below_1_2(value: str | None) -> bool:
-    if value is None:
-        return False
-    normalized = value.strip().upper().replace(".", "_")
-    return normalized in {"TLS1_0", "TLS1_1"}

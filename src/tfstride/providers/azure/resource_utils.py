@@ -38,6 +38,186 @@ def first_non_empty(*values: Any) -> str | None:
     return compacted[0] if compacted else None
 
 
+def value_is_unknown(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, Mapping):
+        return any(value_is_unknown(item) for item in value.values())
+    if isinstance(value, list):
+        return any(value_is_unknown(item) for item in value)
+    return False
+
+
+def attribute_unknown(unknown_values: Mapping[str, Any] | None, key: str) -> bool:
+    return isinstance(unknown_values, Mapping) and value_is_unknown(unknown_values.get(key))
+
+
+def first_mapping(value: Any) -> Mapping[str, Any] | None:
+    if isinstance(value, Mapping):
+        return value
+    if isinstance(value, list) and value and isinstance(value[0], Mapping):
+        return value[0]
+    return None
+
+
+def unknown_block_at(value: Any, index: int) -> Any:
+    if value is True:
+        return True
+    if isinstance(value, list) and index < len(value):
+        return value[index]
+    return None
+
+
+def block_attribute_unknown(unknown_block: Any, key: str) -> bool:
+    if unknown_block is True:
+        return True
+    if isinstance(unknown_block, Mapping):
+        return value_is_unknown(unknown_block.get(key))
+    if isinstance(unknown_block, list) and unknown_block:
+        first = unknown_block[0]
+        return first is True or (isinstance(first, Mapping) and value_is_unknown(first.get(key)))
+    return False
+
+
+def first_block_attribute_unknown(
+    unknown_values: Mapping[str, Any] | None,
+    block: str,
+    key: str,
+) -> bool:
+    if not isinstance(unknown_values, Mapping):
+        return False
+    return block_attribute_unknown(unknown_values.get(block), key)
+
+
+def known_string(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str | None = None,
+    require_string: bool = False,
+) -> str | None:
+    display_path = path or key
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{display_path} is unknown after planning")
+        return None
+    raw = values.get(key)
+    if raw is None:
+        return None
+    if require_string and not isinstance(raw, str):
+        uncertainties.append(f"{display_path} has an unrecognized value shape")
+        return None
+    return first_non_empty(raw)
+
+
+def known_string_list(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str | None = None,
+) -> list[str]:
+    display_path = path or key
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{display_path} is unknown after planning")
+        return []
+    return compact_strings(as_list(values.get(key)))
+
+
+def known_bool(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str | None = None,
+    allow_string: bool = True,
+) -> bool | None:
+    display_path = path or key
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{display_path} is unknown after planning")
+        return None
+    if key not in values or values[key] is None:
+        return None
+    value = values[key]
+    if isinstance(value, bool):
+        return value
+    if allow_string and isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "enabled", "yes", "on"}:
+            return True
+        if normalized in {"false", "disabled", "no", "off"}:
+            return False
+    uncertainties.append(f"{display_path} has an unrecognized value shape")
+    return None
+
+
+def known_block_string(
+    values: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> str | None:
+    if block_attribute_unknown(unknown_block, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return None
+    return first_non_empty(values.get(key)) if values is not None else None
+
+
+def known_block_strings(
+    values: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> list[str]:
+    if block_attribute_unknown(unknown_block, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return []
+    return compact_strings(as_list(values.get(key))) if values is not None else []
+
+
+def known_block_bool(
+    values: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> bool | None:
+    if block_attribute_unknown(unknown_block, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return None
+    value = values.get(key) if values is not None else None
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+    return None
+
+
+def tls_version_below_1_2(value: str | None) -> bool:
+    if value is None:
+        return False
+    normalized = value.strip().lower().replace(".", "_").replace("-", "_")
+    return normalized in {"tls1_0", "tls1_1", "tlsv1", "tlsv1_0", "tlsv1_1", "1_0", "1_1"}
+
+
 def azure_reference_key(value: str | None) -> str:
     if value is None:
         return ""
@@ -206,7 +386,7 @@ def _unknown_decision_fields(unknown_values: Mapping[str, Any] | bool | None) ->
         return list(decision_fields)
     if not isinstance(unknown_values, Mapping):
         return []
-    return [field for field in decision_fields if _value_is_unknown(unknown_values.get(field))]
+    return [field for field in decision_fields if value_is_unknown(unknown_values.get(field))]
 
 
 def _unsupported_decision_fields(record: Mapping[str, Any]) -> list[str]:
@@ -214,16 +394,6 @@ def _unsupported_decision_fields(record: Mapping[str, Any]) -> list[str]:
     if record.get("destination_application_security_group_ids"):
         unsupported.append("destination_application_security_group_ids")
     return unsupported
-
-
-def _value_is_unknown(value: Any) -> bool:
-    if value is True:
-        return True
-    if isinstance(value, Mapping):
-        return any(_value_is_unknown(item) for item in value.values())
-    if isinstance(value, list):
-        return any(_value_is_unknown(item) for item in value)
-    return False
 
 
 def _direction(value: Any) -> str:

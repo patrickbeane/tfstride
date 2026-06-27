@@ -7,6 +7,7 @@ from tfstride.models import Finding
 from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_DISABLED
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES
+from tfstride.providers.azure.resource_utils import tls_version_below_1_2
 
 
 class AzureAppServiceRuleDetectors:
@@ -67,7 +68,7 @@ class AzureAppServiceRuleDetectors:
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
             tls_version = facts.min_tls_version
-            if not _tls_version_below_1_2(tls_version):
+            if not tls_version_below_1_2(tls_version):
                 continue
             public_enabled = facts.public_network_access_enabled is True
             severity_reasoning = build_severity_reasoning(
@@ -286,10 +287,3 @@ def _vnet_integration_evidence(facts: AzureResourceFacts) -> list[str]:
 
 def _vnet_integration_is_unknown(facts: AzureResourceFacts) -> bool:
     return any("virtual_network_subnet_id" in uncertainty for uncertainty in facts.app_service_posture_uncertainties)
-
-
-def _tls_version_below_1_2(value: str | None) -> bool:
-    if value is None:
-        return False
-    normalized = value.strip().lower().replace(".", "_").replace("-", "_")
-    return normalized in {"tls1_0", "tls1_1", "tlsv1", "tlsv1_0", "tlsv1_1", "1_0", "1_1"}

@@ -6,6 +6,13 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
+from tfstride.providers.azure.resource_utils import (
+    attribute_unknown,
+    first_block_attribute_unknown,
+    first_mapping,
+    first_non_empty,
+    known_bool,
+)
 
 AZURE_PROVIDER = "azure"
 
@@ -15,10 +22,10 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
     name = _optional_string(values.get("name")) or resource.name
     account_id = _optional_string(values.get("id"))
     uncertainties: list[str] = []
-    inline_network_rules = _first_mapping(values.get("network_rules"))
-    network_rules_unknown = _attribute_unknown(resource, "network_rules")
-    default_action_unknown = network_rules_unknown or _first_block_attribute_unknown(
-        resource,
+    inline_network_rules = first_mapping(values.get("network_rules"))
+    network_rules_unknown = attribute_unknown(resource.unknown_values, "network_rules")
+    default_action_unknown = network_rules_unknown or first_block_attribute_unknown(
+        resource.unknown_values,
         "network_rules",
         "default_action",
     )
@@ -56,18 +63,15 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
         default=True,
         uncertainties=uncertainties,
     )
-    public_network_access_enabled = _known_bool(
-        metadata_key="public_network_access_enabled",
-        resource=resource,
-        values=values,
-        uncertainties=uncertainties,
+    public_network_access_enabled = known_bool(
+        values, resource.unknown_values, "public_network_access_enabled", uncertainties
     )
     metadata[AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE] = public_network_fallback_state(
         public_network_access_enabled
     )
     if public_network_access_enabled is not None:
         metadata[AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED] = public_network_access_enabled
-    if _attribute_unknown(resource, "min_tls_version"):
+    if attribute_unknown(resource.unknown_values, "min_tls_version"):
         uncertainties.append("min_tls_version is unknown after planning")
     else:
         metadata[AzureResourceMetadata.MIN_TLS_VERSION] = _optional_string(values.get("min_tls_version")) or "TLS1_2"
@@ -94,12 +98,12 @@ def normalize_storage_container(resource: TerraformResource) -> NormalizedResour
     uncertainties: list[str] = []
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: name,
-        AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: _first_non_empty(
+        AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: first_non_empty(
             values.get("storage_account_id"),
             values.get("storage_account_name"),
         ),
     }
-    if _attribute_unknown(resource, "container_access_type"):
+    if attribute_unknown(resource.unknown_values, "container_access_type"):
         uncertainties.append("container_access_type is unknown after planning")
     else:
         metadata[AzureResourceMetadata.CONTAINER_ACCESS_TYPE] = (
@@ -130,7 +134,7 @@ def normalize_storage_account_network_rules(resource: TerraformResource) -> Norm
         AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: storage_account_reference,
         AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: resource.address,
     }
-    if _attribute_unknown(resource, "default_action"):
+    if attribute_unknown(resource.unknown_values, "default_action"):
         uncertainties.append("default_action is unknown after planning")
     else:
         metadata[AzureResourceMetadata.NETWORK_DEFAULT_ACTION] = _optional_string(values.get("default_action"))
@@ -158,51 +162,10 @@ def _set_bool_posture(
     default: bool,
     uncertainties: list[str],
 ) -> None:
-    if _attribute_unknown(resource, key):
+    if attribute_unknown(resource.unknown_values, key):
         uncertainties.append(f"{key} is unknown after planning")
         return
     metadata[field] = _bool_with_default(values, key, default)
-
-
-def _known_bool(
-    *,
-    metadata_key: str,
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    uncertainties: list[str],
-) -> bool | None:
-    if _attribute_unknown(resource, metadata_key):
-        uncertainties.append(f"{metadata_key} is unknown after planning")
-        return None
-    if metadata_key not in values or values[metadata_key] is None:
-        return None
-    value = values[metadata_key]
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "enabled", "yes", "on"}:
-            return True
-        if normalized in {"false", "disabled", "no", "off"}:
-            return False
-    uncertainties.append(f"{metadata_key} has an unrecognized value shape")
-    return None
-
-
-def _attribute_unknown(resource: TerraformResource, key: str) -> bool:
-    return resource.unknown_values.get(key) is True
-
-
-def _first_block_attribute_unknown(resource: TerraformResource, block: str, key: str) -> bool:
-    unknown_block = resource.unknown_values.get(block)
-    if unknown_block is True:
-        return True
-    if isinstance(unknown_block, Mapping):
-        return unknown_block.get(key) is True
-    if isinstance(unknown_block, list) and unknown_block:
-        first = unknown_block[0]
-        return first is True or (isinstance(first, Mapping) and first.get(key) is True)
-    return False
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:
@@ -223,22 +186,6 @@ def _bool_with_default(values: Mapping[str, Any], key: str, default: bool) -> bo
         if normalized in {"false", "disabled", "no", "off"}:
             return False
     return bool(value)
-
-
-def _first_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    if isinstance(value, list) and value and isinstance(value[0], Mapping):
-        return value[0]
-    return None
-
-
-def _first_non_empty(*values: Any) -> str | None:
-    for value in values:
-        normalized = _optional_string(value)
-        if normalized is not None:
-            return normalized
-    return None
 
 
 def _optional_string(value: Any) -> str | None:

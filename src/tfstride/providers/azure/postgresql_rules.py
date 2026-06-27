@@ -11,6 +11,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.resource_utils import tls_version_below_1_2
 
 _BROAD_IP_RANGES = frozenset(
     {
@@ -137,7 +138,7 @@ class AzurePostgresqlRuleDetectors:
 
             server_configs = configs_by_server.get(facts.postgresql_server_id, {})
             ssl_version = server_configs.get("ssl_min_protocol_version")
-            if ssl_version is not None and _ssl_version_is_weak(ssl_version):
+            if ssl_version is not None and tls_version_below_1_2(ssl_version):
                 weak = True
                 evidence_parts.append(f"ssl_min_protocol_version is {ssl_version}")
 
@@ -235,10 +236,3 @@ def _configs_by_server(inventory) -> dict[str, dict[str, str]]:
         if server_id and name:
             configs.setdefault(server_id, {})[name] = value or ""
     return configs
-
-
-def _ssl_version_is_weak(value: str | None) -> bool:
-    if value is None:
-        return False
-    normalized = value.strip().lower().replace(".", "_")
-    return normalized in {"tls1_0", "tls1_1", "1_0", "1_1", "tlsv1", "tlsv1_0", "tlsv1_1"}

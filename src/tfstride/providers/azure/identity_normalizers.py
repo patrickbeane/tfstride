@@ -6,7 +6,17 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.rbac_breadth import classify_role_definition_breadth
-from tfstride.providers.azure.resource_utils import as_list, compact_strings, first_non_empty
+from tfstride.providers.azure.resource_utils import (
+    as_list,
+    compact_strings,
+    first_mapping,
+    first_non_empty,
+    known_block_string,
+    known_block_strings,
+    known_string,
+    known_string_list,
+    value_is_unknown,
+)
 
 AZURE_PROVIDER = "azure"
 _USER_ASSIGNED_IDENTITY_TYPE = "UserAssigned"
@@ -15,9 +25,9 @@ _USER_ASSIGNED_IDENTITY_TYPE = "UserAssigned"
 def normalize_user_assigned_identity(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     uncertainties: list[str] = []
-    principal_id = _known_string(resource, values, "principal_id", uncertainties)
-    client_id = _known_string(resource, values, "client_id", uncertainties)
-    tenant_id = _known_string(resource, values, "tenant_id", uncertainties)
+    principal_id = known_string(values, resource.unknown_values, "principal_id", uncertainties)
+    client_id = known_string(values, resource.unknown_values, "client_id", uncertainties)
+    tenant_id = known_string(values, resource.unknown_values, "tenant_id", uncertainties)
     identity_id = None if resource.unknown_values.get("id") is True else first_non_empty(values.get("id"))
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
@@ -44,14 +54,14 @@ def normalize_user_assigned_identity(resource: TerraformResource) -> NormalizedR
 def normalize_role_definition(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     uncertainties: list[str] = []
-    role_name = _known_string(resource, values, "name", uncertainties)
+    role_name = known_string(values, resource.unknown_values, "name", uncertainties)
     role_definition_id = (
-        _known_string(resource, values, "role_definition_id", uncertainties)
-        or _known_string(resource, values, "role_definition_resource_id", uncertainties)
-        or _known_string(resource, values, "id", uncertainties)
+        known_string(values, resource.unknown_values, "role_definition_id", uncertainties)
+        or known_string(values, resource.unknown_values, "role_definition_resource_id", uncertainties)
+        or known_string(values, resource.unknown_values, "id", uncertainties)
     )
-    scope = _known_string(resource, values, "scope", uncertainties)
-    assignable_scopes = _known_string_list(resource, values, "assignable_scopes", uncertainties)
+    scope = known_string(values, resource.unknown_values, "scope", uncertainties)
+    assignable_scopes = known_string_list(values, resource.unknown_values, "assignable_scopes", uncertainties)
     permissions = _role_definition_permission_records(resource, values, uncertainties)
     actions = _permission_values(permissions, "actions")
     not_actions = _permission_values(permissions, "not_actions")
@@ -94,11 +104,11 @@ def normalize_role_definition(resource: TerraformResource) -> NormalizedResource
 def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     uncertainties: list[str] = []
-    scope = _known_string(resource, values, "scope", uncertainties)
-    role_definition_name = _known_string(resource, values, "role_definition_name", uncertainties)
-    role_definition_id = _known_string(resource, values, "role_definition_id", uncertainties)
-    principal_id = _known_string(resource, values, "principal_id", uncertainties)
-    principal_type = _known_string(resource, values, "principal_type", uncertainties)
+    scope = known_string(values, resource.unknown_values, "scope", uncertainties)
+    role_definition_name = known_string(values, resource.unknown_values, "role_definition_name", uncertainties)
+    role_definition_id = known_string(values, resource.unknown_values, "role_definition_id", uncertainties)
+    principal_id = known_string(values, resource.unknown_values, "principal_id", uncertainties)
+    principal_type = known_string(values, resource.unknown_values, "principal_type", uncertainties)
     assignment = {
         "source": resource.address,
         "scope": scope,
@@ -127,7 +137,7 @@ def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource
 
 
 def managed_identity_metadata(resource: TerraformResource) -> dict[Any, Any]:
-    identity = _first_mapping(resource.values.get("identity"))
+    identity = first_mapping(resource.values.get("identity"))
     identity_unknown = resource.unknown_values.get("identity")
     if identity is None and identity_unknown is None:
         return {}
@@ -136,15 +146,12 @@ def managed_identity_metadata(resource: TerraformResource) -> dict[Any, Any]:
     if identity_unknown is True:
         return {AzureResourceMetadata.MANAGED_IDENTITY_UNCERTAINTIES: ["identity is unknown after planning"]}
 
-    identity_type = _block_known_string(identity, identity_unknown, "type", uncertainties)
-    principal_id = _block_known_string(identity, identity_unknown, "principal_id", uncertainties)
-    client_id = _block_known_string(identity, identity_unknown, "client_id", uncertainties)
-    tenant_id = _block_known_string(identity, identity_unknown, "tenant_id", uncertainties)
-    attached_identity_references = _block_known_strings(
-        identity,
-        identity_unknown,
-        "identity_ids",
-        uncertainties,
+    identity_type = known_block_string(identity, identity_unknown, "type", uncertainties, path="identity")
+    principal_id = known_block_string(identity, identity_unknown, "principal_id", uncertainties, path="identity")
+    client_id = known_block_string(identity, identity_unknown, "client_id", uncertainties, path="identity")
+    tenant_id = known_block_string(identity, identity_unknown, "tenant_id", uncertainties, path="identity")
+    attached_identity_references = known_block_strings(
+        identity, identity_unknown, "identity_ids", uncertainties, path="identity"
     )
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.IDENTITY_TYPE: identity_type,
@@ -156,30 +163,6 @@ def managed_identity_metadata(resource: TerraformResource) -> dict[Any, Any]:
     if uncertainties:
         metadata[AzureResourceMetadata.MANAGED_IDENTITY_UNCERTAINTIES] = uncertainties
     return metadata
-
-
-def _known_string(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    uncertainties: list[str],
-) -> str | None:
-    if resource.unknown_values.get(key) is True:
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    return first_non_empty(values.get(key))
-
-
-def _known_string_list(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    uncertainties: list[str],
-) -> list[str]:
-    if _value_is_unknown(resource.unknown_values.get(key)):
-        uncertainties.append(f"{key} is unknown after planning")
-        return []
-    return compact_strings(as_list(values.get(key)))
 
 
 def _role_definition_permission_records(
@@ -238,62 +221,9 @@ def _permission_strings(
 
 def _permission_field_unknown(unknown_permission: Any, key: str) -> bool:
     if isinstance(unknown_permission, Mapping):
-        return _value_is_unknown(unknown_permission.get(key))
+        return value_is_unknown(unknown_permission.get(key))
     return False
 
 
 def _permission_values(permissions: list[dict[str, Any]], key: str) -> list[str]:
     return compact_strings(value for permission in permissions for value in permission.get(key, []))
-
-
-def _block_known_string(
-    values: Mapping[str, Any] | None,
-    unknown_block: Any,
-    key: str,
-    uncertainties: list[str],
-) -> str | None:
-    if _block_attribute_unknown(unknown_block, key):
-        uncertainties.append(f"identity.{key} is unknown after planning")
-        return None
-    return first_non_empty(values.get(key)) if values is not None else None
-
-
-def _block_known_strings(
-    values: Mapping[str, Any] | None,
-    unknown_block: Any,
-    key: str,
-    uncertainties: list[str],
-) -> list[str]:
-    if _block_attribute_unknown(unknown_block, key):
-        uncertainties.append(f"identity.{key} is unknown after planning")
-        return []
-    return compact_strings(as_list(values.get(key))) if values is not None else []
-
-
-def _block_attribute_unknown(unknown_block: Any, key: str) -> bool:
-    if unknown_block is True:
-        return True
-    if isinstance(unknown_block, Mapping):
-        return _value_is_unknown(unknown_block.get(key))
-    if isinstance(unknown_block, list) and unknown_block:
-        first = unknown_block[0]
-        return first is True or (isinstance(first, Mapping) and _value_is_unknown(first.get(key)))
-    return False
-
-
-def _value_is_unknown(value: Any) -> bool:
-    if value is True:
-        return True
-    if isinstance(value, Mapping):
-        return any(_value_is_unknown(item) for item in value.values())
-    if isinstance(value, list):
-        return any(_value_is_unknown(item) for item in value)
-    return False
-
-
-def _first_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    if isinstance(value, list) and value and isinstance(value[0], Mapping):
-        return value[0]
-    return None

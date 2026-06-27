@@ -11,6 +11,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.resource_utils import tls_version_below_1_2
 
 _BROAD_IP_RANGES = frozenset(
     {
@@ -132,7 +133,7 @@ class AzureMssqlRuleDetectors:
         for server in context.inventory.by_type(AzureResourceType.MSSQL_SERVER):
             facts = azure_facts(server)
             tls_version = facts.min_tls_version
-            if not _tls_version_below_1_2(tls_version):
+            if not tls_version_below_1_2(tls_version):
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=server.direct_internet_reachable,
@@ -211,10 +212,3 @@ def _servers_by_id(inventory) -> dict[str, str]:
         if server_id:
             servers[server_id] = server.address
     return servers
-
-
-def _tls_version_below_1_2(value: str | None) -> bool:
-    if value is None:
-        return False
-    normalized = value.strip().upper().replace(".", "_")
-    return normalized in {"TLS1_0", "TLS1_1", "1_0", "1_1"}

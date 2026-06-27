@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
-from tfstride.providers.azure.resource_utils import first_non_empty
+from tfstride.providers.azure.resource_utils import first_non_empty, known_bool, known_string
 
 AZURE_PROVIDER = "azure"
 
@@ -17,17 +16,11 @@ def normalize_mssql_server(resource: TerraformResource) -> NormalizedResource:
     name = first_non_empty(values.get("name"), resource.name)
     uncertainties: list[str] = []
 
-    public_network_access_enabled = _known_bool(
-        resource,
-        values,
-        "public_network_access_enabled",
-        uncertainties=uncertainties,
+    public_network_access_enabled = known_bool(
+        values, resource.unknown_values, "public_network_access_enabled", uncertainties
     )
-    min_tls_version = _known_string(
-        resource,
-        values,
-        "minimum_tls_version",
-        uncertainties=uncertainties,
+    min_tls_version = known_string(
+        values, resource.unknown_values, "minimum_tls_version", uncertainties, require_string=True
     )
 
     metadata: dict[Any, Any] = {
@@ -166,47 +159,3 @@ def normalize_mssql_server_security_alert_policy(resource: TerraformResource) ->
         identifier=first_non_empty(values.get("id"), resource.address),
         metadata=metadata,
     )
-
-
-def _known_bool(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    *,
-    uncertainties: list[str],
-) -> bool | None:
-    if resource.unknown_values.get(key) is True:
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    value = values.get(key)
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "enabled", "yes", "on"}:
-            return True
-        if normalized in {"false", "disabled", "no", "off"}:
-            return False
-    uncertainties.append(f"{key} has an unrecognized value shape")
-    return None
-
-
-def _known_string(
-    resource: TerraformResource,
-    values: Mapping[str, Any],
-    key: str,
-    *,
-    uncertainties: list[str],
-) -> str | None:
-    if resource.unknown_values.get(key) is True:
-        uncertainties.append(f"{key} is unknown after planning")
-        return None
-    raw = values.get(key)
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        return raw
-    uncertainties.append(f"{key} has an unrecognized value shape")
-    return None
