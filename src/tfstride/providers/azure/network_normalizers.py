@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -143,6 +144,249 @@ def normalize_public_ip(resource: TerraformResource) -> NormalizedResource:
             AzureResourceMetadata.PUBLIC_IP_ADDRESS: first_non_empty(values.get("ip_address")),
         },
     )
+
+
+def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    endpoint_id = _known_string(
+        values,
+        resource.unknown_values,
+        "id",
+        uncertainties,
+        path="id",
+    )
+    subnet_reference = _known_string(
+        values,
+        resource.unknown_values,
+        "subnet_id",
+        uncertainties,
+        path="subnet_id",
+    )
+    service_connections, connection_resource_ids, subresource_names = _private_service_connections(
+        resource,
+        uncertainties,
+    )
+    private_dns_zone_groups = _private_dns_zone_groups(resource, uncertainties)
+
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
+        AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
+        AzureResourceMetadata.PRIVATE_ENDPOINT_ID: endpoint_id,
+        AzureResourceMetadata.SUBNET_REFERENCE: subnet_reference,
+        AzureResourceMetadata.PRIVATE_SERVICE_CONNECTIONS: service_connections,
+        AzureResourceMetadata.PRIVATE_CONNECTION_RESOURCE_IDS: connection_resource_ids,
+        AzureResourceMetadata.PRIVATE_ENDPOINT_SUBRESOURCE_NAMES: subresource_names,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUPS: private_dns_zone_groups,
+    }
+    if uncertainties:
+        metadata[AzureResourceMetadata.PRIVATE_ENDPOINT_UNCERTAINTIES] = uncertainties
+
+    return _network_resource(
+        resource,
+        identifier=first_non_empty(endpoint_id, values.get("name"), resource.address),
+        subnet_ids=tuple([subnet_reference] if subnet_reference else []),
+        metadata=metadata,
+    )
+
+
+def _private_service_connections(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    values = resource.values
+    raw_unknown = resource.unknown_values.get("private_service_connection")
+    if raw_unknown is True and not values.get("private_service_connection"):
+        uncertainties.append("private_service_connection is unknown after planning")
+        return [], [], []
+
+    records: list[dict[str, Any]] = []
+    connection_resource_ids: list[str] = []
+    subresource_names: list[str] = []
+    for index, item in enumerate(as_list(values.get("private_service_connection"))):
+        path = f"private_service_connection[{index}]"
+        if not isinstance(item, Mapping):
+            uncertainties.append(f"{path} has an unrecognized value shape")
+            continue
+        unknown_item = _unknown_block_at(raw_unknown, index)
+        record: dict[str, Any] = {}
+        unknown_fields: list[str] = []
+
+        connection_name = _known_block_string(item, unknown_item, "name", uncertainties, path=path)
+        if connection_name:
+            record["name"] = connection_name
+
+        target_id = _known_block_string(
+            item,
+            unknown_item,
+            "private_connection_resource_id",
+            uncertainties,
+            path=path,
+            unknown_fields=unknown_fields,
+        )
+        if target_id:
+            record["private_connection_resource_id"] = target_id
+            connection_resource_ids.append(target_id)
+
+        names = _known_block_strings(
+            item,
+            unknown_item,
+            "subresource_names",
+            uncertainties,
+            path=path,
+            unknown_fields=unknown_fields,
+        )
+        record["subresource_names"] = names
+        subresource_names.extend(names)
+
+        manual_connection = _known_block_bool(
+            item,
+            unknown_item,
+            "is_manual_connection",
+            uncertainties,
+            path=path,
+            unknown_fields=unknown_fields,
+        )
+        if manual_connection is not None:
+            record["is_manual_connection"] = manual_connection
+
+        if unknown_fields:
+            record["unknown_fields"] = unknown_fields
+        records.append(record)
+
+    return records, compact_strings(connection_resource_ids), compact_strings(subresource_names)
+
+
+def _private_dns_zone_groups(resource: TerraformResource, uncertainties: list[str]) -> list[dict[str, Any]]:
+    values = resource.values
+    raw_unknown = resource.unknown_values.get("private_dns_zone_group")
+    if raw_unknown is True and not values.get("private_dns_zone_group"):
+        uncertainties.append("private_dns_zone_group is unknown after planning")
+        return []
+
+    records: list[dict[str, Any]] = []
+    for index, item in enumerate(as_list(values.get("private_dns_zone_group"))):
+        path = f"private_dns_zone_group[{index}]"
+        if not isinstance(item, Mapping):
+            uncertainties.append(f"{path} has an unrecognized value shape")
+            continue
+        unknown_item = _unknown_block_at(raw_unknown, index)
+        record: dict[str, Any] = {}
+        unknown_fields: list[str] = []
+
+        group_name = _known_block_string(item, unknown_item, "name", uncertainties, path=path)
+        if group_name:
+            record["name"] = group_name
+        zone_ids = _known_block_strings(
+            item,
+            unknown_item,
+            "private_dns_zone_ids",
+            uncertainties,
+            path=path,
+            unknown_fields=unknown_fields,
+        )
+        record["private_dns_zone_ids"] = zone_ids
+        if unknown_fields:
+            record["unknown_fields"] = unknown_fields
+        records.append(record)
+    return records
+
+
+def _known_string(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any],
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+) -> str | None:
+    if _value_is_unknown(unknown_values.get(key)):
+        uncertainties.append(f"{path} is unknown after planning")
+        return None
+    return first_non_empty(values.get(key))
+
+
+def _known_block_string(
+    values: Mapping[str, Any],
+    unknown_values: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> str | None:
+    if _block_attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return None
+    return first_non_empty(values.get(key))
+
+
+def _known_block_strings(
+    values: Mapping[str, Any],
+    unknown_values: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> list[str]:
+    if _block_attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return []
+    return compact_strings(as_list(values.get(key)))
+
+
+def _known_block_bool(
+    values: Mapping[str, Any],
+    unknown_values: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> bool | None:
+    if _block_attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return None
+    value = values.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+    return None
+
+
+def _unknown_block_at(value: Any, index: int) -> Any:
+    if value is True:
+        return True
+    if isinstance(value, list) and index < len(value):
+        return value[index]
+    return None
+
+
+def _block_attribute_unknown(unknown_values: Any, key: str) -> bool:
+    if unknown_values is True:
+        return True
+    if isinstance(unknown_values, Mapping):
+        return _value_is_unknown(unknown_values.get(key))
+    return False
+
+
+def _value_is_unknown(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, Mapping):
+        return any(_value_is_unknown(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_value_is_unknown(item) for item in value)
+    return False
 
 
 def _network_resource(

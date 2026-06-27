@@ -108,6 +108,12 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "POSTGRESQL_CONFIG_NAME",
             "POSTGRESQL_CONFIG_VALUE",
             "POSTGRESQL_CONFIG_SERVER_ID",
+            "PRIVATE_ENDPOINT_ID",
+            "PRIVATE_CONNECTION_RESOURCE_IDS",
+            "PRIVATE_ENDPOINT_SUBRESOURCE_NAMES",
+            "PRIVATE_ENDPOINT_UNCERTAINTIES",
+            "PRIVATE_SERVICE_CONNECTIONS",
+            "PRIVATE_DNS_ZONE_GROUPS",
         }
 
         self.assertEqual(contract.provider_owned_fields["azure"], frozenset(expected_fields))

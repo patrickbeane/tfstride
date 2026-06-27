@@ -34,6 +34,7 @@ from tfstride.providers.azure.network_normalizers import (
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
     normalize_network_security_rule,
+    normalize_private_endpoint,
     normalize_public_ip,
     normalize_subnet,
     normalize_subnet_network_security_group_association,
@@ -71,6 +72,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
         normalize_network_interface_security_group_association
     ),
     AzureResourceType.PUBLIC_IP: normalize_public_ip,
+    AzureResourceType.PRIVATE_ENDPOINT: normalize_private_endpoint,
     AzureResourceType.LINUX_VIRTUAL_MACHINE: normalize_linux_virtual_machine,
     AzureResourceType.WINDOWS_VIRTUAL_MACHINE: normalize_windows_virtual_machine,
     AzureResourceType.MSSQL_SERVER: normalize_mssql_server,

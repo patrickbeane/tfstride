@@ -62,6 +62,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),

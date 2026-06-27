@@ -24,6 +24,7 @@ class AzureResourceType:
     NETWORK_INTERFACE = "azurerm_network_interface"
     NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION = "azurerm_network_interface_security_group_association"
     PUBLIC_IP = "azurerm_public_ip"
+    PRIVATE_ENDPOINT = "azurerm_private_endpoint"
     LINUX_VIRTUAL_MACHINE = "azurerm_linux_virtual_machine"
     WINDOWS_VIRTUAL_MACHINE = "azurerm_windows_virtual_machine"
     MSSQL_SERVER = "azurerm_mssql_server"
@@ -68,6 +69,7 @@ AZURE_NETWORK_RESOURCE_TYPES = frozenset(
         AzureResourceType.NETWORK_INTERFACE,
         AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION,
         AzureResourceType.PUBLIC_IP,
+        AzureResourceType.PRIVATE_ENDPOINT,
     }
 )
 
