@@ -67,6 +67,14 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.KEY_VAULT_ID)
 
     @property
+    def app_service_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.APP_SERVICE_ID)
+
+    @property
+    def app_service_plan_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.APP_SERVICE_PLAN_REFERENCE)
+
+    @property
     def key_vault_reference(self) -> str | None:
         return self.get(AzureResourceMetadata.KEY_VAULT_REFERENCE)
 
@@ -91,6 +99,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
         return self.get(AzureResourceMetadata.MIN_TLS_VERSION)
 
     @property
+    def ftps_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.FTPS_STATE)
+
+    @property
     def public_network_access_enabled(self) -> bool | None:
         return self.optional_bool(AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED)
 
@@ -113,6 +125,10 @@ class AzureResourceFacts(NeutralProviderResourceFacts):
     @property
     def storage_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.STORAGE_POSTURE_UNCERTAINTIES)
+
+    @property
+    def app_service_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES)
 
     @property
     def purge_protection_enabled(self) -> bool | None:

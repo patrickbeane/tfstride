@@ -4,6 +4,13 @@ from collections import Counter
 from typing import Any
 
 from tfstride.models import ResourceInventory, TerraformResource
+from tfstride.providers.azure.app_service_normalizers import (
+    normalize_function_app,
+    normalize_linux_function_app,
+    normalize_linux_web_app,
+    normalize_windows_function_app,
+    normalize_windows_web_app,
+)
 from tfstride.providers.azure.compute_normalizers import (
     normalize_linux_virtual_machine,
     normalize_windows_virtual_machine,
@@ -73,6 +80,11 @@ _AZURE_RESOURCE_NORMALIZERS = {
     ),
     AzureResourceType.PUBLIC_IP: normalize_public_ip,
     AzureResourceType.PRIVATE_ENDPOINT: normalize_private_endpoint,
+    AzureResourceType.LINUX_WEB_APP: normalize_linux_web_app,
+    AzureResourceType.WINDOWS_WEB_APP: normalize_windows_web_app,
+    AzureResourceType.FUNCTION_APP: normalize_function_app,
+    AzureResourceType.LINUX_FUNCTION_APP: normalize_linux_function_app,
+    AzureResourceType.WINDOWS_FUNCTION_APP: normalize_windows_function_app,
     AzureResourceType.LINUX_VIRTUAL_MACHINE: normalize_linux_virtual_machine,
     AzureResourceType.WINDOWS_VIRTUAL_MACHINE: normalize_windows_virtual_machine,
     AzureResourceType.MSSQL_SERVER: normalize_mssql_server,
@@ -89,7 +101,7 @@ SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 
 
 class AzureNormalizer(ProviderNormalizer):
-    """Normalize supported AzureRM storage, identity, Key Vault, network, and compute resources."""
+    """Normalize supported AzureRM storage, identity, Key Vault, network, compute, and app resources."""
 
     provider = "azure"
 

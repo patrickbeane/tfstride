@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
+from tfstride.providers.azure.resource_types import (
+    AZURE_APP_SERVICE_RESOURCE_TYPES,
+    AZURE_COMPUTE_RESOURCE_TYPES,
+    AzureResourceType,
+)
 from tfstride.providers.resource_capabilities import ResourceCapability, ResourceCapabilityMap
 
 _STORAGE_ACCOUNTS = frozenset({AzureResourceType.STORAGE_ACCOUNT})
 _VIRTUAL_MACHINES = AZURE_COMPUTE_RESOURCE_TYPES
+_APP_SERVICES = AZURE_APP_SERVICE_RESOURCE_TYPES
 _KEY_VAULTS = frozenset({AzureResourceType.KEY_VAULT})
 _KEY_VAULT_DATA = frozenset(
     {
@@ -25,13 +30,14 @@ _POSTGRESQL_DATA = frozenset(
 
 AZURE_RESOURCE_CAPABILITIES: ResourceCapabilityMap = MappingProxyType(
     {
-        ResourceCapability.WORKLOAD: _VIRTUAL_MACHINES,
+        ResourceCapability.WORKLOAD: _VIRTUAL_MACHINES | _APP_SERVICES,
         ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD: _VIRTUAL_MACHINES,
         ResourceCapability.PUBLIC_COMPUTE: _VIRTUAL_MACHINES,
         ResourceCapability.DATA_STORE: _STORAGE_ACCOUNTS | _KEY_VAULT_DATA | _SQL_DATA | _POSTGRESQL_DATA,
         ResourceCapability.PUBLIC_EDGE: _STORAGE_ACCOUNTS
         | _KEY_VAULTS
         | _VIRTUAL_MACHINES
+        | _APP_SERVICES
         | _SQL_SERVERS
         | _POSTGRESQL_SERVERS,
         ResourceCapability.IDENTITY_ROLE: frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY}),

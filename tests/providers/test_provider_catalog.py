@@ -301,6 +301,13 @@ class ProviderCatalogTests(unittest.TestCase):
             name="deploy",
             category=ResourceCategory.IAM,
         )
+        azure_web_app = NormalizedResource(
+            address="azurerm_linux_web_app.app",
+            provider="azure",
+            resource_type="azurerm_linux_web_app",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+        )
 
         self.assertEqual(registry.providers(), ("aws", "gcp", "azure"))
         self.assertTrue(registry.has_capability(aws_resource, ResourceCapability.WORKLOAD))
@@ -344,6 +351,10 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(
             registry.capabilities_for(azure_managed_identity),
             frozenset({ResourceCapability.IDENTITY_ROLE}),
+        )
+        self.assertEqual(
+            registry.capabilities_for(azure_web_app),
+            frozenset({ResourceCapability.WORKLOAD, ResourceCapability.PUBLIC_EDGE}),
         )
         self.assertEqual(
             registry.capabilities_for(azure_network_security_group),

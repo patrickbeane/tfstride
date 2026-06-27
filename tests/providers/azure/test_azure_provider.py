@@ -63,6 +63,8 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_WEB_APP))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_FUNCTION_APP))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
@@ -73,6 +75,11 @@ class AzureProviderTests(unittest.TestCase):
                 {
                     AzureResourceType.LINUX_VIRTUAL_MACHINE,
                     AzureResourceType.WINDOWS_VIRTUAL_MACHINE,
+                    AzureResourceType.LINUX_WEB_APP,
+                    AzureResourceType.WINDOWS_WEB_APP,
+                    AzureResourceType.FUNCTION_APP,
+                    AzureResourceType.LINUX_FUNCTION_APP,
+                    AzureResourceType.WINDOWS_FUNCTION_APP,
                 }
             ),
         )

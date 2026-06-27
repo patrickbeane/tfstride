@@ -73,6 +73,11 @@ class ResourceConceptTests(unittest.TestCase):
                     "google_compute_instance",
                     "azurerm_linux_virtual_machine",
                     "azurerm_windows_virtual_machine",
+                    "azurerm_linux_web_app",
+                    "azurerm_windows_web_app",
+                    "azurerm_function_app",
+                    "azurerm_linux_function_app",
+                    "azurerm_windows_function_app",
                 }
             ),
         )
@@ -150,6 +155,11 @@ class ResourceConceptTests(unittest.TestCase):
                     "azurerm_key_vault",
                     "azurerm_linux_virtual_machine",
                     "azurerm_windows_virtual_machine",
+                    "azurerm_linux_web_app",
+                    "azurerm_windows_web_app",
+                    "azurerm_function_app",
+                    "azurerm_linux_function_app",
+                    "azurerm_windows_function_app",
                     "azurerm_mssql_server",
                     "azurerm_postgresql_flexible_server",
                 }
@@ -309,6 +319,8 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_workload_resource(_resource("google_cloudfunctions_function", provider="gcp")))
         self.assertTrue(is_workload_resource(_resource("google_compute_instance", provider="gcp")))
         self.assertTrue(is_workload_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
+        self.assertTrue(is_workload_resource(_resource("azurerm_linux_web_app", provider="azure")))
+        self.assertTrue(is_workload_resource(_resource("azurerm_linux_function_app", provider="azure")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_instance")))
         self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_ecs_service")))
         self.assertTrue(
@@ -342,6 +354,8 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_public_edge_resource(_resource("google_sql_database_instance", provider="gcp")))
         self.assertTrue(is_public_edge_resource(_resource("azurerm_storage_account", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
+        self.assertTrue(is_public_edge_resource(_resource("azurerm_linux_web_app", provider="azure")))
+        self.assertTrue(is_public_edge_resource(_resource("azurerm_linux_function_app", provider="azure")))
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("azurerm_user_assigned_identity", provider="azure")))
