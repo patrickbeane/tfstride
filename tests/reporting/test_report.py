@@ -46,6 +46,8 @@ AZURE_COMPUTE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_compute_plan
 AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 AZURE_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nightmare_plan.json"
 AZURE_KEY_VAULT_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_key_vault_plan.json"
+AZURE_IDENTITY_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_identity_plan.json"
+AZURE_NSG_PRECEDENCE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nsg_precedence_plan.json"
 AZURE_STORAGE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_storage_plan.json"
 CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH = (
     FIXTURES_DIR / "aws" / "sample_aws_cross_account_trust_unconstrained_plan.json"
@@ -145,6 +147,8 @@ class MarkdownReportTests(unittest.TestCase):
             AZURE_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_nightmare_report.md",
             AZURE_STORAGE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_storage_report.md",
             AZURE_KEY_VAULT_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_key_vault_report.md",
+            AZURE_IDENTITY_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_identity_report.md",
+            AZURE_NSG_PRECEDENCE_FIXTURE_PATH: EXAMPLES_DIR / "azure" / "azure_nsg_precedence_report.md",
         }
 
         for fixture_path, report_path in scenarios.items():

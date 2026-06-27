@@ -1,0 +1,224 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_storage_account.logs",
+          "mode": "managed",
+          "type": "azurerm_storage_account",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Storage/storageAccounts/tfstrideidentitylogs",
+            "name": "tfstrideidentitylogs",
+            "allow_nested_items_to_be_public": false,
+            "shared_access_key_enabled": false,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": false
+          }
+        },
+        {
+          "address": "azurerm_storage_account_network_rules.logs",
+          "mode": "managed",
+          "type": "azurerm_storage_account_network_rules",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "storage_account_id": "azurerm_storage_account.logs.id",
+            "default_action": "Deny",
+            "bypass": [
+              "AzureServices"
+            ],
+            "ip_rules": [],
+            "virtual_network_subnet_ids": []
+          }
+        },
+        {
+          "address": "azurerm_storage_container.private",
+          "mode": "managed",
+          "type": "azurerm_storage_container",
+          "name": "private",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "name": "private",
+            "storage_account_id": "azurerm_storage_account.logs.id",
+            "container_access_type": "private"
+          }
+        },
+        {
+          "address": "azurerm_virtual_network.main",
+          "mode": "managed",
+          "type": "azurerm_virtual_network",
+          "name": "main",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/virtualNetworks/tfstride-main",
+            "name": "tfstride-main",
+            "location": "eastus",
+            "address_space": [
+              "10.20.0.0/16"
+            ]
+          }
+        },
+        {
+          "address": "azurerm_subnet.web",
+          "mode": "managed",
+          "type": "azurerm_subnet",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/virtualNetworks/tfstride-main/subnets/web",
+            "name": "web",
+            "virtual_network_name": "azurerm_virtual_network.main.name",
+            "address_prefixes": [
+              "10.20.1.0/24"
+            ],
+            "default_outbound_access_enabled": false
+          }
+        },
+        {
+          "address": "azurerm_network_security_group.web_nic",
+          "mode": "managed",
+          "type": "azurerm_network_security_group",
+          "name": "web_nic",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/networkSecurityGroups/web-nic",
+            "name": "web-nic",
+            "location": "eastus",
+            "security_rule": [
+              {
+                "name": "allow-ssh",
+                "priority": 200,
+                "direction": "Inbound",
+                "access": "Allow",
+                "protocol": "Tcp",
+                "source_address_prefix": "Internet",
+                "source_port_range": "*",
+                "destination_address_prefix": "*",
+                "destination_port_range": "22"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_public_ip.web",
+          "mode": "managed",
+          "type": "azurerm_public_ip",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/publicIPAddresses/tfstride-web",
+            "name": "tfstride-web",
+            "location": "eastus",
+            "allocation_method": "Static",
+            "sku": "Standard",
+            "ip_address": "203.0.113.40"
+          }
+        },
+        {
+          "address": "azurerm_network_interface.web",
+          "mode": "managed",
+          "type": "azurerm_network_interface",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/networkInterfaces/tfstride-web",
+            "name": "tfstride-web",
+            "location": "eastus",
+            "ip_forwarding_enabled": false,
+            "ip_configuration": [
+              {
+                "name": "primary",
+                "subnet_id": "azurerm_subnet.web.id",
+                "private_ip_address": "10.20.1.10",
+                "private_ip_address_allocation": "Static",
+                "public_ip_address_id": "azurerm_public_ip.web.id"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_network_interface_security_group_association.web",
+          "mode": "managed",
+          "type": "azurerm_network_interface_security_group_association",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "network_interface_id": "azurerm_network_interface.web.id",
+            "network_security_group_id": "azurerm_network_security_group.web_nic.id"
+          }
+        },
+        {
+          "address": "azurerm_user_assigned_identity.deploy",
+          "mode": "managed",
+          "type": "azurerm_user_assigned_identity",
+          "name": "deploy",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.ManagedIdentity/userAssignedIdentities/tfstride-deploy",
+            "name": "tfstride-deploy",
+            "location": "eastus",
+            "principal_id": "11111111-1111-1111-1111-111111111111",
+            "client_id": "22222222-2222-2222-2222-222222222222",
+            "tenant_id": "00000000-0000-0000-0000-000000000001"
+          }
+        },
+        {
+          "address": "azurerm_linux_virtual_machine.web",
+          "mode": "managed",
+          "type": "azurerm_linux_virtual_machine",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Compute/virtualMachines/tfstride-web",
+            "name": "tfstride-web",
+            "location": "eastus",
+            "size": "Standard_B2s",
+            "admin_username": "azureuser",
+            "disable_password_authentication": true,
+            "network_interface_ids": [
+              "azurerm_network_interface.web.id"
+            ],
+            "identity": [
+              {
+                "type": "UserAssigned",
+                "identity_ids": [
+                  "azurerm_user_assigned_identity.deploy.id"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_role_assignment.subscription_owner",
+          "mode": "managed",
+          "type": "azurerm_role_assignment",
+          "name": "subscription_owner",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+            "role_definition_name": "Owner",
+            "principal_id": "11111111-1111-1111-1111-111111111111",
+            "principal_type": "ServicePrincipal"
+          }
+        },
+        {
+          "address": "azurerm_role_assignment.storage_owner",
+          "mode": "managed",
+          "type": "azurerm_role_assignment",
+          "name": "storage_owner",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "scope": "azurerm_storage_account.logs.id",
+            "role_definition_name": "Storage Blob Data Owner",
+            "principal_id": "11111111-1111-1111-1111-111111111111",
+            "principal_type": "ServicePrincipal"
+          }
+        }
+      ]
+    }
+  }
+}

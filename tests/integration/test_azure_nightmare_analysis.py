@@ -14,8 +14,8 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         result = TfStride().analyze_plan(AZURE_NIGHTMARE_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "azure")
-        self.assertEqual(len(result.inventory.resources), 24)
-        self.assertEqual(len(result.findings), 15)
+        self.assertEqual(len(result.inventory.resources), 26)
+        self.assertEqual(len(result.findings), 17)
         self.assertEqual(
             Counter(finding.rule_id for finding in result.findings),
             Counter(
@@ -26,6 +26,8 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
                     "azure-storage-account-minimum-tls-below-1-2": 2,
                     "azure-storage-account-public-network-unrestricted": 2,
                     "azure-public-compute-broad-ingress": 2,
+                    "azure-managed-identity-broad-rbac": 1,
+                    "azure-public-workload-sensitive-resource-access": 1,
                     "azure-key-vault-public-network-access": 1,
                     "azure-key-vault-purge-protection-disabled": 1,
                 }
@@ -33,7 +35,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 11, "high": 4}),
+            Counter({"medium": 11, "high": 6}),
         )
 
     def test_nightmare_fixture_stresses_distinct_ssh_and_rdp_nsg_paths(self) -> None:
@@ -61,13 +63,35 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
             ],
         )
 
+    def test_nightmare_fixture_includes_managed_identity_sensitive_resource_path(self) -> None:
+        result = TfStride().analyze_plan(AZURE_NIGHTMARE_FIXTURE_PATH)
+        identity = result.inventory.get_by_address("azurerm_user_assigned_identity.deploy")
+        assert identity is not None
+
+        identity_assignments = azure_facts(identity).managed_identity_role_assignments
+        self.assertEqual(len(identity_assignments), 1)
+        self.assertEqual(identity_assignments[0]["target_resource_address"], "azurerm_storage_account.logs")
+        findings = {finding.rule_id: finding for finding in result.findings}
+        self.assertEqual(
+            findings["azure-public-workload-sensitive-resource-access"].trust_boundary_id,
+            "internet-to-service:internet->azurerm_linux_virtual_machine.web",
+        )
+        self.assertEqual(
+            findings["azure-managed-identity-broad-rbac"].affected_resources,
+            [
+                "azurerm_user_assigned_identity.deploy",
+                "azurerm_role_assignment.storage_owner",
+                "azurerm_storage_account.logs",
+            ],
+        )
+
     def test_nightmare_fixture_keeps_unsupported_resources_as_coverage_only(self) -> None:
         result = TfStride().analyze_plan(AZURE_NIGHTMARE_FIXTURE_PATH)
         coverage = result.analysis_coverage.resources
 
-        self.assertEqual(coverage.total_resources, 25)
-        self.assertEqual(coverage.provider_resources, 25)
-        self.assertEqual(coverage.normalized_resources, 24)
+        self.assertEqual(coverage.total_resources, 27)
+        self.assertEqual(coverage.provider_resources, 27)
+        self.assertEqual(coverage.normalized_resources, 26)
         self.assertEqual(coverage.unsupported_resources, 1)
         self.assertEqual(
             coverage.unsupported_resource_types,
@@ -88,6 +112,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("azurerm_windows_virtual_machine.admin", first)
         self.assertIn("allow-rdp priority 200", first)
         self.assertIn("azurerm_storage_container.public_backups", first)
+        self.assertIn("Internet-exposed Azure workload can access sensitive resources", first)
 
 
 if __name__ == "__main__":

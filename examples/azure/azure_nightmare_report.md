@@ -2,22 +2,22 @@
 
 - Analyzed file: `sample_azure_nightmare_plan.json`
 - Provider: `azure`
-- Normalized resources: `24`
+- Normalized resources: `26`
 - Unsupported resources: `1`
 
 ## Summary
 
-This run identified **5 trust boundaries** and **15 findings** across **24 normalized resources**.
+This run identified **5 trust boundaries** and **17 findings** across **26 normalized resources**.
 
-- High severity findings: `4`
+- High severity findings: `6`
 - Medium severity findings: `11`
 - Low severity findings: `0`
 
 ## Analysis Coverage
 
-- Terraform resources seen: `25`
-- Provider resources considered: `25`
-- Normalized resources: `24`
+- Terraform resources seen: `27`
+- Provider resources considered: `27`
+- Normalized resources: `26`
 - Unsupported resources: `1`
 - Registered rules: `59`
 - Enabled rules: `59`
@@ -35,6 +35,8 @@ This run identified **5 trust boundaries** and **15 findings** across **24 norma
   - `azure-storage-account-public-network-unrestricted`: `2`
   - `azure-key-vault-public-network-access`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
+  - `azure-managed-identity-broad-rbac`: `1`
+  - `azure-public-workload-sensitive-resource-access`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -120,6 +122,32 @@ This run identified **5 trust boundaries** and **15 findings** across **24 norma
 - Recommended mitigation: Set `allow_nested_items_to_be_public` to `false` so containers and blobs cannot opt into anonymous public access.
 - Evidence:
   - public access posture: allow_nested_items_to_be_public is true
+
+#### Azure managed identity has broad RBAC authority
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `azurerm_user_assigned_identity.deploy`, `azurerm_role_assignment.storage_owner`, `azurerm_storage_account.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +3, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
+- Rationale: azurerm_user_assigned_identity.deploy has Azure role assignments with broad scope or high-impact built-in roles. These grants expand what the managed identity can do if the workload or deployment path using it is compromised.
+- Recommended mitigation: Replace broad managed identity role assignments with least-privilege resource-scoped roles, split deployment and runtime identities, and avoid subscription or resource-group scope unless required.
+- Evidence:
+  - managed identity: address=azurerm_user_assigned_identity.deploy; identity_type=UserAssigned; principal_id=11111111-1111-1111-1111-111111111111; client_id=22222222-2222-2222-2222-222222222222
+  - role assignments: source=azurerm_role_assignment.storage_owner; role=Storage Blob Data Owner; scope=azurerm_storage_account.logs.id; scope_kind=resource; target=azurerm_storage_account.logs; signals=broad_builtin_role,sensitive_resource_scope
+  - breadth signals: broad_builtin_role; sensitive_resource_scope
+
+#### Internet-exposed Azure workload can access sensitive resources
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_linux_virtual_machine.web`, `azurerm_user_assigned_identity.deploy`, `azurerm_role_assignment.storage_owner`, `azurerm_storage_account.logs`
+- Trust boundary: `internet-to-service:internet->azurerm_linux_virtual_machine.web`
+- Severity reasoning: internet_exposure +2, privilege_breadth +3, data_sensitivity +2, lateral_movement +1, blast_radius +2, final_score 10 => high
+- Rationale: azurerm_user_assigned_identity.deploy is usable by an internet-exposed Azure workload and has a deterministic role assignment to a sensitive Azure resource. This creates a clear public workload to sensitive resource path if the workload identity is abused.
+- Recommended mitigation: Remove direct internet exposure from the workload, restrict NSG ingress to trusted paths, and narrow the managed identity role assignment to the minimum sensitive resource operations required.
+- Evidence:
+  - public workloads: address=azurerm_linux_virtual_machine.web; public_exposure=true; public_exposure_reasons=virtual machine has a public IP path and effective subnet/NIC NSG decisions allow internet ingress
+  - managed identity: address=azurerm_user_assigned_identity.deploy; identity_type=UserAssigned; principal_id=11111111-1111-1111-1111-111111111111; client_id=22222222-2222-2222-2222-222222222222
+  - sensitive resource assignments: source=azurerm_role_assignment.storage_owner; role=Storage Blob Data Owner; scope=azurerm_storage_account.logs.id; scope_kind=resource; target=azurerm_storage_account.logs; signals=broad_builtin_role,sensitive_resource_scope
 
 ### Medium
 
@@ -253,6 +281,44 @@ This run identified **5 trust boundaries** and **15 findings** across **24 norma
 ### Low
 
 No findings in this severity band.
+
+## Controls Observed
+
+### Azure managed identity principal is modeled
+
+- Category: `iam`
+- Affected resources: `azurerm_linux_virtual_machine.web`
+- Rationale: azurerm_linux_virtual_machine.web exposes a `UserAssigned` managed identity principal. Role assignments are connected only when principal IDs are known in the Terraform plan.
+- Evidence:
+  - identity type: UserAssigned
+  - attached identity references: azurerm_user_assigned_identity.deploy.id
+  - analysis scope: managed identity role assignments are connected when principal IDs are deterministic; transitive access findings are not emitted from managed identity assignments yet
+
+### Azure managed identity principal is modeled
+
+- Category: `iam`
+- Affected resources: `azurerm_user_assigned_identity.deploy`
+- Rationale: azurerm_user_assigned_identity.deploy exposes a `UserAssigned` managed identity principal. Role assignments are connected only when principal IDs are known in the Terraform plan.
+- Evidence:
+  - identity type: UserAssigned
+  - principal id: 11111111-1111-1111-1111-111111111111
+  - client id: 22222222-2222-2222-2222-222222222222
+  - tenant id: 00000000-0000-0000-0000-000000000001
+  - analysis scope: managed identity role assignments are connected when principal IDs are deterministic; transitive access findings are not emitted from managed identity assignments yet
+
+### Azure managed identity role assignment is connected
+
+- Category: `iam`
+- Affected resources: `azurerm_user_assigned_identity.deploy`, `azurerm_role_assignment.storage_owner`
+- Rationale: azurerm_user_assigned_identity.deploy has Azure role assignments whose `principal_id` matches this managed identity. Scope breadth is reported separately from any downstream exposure rule.
+- Evidence:
+  - role assignment sources: azurerm_role_assignment.storage_owner
+  - role definition names: Storage Blob Data Owner
+  - scopes: azurerm_storage_account.logs.id
+  - scope kinds: resource
+  - target resources: azurerm_storage_account.logs
+  - breadth signals: broad_builtin_role; sensitive_resource_scope
+  - analysis scope: identity-to-role connection is modeled without inferring transitive data exposure
 
 ## Limitations / Unsupported Resources
 
