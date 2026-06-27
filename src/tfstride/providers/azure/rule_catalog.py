@@ -147,6 +147,50 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-public-network-access-not-disabled",
+        title="Azure App Service public network access is not disabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set `public_network_access_enabled` to `false` for private apps, or document the required public "
+            "entry path and pair it with authentication, access restrictions, and monitored ingress controls."
+        ),
+        tags=("azure", "app-service", "function-app", "network", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-minimum-tls-below-1-2",
+        title="Azure App Service allows TLS below 1.2",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set the App Service or Function App `minimum_tls_version` to `1.2` or newer and retire clients "
+            "that require deprecated TLS versions."
+        ),
+        tags=("azure", "app-service", "function-app", "tls"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-minimum-tls-unknown",
+        title="Azure App Service minimum TLS version is not deterministic",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set the App Service or Function App `minimum_tls_version` explicitly to `1.2` or newer so the "
+            "planned endpoint posture is reviewable before deployment."
+        ),
+        tags=("azure", "app-service", "function-app", "tls", "analysis-uncertainty"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-managed-identity-missing",
+        title="Azure App Service does not configure managed identity",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable a system-assigned or user-assigned managed identity for Azure resource access and remove "
+            "static credentials from app settings, deployment variables, and connection strings where possible."
+        ),
+        tags=("azure", "app-service", "function-app", "managed-identity", "least-privilege"),
+        severity_factors=("internet_exposure", "privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-sql-public-network-access-enabled",
         title="Azure SQL Database has public network access enabled",
         category=StrideCategory.INFORMATION_DISCLOSURE,

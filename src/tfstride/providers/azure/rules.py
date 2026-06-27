@@ -18,6 +18,7 @@ from tfstride.analysis.rule_definitions import (
 )
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
@@ -42,6 +43,10 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-key-vault-purge-protection-disabled",
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
+        "azure-app-service-public-network-access-not-disabled",
+        "azure-app-service-minimum-tls-below-1-2",
+        "azure-app-service-minimum-tls-unknown",
+        "azure-app-service-managed-identity-missing",
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
@@ -477,6 +482,7 @@ def build_azure_rule_contribution(
     metadata_registry: RuleRegistry | None = None,
 ) -> RuleContribution:
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
+    app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     managed_identity_detectors = AzureManagedIdentityRuleDetectors(finding_factory)
@@ -503,6 +509,12 @@ def build_azure_rule_contribution(
         "azure-public-workload-sensitive-resource-access": (
             managed_identity_detectors.detect_public_workload_sensitive_resource_access
         ),
+        "azure-app-service-public-network-access-not-disabled": (
+            app_service_detectors.detect_public_network_access_not_disabled
+        ),
+        "azure-app-service-minimum-tls-below-1-2": app_service_detectors.detect_minimum_tls_below_1_2,
+        "azure-app-service-minimum-tls-unknown": app_service_detectors.detect_minimum_tls_unknown,
+        "azure-app-service-managed-identity-missing": app_service_detectors.detect_managed_identity_missing,
         "azure-sql-public-network-access-enabled": mssql_detectors.detect_public_network_access_enabled,
         "azure-sql-missing-private-endpoint": (private_endpoint_detectors.detect_sql_server_missing_private_endpoint),
         "azure-sql-firewall-broad-public-access": mssql_detectors.detect_broad_firewall_access,
