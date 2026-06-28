@@ -258,6 +258,8 @@
         "aws_s3_bucket",
         "aws_s3_bucket_policy",
         "aws_s3_bucket_public_access_block",
+        "aws_s3_bucket_server_side_encryption_configuration",
+        "aws_s3_bucket_versioning",
         "aws_secretsmanager_secret",
         "aws_secretsmanager_secret_policy",
         "aws_security_group",

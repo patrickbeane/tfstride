@@ -164,6 +164,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "resolve_ecs_service_relationships",
                 "merge_resource_policy_resources",
                 "apply_s3_public_access_blocks",
+                "apply_s3_posture_resources",
                 "derive_subnet_posture",
                 "infer_vpc_ids",
                 "derive_public_exposure",

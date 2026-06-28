@@ -96,6 +96,15 @@ _PROVIDER_STORAGE_SQL_METADATA_FIELDS = (
     AwsResourceMetadata.BUCKET_ACL,
     AwsResourceMetadata.ENGINE,
     AwsResourceMetadata.PUBLIC_ACCESS_BLOCK,
+    AwsResourceMetadata.S3_VERSIONING_STATUS,
+    AwsResourceMetadata.S3_VERSIONING_SOURCE_ADDRESS,
+    AwsResourceMetadata.S3_ENCRYPTION_ALGORITHM,
+    AwsResourceMetadata.S3_KMS_MASTER_KEY_ID,
+    AwsResourceMetadata.S3_BUCKET_KEY_ENABLED_STATE,
+    AwsResourceMetadata.S3_ENCRYPTION_SOURCE_ADDRESS,
+    AwsResourceMetadata.S3_VERSIONING_CONFIGURATION,
+    AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION,
+    AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES,
     GcpResourceMetadata.BUCKET_NAME,
     GcpResourceMetadata.DATABASE_VERSION,
 )
@@ -281,6 +290,9 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("BUCKET_ACL", aws_owned)
         self.assertIn("ENGINE", aws_owned)
         self.assertIn("PUBLIC_ACCESS_BLOCK", aws_owned)
+        self.assertIn("S3_VERSIONING_STATUS", aws_owned)
+        self.assertIn("S3_ENCRYPTION_ALGORITHM", aws_owned)
+        self.assertIn("S3_POSTURE_UNCERTAINTIES", aws_owned)
         self.assertIn("POLICY_DOCUMENT", aws_owned)
         self.assertIn("TRUST_STATEMENTS", aws_owned)
         self.assertIn("RESOURCE_POLICY_SOURCE_ADDRESSES", aws_owned)

@@ -41,6 +41,15 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "requires_compatibilities": ["FARGATE"],
                 "engine": "postgres",
                 "trust_statements": [{"Effect": "Allow"}],
+                "s3_versioning_status": "Enabled",
+                "s3_versioning_source_address": "aws_s3_bucket_versioning.logs",
+                "s3_versioning_configuration": {"status": "Enabled"},
+                "s3_encryption_algorithm": "aws:kms",
+                "s3_kms_master_key_id": "arn:aws:kms:us-east-1:111122223333:key/storage",
+                "s3_bucket_key_enabled_state": "enabled",
+                "s3_encryption_source_address": "aws_s3_bucket_server_side_encryption_configuration.logs",
+                "s3_server_side_encryption_configuration": {"rule": []},
+                "s3_posture_uncertainties": ["aws_s3_bucket_versioning.logs: status is unknown"],
             }
         )
 
@@ -53,6 +62,20 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.requires_compatibilities, ["FARGATE"])
         self.assertEqual(facts.engine, "postgres")
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
+        self.assertEqual(facts.s3_versioning_status, "Enabled")
+        self.assertTrue(facts.s3_versioning_enabled)
+        self.assertEqual(facts.s3_versioning_source_address, "aws_s3_bucket_versioning.logs")
+        self.assertEqual(facts.s3_versioning_configuration, {"status": "Enabled"})
+        self.assertEqual(facts.s3_encryption_algorithm, "aws:kms")
+        self.assertEqual(facts.s3_kms_master_key_id, "arn:aws:kms:us-east-1:111122223333:key/storage")
+        self.assertEqual(facts.s3_bucket_key_enabled_state, "enabled")
+        self.assertTrue(facts.s3_bucket_key_enabled)
+        self.assertEqual(
+            facts.s3_encryption_source_address,
+            "aws_s3_bucket_server_side_encryption_configuration.logs",
+        )
+        self.assertEqual(facts.s3_server_side_encryption_configuration, {"rule": []})
+        self.assertEqual(facts.s3_posture_uncertainties, ["aws_s3_bucket_versioning.logs: status is unknown"])
 
     def test_writes_aws_provider_metadata_through_resource_fields(self) -> None:
         resource = _resource()
@@ -63,6 +86,19 @@ class AwsResourceFactsTests(unittest.TestCase):
         facts.add_unresolved_task_definition_reference("app:7")
         facts.add_unresolved_task_definition_reference("app:7")
         facts.add_public_exposure_reason("service is internet-facing")
+        facts.set_s3_versioning_posture(
+            status="Suspended",
+            configuration={"status": "Suspended"},
+            source_address="aws_s3_bucket_versioning.logs",
+        )
+        facts.set_s3_encryption_posture(
+            algorithm="AES256",
+            kms_master_key_id=None,
+            bucket_key_enabled_state="disabled",
+            configuration={"rule": []},
+            source_address="aws_s3_bucket_server_side_encryption_configuration.logs",
+        )
+        facts.extend_s3_posture_uncertainties(["status is unknown", "status is unknown"])
 
         self.assertEqual(facts.network_mode, "awsvpc")
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
@@ -71,7 +107,36 @@ class AwsResourceFactsTests(unittest.TestCase):
             ["app:7"],
         )
         self.assertEqual(resource.public_exposure_reasons, ["service is internet-facing"])
+        self.assertEqual(facts.s3_versioning_status, "Suspended")
+        self.assertFalse(facts.s3_versioning_enabled)
+        self.assertEqual(facts.s3_versioning_source_address, "aws_s3_bucket_versioning.logs")
+        self.assertEqual(facts.s3_versioning_configuration, {"status": "Suspended"})
+        self.assertEqual(facts.s3_encryption_algorithm, "AES256")
+        self.assertIsNone(facts.s3_kms_master_key_id)
+        self.assertEqual(facts.s3_bucket_key_enabled_state, "disabled")
+        self.assertFalse(facts.s3_bucket_key_enabled)
+        self.assertEqual(
+            facts.s3_encryption_source_address,
+            "aws_s3_bucket_server_side_encryption_configuration.logs",
+        )
+        self.assertEqual(facts.s3_server_side_encryption_configuration, {"rule": []})
+        self.assertEqual(facts.s3_posture_uncertainties, ["status is unknown"])
         self.assertFalse(hasattr(resource, "task_role_arn"))
+
+    def test_s3_posture_facts_default_to_missing_when_not_modeled(self) -> None:
+        facts = aws_facts(_resource())
+
+        self.assertIsNone(facts.s3_versioning_status)
+        self.assertIsNone(facts.s3_versioning_enabled)
+        self.assertIsNone(facts.s3_versioning_source_address)
+        self.assertEqual(facts.s3_versioning_configuration, {})
+        self.assertIsNone(facts.s3_encryption_algorithm)
+        self.assertIsNone(facts.s3_kms_master_key_id)
+        self.assertIsNone(facts.s3_bucket_key_enabled_state)
+        self.assertIsNone(facts.s3_bucket_key_enabled)
+        self.assertIsNone(facts.s3_encryption_source_address)
+        self.assertEqual(facts.s3_server_side_encryption_configuration, {})
+        self.assertEqual(facts.s3_posture_uncertainties, [])
 
     def test_policy_document_is_mutated_only_through_facts_facade(self) -> None:
         resource = _resource()
@@ -145,6 +210,7 @@ class AwsResourceFactsTests(unittest.TestCase):
                 AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": []},
                 AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
                 AwsResourceMetadata.ENGINE: "postgres",
+                AwsResourceMetadata.S3_VERSIONING_STATUS: "Enabled",
             }
         )
 
@@ -157,6 +223,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsInstance(domains.workload, NeutralProviderWorkloadFacts)
         self.assertEqual(domains.storage.bucket_name, "logs")
         self.assertEqual(domains.storage.bucket_acl, "private")
+        self.assertTrue(domains.storage.s3_versioning_enabled)
         self.assertIsNone(domains.storage.uniform_bucket_level_access)
         self.assertEqual(domains.iam.policy_document, {"Statement": []})
         self.assertEqual(domains.iam.trust_statements, [{"Effect": "Allow"}])

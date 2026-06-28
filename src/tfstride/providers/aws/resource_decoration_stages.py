@@ -19,6 +19,7 @@ from tfstride.providers.aws.resource_decoration.public_exposure import (
     DerivePublicExposureStage,
 )
 from tfstride.providers.aws.resource_decoration.resource_policies import (
+    ApplyS3PostureResourcesStage,
     ApplyS3PublicAccessBlocksStage,
     MergeResourcePolicyResourcesStage,
 )
@@ -44,6 +45,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         ResolveEcsServiceRelationshipsStage(),
         MergeResourcePolicyResourcesStage(),
         ApplyS3PublicAccessBlocksStage(),
+        ApplyS3PostureResourcesStage(),
         DeriveSubnetPostureStage(),
         InferVpcIdsStage(),
         DerivePublicExposureStage(),

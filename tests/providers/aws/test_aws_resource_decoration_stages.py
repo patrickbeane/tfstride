@@ -23,6 +23,7 @@ from tfstride.providers.aws.resource_decoration.public_exposure import (
     DerivePublicExposureStage,
 )
 from tfstride.providers.aws.resource_decoration.resource_policies import (
+    ApplyS3PostureResourcesStage,
     ApplyS3PublicAccessBlocksStage,
     MergeResourcePolicyResourcesStage,
 )
@@ -739,6 +740,78 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
                 "restrict_public_buckets": True,
             },
         )
+
+    def test_s3_posture_stage_applies_versioning_and_encryption_to_bucket(self) -> None:
+        bucket = _resource(
+            "aws_s3_bucket.logs",
+            "aws_s3_bucket",
+            ResourceCategory.DATA,
+            identifier="logs",
+            arn="arn:aws:s3:::logs",
+            metadata={"bucket": "logs"},
+        )
+        versioning = _resource(
+            "aws_s3_bucket_versioning.logs",
+            "aws_s3_bucket_versioning",
+            ResourceCategory.DATA,
+            metadata={
+                "bucket": "logs",
+                "s3_versioning_status": "Enabled",
+                "s3_versioning_configuration": {"status": "Enabled"},
+            },
+        )
+        encryption = _resource(
+            "aws_s3_bucket_server_side_encryption_configuration.logs",
+            "aws_s3_bucket_server_side_encryption_configuration",
+            ResourceCategory.DATA,
+            metadata={
+                "bucket": "logs",
+                "s3_encryption_algorithm": "aws:kms",
+                "s3_kms_master_key_id": "arn:aws:kms:us-east-1:111122223333:key/storage",
+                "s3_bucket_key_enabled_state": "enabled",
+                "s3_server_side_encryption_configuration": {"rule": []},
+                "s3_posture_uncertainties": ["rule.bucket_key_enabled is unknown after planning"],
+            },
+        )
+        resources = [bucket, versioning, encryption]
+
+        ApplyS3PostureResourcesStage().apply(resources, _context(resources))
+
+        bucket_facts = aws_facts(bucket)
+        self.assertEqual(bucket_facts.s3_versioning_status, "Enabled")
+        self.assertTrue(bucket_facts.s3_versioning_enabled)
+        self.assertEqual(bucket_facts.s3_versioning_source_address, "aws_s3_bucket_versioning.logs")
+        self.assertEqual(bucket_facts.s3_versioning_configuration, {"status": "Enabled"})
+        self.assertEqual(bucket_facts.s3_encryption_algorithm, "aws:kms")
+        self.assertEqual(
+            bucket_facts.s3_kms_master_key_id,
+            "arn:aws:kms:us-east-1:111122223333:key/storage",
+        )
+        self.assertTrue(bucket_facts.s3_bucket_key_enabled)
+        self.assertEqual(
+            bucket_facts.s3_encryption_source_address,
+            "aws_s3_bucket_server_side_encryption_configuration.logs",
+        )
+        self.assertEqual(bucket_facts.s3_server_side_encryption_configuration, {"rule": []})
+        self.assertEqual(
+            bucket_facts.s3_posture_uncertainties,
+            [
+                "aws_s3_bucket_server_side_encryption_configuration.logs: "
+                "rule.bucket_key_enabled is unknown after planning"
+            ],
+        )
+
+    def test_s3_posture_stage_records_unresolved_bucket_references(self) -> None:
+        versioning = _resource(
+            "aws_s3_bucket_versioning.logs",
+            "aws_s3_bucket_versioning",
+            ResourceCategory.DATA,
+            metadata={"bucket": "logs", "s3_versioning_status": "Enabled"},
+        )
+
+        ApplyS3PostureResourcesStage().apply([versioning], _context([versioning]))
+
+        self.assertEqual(versioning.metadata["unresolved_bucket_references"], ["logs"])
 
     def test_ecs_stage_resolves_task_definition_roles_and_runtime_metadata(self) -> None:
         cluster = _resource(

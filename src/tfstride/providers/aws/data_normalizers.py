@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.aws.coercion import as_list
 from tfstride.providers.aws.metadata import AwsResourceMetadata
@@ -107,6 +110,92 @@ def normalize_s3_bucket_public_access_block(resource: TerraformResource) -> Norm
     )
 
 
+def normalize_s3_bucket_versioning(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    versioning_configuration = _first_mapping(values.get("versioning_configuration"))
+    unknown_configuration = _first_unknown_mapping(unknown_values, "versioning_configuration")
+    uncertainties: list[str] = []
+    status = _known_block_string(
+        versioning_configuration,
+        unknown_configuration,
+        "status",
+        uncertainties,
+        "versioning_configuration.status",
+    )
+    if versioning_configuration is None and _block_is_unknown(unknown_values, "versioning_configuration"):
+        uncertainties.append("versioning_configuration is unknown after planning")
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("bucket") or resource.address,
+        metadata={
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.S3_VERSIONING_STATUS: status,
+            AwsResourceMetadata.S3_VERSIONING_CONFIGURATION: dict(versioning_configuration)
+            if versioning_configuration is not None
+            else None,
+            AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def normalize_s3_bucket_server_side_encryption_configuration(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    rule = _first_mapping(values.get("rule"))
+    encryption_default = _first_mapping(rule.get("apply_server_side_encryption_by_default")) if rule else None
+    unknown_rule = _first_unknown_mapping(unknown_values, "rule")
+    unknown_encryption_default = (
+        _first_mapping(unknown_rule.get("apply_server_side_encryption_by_default")) if unknown_rule else None
+    )
+    uncertainties: list[str] = []
+    algorithm = _known_block_string(
+        encryption_default,
+        unknown_encryption_default,
+        "sse_algorithm",
+        uncertainties,
+        "rule.apply_server_side_encryption_by_default.sse_algorithm",
+    )
+    kms_key_id = _known_block_string(
+        encryption_default,
+        unknown_encryption_default,
+        "kms_master_key_id",
+        uncertainties,
+        "rule.apply_server_side_encryption_by_default.kms_master_key_id",
+    )
+    bucket_key_state = _known_block_bool_state(
+        rule,
+        unknown_rule,
+        "bucket_key_enabled",
+        uncertainties,
+        "rule.bucket_key_enabled",
+    )
+    if rule is None and _block_is_unknown(unknown_values, "rule"):
+        uncertainties.append("rule is unknown after planning")
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("bucket") or resource.address,
+        metadata={
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.S3_ENCRYPTION_ALGORITHM: algorithm,
+            AwsResourceMetadata.S3_KMS_MASTER_KEY_ID: kms_key_id,
+            AwsResourceMetadata.S3_BUCKET_KEY_ENABLED_STATE: bucket_key_state,
+            AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION: _s3_encryption_configuration(rule),
+            AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
 def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     policy_document = load_json_document(values.get("policy"))
@@ -200,3 +289,67 @@ def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> Norma
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
+
+
+def _first_mapping(value: Any) -> Mapping[str, Any] | None:
+    if isinstance(value, Mapping):
+        return value
+    for item in as_list(value):
+        if isinstance(item, Mapping):
+            return item
+    return None
+
+
+def _first_unknown_mapping(unknown_values: Mapping[str, Any], key: str) -> Mapping[str, Any] | None:
+    return _first_mapping(unknown_values.get(key))
+
+
+def _block_is_unknown(unknown_values: Mapping[str, Any], key: str) -> bool:
+    return unknown_values.get(key) is True
+
+
+def _known_block_string(
+    block: Mapping[str, Any] | None,
+    unknown_block: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+    path: str,
+) -> str | None:
+    if _block_attribute_is_unknown(unknown_block, key):
+        uncertainties.append(f"{path} is unknown after planning")
+        return None
+    if block is None:
+        return None
+    value = block.get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _known_block_bool_state(
+    block: Mapping[str, Any] | None,
+    unknown_block: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+    path: str,
+) -> str | None:
+    if _block_attribute_is_unknown(unknown_block, key):
+        uncertainties.append(f"{path} is unknown after planning")
+        return None
+    if block is None:
+        return None
+    value = block.get(key)
+    if isinstance(value, bool):
+        return "enabled" if value else "disabled"
+    return None
+
+
+def _block_attribute_is_unknown(unknown_block: Mapping[str, Any] | None, key: str) -> bool:
+    return unknown_block is not None and unknown_block.get(key) is True
+
+
+def _s3_encryption_configuration(rule: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if rule is None:
+        return None
+    return {"rule": [dict(rule)]}

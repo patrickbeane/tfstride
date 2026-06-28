@@ -22,6 +22,8 @@ _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
     provider="aws",
     namespace=AwsResourceMetadata,
 )
+_S3_BUCKET_KEY_ENABLED = "enabled"
+_S3_BUCKET_KEY_DISABLED = "disabled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +172,63 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.BUCKET_ACL) or ""
 
     @property
+    def s3_versioning_status(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_VERSIONING_STATUS)
+
+    @property
+    def s3_versioning_enabled(self) -> bool | None:
+        status = self.s3_versioning_status
+        if status is None:
+            return None
+        normalized = status.strip().lower()
+        if normalized == "enabled":
+            return True
+        if normalized in {"disabled", "suspended"}:
+            return False
+        return None
+
+    @property
+    def s3_versioning_source_address(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_VERSIONING_SOURCE_ADDRESS)
+
+    @property
+    def s3_versioning_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.S3_VERSIONING_CONFIGURATION)
+
+    @property
+    def s3_encryption_algorithm(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_ENCRYPTION_ALGORITHM)
+
+    @property
+    def s3_kms_master_key_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_KMS_MASTER_KEY_ID)
+
+    @property
+    def s3_bucket_key_enabled_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_BUCKET_KEY_ENABLED_STATE)
+
+    @property
+    def s3_bucket_key_enabled(self) -> bool | None:
+        state = self.s3_bucket_key_enabled_state
+        if state == _S3_BUCKET_KEY_ENABLED:
+            return True
+        if state == _S3_BUCKET_KEY_DISABLED:
+            return False
+        return None
+
+    @property
+    def s3_encryption_source_address(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_ENCRYPTION_SOURCE_ADDRESS)
+
+    @property
+    def s3_server_side_encryption_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION)
+
+    @property
+    def s3_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES)
+
+    @property
     def engine(self) -> str | None:
         return self.get(AwsResourceMetadata.ENGINE)
 
@@ -221,6 +280,35 @@ class AwsResourceFacts:
 
     def set_policy_document(self, value: dict[str, Any] | None) -> None:
         self.set(AwsResourceMetadata.POLICY_DOCUMENT, value)
+
+    def set_s3_versioning_posture(
+        self,
+        *,
+        status: str | None,
+        configuration: dict[str, Any] | None,
+        source_address: str | None,
+    ) -> None:
+        self.set(AwsResourceMetadata.S3_VERSIONING_STATUS, status)
+        self.set(AwsResourceMetadata.S3_VERSIONING_CONFIGURATION, configuration)
+        self.set(AwsResourceMetadata.S3_VERSIONING_SOURCE_ADDRESS, source_address)
+
+    def set_s3_encryption_posture(
+        self,
+        *,
+        algorithm: str | None,
+        kms_master_key_id: str | None,
+        bucket_key_enabled_state: str | None,
+        configuration: dict[str, Any] | None,
+        source_address: str | None,
+    ) -> None:
+        self.set(AwsResourceMetadata.S3_ENCRYPTION_ALGORITHM, algorithm)
+        self.set(AwsResourceMetadata.S3_KMS_MASTER_KEY_ID, kms_master_key_id)
+        self.set(AwsResourceMetadata.S3_BUCKET_KEY_ENABLED_STATE, bucket_key_enabled_state)
+        self.set(AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION, configuration)
+        self.set(AwsResourceMetadata.S3_ENCRYPTION_SOURCE_ADDRESS, source_address)
+
+    def extend_s3_posture_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES, values)
 
     def add_standalone_rule_address(self, value: str | None) -> None:
         self.append(AwsResourceMetadata.STANDALONE_RULE_ADDRESSES, value)

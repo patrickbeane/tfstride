@@ -45,6 +45,15 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "POLICY_DOCUMENT": "policy_document",
             "PUBLIC_ACCESS_BLOCK": "public_access_block",
             "RESOURCE_POLICY_SOURCE_ADDRESSES": "resource_policy_source_addresses",
+            "S3_VERSIONING_STATUS": "s3_versioning_status",
+            "S3_VERSIONING_SOURCE_ADDRESS": "s3_versioning_source_address",
+            "S3_ENCRYPTION_ALGORITHM": "s3_encryption_algorithm",
+            "S3_KMS_MASTER_KEY_ID": "s3_kms_master_key_id",
+            "S3_BUCKET_KEY_ENABLED_STATE": "s3_bucket_key_enabled_state",
+            "S3_ENCRYPTION_SOURCE_ADDRESS": "s3_encryption_source_address",
+            "S3_VERSIONING_CONFIGURATION": "s3_versioning_configuration",
+            "S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION": "s3_server_side_encryption_configuration",
+            "S3_POSTURE_UNCERTAINTIES": "s3_posture_uncertainties",
         }
 
         for field_name, key in expected_keys.items():

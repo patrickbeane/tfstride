@@ -116,6 +116,61 @@ class ApplyS3PublicAccessBlocksStage:
             )
 
 
+class ApplyS3PostureResourcesStage:
+    name = "apply_s3_posture_resources"
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        for posture_resource in resources:
+            if posture_resource.resource_type == "aws_s3_bucket_versioning":
+                self._apply_versioning_resource(posture_resource, context)
+            elif posture_resource.resource_type == "aws_s3_bucket_server_side_encryption_configuration":
+                self._apply_encryption_resource(posture_resource, context)
+
+    def _apply_versioning_resource(
+        self,
+        posture_resource: NormalizedResource,
+        context: AwsDecorationContext,
+    ) -> None:
+        posture_facts = aws_facts(posture_resource)
+        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        if bucket is None:
+            posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
+            return
+        aws_facts(bucket).set_s3_versioning_posture(
+            status=posture_facts.s3_versioning_status,
+            configuration=posture_facts.s3_versioning_configuration,
+            source_address=posture_resource.address,
+        )
+        aws_facts(bucket).extend_s3_posture_uncertainties(
+            _source_uncertainties(posture_resource, posture_facts.s3_posture_uncertainties)
+        )
+
+    def _apply_encryption_resource(
+        self,
+        posture_resource: NormalizedResource,
+        context: AwsDecorationContext,
+    ) -> None:
+        posture_facts = aws_facts(posture_resource)
+        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        if bucket is None:
+            posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
+            return
+        aws_facts(bucket).set_s3_encryption_posture(
+            algorithm=posture_facts.s3_encryption_algorithm,
+            kms_master_key_id=posture_facts.s3_kms_master_key_id,
+            bucket_key_enabled_state=posture_facts.s3_bucket_key_enabled_state,
+            configuration=posture_facts.s3_server_side_encryption_configuration,
+            source_address=posture_resource.address,
+        )
+        aws_facts(bucket).extend_s3_posture_uncertainties(
+            _source_uncertainties(posture_resource, posture_facts.s3_posture_uncertainties)
+        )
+
+
+def _source_uncertainties(resource: NormalizedResource, uncertainties: list[str]) -> list[str]:
+    return [f"{resource.address}: {uncertainty}" for uncertainty in uncertainties]
+
+
 def _merge_resource_policy(
     resource: NormalizedResource,
     policy_statements: list[IAMPolicyStatement],
