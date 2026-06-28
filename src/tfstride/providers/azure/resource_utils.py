@@ -211,6 +211,33 @@ def known_block_bool(
     return None
 
 
+def known_block_int(
+    values: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+    unknown_fields: list[str] | None = None,
+) -> int | None:
+    if block_attribute_unknown(unknown_block, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append(key)
+        return None
+    value = values.get(key) if values is not None else None
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+        return None
+
+
 def tls_version_below_1_2(value: str | None) -> bool:
     if value is None:
         return False

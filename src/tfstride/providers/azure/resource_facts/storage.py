@@ -37,6 +37,34 @@ class AzureStorageFacts:
         return self.optional_bool(AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED)
 
     @property
+    def storage_infrastructure_encryption_enabled(self) -> bool | None:
+        return self.optional_bool(AzureResourceMetadata.STORAGE_INFRASTRUCTURE_ENCRYPTION_ENABLED)
+
+    @property
+    def storage_customer_managed_key_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_ID)
+
+    @property
+    def storage_customer_managed_key_identity_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID)
+
+    @property
+    def storage_blob_versioning_enabled(self) -> bool | None:
+        return self.optional_bool(AzureResourceMetadata.STORAGE_BLOB_VERSIONING_ENABLED)
+
+    @property
+    def storage_blob_delete_retention_days(self) -> int | None:
+        return self.get(AzureResourceMetadata.STORAGE_BLOB_DELETE_RETENTION_DAYS)
+
+    @property
+    def storage_container_delete_retention_days(self) -> int | None:
+        return self.get(AzureResourceMetadata.STORAGE_CONTAINER_DELETE_RETENTION_DAYS)
+
+    @property
+    def storage_blob_restore_policy_days(self) -> int | None:
+        return self.get(AzureResourceMetadata.STORAGE_BLOB_RESTORE_POLICY_DAYS)
+
+    @property
     def public_container_addresses(self) -> list[str]:
         return self.get(AzureResourceMetadata.PUBLIC_CONTAINER_ADDRESSES)
 

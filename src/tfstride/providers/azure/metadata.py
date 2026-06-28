@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.resource_metadata import (
     BoolMetadataField,
     DictListMetadataField,
+    OptionalIntMetadataField,
     OptionalStringMetadataField,
     StringListMetadataField,
 )
@@ -22,6 +23,8 @@ class AzureResourceMetadata:
     KEY_VAULT_REFERENCE = OptionalStringMetadataField("key_vault_reference")
     RESOLVED_KEY_VAULT_ADDRESS = OptionalStringMetadataField("resolved_key_vault_address")
     CONTAINER_ACCESS_TYPE = OptionalStringMetadataField("container_access_type")
+    STORAGE_CUSTOMER_MANAGED_KEY_ID = OptionalStringMetadataField("storage_customer_managed_key_id")
+    STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID = OptionalStringMetadataField("storage_customer_managed_key_identity_id")
     MIN_TLS_VERSION = OptionalStringMetadataField("min_tls_version")
     FTPS_STATE = OptionalStringMetadataField("ftps_state")
     NETWORK_DEFAULT_ACTION = OptionalStringMetadataField("network_default_action")
@@ -70,6 +73,8 @@ class AzureResourceMetadata:
 
     ALLOW_NESTED_ITEMS_TO_BE_PUBLIC = BoolMetadataField("allow_nested_items_to_be_public")
     SHARED_ACCESS_KEY_ENABLED = BoolMetadataField("shared_access_key_enabled")
+    STORAGE_INFRASTRUCTURE_ENCRYPTION_ENABLED = BoolMetadataField("storage_infrastructure_encryption_enabled")
+    STORAGE_BLOB_VERSIONING_ENABLED = BoolMetadataField("storage_blob_versioning_enabled")
     PUBLIC_NETWORK_ACCESS_ENABLED = BoolMetadataField("public_network_access_enabled")
     DEFAULT_OUTBOUND_ACCESS_ENABLED = BoolMetadataField("default_outbound_access_enabled", default=True)
     IP_FORWARDING_ENABLED = BoolMetadataField("ip_forwarding_enabled")
@@ -80,6 +85,9 @@ class AzureResourceMetadata:
     PUBLIC_CONTAINER_ADDRESSES = StringListMetadataField("public_container_addresses")
     UNRESOLVED_STORAGE_ACCOUNT_REFERENCES = StringListMetadataField("unresolved_storage_account_references")
     STORAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("storage_posture_uncertainties")
+    STORAGE_BLOB_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_blob_delete_retention_days")
+    STORAGE_CONTAINER_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_container_delete_retention_days")
+    STORAGE_BLOB_RESTORE_POLICY_DAYS = OptionalIntMetadataField("storage_blob_restore_policy_days")
     APP_SERVICE_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_posture_uncertainties")
     KEY_VAULT_RELATED_RESOURCE_ADDRESSES = StringListMetadataField("key_vault_related_resource_addresses")
     KEY_VAULT_NETWORK_IP_RULES = StringListMetadataField("key_vault_network_ip_rules")

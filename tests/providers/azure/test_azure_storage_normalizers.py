@@ -65,6 +65,128 @@ class AzureStorageNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.network_default_action, "Deny")
         self.assertEqual(facts.network_rule_source_address, "azurerm_storage_account.logs")
 
+    def test_storage_account_normalizes_recovery_and_encryption_posture(self) -> None:
+        normalized = normalize_storage_account(
+            _resource(
+                AzureResourceType.STORAGE_ACCOUNT,
+                {
+                    "name": "tfstridelogs",
+                    "infrastructure_encryption_enabled": True,
+                    "customer_managed_key": [
+                        {
+                            "key_vault_key_id": "azurerm_key_vault_key.storage.id",
+                            "user_assigned_identity_id": "azurerm_user_assigned_identity.storage.id",
+                        }
+                    ],
+                    "blob_properties": [
+                        {
+                            "versioning_enabled": True,
+                            "delete_retention_policy": [{"days": 30}],
+                            "container_delete_retention_policy": [{"days": 14}],
+                            "restore_policy": [{"days": 7}],
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertTrue(facts.storage_infrastructure_encryption_enabled)
+        self.assertEqual(facts.storage_customer_managed_key_id, "azurerm_key_vault_key.storage.id")
+        self.assertEqual(
+            facts.storage_customer_managed_key_identity_id,
+            "azurerm_user_assigned_identity.storage.id",
+        )
+        self.assertTrue(facts.storage_blob_versioning_enabled)
+        self.assertEqual(facts.storage_blob_delete_retention_days, 30)
+        self.assertEqual(facts.storage_container_delete_retention_days, 14)
+        self.assertEqual(facts.storage_blob_restore_policy_days, 7)
+        self.assertEqual(facts.storage_posture_uncertainties, [])
+
+    def test_storage_account_preserves_disabled_or_missing_recovery_posture_as_unknown(self) -> None:
+        normalized = normalize_storage_account(
+            _resource(
+                AzureResourceType.STORAGE_ACCOUNT,
+                {
+                    "name": "tfstridelogs",
+                    "infrastructure_encryption_enabled": False,
+                    "blob_properties": [{"versioning_enabled": False}],
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertFalse(facts.storage_infrastructure_encryption_enabled)
+        self.assertIsNone(facts.storage_customer_managed_key_id)
+        self.assertIsNone(facts.storage_customer_managed_key_identity_id)
+        self.assertFalse(facts.storage_blob_versioning_enabled)
+        self.assertIsNone(facts.storage_blob_delete_retention_days)
+        self.assertIsNone(facts.storage_container_delete_retention_days)
+        self.assertIsNone(facts.storage_blob_restore_policy_days)
+        self.assertEqual(facts.storage_posture_uncertainties, [])
+
+    def test_storage_account_preserves_computed_recovery_and_encryption_posture_as_unknown(self) -> None:
+        normalized = normalize_storage_account(
+            _resource(
+                AzureResourceType.STORAGE_ACCOUNT,
+                {
+                    "name": "tfstridelogs",
+                    "infrastructure_encryption_enabled": None,
+                    "customer_managed_key": [
+                        {
+                            "key_vault_key_id": None,
+                            "user_assigned_identity_id": None,
+                        }
+                    ],
+                    "blob_properties": [
+                        {
+                            "versioning_enabled": None,
+                            "delete_retention_policy": [{"days": None}],
+                            "container_delete_retention_policy": [{"days": None}],
+                            "restore_policy": [{"days": None}],
+                        }
+                    ],
+                },
+                unknown_values={
+                    "infrastructure_encryption_enabled": True,
+                    "customer_managed_key": [
+                        {
+                            "key_vault_key_id": True,
+                            "user_assigned_identity_id": True,
+                        }
+                    ],
+                    "blob_properties": [
+                        {
+                            "versioning_enabled": True,
+                            "delete_retention_policy": [{"days": True}],
+                            "container_delete_retention_policy": [{"days": True}],
+                            "restore_policy": [{"days": True}],
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertIsNone(facts.storage_infrastructure_encryption_enabled)
+        self.assertIsNone(facts.storage_customer_managed_key_id)
+        self.assertIsNone(facts.storage_customer_managed_key_identity_id)
+        self.assertIsNone(facts.storage_blob_versioning_enabled)
+        self.assertIsNone(facts.storage_blob_delete_retention_days)
+        self.assertIsNone(facts.storage_container_delete_retention_days)
+        self.assertIsNone(facts.storage_blob_restore_policy_days)
+        self.assertEqual(
+            facts.storage_posture_uncertainties,
+            [
+                "infrastructure_encryption_enabled is unknown after planning",
+                "customer_managed_key is unknown after planning",
+                "blob_properties.versioning_enabled is unknown after planning",
+                "blob_properties.delete_retention_policy.days is unknown after planning",
+                "blob_properties.container_delete_retention_policy.days is unknown after planning",
+                "blob_properties.restore_policy.days is unknown after planning",
+            ],
+        )
+
     def test_storage_account_applies_documented_azurerm_defaults(self) -> None:
         normalized = normalize_storage_account(_resource(AzureResourceType.STORAGE_ACCOUNT, {"name": "tfstridelogs"}))
         facts = azure_facts(normalized)

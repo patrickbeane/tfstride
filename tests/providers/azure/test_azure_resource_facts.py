@@ -29,6 +29,15 @@ class AzureResourceFactsTests(unittest.TestCase):
                 AzureResourceMetadata.STORAGE_ACCOUNT_ID: "/subscriptions/example/storageAccounts/tfstridelogs",
                 AzureResourceMetadata.ALLOW_NESTED_ITEMS_TO_BE_PUBLIC: False,
                 AzureResourceMetadata.SHARED_ACCESS_KEY_ENABLED: False,
+                AzureResourceMetadata.STORAGE_INFRASTRUCTURE_ENCRYPTION_ENABLED: True,
+                AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_ID: "azurerm_key_vault_key.storage.id",
+                AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID: (
+                    "azurerm_user_assigned_identity.storage.id"
+                ),
+                AzureResourceMetadata.STORAGE_BLOB_VERSIONING_ENABLED: True,
+                AzureResourceMetadata.STORAGE_BLOB_DELETE_RETENTION_DAYS: 30,
+                AzureResourceMetadata.STORAGE_CONTAINER_DELETE_RETENTION_DAYS: 14,
+                AzureResourceMetadata.STORAGE_BLOB_RESTORE_POLICY_DAYS: 7,
                 AzureResourceMetadata.MIN_TLS_VERSION: "TLS1_2",
                 AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED: True,
                 AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: "enabled",
@@ -42,6 +51,16 @@ class AzureResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.storage_account_id, "/subscriptions/example/storageAccounts/tfstridelogs")
         self.assertFalse(facts.allow_nested_items_to_be_public)
         self.assertFalse(facts.shared_access_key_enabled)
+        self.assertTrue(facts.storage_infrastructure_encryption_enabled)
+        self.assertEqual(facts.storage_customer_managed_key_id, "azurerm_key_vault_key.storage.id")
+        self.assertEqual(
+            facts.storage_customer_managed_key_identity_id,
+            "azurerm_user_assigned_identity.storage.id",
+        )
+        self.assertTrue(facts.storage_blob_versioning_enabled)
+        self.assertEqual(facts.storage_blob_delete_retention_days, 30)
+        self.assertEqual(facts.storage_container_delete_retention_days, 14)
+        self.assertEqual(facts.storage_blob_restore_policy_days, 7)
         self.assertEqual(facts.min_tls_version, "TLS1_2")
         self.assertTrue(facts.public_network_access_enabled)
         self.assertEqual(facts.public_network_fallback_state, "enabled")

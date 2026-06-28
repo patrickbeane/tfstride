@@ -11,7 +11,10 @@ from tfstride.providers.azure.resource_utils import (
     first_block_attribute_unknown,
     first_mapping,
     first_non_empty,
+    known_block_bool,
+    known_block_int,
     known_bool,
+    unknown_block_at,
 )
 
 AZURE_PROVIDER = "azure"
@@ -63,6 +66,8 @@ def normalize_storage_account(resource: TerraformResource) -> NormalizedResource
         default=True,
         uncertainties=uncertainties,
     )
+    _set_storage_encryption_posture(metadata, resource, values, uncertainties)
+    _set_storage_blob_recovery_posture(metadata, resource, values, uncertainties)
     public_network_access_enabled = known_bool(
         values, resource.unknown_values, "public_network_access_enabled", uncertainties
     )
@@ -150,6 +155,125 @@ def normalize_storage_account_network_rules(resource: TerraformResource) -> Norm
         identifier=_optional_string(values.get("id")) or storage_account_reference or resource.address,
         metadata=metadata,
     )
+
+
+def _set_storage_encryption_posture(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> None:
+    infrastructure_encryption_enabled = known_bool(
+        values,
+        resource.unknown_values,
+        "infrastructure_encryption_enabled",
+        uncertainties,
+    )
+    if infrastructure_encryption_enabled is not None:
+        metadata[AzureResourceMetadata.STORAGE_INFRASTRUCTURE_ENCRYPTION_ENABLED] = infrastructure_encryption_enabled
+
+    customer_managed_key_unknown = attribute_unknown(resource.unknown_values, "customer_managed_key")
+    if customer_managed_key_unknown:
+        uncertainties.append("customer_managed_key is unknown after planning")
+        return
+
+    customer_managed_key = first_mapping(values.get("customer_managed_key"))
+    if customer_managed_key is None:
+        return
+
+    key_id = first_non_empty(
+        customer_managed_key.get("key_vault_key_id"),
+        customer_managed_key.get("key_vault_key_uri"),
+    )
+    if key_id:
+        metadata[AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_ID] = key_id
+
+    identity_id = first_non_empty(
+        customer_managed_key.get("user_assigned_identity_id"),
+        customer_managed_key.get("user_assigned_identity_resource_id"),
+    )
+    if identity_id:
+        metadata[AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID] = identity_id
+
+
+def _set_storage_blob_recovery_posture(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> None:
+    blob_properties = first_mapping(values.get("blob_properties"))
+    blob_unknown_value = resource.unknown_values.get("blob_properties")
+    blob_unknown = (
+        blob_unknown_value
+        if blob_unknown_value is True or isinstance(blob_unknown_value, Mapping)
+        else unknown_block_at(blob_unknown_value, 0)
+    )
+
+    versioning_enabled = known_block_bool(
+        blob_properties,
+        blob_unknown,
+        "versioning_enabled",
+        uncertainties,
+        path="blob_properties",
+    )
+    if versioning_enabled is not None:
+        metadata[AzureResourceMetadata.STORAGE_BLOB_VERSIONING_ENABLED] = versioning_enabled
+
+    _set_storage_blob_policy_days(
+        metadata,
+        blob_properties,
+        blob_unknown,
+        block_name="delete_retention_policy",
+        field=AzureResourceMetadata.STORAGE_BLOB_DELETE_RETENTION_DAYS,
+        uncertainties=uncertainties,
+    )
+    _set_storage_blob_policy_days(
+        metadata,
+        blob_properties,
+        blob_unknown,
+        block_name="container_delete_retention_policy",
+        field=AzureResourceMetadata.STORAGE_CONTAINER_DELETE_RETENTION_DAYS,
+        uncertainties=uncertainties,
+    )
+    _set_storage_blob_policy_days(
+        metadata,
+        blob_properties,
+        blob_unknown,
+        block_name="restore_policy",
+        field=AzureResourceMetadata.STORAGE_BLOB_RESTORE_POLICY_DAYS,
+        uncertainties=uncertainties,
+    )
+
+
+def _set_storage_blob_policy_days(
+    metadata: dict[Any, Any],
+    blob_properties: Mapping[str, Any] | None,
+    blob_unknown: Any,
+    *,
+    block_name: str,
+    field: Any,
+    uncertainties: list[str],
+) -> None:
+    policy = first_mapping(blob_properties.get(block_name)) if blob_properties is not None else None
+    policy_unknown = _unknown_child_block(blob_unknown, block_name)
+    days = known_block_int(
+        policy,
+        policy_unknown,
+        "days",
+        uncertainties,
+        path=f"blob_properties.{block_name}",
+    )
+    if days is not None:
+        metadata[field] = days
+
+
+def _unknown_child_block(unknown_block: Any, key: str) -> Any:
+    if unknown_block is True:
+        return True
+    if isinstance(unknown_block, Mapping):
+        return unknown_block.get(key)
+    return None
 
 
 def _set_bool_posture(
