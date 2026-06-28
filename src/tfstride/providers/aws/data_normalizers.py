@@ -10,6 +10,7 @@ from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
+from tfstride.providers.coercion import first_mapping, known_block_bool_state, known_block_string
 from tfstride.providers.json_documents import load_json_document
 from tfstride.resource_helpers import policy_allows_public_access
 
@@ -113,17 +114,17 @@ def normalize_s3_bucket_public_access_block(resource: TerraformResource) -> Norm
 def normalize_s3_bucket_versioning(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     unknown_values = resource.unknown_values
-    versioning_configuration = _first_mapping(values.get("versioning_configuration"))
-    unknown_configuration = _first_unknown_mapping(unknown_values, "versioning_configuration")
+    versioning_configuration = first_mapping(values.get("versioning_configuration"), scan_all=True)
+    unknown_configuration = first_mapping(unknown_values.get("versioning_configuration"), scan_all=True)
     uncertainties: list[str] = []
-    status = _known_block_string(
+    status = known_block_string(
         versioning_configuration,
         unknown_configuration,
         "status",
         uncertainties,
-        "versioning_configuration.status",
+        path="versioning_configuration",
     )
-    if versioning_configuration is None and _block_is_unknown(unknown_values, "versioning_configuration"):
+    if versioning_configuration is None and unknown_values.get("versioning_configuration") is True:
         uncertainties.append("versioning_configuration is unknown after planning")
 
     return NormalizedResource(
@@ -147,35 +148,39 @@ def normalize_s3_bucket_versioning(resource: TerraformResource) -> NormalizedRes
 def normalize_s3_bucket_server_side_encryption_configuration(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     unknown_values = resource.unknown_values
-    rule = _first_mapping(values.get("rule"))
-    encryption_default = _first_mapping(rule.get("apply_server_side_encryption_by_default")) if rule else None
-    unknown_rule = _first_unknown_mapping(unknown_values, "rule")
+    rule = first_mapping(values.get("rule"), scan_all=True)
+    encryption_default = (
+        first_mapping(rule.get("apply_server_side_encryption_by_default"), scan_all=True) if rule else None
+    )
+    unknown_rule = first_mapping(unknown_values.get("rule"), scan_all=True)
     unknown_encryption_default = (
-        _first_mapping(unknown_rule.get("apply_server_side_encryption_by_default")) if unknown_rule else None
+        first_mapping(unknown_rule.get("apply_server_side_encryption_by_default"), scan_all=True)
+        if unknown_rule
+        else None
     )
     uncertainties: list[str] = []
-    algorithm = _known_block_string(
+    algorithm = known_block_string(
         encryption_default,
         unknown_encryption_default,
         "sse_algorithm",
         uncertainties,
-        "rule.apply_server_side_encryption_by_default.sse_algorithm",
+        path="rule.apply_server_side_encryption_by_default",
     )
-    kms_key_id = _known_block_string(
+    kms_key_id = known_block_string(
         encryption_default,
         unknown_encryption_default,
         "kms_master_key_id",
         uncertainties,
-        "rule.apply_server_side_encryption_by_default.kms_master_key_id",
+        path="rule.apply_server_side_encryption_by_default",
     )
-    bucket_key_state = _known_block_bool_state(
+    bucket_key_state = known_block_bool_state(
         rule,
         unknown_rule,
         "bucket_key_enabled",
         uncertainties,
-        "rule.bucket_key_enabled",
+        path="rule",
     )
-    if rule is None and _block_is_unknown(unknown_values, "rule"):
+    if rule is None and unknown_values.get("rule") is True:
         uncertainties.append("rule is unknown after planning")
 
     return NormalizedResource(
@@ -289,64 +294,6 @@ def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> Norma
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
-
-
-def _first_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    for item in as_list(value):
-        if isinstance(item, Mapping):
-            return item
-    return None
-
-
-def _first_unknown_mapping(unknown_values: Mapping[str, Any], key: str) -> Mapping[str, Any] | None:
-    return _first_mapping(unknown_values.get(key))
-
-
-def _block_is_unknown(unknown_values: Mapping[str, Any], key: str) -> bool:
-    return unknown_values.get(key) is True
-
-
-def _known_block_string(
-    block: Mapping[str, Any] | None,
-    unknown_block: Mapping[str, Any] | None,
-    key: str,
-    uncertainties: list[str],
-    path: str,
-) -> str | None:
-    if _block_attribute_is_unknown(unknown_block, key):
-        uncertainties.append(f"{path} is unknown after planning")
-        return None
-    if block is None:
-        return None
-    value = block.get(key)
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
-def _known_block_bool_state(
-    block: Mapping[str, Any] | None,
-    unknown_block: Mapping[str, Any] | None,
-    key: str,
-    uncertainties: list[str],
-    path: str,
-) -> str | None:
-    if _block_attribute_is_unknown(unknown_block, key):
-        uncertainties.append(f"{path} is unknown after planning")
-        return None
-    if block is None:
-        return None
-    value = block.get(key)
-    if isinstance(value, bool):
-        return "enabled" if value else "disabled"
-    return None
-
-
-def _block_attribute_is_unknown(unknown_block: Mapping[str, Any] | None, key: str) -> bool:
-    return unknown_block is not None and unknown_block.get(key) is True
 
 
 def _s3_encryption_configuration(rule: Mapping[str, Any] | None) -> dict[str, Any] | None:

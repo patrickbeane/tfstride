@@ -2,45 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from tfstride.providers.coercion import as_bool as _as_bool
+from tfstride.providers.coercion import as_list as _as_list
+from tfstride.providers.coercion import as_optional_int as as_optional_int
+from tfstride.providers.coercion import compact as compact
+from tfstride.providers.coercion import first_item as _first_item
 
-def compact(values: list[Any]) -> list[str]:
-    return [str(value) for value in values if value not in (None, "", [])]
+__all__ = ["as_bool", "as_list", "as_optional_int", "compact", "first_item"]
 
 
 def as_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "enabled", "yes"}:
-            return True
-        if normalized in {"false", "disabled", "no"}:
-            return False
-    return bool(value)
+    return _as_bool(value, allow_on_off=False)
 
 
 def as_list(value: Any) -> list[Any]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
+    return _as_list(value, expand_tuples=False)
 
 
 def first_item(value: Any) -> dict[str, Any] | None:
-    items = as_list(value)
-    if not items:
-        return None
-    first = items[0]
-    if isinstance(first, dict):
-        return first
-    return None
-
-
-def as_optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+    return _first_item(value, expand_tuples=False)
