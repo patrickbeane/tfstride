@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **33 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **34 findings** across **30 normalized resources**.
 
 - High severity findings: `14`
-- Medium severity findings: `19`
+- Medium severity findings: `20`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **33 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `90`
-- Enabled rules: `90`
+- Registered rules: `91`
+- Enabled rules: `91`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -40,6 +40,7 @@ This run identified **9 trust boundaries** and **33 findings** across **30 norma
   - `gcp-gcs-public-access-prevention-not-enforced`: `1`
   - `gcp-gcs-versioning-disabled`: `1`
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
+  - `gcp-gcs-retention-policy-insufficient`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
   - `gcp-gke-public-control-plane`: `1`
@@ -458,6 +459,18 @@ This run identified **9 trust boundaries** and **33 findings** across **30 norma
 - Recommended mitigation: Configure a Cloud KMS customer-managed key for sensitive GCS buckets, assign the GCS service agent only the key roles it needs, and manage key rotation separately from bucket IAM.
 - Evidence:
   - encryption posture: default_kms_key_name is unset; customer_managed_encryption is false
+
+#### GCS sensitive bucket retention policy is insufficient
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_storage_bucket.logs`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_storage_bucket.logs does not have deterministic GCS retention posture that meets the minimum retention threshold and lock expectation. Retention policy and retention lock reduce destructive deletion or overwrite risk, but are distinct from soft-delete recovery controls.
+- Recommended mitigation: Configure a GCS retention policy that meets recovery and compliance objectives, and lock the retention policy after operational validation. Treat retention lock as immutability posture, not as a replacement for object versioning or soft-delete recovery.
+- Evidence:
+  - retention policy issues: retention_policy is missing
+  - retention policy posture: retention_policy.retention_period_state=missing; minimum_retention_period_days=7; minimum_retention_period_seconds=604800; retention_policy.is_locked is unset
 
 #### GCS sensitive bucket versioning is disabled
 

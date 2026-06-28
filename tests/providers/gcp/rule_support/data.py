@@ -9,6 +9,8 @@ def _storage_bucket(
     uniform_bucket_level_access: bool = True,
     versioning_enabled: bool = True,
     default_kms_key_name: str | None = "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
+    retention_policy: dict[str, object] | None = None,
+    unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values = {
         "name": "tfstride-logs",
@@ -21,6 +23,8 @@ def _storage_bucket(
         values["public_access_prevention"] = public_access_prevention
     if default_kms_key_name is not None:
         values["encryption"] = [{"default_kms_key_name": default_kms_key_name}]
+    if retention_policy is not None:
+        values["retention_policy"] = [retention_policy]
     return TerraformResource(
         address="google_storage_bucket.logs",
         mode="managed",
@@ -28,6 +32,7 @@ def _storage_bucket(
         name="logs",
         provider_name="registry.terraform.io/hashicorp/google",
         values=values,
+        unknown_values=unknown_values or {},
     )
 
 

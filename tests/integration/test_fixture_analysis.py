@@ -106,8 +106,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 5, {"high": 3, "medium": 2}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 19, {"high": 6, "medium": 13}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 33, {"high": 14, "medium": 19}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 20, {"high": 6, "medium": 14}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 34, {"high": 14, "medium": 20}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
@@ -175,6 +175,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
+                "GCS sensitive bucket retention policy is insufficient": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 1,
@@ -201,6 +202,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
                 "GCS sensitive bucket does not use customer-managed encryption": 1,
+                "GCS sensitive bucket retention policy is insufficient": 1,
                 "GCS sensitive bucket versioning is disabled": 1,
                 "GKE cluster does not enable Workload Identity": 1,
                 "GKE cluster exposes a public control plane": 1,
@@ -432,7 +434,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             result.analysis_coverage.resources.unsupported_resource_types,
             {"google_logging_project_sink": 1},
         )
-        self.assertEqual(len(result.findings), 19)
+        self.assertEqual(len(result.findings), 20)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -470,6 +472,10 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         )
         self.assertEqual(
             findings_by_rule["gcp-gcs-customer-managed-encryption-missing"].affected_resources,
+            ["google_storage_bucket.logs"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-gcs-retention-policy-insufficient"].affected_resources,
             ["google_storage_bucket.logs"],
         )
         cloud_sql_public_finding = findings_by_rule["gcp-cloud-sql-public-authorized-network"]

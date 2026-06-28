@@ -173,6 +173,116 @@ class GcpStorageRuleTests(unittest.TestCase):
             ["versioning.enabled is false", "data_sensitivity is sensitive"],
         )
 
+    def test_gcs_retention_policy_missing_is_detected_for_sensitive_bucket(self) -> None:
+        inventory = GcpNormalizer().normalize([_storage_bucket()])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-retention-policy-insufficient"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-gcs-retention-policy-insufficient")
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(finding.affected_resources, ["google_storage_bucket.logs"])
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["retention_policy_issues"], ["retention_policy is missing"])
+        self.assertEqual(
+            evidence["retention_policy_posture"],
+            [
+                "retention_policy.retention_period_state=missing",
+                "minimum_retention_period_days=7",
+                "minimum_retention_period_seconds=604800",
+                "retention_policy.is_locked is unset",
+            ],
+        )
+
+    def test_gcs_short_retention_policy_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_storage_bucket(retention_policy={"retention_period": 3_600, "is_locked": True})]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-retention-policy-insufficient"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["retention_policy_issues"],
+            ["retention_policy.retention_period is 3600 seconds; minimum is 604800 seconds"],
+        )
+        self.assertEqual(
+            evidence["retention_policy_posture"],
+            [
+                "retention_policy.retention_period_state=short",
+                "retention_policy.retention_period_seconds=3600",
+                "minimum_retention_period_days=7",
+                "minimum_retention_period_seconds=604800",
+                "retention_policy.is_locked is true",
+            ],
+        )
+
+    def test_gcs_unlocked_retention_policy_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_storage_bucket(retention_policy={"retention_period": 2_592_000, "is_locked": False})]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-retention-policy-insufficient"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["retention_policy_issues"], ["retention_policy.is_locked is false"])
+        self.assertEqual(
+            evidence["retention_policy_posture"],
+            [
+                "retention_policy.retention_period_state=configured",
+                "retention_policy.retention_period_seconds=2592000",
+                "minimum_retention_period_days=7",
+                "minimum_retention_period_seconds=604800",
+                "retention_policy.is_locked is false",
+            ],
+        )
+
+    def test_gcs_locked_retention_policy_meeting_threshold_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [_storage_bucket(retention_policy={"retention_period": 2_592_000, "is_locked": True})]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-retention-policy-insufficient"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gcs_unknown_retention_policy_is_not_overclaimed(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _storage_bucket(
+                    retention_policy={},
+                    unknown_values={"retention_policy": [{"retention_period": True, "is_locked": True}]},
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-retention-policy-insufficient"})),
+        )
+
+        self.assertEqual(findings, [])
+
     def test_gcs_customer_managed_encryption_missing_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_storage_bucket(default_kms_key_name=None)])
 

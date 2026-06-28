@@ -108,6 +108,7 @@ EXPECTED_GCP_RULE_GROUP_IDS = (
         "gcp-gcs-public-access-prevention-not-enforced",
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
+        "gcp-gcs-retention-policy-insufficient",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-compute-os-login-disabled",
@@ -241,9 +242,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (69, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (70, 2, 2, 12, 3, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (5, 2, 2, 2, 2, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (25, 0, 0, 10, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (40, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:

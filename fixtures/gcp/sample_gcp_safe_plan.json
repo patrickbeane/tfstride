@@ -139,6 +139,12 @@
               {
                 "default_kms_key_name": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-gcs"
               }
+            ],
+            "retention_policy": [
+              {
+                "retention_period": 2592000,
+                "is_locked": true
+              }
             ]
           }
         },

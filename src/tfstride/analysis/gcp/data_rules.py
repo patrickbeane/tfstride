@@ -26,6 +26,8 @@ from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
+_GCS_MIN_RETENTION_PERIOD_DAYS = 7
+_GCS_MIN_RETENTION_PERIOD_SECONDS = _GCS_MIN_RETENTION_PERIOD_DAYS * 24 * 60 * 60
 
 
 class GcpDataRuleDetectors:
@@ -382,6 +384,50 @@ class GcpDataRuleDetectors:
             )
         return findings
 
+    def detect_gcs_retention_policy_insufficient(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for bucket in context.inventory.by_type("google_storage_bucket"):
+            bucket_facts = gcp_facts(bucket)
+            if bucket.data_sensitivity != "sensitive":
+                continue
+            retention_issues = _gcs_retention_policy_issues(bucket_facts)
+            if not retention_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[bucket.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{bucket.display_name} does not have deterministic GCS retention posture that "
+                        "meets the minimum retention threshold and lock expectation. Retention policy and "
+                        "retention lock reduce destructive deletion or overwrite risk, but are distinct from "
+                        "soft-delete recovery controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("retention_policy_issues", retention_issues),
+                        evidence_item("retention_policy_posture", _gcs_retention_policy_evidence(bucket_facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_public_authorized_network(
         self,
         context: RuleEvaluationContext,
@@ -657,6 +703,46 @@ def _bool_status(value: bool | None) -> str:
     if value is None:
         return "unset"
     return str(value).lower()
+
+
+def _gcs_retention_policy_issues(bucket_facts: GcpResourceFacts) -> list[str]:
+    if bucket_facts.gcs_retention_policy_uncertainties:
+        return []
+
+    issues: list[str] = []
+    retention_period_seconds = bucket_facts.gcs_retention_period_seconds
+    if retention_period_seconds is None:
+        issues.append("retention_policy is missing")
+    elif retention_period_seconds < _GCS_MIN_RETENTION_PERIOD_SECONDS:
+        issues.append(
+            "retention_policy.retention_period is "
+            f"{retention_period_seconds} seconds; minimum is {_GCS_MIN_RETENTION_PERIOD_SECONDS} seconds"
+        )
+
+    if bucket_facts.gcs_retention_policy_locked is False:
+        issues.append("retention_policy.is_locked is false")
+
+    return issues
+
+
+def _gcs_retention_policy_evidence(bucket_facts: GcpResourceFacts) -> list[str]:
+    retention_period_seconds = bucket_facts.gcs_retention_period_seconds
+    if retention_period_seconds is None:
+        retention_state = "missing"
+    elif retention_period_seconds < _GCS_MIN_RETENTION_PERIOD_SECONDS:
+        retention_state = "short"
+    else:
+        retention_state = "configured"
+
+    evidence = [
+        f"retention_policy.retention_period_state={retention_state}",
+        f"minimum_retention_period_days={_GCS_MIN_RETENTION_PERIOD_DAYS}",
+        f"minimum_retention_period_seconds={_GCS_MIN_RETENTION_PERIOD_SECONDS}",
+        f"retention_policy.is_locked is {_bool_status(bucket_facts.gcs_retention_policy_locked)}",
+    ]
+    if retention_period_seconds is not None:
+        evidence.insert(1, f"retention_policy.retention_period_seconds={retention_period_seconds}")
+    return evidence
 
 
 def _gcs_public_access_prevention_enforced(value: str | None) -> bool:

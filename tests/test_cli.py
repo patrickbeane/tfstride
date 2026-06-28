@@ -237,7 +237,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["inventory"]["provider"], "gcp")
         self.assertEqual(len(report["inventory"]["resources"]), 22)
         self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
-        self.assertEqual(report["summary"]["active_findings"], 19)
+        self.assertEqual(report["summary"]["active_findings"], 20)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
     def test_cli_provider_option_can_select_azure_inventory(self) -> None:

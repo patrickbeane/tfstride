@@ -146,6 +146,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                                 "uniform_bucket_level_access": True,
                                 "public_access_prevention": "enforced",
                                 "versioning": [{"enabled": True}],
+                                "retention_policy": [{"retention_period": 2_592_000, "is_locked": True}],
                                 "encryption": [
                                     {
                                         "default_kms_key_name": (

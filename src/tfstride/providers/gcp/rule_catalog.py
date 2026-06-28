@@ -178,6 +178,18 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-gcs-retention-policy-insufficient",
+        title="GCS sensitive bucket retention policy is insufficient",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure a GCS retention policy that meets recovery and compliance objectives, and lock the "
+            "retention policy after operational validation. Treat retention lock as immutability posture, not "
+            "as a replacement for object versioning or soft-delete recovery."
+        ),
+        tags=("gcp", "gcs", "storage", "retention", "immutability"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,
