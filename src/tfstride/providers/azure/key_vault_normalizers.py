@@ -6,6 +6,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
+from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_utils import (
     as_list,
     attribute_unknown,
@@ -238,5 +239,5 @@ def _bool_with_default(values: Mapping[str, Any], key: str, default: bool) -> bo
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:
-    resource.storage_encrypted = True
+    azure_facts(resource).set_storage_encrypted(True)
     return resource

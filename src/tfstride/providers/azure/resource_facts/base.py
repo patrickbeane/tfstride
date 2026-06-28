@@ -65,6 +65,9 @@ class AzureBaseFacts(NeutralProviderResourceFacts):
     def network_rule_source_address(self) -> str | None:
         return self.get(AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS)
 
+    def set_storage_encrypted(self, value: bool) -> None:
+        self.resource.storage_encrypted = value
+
     def add_unresolved_resource_reference(self, kind: str, reference: str | None) -> None:
         self.append(
             AzureResourceMetadata.UNRESOLVED_RESOURCE_REFERENCES,

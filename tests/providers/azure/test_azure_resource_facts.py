@@ -79,6 +79,7 @@ class AzureResourceFactsTests(unittest.TestCase):
         resource = _resource()
         facts = azure_facts(resource)
 
+        facts.set_storage_encrypted(True)
         facts.set_effective_network_rule("Allow", "azurerm_storage_account_network_rules.logs")
         facts.add_public_container_address("azurerm_storage_container.public")
         facts.add_storage_posture_uncertainty("default_action is unknown after planning")
@@ -90,6 +91,7 @@ class AzureResourceFactsTests(unittest.TestCase):
         )
         facts.set_public_endpoint_posture(reachable=True, reasons=["public network"])
 
+        self.assertTrue(resource.storage_encrypted)
         self.assertEqual(facts.network_default_action, "Allow")
         self.assertEqual(
             facts.network_rule_source_address,
