@@ -41,6 +41,12 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-storage-account-shared-key-enabled",
         "azure-storage-account-minimum-tls-below-1-2",
         "azure-storage-account-public-network-unrestricted",
+        "azure-storage-account-customer-managed-key-missing",
+        "azure-storage-account-infrastructure-encryption-not-enabled",
+        "azure-storage-account-blob-versioning-disabled",
+        "azure-storage-account-blob-soft-delete-insufficient",
+        "azure-storage-account-container-soft-delete-insufficient",
+        "azure-storage-account-point-in-time-restore-missing",
         "azure-storage-account-missing-private-endpoint",
         "azure-key-vault-public-network-access",
         "azure-key-vault-missing-private-endpoint",
@@ -76,6 +82,8 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (),
     (),
 )
+
+_MIN_STORAGE_RECOVERY_RETENTION_DAYS = 7
 
 
 class AzureComputeRuleDetectors:
@@ -447,6 +455,206 @@ class AzureStorageRuleDetectors:
             )
         return findings
 
+    def detect_customer_managed_key_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
+            facts = azure_facts(account)
+            cmk_state = _customer_managed_key_state(facts)
+            if cmk_state == "configured":
+                continue
+            unknown = cmk_state == "unknown"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=1 if unknown else 2,
+                lateral_movement=0,
+                blast_radius=0 if unknown else 1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[account.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{account.display_name} relies on Azure-managed storage encryption keys or does not "
+                        "expose deterministic customer-managed key evidence in the Terraform plan. Azure Storage "
+                        "is encrypted by default; this finding concerns customer key ownership, rotation, and "
+                        "separation-of-duties controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _storage_target_evidence(account)),
+                        evidence_item("encryption_ownership", _customer_managed_key_evidence(facts, cmk_state)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _storage_uncertainty_evidence(facts, "customer_managed_key"),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_infrastructure_encryption_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
+            facts = azure_facts(account)
+            enabled = facts.storage_infrastructure_encryption_enabled
+            if enabled is True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=1,
+                lateral_movement=0,
+                blast_radius=1 if enabled is False else 0,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[account.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{account.display_name} does not explicitly enable infrastructure encryption for "
+                        "additional encryption-at-rest depth. Azure Storage default encryption remains in place; "
+                        "this finding tracks defense-in-depth posture."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _storage_target_evidence(account)),
+                        evidence_item(
+                            "infrastructure_encryption",
+                            _storage_bool_evidence(
+                                "infrastructure_encryption_enabled",
+                                enabled,
+                                unknown_label="unknown",
+                            ),
+                        ),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _storage_uncertainty_evidence(facts, "infrastructure_encryption_enabled"),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_blob_versioning_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
+            facts = azure_facts(account)
+            enabled = facts.storage_blob_versioning_enabled
+            if enabled is True:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=1 if enabled is None else 2,
+                lateral_movement=0,
+                blast_radius=0 if enabled is None else 1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[account.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{account.display_name} does not have deterministic blob versioning enabled. "
+                        "Reduced object version history limits recovery options after overwrite, deletion, "
+                        "or destructive change."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _storage_target_evidence(account)),
+                        evidence_item(
+                            "versioning_posture",
+                            _storage_bool_evidence("blob_properties.versioning_enabled", enabled),
+                        ),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _storage_uncertainty_evidence(facts, "blob_properties.versioning_enabled"),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_blob_soft_delete_insufficient(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_storage_retention_posture(
+            context,
+            rule_id,
+            days_selector=lambda facts: facts.storage_blob_delete_retention_days,
+            evidence_key="blob_soft_delete_posture",
+            field_path="blob_properties.delete_retention_policy.days",
+            rationale=(
+                "does not have deterministic blob soft delete retention that meets the minimum recovery "
+                "threshold. Short or absent blob delete retention reduces recovery options after accidental "
+                "or malicious blob deletion."
+            ),
+        )
+
+    def detect_container_soft_delete_insufficient(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_storage_retention_posture(
+            context,
+            rule_id,
+            days_selector=lambda facts: facts.storage_container_delete_retention_days,
+            evidence_key="container_soft_delete_posture",
+            field_path="blob_properties.container_delete_retention_policy.days",
+            rationale=(
+                "does not have deterministic container soft delete retention that meets the minimum recovery "
+                "threshold. Short or absent container delete retention reduces recovery options after container "
+                "deletion."
+            ),
+        )
+
+    def detect_point_in_time_restore_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_storage_retention_posture(
+            context,
+            rule_id,
+            days_selector=lambda facts: facts.storage_blob_restore_policy_days,
+            evidence_key="point_in_time_restore_posture",
+            field_path="blob_properties.restore_policy.days",
+            rationale=(
+                "does not have deterministic point-in-time restore configured for the minimum recovery "
+                "threshold. Missing or short restore policy limits recovery from destructive blob changes."
+            ),
+        )
+
     def _detect_account_boolean_posture(
         self,
         context: RuleEvaluationContext,
@@ -488,6 +696,50 @@ class AzureStorageRuleDetectors:
             )
         return findings
 
+    def _detect_storage_retention_posture(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+        *,
+        days_selector: Callable[[AzureResourceFacts], int | None],
+        evidence_key: str,
+        field_path: str,
+        rationale: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for account in context.inventory.by_type(AzureResourceType.STORAGE_ACCOUNT):
+            facts = azure_facts(account)
+            days = days_selector(facts)
+            unknown = _storage_field_unknown(facts, field_path)
+            if days is not None and days >= _MIN_STORAGE_RECOVERY_RETENTION_DAYS:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=1 if unknown else 2,
+                lateral_movement=0,
+                blast_radius=0 if unknown else 1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[account.address],
+                    trust_boundary_id=None,
+                    rationale=f"{account.display_name} {rationale}",
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _storage_target_evidence(account)),
+                        evidence_item(evidence_key, _retention_evidence(field_path, days, unknown=unknown)),
+                        evidence_item("posture_uncertainty", _storage_uncertainty_evidence(facts, field_path)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def build_azure_rule_contribution(
     finding_factory: FindingFactory,
@@ -509,6 +761,16 @@ def build_azure_rule_contribution(
         "azure-storage-account-shared-key-enabled": storage_detectors.detect_shared_key_enabled,
         "azure-storage-account-minimum-tls-below-1-2": storage_detectors.detect_minimum_tls_below_1_2,
         "azure-storage-account-public-network-unrestricted": (storage_detectors.detect_unrestricted_public_network),
+        "azure-storage-account-customer-managed-key-missing": (storage_detectors.detect_customer_managed_key_missing),
+        "azure-storage-account-infrastructure-encryption-not-enabled": (
+            storage_detectors.detect_infrastructure_encryption_not_enabled
+        ),
+        "azure-storage-account-blob-versioning-disabled": storage_detectors.detect_blob_versioning_disabled,
+        "azure-storage-account-blob-soft-delete-insufficient": (storage_detectors.detect_blob_soft_delete_insufficient),
+        "azure-storage-account-container-soft-delete-insufficient": (
+            storage_detectors.detect_container_soft_delete_insufficient
+        ),
+        "azure-storage-account-point-in-time-restore-missing": (storage_detectors.detect_point_in_time_restore_missing),
         "azure-storage-account-missing-private-endpoint": (
             private_endpoint_detectors.detect_storage_account_missing_private_endpoint
         ),
@@ -554,6 +816,66 @@ def build_azure_rule_contribution(
         ),
         resolved_metadata_registry,
     )
+
+
+def _storage_target_evidence(account) -> list[str]:
+    return [f"address={account.address}", f"type={account.resource_type}"]
+
+
+def _customer_managed_key_state(facts: AzureResourceFacts) -> str:
+    if facts.storage_customer_managed_key_id:
+        return "configured"
+    if _storage_field_unknown(facts, "customer_managed_key"):
+        return "unknown"
+    return "not_configured"
+
+
+def _customer_managed_key_evidence(facts: AzureResourceFacts, cmk_state: str) -> list[str]:
+    values = [f"customer_managed_key_state={cmk_state}"]
+    if facts.storage_customer_managed_key_id:
+        values.append(f"key_vault_key_id={facts.storage_customer_managed_key_id}")
+    else:
+        values.append("key_vault_key_id is unset")
+    if facts.storage_customer_managed_key_identity_id:
+        values.append(f"user_assigned_identity_id={facts.storage_customer_managed_key_identity_id}")
+    values.append("Azure Storage encryption by default is still enabled; this finding concerns customer key control")
+    return values
+
+
+def _storage_bool_evidence(field_path: str, value: bool | None, *, unknown_label: str = "unknown") -> list[str]:
+    if value is True:
+        state = "enabled"
+    elif value is False:
+        state = "disabled"
+    else:
+        state = unknown_label
+    return [f"{field_path} is {state}"]
+
+
+def _retention_evidence(field_path: str, days: int | None, *, unknown: bool) -> list[str]:
+    if unknown:
+        state = "unknown"
+    elif days is None:
+        state = "disabled_or_missing"
+    elif days < _MIN_STORAGE_RECOVERY_RETENTION_DAYS:
+        state = "short"
+    else:
+        state = "configured"
+    values = [
+        f"{field_path}_state={state}",
+        f"minimum_retention_days={_MIN_STORAGE_RECOVERY_RETENTION_DAYS}",
+    ]
+    if days is not None:
+        values.insert(1, f"retention_days={days}")
+    return values
+
+
+def _storage_uncertainty_evidence(facts: AzureResourceFacts, field_path: str) -> list[str]:
+    return [uncertainty for uncertainty in facts.storage_posture_uncertainties if field_path in uncertainty]
+
+
+def _storage_field_unknown(facts: AzureResourceFacts, field_path: str) -> bool:
+    return bool(_storage_uncertainty_evidence(facts, field_path))
 
 
 def _managed_identity_resources(inventory) -> list[Any]:

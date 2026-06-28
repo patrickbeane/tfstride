@@ -48,6 +48,12 @@ EXPECTED_AZURE_RULE_GROUP_IDS = (
         "azure-storage-account-shared-key-enabled",
         "azure-storage-account-minimum-tls-below-1-2",
         "azure-storage-account-public-network-unrestricted",
+        "azure-storage-account-customer-managed-key-missing",
+        "azure-storage-account-infrastructure-encryption-not-enabled",
+        "azure-storage-account-blob-versioning-disabled",
+        "azure-storage-account-blob-soft-delete-insufficient",
+        "azure-storage-account-container-soft-delete-insufficient",
+        "azure-storage-account-point-in-time-restore-missing",
         "azure-storage-account-missing-private-endpoint",
         "azure-key-vault-public-network-access",
         "azure-key-vault-missing-private-endpoint",
@@ -233,10 +239,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (61, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (67, 2, 2, 12, 3, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (3, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (24, 0, 0, 10, 1, 0))
-        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (34, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (40, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)

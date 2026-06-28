@@ -188,6 +188,21 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                                 "min_tls_version": "TLS1_2",
                                 "public_network_access_enabled": False,
                                 "network_rules": [{"default_action": "Deny"}],
+                                "infrastructure_encryption_enabled": True,
+                                "customer_managed_key": [
+                                    {
+                                        "key_vault_key_id": "azurerm_key_vault_key.storage.id",
+                                        "user_assigned_identity_id": "azurerm_user_assigned_identity.storage.id",
+                                    }
+                                ],
+                                "blob_properties": [
+                                    {
+                                        "versioning_enabled": True,
+                                        "delete_retention_policy": [{"days": 30}],
+                                        "container_delete_retention_policy": [{"days": 14}],
+                                        "restore_policy": [{"days": 7}],
+                                    }
+                                ],
                             },
                         }
                     ]

@@ -70,6 +70,72 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-storage-account-customer-managed-key-missing",
+        title="Azure Storage account does not use customer-managed key control",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure a customer-managed Key Vault key for storage encryption where regulatory, rotation, "
+            "or separation-of-duties requirements call for customer key ownership."
+        ),
+        tags=("azure", "storage", "encryption", "cmk", "key-management"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-storage-account-infrastructure-encryption-not-enabled",
+        title="Azure Storage account does not explicitly enable infrastructure encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable infrastructure encryption for storage accounts that require additional encryption-at-rest "
+            "depth beyond Azure Storage default encryption."
+        ),
+        tags=("azure", "storage", "encryption", "defense-in-depth"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-storage-account-blob-versioning-disabled",
+        title="Azure Storage account blob versioning is not enabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable blob versioning for sensitive storage accounts and pair it with lifecycle policies that "
+            "match recovery objectives and storage cost constraints."
+        ),
+        tags=("azure", "storage", "blob", "recovery", "versioning"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-storage-account-blob-soft-delete-insufficient",
+        title="Azure Storage account blob soft delete retention is insufficient",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable blob soft delete and configure a retention period that meets recovery objectives for "
+            "accidental or malicious blob deletion."
+        ),
+        tags=("azure", "storage", "blob", "recovery", "soft-delete"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-storage-account-container-soft-delete-insufficient",
+        title="Azure Storage account container soft delete retention is insufficient",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable container soft delete and configure a retention period that meets recovery objectives for "
+            "container-level deletion events."
+        ),
+        tags=("azure", "storage", "container", "recovery", "soft-delete"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-storage-account-point-in-time-restore-missing",
+        title="Azure Storage account point-in-time restore is not configured",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure point-in-time restore for supported blob workloads where recovery from destructive "
+            "changes is required, and align restore days with recovery objectives."
+        ),
+        tags=("azure", "storage", "blob", "recovery", "point-in-time-restore"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-storage-account-missing-private-endpoint",
         title="Azure Storage account lacks resolved private endpoint coverage",
         category=StrideCategory.INFORMATION_DISCLOSURE,
