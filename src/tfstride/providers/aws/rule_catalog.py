@@ -49,6 +49,28 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-s3-customer-managed-encryption-missing",
+        title="S3 bucket does not use customer-managed SSE-KMS encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure S3 default server-side encryption with SSE-KMS or DSSE-KMS and a customer-managed KMS "
+            "key where key ownership, rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "s3", "storage", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-s3-versioning-disabled",
+        title="S3 bucket versioning is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable S3 bucket versioning for sensitive buckets and pair it with lifecycle policies that retain "
+            "recoverable object versions for the expected recovery window."
+        ),
+        tags=("aws", "s3", "storage", "recovery", "versioning"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sensitive-resource-policy-external-access",
         title="Sensitive resource policy allows broad or cross-account access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

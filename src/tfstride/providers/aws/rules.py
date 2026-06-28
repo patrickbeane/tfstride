@@ -10,12 +10,15 @@ from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.posture_rules import PostureRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.aws.storage_rules import AwsS3PostureRuleDetectors
 
 AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
         "aws-public-compute-broad-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
+        "aws-s3-customer-managed-encryption-missing",
+        "aws-s3-versioning-disabled",
     ),
     (
         "aws-database-permissive-ingress",
@@ -49,10 +52,13 @@ def build_aws_rule_contribution(
     path_chain_detectors = PathChainRuleDetectors(finding_factory)
     iam_detectors = IAMRuleDetectors(finding_factory)
     policy_trust_detectors = PolicyTrustRuleDetectors(finding_factory)
+    s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
         "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
         "aws-s3-public-access": posture_detectors.detect_public_object_storage,
+        "aws-s3-customer-managed-encryption-missing": (s3_posture_detectors.detect_customer_managed_encryption_missing),
+        "aws-s3-versioning-disabled": s3_posture_detectors.detect_versioning_disabled_or_unknown,
         "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
         "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,
         "aws-sensitive-resource-policy-external-access": (

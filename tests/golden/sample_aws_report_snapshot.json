@@ -37,12 +37,14 @@
       }
     },
     "rules": {
-      "registered_rule_count": 88,
+      "registered_rule_count": 90,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-s3-public-access",
+        "aws-s3-customer-managed-encryption-missing",
+        "aws-s3-versioning-disabled",
         "aws-sensitive-resource-policy-external-access",
         "aws-service-resource-policy-external-access",
         "aws-iam-wildcard-permissions",
@@ -135,6 +137,8 @@
         "aws-database-permissive-ingress": 1,
         "aws-rds-storage-encryption-disabled": 0,
         "aws-s3-public-access": 1,
+        "aws-s3-customer-managed-encryption-missing": 0,
+        "aws-s3-versioning-disabled": 0,
         "aws-sensitive-resource-policy-external-access": 0,
         "aws-service-resource-policy-external-access": 0,
         "aws-iam-wildcard-permissions": 2,
