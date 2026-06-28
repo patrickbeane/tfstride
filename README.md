@@ -105,9 +105,9 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 
 | Provider | Status          | Coverage Summary                                                                                                                                     |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations.     |
-| GCP      | Active support  | Compute, GKE, Cloud SQL, GCS, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Active support  | Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, Private Endpoint posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
+| GCP      | Active support  | Compute, GKE, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
+| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL, App Service/Function Apps, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -128,6 +128,8 @@ AWS support currently includes:
 * `aws_s3_bucket`
 * `aws_s3_bucket_policy`
 * `aws_s3_bucket_public_access_block`
+* `aws_s3_bucket_versioning`
+* `aws_s3_bucket_server_side_encryption_configuration`
 * `aws_iam_role`
 * `aws_iam_policy`
 * `aws_iam_role_policy`
@@ -192,7 +194,7 @@ GCP support currently includes normalization and analysis for:
 
 GCP trust-boundary coverage includes public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, GCS buckets, Cloud NAT posture, and workload-to-sensitive-data paths through GCE, Cloud Run, and Cloud Functions service accounts.
 
-GCP rule coverage includes public compute ingress, GKE posture, Cloud SQL exposure and recovery posture, GCS public-access posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
+GCP rule coverage includes public compute ingress, GKE posture, Cloud SQL exposure and recovery posture, GCS public-access, encryption, versioning, and retention posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
 
 GCP control observations are not implemented yet.
 
@@ -201,7 +203,7 @@ GCP control observations are not implemented yet.
 <details>
 <summary>Detailed Azure resource coverage</summary>
 
-Azure support currently includes normalization and analysis for AzureRM resources:
+Azure support currently includes normalization, decoration, and analysis for AzureRM resources:
 
 * `azurerm_storage_account`
 * `azurerm_storage_account_network_rules`
@@ -440,6 +442,8 @@ Provider-specific behavior is exposed through plugin contribution points for:
 * trust-boundary contributors
 * provider-specific analysis index extensions
 
+Provider-specific rule detectors live in provider-owned domain modules and are wired through each provider's rule contribution root, while rule metadata remains in provider-owned catalogs.
+
 ## Repo Layout
 
 * `src/tfstride/`: CLI, analysis engine, provider plugins, filtering, config, and models
@@ -504,6 +508,8 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 | Nightmare        | `fixtures/azure/sample_azure_nightmare_plan.json`      | `examples/azure/azure_nightmare_report.md`         |
 
 </details>
+
+Additional Azure regression fixtures cover Private Endpoint normalization/posture and unknown storage posture under `fixtures/azure/`; they are intentionally not all generated as demo reports.
 
 ## Development Checks
 
