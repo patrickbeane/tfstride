@@ -18,6 +18,7 @@ from tfstride.providers.gcp.data_normalizers import (
     normalize_storage_bucket,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 
 class GcpDataNormalizerTests(GcpNormalizerTestCase):
@@ -35,6 +36,123 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.GCS_ENCRYPTION_CONFIGURATION), {})
         self.assertTrue(normalized.storage_encrypted)
         self.assertEqual(normalized.metadata_snapshot()["location"], "US")
+
+    def test_storage_bucket_normalizer_preserves_retention_policy(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {
+                    "name": "tfstride-logs",
+                    "project": "tfstride-demo",
+                    "location": "US",
+                    "versioning": [{"enabled": True}],
+                    "retention_policy": [{"retention_period": 2_592_000, "is_locked": False}],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.gcs_retention_period_seconds, 2_592_000)
+        self.assertFalse(facts.gcs_retention_policy_locked)
+        self.assertEqual(
+            facts.gcs_retention_policy_configuration,
+            {"retention_period": 2_592_000, "is_locked": False},
+        )
+        self.assertEqual(facts.gcs_retention_policy_uncertainties, [])
+
+    def test_storage_bucket_normalizer_preserves_short_retention_period(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {
+                    "name": "tfstride-logs",
+                    "retention_policy": [{"retention_period": 3_600, "is_locked": False}],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.gcs_retention_period_seconds, 3_600)
+        self.assertFalse(facts.gcs_retention_policy_locked)
+
+    def test_storage_bucket_normalizer_preserves_retention_lock(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {
+                    "name": "tfstride-logs",
+                    "retention_policy": [{"retention_period": 31_536_000, "is_locked": True}],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.gcs_retention_period_seconds, 31_536_000)
+        self.assertTrue(facts.gcs_retention_policy_locked)
+        self.assertEqual(
+            facts.gcs_retention_policy_configuration,
+            {"retention_period": 31_536_000, "is_locked": True},
+        )
+
+    def test_storage_bucket_normalizer_represents_missing_retention_policy(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {"name": "tfstride-logs"},
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.gcs_retention_period_seconds)
+        self.assertIsNone(facts.gcs_retention_policy_locked)
+        self.assertEqual(facts.gcs_retention_policy_configuration, {})
+        self.assertEqual(facts.gcs_retention_policy_uncertainties, [])
+
+    def test_storage_bucket_normalizer_preserves_unknown_retention_policy_fields(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {"name": "tfstride-logs", "retention_policy": [{}]},
+                unknown_values={"retention_policy": [{"retention_period": True, "is_locked": True}]},
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.gcs_retention_period_seconds)
+        self.assertIsNone(facts.gcs_retention_policy_locked)
+        self.assertEqual(facts.gcs_retention_policy_configuration, {})
+        self.assertEqual(
+            facts.gcs_retention_policy_uncertainties,
+            [
+                "retention_policy.retention_period is unknown after planning",
+                "retention_policy.is_locked is unknown after planning",
+            ],
+        )
+
+    def test_storage_bucket_normalizer_preserves_unknown_retention_policy_block(self) -> None:
+        normalized = normalize_storage_bucket(
+            _terraform_resource(
+                "google_storage_bucket.logs",
+                "google_storage_bucket",
+                {"name": "tfstride-logs"},
+                unknown_values={"retention_policy": True},
+            )
+        )
+
+        self.assertEqual(
+            gcp_facts(normalized).gcs_retention_policy_uncertainties,
+            ["retention_policy is unknown after planning"],
+        )
 
     def test_secret_manager_secret_normalizer_preserves_secret_context(self) -> None:
         normalized = normalize_secret_manager_secret(self.resources["google_secret_manager_secret.api_key"])

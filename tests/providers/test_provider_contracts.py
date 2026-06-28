@@ -120,6 +120,10 @@ _GCP_PROMOTED_RULE_FACING_METADATA_FIELDS = (
     GcpResourceMetadata.UNIFORM_BUCKET_LEVEL_ACCESS,
     GcpResourceMetadata.GCS_VERSIONING_ENABLED,
     GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME,
+    GcpResourceMetadata.GCS_RETENTION_PERIOD_SECONDS,
+    GcpResourceMetadata.GCS_RETENTION_POLICY_LOCKED,
+    GcpResourceMetadata.GCS_RETENTION_POLICY_CONFIGURATION,
+    GcpResourceMetadata.GCS_RETENTION_POLICY_UNCERTAINTIES,
     GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION,
     GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED,
     GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED,
@@ -286,6 +290,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("FIREWALL_DIRECTION", gcp_owned)
         self.assertIn("FIREWALL_POLICY_ENABLE_LOGGING", gcp_owned)
         self.assertIn("CUSTOMER_MANAGED_ENCRYPTION", gcp_owned)
+        self.assertIn("GCS_RETENTION_PERIOD_SECONDS", gcp_owned)
+        self.assertIn("GCS_RETENTION_POLICY_LOCKED", gcp_owned)
         self.assertIn("BUCKET_NAME", aws_owned)
         self.assertIn("BUCKET_ACL", aws_owned)
         self.assertIn("ENGINE", aws_owned)

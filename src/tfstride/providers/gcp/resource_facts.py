@@ -98,6 +98,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.optional_bool(GcpResourceMetadata.GCS_VERSIONING_ENABLED)
 
     @property
+    def gcs_retention_period_seconds(self) -> int | None:
+        return self.get(GcpResourceMetadata.GCS_RETENTION_PERIOD_SECONDS)
+
+    @property
+    def gcs_retention_policy_locked(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GCS_RETENTION_POLICY_LOCKED)
+
+    @property
+    def gcs_retention_policy_configuration(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GCS_RETENTION_POLICY_CONFIGURATION)
+
+    @property
+    def gcs_retention_policy_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.GCS_RETENTION_POLICY_UNCERTAINTIES)
+
+    @property
     def default_kms_key_name(self) -> str | None:
         return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
 

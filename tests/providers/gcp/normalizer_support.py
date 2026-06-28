@@ -17,6 +17,8 @@ def _terraform_resource(
     address: str,
     resource_type: str,
     values: dict[str, object],
+    *,
+    unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     return TerraformResource(
         address=address,
@@ -25,6 +27,7 @@ def _terraform_resource(
         name=address.rsplit(".", 1)[-1],
         provider_name="registry.terraform.io/hashicorp/google",
         values=values,
+        unknown_values=unknown_values or {},
     )
 
 
