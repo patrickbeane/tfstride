@@ -26,6 +26,11 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "aws-s3-public-access",
     "aws-s3-customer-managed-encryption-missing",
     "aws-s3-versioning-disabled",
+    "aws-eks-api-endpoint-public-unrestricted",
+    "aws-eks-private-endpoint-not-enabled",
+    "aws-eks-secrets-encryption-not-configured",
+    "aws-eks-control-plane-logging-incomplete",
+    "aws-eks-authentication-mode-weak-or-unknown",
     "aws-sensitive-resource-policy-external-access",
     "aws-service-resource-policy-external-access",
     "aws-iam-wildcard-permissions",
@@ -162,7 +167,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 96)
+        self.assertEqual(len(metadata), 101)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -171,7 +176,7 @@ class RuleRegistryTests(unittest.TestCase):
         azure_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("azure-"))
 
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
-        self.assertEqual(len(aws_metadata_ids), 15)
+        self.assertEqual(len(aws_metadata_ids), 20)
         self.assertEqual(len(gcp_metadata_ids), 36)
         self.assertEqual(len(azure_metadata_ids), 45)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))

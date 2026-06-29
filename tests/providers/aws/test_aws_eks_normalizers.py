@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
+from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.eks_normalizers import normalize_eks_cluster
@@ -29,7 +30,7 @@ def _cluster(
 
 def _aws_findings(resources: list[TerraformResource]):
     inventory = AwsNormalizer().normalize(resources)
-    return StrideRuleEngine().evaluate(inventory, [])
+    return StrideRuleEngine().evaluate(inventory, [], rule_policy=RulePolicy(enabled_rule_ids=frozenset()))
 
 
 class AwsEksNormalizerTests(unittest.TestCase):

@@ -71,6 +71,60 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-eks-api-endpoint-public-unrestricted",
+        title="EKS Kubernetes API endpoint is public without narrow CIDR restrictions",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable public endpoint access where possible, enable private endpoint access, or restrict "
+            "`vpc_config.public_access_cidrs` to narrow trusted CIDRs."
+        ),
+        tags=("aws", "eks", "kubernetes", "control-plane", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-eks-private-endpoint-not-enabled",
+        title="EKS private API endpoint is not enabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable the EKS private endpoint for private workloads, then restrict or disable public endpoint access "
+            "based on operator access requirements."
+        ),
+        tags=("aws", "eks", "kubernetes", "control-plane", "private-endpoint"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-eks-secrets-encryption-not-configured",
+        title="EKS secrets encryption is not configured",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure EKS `encryption_config` with a KMS key and include `secrets` in the encrypted resources."
+        ),
+        tags=("aws", "eks", "kubernetes", "secrets", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-eks-control-plane-logging-incomplete",
+        title="EKS control-plane logging is disabled or incomplete",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable EKS control-plane log types `api`, `audit`, and `authenticator`, and route logs to retained "
+            "CloudWatch log groups or a centralized logging pipeline."
+        ),
+        tags=("aws", "eks", "kubernetes", "logging", "audit"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-eks-authentication-mode-weak-or-unknown",
+        title="EKS authentication mode is weak or unknown",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Use the EKS access management API where supported, prefer `API` or `API_AND_CONFIG_MAP`, and review "
+            "legacy ConfigMap-only cluster access paths."
+        ),
+        tags=("aws", "eks", "kubernetes", "authentication", "access-management"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sensitive-resource-policy-external-access",
         title="Sensitive resource policy allows broad or cross-account access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

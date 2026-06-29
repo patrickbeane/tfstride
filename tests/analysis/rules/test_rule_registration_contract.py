@@ -19,6 +19,11 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-eks-api-endpoint-public-unrestricted",
+        "aws-eks-private-endpoint-not-enabled",
+        "aws-eks-secrets-encryption-not-configured",
+        "aws-eks-control-plane-logging-incomplete",
+        "aws-eks-authentication-mode-weak-or-unknown",
     ),
     (
         "aws-database-permissive-ingress",
@@ -247,8 +252,8 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (75, 2, 2, 12, 3, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (5, 2, 2, 2, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (80, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (10, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (25, 0, 0, 10, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (45, 0, 0, 0, 0, 0))
 

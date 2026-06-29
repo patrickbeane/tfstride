@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 96,
+      "registered_rule_count": 101,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -45,6 +45,11 @@
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-eks-api-endpoint-public-unrestricted",
+        "aws-eks-private-endpoint-not-enabled",
+        "aws-eks-secrets-encryption-not-configured",
+        "aws-eks-control-plane-logging-incomplete",
+        "aws-eks-authentication-mode-weak-or-unknown",
         "aws-sensitive-resource-policy-external-access",
         "aws-service-resource-policy-external-access",
         "aws-iam-wildcard-permissions",
@@ -145,6 +150,11 @@
         "aws-s3-public-access": 1,
         "aws-s3-customer-managed-encryption-missing": 0,
         "aws-s3-versioning-disabled": 0,
+        "aws-eks-api-endpoint-public-unrestricted": 0,
+        "aws-eks-private-endpoint-not-enabled": 0,
+        "aws-eks-secrets-encryption-not-configured": 0,
+        "aws-eks-control-plane-logging-incomplete": 0,
+        "aws-eks-authentication-mode-weak-or-unknown": 0,
         "aws-sensitive-resource-policy-external-access": 0,
         "aws-service-resource-policy-external-access": 0,
         "aws-iam-wildcard-permissions": 2,
