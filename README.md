@@ -105,7 +105,7 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 
 | Provider | Status          | Coverage Summary                                                                                                                                     |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, RDS, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, EKS control-plane posture, RDS, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
 | GCP      | Active support  | Compute, GKE, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
 | Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
@@ -148,6 +148,8 @@ AWS support currently includes:
 * `aws_internet_gateway`
 * `aws_route_table`
 * `aws_route_table_association`
+
+AWS rule coverage includes public compute ingress, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption and control-plane logging posture, S3 public-access/encryption/versioning posture, database encryption and ingress posture, IAM wildcard and workload-role permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
 
 </details>
 
@@ -536,7 +538,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 * AWS is currently the deepest provider implementation.
 * GCP support is narrower than AWS today and does not include control-observation coverage yet.
 * Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane posture, Private Endpoint posture, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
-* Deeper AKS workload/node posture, Private Endpoint DNS correctness, load balancers, full App Service routing/access-restriction modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
+* Deeper EKS/AKS workload and node posture, Private Endpoint DNS correctness, load balancers, full App Service routing/access-restriction modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
