@@ -7,11 +7,11 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **10 findings** across **15 normalized resources**.
+This run identified **3 trust boundaries** and **14 findings** across **15 normalized resources**.
 
-- High severity findings: `2`
+- High severity findings: `3`
 - Medium severity findings: `8`
-- Low severity findings: `0`
+- Low severity findings: `3`
 
 ## Analysis Coverage
 
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **10 findings** across **15 norma
 - Provider resources considered: `15`
 - Normalized resources: `15`
 - Unsupported resources: `0`
-- Registered rules: `91`
-- Enabled rules: `91`
+- Registered rules: `96`
+- Enabled rules: `96`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -35,6 +35,10 @@ This run identified **3 trust boundaries** and **10 findings** across **15 norma
   - `azure-key-vault-public-network-access`: `1`
   - `azure-key-vault-missing-private-endpoint`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
+  - `azure-aks-api-server-public-unrestricted`: `1`
+  - `azure-aks-local-accounts-not-disabled`: `1`
+  - `azure-aks-rbac-posture-weak`: `1`
+  - `azure-aks-network-policy-missing`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -62,6 +66,18 @@ This run identified **3 trust boundaries** and **10 findings** across **15 norma
 ## Findings
 
 ### High
+
+#### AKS control plane is public without narrow authorized IP ranges
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 6 => high
+- Rationale: azurerm_kubernetes_cluster.platform has AKS private cluster mode disabled and does not define narrow authorized IP ranges for the Kubernetes API server. The control plane is publicly reachable without a reviewed source range restriction.
+- Recommended mitigation: Enable private cluster mode where possible, or configure `api_server_access_profile.authorized_ip_ranges` with narrow trusted CIDRs and avoid internet-wide source ranges.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - control plane posture: private_cluster_state=disabled; authorized_ip_ranges_state=not_configured; api_server_vnet_integration_state=unknown
 
 #### Azure Storage account permits Shared Key authorization
 
@@ -186,9 +202,43 @@ This run identified **3 trust boundaries** and **10 findings** across **15 norma
 
 ### Low
 
-No findings in this severity band.
+#### AKS RBAC posture is weak or not deterministic
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 2 => low
+- Rationale: azurerm_kubernetes_cluster.platform has weak or non-deterministic AKS RBAC posture. Kubernetes RBAC should be explicitly enabled, and Azure RBAC integration should not be disabled when the Azure Active Directory RBAC block is represented in the Terraform plan.
+- Recommended mitigation: Enable Kubernetes RBAC explicitly, use Microsoft Entra ID integration for administrative access, and avoid disabling Azure RBAC integration when the cluster relies on Azure authorization controls.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - rbac posture: kubernetes_rbac_state=unknown; aad_rbac_state=not_configured; aad_managed_state=unknown; aad_azure_rbac_state=unknown; kubernetes RBAC state is unknown
+
+#### AKS local accounts are not disabled
+
+- STRIDE category: Spoofing
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 2 => low
+- Rationale: azurerm_kubernetes_cluster.platform does not deterministically disable AKS local accounts. Local cluster accounts can weaken centralized Microsoft Entra ID identity, auditing, and access control if they remain enabled.
+- Recommended mitigation: Set `local_account_disabled` to `true`, use Microsoft Entra ID-backed authentication, and review any break-glass access paths separately.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - authentication posture: local_account_state=unknown
+
+#### AKS network policy is not configured
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 2 => low
+- Rationale: azurerm_kubernetes_cluster.platform does not have deterministic AKS network policy configured. Without a pod network policy provider, Kubernetes workloads have weaker pod-level traffic isolation and lateral-movement controls.
+- Recommended mitigation: Configure an AKS network policy provider such as Azure, Cilium, or Calico, then define pod-level network policies for sensitive namespaces and workloads.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - network policy posture: network_policy_state=unknown; network_policy is not represented in planned values
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, AKS posture normalization without AKS findings, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and broader platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, AKS control-plane posture findings, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and broader platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

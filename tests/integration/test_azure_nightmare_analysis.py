@@ -15,7 +15,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(len(result.inventory.resources), 27)
-        self.assertEqual(len(result.findings), 20)
+        self.assertEqual(len(result.findings), 24)
         self.assertEqual(
             Counter(finding.rule_id for finding in result.findings),
             Counter(
@@ -27,6 +27,10 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
                     "azure-storage-account-public-network-unrestricted": 2,
                     "azure-storage-account-missing-private-endpoint": 2,
                     "azure-public-compute-broad-ingress": 2,
+                    "azure-aks-api-server-public-unrestricted": 1,
+                    "azure-aks-local-accounts-not-disabled": 1,
+                    "azure-aks-rbac-posture-weak": 1,
+                    "azure-aks-network-policy-missing": 1,
                     "azure-managed-identity-broad-rbac": 1,
                     "azure-public-workload-sensitive-resource-access": 1,
                     "azure-key-vault-public-network-access": 1,
@@ -37,7 +41,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 14, "high": 6}),
+            Counter({"medium": 14, "high": 7, "low": 3}),
         )
 
     def test_nightmare_fixture_stresses_distinct_ssh_and_rdp_nsg_paths(self) -> None:
@@ -110,6 +114,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("allow-rdp priority 200", first)
         self.assertIn("azurerm_storage_container.public_backups", first)
         self.assertIn("Internet-exposed Azure workload can access sensitive resources", first)
+        self.assertIn("AKS control plane is public without narrow authorized IP ranges", first)
 
 
 if __name__ == "__main__":

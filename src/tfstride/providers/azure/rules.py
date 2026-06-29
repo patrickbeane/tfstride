@@ -9,6 +9,7 @@ from tfstride.analysis.rule_definitions import (
     build_rule_contribution,
 )
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
@@ -51,6 +52,11 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
         "azure-app-service-vnet-integration-missing",
+        "azure-aks-api-server-public-unrestricted",
+        "azure-aks-private-cluster-not-enabled",
+        "azure-aks-local-accounts-not-disabled",
+        "azure-aks-rbac-posture-weak",
+        "azure-aks-network-policy-missing",
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
@@ -76,6 +82,7 @@ def build_azure_rule_contribution(
 ) -> RuleContribution:
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
+    aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     custom_role_detectors = AzureCustomRoleRuleDetectors(finding_factory)
@@ -126,6 +133,11 @@ def build_azure_rule_contribution(
         "azure-app-service-minimum-tls-unknown": app_service_detectors.detect_minimum_tls_unknown,
         "azure-app-service-managed-identity-missing": app_service_detectors.detect_managed_identity_missing,
         "azure-app-service-vnet-integration-missing": app_service_detectors.detect_vnet_integration_missing,
+        "azure-aks-api-server-public-unrestricted": aks_detectors.detect_public_api_server_unrestricted,
+        "azure-aks-private-cluster-not-enabled": aks_detectors.detect_private_cluster_not_enabled,
+        "azure-aks-local-accounts-not-disabled": aks_detectors.detect_local_accounts_not_disabled,
+        "azure-aks-rbac-posture-weak": aks_detectors.detect_rbac_posture_weak,
+        "azure-aks-network-policy-missing": aks_detectors.detect_network_policy_missing,
         "azure-sql-public-network-access-enabled": mssql_detectors.detect_public_network_access_enabled,
         "azure-sql-missing-private-endpoint": (private_endpoint_detectors.detect_sql_server_missing_private_endpoint),
         "azure-sql-firewall-broad-public-access": mssql_detectors.detect_broad_firewall_access,

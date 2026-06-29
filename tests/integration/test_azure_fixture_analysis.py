@@ -16,6 +16,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         self.assertEqual(
             [finding.rule_id for finding in result.findings],
             [
+                "azure-aks-api-server-public-unrestricted",
                 "azure-storage-account-shared-key-enabled",
                 "azure-storage-account-nested-public-access-enabled",
                 "azure-key-vault-public-network-access",
@@ -26,11 +27,14 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
                 "azure-public-compute-broad-ingress",
+                "azure-aks-rbac-posture-weak",
+                "azure-aks-local-accounts-not-disabled",
+                "azure-aks-network-policy-missing",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 8, "high": 2}),
+            Counter({"medium": 8, "high": 3, "low": 3}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],
@@ -74,6 +78,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", first)
         self.assertIn("Azure Storage container is publicly accessible", first)
         self.assertIn("Azure Key Vault allows unrestricted public network access", first)
+        self.assertIn("AKS control plane is public without narrow authorized IP ranges", first)
 
 
 if __name__ == "__main__":

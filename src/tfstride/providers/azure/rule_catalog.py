@@ -337,6 +337,61 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-aks-api-server-public-unrestricted",
+        title="AKS control plane is public without narrow authorized IP ranges",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable private cluster mode where possible, or configure `api_server_access_profile.authorized_ip_ranges` "
+            "with narrow trusted CIDRs and avoid internet-wide source ranges."
+        ),
+        tags=("azure", "aks", "kubernetes", "control-plane", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-private-cluster-not-enabled",
+        title="AKS private cluster mode is not enabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable AKS private cluster mode for private workloads, or document why public API server access is "
+            "required and pair it with narrow authorized IP ranges."
+        ),
+        tags=("azure", "aks", "kubernetes", "control-plane", "private-cluster"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-local-accounts-not-disabled",
+        title="AKS local accounts are not disabled",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Set `local_account_disabled` to `true`, use Microsoft Entra ID-backed authentication, and review any "
+            "break-glass access paths separately."
+        ),
+        tags=("azure", "aks", "kubernetes", "identity", "local-accounts"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-rbac-posture-weak",
+        title="AKS RBAC posture is weak or not deterministic",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable Kubernetes RBAC explicitly, use Microsoft Entra ID integration for administrative access, and "
+            "avoid disabling Azure RBAC integration when the cluster relies on Azure authorization controls."
+        ),
+        tags=("azure", "aks", "kubernetes", "rbac", "least-privilege"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-network-policy-missing",
+        title="AKS network policy is not configured",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure an AKS network policy provider such as Azure, Cilium, or Calico, then define pod-level "
+            "network policies for sensitive namespaces and workloads."
+        ),
+        tags=("azure", "aks", "kubernetes", "network-policy", "segmentation"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-sql-public-network-access-enabled",
         title="Azure SQL Database has public network access enabled",
         category=StrideCategory.INFORMATION_DISCLOSURE,

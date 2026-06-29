@@ -6,6 +6,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -252,7 +253,16 @@ class AzureRuleDetectorProviderScopeUnitTests(unittest.TestCase):
                 AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: PUBLIC_NETWORK_FALLBACK_ENABLED,
             },
         )
-        non_azure_context = _context([app, vault, sql, postgres, storage], provider="aws")
+        cluster = _resource(
+            AzureResourceType.KUBERNETES_CLUSTER,
+            "cluster",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                AzureResourceMetadata.AKS_PRIVATE_CLUSTER_STATE: "disabled",
+                AzureResourceMetadata.AKS_AUTHORIZED_IP_RANGES_STATE: "not_configured",
+            },
+        )
+        non_azure_context = _context([app, vault, sql, postgres, storage, cluster], provider="aws")
 
         cases = (
             (
@@ -276,6 +286,10 @@ class AzureRuleDetectorProviderScopeUnitTests(unittest.TestCase):
                     _FINDING_FACTORY
                 ).detect_storage_account_missing_private_endpoint,
                 "azure-storage-account-missing-private-endpoint",
+            ),
+            (
+                AzureAksRuleDetectors(_FINDING_FACTORY).detect_public_api_server_unrestricted,
+                "azure-aks-api-server-public-unrestricted",
             ),
         )
 

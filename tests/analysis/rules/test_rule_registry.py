@@ -101,6 +101,11 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "azure-app-service-minimum-tls-unknown",
     "azure-app-service-managed-identity-missing",
     "azure-app-service-vnet-integration-missing",
+    "azure-aks-api-server-public-unrestricted",
+    "azure-aks-private-cluster-not-enabled",
+    "azure-aks-local-accounts-not-disabled",
+    "azure-aks-rbac-posture-weak",
+    "azure-aks-network-policy-missing",
     "azure-sql-public-network-access-enabled",
     "azure-sql-missing-private-endpoint",
     "azure-sql-firewall-broad-public-access",
@@ -157,7 +162,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 91)
+        self.assertEqual(len(metadata), 96)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -168,7 +173,7 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 15)
         self.assertEqual(len(gcp_metadata_ids), 36)
-        self.assertEqual(len(azure_metadata_ids), 40)
+        self.assertEqual(len(azure_metadata_ids), 45)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
         self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))

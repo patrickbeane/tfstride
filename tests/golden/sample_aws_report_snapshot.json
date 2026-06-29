@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 91,
+      "registered_rule_count": 96,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -120,6 +120,11 @@
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
         "azure-app-service-vnet-integration-missing",
+        "azure-aks-api-server-public-unrestricted",
+        "azure-aks-private-cluster-not-enabled",
+        "azure-aks-local-accounts-not-disabled",
+        "azure-aks-rbac-posture-weak",
+        "azure-aks-network-policy-missing",
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
@@ -215,6 +220,11 @@
         "azure-app-service-minimum-tls-unknown": 0,
         "azure-app-service-managed-identity-missing": 0,
         "azure-app-service-vnet-integration-missing": 0,
+        "azure-aks-api-server-public-unrestricted": 0,
+        "azure-aks-private-cluster-not-enabled": 0,
+        "azure-aks-local-accounts-not-disabled": 0,
+        "azure-aks-rbac-posture-weak": 0,
+        "azure-aks-network-policy-missing": 0,
         "azure-sql-public-network-access-enabled": 0,
         "azure-sql-missing-private-endpoint": 0,
         "azure-sql-firewall-broad-public-access": 0,

@@ -111,8 +111,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
-            "azure-inventory": (AZURE_FIXTURE_PATH, 10, {"high": 2, "medium": 8}),
-            "azure-nightmare": (AZURE_NIGHTMARE_FIXTURE_PATH, 20, {"high": 6, "medium": 14}),
+            "azure-inventory": (AZURE_FIXTURE_PATH, 14, {"high": 3, "medium": 8, "low": 3}),
+            "azure-nightmare": (AZURE_NIGHTMARE_FIXTURE_PATH, 24, {"high": 7, "medium": 14, "low": 3}),
             "azure-nsg-precedence": (AZURE_NSG_PRECEDENCE_FIXTURE_PATH, 0, {}),
             "azure-storage": (AZURE_STORAGE_FIXTURE_PATH, 6, {"high": 2, "medium": 4}),
         }
@@ -226,6 +226,10 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
             },
             "azure-inventory": {
+                "AKS control plane is public without narrow authorized IP ranges": 1,
+                "AKS local accounts are not disabled": 1,
+                "AKS RBAC posture is weak or not deterministic": 1,
+                "AKS network policy is not configured": 1,
                 "Azure Key Vault allows unrestricted public network access": 1,
                 "Azure Key Vault purge protection is disabled": 1,
                 "Azure Key Vault lacks resolved private endpoint coverage": 1,
@@ -238,6 +242,10 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
             },
             "azure-nightmare": {
+                "AKS control plane is public without narrow authorized IP ranges": 1,
+                "AKS local accounts are not disabled": 1,
+                "AKS RBAC posture is weak or not deterministic": 1,
+                "AKS network policy is not configured": 1,
                 "Azure Key Vault allows unrestricted public network access": 1,
                 "Azure Key Vault purge protection is disabled": 1,
                 "Azure Key Vault lacks resolved private endpoint coverage": 1,

@@ -70,7 +70,6 @@ class AzureAksNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.aks_azure_policy_state, "disabled")
         self.assertEqual(facts.aks_kubernetes_version, "1.29.4")
         self.assertEqual(facts.aks_posture_uncertainties, [])
-        self.assertEqual(_azure_findings([_cluster({"name": "public", "private_cluster_enabled": False})]), [])
 
     def test_restricted_cluster_normalizes_safe_posture_values(self) -> None:
         normalized = normalize_kubernetes_cluster(
@@ -153,7 +152,25 @@ class AzureAksNormalizerTests(unittest.TestCase):
             facts.aks_maintenance_windows,
             [{"type": "maintenance_window_auto_upgrade", "frequency": "Weekly", "day_of_week": "Sunday"}],
         )
-        self.assertEqual(_azure_findings([_cluster({"name": "restricted", "private_cluster_enabled": True})]), [])
+        self.assertEqual(
+            _azure_findings(
+                [
+                    _cluster(
+                        {
+                            "name": "restricted",
+                            "private_cluster_enabled": True,
+                            "local_account_disabled": True,
+                            "role_based_access_control_enabled": True,
+                            "azure_active_directory_role_based_access_control": [
+                                {"managed": True, "azure_rbac_enabled": True}
+                            ],
+                            "network_profile": [{"network_plugin": "azure", "network_policy": "azure"}],
+                        }
+                    )
+                ]
+            ),
+            [],
+        )
 
     def test_minimal_cluster_uses_explicit_unknown_and_not_configured_states(self) -> None:
         normalized = normalize_kubernetes_cluster(_cluster({"name": "minimal"}, name="minimal"))
@@ -290,14 +307,19 @@ class AzureAksNormalizerTests(unittest.TestCase):
             ],
         )
 
-    def test_azure_normalizer_supports_kubernetes_cluster_without_findings(self) -> None:
+    def test_azure_normalizer_supports_kubernetes_cluster_resource_type(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
                 _cluster(
                     {
                         "name": "cluster",
-                        "private_cluster_enabled": False,
-                        "api_server_access_profile": [{"authorized_ip_ranges": []}],
+                        "private_cluster_enabled": True,
+                        "local_account_disabled": True,
+                        "role_based_access_control_enabled": True,
+                        "azure_active_directory_role_based_access_control": [
+                            {"managed": True, "azure_rbac_enabled": True}
+                        ],
+                        "network_profile": [{"network_plugin": "azure", "network_policy": "azure"}],
                     }
                 )
             ]
