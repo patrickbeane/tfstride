@@ -26,6 +26,7 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_sns_topic,
     normalize_sqs_queue,
 )
+from tfstride.providers.aws.eks_normalizers import normalize_eks_cluster
 from tfstride.providers.aws.iam_normalizers import (
     normalize_iam_instance_profile,
     normalize_iam_policy,
@@ -59,6 +60,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_ecs_cluster": normalize_ecs_cluster,
     "aws_ecs_service": normalize_ecs_service,
     "aws_ecs_task_definition": normalize_ecs_task_definition,
+    "aws_eks_cluster": normalize_eks_cluster,
     "aws_iam_instance_profile": normalize_iam_instance_profile,
     "aws_iam_policy": normalize_iam_policy,
     "aws_iam_role": normalize_iam_role,

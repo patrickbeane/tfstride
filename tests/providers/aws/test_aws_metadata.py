@@ -54,6 +54,17 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "S3_VERSIONING_CONFIGURATION": "s3_versioning_configuration",
             "S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION": "s3_server_side_encryption_configuration",
             "S3_POSTURE_UNCERTAINTIES": "s3_posture_uncertainties",
+            "EKS_CLUSTER_ARN": "eks_cluster_arn",
+            "EKS_CLUSTER_ROLE_ARN": "eks_cluster_role_arn",
+            "EKS_ENDPOINT_PUBLIC_ACCESS_STATE": "eks_endpoint_public_access_state",
+            "EKS_ENDPOINT_PRIVATE_ACCESS_STATE": "eks_endpoint_private_access_state",
+            "EKS_PUBLIC_ACCESS_CIDRS": "eks_public_access_cidrs",
+            "EKS_PUBLIC_ACCESS_CIDRS_STATE": "eks_public_access_cidrs_state",
+            "EKS_CONTROL_PLANE_LOGGING_STATE": "eks_control_plane_logging_state",
+            "EKS_ENABLED_CLUSTER_LOG_TYPES": "eks_enabled_cluster_log_types",
+            "EKS_SECRETS_ENCRYPTION_STATE": "eks_secrets_encryption_state",
+            "EKS_AUTHENTICATION_MODE": "eks_authentication_mode",
+            "EKS_POSTURE_UNCERTAINTIES": "eks_posture_uncertainties",
         }
 
         for field_name, key in expected_keys.items():

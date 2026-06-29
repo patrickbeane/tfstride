@@ -229,6 +229,98 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES)
 
     @property
+    def eks_cluster_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_CLUSTER_ARN)
+
+    @property
+    def eks_cluster_role_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_CLUSTER_ROLE_ARN)
+
+    @property
+    def eks_kubernetes_version(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_KUBERNETES_VERSION)
+
+    @property
+    def eks_endpoint_public_access_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ENDPOINT_PUBLIC_ACCESS_STATE)
+
+    @property
+    def eks_endpoint_private_access_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ENDPOINT_PRIVATE_ACCESS_STATE)
+
+    @property
+    def eks_public_access_cidrs(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_PUBLIC_ACCESS_CIDRS)
+
+    @property
+    def eks_public_access_cidrs_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_PUBLIC_ACCESS_CIDRS_STATE)
+
+    @property
+    def eks_subnet_ids(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_SUBNET_IDS)
+
+    @property
+    def eks_security_group_ids(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_SECURITY_GROUP_IDS)
+
+    @property
+    def eks_cluster_security_group_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_CLUSTER_SECURITY_GROUP_ID)
+
+    @property
+    def eks_vpc_config(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.EKS_VPC_CONFIG)
+
+    @property
+    def eks_enabled_cluster_log_types(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_ENABLED_CLUSTER_LOG_TYPES)
+
+    @property
+    def eks_control_plane_logging_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_CONTROL_PLANE_LOGGING_STATE)
+
+    @property
+    def eks_encryption_config(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.EKS_ENCRYPTION_CONFIG)
+
+    @property
+    def eks_encryption_config_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ENCRYPTION_CONFIG_STATE)
+
+    @property
+    def eks_secrets_encryption_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_SECRETS_ENCRYPTION_STATE)
+
+    @property
+    def eks_encryption_key_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ENCRYPTION_KEY_ARN)
+
+    @property
+    def eks_encryption_resources(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_ENCRYPTION_RESOURCES)
+
+    @property
+    def eks_access_config_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ACCESS_CONFIG_STATE)
+
+    @property
+    def eks_authentication_mode(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_AUTHENTICATION_MODE)
+
+    @property
+    def eks_bootstrap_cluster_creator_admin_permissions_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_BOOTSTRAP_CLUSTER_CREATOR_ADMIN_PERMISSIONS_STATE)
+
+    @property
+    def eks_access_config(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.EKS_ACCESS_CONFIG)
+
+    @property
+    def eks_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES)
+
+    @property
     def engine(self) -> str | None:
         return self.get(AwsResourceMetadata.ENGINE)
 

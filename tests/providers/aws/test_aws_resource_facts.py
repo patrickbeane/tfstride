@@ -50,6 +50,34 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "s3_encryption_source_address": "aws_s3_bucket_server_side_encryption_configuration.logs",
                 "s3_server_side_encryption_configuration": {"rule": []},
                 "s3_posture_uncertainties": ["aws_s3_bucket_versioning.logs: status is unknown"],
+                "eks_cluster_arn": "arn:aws:eks:us-east-1:111122223333:cluster/app",
+                "eks_cluster_role_arn": "arn:aws:iam::111122223333:role/eks-control-plane",
+                "eks_kubernetes_version": "1.29",
+                "eks_endpoint_public_access_state": "enabled",
+                "eks_endpoint_private_access_state": "disabled",
+                "eks_public_access_cidrs": ["0.0.0.0/0"],
+                "eks_public_access_cidrs_state": "configured",
+                "eks_subnet_ids": ["subnet-a", "subnet-b"],
+                "eks_security_group_ids": ["sg-client"],
+                "eks_cluster_security_group_id": "sg-cluster",
+                "eks_vpc_config": {"endpoint_public_access": True},
+                "eks_enabled_cluster_log_types": ["api", "audit", "authenticator"],
+                "eks_control_plane_logging_state": "configured",
+                "eks_encryption_config": [
+                    {
+                        "key_arn": "arn:aws:kms:us-east-1:111122223333:key/eks",
+                        "resources": ["secrets"],
+                    }
+                ],
+                "eks_encryption_config_state": "configured",
+                "eks_secrets_encryption_state": "enabled",
+                "eks_encryption_key_arn": "arn:aws:kms:us-east-1:111122223333:key/eks",
+                "eks_encryption_resources": ["secrets"],
+                "eks_access_config_state": "configured",
+                "eks_authentication_mode": "API_AND_CONFIG_MAP",
+                "eks_bootstrap_cluster_creator_admin_permissions_state": "enabled",
+                "eks_access_config": {"authentication_mode": "API_AND_CONFIG_MAP"},
+                "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
 
@@ -76,6 +104,35 @@ class AwsResourceFactsTests(unittest.TestCase):
         )
         self.assertEqual(facts.s3_server_side_encryption_configuration, {"rule": []})
         self.assertEqual(facts.s3_posture_uncertainties, ["aws_s3_bucket_versioning.logs: status is unknown"])
+        self.assertEqual(facts.eks_cluster_arn, "arn:aws:eks:us-east-1:111122223333:cluster/app")
+        self.assertEqual(facts.eks_cluster_role_arn, "arn:aws:iam::111122223333:role/eks-control-plane")
+        self.assertEqual(facts.eks_kubernetes_version, "1.29")
+        self.assertEqual(facts.eks_endpoint_public_access_state, "enabled")
+        self.assertEqual(facts.eks_endpoint_private_access_state, "disabled")
+        self.assertEqual(facts.eks_public_access_cidrs, ["0.0.0.0/0"])
+        self.assertEqual(facts.eks_public_access_cidrs_state, "configured")
+        self.assertEqual(facts.eks_subnet_ids, ["subnet-a", "subnet-b"])
+        self.assertEqual(facts.eks_security_group_ids, ["sg-client"])
+        self.assertEqual(facts.eks_cluster_security_group_id, "sg-cluster")
+        self.assertEqual(facts.eks_vpc_config, {"endpoint_public_access": True})
+        self.assertEqual(facts.eks_enabled_cluster_log_types, ["api", "audit", "authenticator"])
+        self.assertEqual(facts.eks_control_plane_logging_state, "configured")
+        self.assertEqual(
+            facts.eks_encryption_config,
+            [{"key_arn": "arn:aws:kms:us-east-1:111122223333:key/eks", "resources": ["secrets"]}],
+        )
+        self.assertEqual(facts.eks_encryption_config_state, "configured")
+        self.assertEqual(facts.eks_secrets_encryption_state, "enabled")
+        self.assertEqual(facts.eks_encryption_key_arn, "arn:aws:kms:us-east-1:111122223333:key/eks")
+        self.assertEqual(facts.eks_encryption_resources, ["secrets"])
+        self.assertEqual(facts.eks_access_config_state, "configured")
+        self.assertEqual(facts.eks_authentication_mode, "API_AND_CONFIG_MAP")
+        self.assertEqual(facts.eks_bootstrap_cluster_creator_admin_permissions_state, "enabled")
+        self.assertEqual(facts.eks_access_config, {"authentication_mode": "API_AND_CONFIG_MAP"})
+        self.assertEqual(
+            facts.eks_posture_uncertainties,
+            ["vpc_config.endpoint_public_access is unknown after planning"],
+        )
 
     def test_writes_aws_provider_metadata_through_resource_fields(self) -> None:
         resource = _resource()
@@ -137,6 +194,29 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.s3_encryption_source_address)
         self.assertEqual(facts.s3_server_side_encryption_configuration, {})
         self.assertEqual(facts.s3_posture_uncertainties, [])
+        self.assertIsNone(facts.eks_cluster_arn)
+        self.assertIsNone(facts.eks_cluster_role_arn)
+        self.assertIsNone(facts.eks_kubernetes_version)
+        self.assertIsNone(facts.eks_endpoint_public_access_state)
+        self.assertIsNone(facts.eks_endpoint_private_access_state)
+        self.assertEqual(facts.eks_public_access_cidrs, [])
+        self.assertIsNone(facts.eks_public_access_cidrs_state)
+        self.assertEqual(facts.eks_subnet_ids, [])
+        self.assertEqual(facts.eks_security_group_ids, [])
+        self.assertIsNone(facts.eks_cluster_security_group_id)
+        self.assertEqual(facts.eks_vpc_config, {})
+        self.assertEqual(facts.eks_enabled_cluster_log_types, [])
+        self.assertIsNone(facts.eks_control_plane_logging_state)
+        self.assertEqual(facts.eks_encryption_config, [])
+        self.assertIsNone(facts.eks_encryption_config_state)
+        self.assertIsNone(facts.eks_secrets_encryption_state)
+        self.assertIsNone(facts.eks_encryption_key_arn)
+        self.assertEqual(facts.eks_encryption_resources, [])
+        self.assertIsNone(facts.eks_access_config_state)
+        self.assertIsNone(facts.eks_authentication_mode)
+        self.assertIsNone(facts.eks_bootstrap_cluster_creator_admin_permissions_state)
+        self.assertEqual(facts.eks_access_config, {})
+        self.assertEqual(facts.eks_posture_uncertainties, [])
 
     def test_policy_document_is_mutated_only_through_facts_facade(self) -> None:
         resource = _resource()
