@@ -14,7 +14,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         result = TfStride().analyze_plan(AZURE_NIGHTMARE_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "azure")
-        self.assertEqual(len(result.inventory.resources), 26)
+        self.assertEqual(len(result.inventory.resources), 27)
         self.assertEqual(len(result.findings), 20)
         self.assertEqual(
             Counter(finding.rule_id for finding in result.findings),
@@ -93,16 +93,11 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(coverage.total_resources, 27)
         self.assertEqual(coverage.provider_resources, 27)
-        self.assertEqual(coverage.normalized_resources, 26)
-        self.assertEqual(coverage.unsupported_resources, 1)
-        self.assertEqual(
-            coverage.unsupported_resource_types,
-            {"azurerm_kubernetes_cluster": 1},
-        )
-        self.assertEqual(
-            result.inventory.unsupported_resources,
-            ["azurerm_kubernetes_cluster.platform"],
-        )
+        self.assertEqual(coverage.normalized_resources, 27)
+        self.assertEqual(coverage.unsupported_resources, 0)
+        self.assertEqual(coverage.unsupported_resource_types, {})
+        self.assertEqual(result.inventory.unsupported_resources, [])
+        self.assertIsNotNone(result.inventory.get_by_address("azurerm_kubernetes_cluster.platform"))
 
     def test_nightmare_report_is_deterministic(self) -> None:
         engine = TfStride()

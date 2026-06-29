@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_azure_plan.json`
 - Provider: `azure`
-- Normalized resources: `14`
-- Unsupported resources: `1`
+- Normalized resources: `15`
+- Unsupported resources: `0`
 
 ## Summary
 
-This run identified **3 trust boundaries** and **10 findings** across **14 normalized resources**.
+This run identified **3 trust boundaries** and **10 findings** across **15 normalized resources**.
 
 - High severity findings: `2`
 - Medium severity findings: `8`
@@ -17,15 +17,13 @@ This run identified **3 trust boundaries** and **10 findings** across **14 norma
 
 - Terraform resources seen: `15`
 - Provider resources considered: `15`
-- Normalized resources: `14`
-- Unsupported resources: `1`
+- Normalized resources: `15`
+- Unsupported resources: `0`
 - Registered rules: `91`
 - Enabled rules: `91`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
-- Unsupported resource types:
-  - `azurerm_kubernetes_cluster`: `1`
 - Findings by rule:
   - `azure-public-compute-broad-ingress`: `1`
   - `azure-storage-container-public-access`: `1`
@@ -192,6 +190,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and platform-service modeling are not implemented yet.
+- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, AKS posture normalization without AKS findings, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and broader platform-service modeling are not implemented yet.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.
-- Unsupported resource skipped: `azurerm_kubernetes_cluster.platform`

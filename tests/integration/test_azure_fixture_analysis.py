@@ -70,7 +70,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertIn("azurerm_key_vault", first)
-        self.assertIn("azurerm_kubernetes_cluster", first)
+        self.assertIn("Unsupported resources: `0`", first)
         self.assertIn("Internet-exposed Azure virtual machine permits broad ingress", first)
         self.assertIn("Azure Storage container is publicly accessible", first)
         self.assertIn("Azure Key Vault allows unrestricted public network access", first)

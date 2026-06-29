@@ -66,6 +66,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_WEB_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_FUNCTION_APP))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.KUBERNETES_CLUSTER))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),

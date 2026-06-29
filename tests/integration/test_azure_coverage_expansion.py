@@ -15,16 +15,10 @@ class AzureCoverageExpansionIntegrationTests(unittest.TestCase):
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(coverage.total_resources, 15)
         self.assertEqual(coverage.provider_resources, 15)
-        self.assertEqual(coverage.normalized_resources, 14)
-        self.assertEqual(coverage.unsupported_resources, 1)
-        self.assertEqual(
-            result.inventory.unsupported_resources,
-            ["azurerm_kubernetes_cluster.platform"],
-        )
-        self.assertEqual(
-            coverage.unsupported_resource_types,
-            {"azurerm_kubernetes_cluster": 1},
-        )
+        self.assertEqual(coverage.normalized_resources, 15)
+        self.assertEqual(coverage.unsupported_resources, 0)
+        self.assertEqual(result.inventory.unsupported_resources, [])
+        self.assertEqual(coverage.unsupported_resource_types, {})
 
     def test_mixed_fixture_normalizes_only_existing_storage_compute_and_network_domains(self) -> None:
         result = TfStride().analyze_plan(AZURE_FIXTURE_PATH)
@@ -45,11 +39,11 @@ class AzureCoverageExpansionIntegrationTests(unittest.TestCase):
                 AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION,
                 AzureResourceType.PUBLIC_IP,
                 AzureResourceType.LINUX_VIRTUAL_MACHINE,
+                AzureResourceType.KUBERNETES_CLUSTER,
                 AzureResourceType.KEY_VAULT,
             },
         )
         self.assertIn(AzureResourceType.KEY_VAULT, normalized_types)
-        self.assertNotIn("azurerm_kubernetes_cluster", normalized_types)
 
 
 if __name__ == "__main__":

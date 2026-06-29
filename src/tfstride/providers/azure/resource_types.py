@@ -31,6 +31,7 @@ class AzureResourceType:
     FUNCTION_APP = "azurerm_function_app"
     LINUX_FUNCTION_APP = "azurerm_linux_function_app"
     WINDOWS_FUNCTION_APP = "azurerm_windows_function_app"
+    KUBERNETES_CLUSTER = "azurerm_kubernetes_cluster"
     LINUX_VIRTUAL_MACHINE = "azurerm_linux_virtual_machine"
     WINDOWS_VIRTUAL_MACHINE = "azurerm_windows_virtual_machine"
     MSSQL_SERVER = "azurerm_mssql_server"
@@ -87,6 +88,8 @@ AZURE_COMPUTE_RESOURCE_TYPES = frozenset(
     }
 )
 
+AZURE_AKS_RESOURCE_TYPES = frozenset({AzureResourceType.KUBERNETES_CLUSTER})
+
 AZURE_APP_SERVICE_RESOURCE_TYPES = frozenset(
     {
         AzureResourceType.LINUX_WEB_APP,
@@ -123,6 +126,7 @@ AZURE_SUPPORTED_RESOURCE_TYPES = (
     | AZURE_RBAC_RESOURCE_TYPES
     | AZURE_NETWORK_RESOURCE_TYPES
     | AZURE_COMPUTE_RESOURCE_TYPES
+    | AZURE_AKS_RESOURCE_TYPES
     | AZURE_APP_SERVICE_RESOURCE_TYPES
     | AZURE_SQL_RESOURCE_TYPES
     | AZURE_POSTGRESQL_RESOURCE_TYPES
