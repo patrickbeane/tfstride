@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
 from dataclasses import dataclass
 
 from tfstride.analysis.finding_factory import FindingFactory
@@ -9,6 +8,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
 
 _ENABLED = "enabled"
 _DISABLED = "disabled"
@@ -71,8 +71,8 @@ class AzureAksRuleDetectors:
                         evidence_item("control_plane_posture", _control_plane_evidence(facts, authorized_ips)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(
-                                facts,
+                            uncertainty_evidence(
+                                facts.aks_posture_uncertainties,
                                 (
                                     "private_cluster_enabled",
                                     "api_server_access_profile.authorized_ip_ranges",
@@ -167,7 +167,7 @@ class AzureAksRuleDetectors:
                         evidence_item("authentication_posture", _local_account_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("local_account_disabled",)),
+                            uncertainty_evidence(facts.aks_posture_uncertainties, ("local_account_disabled",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -214,8 +214,8 @@ class AzureAksRuleDetectors:
                         evidence_item("rbac_posture", _rbac_evidence(facts, issues)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(
-                                facts,
+                            uncertainty_evidence(
+                                facts.aks_posture_uncertainties,
                                 (
                                     "role_based_access_control_enabled",
                                     "azure_active_directory_role_based_access_control.azure_rbac_enabled",
@@ -268,7 +268,7 @@ class AzureAksRuleDetectors:
                         evidence_item("network_policy_posture", _network_policy_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("network_profile.network_policy",)),
+                            uncertainty_evidence(facts.aks_posture_uncertainties, ("network_profile.network_policy",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -316,7 +316,9 @@ class AzureAksRuleDetectors:
                         evidence_item("workload_identity_posture", _workload_identity_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("oidc_issuer_enabled", "workload_identity_enabled")),
+                            uncertainty_evidence(
+                                facts.aks_posture_uncertainties, ("oidc_issuer_enabled", "workload_identity_enabled")
+                            ),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -360,7 +362,10 @@ class AzureAksRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(cluster)),
                         evidence_item("secret_encryption_posture", _kms_evidence(facts)),
-                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("key_management_service",))),
+                        evidence_item(
+                            "posture_uncertainty",
+                            uncertainty_evidence(facts.aks_posture_uncertainties, ("key_management_service",)),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -403,7 +408,9 @@ class AzureAksRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(cluster)),
                         evidence_item("monitoring_posture", _monitoring_evidence(facts)),
-                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("oms_agent",))),
+                        evidence_item(
+                            "posture_uncertainty", uncertainty_evidence(facts.aks_posture_uncertainties, ("oms_agent",))
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -448,7 +455,9 @@ class AzureAksRuleDetectors:
                         evidence_item("defender_posture", _defender_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("microsoft_defender", "security_profile")),
+                            uncertainty_evidence(
+                                facts.aks_posture_uncertainties, ("microsoft_defender", "security_profile")
+                            ),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -492,7 +501,10 @@ class AzureAksRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(cluster)),
                         evidence_item("azure_policy_posture", _azure_policy_evidence(facts)),
-                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("azure_policy_enabled",))),
+                        evidence_item(
+                            "posture_uncertainty",
+                            uncertainty_evidence(facts.aks_posture_uncertainties, ("azure_policy_enabled",)),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -608,22 +620,11 @@ def _authorized_ip_restriction(facts: AzureResourceFacts) -> _AuthorizedIpRestri
     if not facts.aks_authorized_ip_ranges:
         return _AuthorizedIpRestriction(_NOT_CONFIGURED)
     broad_ranges = tuple(
-        range_value for range_value in facts.aks_authorized_ip_ranges if _is_broad_public_range(range_value)
+        range_value for range_value in facts.aks_authorized_ip_ranges if is_broad_public_range(range_value)
     )
     if broad_ranges:
         return _AuthorizedIpRestriction("broad", broad_ranges)
     return _AuthorizedIpRestriction("narrow")
-
-
-def _is_broad_public_range(value: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"*", "internet", "any"}:
-        return True
-    try:
-        network = ipaddress.ip_network(normalized, strict=False)
-    except ValueError:
-        return False
-    return network.prefixlen == 0
 
 
 def _rbac_issues(facts: AzureResourceFacts) -> list[str]:
@@ -653,11 +654,3 @@ def _network_policy_is_none(value: str | None) -> bool:
     if value is None:
         return False
     return value.strip().lower() in {"none", "disabled", "false", "off"}
-
-
-def _uncertainty_evidence(facts: AzureResourceFacts, field_markers: tuple[str, ...]) -> list[str]:
-    return [
-        uncertainty
-        for uncertainty in facts.aks_posture_uncertainties
-        if any(marker in uncertainty for marker in field_markers)
-    ]

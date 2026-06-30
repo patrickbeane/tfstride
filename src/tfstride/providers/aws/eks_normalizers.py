@@ -18,8 +18,8 @@ from tfstride.providers.coercion import (
     known_bool,
     known_string,
     known_string_list,
-    unknown_block_at,
 )
+from tfstride.providers.kubernetes import block_value, dedupe, first_unknown_block, unknown_block_at_index
 
 _STATE_ENABLED = "enabled"
 _STATE_DISABLED = "disabled"
@@ -42,9 +42,9 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
     cluster_arn = known_string(values, unknown_values, "arn", uncertainties)
     role_arn = known_string(values, unknown_values, "role_arn", uncertainties)
     vpc_config = first_mapping(values.get("vpc_config"), scan_all=True)
-    vpc_unknown = _first_unknown_block(unknown_values.get("vpc_config"))
+    vpc_unknown = first_unknown_block(unknown_values.get("vpc_config"))
     access_config = first_mapping(values.get("access_config"), scan_all=True)
-    access_unknown = _first_unknown_block(unknown_values.get("access_config"))
+    access_unknown = first_unknown_block(unknown_values.get("access_config"))
     public_access_cidrs = known_block_strings(
         vpc_config,
         vpc_unknown,
@@ -142,7 +142,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
         AwsResourceMetadata.EKS_ACCESS_CONFIG: dict(access_config) if access_config is not None else None,
     }
     if uncertainties:
-        metadata[AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES] = _dedupe(uncertainties)
+        metadata[AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES] = dedupe(uncertainties)
 
     return NormalizedResource(
         address=resource.address,
@@ -189,7 +189,7 @@ def normalize_eks_addon(resource: TerraformResource) -> NormalizedResource:
         AwsResourceMetadata.EKS_ADDON_TARGET_CLASS: _addon_target_class(addon_name),
     }
     if uncertainties:
-        metadata[AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES] = _dedupe(uncertainties)
+        metadata[AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES] = dedupe(uncertainties)
 
     return NormalizedResource(
         address=resource.address,
@@ -289,9 +289,9 @@ def _encryption_config(resource: TerraformResource, uncertainties: list[str]) ->
                 uncertainties.append(f"encryption_config[{index}] has an unrecognized value shape")
             continue
         path = f"encryption_config[{index}]"
-        unknown_item = _unknown_block_at(raw_unknown, index)
+        unknown_item = unknown_block_at_index(raw_unknown, index, mapping_applies_to_any_index=True)
         provider = first_mapping(item.get("provider"), scan_all=True)
-        provider_unknown = _first_unknown_block(_block_value(unknown_item, "provider"))
+        provider_unknown = first_unknown_block(block_value(unknown_item, "provider"))
         key_arn = known_block_string(provider, provider_unknown, "key_arn", uncertainties, path=f"{path}.provider")
         resources = known_block_strings(item, unknown_item, "resources", uncertainties, path=path)
         record: dict[str, Any] = {}
@@ -304,7 +304,7 @@ def _encryption_config(resource: TerraformResource, uncertainties: list[str]) ->
 
 
 def _encryption_resources(records: list[dict[str, Any]]) -> list[str]:
-    return _dedupe(value for record in records for value in record.get("resources", []))
+    return dedupe(value for record in records for value in record.get("resources", []))
 
 
 def _encryption_resources_unknown(unknown_block: Any) -> bool:
@@ -338,26 +338,6 @@ def _addon_target_class(addon_name: str | None) -> str | None:
     return _EKS_ADDON_TARGET_CLASSES.get(addon_name.strip().lower())
 
 
-def _first_unknown_block(value: Any) -> Any:
-    if value is True or isinstance(value, Mapping):
-        return value
-    return unknown_block_at(value, 0)
-
-
-def _unknown_block_at(value: Any, index: int) -> Any:
-    if value is True or isinstance(value, Mapping):
-        return value
-    return unknown_block_at(value, index)
-
-
-def _block_value(block: Any, key: str) -> Any:
-    if isinstance(block, Mapping):
-        return block.get(key)
-    if block is True:
-        return True
-    return None
-
-
 def _first_non_empty(values: Any) -> str | None:
     for value in values:
         if value is None:
@@ -366,17 +346,3 @@ def _first_non_empty(values: Any) -> str | None:
         if text:
             return text
     return None
-
-
-def _dedupe(values: Any) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if not text or text in seen:
-            continue
-        deduped.append(text)
-        seen.add(text)
-    return deduped

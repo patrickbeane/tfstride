@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
 
 _AWS_EKS_CLUSTER = "aws_eks_cluster"
 _AWS_EKS_ADDON = "aws_eks_addon"
@@ -85,8 +85,8 @@ class AwsEksRuleDetectors:
                         evidence_item("api_endpoint_posture", _api_endpoint_evidence(facts, restriction)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(
-                                facts,
+                            uncertainty_evidence(
+                                facts.eks_posture_uncertainties,
                                 (
                                     "vpc_config.endpoint_public_access",
                                     "vpc_config.public_access_cidrs",
@@ -180,7 +180,7 @@ class AwsEksRuleDetectors:
                         evidence_item("secrets_encryption_posture", _secrets_encryption_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("encryption_config",)),
+                            uncertainty_evidence(facts.eks_posture_uncertainties, ("encryption_config",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -228,7 +228,7 @@ class AwsEksRuleDetectors:
                         evidence_item("control_plane_logging", _control_plane_logging_evidence(facts, missing_logs)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("enabled_cluster_log_types",)),
+                            uncertainty_evidence(facts.eks_posture_uncertainties, ("enabled_cluster_log_types",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -274,7 +274,9 @@ class AwsEksRuleDetectors:
                         evidence_item("authentication_posture", _authentication_evidence(facts, state)),
                         evidence_item(
                             "posture_uncertainty",
-                            _uncertainty_evidence(facts, ("access_config.authentication_mode",)),
+                            uncertainty_evidence(
+                                facts.eks_posture_uncertainties, ("access_config.authentication_mode",)
+                            ),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -457,21 +459,10 @@ def _public_access_restriction(facts: AwsResourceFacts) -> _PublicAccessRestrict
         return _PublicAccessRestriction(_STATE_UNKNOWN)
     if not facts.eks_public_access_cidrs:
         return _PublicAccessRestriction(_STATE_NOT_CONFIGURED)
-    broad_ranges = tuple(value for value in facts.eks_public_access_cidrs if _is_broad_public_range(value))
+    broad_ranges = tuple(value for value in facts.eks_public_access_cidrs if is_broad_public_range(value))
     if broad_ranges:
         return _PublicAccessRestriction("broad", broad_ranges)
     return _PublicAccessRestriction("narrow")
-
-
-def _is_broad_public_range(value: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"*", "internet", "any"}:
-        return True
-    try:
-        network = ipaddress.ip_network(normalized, strict=False)
-    except ValueError:
-        return False
-    return network.prefixlen == 0
 
 
 def _missing_security_log_types(facts: AwsResourceFacts) -> tuple[str, ...]:
@@ -481,8 +472,8 @@ def _missing_security_log_types(facts: AwsResourceFacts) -> tuple[str, ...]:
 
 def _authentication_mode_state(facts: AwsResourceFacts) -> str:
     mode = facts.eks_authentication_mode
-    if facts.eks_access_config_state == _STATE_UNKNOWN or _uncertainty_evidence(
-        facts,
+    if facts.eks_access_config_state == _STATE_UNKNOWN or uncertainty_evidence(
+        facts.eks_posture_uncertainties,
         ("access_config.authentication_mode",),
     ):
         return _STATE_UNKNOWN
@@ -548,11 +539,3 @@ def _display_config_value(value: Any) -> str:
     if isinstance(value, bool):
         return str(value).lower()
     return str(value)
-
-
-def _uncertainty_evidence(facts: AwsResourceFacts, field_markers: tuple[str, ...]) -> list[str]:
-    return [
-        uncertainty
-        for uncertainty in facts.eks_posture_uncertainties
-        if any(marker in uncertainty for marker in field_markers)
-    ]

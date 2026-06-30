@@ -35,6 +35,7 @@ from tfstride.providers.gcp.constants import (
 )
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
+from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
 from tfstride.resource_helpers import describe_security_group_rule
 
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
@@ -469,7 +470,9 @@ class GcpComputeRuleDetectors:
                         evidence_item("logging_posture", _gke_logging_evidence(cluster_facts, logging_issues)),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(cluster_facts, ("logging_service", "logging_config")),
+                            uncertainty_evidence(
+                                cluster_facts.gke_posture_uncertainties, ("logging_service", "logging_config")
+                            ),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -513,7 +516,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("network_policy_posture", _gke_network_policy_evidence(cluster_facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(cluster_facts, ("network_policy",)),
+                            uncertainty_evidence(cluster_facts.gke_posture_uncertainties, ("network_policy",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -557,7 +560,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("secret_encryption_posture", _gke_secrets_encryption_evidence(cluster_facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(cluster_facts, ("database_encryption",)),
+                            uncertainty_evidence(cluster_facts.gke_posture_uncertainties, ("database_encryption",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -601,7 +604,7 @@ class GcpComputeRuleDetectors:
                         evidence_item("legacy_abac_posture", _gke_legacy_abac_evidence(cluster_facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(cluster_facts, ("enable_legacy_abac",)),
+                            uncertainty_evidence(cluster_facts.gke_posture_uncertainties, ("enable_legacy_abac",)),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -650,8 +653,8 @@ class GcpComputeRuleDetectors:
                         ),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(
-                                cluster_facts,
+                            uncertainty_evidence(
+                                cluster_facts.gke_posture_uncertainties,
                                 ("master_auth.client_certificate_config.issue_client_certificate",),
                             ),
                         ),
@@ -697,8 +700,8 @@ class GcpComputeRuleDetectors:
                         evidence_item("shielded_nodes_posture", _gke_shielded_nodes_evidence(cluster_facts)),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(
-                                cluster_facts,
+                            uncertainty_evidence(
+                                cluster_facts.gke_posture_uncertainties,
                                 ("enable_shielded_nodes", "shielded_nodes.enabled"),
                             ),
                         ),
@@ -749,7 +752,9 @@ class GcpComputeRuleDetectors:
                         ),
                         evidence_item(
                             "posture_uncertainty",
-                            _gke_uncertainty_evidence(cluster_facts, ("binary_authorization.evaluation_mode",)),
+                            uncertainty_evidence(
+                                cluster_facts.gke_posture_uncertainties, ("binary_authorization.evaluation_mode",)
+                            ),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -977,7 +982,7 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
     descriptions: list[str] = []
     for network in facts.gke_master_authorized_networks:
         cidr = str(network.get("cidr_block") or "").strip()
-        if cidr not in {"0.0.0.0/0", "::/0"}:
+        if not is_broad_public_range(cidr):
             continue
         name = str(network.get("display_name") or network.get("name") or "unnamed").strip() or "unnamed"
         descriptions.append(f"{name} ({cidr})")
@@ -1046,7 +1051,11 @@ def _gke_client_certificate_auth_represented(facts: GcpResourceFacts) -> bool:
     return (
         facts.gke_client_certificate_auth_state in {"enabled", "disabled"}
         or bool(facts.gke_client_certificate_config)
-        or bool(_gke_uncertainty_evidence(facts, ("master_auth.client_certificate_config.issue_client_certificate",)))
+        or bool(
+            uncertainty_evidence(
+                facts.gke_posture_uncertainties, ("master_auth.client_certificate_config.issue_client_certificate",)
+            )
+        )
     )
 
 
@@ -1077,7 +1086,7 @@ def _gke_binary_authorization_represented(facts: GcpResourceFacts) -> bool:
     return (
         facts.gke_binary_authorization_state in {"enabled", "disabled"}
         or bool(facts.gke_binary_authorization)
-        or bool(_gke_uncertainty_evidence(facts, ("binary_authorization.evaluation_mode",)))
+        or bool(uncertainty_evidence(facts.gke_posture_uncertainties, ("binary_authorization.evaluation_mode",)))
     )
 
 
@@ -1088,14 +1097,6 @@ def _gke_binary_authorization_evidence(facts: GcpResourceFacts) -> list[str]:
     else:
         values.append("binary_authorization.evaluation_mode is not represented in planned values")
     return values
-
-
-def _gke_uncertainty_evidence(facts: GcpResourceFacts, field_paths: tuple[str, ...]) -> list[str]:
-    return [
-        uncertainty
-        for uncertainty in facts.gke_posture_uncertainties
-        if any(field_path in uncertainty for field_path in field_paths)
-    ]
 
 
 def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:

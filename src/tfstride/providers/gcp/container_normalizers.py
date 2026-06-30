@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
 from collections.abc import Mapping
 from typing import Any
 
@@ -12,7 +11,6 @@ from tfstride.providers.coercion import (
     known_block_strings,
     known_bool,
     known_string,
-    unknown_block_at,
 )
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_bool, compact, first_item
@@ -20,6 +18,7 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
+from tfstride.providers.kubernetes import block_value, dedupe, first_unknown_block, is_broad_public_range
 
 _STATE_CONFIGURED = "configured"
 _STATE_DISABLED = "disabled"
@@ -41,7 +40,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
     node_config_value = _optional_first_block(values, GcpAttr.NODE_CONFIG)
     node_config_values = node_config_value or {}
     logging_config = _optional_first_block(values, GcpAttr.LOGGING_CONFIG)
-    logging_unknown = _first_unknown_block(unknown_values.get(GcpAttr.LOGGING_CONFIG.key))
+    logging_unknown = first_unknown_block(unknown_values.get(GcpAttr.LOGGING_CONFIG.key))
     logging_components = known_block_strings(
         logging_config,
         logging_unknown,
@@ -56,7 +55,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         uncertainties,
     )
     network_policy = _optional_first_block(values, GcpAttr.NETWORK_POLICY)
-    network_policy_unknown = _first_unknown_block(unknown_values.get(GcpAttr.NETWORK_POLICY.key))
+    network_policy_unknown = first_unknown_block(unknown_values.get(GcpAttr.NETWORK_POLICY.key))
     network_policy_enabled = known_block_bool(
         network_policy,
         network_policy_unknown,
@@ -65,7 +64,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         path=GcpAttr.NETWORK_POLICY.key,
     )
     database_encryption = _optional_first_block(values, GcpAttr.DATABASE_ENCRYPTION)
-    database_encryption_unknown = _first_unknown_block(unknown_values.get(GcpAttr.DATABASE_ENCRYPTION.key))
+    database_encryption_unknown = first_unknown_block(unknown_values.get(GcpAttr.DATABASE_ENCRYPTION.key))
     database_encryption_state = known_block_string(
         database_encryption,
         database_encryption_unknown,
@@ -88,10 +87,10 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         allow_string=False,
     )
     master_auth = _optional_first_block(values, GcpAttr.MASTER_AUTH)
-    master_auth_unknown = _first_unknown_block(unknown_values.get(GcpAttr.MASTER_AUTH.key))
+    master_auth_unknown = first_unknown_block(unknown_values.get(GcpAttr.MASTER_AUTH.key))
     client_certificate_config = _optional_nested_first_block(master_auth, GcpAttr.CLIENT_CERTIFICATE_CONFIG)
-    client_certificate_config_unknown = _first_unknown_block(
-        _block_value(master_auth_unknown, GcpAttr.CLIENT_CERTIFICATE_CONFIG.key)
+    client_certificate_config_unknown = first_unknown_block(
+        block_value(master_auth_unknown, GcpAttr.CLIENT_CERTIFICATE_CONFIG.key)
     )
     client_certificate_auth_enabled = known_block_bool(
         client_certificate_config,
@@ -115,7 +114,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         path=GcpAttr.MASTER_AUTH.key,
     )
     release_channel_config = _optional_first_block(values, GcpAttr.RELEASE_CHANNEL)
-    release_channel_unknown = _first_unknown_block(unknown_values.get(GcpAttr.RELEASE_CHANNEL.key))
+    release_channel_unknown = first_unknown_block(unknown_values.get(GcpAttr.RELEASE_CHANNEL.key))
     release_channel = known_block_string(
         release_channel_config,
         release_channel_unknown,
@@ -124,7 +123,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         path=GcpAttr.RELEASE_CHANNEL.key,
     )
     shielded_nodes = _optional_first_block(values, GcpAttr.SHIELDED_NODES)
-    shielded_nodes_unknown = _first_unknown_block(unknown_values.get(GcpAttr.SHIELDED_NODES.key))
+    shielded_nodes_unknown = first_unknown_block(unknown_values.get(GcpAttr.SHIELDED_NODES.key))
     shielded_nodes_enabled = _shielded_nodes_enabled(
         resource.values,
         unknown_values,
@@ -133,7 +132,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         uncertainties,
     )
     binary_authorization = _optional_first_block(values, GcpAttr.BINARY_AUTHORIZATION)
-    binary_authorization_unknown = _first_unknown_block(unknown_values.get(GcpAttr.BINARY_AUTHORIZATION.key))
+    binary_authorization_unknown = first_unknown_block(unknown_values.get(GcpAttr.BINARY_AUTHORIZATION.key))
     binary_authorization_evaluation_mode = known_block_string(
         binary_authorization,
         binary_authorization_unknown,
@@ -245,7 +244,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         },
     )
     if uncertainties:
-        metadata[GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES] = _dedupe(uncertainties)
+        metadata[GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES] = dedupe(uncertainties)
 
     normalized = NormalizedResource(
         address=resource.address,
@@ -486,26 +485,6 @@ def _container_metadata(
     return metadata
 
 
-def _first_unknown_block(value: Any) -> Any:
-    if value is True or isinstance(value, Mapping):
-        return value
-    return unknown_block_at(value, 0)
-
-
-def _dedupe(values: Any) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if not text or text in seen:
-            continue
-        deduped.append(text)
-        seen.add(text)
-    return deduped
-
-
 def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:
     return first_item(values.get(attribute)) or {}
 
@@ -522,14 +501,6 @@ def _optional_nested_first_block(
     return first_item(values.get(attribute.key))
 
 
-def _block_value(block: Any, key: str) -> Any:
-    if block is True:
-        return True
-    if isinstance(block, Mapping):
-        return block.get(key)
-    return None
-
-
 def _authorized_networks(config: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not config:
         return []
@@ -537,17 +508,7 @@ def _authorized_networks(config: dict[str, Any] | None) -> list[dict[str, Any]]:
 
 
 def _broad_authorized_networks(networks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [network for network in networks if _cidr_allows_internet(GcpValues(network).get(GcpAttr.CIDR_BLOCK))]
-
-
-def _cidr_allows_internet(value: object) -> bool:
-    if value in (None, ""):
-        return False
-    try:
-        parsed = ipaddress.ip_network(str(value), strict=False)
-    except ValueError:
-        return False
-    return parsed.prefixlen == 0
+    return [network for network in networks if is_broad_public_range(GcpValues(network).get(GcpAttr.CIDR_BLOCK))]
 
 
 def _public_endpoint_enabled(values: GcpValues, private_cluster_config: GcpValues) -> bool:

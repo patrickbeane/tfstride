@@ -17,6 +17,7 @@ from tfstride.providers.azure.resource_utils import (
     known_string,
     value_is_unknown,
 )
+from tfstride.providers.kubernetes import dedupe, first_unknown_block, unknown_block_at_index
 
 AZURE_PROVIDER = "azure"
 _STATE_ENABLED = "enabled"
@@ -31,17 +32,17 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
     uncertainties: list[str] = []
     cluster_id = known_string(values, resource.unknown_values, "id", uncertainties)
     api_server_profile = first_mapping(values.get("api_server_access_profile"))
-    api_server_unknown = _first_unknown_block(resource.unknown_values.get("api_server_access_profile"))
+    api_server_unknown = first_unknown_block(resource.unknown_values.get("api_server_access_profile"))
     aad_profile = first_mapping(values.get("azure_active_directory_role_based_access_control"))
-    aad_unknown = _first_unknown_block(resource.unknown_values.get("azure_active_directory_role_based_access_control"))
+    aad_unknown = first_unknown_block(resource.unknown_values.get("azure_active_directory_role_based_access_control"))
     network_profile = first_mapping(values.get("network_profile"))
-    network_unknown = _first_unknown_block(resource.unknown_values.get("network_profile"))
+    network_unknown = first_unknown_block(resource.unknown_values.get("network_profile"))
     kubelet_uncertainties: list[str] = []
     kubelet_identity = _kubelet_identities(resource, kubelet_uncertainties)
     kms_profile = first_mapping(values.get("key_management_service"))
-    kms_unknown = _first_unknown_block(resource.unknown_values.get("key_management_service"))
+    kms_unknown = first_unknown_block(resource.unknown_values.get("key_management_service"))
     oms_agent = first_mapping(values.get("oms_agent"))
-    oms_unknown = _first_unknown_block(resource.unknown_values.get("oms_agent"))
+    oms_unknown = first_unknown_block(resource.unknown_values.get("oms_agent"))
     defender_profile = _defender_profile(resource)
     identity_metadata = managed_identity_metadata(resource)
     identity_ids = identity_metadata.get(AzureResourceMetadata.ATTACHED_IDENTITY_REFERENCES, [])
@@ -222,7 +223,7 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
         AzureResourceMetadata.AKS_MAINTENANCE_WINDOWS: _maintenance_windows(resource, uncertainties),
     }
     metadata.update(identity_metadata)
-    combined_uncertainties = _dedupe([*uncertainties, *kubelet_uncertainties])
+    combined_uncertainties = dedupe([*uncertainties, *kubelet_uncertainties])
     if combined_uncertainties:
         metadata[AzureResourceMetadata.AKS_POSTURE_UNCERTAINTIES] = combined_uncertainties
 
@@ -335,7 +336,7 @@ def _kubelet_identities(resource: TerraformResource, uncertainties: list[str]) -
                 uncertainties.append(f"kubelet_identity[{index}] has an unrecognized value shape")
             continue
         path = f"kubelet_identity[{index}]"
-        unknown_item = _unknown_block_at(raw_unknown, index)
+        unknown_item = unknown_block_at_index(raw_unknown, index)
         record: dict[str, Any] = {}
         for key in ("client_id", "object_id", "user_assigned_identity_id"):
             value = known_block_string(item, unknown_item, key, uncertainties, path=path)
@@ -376,31 +377,11 @@ def _defender_profile(resource: TerraformResource) -> Mapping[str, Any] | None:
 def _defender_unknown(resource: TerraformResource) -> Any:
     if resource.unknown_values.get("microsoft_defender") is True:
         return True
-    security_unknown = _first_unknown_block(resource.unknown_values.get("security_profile"))
+    security_unknown = first_unknown_block(resource.unknown_values.get("security_profile"))
     if security_unknown is True:
         return True
     if isinstance(security_unknown, Mapping) and value_is_unknown(security_unknown.get("defender")):
         return True
-    return None
-
-
-def _first_unknown_block(value: Any) -> Any:
-    if value is True:
-        return True
-    if isinstance(value, list) and value:
-        return value[0]
-    if isinstance(value, Mapping):
-        return value
-    return None
-
-
-def _unknown_block_at(value: Any, index: int) -> Any:
-    if value is True:
-        return True
-    if isinstance(value, list) and index < len(value):
-        return value[index]
-    if isinstance(value, Mapping) and index == 0:
-        return value
     return None
 
 
@@ -410,14 +391,3 @@ def _block_field_unknown(unknown_block: Any, key: str) -> bool:
     if isinstance(unknown_block, Mapping):
         return value_is_unknown(unknown_block.get(key))
     return False
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped
