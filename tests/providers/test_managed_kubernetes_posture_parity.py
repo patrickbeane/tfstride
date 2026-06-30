@@ -6,6 +6,9 @@ from tests.providers.aws.test_aws_eks_rules import (
     _EKS_RULE_IDS as AWS_EKS_RULE_IDS,
 )
 from tests.providers.aws.test_aws_eks_rules import (
+    _addon as _aws_eks_addon,
+)
+from tests.providers.aws.test_aws_eks_rules import (
     _cluster as _aws_eks_cluster,
 )
 from tests.providers.aws.test_aws_eks_rules import (
@@ -47,6 +50,55 @@ GCP_GKE_RULE_IDS = (
     "gcp-gke-binary-authorization-not-enabled",
 )
 ALL_MANAGED_KUBERNETES_RULE_IDS = frozenset(AWS_EKS_RULE_IDS + GCP_GKE_RULE_IDS + AZURE_AKS_RULE_IDS)
+
+SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS = {
+    "identity_and_auth_hardening": {
+        "aws": frozenset({"aws-eks-authentication-mode-weak-or-unknown"}),
+        "gcp": frozenset(
+            {
+                "gcp-gke-workload-identity-disabled",
+                "gcp-gke-legacy-abac-enabled-or-unknown",
+                "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                "gcp-gke-shielded-nodes-disabled-or-unknown",
+                "gcp-gke-binary-authorization-not-enabled",
+            }
+        ),
+        "azure": frozenset(
+            {
+                "azure-aks-local-accounts-not-disabled",
+                "azure-aks-rbac-posture-weak",
+                "azure-aks-workload-identity-not-enabled",
+            }
+        ),
+    },
+    "secrets_encryption": {
+        "aws": frozenset({"aws-eks-secrets-encryption-not-configured"}),
+        "gcp": frozenset({"gcp-gke-secrets-encryption-not-configured"}),
+        "azure": frozenset({"azure-aks-key-management-service-not-configured"}),
+    },
+    "logging_and_monitoring": {
+        "aws": frozenset({"aws-eks-control-plane-logging-incomplete"}),
+        "gcp": frozenset({"gcp-gke-control-plane-logging-incomplete"}),
+        "azure": frozenset(
+            {
+                "azure-aks-monitoring-agent-not-enabled",
+                "azure-aks-defender-not-enabled",
+                "azure-aks-azure-policy-not-enabled",
+            }
+        ),
+    },
+    "network_policy_and_addons": {
+        "aws": frozenset({"aws-eks-vpc-cni-network-policy-not-enabled"}),
+        "gcp": frozenset({"gcp-gke-network-policy-disabled"}),
+        "azure": frozenset({"azure-aks-network-policy-missing"}),
+    },
+}
+SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS = frozenset(
+    rule_id
+    for provider_expectations in SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS.values()
+    for rule_ids in provider_expectations.values()
+    for rule_id in rule_ids
+)
 
 
 def _evaluate_aws(resources: list[TerraformResource], rule_ids=ALL_MANAGED_KUBERNETES_RULE_IDS):
@@ -255,6 +307,170 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
         ):
             with self.subTest(provider_prefix=prefix):
                 self.assertTrue(all(finding.rule_id.startswith(prefix) for finding in findings))
+
+    def test_managed_kubernetes_second_tier_posture_findings_are_pinned_by_concept(self) -> None:
+        aws_findings = _evaluate_aws(
+            [
+                _aws_safe_eks_cluster(
+                    enabled_cluster_log_types=[],
+                    encryption_resources=[],
+                    authentication_mode="CONFIG_MAP",
+                ),
+                _aws_eks_addon(configuration_values='{ "env": { "ENABLE_NETWORK_POLICY": "false" } }'),
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+        gcp_findings = _evaluate_gcp(
+            [
+                _gke_cluster(
+                    logging_service="logging.googleapis.com/none",
+                    logging_components=[],
+                    network_policy_enabled=False,
+                    network_policy_provider="PROVIDER_UNSPECIFIED",
+                    database_encryption_state="DECRYPTED",
+                    legacy_abac_enabled=True,
+                    client_certificate_enabled=True,
+                    shielded_nodes_enabled=False,
+                    binary_authorization_evaluation_mode="DISABLED",
+                )
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+        azure_findings = _evaluate_azure(
+            [
+                _azure_aks_cluster(
+                    private_cluster=True,
+                    authorized_ip_ranges=["198.51.100.10/32"],
+                    local_account_disabled=False,
+                    kubernetes_rbac=False,
+                    network_policy=AZURE_MISSING,
+                    oidc_issuer=False,
+                    workload_identity=False,
+                    kms_key_vault_key_id=AZURE_MISSING,
+                    oms_workspace_id=AZURE_MISSING,
+                    defender=False,
+                    azure_policy=False,
+                )
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+
+        findings_by_provider = {
+            "aws": _finding_ids(aws_findings),
+            "gcp": _finding_ids(gcp_findings),
+            "azure": _finding_ids(azure_findings),
+        }
+        for concept, provider_expectations in SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS.items():
+            for provider, expected_rule_ids in provider_expectations.items():
+                with self.subTest(concept=concept, provider=provider):
+                    self.assertLessEqual(expected_rule_ids, findings_by_provider[provider])
+
+    def test_managed_kubernetes_second_tier_safe_posture_is_quiet(self) -> None:
+        aws_findings = _evaluate_aws(
+            [
+                _aws_safe_eks_cluster(),
+                _aws_eks_addon(configuration_values='{ "env": { "ENABLE_NETWORK_POLICY": "true" } }'),
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+        gcp_findings = _evaluate_gcp(
+            [
+                _gke_cluster(
+                    workload_identity_pool="tfstride-demo.svc.id.goog",
+                    logging_service="logging.googleapis.com/kubernetes",
+                    logging_components=["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"],
+                    network_policy_enabled=True,
+                    network_policy_provider="CALICO",
+                    database_encryption_state="ENCRYPTED",
+                    database_encryption_key_name=(
+                        "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets"
+                    ),
+                    legacy_abac_enabled=False,
+                    client_certificate_enabled=False,
+                    shielded_nodes_enabled=True,
+                    binary_authorization_evaluation_mode="PROJECT_SINGLETON_POLICY_ENFORCE",
+                )
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+        azure_findings = _evaluate_azure(
+            [
+                _azure_aks_cluster(
+                    private_cluster=True,
+                    authorized_ip_ranges=["198.51.100.10/32"],
+                    local_account_disabled=True,
+                    kubernetes_rbac=True,
+                    aad_rbac=True,
+                    azure_rbac_enabled=True,
+                    network_policy="azure",
+                    oidc_issuer=True,
+                    workload_identity=True,
+                    kms_key_vault_key_id="azurerm_key_vault_key.aks.id",
+                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
+                    defender=True,
+                    azure_policy=True,
+                )
+            ],
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+        )
+
+        self.assertEqual(aws_findings, [])
+        self.assertEqual(gcp_findings, [])
+        self.assertEqual(azure_findings, [])
+
+    def test_managed_kubernetes_second_tier_rules_remain_provider_local(self) -> None:
+        findings_by_provider = {
+            "aws": _evaluate_aws(
+                [
+                    _aws_safe_eks_cluster(
+                        enabled_cluster_log_types=[],
+                        encryption_resources=[],
+                        authentication_mode="CONFIG_MAP",
+                    ),
+                    _aws_eks_addon(configuration_values='{ "env": { "ENABLE_NETWORK_POLICY": "false" } }'),
+                ],
+                SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+            ),
+            "gcp": _evaluate_gcp(
+                [
+                    _gke_cluster(
+                        logging_service="logging.googleapis.com/none",
+                        logging_components=[],
+                        network_policy_enabled=False,
+                        network_policy_provider="PROVIDER_UNSPECIFIED",
+                        database_encryption_state="DECRYPTED",
+                        legacy_abac_enabled=True,
+                        client_certificate_enabled=True,
+                        shielded_nodes_enabled=False,
+                        binary_authorization_evaluation_mode="DISABLED",
+                    )
+                ],
+                SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+            ),
+            "azure": _evaluate_azure(
+                [
+                    _azure_aks_cluster(
+                        private_cluster=True,
+                        authorized_ip_ranges=["198.51.100.10/32"],
+                        local_account_disabled=False,
+                        kubernetes_rbac=False,
+                        network_policy=AZURE_MISSING,
+                        oidc_issuer=False,
+                        workload_identity=False,
+                        kms_key_vault_key_id=AZURE_MISSING,
+                        oms_workspace_id=AZURE_MISSING,
+                        defender=False,
+                        azure_policy=False,
+                    )
+                ],
+                SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS,
+            ),
+        }
+
+        for provider, findings in findings_by_provider.items():
+            with self.subTest(provider=provider):
+                self.assertTrue(findings)
+                self.assertTrue(all(finding.rule_id.startswith(f"{provider}-") for finding in findings))
 
 
 if __name__ == "__main__":
