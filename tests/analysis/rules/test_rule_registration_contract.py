@@ -139,6 +139,10 @@ EXPECTED_GCP_RULE_GROUP_IDS = (
         "gcp-gke-control-plane-logging-incomplete",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
+        "gcp-gke-legacy-abac-enabled-or-unknown",
+        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+        "gcp-gke-shielded-nodes-disabled-or-unknown",
+        "gcp-gke-binary-authorization-not-enabled",
         "gcp-cloud-run-public-invoker",
         "gcp-cloud-functions-public-invoker",
     ),
@@ -264,9 +268,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (92, 2, 2, 12, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (96, 2, 2, 12, 3, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (14, 2, 2, 2, 2, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (28, 0, 0, 10, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (32, 0, 0, 10, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (50, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:

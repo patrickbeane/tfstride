@@ -99,6 +99,13 @@ def _gke_cluster(
     network_policy_provider: object = _MISSING,
     database_encryption_state: object = _MISSING,
     database_encryption_key_name: object = _MISSING,
+    legacy_abac_enabled: object = _MISSING,
+    client_certificate_enabled: object = _MISSING,
+    basic_auth_username: object = _MISSING,
+    basic_auth_password: object = _MISSING,
+    release_channel: object = _MISSING,
+    shielded_nodes_enabled: object = _MISSING,
+    binary_authorization_evaluation_mode: object = _MISSING,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     node_config: dict[str, object] = {
@@ -146,6 +153,27 @@ def _gke_cluster(
         if database_encryption_key_name is not _MISSING:
             database_encryption["key_name"] = database_encryption_key_name
         values["database_encryption"] = [database_encryption]
+    if legacy_abac_enabled is not _MISSING:
+        values["enable_legacy_abac"] = legacy_abac_enabled
+    if (
+        client_certificate_enabled is not _MISSING
+        or basic_auth_username is not _MISSING
+        or basic_auth_password is not _MISSING
+    ):
+        master_auth: dict[str, object] = {}
+        if client_certificate_enabled is not _MISSING:
+            master_auth["client_certificate_config"] = [{"issue_client_certificate": client_certificate_enabled}]
+        if basic_auth_username is not _MISSING:
+            master_auth["username"] = basic_auth_username
+        if basic_auth_password is not _MISSING:
+            master_auth["password"] = basic_auth_password
+        values["master_auth"] = [master_auth]
+    if release_channel is not _MISSING:
+        values["release_channel"] = [{"channel": release_channel}]
+    if shielded_nodes_enabled is not _MISSING:
+        values["shielded_nodes"] = [{"enabled": shielded_nodes_enabled}]
+    if binary_authorization_evaluation_mode is not _MISSING:
+        values["binary_authorization"] = [{"evaluation_mode": binary_authorization_evaluation_mode}]
     return TerraformResource(
         address="google_container_cluster.app",
         mode="managed",

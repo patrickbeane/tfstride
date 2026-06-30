@@ -565,6 +565,198 @@ class GcpComputeRuleDetectors:
             )
         return findings
 
+    def detect_gke_legacy_abac_enabled_or_unknown(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if cluster_facts.gke_legacy_abac_state == "disabled":
+                continue
+            unknown = cluster_facts.gke_legacy_abac_state == "unknown"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0 if unknown else 2,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show legacy ABAC disabled. Legacy ABAC can bypass "
+                        "stronger IAM and Kubernetes RBAC expectations, and an unknown Terraform value should "
+                        "be reviewed before relying on RBAC-only authorization."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("legacy_abac_posture", _gke_legacy_abac_evidence(cluster_facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(cluster_facts, ("enable_legacy_abac",)),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_client_certificate_auth_enabled_or_unknown(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if not _gke_client_certificate_auth_represented(cluster_facts):
+                continue
+            if cluster_facts.gke_client_certificate_auth_state == "disabled":
+                continue
+            unknown = cluster_facts.gke_client_certificate_auth_state == "unknown"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0 if unknown else 1,
+                data_sensitivity=0,
+                lateral_movement=0 if unknown else 1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show client certificate authentication disabled. "
+                        "Client certificate authentication can create an additional cluster-admin path outside "
+                        "the intended centralized identity controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "client_certificate_auth_posture",
+                            _gke_client_certificate_auth_evidence(cluster_facts),
+                        ),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(
+                                cluster_facts,
+                                ("master_auth.client_certificate_config.issue_client_certificate",),
+                            ),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_shielded_nodes_disabled_or_unknown(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if cluster_facts.gke_shielded_nodes_state == "enabled":
+                continue
+            unknown = cluster_facts.gke_shielded_nodes_state == "unknown"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0 if unknown else 2,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show GKE Shielded Nodes enabled. Shielded Nodes add "
+                        "node integrity protections that reduce the impact of boot-level tampering and host "
+                        "compromise paths."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("shielded_nodes_posture", _gke_shielded_nodes_evidence(cluster_facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(
+                                cluster_facts,
+                                ("enable_shielded_nodes", "shielded_nodes.enabled"),
+                            ),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_binary_authorization_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if not _gke_binary_authorization_represented(cluster_facts):
+                continue
+            if cluster_facts.gke_binary_authorization_state == "enabled":
+                continue
+            unknown = cluster_facts.gke_binary_authorization_state == "unknown"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0 if unknown else 2,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show GKE Binary Authorization enabled. Without an "
+                        "admission policy for trusted container images, unauthorized or unreviewed workload "
+                        "images are harder to prevent at deploy time."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "binary_authorization_posture",
+                            _gke_binary_authorization_evidence(cluster_facts),
+                        ),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(cluster_facts, ("binary_authorization.evaluation_mode",)),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_run_public_invoker(
         self,
         context: RuleEvaluationContext,
@@ -838,6 +1030,63 @@ def _gke_secrets_encryption_evidence(facts: GcpResourceFacts) -> list[str]:
         values.append(f"database_encryption_key_name={facts.gke_database_encryption_key_name}")
     else:
         values.append("database_encryption_key_name is not represented in planned values")
+    return values
+
+
+def _gke_legacy_abac_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"legacy_abac_state={facts.gke_legacy_abac_state or 'unknown'}"]
+    if facts.gke_legacy_abac_enabled is None:
+        values.append("enable_legacy_abac is not represented in planned values")
+    else:
+        values.append(f"enable_legacy_abac={str(facts.gke_legacy_abac_enabled).lower()}")
+    return values
+
+
+def _gke_client_certificate_auth_represented(facts: GcpResourceFacts) -> bool:
+    return (
+        facts.gke_client_certificate_auth_state in {"enabled", "disabled"}
+        or bool(facts.gke_client_certificate_config)
+        or bool(_gke_uncertainty_evidence(facts, ("master_auth.client_certificate_config.issue_client_certificate",)))
+    )
+
+
+def _gke_client_certificate_auth_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"client_certificate_auth_state={facts.gke_client_certificate_auth_state or 'unknown'}"]
+    if facts.gke_client_certificate_auth_enabled is None:
+        values.append(
+            "master_auth.client_certificate_config.issue_client_certificate is not represented in planned values"
+        )
+    else:
+        values.append(
+            "master_auth.client_certificate_config.issue_client_certificate="
+            f"{str(facts.gke_client_certificate_auth_enabled).lower()}"
+        )
+    return values
+
+
+def _gke_shielded_nodes_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"shielded_nodes_state={facts.gke_shielded_nodes_state or 'unknown'}"]
+    if facts.gke_shielded_nodes_enabled is None:
+        values.append("shielded nodes setting is not represented in planned values")
+    else:
+        values.append(f"shielded_nodes.enabled={str(facts.gke_shielded_nodes_enabled).lower()}")
+    return values
+
+
+def _gke_binary_authorization_represented(facts: GcpResourceFacts) -> bool:
+    return (
+        facts.gke_binary_authorization_state in {"enabled", "disabled"}
+        or bool(facts.gke_binary_authorization)
+        or bool(_gke_uncertainty_evidence(facts, ("binary_authorization.evaluation_mode",)))
+    )
+
+
+def _gke_binary_authorization_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"binary_authorization_state={facts.gke_binary_authorization_state or 'unknown'}"]
+    if facts.gke_binary_authorization_evaluation_mode:
+        values.append(f"evaluation_mode={facts.gke_binary_authorization_evaluation_mode}")
+    else:
+        values.append("binary_authorization.evaluation_mode is not represented in planned values")
     return values
 
 

@@ -36,6 +36,10 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gke-control-plane-logging-incomplete",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
+        "gcp-gke-legacy-abac-enabled-or-unknown",
+        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+        "gcp-gke-shielded-nodes-disabled-or-unknown",
+        "gcp-gke-binary-authorization-not-enabled",
         "gcp-cloud-run-public-invoker",
         "gcp-cloud-functions-public-invoker",
     ),
@@ -97,6 +101,12 @@ def build_gcp_rule_contribution(
         "gcp-gke-control-plane-logging-incomplete": gcp_detectors.detect_gke_control_plane_logging_incomplete,
         "gcp-gke-network-policy-disabled": gcp_detectors.detect_gke_network_policy_disabled,
         "gcp-gke-secrets-encryption-not-configured": gcp_detectors.detect_gke_secrets_encryption_not_configured,
+        "gcp-gke-legacy-abac-enabled-or-unknown": gcp_detectors.detect_gke_legacy_abac_enabled_or_unknown,
+        "gcp-gke-client-certificate-auth-enabled-or-unknown": (
+            gcp_detectors.detect_gke_client_certificate_auth_enabled_or_unknown
+        ),
+        "gcp-gke-shielded-nodes-disabled-or-unknown": gcp_detectors.detect_gke_shielded_nodes_disabled_or_unknown,
+        "gcp-gke-binary-authorization-not-enabled": gcp_detectors.detect_gke_binary_authorization_not_enabled,
         "gcp-cloud-run-public-invoker": gcp_detectors.detect_cloud_run_public_invoker,
         "gcp-cloud-functions-public-invoker": gcp_detectors.detect_cloud_function_public_invoker,
         "gcp-service-account-iam-broad-principal": gcp_detectors.detect_service_account_iam_broad_principal,

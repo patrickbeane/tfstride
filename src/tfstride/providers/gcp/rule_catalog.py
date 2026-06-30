@@ -312,6 +312,50 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-gke-legacy-abac-enabled-or-unknown",
+        title="GKE legacy ABAC is enabled or unknown",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable legacy ABAC and rely on Kubernetes RBAC with centralized IAM-backed administration. "
+            "Review unknown ABAC values before treating the cluster authorization posture as hardened."
+        ),
+        tags=("gcp", "gke", "kubernetes", "auth", "rbac"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-client-certificate-auth-enabled-or-unknown",
+        title="GKE client certificate authentication is enabled or unknown",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Disable client certificate authentication for GKE clusters and use centralized IAM and Kubernetes "
+            "RBAC controls for administrative access."
+        ),
+        tags=("gcp", "gke", "kubernetes", "auth", "certificate"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-shielded-nodes-disabled-or-unknown",
+        title="GKE Shielded Nodes is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable GKE Shielded Nodes to add node integrity protections against boot-level tampering and host "
+            "compromise paths."
+        ),
+        tags=("gcp", "gke", "kubernetes", "node", "hardening"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-binary-authorization-not-enabled",
+        title="GKE Binary Authorization is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable GKE Binary Authorization or an equivalent admission policy so only trusted container images "
+            "can be deployed to the cluster."
+        ),
+        tags=("gcp", "gke", "kubernetes", "binary-authorization", "admission-control"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-run-public-invoker",
         title="Cloud Run service is publicly invokable",
         category=StrideCategory.SPOOFING,

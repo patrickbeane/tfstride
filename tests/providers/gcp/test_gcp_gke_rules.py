@@ -328,6 +328,172 @@ class GcpGkeRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_gke_auth_and_hardening_rules_detect_explicit_gaps(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    legacy_abac_enabled=True,
+                    client_certificate_enabled=True,
+                    shielded_nodes_enabled=False,
+                    binary_authorization_evaluation_mode="DISABLED",
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-legacy-abac-enabled-or-unknown",
+                        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                        "gcp-gke-shielded-nodes-disabled-or-unknown",
+                        "gcp-gke-binary-authorization-not-enabled",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "gcp-gke-legacy-abac-enabled-or-unknown",
+                "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                "gcp-gke-shielded-nodes-disabled-or-unknown",
+                "gcp-gke-binary-authorization-not-enabled",
+            ],
+        )
+        self.assertEqual([finding.severity.value for finding in findings], ["medium", "medium", "medium", "medium"])
+        evidence_by_rule = {
+            finding.rule_id: {item.key: item.values for item in finding.evidence} for finding in findings
+        }
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-legacy-abac-enabled-or-unknown"]["legacy_abac_posture"],
+            ["legacy_abac_state=enabled", "enable_legacy_abac=true"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-client-certificate-auth-enabled-or-unknown"]["client_certificate_auth_posture"],
+            [
+                "client_certificate_auth_state=enabled",
+                "master_auth.client_certificate_config.issue_client_certificate=true",
+            ],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-shielded-nodes-disabled-or-unknown"]["shielded_nodes_posture"],
+            ["shielded_nodes_state=disabled", "shielded_nodes.enabled=false"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-binary-authorization-not-enabled"]["binary_authorization_posture"],
+            ["binary_authorization_state=disabled", "evaluation_mode=DISABLED"],
+        )
+
+    def test_gke_auth_and_hardening_rules_ignore_configured_cluster(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    legacy_abac_enabled=False,
+                    client_certificate_enabled=False,
+                    shielded_nodes_enabled=True,
+                    binary_authorization_evaluation_mode="PROJECT_SINGLETON_POLICY_ENFORCE",
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-legacy-abac-enabled-or-unknown",
+                        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                        "gcp-gke-shielded-nodes-disabled-or-unknown",
+                        "gcp-gke-binary-authorization-not-enabled",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gke_client_certificate_and_binary_authorization_rules_ignore_unrepresented_fields(self) -> None:
+        inventory = GcpNormalizer().normalize([_gke_cluster()])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                        "gcp-gke-binary-authorization-not-enabled",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gke_auth_and_hardening_unknown_rules_emit_low_severity_uncertainty_findings(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    legacy_abac_enabled=None,
+                    client_certificate_enabled=None,
+                    shielded_nodes_enabled=None,
+                    binary_authorization_evaluation_mode=None,
+                    unknown_values={
+                        "enable_legacy_abac": True,
+                        "master_auth": [{"client_certificate_config": [{"issue_client_certificate": True}]}],
+                        "shielded_nodes": [{"enabled": True}],
+                        "binary_authorization": [{"evaluation_mode": True}],
+                    },
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-legacy-abac-enabled-or-unknown",
+                        "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                        "gcp-gke-shielded-nodes-disabled-or-unknown",
+                        "gcp-gke-binary-authorization-not-enabled",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "gcp-gke-legacy-abac-enabled-or-unknown",
+                "gcp-gke-client-certificate-auth-enabled-or-unknown",
+                "gcp-gke-shielded-nodes-disabled-or-unknown",
+                "gcp-gke-binary-authorization-not-enabled",
+            ],
+        )
+        self.assertEqual([finding.severity.value for finding in findings], ["low", "low", "low", "low"])
+        evidence_by_rule = {
+            finding.rule_id: {item.key: item.values for item in finding.evidence} for finding in findings
+        }
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-legacy-abac-enabled-or-unknown"]["posture_uncertainty"],
+            ["enable_legacy_abac is unknown after planning"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-client-certificate-auth-enabled-or-unknown"]["posture_uncertainty"],
+            ["master_auth.client_certificate_config.issue_client_certificate is unknown after planning"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-shielded-nodes-disabled-or-unknown"]["posture_uncertainty"],
+            ["shielded_nodes.enabled is unknown after planning"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-binary-authorization-not-enabled"]["posture_uncertainty"],
+            ["binary_authorization.evaluation_mode is unknown after planning"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

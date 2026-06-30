@@ -41,6 +41,10 @@ GCP_GKE_RULE_IDS = (
     "gcp-gke-control-plane-logging-incomplete",
     "gcp-gke-network-policy-disabled",
     "gcp-gke-secrets-encryption-not-configured",
+    "gcp-gke-legacy-abac-enabled-or-unknown",
+    "gcp-gke-client-certificate-auth-enabled-or-unknown",
+    "gcp-gke-shielded-nodes-disabled-or-unknown",
+    "gcp-gke-binary-authorization-not-enabled",
 )
 ALL_MANAGED_KUBERNETES_RULE_IDS = frozenset(AWS_EKS_RULE_IDS + GCP_GKE_RULE_IDS + AZURE_AKS_RULE_IDS)
 
@@ -94,6 +98,10 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
             [
                 _gke_cluster(
                     authorized_networks=[{"display_name": "anywhere", "cidr_block": "0.0.0.0/0"}],
+                    legacy_abac_enabled=True,
+                    client_certificate_enabled=True,
+                    shielded_nodes_enabled=False,
+                    binary_authorization_evaluation_mode="DISABLED",
                 ),
                 _gke_node_pool(),
             ]
@@ -163,6 +171,10 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
                     database_encryption_key_name=(
                         "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets"
                     ),
+                    legacy_abac_enabled=False,
+                    client_certificate_enabled=False,
+                    shielded_nodes_enabled=True,
+                    binary_authorization_evaluation_mode="PROJECT_SINGLETON_POLICY_ENFORCE",
                 ),
                 _gke_node_pool(
                     node_service_account="gke-nodes@tfstride-demo.iam.gserviceaccount.com",

@@ -7,11 +7,11 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **37 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **39 findings** across **30 normalized resources**.
 
 - High severity findings: `14`
 - Medium severity findings: `23`
-- Low severity findings: `0`
+- Low severity findings: `2`
 
 ## Analysis Coverage
 
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **37 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `113`
-- Enabled rules: `113`
+- Registered rules: `117`
+- Enabled rules: `117`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -51,6 +51,8 @@ This run identified **9 trust boundaries** and **37 findings** across **30 norma
   - `gcp-gke-control-plane-logging-incomplete`: `1`
   - `gcp-gke-network-policy-disabled`: `1`
   - `gcp-gke-secrets-encryption-not-configured`: `1`
+  - `gcp-gke-legacy-abac-enabled-or-unknown`: `1`
+  - `gcp-gke-shielded-nodes-disabled-or-unknown`: `1`
   - `gcp-cloud-run-public-invoker`: `1`
   - `gcp-cloud-functions-public-invoker`: `1`
   - `gcp-service-account-key-hygiene`: `1`
@@ -596,7 +598,27 @@ This run identified **9 trust boundaries** and **37 findings** across **30 norma
 
 ### Low
 
-No findings in this severity band.
+#### GKE Shielded Nodes is not enabled
+
+- STRIDE category: Tampering
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 1 => low
+- Rationale: google_container_cluster.app does not show GKE Shielded Nodes enabled. Shielded Nodes add node integrity protections that reduce the impact of boot-level tampering and host compromise paths.
+- Recommended mitigation: Enable GKE Shielded Nodes to add node integrity protections against boot-level tampering and host compromise paths.
+- Evidence:
+  - shielded nodes posture: shielded_nodes_state=unknown; shielded nodes setting is not represented in planned values
+
+#### GKE legacy ABAC is enabled or unknown
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 1 => low
+- Rationale: google_container_cluster.app does not show legacy ABAC disabled. Legacy ABAC can bypass stronger IAM and Kubernetes RBAC expectations, and an unknown Terraform value should be reviewed before relying on RBAC-only authorization.
+- Recommended mitigation: Disable legacy ABAC and rely on Kubernetes RBAC with centralized IAM-backed administration. Review unknown ABAC values before treating the cluster authorization posture as hardened.
+- Evidence:
+  - legacy abac posture: legacy_abac_state=unknown; enable_legacy_abac is not represented in planned values
 
 ## Limitations / Unsupported Resources
 
