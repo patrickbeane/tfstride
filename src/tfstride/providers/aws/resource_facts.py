@@ -126,6 +126,62 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.FUNCTION_NAME)
 
     @property
+    def lambda_function_url_function_reference(self) -> str | None:
+        return self.function_name
+
+    @property
+    def lambda_function_url(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL)
+
+    @property
+    def lambda_function_url_authorization_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_AUTHORIZATION_TYPE)
+
+    @property
+    def lambda_function_url_qualifier(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_QUALIFIER)
+
+    @property
+    def lambda_function_url_invoke_mode(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_INVOKE_MODE)
+
+    @property
+    def lambda_function_url_cors(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS)
+
+    @property
+    def lambda_function_url_cors_allow_credentials_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_CREDENTIALS_STATE)
+
+    @property
+    def lambda_function_url_cors_allow_credentials(self) -> bool | None:
+        return _bool_from_state(self.lambda_function_url_cors_allow_credentials_state)
+
+    @property
+    def lambda_function_url_cors_allow_headers(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_HEADERS)
+
+    @property
+    def lambda_function_url_cors_allow_methods(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_METHODS)
+
+    @property
+    def lambda_function_url_cors_allow_origins(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS)
+
+    @property
+    def lambda_function_url_cors_expose_headers(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS)
+
+    @property
+    def lambda_function_url_cors_max_age(self) -> int | None:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_MAX_AGE)
+
+    @property
+    def lambda_function_url_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES)
+
+    @property
     def route_table_id(self) -> str | None:
         return self.get(AwsResourceMetadata.ROUTE_TABLE_ID)
 

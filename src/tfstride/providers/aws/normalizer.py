@@ -11,6 +11,7 @@ from tfstride.providers.aws.compute_normalizers import (
     normalize_ecs_task_definition,
     normalize_instance,
     normalize_lambda_function,
+    normalize_lambda_function_url,
     normalize_lambda_permission,
 )
 from tfstride.providers.aws.data_normalizers import (
@@ -71,6 +72,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_internet_gateway": normalize_internet_gateway,
     "aws_kms_key": normalize_kms_key,
     "aws_lambda_function": normalize_lambda_function,
+    "aws_lambda_function_url": normalize_lambda_function_url,
     "aws_lambda_permission": normalize_lambda_permission,
     "aws_lb": normalize_load_balancer,
     "aws_lb_listener": normalize_load_balancer_listener,

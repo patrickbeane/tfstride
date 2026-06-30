@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.aws.coercion import as_bool, as_list, as_optional_int, compact, first_item
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import (
     compact_condition_entries,
@@ -10,6 +14,13 @@ from tfstride.providers.aws.policy_documents import (
 )
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import ecs_task_definition_identifier
+from tfstride.providers.coercion import (
+    first_mapping,
+    known_block_bool_state,
+    known_block_int,
+    known_block_strings,
+    known_string,
+)
 
 
 def normalize_instance(resource: TerraformResource) -> NormalizedResource:
@@ -135,6 +146,77 @@ def normalize_lambda_function(resource: TerraformResource) -> NormalizedResource
             "vpc_enabled": bool(vpc_config),
         },
     )
+
+
+def normalize_lambda_function_url(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    function_name = known_string(values, unknown_values, "function_name", uncertainties)
+    authorization_type = known_string(values, unknown_values, "authorization_type", uncertainties)
+    function_url = known_string(values, unknown_values, "function_url", uncertainties)
+    qualifier = known_string(values, unknown_values, "qualifier", uncertainties)
+    invoke_mode = known_string(values, unknown_values, "invoke_mode", uncertainties)
+
+    cors = first_mapping(values.get("cors"), scan_all=True)
+    unknown_cors = first_mapping(unknown_values.get("cors"), scan_all=True)
+    if cors is None and unknown_values.get("cors") is True:
+        uncertainties.append("cors is unknown after planning")
+
+    cors_allow_credentials_state = known_block_bool_state(
+        cors,
+        unknown_cors,
+        "allow_credentials",
+        uncertainties,
+        path="cors",
+    )
+    cors_allow_headers = known_block_strings(cors, unknown_cors, "allow_headers", uncertainties, path="cors")
+    cors_allow_methods = known_block_strings(cors, unknown_cors, "allow_methods", uncertainties, path="cors")
+    cors_allow_origins = known_block_strings(cors, unknown_cors, "allow_origins", uncertainties, path="cors")
+    cors_expose_headers = known_block_strings(cors, unknown_cors, "expose_headers", uncertainties, path="cors")
+    cors_max_age = known_block_int(cors, unknown_cors, "max_age", uncertainties, path="cors")
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=function_url or values.get("url_id") or values.get("id") or function_name or resource.address,
+        metadata={
+            AwsResourceMetadata.FUNCTION_NAME: function_name,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL: function_url,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_AUTHORIZATION_TYPE: authorization_type,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_QUALIFIER: qualifier,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_INVOKE_MODE: invoke_mode,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS: _lambda_function_url_cors_evidence(cors),
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_CREDENTIALS_STATE: cors_allow_credentials_state,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_HEADERS: cors_allow_headers,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_METHODS: cors_allow_methods,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS: cors_allow_origins,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS: cors_expose_headers,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_CORS_MAX_AGE: cors_max_age,
+            AwsResourceMetadata.LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def _lambda_function_url_cors_evidence(cors: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if cors is None:
+        return None
+    return {
+        key: cors[key]
+        for key in (
+            "allow_credentials",
+            "allow_headers",
+            "allow_methods",
+            "allow_origins",
+            "expose_headers",
+            "max_age",
+        )
+        if key in cors
+    }
 
 
 def normalize_lambda_permission(resource: TerraformResource) -> NormalizedResource:

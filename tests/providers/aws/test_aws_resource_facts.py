@@ -91,6 +91,18 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "eks_addon_preserve_state": "enabled",
                 "eks_addon_service_account_role_arn": "arn:aws:iam::111122223333:role/eks-vpc-cni",
                 "eks_addon_target_class": "networking",
+                "lambda_function_url": "https://abc.lambda-url.us-east-1.on.aws/",
+                "lambda_function_url_authorization_type": "AWS_IAM",
+                "lambda_function_url_qualifier": "prod",
+                "lambda_function_url_invoke_mode": "BUFFERED",
+                "lambda_function_url_cors": {"allow_origins": ["https://example.com"]},
+                "lambda_function_url_cors_allow_credentials_state": "enabled",
+                "lambda_function_url_cors_allow_headers": ["authorization"],
+                "lambda_function_url_cors_allow_methods": ["GET"],
+                "lambda_function_url_cors_allow_origins": ["https://example.com"],
+                "lambda_function_url_cors_expose_headers": ["x-request-id"],
+                "lambda_function_url_cors_max_age": 3600,
+                "lambda_function_url_posture_uncertainties": ["authorization_type is unknown after planning"],
                 "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
@@ -161,6 +173,22 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertTrue(facts.eks_addon_preserve)
         self.assertEqual(facts.eks_addon_service_account_role_arn, "arn:aws:iam::111122223333:role/eks-vpc-cni")
         self.assertEqual(facts.eks_addon_target_class, "networking")
+        self.assertEqual(facts.lambda_function_url, "https://abc.lambda-url.us-east-1.on.aws/")
+        self.assertEqual(facts.lambda_function_url_authorization_type, "AWS_IAM")
+        self.assertEqual(facts.lambda_function_url_qualifier, "prod")
+        self.assertEqual(facts.lambda_function_url_invoke_mode, "BUFFERED")
+        self.assertEqual(facts.lambda_function_url_cors, {"allow_origins": ["https://example.com"]})
+        self.assertEqual(facts.lambda_function_url_cors_allow_credentials_state, "enabled")
+        self.assertTrue(facts.lambda_function_url_cors_allow_credentials)
+        self.assertEqual(facts.lambda_function_url_cors_allow_headers, ["authorization"])
+        self.assertEqual(facts.lambda_function_url_cors_allow_methods, ["GET"])
+        self.assertEqual(facts.lambda_function_url_cors_allow_origins, ["https://example.com"])
+        self.assertEqual(facts.lambda_function_url_cors_expose_headers, ["x-request-id"])
+        self.assertEqual(facts.lambda_function_url_cors_max_age, 3600)
+        self.assertEqual(
+            facts.lambda_function_url_posture_uncertainties,
+            ["authorization_type is unknown after planning"],
+        )
         self.assertEqual(
             facts.eks_posture_uncertainties,
             ["vpc_config.endpoint_public_access is unknown after planning"],
@@ -257,6 +285,19 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.eks_addon_preserve)
         self.assertIsNone(facts.eks_addon_service_account_role_arn)
         self.assertIsNone(facts.eks_addon_target_class)
+        self.assertIsNone(facts.lambda_function_url)
+        self.assertIsNone(facts.lambda_function_url_authorization_type)
+        self.assertIsNone(facts.lambda_function_url_qualifier)
+        self.assertIsNone(facts.lambda_function_url_invoke_mode)
+        self.assertEqual(facts.lambda_function_url_cors, {})
+        self.assertIsNone(facts.lambda_function_url_cors_allow_credentials_state)
+        self.assertIsNone(facts.lambda_function_url_cors_allow_credentials)
+        self.assertEqual(facts.lambda_function_url_cors_allow_headers, [])
+        self.assertEqual(facts.lambda_function_url_cors_allow_methods, [])
+        self.assertEqual(facts.lambda_function_url_cors_allow_origins, [])
+        self.assertEqual(facts.lambda_function_url_cors_expose_headers, [])
+        self.assertIsNone(facts.lambda_function_url_cors_max_age)
+        self.assertEqual(facts.lambda_function_url_posture_uncertainties, [])
         self.assertIsNone(facts.rds_publicly_accessible_state)
         self.assertIsNone(facts.rds_publicly_accessible)
         self.assertIsNone(facts.rds_backup_retention_period)

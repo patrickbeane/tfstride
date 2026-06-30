@@ -63,6 +63,11 @@ class AwsResourceMetadata:
     EKS_ENCRYPTION_RESOURCES = StringListMetadataField("eks_encryption_resources")
     EKS_ADDON_CONFIGURATION_KEYS = StringListMetadataField("eks_addon_configuration_keys")
     EKS_POSTURE_UNCERTAINTIES = StringListMetadataField("eks_posture_uncertainties")
+    LAMBDA_FUNCTION_URL_CORS_ALLOW_HEADERS = StringListMetadataField("lambda_function_url_cors_allow_headers")
+    LAMBDA_FUNCTION_URL_CORS_ALLOW_METHODS = StringListMetadataField("lambda_function_url_cors_allow_methods")
+    LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS = StringListMetadataField("lambda_function_url_cors_allow_origins")
+    LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS = StringListMetadataField("lambda_function_url_cors_expose_headers")
+    LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES = StringListMetadataField("lambda_function_url_posture_uncertainties")
     UNRESOLVED_SECRET_ARNS = StringListMetadataField("unresolved_secret_arns")
     UNRESOLVED_FUNCTION_REFERENCES = StringListMetadataField("unresolved_function_references")
     REQUIRES_COMPATIBILITIES = StringListMetadataField("requires_compatibilities")
@@ -116,6 +121,13 @@ class AwsResourceMetadata:
     EKS_ADDON_PRESERVE_STATE = OptionalStringMetadataField("eks_addon_preserve_state")
     EKS_ADDON_SERVICE_ACCOUNT_ROLE_ARN = OptionalStringMetadataField("eks_addon_service_account_role_arn")
     EKS_ADDON_TARGET_CLASS = OptionalStringMetadataField("eks_addon_target_class")
+    LAMBDA_FUNCTION_URL = OptionalStringMetadataField("lambda_function_url")
+    LAMBDA_FUNCTION_URL_AUTHORIZATION_TYPE = OptionalStringMetadataField("lambda_function_url_authorization_type")
+    LAMBDA_FUNCTION_URL_QUALIFIER = OptionalStringMetadataField("lambda_function_url_qualifier")
+    LAMBDA_FUNCTION_URL_INVOKE_MODE = OptionalStringMetadataField("lambda_function_url_invoke_mode")
+    LAMBDA_FUNCTION_URL_CORS_ALLOW_CREDENTIALS_STATE = OptionalStringMetadataField(
+        "lambda_function_url_cors_allow_credentials_state"
+    )
     RDS_PUBLICLY_ACCESSIBLE_STATE = OptionalStringMetadataField("rds_publicly_accessible_state")
     RDS_DELETION_PROTECTION_STATE = OptionalStringMetadataField("rds_deletion_protection_state")
     RDS_MULTI_AZ_STATE = OptionalStringMetadataField("rds_multi_az_state")
@@ -123,6 +135,7 @@ class AwsResourceMetadata:
     ENGINE = OptionalStringMetadataField("engine")
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
+    LAMBDA_FUNCTION_URL_CORS_MAX_AGE = OptionalIntMetadataField("lambda_function_url_cors_max_age")
     TASK_DEFINITION_REVISION = OptionalIntMetadataField("revision")
 
     POLICY_DOCUMENT = DictMetadataField("policy_document")
@@ -130,6 +143,7 @@ class AwsResourceMetadata:
     S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION = DictMetadataField("s3_server_side_encryption_configuration")
     EKS_VPC_CONFIG = DictMetadataField("eks_vpc_config")
     EKS_ACCESS_CONFIG = DictMetadataField("eks_access_config")
+    LAMBDA_FUNCTION_URL_CORS = DictMetadataField("lambda_function_url_cors")
     ROUTES = DictListMetadataField("routes")
     TRUST_STATEMENTS = DictListMetadataField("trust_statements")
     EKS_ENCRYPTION_CONFIG = DictListMetadataField("eks_encryption_config")

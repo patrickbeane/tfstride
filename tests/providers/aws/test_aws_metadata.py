@@ -79,6 +79,18 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "EKS_ADDON_SERVICE_ACCOUNT_ROLE_ARN": "eks_addon_service_account_role_arn",
             "EKS_ADDON_TARGET_CLASS": "eks_addon_target_class",
             "EKS_POSTURE_UNCERTAINTIES": "eks_posture_uncertainties",
+            "LAMBDA_FUNCTION_URL": "lambda_function_url",
+            "LAMBDA_FUNCTION_URL_AUTHORIZATION_TYPE": "lambda_function_url_authorization_type",
+            "LAMBDA_FUNCTION_URL_QUALIFIER": "lambda_function_url_qualifier",
+            "LAMBDA_FUNCTION_URL_INVOKE_MODE": "lambda_function_url_invoke_mode",
+            "LAMBDA_FUNCTION_URL_CORS": "lambda_function_url_cors",
+            "LAMBDA_FUNCTION_URL_CORS_ALLOW_CREDENTIALS_STATE": ("lambda_function_url_cors_allow_credentials_state"),
+            "LAMBDA_FUNCTION_URL_CORS_ALLOW_HEADERS": "lambda_function_url_cors_allow_headers",
+            "LAMBDA_FUNCTION_URL_CORS_ALLOW_METHODS": "lambda_function_url_cors_allow_methods",
+            "LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS": "lambda_function_url_cors_allow_origins",
+            "LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS": "lambda_function_url_cors_expose_headers",
+            "LAMBDA_FUNCTION_URL_CORS_MAX_AGE": "lambda_function_url_cors_max_age",
+            "LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES": "lambda_function_url_posture_uncertainties",
         }
 
         for field_name, key in expected_keys.items():
