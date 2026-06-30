@@ -269,6 +269,18 @@ class GcpProviderTests(unittest.TestCase):
                 "GKE_NODE_OAUTH_SCOPES",
                 "GKE_NODE_METADATA_MODE",
                 "GKE_LEGACY_METADATA_ENDPOINTS_ENABLED",
+                "GKE_LOGGING_SERVICE",
+                "GKE_LOGGING_COMPONENTS",
+                "GKE_CONTROL_PLANE_LOGGING_STATE",
+                "GKE_LOGGING_CONFIG",
+                "GKE_NETWORK_POLICY_STATE",
+                "GKE_NETWORK_POLICY_PROVIDER",
+                "GKE_NETWORK_POLICY",
+                "GKE_DATABASE_ENCRYPTION_STATE",
+                "GKE_DATABASE_ENCRYPTION_KEY_NAME",
+                "GKE_SECRETS_ENCRYPTION_STATE",
+                "GKE_DATABASE_ENCRYPTION",
+                "GKE_POSTURE_UNCERTAINTIES",
             },
         )
 
@@ -312,6 +324,18 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.gke_node_oauth_scopes, [])
         self.assertIsNone(facts.gke_node_metadata_mode)
         self.assertIsNone(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertIsNone(facts.gke_logging_service)
+        self.assertEqual(facts.gke_logging_components, [])
+        self.assertIsNone(facts.gke_control_plane_logging_state)
+        self.assertEqual(facts.gke_logging_config, {})
+        self.assertIsNone(facts.gke_network_policy_state)
+        self.assertIsNone(facts.gke_network_policy_provider)
+        self.assertEqual(facts.gke_network_policy, {})
+        self.assertIsNone(facts.gke_database_encryption_state)
+        self.assertIsNone(facts.gke_database_encryption_key_name)
+        self.assertIsNone(facts.gke_secrets_encryption_state)
+        self.assertEqual(facts.gke_database_encryption, {})
+        self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_optional_boolean_facts_preserve_none_and_false(self) -> None:
         resource = NormalizedResource(
@@ -351,6 +375,21 @@ class GcpProviderTests(unittest.TestCase):
                 GcpResourceMetadata.GKE_NODE_OAUTH_SCOPES: ["https://www.googleapis.com/auth/cloud-platform"],
                 GcpResourceMetadata.GKE_NODE_METADATA_MODE: "GCE_METADATA",
                 GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED: True,
+                GcpResourceMetadata.GKE_LOGGING_SERVICE: "logging.googleapis.com/kubernetes",
+                GcpResourceMetadata.GKE_LOGGING_COMPONENTS: ["APISERVER", "SCHEDULER"],
+                GcpResourceMetadata.GKE_CONTROL_PLANE_LOGGING_STATE: "configured",
+                GcpResourceMetadata.GKE_LOGGING_CONFIG: {"enable_components": ["APISERVER", "SCHEDULER"]},
+                GcpResourceMetadata.GKE_NETWORK_POLICY_STATE: "enabled",
+                GcpResourceMetadata.GKE_NETWORK_POLICY_PROVIDER: "CALICO",
+                GcpResourceMetadata.GKE_NETWORK_POLICY: {"enabled": True, "provider": "CALICO"},
+                GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_STATE: "ENCRYPTED",
+                GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_KEY_NAME: "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+                GcpResourceMetadata.GKE_SECRETS_ENCRYPTION_STATE: "enabled",
+                GcpResourceMetadata.GKE_DATABASE_ENCRYPTION: {
+                    "state": "ENCRYPTED",
+                    "key_name": "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+                },
+                GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES: [],
             },
         )
 
@@ -375,6 +414,24 @@ class GcpProviderTests(unittest.TestCase):
         )
         self.assertEqual(facts.gke_node_metadata_mode, "GCE_METADATA")
         self.assertTrue(facts.gke_legacy_metadata_endpoints_enabled)
+        self.assertEqual(facts.gke_logging_service, "logging.googleapis.com/kubernetes")
+        self.assertEqual(facts.gke_logging_components, ["APISERVER", "SCHEDULER"])
+        self.assertEqual(facts.gke_control_plane_logging_state, "configured")
+        self.assertEqual(facts.gke_logging_config, {"enable_components": ["APISERVER", "SCHEDULER"]})
+        self.assertEqual(facts.gke_network_policy_state, "enabled")
+        self.assertEqual(facts.gke_network_policy_provider, "CALICO")
+        self.assertEqual(facts.gke_network_policy, {"enabled": True, "provider": "CALICO"})
+        self.assertEqual(facts.gke_database_encryption_state, "ENCRYPTED")
+        self.assertEqual(
+            facts.gke_database_encryption_key_name,
+            "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+        )
+        self.assertEqual(facts.gke_secrets_encryption_state, "enabled")
+        self.assertEqual(
+            facts.gke_database_encryption,
+            {"state": "ENCRYPTED", "key_name": "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets"},
+        )
+        self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_normalizer_reports_resource_ownership(self) -> None:
         normalizer = GcpNormalizer()

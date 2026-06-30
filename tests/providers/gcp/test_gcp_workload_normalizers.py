@@ -13,6 +13,7 @@ from tfstride.providers.gcp.container_normalizers import (
     normalize_container_node_pool,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 
 class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
@@ -104,6 +105,113 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
             ["https://www.googleapis.com/auth/cloud-platform"],
         )
         self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED))
+        facts = gcp_facts(normalized)
+        self.assertIsNone(facts.gke_logging_service)
+        self.assertEqual(facts.gke_logging_components, [])
+        self.assertEqual(facts.gke_control_plane_logging_state, "not_configured")
+        self.assertEqual(facts.gke_logging_config, {})
+        self.assertEqual(facts.gke_network_policy_state, "not_configured")
+        self.assertIsNone(facts.gke_network_policy_provider)
+        self.assertEqual(facts.gke_network_policy, {})
+        self.assertIsNone(facts.gke_database_encryption_state)
+        self.assertIsNone(facts.gke_database_encryption_key_name)
+        self.assertEqual(facts.gke_secrets_encryption_state, "disabled")
+        self.assertEqual(facts.gke_database_encryption, {})
+        self.assertEqual(facts.gke_posture_uncertainties, [])
+
+    def test_container_cluster_normalizer_preserves_gke_logging_network_policy_and_encryption(self) -> None:
+        normalized = normalize_container_cluster(
+            _terraform_resource(
+                "google_container_cluster.restricted",
+                "google_container_cluster",
+                {
+                    "name": "restricted-gke",
+                    "project": "tfstride-demo",
+                    "location": "us-central1",
+                    "logging_service": "logging.googleapis.com/kubernetes",
+                    "logging_config": [
+                        {"enable_components": ["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"]}
+                    ],
+                    "network_policy": [{"enabled": True, "provider": "CALICO"}],
+                    "database_encryption": [
+                        {
+                            "state": "ENCRYPTED",
+                            "key_name": "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+                        }
+                    ],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.gke_logging_service, "logging.googleapis.com/kubernetes")
+        self.assertEqual(
+            facts.gke_logging_components,
+            ["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"],
+        )
+        self.assertEqual(facts.gke_control_plane_logging_state, "configured")
+        self.assertEqual(
+            facts.gke_logging_config,
+            {"enable_components": ["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"]},
+        )
+        self.assertEqual(facts.gke_network_policy_state, "enabled")
+        self.assertEqual(facts.gke_network_policy_provider, "CALICO")
+        self.assertEqual(facts.gke_network_policy, {"enabled": True, "provider": "CALICO"})
+        self.assertEqual(facts.gke_database_encryption_state, "ENCRYPTED")
+        self.assertEqual(
+            facts.gke_database_encryption_key_name,
+            "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+        )
+        self.assertEqual(facts.gke_secrets_encryption_state, "enabled")
+        self.assertEqual(
+            facts.gke_database_encryption,
+            {
+                "state": "ENCRYPTED",
+                "key_name": "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets",
+            },
+        )
+        self.assertEqual(facts.gke_posture_uncertainties, [])
+
+    def test_container_cluster_normalizer_preserves_unknown_gke_addon_posture(self) -> None:
+        normalized = normalize_container_cluster(
+            _terraform_resource(
+                "google_container_cluster.pending",
+                "google_container_cluster",
+                {
+                    "name": "pending-gke",
+                    "logging_config": [{}],
+                    "network_policy": [{}],
+                    "database_encryption": [{}],
+                },
+                unknown_values={
+                    "logging_service": True,
+                    "logging_config": [{"enable_components": True}],
+                    "network_policy": [{"enabled": True, "provider": True}],
+                    "database_encryption": [{"state": True, "key_name": True}],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.gke_logging_service)
+        self.assertEqual(facts.gke_logging_components, [])
+        self.assertEqual(facts.gke_control_plane_logging_state, "unknown")
+        self.assertEqual(facts.gke_network_policy_state, "unknown")
+        self.assertIsNone(facts.gke_network_policy_provider)
+        self.assertIsNone(facts.gke_database_encryption_state)
+        self.assertIsNone(facts.gke_database_encryption_key_name)
+        self.assertEqual(facts.gke_secrets_encryption_state, "unknown")
+        self.assertEqual(
+            facts.gke_posture_uncertainties,
+            [
+                "logging_config.enable_components is unknown after planning",
+                "logging_service is unknown after planning",
+                "network_policy.enabled is unknown after planning",
+                "database_encryption.state is unknown after planning",
+                "database_encryption.key_name is unknown after planning",
+                "network_policy.provider is unknown after planning",
+            ],
+        )
 
     def test_container_node_pool_normalizer_preserves_node_identity(self) -> None:
         normalized = normalize_container_node_pool(

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.coercion import (
+    block_attribute_unknown,
+    known_block_bool,
+    known_block_string,
+    known_block_strings,
+    known_string,
+    unknown_block_at,
+)
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_bool, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -11,9 +20,17 @@ from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
 
+_STATE_CONFIGURED = "configured"
+_STATE_DISABLED = "disabled"
+_STATE_ENABLED = "enabled"
+_STATE_NOT_CONFIGURED = "not_configured"
+_STATE_UNKNOWN = "unknown"
+
 
 def normalize_container_cluster(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
     private_cluster_config_values = _first_block(values, GcpAttr.PRIVATE_CLUSTER_CONFIG)
     private_cluster_config = GcpValues(private_cluster_config_values)
     authorized_networks_config = _optional_first_block(values, GcpAttr.MASTER_AUTHORIZED_NETWORKS_CONFIG)
@@ -22,6 +39,46 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
     workload_identity_config = GcpValues(workload_identity_config_values)
     node_config_value = _optional_first_block(values, GcpAttr.NODE_CONFIG)
     node_config_values = node_config_value or {}
+    logging_config = _optional_first_block(values, GcpAttr.LOGGING_CONFIG)
+    logging_unknown = _first_unknown_block(unknown_values.get(GcpAttr.LOGGING_CONFIG.key))
+    logging_components = known_block_strings(
+        logging_config,
+        logging_unknown,
+        GcpAttr.ENABLE_COMPONENTS.key,
+        uncertainties,
+        path=GcpAttr.LOGGING_CONFIG.key,
+    )
+    logging_service = known_string(
+        resource.values,
+        unknown_values,
+        GcpAttr.LOGGING_SERVICE.key,
+        uncertainties,
+    )
+    network_policy = _optional_first_block(values, GcpAttr.NETWORK_POLICY)
+    network_policy_unknown = _first_unknown_block(unknown_values.get(GcpAttr.NETWORK_POLICY.key))
+    network_policy_enabled = known_block_bool(
+        network_policy,
+        network_policy_unknown,
+        GcpAttr.ENABLED.key,
+        uncertainties,
+        path=GcpAttr.NETWORK_POLICY.key,
+    )
+    database_encryption = _optional_first_block(values, GcpAttr.DATABASE_ENCRYPTION)
+    database_encryption_unknown = _first_unknown_block(unknown_values.get(GcpAttr.DATABASE_ENCRYPTION.key))
+    database_encryption_state = known_block_string(
+        database_encryption,
+        database_encryption_unknown,
+        GcpAttr.STATE.key,
+        uncertainties,
+        path=GcpAttr.DATABASE_ENCRYPTION.key,
+    )
+    database_encryption_key_name = known_block_string(
+        database_encryption,
+        database_encryption_unknown,
+        GcpAttr.KEY_NAME.key,
+        uncertainties,
+        path=GcpAttr.DATABASE_ENCRYPTION.key,
+    )
     public_endpoint = _public_endpoint_enabled(values, private_cluster_config)
     broad_authorized_networks = _broad_authorized_networks(authorized_networks)
     public_exposure = public_endpoint and (
@@ -50,12 +107,48 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
             GcpResourceMetadata.GKE_MASTER_AUTHORIZED_NETWORKS: authorized_networks,
             GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_POOL: workload_pool,
             GcpResourceMetadata.GKE_WORKLOAD_IDENTITY_ENABLED: bool(workload_pool),
+            GcpResourceMetadata.GKE_LOGGING_SERVICE: logging_service,
+            GcpResourceMetadata.GKE_LOGGING_COMPONENTS: logging_components,
+            GcpResourceMetadata.GKE_CONTROL_PLANE_LOGGING_STATE: _control_plane_logging_state(
+                logging_service,
+                logging_components,
+                unknown_values,
+                logging_unknown,
+            ),
+            GcpResourceMetadata.GKE_LOGGING_CONFIG: dict(logging_config) if logging_config is not None else None,
+            GcpResourceMetadata.GKE_NETWORK_POLICY_STATE: _network_policy_state(
+                network_policy,
+                network_policy_unknown,
+                network_policy_enabled,
+            ),
+            GcpResourceMetadata.GKE_NETWORK_POLICY_PROVIDER: known_block_string(
+                network_policy,
+                network_policy_unknown,
+                GcpAttr.PROVIDER.key,
+                uncertainties,
+                path=GcpAttr.NETWORK_POLICY.key,
+            ),
+            GcpResourceMetadata.GKE_NETWORK_POLICY: dict(network_policy) if network_policy is not None else None,
+            GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_STATE: database_encryption_state,
+            GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_KEY_NAME: database_encryption_key_name,
+            GcpResourceMetadata.GKE_SECRETS_ENCRYPTION_STATE: _secrets_encryption_state(
+                database_encryption,
+                database_encryption_unknown,
+                database_encryption_state,
+                database_encryption_key_name,
+            ),
+            GcpResourceMetadata.GKE_DATABASE_ENCRYPTION: (
+                dict(database_encryption) if database_encryption is not None else None
+            ),
             "private_cluster_config": private_cluster_config_values,
             "master_authorized_networks_config": authorized_networks_config or {},
             "workload_identity_config": workload_identity_config_values,
             "remove_default_node_pool": values.get(GcpAttr.REMOVE_DEFAULT_NODE_POOL),
         },
     )
+    if uncertainties:
+        metadata[GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES] = _dedupe(uncertainties)
+
     normalized = NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -78,6 +171,62 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
     )
     mutations.set_public_exposure(public_exposure, reasons=public_exposure_reasons)
     return normalized
+
+
+def _control_plane_logging_state(
+    logging_service: str | None,
+    logging_components: list[str],
+    unknown_values: Mapping[str, Any],
+    logging_unknown: Any,
+) -> str:
+    if block_attribute_unknown(unknown_values, GcpAttr.LOGGING_SERVICE.key) or block_attribute_unknown(
+        logging_unknown,
+        GcpAttr.ENABLE_COMPONENTS.key,
+    ):
+        return _STATE_UNKNOWN
+    if logging_components:
+        return _STATE_CONFIGURED
+    if logging_service is None:
+        return _STATE_NOT_CONFIGURED
+    normalized = logging_service.strip().lower()
+    if normalized in {"none", "logging.googleapis.com/none"}:
+        return _STATE_DISABLED
+    return _STATE_CONFIGURED
+
+
+def _network_policy_state(
+    network_policy: Mapping[str, Any] | None,
+    network_policy_unknown: Any,
+    enabled: bool | None,
+) -> str:
+    if block_attribute_unknown(network_policy_unknown, GcpAttr.ENABLED.key):
+        return _STATE_UNKNOWN
+    if network_policy is None:
+        return _STATE_NOT_CONFIGURED
+    if enabled is None:
+        return _STATE_UNKNOWN
+    return _STATE_ENABLED if enabled else _STATE_DISABLED
+
+
+def _secrets_encryption_state(
+    database_encryption: Mapping[str, Any] | None,
+    database_encryption_unknown: Any,
+    encryption_state: str | None,
+    key_name: str | None,
+) -> str:
+    if database_encryption is None:
+        return _STATE_UNKNOWN if database_encryption_unknown is True else _STATE_DISABLED
+    if block_attribute_unknown(database_encryption_unknown, GcpAttr.STATE.key) or block_attribute_unknown(
+        database_encryption_unknown,
+        GcpAttr.KEY_NAME.key,
+    ):
+        return _STATE_UNKNOWN
+    normalized = (encryption_state or "").strip().upper()
+    if normalized == "ENCRYPTED" and key_name:
+        return _STATE_ENABLED
+    if normalized in {"ENCRYPTED", "DECRYPTED"}:
+        return _STATE_DISABLED
+    return _STATE_UNKNOWN
 
 
 def normalize_container_node_pool(resource: TerraformResource) -> NormalizedResource:
@@ -135,6 +284,26 @@ def _container_metadata(
     }
     metadata.update(extra)
     return metadata
+
+
+def _first_unknown_block(value: Any) -> Any:
+    if value is True or isinstance(value, Mapping):
+        return value
+    return unknown_block_at(value, 0)
+
+
+def _dedupe(values: Any) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        deduped.append(text)
+        seen.add(text)
+    return deduped
 
 
 def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:

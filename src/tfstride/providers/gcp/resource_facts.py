@@ -257,6 +257,54 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.optional_bool(GcpResourceMetadata.GKE_LEGACY_METADATA_ENDPOINTS_ENABLED)
 
     @property
+    def gke_logging_service(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_LOGGING_SERVICE)
+
+    @property
+    def gke_logging_components(self) -> list[str]:
+        return self.get(GcpResourceMetadata.GKE_LOGGING_COMPONENTS)
+
+    @property
+    def gke_control_plane_logging_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_CONTROL_PLANE_LOGGING_STATE)
+
+    @property
+    def gke_logging_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_LOGGING_CONFIG)
+
+    @property
+    def gke_network_policy_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_NETWORK_POLICY_STATE)
+
+    @property
+    def gke_network_policy_provider(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_NETWORK_POLICY_PROVIDER)
+
+    @property
+    def gke_network_policy(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_NETWORK_POLICY)
+
+    @property
+    def gke_database_encryption_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_STATE)
+
+    @property
+    def gke_database_encryption_key_name(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_DATABASE_ENCRYPTION_KEY_NAME)
+
+    @property
+    def gke_secrets_encryption_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_SECRETS_ENCRYPTION_STATE)
+
+    @property
+    def gke_database_encryption(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_DATABASE_ENCRYPTION)
+
+    @property
+    def gke_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES)
+
+    @property
     def service_account_email(self) -> str | None:
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL)
 
