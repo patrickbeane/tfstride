@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **19 trust boundaries** and **16 findings** across **25 normalized resources**.
+This run identified **19 trust boundaries** and **18 findings** across **25 normalized resources**.
 
 - High severity findings: `5`
-- Medium severity findings: `11`
+- Medium severity findings: `13`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Provider resources considered: `25`
 - Normalized resources: `25`
 - Unsupported resources: `0`
-- Registered rules: `101`
-- Enabled rules: `101`
+- Registered rules: `105`
+- Enabled rules: `105`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -28,6 +28,8 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
   - `aws-public-compute-broad-ingress`: `2`
   - `aws-database-permissive-ingress`: `1`
   - `aws-rds-storage-encryption-disabled`: `1`
+  - `aws-rds-backup-retention-insufficient`: `1`
+  - `aws-rds-deletion-protection-disabled`: `1`
   - `aws-s3-public-access`: `2`
   - `aws-iam-wildcard-permissions`: `3`
   - `aws-workload-role-sensitive-permissions`: `2`
@@ -361,6 +363,30 @@ This run identified **19 trust boundaries** and **16 findings** across **25 norm
 - Recommended mitigation: Remove public ACL or bucket policy access, enable an S3 public access block, and serve content through a controlled CDN or origin access pattern when public distribution is required.
 - Evidence:
   - public exposure reasons: bucket ACL `public-read-write` grants public access
+
+#### RDS automated backup retention is disabled or too short
+
+- STRIDE category: Denial of Service
+- Affected resources: `aws_db_instance.customer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: aws_db_instance.customer has RDS automated backup retention set to 0 days, which disables automated backups and weakens recovery after accidental deletion, destructive migration, or compromise.
+- Recommended mitigation: Enable RDS automated backups and retain backups for a recovery window that matches business requirements, incident response timelines, and compliance expectations.
+- Evidence:
+  - target resource: address=aws_db_instance.customer; type=aws_db_instance; identifier=db-bad-001; engine=postgres
+  - backup posture: backup_retention_state=disabled; backup_retention_period=0; minimum_backup_retention_days=7
+
+#### RDS deletion protection is disabled
+
+- STRIDE category: Denial of Service
+- Affected resources: `aws_db_instance.customer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: aws_db_instance.customer has RDS deletion protection disabled. Accidental or malicious delete operations can therefore remove the database instance without the additional control-plane guardrail.
+- Recommended mitigation: Enable RDS deletion protection for persistent databases and require an explicit reviewed change before destructive instance deletion.
+- Evidence:
+  - target resource: address=aws_db_instance.customer; type=aws_db_instance; identifier=db-bad-001; engine=postgres
+  - deletion protection: deletion_protection_state=disabled; deletion_protection is false
 
 #### Role trust relationship expands blast radius
 

@@ -37,11 +37,15 @@
       }
     },
     "rules": {
-      "registered_rule_count": 101,
+      "registered_rule_count": 105,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
         "aws-rds-storage-encryption-disabled",
+        "aws-rds-public-endpoint-enabled",
+        "aws-rds-backup-retention-insufficient",
+        "aws-rds-deletion-protection-disabled",
+        "aws-rds-customer-managed-kms-key-missing",
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
@@ -147,6 +151,10 @@
         "aws-public-compute-broad-ingress": 1,
         "aws-database-permissive-ingress": 1,
         "aws-rds-storage-encryption-disabled": 0,
+        "aws-rds-public-endpoint-enabled": 0,
+        "aws-rds-backup-retention-insufficient": 0,
+        "aws-rds-deletion-protection-disabled": 0,
+        "aws-rds-customer-managed-kms-key-missing": 0,
         "aws-s3-public-access": 1,
         "aws-s3-customer-managed-encryption-missing": 0,
         "aws-s3-versioning-disabled": 0,

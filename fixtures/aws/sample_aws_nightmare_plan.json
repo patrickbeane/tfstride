@@ -363,6 +363,8 @@
             "arn": "arn:aws:rds:us-east-1:555566667777:db:nightmare-customer-db",
             "engine": "postgres",
             "publicly_accessible": false,
+            "backup_retention_period": 0,
+            "deletion_protection": false,
             "storage_encrypted": false,
             "db_subnet_group_name": "bad-private-data",
             "vpc_security_group_ids": [

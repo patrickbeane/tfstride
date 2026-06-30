@@ -38,6 +38,50 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-rds-public-endpoint-enabled",
+        title="RDS database endpoint is publicly accessible",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable `publicly_accessible` for private databases, place RDS instances in private subnets, "
+            "and restrict database ingress to expected application security groups or controlled operator paths."
+        ),
+        tags=("aws", "database", "rds", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-backup-retention-insufficient",
+        title="RDS automated backup retention is disabled or too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable RDS automated backups and retain backups for a recovery window that matches business "
+            "requirements, incident response timelines, and compliance expectations."
+        ),
+        tags=("aws", "database", "rds", "backup", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-deletion-protection-disabled",
+        title="RDS deletion protection is disabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable RDS deletion protection for persistent databases and require an explicit reviewed change "
+            "before destructive instance deletion."
+        ),
+        tags=("aws", "database", "rds", "recovery", "deletion-protection"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-customer-managed-kms-key-missing",
+        title="RDS encrypted storage does not use a customer-managed KMS key",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Use a customer-managed KMS key for RDS storage encryption where key ownership, rotation, "
+            "audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "database", "rds", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-s3-public-access",
         title="Object storage is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

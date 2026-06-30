@@ -11,12 +11,17 @@ from tfstride.analysis.posture_rules import PostureRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
+from tfstride.providers.aws.rds_rules import AwsRdsPostureRuleDetectors
 from tfstride.providers.aws.storage_rules import AwsS3PostureRuleDetectors
 
 AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
         "aws-public-compute-broad-ingress",
         "aws-rds-storage-encryption-disabled",
+        "aws-rds-public-endpoint-enabled",
+        "aws-rds-backup-retention-insufficient",
+        "aws-rds-deletion-protection-disabled",
+        "aws-rds-customer-managed-kms-key-missing",
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
@@ -58,11 +63,16 @@ def build_aws_rule_contribution(
     path_chain_detectors = PathChainRuleDetectors(finding_factory)
     iam_detectors = IAMRuleDetectors(finding_factory)
     policy_trust_detectors = PolicyTrustRuleDetectors(finding_factory)
+    rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     eks_detectors = AwsEksRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
         "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
+        "aws-rds-public-endpoint-enabled": rds_posture_detectors.detect_public_endpoint_enabled,
+        "aws-rds-backup-retention-insufficient": rds_posture_detectors.detect_backup_retention_insufficient,
+        "aws-rds-deletion-protection-disabled": rds_posture_detectors.detect_deletion_protection_disabled,
+        "aws-rds-customer-managed-kms-key-missing": (rds_posture_detectors.detect_customer_managed_kms_key_missing),
         "aws-s3-public-access": posture_detectors.detect_public_object_storage,
         "aws-s3-customer-managed-encryption-missing": (s3_posture_detectors.detect_customer_managed_encryption_missing),
         "aws-s3-versioning-disabled": s3_posture_detectors.detect_versioning_disabled_or_unknown,

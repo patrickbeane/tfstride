@@ -426,7 +426,10 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             name="customer",
             category=ResourceCategory.DATA,
             security_group_ids=["sg-database"],
-            metadata={"storage_encrypted": True},
+            metadata={
+                "storage_encrypted": True,
+                "rds_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/rds",
+            },
         )
         inventory = ResourceInventory(
             provider="aws",
