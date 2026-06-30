@@ -24,6 +24,8 @@ _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 )
 _S3_BUCKET_KEY_ENABLED = "enabled"
 _S3_BUCKET_KEY_DISABLED = "disabled"
+_STATE_ENABLED = "enabled"
+_STATE_DISABLED = "disabled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,6 +323,42 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES)
 
     @property
+    def rds_publicly_accessible_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_PUBLICLY_ACCESSIBLE_STATE)
+
+    @property
+    def rds_publicly_accessible(self) -> bool | None:
+        return _bool_from_state(self.rds_publicly_accessible_state)
+
+    @property
+    def rds_backup_retention_period(self) -> int | None:
+        return self.get(AwsResourceMetadata.RDS_BACKUP_RETENTION_PERIOD)
+
+    @property
+    def rds_deletion_protection_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_DELETION_PROTECTION_STATE)
+
+    @property
+    def rds_deletion_protection(self) -> bool | None:
+        return _bool_from_state(self.rds_deletion_protection_state)
+
+    @property
+    def rds_multi_az_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_MULTI_AZ_STATE)
+
+    @property
+    def rds_multi_az(self) -> bool | None:
+        return _bool_from_state(self.rds_multi_az_state)
+
+    @property
+    def rds_kms_key_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_KMS_KEY_ID)
+
+    @property
+    def rds_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.RDS_POSTURE_UNCERTAINTIES)
+
+    @property
     def engine(self) -> str | None:
         return self.get(AwsResourceMetadata.ENGINE)
 
@@ -473,6 +511,14 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES)
 
 
+def _bool_from_state(state: str | None) -> bool | None:
+    if state == _STATE_ENABLED:
+        return True
+    if state == _STATE_DISABLED:
+        return False
+    return None
+
+
 class AwsStorageFacts(AwsResourceFacts, NeutralProviderStorageFacts):
     __slots__ = ()
 
@@ -483,6 +529,21 @@ class AwsIamFacts(AwsResourceFacts, NeutralProviderIamFacts):
 
 class AwsSqlFacts(AwsResourceFacts, NeutralProviderSqlFacts):
     __slots__ = ()
+
+    @property
+    def backup_enabled(self) -> bool | None:
+        period = self.rds_backup_retention_period
+        if period is None:
+            return None
+        return period > 0
+
+    @property
+    def deletion_protection(self) -> bool | None:
+        return self.rds_deletion_protection
+
+    @property
+    def ipv4_enabled(self) -> bool | None:
+        return self.rds_publicly_accessible
 
 
 def aws_facts(resource: NormalizedResource) -> AwsResourceFacts:

@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.data_normalizers import (
+    normalize_db_instance,
     normalize_s3_bucket_server_side_encryption_configuration,
     normalize_s3_bucket_versioning,
 )
@@ -29,6 +30,88 @@ def _terraform_resource(
 
 
 class AwsDataNormalizerTests(unittest.TestCase):
+    def test_db_instance_normalizes_recovery_endpoint_and_key_posture(self) -> None:
+        resource = _terraform_resource(
+            "aws_db_instance",
+            {
+                "id": "db-1",
+                "identifier": "customer",
+                "arn": "arn:aws:rds:us-east-1:111122223333:db:customer",
+                "engine": "postgres",
+                "publicly_accessible": True,
+                "backup_retention_period": 14,
+                "deletion_protection": True,
+                "multi_az": False,
+                "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/rds",
+                "storage_encrypted": True,
+                "vpc_security_group_ids": ["sg-db"],
+            },
+        )
+
+        normalized = normalize_db_instance(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "db-1")
+        self.assertEqual(normalized.arn, "arn:aws:rds:us-east-1:111122223333:db:customer")
+        self.assertTrue(normalized.public_access_configured)
+        self.assertTrue(normalized.publicly_accessible)
+        self.assertTrue(normalized.storage_encrypted)
+        self.assertEqual(normalized.security_group_ids, ("sg-db",))
+        self.assertEqual(facts.engine, "postgres")
+        self.assertEqual(facts.rds_publicly_accessible_state, "enabled")
+        self.assertTrue(facts.rds_publicly_accessible)
+        self.assertEqual(facts.rds_backup_retention_period, 14)
+        self.assertEqual(facts.rds_deletion_protection_state, "enabled")
+        self.assertTrue(facts.rds_deletion_protection)
+        self.assertEqual(facts.rds_multi_az_state, "disabled")
+        self.assertFalse(facts.rds_multi_az)
+        self.assertEqual(facts.rds_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/rds")
+        self.assertEqual(facts.rds_posture_uncertainties, [])
+
+    def test_db_instance_missing_posture_fields_are_explicitly_unknown(self) -> None:
+        facts = aws_facts(normalize_db_instance(_terraform_resource("aws_db_instance", {"identifier": "customer"})))
+
+        self.assertEqual(facts.rds_publicly_accessible_state, "unknown")
+        self.assertIsNone(facts.rds_publicly_accessible)
+        self.assertIsNone(facts.rds_backup_retention_period)
+        self.assertEqual(facts.rds_deletion_protection_state, "unknown")
+        self.assertIsNone(facts.rds_deletion_protection)
+        self.assertEqual(facts.rds_multi_az_state, "unknown")
+        self.assertIsNone(facts.rds_multi_az)
+        self.assertIsNone(facts.rds_kms_key_id)
+        self.assertEqual(facts.rds_posture_uncertainties, [])
+
+    def test_db_instance_preserves_unknown_posture_values(self) -> None:
+        resource = _terraform_resource(
+            "aws_db_instance",
+            {"identifier": "customer"},
+            unknown_values={
+                "publicly_accessible": True,
+                "backup_retention_period": True,
+                "deletion_protection": True,
+                "multi_az": True,
+                "kms_key_id": True,
+            },
+        )
+
+        facts = aws_facts(normalize_db_instance(resource))
+
+        self.assertEqual(facts.rds_publicly_accessible_state, "unknown")
+        self.assertIsNone(facts.rds_backup_retention_period)
+        self.assertEqual(facts.rds_deletion_protection_state, "unknown")
+        self.assertEqual(facts.rds_multi_az_state, "unknown")
+        self.assertIsNone(facts.rds_kms_key_id)
+        self.assertEqual(
+            facts.rds_posture_uncertainties,
+            [
+                "publicly_accessible is unknown after planning",
+                "deletion_protection is unknown after planning",
+                "multi_az is unknown after planning",
+                "backup_retention_period is unknown after planning",
+                "kms_key_id is unknown after planning",
+            ],
+        )
+
     def test_s3_bucket_versioning_normalizes_enabled_status(self) -> None:
         resource = _terraform_resource(
             "aws_s3_bucket_versioning",

@@ -40,6 +40,12 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "task_role_arn": "arn:aws:iam::111122223333:role/task",
                 "requires_compatibilities": ["FARGATE"],
                 "engine": "postgres",
+                "rds_publicly_accessible_state": "enabled",
+                "rds_backup_retention_period": 7,
+                "rds_deletion_protection_state": "enabled",
+                "rds_multi_az_state": "disabled",
+                "rds_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/rds",
+                "rds_posture_uncertainties": ["backup_retention_period is unknown after planning"],
                 "trust_statements": [{"Effect": "Allow"}],
                 "s3_versioning_status": "Enabled",
                 "s3_versioning_source_address": "aws_s3_bucket_versioning.logs",
@@ -89,6 +95,15 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(facts.requires_compatibilities, ["FARGATE"])
         self.assertEqual(facts.engine, "postgres")
+        self.assertEqual(facts.rds_publicly_accessible_state, "enabled")
+        self.assertTrue(facts.rds_publicly_accessible)
+        self.assertEqual(facts.rds_backup_retention_period, 7)
+        self.assertEqual(facts.rds_deletion_protection_state, "enabled")
+        self.assertTrue(facts.rds_deletion_protection)
+        self.assertEqual(facts.rds_multi_az_state, "disabled")
+        self.assertFalse(facts.rds_multi_az)
+        self.assertEqual(facts.rds_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/rds")
+        self.assertEqual(facts.rds_posture_uncertainties, ["backup_retention_period is unknown after planning"])
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.s3_versioning_status, "Enabled")
         self.assertTrue(facts.s3_versioning_enabled)
@@ -216,6 +231,15 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.eks_authentication_mode)
         self.assertIsNone(facts.eks_bootstrap_cluster_creator_admin_permissions_state)
         self.assertEqual(facts.eks_access_config, {})
+        self.assertIsNone(facts.rds_publicly_accessible_state)
+        self.assertIsNone(facts.rds_publicly_accessible)
+        self.assertIsNone(facts.rds_backup_retention_period)
+        self.assertIsNone(facts.rds_deletion_protection_state)
+        self.assertIsNone(facts.rds_deletion_protection)
+        self.assertIsNone(facts.rds_multi_az_state)
+        self.assertIsNone(facts.rds_multi_az)
+        self.assertIsNone(facts.rds_kms_key_id)
+        self.assertEqual(facts.rds_posture_uncertainties, [])
         self.assertEqual(facts.eks_posture_uncertainties, [])
 
     def test_policy_document_is_mutated_only_through_facts_facade(self) -> None:
@@ -290,6 +314,9 @@ class AwsResourceFactsTests(unittest.TestCase):
                 AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": []},
                 AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
                 AwsResourceMetadata.ENGINE: "postgres",
+                AwsResourceMetadata.RDS_BACKUP_RETENTION_PERIOD: 7,
+                AwsResourceMetadata.RDS_DELETION_PROTECTION_STATE: "enabled",
+                AwsResourceMetadata.RDS_PUBLICLY_ACCESSIBLE_STATE: "disabled",
                 AwsResourceMetadata.S3_VERSIONING_STATUS: "Enabled",
             }
         )
@@ -310,6 +337,9 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(domains.iam.reference_values, [])
         self.assertIsNone(domains.iam.service_account_email)
         self.assertEqual(domains.sql.engine, "postgres")
+        self.assertTrue(domains.sql.backup_enabled)
+        self.assertTrue(domains.sql.deletion_protection)
+        self.assertFalse(domains.sql.ipv4_enabled)
         self.assertEqual(domains.sql.authorized_networks, [])
         self.assertFalse(domains.compute.fronted_by_internet_facing_load_balancer)
         self.assertEqual(domains.workload.workload_identity_members, [])

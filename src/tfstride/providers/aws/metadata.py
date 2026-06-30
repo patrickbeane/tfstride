@@ -55,6 +55,7 @@ class AwsResourceMetadata:
     UNRESOLVED_EXECUTION_ROLE_ARNS = StringListMetadataField("unresolved_execution_role_arns")
     UNRESOLVED_BUCKET_REFERENCES = StringListMetadataField("unresolved_bucket_references")
     S3_POSTURE_UNCERTAINTIES = StringListMetadataField("s3_posture_uncertainties")
+    RDS_POSTURE_UNCERTAINTIES = StringListMetadataField("rds_posture_uncertainties")
     EKS_PUBLIC_ACCESS_CIDRS = StringListMetadataField("eks_public_access_cidrs")
     EKS_SUBNET_IDS = StringListMetadataField("eks_subnet_ids")
     EKS_SECURITY_GROUP_IDS = StringListMetadataField("eks_security_group_ids")
@@ -107,8 +108,13 @@ class AwsResourceMetadata:
         "eks_bootstrap_cluster_creator_admin_permissions_state"
     )
     EKS_ACCESS_CONFIG_STATE = OptionalStringMetadataField("eks_access_config_state")
+    RDS_PUBLICLY_ACCESSIBLE_STATE = OptionalStringMetadataField("rds_publicly_accessible_state")
+    RDS_DELETION_PROTECTION_STATE = OptionalStringMetadataField("rds_deletion_protection_state")
+    RDS_MULTI_AZ_STATE = OptionalStringMetadataField("rds_multi_az_state")
+    RDS_KMS_KEY_ID = OptionalStringMetadataField("rds_kms_key_id")
     ENGINE = OptionalStringMetadataField("engine")
 
+    RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
     TASK_DEFINITION_REVISION = OptionalIntMetadataField("revision")
 
     POLICY_DOCUMENT = DictMetadataField("policy_document")

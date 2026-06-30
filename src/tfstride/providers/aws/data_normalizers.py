@@ -10,14 +10,79 @@ from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
-from tfstride.providers.coercion import first_mapping, known_block_bool_state, known_block_string
+from tfstride.providers.coercion import (
+    as_optional_int,
+    attribute_unknown,
+    first_mapping,
+    known_block_bool_state,
+    known_block_string,
+    known_bool,
+    known_string,
+)
 from tfstride.providers.json_documents import load_json_document
 from tfstride.resource_helpers import policy_allows_public_access
+
+_RDS_STATE_ENABLED = "enabled"
+_RDS_STATE_DISABLED = "disabled"
+_RDS_STATE_UNKNOWN = "unknown"
+
+
+def _rds_bool_state(value: bool | None) -> str:
+    if value is True:
+        return _RDS_STATE_ENABLED
+    if value is False:
+        return _RDS_STATE_DISABLED
+    return _RDS_STATE_UNKNOWN
+
+
+def _known_top_level_int(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+) -> int | None:
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    value = values.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        uncertainties.append(f"{key} has an unrecognized value shape")
+        return None
+    parsed = as_optional_int(value)
+    if parsed is None:
+        uncertainties.append(f"{key} has an unrecognized value shape")
+    return parsed
 
 
 def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    publicly_accessible = bool(values.get("publicly_accessible", False))
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    publicly_accessible_value = known_bool(
+        values,
+        unknown_values,
+        "publicly_accessible",
+        uncertainties,
+        allow_string=False,
+    )
+    deletion_protection = known_bool(
+        values,
+        unknown_values,
+        "deletion_protection",
+        uncertainties,
+        allow_string=False,
+    )
+    multi_az = known_bool(
+        values,
+        unknown_values,
+        "multi_az",
+        uncertainties,
+        allow_string=False,
+    )
+    publicly_accessible = publicly_accessible_value is True
     public_access_reasons = ["database instance is marked publicly_accessible"] if publicly_accessible else []
     normalized = NormalizedResource(
         address=resource.address,
@@ -32,6 +97,22 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         metadata={
             AwsResourceMetadata.ENGINE: values.get("engine"),
+            AwsResourceMetadata.RDS_PUBLICLY_ACCESSIBLE_STATE: _rds_bool_state(publicly_accessible_value),
+            AwsResourceMetadata.RDS_BACKUP_RETENTION_PERIOD: _known_top_level_int(
+                values,
+                unknown_values,
+                "backup_retention_period",
+                uncertainties,
+            ),
+            AwsResourceMetadata.RDS_DELETION_PROTECTION_STATE: _rds_bool_state(deletion_protection),
+            AwsResourceMetadata.RDS_MULTI_AZ_STATE: _rds_bool_state(multi_az),
+            AwsResourceMetadata.RDS_KMS_KEY_ID: known_string(
+                values,
+                unknown_values,
+                "kms_key_id",
+                uncertainties,
+            ),
+            AwsResourceMetadata.RDS_POSTURE_UNCERTAINTIES: uncertainties,
             "db_subnet_group_name": values.get("db_subnet_group_name"),
         },
     )
