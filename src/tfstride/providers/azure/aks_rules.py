@@ -276,6 +276,229 @@ class AzureAksRuleDetectors:
             )
         return findings
 
+    def detect_workload_identity_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type(AzureResourceType.KUBERNETES_CLUSTER):
+            facts = azure_facts(cluster)
+            if facts.aks_oidc_issuer_state == _ENABLED and facts.aks_workload_identity_state == _ENABLED:
+                continue
+
+            explicit_absent = _state_absent(facts.aks_oidc_issuer_state) or _state_absent(
+                facts.aks_workload_identity_state
+            )
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=2 if explicit_absent else 1,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not deterministically enable AKS workload identity and its "
+                        "OIDC issuer. Pods may need to rely on broader node credentials, static secrets, or less "
+                        "auditable identity paths for Azure resource access."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(cluster)),
+                        evidence_item("workload_identity_posture", _workload_identity_evidence(facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _uncertainty_evidence(facts, ("oidc_issuer_enabled", "workload_identity_enabled")),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_key_management_service_not_configured(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type(AzureResourceType.KUBERNETES_CLUSTER):
+            facts = azure_facts(cluster)
+            if facts.aks_kms_state == _CONFIGURED and facts.aks_kms_key_vault_key_id:
+                continue
+
+            explicit_absent = facts.aks_kms_state == _NOT_CONFIGURED
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2 if explicit_absent else 1,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show deterministic AKS Key Management Service "
+                        "configuration with a Key Vault key. Kubernetes secrets may not have customer-controlled "
+                        "encryption key ownership represented in the Terraform plan."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(cluster)),
+                        evidence_item("secret_encryption_posture", _kms_evidence(facts)),
+                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("key_management_service",))),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_monitoring_agent_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type(AzureResourceType.KUBERNETES_CLUSTER):
+            facts = azure_facts(cluster)
+            if facts.aks_oms_agent_state == _ENABLED and facts.aks_log_analytics_workspace_id:
+                continue
+
+            explicit_absent = facts.aks_oms_agent_state == _NOT_CONFIGURED
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2 if explicit_absent else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show deterministic AKS monitoring through the OMS agent "
+                        "and Log Analytics. Missing cluster telemetry can limit detection and investigation of "
+                        "control-plane and workload activity."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(cluster)),
+                        evidence_item("monitoring_posture", _monitoring_evidence(facts)),
+                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("oms_agent",))),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_defender_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type(AzureResourceType.KUBERNETES_CLUSTER):
+            facts = azure_facts(cluster)
+            if facts.aks_defender_state == _ENABLED:
+                continue
+
+            explicit_absent = facts.aks_defender_state == _NOT_CONFIGURED
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2 if explicit_absent else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show deterministic Microsoft Defender for Containers "
+                        "coverage. Missing Defender signals can reduce runtime threat detection and security "
+                        "recommendations for AKS workloads."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(cluster)),
+                        evidence_item("defender_posture", _defender_evidence(facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _uncertainty_evidence(facts, ("microsoft_defender", "security_profile")),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_azure_policy_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type(AzureResourceType.KUBERNETES_CLUSTER):
+            facts = azure_facts(cluster)
+            if facts.aks_azure_policy_state == _ENABLED:
+                continue
+
+            explicit_disabled = facts.aks_azure_policy_state == _DISABLED
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2 if explicit_disabled else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not deterministically enable the Azure Policy add-on. "
+                        "Without the add-on, Kubernetes policy and governance controls may rely on external review "
+                        "instead of in-cluster policy enforcement."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(cluster)),
+                        evidence_item("azure_policy_posture", _azure_policy_evidence(facts)),
+                        evidence_item("posture_uncertainty", _uncertainty_evidence(facts, ("azure_policy_enabled",))),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _target_resource_evidence(cluster) -> list[str]:
     return [f"address={cluster.address}", f"type={cluster.resource_type}"]
@@ -340,6 +563,43 @@ def _network_policy_evidence(facts: AzureResourceFacts) -> list[str]:
     if facts.aks_network_plugin:
         values.append(f"network_plugin={facts.aks_network_plugin}")
     return values
+
+
+def _workload_identity_evidence(facts: AzureResourceFacts) -> list[str]:
+    return [
+        f"oidc_issuer_state={facts.aks_oidc_issuer_state or _UNKNOWN}",
+        f"workload_identity_state={facts.aks_workload_identity_state or _UNKNOWN}",
+    ]
+
+
+def _kms_evidence(facts: AzureResourceFacts) -> list[str]:
+    values = [f"key_management_service_state={facts.aks_kms_state or _UNKNOWN}"]
+    if facts.aks_kms_key_vault_key_id:
+        values.append(f"key_vault_key_id={facts.aks_kms_key_vault_key_id}")
+    else:
+        values.append("key_vault_key_id is not represented in planned values")
+    return values
+
+
+def _monitoring_evidence(facts: AzureResourceFacts) -> list[str]:
+    values = [f"oms_agent_state={facts.aks_oms_agent_state or _UNKNOWN}"]
+    if facts.aks_log_analytics_workspace_id:
+        values.append(f"log_analytics_workspace_id={facts.aks_log_analytics_workspace_id}")
+    else:
+        values.append("log_analytics_workspace_id is not represented in planned values")
+    return values
+
+
+def _defender_evidence(facts: AzureResourceFacts) -> list[str]:
+    return [f"defender_state={facts.aks_defender_state or _UNKNOWN}"]
+
+
+def _azure_policy_evidence(facts: AzureResourceFacts) -> list[str]:
+    return [f"azure_policy_state={facts.aks_azure_policy_state or _UNKNOWN}"]
+
+
+def _state_absent(state: str | None) -> bool:
+    return state in {_DISABLED, _NOT_CONFIGURED}
 
 
 def _authorized_ip_restriction(facts: AzureResourceFacts) -> _AuthorizedIpRestriction:

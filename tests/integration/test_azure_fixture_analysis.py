@@ -19,6 +19,9 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-aks-api-server-public-unrestricted",
                 "azure-storage-account-shared-key-enabled",
                 "azure-storage-account-nested-public-access-enabled",
+                "azure-aks-defender-not-enabled",
+                "azure-aks-key-management-service-not-configured",
+                "azure-aks-monitoring-agent-not-enabled",
                 "azure-key-vault-public-network-access",
                 "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
@@ -27,14 +30,16 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
                 "azure-public-compute-broad-ingress",
+                "azure-aks-azure-policy-not-enabled",
                 "azure-aks-rbac-posture-weak",
                 "azure-aks-local-accounts-not-disabled",
                 "azure-aks-network-policy-missing",
+                "azure-aks-workload-identity-not-enabled",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 8, "high": 3, "low": 3}),
+            Counter({"medium": 11, "high": 3, "low": 5}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],
@@ -79,6 +84,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("Azure Storage container is publicly accessible", first)
         self.assertIn("Azure Key Vault allows unrestricted public network access", first)
         self.assertIn("AKS control plane is public without narrow authorized IP ranges", first)
+        self.assertIn("AKS workload identity is not fully enabled", first)
 
 
 if __name__ == "__main__":

@@ -7,11 +7,11 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **14 findings** across **15 normalized resources**.
+This run identified **3 trust boundaries** and **19 findings** across **15 normalized resources**.
 
 - High severity findings: `3`
-- Medium severity findings: `8`
-- Low severity findings: `3`
+- Medium severity findings: `11`
+- Low severity findings: `5`
 
 ## Analysis Coverage
 
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **14 findings** across **15 norma
 - Provider resources considered: `15`
 - Normalized resources: `15`
 - Unsupported resources: `0`
-- Registered rules: `105`
-- Enabled rules: `105`
+- Registered rules: `110`
+- Enabled rules: `110`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -39,6 +39,11 @@ This run identified **3 trust boundaries** and **14 findings** across **15 norma
   - `azure-aks-local-accounts-not-disabled`: `1`
   - `azure-aks-rbac-posture-weak`: `1`
   - `azure-aks-network-policy-missing`: `1`
+  - `azure-aks-workload-identity-not-enabled`: `1`
+  - `azure-aks-key-management-service-not-configured`: `1`
+  - `azure-aks-monitoring-agent-not-enabled`: `1`
+  - `azure-aks-defender-not-enabled`: `1`
+  - `azure-aks-azure-policy-not-enabled`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -102,6 +107,42 @@ This run identified **3 trust boundaries** and **14 findings** across **15 norma
   - public access posture: allow_nested_items_to_be_public is true
 
 ### Medium
+
+#### AKS Defender coverage is not enabled
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_kubernetes_cluster.platform does not show deterministic Microsoft Defender for Containers coverage. Missing Defender signals can reduce runtime threat detection and security recommendations for AKS workloads.
+- Recommended mitigation: Enable Microsoft Defender for Containers for AKS clusters that need runtime threat detection, vulnerability recommendations, and security posture monitoring.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - defender posture: defender_state=not_configured
+
+#### AKS Key Management Service is not configured
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_kubernetes_cluster.platform does not show deterministic AKS Key Management Service configuration with a Key Vault key. Kubernetes secrets may not have customer-controlled encryption key ownership represented in the Terraform plan.
+- Recommended mitigation: Configure AKS Key Management Service with a customer-managed Key Vault key for Kubernetes secrets where customer key ownership or stronger secrets encryption posture is required.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - secret encryption posture: key_management_service_state=not_configured; key_vault_key_id is not represented in planned values
+
+#### AKS monitoring agent is not enabled
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_kubernetes_cluster.platform does not show deterministic AKS monitoring through the OMS agent and Log Analytics. Missing cluster telemetry can limit detection and investigation of control-plane and workload activity.
+- Recommended mitigation: Enable the OMS agent or the current Azure Monitor integration for AKS and route cluster telemetry to a retained Log Analytics workspace or centralized logging pipeline.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - monitoring posture: oms_agent_state=not_configured; log_analytics_workspace_id is not represented in planned values
 
 #### Azure Key Vault allows unrestricted public network access
 
@@ -202,6 +243,18 @@ This run identified **3 trust boundaries** and **14 findings** across **15 norma
 
 ### Low
 
+#### AKS Azure Policy add-on is not enabled
+
+- STRIDE category: Tampering
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 1 => low
+- Rationale: azurerm_kubernetes_cluster.platform does not deterministically enable the Azure Policy add-on. Without the add-on, Kubernetes policy and governance controls may rely on external review instead of in-cluster policy enforcement.
+- Recommended mitigation: Enable the Azure Policy add-on for AKS where policy-as-code enforcement, guardrails, or compliance reporting are expected for Kubernetes resources.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - azure policy posture: azure_policy_state=unknown
+
 #### AKS RBAC posture is weak or not deterministic
 
 - STRIDE category: Elevation of Privilege
@@ -237,6 +290,18 @@ This run identified **3 trust boundaries** and **14 findings** across **15 norma
 - Evidence:
   - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
   - network policy posture: network_policy_state=unknown; network_policy is not represented in planned values
+
+#### AKS workload identity is not fully enabled
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +0, lateral_movement +0, blast_radius +1, final_score 2 => low
+- Rationale: azurerm_kubernetes_cluster.platform does not deterministically enable AKS workload identity and its OIDC issuer. Pods may need to rely on broader node credentials, static secrets, or less auditable identity paths for Azure resource access.
+- Recommended mitigation: Enable the AKS OIDC issuer and workload identity, bind Kubernetes service accounts to narrow managed identities, and avoid relying on node credentials or static secrets for Azure API access.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster
+  - workload identity posture: oidc_issuer_state=unknown; workload_identity_state=unknown
 
 ## Limitations / Unsupported Resources
 

@@ -103,6 +103,12 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
                     local_account_disabled=False,
                     kubernetes_rbac=False,
                     network_policy=AZURE_MISSING,
+                    oidc_issuer=True,
+                    workload_identity=True,
+                    kms_key_vault_key_id="azurerm_key_vault_key.aks.id",
+                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
+                    defender=True,
+                    azure_policy=True,
                 )
             ]
         )
@@ -165,6 +171,12 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
                     aad_rbac=True,
                     azure_rbac_enabled=True,
                     network_policy="azure",
+                    oidc_issuer=True,
+                    workload_identity=True,
+                    kms_key_vault_key_id="azurerm_key_vault_key.aks.id",
+                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
+                    defender=True,
+                    azure_policy=True,
                 )
             ]
         )
@@ -191,6 +203,12 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
                     local_account_disabled=True,
                     kubernetes_rbac=True,
                     network_policy="calico",
+                    oidc_issuer=True,
+                    workload_identity=True,
+                    kms_key_vault_key_id="azurerm_key_vault_key.aks.id",
+                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
+                    defender=True,
+                    azure_policy=True,
                 )
             ]
         )

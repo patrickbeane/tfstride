@@ -164,7 +164,13 @@ class AzureAksNormalizerTests(unittest.TestCase):
                             "azure_active_directory_role_based_access_control": [
                                 {"managed": True, "azure_rbac_enabled": True}
                             ],
+                            "oidc_issuer_enabled": True,
+                            "workload_identity_enabled": True,
                             "network_profile": [{"network_plugin": "azure", "network_policy": "azure"}],
+                            "key_management_service": [{"key_vault_key_id": "azurerm_key_vault_key.aks.id"}],
+                            "oms_agent": [{"log_analytics_workspace_id": "azurerm_log_analytics_workspace.aks.id"}],
+                            "microsoft_defender": [{"enabled": True}],
+                            "azure_policy_enabled": True,
                         }
                     )
                 ]
@@ -319,7 +325,13 @@ class AzureAksNormalizerTests(unittest.TestCase):
                         "azure_active_directory_role_based_access_control": [
                             {"managed": True, "azure_rbac_enabled": True}
                         ],
+                        "oidc_issuer_enabled": True,
+                        "workload_identity_enabled": True,
                         "network_profile": [{"network_plugin": "azure", "network_policy": "azure"}],
+                        "key_management_service": [{"key_vault_key_id": "azurerm_key_vault_key.aks.id"}],
+                        "oms_agent": [{"log_analytics_workspace_id": "azurerm_log_analytics_workspace.aks.id"}],
+                        "microsoft_defender": [{"enabled": True}],
+                        "azure_policy_enabled": True,
                     }
                 )
             ]

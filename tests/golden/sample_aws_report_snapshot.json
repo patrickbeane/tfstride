@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 105,
+      "registered_rule_count": 110,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -134,6 +134,11 @@
         "azure-aks-local-accounts-not-disabled",
         "azure-aks-rbac-posture-weak",
         "azure-aks-network-policy-missing",
+        "azure-aks-workload-identity-not-enabled",
+        "azure-aks-key-management-service-not-configured",
+        "azure-aks-monitoring-agent-not-enabled",
+        "azure-aks-defender-not-enabled",
+        "azure-aks-azure-policy-not-enabled",
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
@@ -243,6 +248,11 @@
         "azure-aks-local-accounts-not-disabled": 0,
         "azure-aks-rbac-posture-weak": 0,
         "azure-aks-network-policy-missing": 0,
+        "azure-aks-workload-identity-not-enabled": 0,
+        "azure-aks-key-management-service-not-configured": 0,
+        "azure-aks-monitoring-agent-not-enabled": 0,
+        "azure-aks-defender-not-enabled": 0,
+        "azure-aks-azure-policy-not-enabled": 0,
         "azure-sql-public-network-access-enabled": 0,
         "azure-sql-missing-private-endpoint": 0,
         "azure-sql-firewall-broad-public-access": 0,

@@ -392,6 +392,61 @@ AZURE_RULE_METADATA = (
         severity_factors=("lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-aks-workload-identity-not-enabled",
+        title="AKS workload identity is not fully enabled",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Enable the AKS OIDC issuer and workload identity, bind Kubernetes service accounts to narrow "
+            "managed identities, and avoid relying on node credentials or static secrets for Azure API access."
+        ),
+        tags=("azure", "aks", "kubernetes", "identity", "workload-identity"),
+        severity_factors=("privilege_breadth", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-key-management-service-not-configured",
+        title="AKS Key Management Service is not configured",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure AKS Key Management Service with a customer-managed Key Vault key for Kubernetes secrets "
+            "where customer key ownership or stronger secrets encryption posture is required."
+        ),
+        tags=("azure", "aks", "kubernetes", "secrets", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-monitoring-agent-not-enabled",
+        title="AKS monitoring agent is not enabled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable the OMS agent or the current Azure Monitor integration for AKS and route cluster telemetry to "
+            "a retained Log Analytics workspace or centralized logging pipeline."
+        ),
+        tags=("azure", "aks", "kubernetes", "monitoring", "logging"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-defender-not-enabled",
+        title="AKS Defender coverage is not enabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable Microsoft Defender for Containers for AKS clusters that need runtime threat detection, "
+            "vulnerability recommendations, and security posture monitoring."
+        ),
+        tags=("azure", "aks", "kubernetes", "defender", "monitoring"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-aks-azure-policy-not-enabled",
+        title="AKS Azure Policy add-on is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable the Azure Policy add-on for AKS where policy-as-code enforcement, guardrails, or compliance "
+            "reporting are expected for Kubernetes resources."
+        ),
+        tags=("azure", "aks", "kubernetes", "azure-policy", "governance"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-sql-public-network-access-enabled",
         title="Azure SQL Database has public network access enabled",
         category=StrideCategory.INFORMATION_DISCLOSURE,

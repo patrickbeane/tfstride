@@ -9,13 +9,21 @@ from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 
-_AKS_RULE_IDS = (
+_AKS_CONTROL_PLANE_RULE_IDS = (
     "azure-aks-api-server-public-unrestricted",
     "azure-aks-private-cluster-not-enabled",
     "azure-aks-local-accounts-not-disabled",
     "azure-aks-rbac-posture-weak",
     "azure-aks-network-policy-missing",
 )
+_AKS_SECURITY_ADDON_RULE_IDS = (
+    "azure-aks-workload-identity-not-enabled",
+    "azure-aks-key-management-service-not-configured",
+    "azure-aks-monitoring-agent-not-enabled",
+    "azure-aks-defender-not-enabled",
+    "azure-aks-azure-policy-not-enabled",
+)
+_AKS_RULE_IDS = _AKS_CONTROL_PLANE_RULE_IDS + _AKS_SECURITY_ADDON_RULE_IDS
 _MISSING = object()
 
 
@@ -29,6 +37,12 @@ def _cluster(
     aad_rbac: object = _MISSING,
     azure_rbac_enabled: object = _MISSING,
     network_policy: object = _MISSING,
+    oidc_issuer: object = _MISSING,
+    workload_identity: object = _MISSING,
+    kms_key_vault_key_id: object = _MISSING,
+    oms_workspace_id: object = _MISSING,
+    defender: object = _MISSING,
+    azure_policy: object = _MISSING,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -51,6 +65,20 @@ def _cluster(
         values["azure_active_directory_role_based_access_control"] = [aad_block]
     if network_policy is not _MISSING:
         values["network_profile"] = [{"network_plugin": "azure", "network_policy": network_policy}]
+    if oidc_issuer is not _MISSING:
+        values["oidc_issuer_enabled"] = oidc_issuer
+    if workload_identity is not _MISSING:
+        values["workload_identity_enabled"] = workload_identity
+    if kms_key_vault_key_id is not _MISSING:
+        values["key_management_service"] = [
+            {} if kms_key_vault_key_id is None else {"key_vault_key_id": kms_key_vault_key_id}
+        ]
+    if oms_workspace_id is not _MISSING:
+        values["oms_agent"] = [{} if oms_workspace_id is None else {"log_analytics_workspace_id": oms_workspace_id}]
+    if defender is not _MISSING:
+        values["microsoft_defender"] = [{"enabled": True}] if defender else []
+    if azure_policy is not _MISSING:
+        values["azure_policy_enabled"] = azure_policy
     return TerraformResource(
         address=f"azurerm_kubernetes_cluster.{name}",
         mode="managed",
@@ -87,7 +115,7 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
                     network_policy=_MISSING,
                 )
             ],
-            *_AKS_RULE_IDS,
+            *_AKS_CONTROL_PLANE_RULE_IDS,
         )
 
         self.assertEqual(
@@ -127,7 +155,7 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
                     network_policy="azure",
                 )
             ],
-            *_AKS_RULE_IDS,
+            *_AKS_CONTROL_PLANE_RULE_IDS,
         )
 
         self.assertEqual(findings, [])
@@ -143,7 +171,7 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
                     network_policy="calico",
                 )
             ],
-            *_AKS_RULE_IDS,
+            *_AKS_CONTROL_PLANE_RULE_IDS,
         )
 
         self.assertEqual([finding.rule_id for finding in findings], ["azure-aks-private-cluster-not-enabled"])
@@ -174,7 +202,7 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
         self.assertIn("broad_authorized_ip_ranges=[0.0.0.0/0]", evidence["control_plane_posture"])
 
     def test_unknown_minimal_cluster_emits_uncertain_findings_without_disabled_claims(self) -> None:
-        findings = _evaluate([_cluster()], *_AKS_RULE_IDS)
+        findings = _evaluate([_cluster()], *_AKS_CONTROL_PLANE_RULE_IDS)
 
         self.assertEqual(
             [finding.rule_id for finding in findings],
@@ -216,7 +244,7 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
                     },
                 )
             ],
-            *_AKS_RULE_IDS,
+            *_AKS_CONTROL_PLANE_RULE_IDS,
         )
 
         findings_by_rule = {finding.rule_id: finding for finding in findings}
@@ -230,6 +258,115 @@ class AzureAksControlPlaneRuleTests(unittest.TestCase):
         self.assertEqual(
             _evidence_by_key(findings_by_rule["azure-aks-network-policy-missing"])["posture_uncertainty"],
             ["network_profile.network_policy is unknown after planning"],
+        )
+
+    def test_missing_security_addons_emit_focused_findings(self) -> None:
+        findings = _evaluate(
+            [
+                _cluster(
+                    oidc_issuer=False,
+                    workload_identity=False,
+                    kms_key_vault_key_id=_MISSING,
+                    oms_workspace_id=_MISSING,
+                    defender=False,
+                    azure_policy=False,
+                )
+            ],
+            *_AKS_SECURITY_ADDON_RULE_IDS,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], list(_AKS_SECURITY_ADDON_RULE_IDS))
+        self.assertEqual(
+            [finding.severity.value for finding in findings], ["medium", "medium", "medium", "medium", "medium"]
+        )
+        findings_by_rule = {finding.rule_id: finding for finding in findings}
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-workload-identity-not-enabled"])["workload_identity_posture"],
+            ["oidc_issuer_state=disabled", "workload_identity_state=disabled"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-key-management-service-not-configured"])[
+                "secret_encryption_posture"
+            ],
+            ["key_management_service_state=not_configured", "key_vault_key_id is not represented in planned values"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-monitoring-agent-not-enabled"])["monitoring_posture"],
+            ["oms_agent_state=not_configured", "log_analytics_workspace_id is not represented in planned values"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-defender-not-enabled"])["defender_posture"],
+            ["defender_state=not_configured"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-azure-policy-not-enabled"])["azure_policy_posture"],
+            ["azure_policy_state=disabled"],
+        )
+
+    def test_configured_security_addons_are_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _cluster(
+                    oidc_issuer=True,
+                    workload_identity=True,
+                    kms_key_vault_key_id="azurerm_key_vault_key.aks.id",
+                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
+                    defender=True,
+                    azure_policy=True,
+                )
+            ],
+            *_AKS_SECURITY_ADDON_RULE_IDS,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unknown_security_addon_values_emit_uncertain_low_severity_findings(self) -> None:
+        findings = _evaluate(
+            [
+                _cluster(
+                    oidc_issuer=None,
+                    workload_identity=None,
+                    kms_key_vault_key_id=_MISSING,
+                    oms_workspace_id=_MISSING,
+                    defender=_MISSING,
+                    azure_policy=None,
+                    unknown_values={
+                        "oidc_issuer_enabled": True,
+                        "workload_identity_enabled": True,
+                        "key_management_service": True,
+                        "oms_agent": True,
+                        "microsoft_defender": True,
+                        "azure_policy_enabled": True,
+                    },
+                )
+            ],
+            *_AKS_SECURITY_ADDON_RULE_IDS,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], list(_AKS_SECURITY_ADDON_RULE_IDS))
+        self.assertEqual([finding.severity.value for finding in findings], ["low", "low", "low", "low", "low"])
+        findings_by_rule = {finding.rule_id: finding for finding in findings}
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-workload-identity-not-enabled"])["posture_uncertainty"],
+            ["oidc_issuer_enabled is unknown after planning", "workload_identity_enabled is unknown after planning"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-key-management-service-not-configured"])[
+                "posture_uncertainty"
+            ],
+            ["key_management_service.key_vault_key_id is unknown after planning"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-monitoring-agent-not-enabled"])["posture_uncertainty"],
+            ["oms_agent.log_analytics_workspace_id is unknown after planning"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-defender-not-enabled"])["defender_posture"],
+            ["defender_state=unknown"],
+        )
+        self.assertEqual(
+            _evidence_by_key(findings_by_rule["azure-aks-azure-policy-not-enabled"])["posture_uncertainty"],
+            ["azure_policy_enabled is unknown after planning"],
         )
 
     def test_aks_rule_ids_are_registered_with_azure_rule_group(self) -> None:
