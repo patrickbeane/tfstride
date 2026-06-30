@@ -70,6 +70,14 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "EKS_ENABLED_CLUSTER_LOG_TYPES": "eks_enabled_cluster_log_types",
             "EKS_SECRETS_ENCRYPTION_STATE": "eks_secrets_encryption_state",
             "EKS_AUTHENTICATION_MODE": "eks_authentication_mode",
+            "EKS_ADDON_NAME": "eks_addon_name",
+            "EKS_ADDON_CLUSTER_NAME": "eks_addon_cluster_name",
+            "EKS_ADDON_VERSION": "eks_addon_version",
+            "EKS_ADDON_CONFIGURATION_VALUES": "eks_addon_configuration_values",
+            "EKS_ADDON_CONFIGURATION_KEYS": "eks_addon_configuration_keys",
+            "EKS_ADDON_PRESERVE_STATE": "eks_addon_preserve_state",
+            "EKS_ADDON_SERVICE_ACCOUNT_ROLE_ARN": "eks_addon_service_account_role_arn",
+            "EKS_ADDON_TARGET_CLASS": "eks_addon_target_class",
             "EKS_POSTURE_UNCERTAINTIES": "eks_posture_uncertainties",
         }
 

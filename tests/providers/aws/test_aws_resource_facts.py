@@ -83,6 +83,14 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "eks_authentication_mode": "API_AND_CONFIG_MAP",
                 "eks_bootstrap_cluster_creator_admin_permissions_state": "enabled",
                 "eks_access_config": {"authentication_mode": "API_AND_CONFIG_MAP"},
+                "eks_addon_name": "vpc-cni",
+                "eks_addon_cluster_name": "app",
+                "eks_addon_version": "v1.18.1-eksbuild.1",
+                "eks_addon_configuration_values": '{"env":{}}',
+                "eks_addon_configuration_keys": ["env"],
+                "eks_addon_preserve_state": "enabled",
+                "eks_addon_service_account_role_arn": "arn:aws:iam::111122223333:role/eks-vpc-cni",
+                "eks_addon_target_class": "networking",
                 "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
@@ -144,6 +152,15 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.eks_authentication_mode, "API_AND_CONFIG_MAP")
         self.assertEqual(facts.eks_bootstrap_cluster_creator_admin_permissions_state, "enabled")
         self.assertEqual(facts.eks_access_config, {"authentication_mode": "API_AND_CONFIG_MAP"})
+        self.assertEqual(facts.eks_addon_name, "vpc-cni")
+        self.assertEqual(facts.eks_addon_cluster_name, "app")
+        self.assertEqual(facts.eks_addon_version, "v1.18.1-eksbuild.1")
+        self.assertEqual(facts.eks_addon_configuration_values, '{"env":{}}')
+        self.assertEqual(facts.eks_addon_configuration_keys, ["env"])
+        self.assertEqual(facts.eks_addon_preserve_state, "enabled")
+        self.assertTrue(facts.eks_addon_preserve)
+        self.assertEqual(facts.eks_addon_service_account_role_arn, "arn:aws:iam::111122223333:role/eks-vpc-cni")
+        self.assertEqual(facts.eks_addon_target_class, "networking")
         self.assertEqual(
             facts.eks_posture_uncertainties,
             ["vpc_config.endpoint_public_access is unknown after planning"],
@@ -231,6 +248,15 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.eks_authentication_mode)
         self.assertIsNone(facts.eks_bootstrap_cluster_creator_admin_permissions_state)
         self.assertEqual(facts.eks_access_config, {})
+        self.assertIsNone(facts.eks_addon_name)
+        self.assertIsNone(facts.eks_addon_cluster_name)
+        self.assertIsNone(facts.eks_addon_version)
+        self.assertIsNone(facts.eks_addon_configuration_values)
+        self.assertEqual(facts.eks_addon_configuration_keys, [])
+        self.assertIsNone(facts.eks_addon_preserve_state)
+        self.assertIsNone(facts.eks_addon_preserve)
+        self.assertIsNone(facts.eks_addon_service_account_role_arn)
+        self.assertIsNone(facts.eks_addon_target_class)
         self.assertIsNone(facts.rds_publicly_accessible_state)
         self.assertIsNone(facts.rds_publicly_accessible)
         self.assertIsNone(facts.rds_backup_retention_period)

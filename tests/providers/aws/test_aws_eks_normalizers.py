@@ -6,7 +6,7 @@ from typing import Any
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
-from tfstride.providers.aws.eks_normalizers import normalize_eks_cluster
+from tfstride.providers.aws.eks_normalizers import normalize_eks_addon, normalize_eks_cluster
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -21,6 +21,23 @@ def _cluster(
         address=f"aws_eks_cluster.{name}",
         mode="managed",
         resource_type="aws_eks_cluster",
+        name=name,
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _addon(
+    values: dict[str, Any],
+    *,
+    name: str = "vpc_cni",
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address=f"aws_eks_addon.{name}",
+        mode="managed",
+        resource_type="aws_eks_addon",
         name=name,
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
@@ -244,12 +261,113 @@ class AwsEksNormalizerTests(unittest.TestCase):
             },
         )
 
-    def test_aws_normalizer_supports_eks_cluster_resource_type(self) -> None:
-        inventory = AwsNormalizer().normalize([_cluster({"name": "cluster"})])
+    def test_eks_addon_normalizes_core_addon_version_and_configuration(self) -> None:
+        configuration_values = '{"env":{"ENABLE_PREFIX_DELEGATION":"true"},"resources":{"limits":{"cpu":"100m"}}}'
+        normalized = normalize_eks_addon(
+            _addon(
+                {
+                    "cluster_name": "app",
+                    "addon_name": "vpc-cni",
+                    "addon_version": "v1.18.1-eksbuild.1",
+                    "configuration_values": configuration_values,
+                    "preserve": True,
+                    "service_account_role_arn": "arn:aws:iam::111122223333:role/eks-vpc-cni",
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "vpc-cni")
+        self.assertEqual(normalized.attached_role_arns, ["arn:aws:iam::111122223333:role/eks-vpc-cni"])
+        self.assertEqual(facts.resource_name, "vpc-cni")
+        self.assertEqual(facts.eks_addon_name, "vpc-cni")
+        self.assertEqual(facts.eks_addon_cluster_name, "app")
+        self.assertEqual(facts.eks_addon_version, "v1.18.1-eksbuild.1")
+        self.assertEqual(facts.eks_addon_configuration_values, configuration_values)
+        self.assertEqual(facts.eks_addon_configuration_keys, ["env", "resources"])
+        self.assertEqual(facts.eks_addon_preserve_state, "enabled")
+        self.assertTrue(facts.eks_addon_preserve)
+        self.assertEqual(facts.eks_addon_service_account_role_arn, "arn:aws:iam::111122223333:role/eks-vpc-cni")
+        self.assertEqual(facts.eks_addon_target_class, "networking")
+        self.assertEqual(facts.eks_posture_uncertainties, [])
+        self.assertEqual(_aws_findings([_addon({"cluster_name": "app", "addon_name": "vpc-cni"})]), [])
+
+    def test_eks_addon_preserves_unknown_values_without_inference(self) -> None:
+        normalized = normalize_eks_addon(
+            _addon(
+                {"configuration_values": {}},
+                name="unknown",
+                unknown_values={
+                    "addon_name": True,
+                    "cluster_name": True,
+                    "addon_version": True,
+                    "configuration_values": True,
+                    "preserve": True,
+                    "service_account_role_arn": True,
+                },
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "aws_eks_addon.unknown")
+        self.assertIsNone(facts.eks_addon_name)
+        self.assertIsNone(facts.eks_addon_cluster_name)
+        self.assertIsNone(facts.eks_addon_version)
+        self.assertIsNone(facts.eks_addon_configuration_values)
+        self.assertEqual(facts.eks_addon_configuration_keys, [])
+        self.assertEqual(facts.eks_addon_preserve_state, "unknown")
+        self.assertIsNone(facts.eks_addon_preserve)
+        self.assertIsNone(facts.eks_addon_service_account_role_arn)
+        self.assertIsNone(facts.eks_addon_target_class)
+        self.assertEqual(
+            facts.eks_posture_uncertainties,
+            [
+                "addon_name is unknown after planning",
+                "cluster_name is unknown after planning",
+                "addon_version is unknown after planning",
+                "configuration_values is unknown after planning",
+                "preserve is unknown after planning",
+                "service_account_role_arn is unknown after planning",
+            ],
+        )
+
+    def test_eks_addon_records_unrecognized_configuration_shape_as_uncertainty(self) -> None:
+        normalized = normalize_eks_addon(
+            _addon(
+                {
+                    "cluster_name": "app",
+                    "addon_name": "coredns",
+                    "configuration_values": "[1, 2, 3]",
+                    "preserve": False,
+                },
+                name="coredns",
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(facts.eks_addon_name, "coredns")
+        self.assertEqual(facts.eks_addon_target_class, "dns")
+        self.assertEqual(facts.eks_addon_configuration_values, "[1, 2, 3]")
+        self.assertEqual(facts.eks_addon_configuration_keys, [])
+        self.assertEqual(facts.eks_addon_preserve_state, "disabled")
+        self.assertFalse(facts.eks_addon_preserve)
+        self.assertEqual(facts.eks_posture_uncertainties, ["configuration_values has an unrecognized JSON shape"])
+
+    def test_aws_normalizer_supports_eks_cluster_and_addon_resource_types(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                _cluster({"name": "cluster"}),
+                _addon({"cluster_name": "cluster", "addon_name": "aws-ebs-csi-driver"}, name="ebs_csi"),
+            ]
+        )
 
         self.assertIn("aws_eks_cluster", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_eks_addon", SUPPORTED_AWS_TYPES)
         self.assertEqual(inventory.unsupported_resources, [])
-        self.assertEqual([resource.address for resource in inventory.resources], ["aws_eks_cluster.cluster"])
+        self.assertEqual(
+            [resource.address for resource in inventory.resources],
+            ["aws_eks_cluster.cluster", "aws_eks_addon.ebs_csi"],
+        )
         self.assertEqual(inventory.metadata["supported_resource_types"], sorted(SUPPORTED_AWS_TYPES))
 
 

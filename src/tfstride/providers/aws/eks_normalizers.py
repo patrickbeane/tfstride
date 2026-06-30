@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,6 +15,7 @@ from tfstride.providers.coercion import (
     known_block_bool,
     known_block_string,
     known_block_strings,
+    known_bool,
     known_string,
     known_string_list,
     unknown_block_at,
@@ -24,6 +26,12 @@ _STATE_DISABLED = "disabled"
 _STATE_CONFIGURED = "configured"
 _STATE_NOT_CONFIGURED = "not_configured"
 _STATE_UNKNOWN = "unknown"
+_EKS_ADDON_TARGET_CLASSES = {
+    "vpc-cni": "networking",
+    "coredns": "dns",
+    "kube-proxy": "node-proxy",
+    "aws-ebs-csi-driver": "storage-csi",
+}
 
 
 def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
@@ -152,6 +160,49 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
     )
 
 
+def normalize_eks_addon(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    addon_name = known_string(values, unknown_values, "addon_name", uncertainties)
+    cluster_name = known_string(values, unknown_values, "cluster_name", uncertainties)
+    addon_version = known_string(values, unknown_values, "addon_version", uncertainties)
+    configuration_values = known_string(
+        values,
+        unknown_values,
+        "configuration_values",
+        uncertainties,
+        require_string=True,
+    )
+    preserve_state = _top_level_bool_state(values, unknown_values, "preserve", uncertainties)
+    service_account_role_arn = known_string(values, unknown_values, "service_account_role_arn", uncertainties)
+
+    metadata: dict[Any, Any] = {
+        AwsResourceMetadata.NAME: addon_name or resource.name,
+        AwsResourceMetadata.EKS_ADDON_NAME: addon_name,
+        AwsResourceMetadata.EKS_ADDON_CLUSTER_NAME: cluster_name,
+        AwsResourceMetadata.EKS_ADDON_VERSION: addon_version,
+        AwsResourceMetadata.EKS_ADDON_CONFIGURATION_VALUES: configuration_values,
+        AwsResourceMetadata.EKS_ADDON_CONFIGURATION_KEYS: _configuration_keys(configuration_values, uncertainties),
+        AwsResourceMetadata.EKS_ADDON_PRESERVE_STATE: preserve_state,
+        AwsResourceMetadata.EKS_ADDON_SERVICE_ACCOUNT_ROLE_ARN: service_account_role_arn,
+        AwsResourceMetadata.EKS_ADDON_TARGET_CLASS: _addon_target_class(addon_name),
+    }
+    if uncertainties:
+        metadata[AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES] = _dedupe(uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.COMPUTE,
+        identifier=addon_name or values.get("id") or resource.address,
+        attached_role_arns=compact_strings([service_account_role_arn]),
+        metadata=metadata,
+    )
+
+
 def _block_bool_state(
     block: Mapping[str, Any] | None,
     unknown_block: Any,
@@ -170,6 +221,18 @@ def _block_config_state(block: Mapping[str, Any] | None, unknown_block: Any) -> 
     if unknown_block is True and block is None:
         return _STATE_UNKNOWN
     return _STATE_CONFIGURED if block else _STATE_NOT_CONFIGURED
+
+
+def _top_level_bool_state(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any],
+    key: str,
+    uncertainties: list[str],
+) -> str | None:
+    value = known_bool(values, unknown_values, key, uncertainties)
+    if value is None:
+        return _STATE_UNKNOWN if block_attribute_unknown(unknown_values, key) else None
+    return _STATE_ENABLED if value else _STATE_DISABLED
 
 
 def _block_list_config_state(
@@ -253,6 +316,26 @@ def _encryption_resources_unknown(unknown_block: Any) -> bool:
         if isinstance(item, Mapping) and block_attribute_unknown(item, "resources"):
             return True
     return False
+
+
+def _configuration_keys(configuration_values: str | None, uncertainties: list[str]) -> list[str]:
+    if not configuration_values:
+        return []
+    try:
+        parsed = json.loads(configuration_values)
+    except json.JSONDecodeError:
+        uncertainties.append("configuration_values is not valid JSON")
+        return []
+    if not isinstance(parsed, Mapping):
+        uncertainties.append("configuration_values has an unrecognized JSON shape")
+        return []
+    return sorted(str(key) for key in parsed)
+
+
+def _addon_target_class(addon_name: str | None) -> str | None:
+    if addon_name is None:
+        return None
+    return _EKS_ADDON_TARGET_CLASSES.get(addon_name.strip().lower())
 
 
 def _first_unknown_block(value: Any) -> Any:

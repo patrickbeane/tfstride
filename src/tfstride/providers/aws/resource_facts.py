@@ -323,6 +323,42 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.EKS_POSTURE_UNCERTAINTIES)
 
     @property
+    def eks_addon_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_NAME)
+
+    @property
+    def eks_addon_cluster_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_CLUSTER_NAME)
+
+    @property
+    def eks_addon_version(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_VERSION)
+
+    @property
+    def eks_addon_configuration_values(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_CONFIGURATION_VALUES)
+
+    @property
+    def eks_addon_configuration_keys(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EKS_ADDON_CONFIGURATION_KEYS)
+
+    @property
+    def eks_addon_preserve_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_PRESERVE_STATE)
+
+    @property
+    def eks_addon_preserve(self) -> bool | None:
+        return _bool_from_state(self.eks_addon_preserve_state)
+
+    @property
+    def eks_addon_service_account_role_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_SERVICE_ACCOUNT_ROLE_ARN)
+
+    @property
+    def eks_addon_target_class(self) -> str | None:
+        return self.get(AwsResourceMetadata.EKS_ADDON_TARGET_CLASS)
+
+    @property
     def rds_publicly_accessible_state(self) -> str | None:
         return self.get(AwsResourceMetadata.RDS_PUBLICLY_ACCESSIBLE_STATE)
 
