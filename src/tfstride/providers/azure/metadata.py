@@ -99,6 +99,13 @@ class AzureResourceMetadata:
     POSTGRESQL_CONFIG_VALUE = OptionalStringMetadataField("postgresql_config_value")
     POSTGRESQL_CONFIG_SERVER_ID = OptionalStringMetadataField("postgresql_config_server_id")
     PRIVATE_ENDPOINT_ID = OptionalStringMetadataField("private_endpoint_id")
+    PRIVATE_DNS_ZONE_ID = OptionalStringMetadataField("private_dns_zone_id")
+    PRIVATE_DNS_ZONE_REFERENCE = OptionalStringMetadataField("private_dns_zone_reference")
+    PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK_ID = OptionalStringMetadataField("private_dns_zone_virtual_network_link_id")
+    PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_REFERENCE = OptionalStringMetadataField(
+        "private_dns_zone_virtual_network_reference"
+    )
+    PRIVATE_DNS_ZONE_REGISTRATION_STATE = OptionalStringMetadataField("private_dns_zone_registration_state")
 
     ALLOW_NESTED_ITEMS_TO_BE_PUBLIC = BoolMetadataField("allow_nested_items_to_be_public")
     SHARED_ACCESS_KEY_ENABLED = BoolMetadataField("shared_access_key_enabled")
@@ -146,7 +153,10 @@ class AzureResourceMetadata:
     POSTGRESQL_POSTURE_UNCERTAINTIES = StringListMetadataField("postgresql_posture_uncertainties")
     PRIVATE_CONNECTION_RESOURCE_IDS = StringListMetadataField("private_connection_resource_ids")
     PRIVATE_ENDPOINT_SUBRESOURCE_NAMES = StringListMetadataField("private_endpoint_subresource_names")
+    PRIVATE_DNS_ZONE_GROUP_NAMES = StringListMetadataField("private_dns_zone_group_names")
+    PRIVATE_DNS_ZONE_IDS = StringListMetadataField("private_dns_zone_ids")
     PRIVATE_ENDPOINT_UNCERTAINTIES = StringListMetadataField("private_endpoint_uncertainties")
+    PRIVATE_DNS_ZONE_UNCERTAINTIES = StringListMetadataField("private_dns_zone_uncertainties")
     ADDRESS_SPACE = StringListMetadataField("address_space")
     ADDRESS_PREFIXES = StringListMetadataField("address_prefixes")
     NETWORK_INTERFACE_REFERENCES = StringListMetadataField("network_interface_references")

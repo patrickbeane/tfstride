@@ -64,6 +64,8 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.ROLE_DEFINITION))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_DNS_ZONE))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_WEB_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_FUNCTION_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KUBERNETES_CLUSTER))

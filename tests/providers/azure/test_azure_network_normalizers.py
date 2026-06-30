@@ -8,6 +8,8 @@ from tfstride.providers.azure.network_normalizers import (
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
     normalize_network_security_rule,
+    normalize_private_dns_zone,
+    normalize_private_dns_zone_virtual_network_link,
     normalize_public_ip,
     normalize_subnet,
     normalize_subnet_network_security_group_association,
@@ -17,7 +19,13 @@ from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
 
-def _resource(resource_type: str, values: dict[str, object], *, name: str = "example") -> TerraformResource:
+def _resource(
+    resource_type: str,
+    values: dict[str, object],
+    *,
+    name: str = "example",
+    unknown_values: dict[str, object] | None = None,
+) -> TerraformResource:
     return TerraformResource(
         address=f"{resource_type}.{name}",
         mode="managed",
@@ -25,6 +33,7 @@ def _resource(resource_type: str, values: dict[str, object], *, name: str = "exa
         name=name,
         provider_name="registry.terraform.io/hashicorp/azurerm",
         values=values,
+        unknown_values=unknown_values or {},
     )
 
 
@@ -159,6 +168,78 @@ class AzureNetworkNormalizerTests(unittest.TestCase):
         self.assertTrue(network_interface.public_access_configured)
         self.assertEqual(public_ip.category, ResourceCategory.EDGE)
         self.assertEqual(azure_facts(public_ip).public_ip_address, "203.0.113.10")
+
+    def test_private_dns_zone_normalizes_zone_identity(self) -> None:
+        zone = normalize_private_dns_zone(
+            _resource(
+                AzureResourceType.PRIVATE_DNS_ZONE,
+                {
+                    "id": "/subscriptions/example/resourceGroups/dns/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net",
+                    "name": "privatelink.blob.core.windows.net",
+                },
+                name="blob",
+            )
+        )
+        facts = azure_facts(zone)
+
+        self.assertEqual(zone.category, ResourceCategory.NETWORK)
+        self.assertEqual(zone.identifier, facts.private_dns_zone_id)
+        self.assertEqual(facts.name, "privatelink.blob.core.windows.net")
+        self.assertEqual(
+            facts.private_dns_zone_id,
+            "/subscriptions/example/resourceGroups/dns/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net",
+        )
+
+    def test_private_dns_zone_virtual_network_link_normalizes_references_and_unknowns(self) -> None:
+        link = normalize_private_dns_zone_virtual_network_link(
+            _resource(
+                AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK,
+                {
+                    "id": "/subscriptions/example/privateDnsZoneLinks/blob-main",
+                    "name": "blob-main",
+                    "private_dns_zone_name": "azurerm_private_dns_zone.blob.name",
+                    "virtual_network_id": "azurerm_virtual_network.main.id",
+                    "registration_enabled": True,
+                },
+                name="blob_main",
+            )
+        )
+        unknown_link = normalize_private_dns_zone_virtual_network_link(
+            _resource(
+                AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK,
+                {
+                    "name": "pending",
+                    "registration_enabled": None,
+                },
+                name="pending",
+                unknown_values={
+                    "id": True,
+                    "private_dns_zone_name": True,
+                    "virtual_network_id": True,
+                    "registration_enabled": True,
+                },
+            )
+        )
+        facts = azure_facts(link)
+        unknown_facts = azure_facts(unknown_link)
+
+        self.assertEqual(link.vpc_id, "azurerm_virtual_network.main.id")
+        self.assertEqual(
+            facts.private_dns_zone_virtual_network_link_id, "/subscriptions/example/privateDnsZoneLinks/blob-main"
+        )
+        self.assertEqual(facts.private_dns_zone_reference, "azurerm_private_dns_zone.blob.name")
+        self.assertEqual(facts.private_dns_zone_virtual_network_reference, "azurerm_virtual_network.main.id")
+        self.assertEqual(facts.private_dns_zone_registration_state, "enabled")
+        self.assertEqual(unknown_facts.private_dns_zone_registration_state, "unknown")
+        self.assertEqual(
+            unknown_facts.private_dns_zone_uncertainties,
+            [
+                "id is unknown after planning",
+                "private_dns_zone_name is unknown after planning",
+                "virtual_network_id is unknown after planning",
+                "registration_enabled is unknown after planning",
+            ],
+        )
 
 
 if __name__ == "__main__":

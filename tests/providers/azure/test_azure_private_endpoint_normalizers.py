@@ -101,6 +101,11 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertEqual(facts.private_endpoint_subresource_names, ["blob", "file"])
+        self.assertEqual(facts.private_dns_zone_group_names, ["storage-dns"])
+        self.assertEqual(
+            facts.private_dns_zone_ids,
+            ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
+        )
         self.assertTrue(facts.private_service_connections[0]["is_manual_connection"])
         self.assertEqual(
             facts.private_dns_zone_groups,
@@ -199,6 +204,8 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
                 }
             ],
         )
+        self.assertEqual(facts.private_dns_zone_group_names, ["pending-dns"])
+        self.assertEqual(facts.private_dns_zone_ids, [])
         self.assertEqual(
             facts.private_dns_zone_groups,
             [{"name": "pending-dns", "private_dns_zone_ids": [], "unknown_fields": ["private_dns_zone_ids"]}],
@@ -217,6 +224,11 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.private_endpoint_subresource_names, ["blob", "file"])
         self.assertEqual(
             facts.private_dns_zone_groups[0]["private_dns_zone_ids"],
+            ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
+        )
+        self.assertEqual(facts.private_dns_zone_group_names, ["storage-dns"])
+        self.assertEqual(
+            facts.private_dns_zone_ids,
             ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
         )
 

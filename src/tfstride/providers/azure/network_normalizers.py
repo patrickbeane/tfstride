@@ -12,6 +12,7 @@ from tfstride.providers.azure.resource_utils import (
     known_block_bool,
     known_block_string,
     known_block_strings,
+    known_bool,
     known_string,
     parse_network_security_rules,
     unknown_block_at,
@@ -160,7 +161,10 @@ def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResourc
         resource,
         uncertainties,
     )
-    private_dns_zone_groups = _private_dns_zone_groups(resource, uncertainties)
+    private_dns_zone_groups, private_dns_zone_ids, private_dns_zone_group_names = _private_dns_zone_groups(
+        resource,
+        uncertainties,
+    )
 
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
@@ -170,6 +174,8 @@ def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResourc
         AzureResourceMetadata.PRIVATE_SERVICE_CONNECTIONS: service_connections,
         AzureResourceMetadata.PRIVATE_CONNECTION_RESOURCE_IDS: connection_resource_ids,
         AzureResourceMetadata.PRIVATE_ENDPOINT_SUBRESOURCE_NAMES: subresource_names,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUP_NAMES: private_dns_zone_group_names,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_IDS: private_dns_zone_ids,
         AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUPS: private_dns_zone_groups,
     }
     if uncertainties:
@@ -179,6 +185,65 @@ def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResourc
         resource,
         identifier=first_non_empty(endpoint_id, values.get("name"), resource.address),
         subnet_ids=tuple([subnet_reference] if subnet_reference else []),
+        metadata=metadata,
+    )
+
+
+def normalize_private_dns_zone(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    zone_id = known_string(values, resource.unknown_values, "id", uncertainties, path="id")
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_ID: zone_id,
+    }
+    if uncertainties:
+        metadata[AzureResourceMetadata.PRIVATE_DNS_ZONE_UNCERTAINTIES] = uncertainties
+    return _network_resource(
+        resource,
+        identifier=first_non_empty(zone_id, values.get("name"), resource.address),
+        metadata=metadata,
+    )
+
+
+def normalize_private_dns_zone_virtual_network_link(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    link_id = known_string(values, resource.unknown_values, "id", uncertainties, path="id")
+    zone_reference = known_string(
+        values,
+        resource.unknown_values,
+        "private_dns_zone_name",
+        uncertainties,
+        path="private_dns_zone_name",
+    )
+    virtual_network_reference = known_string(
+        values,
+        resource.unknown_values,
+        "virtual_network_id",
+        uncertainties,
+        path="virtual_network_id",
+    )
+    registration_enabled = known_bool(
+        values,
+        resource.unknown_values,
+        "registration_enabled",
+        uncertainties,
+        path="registration_enabled",
+    )
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK_ID: link_id,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_REFERENCE: zone_reference,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_REFERENCE: virtual_network_reference,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_REGISTRATION_STATE: _optional_bool_state(registration_enabled),
+    }
+    if uncertainties:
+        metadata[AzureResourceMetadata.PRIVATE_DNS_ZONE_UNCERTAINTIES] = uncertainties
+    return _network_resource(
+        resource,
+        identifier=first_non_empty(link_id, values.get("name"), resource.address),
+        vpc_id=virtual_network_reference,
         metadata=metadata,
     )
 
@@ -250,14 +315,19 @@ def _private_service_connections(
     return records, compact_strings(connection_resource_ids), compact_strings(subresource_names)
 
 
-def _private_dns_zone_groups(resource: TerraformResource, uncertainties: list[str]) -> list[dict[str, Any]]:
+def _private_dns_zone_groups(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     values = resource.values
     raw_unknown = resource.unknown_values.get("private_dns_zone_group")
     if raw_unknown is True and not values.get("private_dns_zone_group"):
         uncertainties.append("private_dns_zone_group is unknown after planning")
-        return []
+        return [], [], []
 
     records: list[dict[str, Any]] = []
+    all_zone_ids: list[str] = []
+    group_names: list[str] = []
     for index, item in enumerate(as_list(values.get("private_dns_zone_group"))):
         path = f"private_dns_zone_group[{index}]"
         if not isinstance(item, Mapping):
@@ -270,7 +340,8 @@ def _private_dns_zone_groups(resource: TerraformResource, uncertainties: list[st
         group_name = known_block_string(item, unknown_item, "name", uncertainties, path=path)
         if group_name:
             record["name"] = group_name
-        zone_ids = known_block_strings(
+            group_names.append(group_name)
+        record_zone_ids = known_block_strings(
             item,
             unknown_item,
             "private_dns_zone_ids",
@@ -278,11 +349,12 @@ def _private_dns_zone_groups(resource: TerraformResource, uncertainties: list[st
             path=path,
             unknown_fields=unknown_fields,
         )
-        record["private_dns_zone_ids"] = zone_ids
+        record["private_dns_zone_ids"] = record_zone_ids
+        all_zone_ids.extend(record_zone_ids)
         if unknown_fields:
             record["unknown_fields"] = unknown_fields
         records.append(record)
-    return records
+    return records, compact_strings(all_zone_ids), compact_strings(group_names)
 
 
 def _network_resource(
@@ -312,3 +384,11 @@ def _network_resource(
 
 def _bool_with_default(value, default: bool) -> bool:
     return default if value is None else bool(value)
+
+
+def _optional_bool_state(value: bool | None) -> str:
+    if value is True:
+        return "enabled"
+    if value is False:
+        return "disabled"
+    return "unknown"

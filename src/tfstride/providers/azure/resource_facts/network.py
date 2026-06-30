@@ -61,6 +61,30 @@ class AzureNetworkFacts:
     def public_ip_address(self) -> str | None:
         return self.get(AzureResourceMetadata.PUBLIC_IP_ADDRESS)
 
+    @property
+    def private_dns_zone_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_ID)
+
+    @property
+    def private_dns_zone_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_REFERENCE)
+
+    @property
+    def private_dns_zone_virtual_network_link_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK_ID)
+
+    @property
+    def private_dns_zone_virtual_network_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_REFERENCE)
+
+    @property
+    def private_dns_zone_registration_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_REGISTRATION_STATE)
+
+    @property
+    def private_dns_zone_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_UNCERTAINTIES)
+
     def set_resolved_virtual_network_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_VIRTUAL_NETWORK_ADDRESS, address)
         self.resource.vpc_id = address
