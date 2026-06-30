@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 117,
+      "registered_rule_count": 118,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -54,6 +54,7 @@
         "aws-eks-secrets-encryption-not-configured",
         "aws-eks-control-plane-logging-incomplete",
         "aws-eks-authentication-mode-weak-or-unknown",
+        "aws-eks-vpc-cni-network-policy-not-enabled",
         "aws-sensitive-resource-policy-external-access",
         "aws-service-resource-policy-external-access",
         "aws-iam-wildcard-permissions",
@@ -175,6 +176,7 @@
         "aws-eks-secrets-encryption-not-configured": 0,
         "aws-eks-control-plane-logging-incomplete": 0,
         "aws-eks-authentication-mode-weak-or-unknown": 0,
+        "aws-eks-vpc-cni-network-policy-not-enabled": 0,
         "aws-sensitive-resource-policy-external-access": 0,
         "aws-service-resource-policy-external-access": 0,
         "aws-iam-wildcard-permissions": 2,

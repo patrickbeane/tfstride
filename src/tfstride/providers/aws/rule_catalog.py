@@ -169,6 +169,17 @@ AWS_RULE_METADATA = (
         severity_factors=("privilege_breadth", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-eks-vpc-cni-network-policy-not-enabled",
+        title="EKS VPC CNI network policy is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable VPC CNI network policy support where the cluster relies on AWS VPC CNI for pod-level traffic "
+            "controls, and validate compatible EKS, CNI, and node-agent deployment requirements."
+        ),
+        tags=("aws", "eks", "kubernetes", "network-policy", "vpc-cni"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sensitive-resource-policy-external-access",
         title="Sensitive resource policy allows broad or cross-account access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

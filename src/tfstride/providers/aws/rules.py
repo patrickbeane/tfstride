@@ -30,6 +30,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-eks-secrets-encryption-not-configured",
         "aws-eks-control-plane-logging-incomplete",
         "aws-eks-authentication-mode-weak-or-unknown",
+        "aws-eks-vpc-cni-network-policy-not-enabled",
     ),
     (
         "aws-database-permissive-ingress",
@@ -81,6 +82,7 @@ def build_aws_rule_contribution(
         "aws-eks-secrets-encryption-not-configured": eks_detectors.detect_secrets_encryption_not_configured,
         "aws-eks-control-plane-logging-incomplete": eks_detectors.detect_control_plane_logging_incomplete,
         "aws-eks-authentication-mode-weak-or-unknown": eks_detectors.detect_authentication_mode_weak_or_unknown,
+        "aws-eks-vpc-cni-network-policy-not-enabled": eks_detectors.detect_vpc_cni_network_policy_not_enabled,
         "aws-database-permissive-ingress": network_data_detectors.detect_database_exposure,
         "aws-missing-tier-segmentation": network_data_detectors.detect_missing_segmentation,
         "aws-sensitive-resource-policy-external-access": (

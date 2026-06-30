@@ -35,6 +35,7 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "aws-eks-secrets-encryption-not-configured",
     "aws-eks-control-plane-logging-incomplete",
     "aws-eks-authentication-mode-weak-or-unknown",
+    "aws-eks-vpc-cni-network-policy-not-enabled",
     "aws-sensitive-resource-policy-external-access",
     "aws-service-resource-policy-external-access",
     "aws-iam-wildcard-permissions",
@@ -183,7 +184,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 117)
+        self.assertEqual(len(metadata), 118)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -192,7 +193,7 @@ class RuleRegistryTests(unittest.TestCase):
         azure_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("azure-"))
 
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
-        self.assertEqual(len(aws_metadata_ids), 24)
+        self.assertEqual(len(aws_metadata_ids), 25)
         self.assertEqual(len(gcp_metadata_ids), 43)
         self.assertEqual(len(azure_metadata_ids), 50)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))

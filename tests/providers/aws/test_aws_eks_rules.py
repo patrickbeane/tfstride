@@ -15,6 +15,7 @@ _EKS_RULE_IDS = (
     "aws-eks-secrets-encryption-not-configured",
     "aws-eks-control-plane-logging-incomplete",
     "aws-eks-authentication-mode-weak-or-unknown",
+    "aws-eks-vpc-cni-network-policy-not-enabled",
 )
 _MISSING = object()
 _KMS_KEY_ARN = "arn:aws:kms:us-east-1:111122223333:key/eks"
@@ -76,6 +77,38 @@ def _cluster(
         address=f"aws_eks_cluster.{name}",
         mode="managed",
         resource_type="aws_eks_cluster",
+        name=name,
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _addon(
+    *,
+    name: str = "vpc_cni",
+    addon_name: object = "vpc-cni",
+    cluster_name: object = "app",
+    addon_version: object = "v1.18.1-eksbuild.1",
+    configuration_values: object = _MISSING,
+    service_account_role_arn: object = _MISSING,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {}
+    if addon_name is not _MISSING:
+        values["addon_name"] = addon_name
+    if cluster_name is not _MISSING:
+        values["cluster_name"] = cluster_name
+    if addon_version is not _MISSING:
+        values["addon_version"] = addon_version
+    if configuration_values is not _MISSING:
+        values["configuration_values"] = configuration_values
+    if service_account_role_arn is not _MISSING:
+        values["service_account_role_arn"] = service_account_role_arn
+    return TerraformResource(
+        address=f"aws_eks_addon.{name}",
+        mode="managed",
+        resource_type="aws_eks_addon",
         name=name,
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
@@ -291,6 +324,63 @@ class AwsEksControlPlaneRuleTests(unittest.TestCase):
             _evidence_by_key(findings_by_rule["aws-eks-authentication-mode-weak-or-unknown"])["posture_uncertainty"],
             ["access_config.authentication_mode is unknown after planning"],
         )
+
+    def test_vpc_cni_network_policy_rule_detects_explicit_disabled_config(self) -> None:
+        findings = _evaluate(
+            [
+                _addon(
+                    configuration_values=(
+                        '{"env":{"ENABLE_NETWORK_POLICY":"false"},"resources":{"limits":{"cpu":"100m"}}}'
+                    ),
+                    service_account_role_arn="arn:aws:iam::111122223333:role/eks-vpc-cni",
+                )
+            ],
+            "aws-eks-vpc-cni-network-policy-not-enabled",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["aws-eks-vpc-cni-network-policy-not-enabled"])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["target_resource"],
+            [
+                "address=aws_eks_addon.vpc_cni",
+                "type=aws_eks_addon",
+                "addon_name=vpc-cni",
+                "cluster_name=app",
+                "addon_version=v1.18.1-eksbuild.1",
+                "target_class=networking",
+                "service_account_role_arn=arn:aws:iam::111122223333:role/eks-vpc-cni",
+            ],
+        )
+        self.assertEqual(
+            evidence["network_policy_posture"],
+            [
+                "addon_name=vpc-cni",
+                "configuration_path=env.ENABLE_NETWORK_POLICY",
+                "configured_value=false",
+                "configuration_keys=[env, resources]",
+            ],
+        )
+
+    def test_vpc_cni_network_policy_rule_ignores_enabled_missing_unknown_and_other_addons(self) -> None:
+        scenarios = {
+            "enabled": _addon(configuration_values='{ "env": { "ENABLE_NETWORK_POLICY": "true" } }'),
+            "missing_config_key": _addon(configuration_values='{ "env": { "WARM_IP_TARGET": "3" } }'),
+            "invalid_config_shape": _addon(configuration_values="[1, 2, 3]"),
+            "unknown_config": _addon(
+                configuration_values=None,
+                unknown_values={"configuration_values": True},
+            ),
+            "other_addon": _addon(
+                addon_name="coredns", configuration_values='{ "env": { "ENABLE_NETWORK_POLICY": "false" } }'
+            ),
+        }
+
+        for name, resource in scenarios.items():
+            with self.subTest(name=name):
+                findings = _evaluate([resource], "aws-eks-vpc-cni-network-policy-not-enabled")
+                self.assertEqual(findings, [])
 
     def test_eks_rule_ids_are_registered_with_aws_rule_group(self) -> None:
         registered = tuple(rule_id for group in AWS_RULE_GROUP_IDS for rule_id in group)

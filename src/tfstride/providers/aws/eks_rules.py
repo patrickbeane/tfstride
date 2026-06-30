@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
@@ -10,6 +13,7 @@ from tfstride.models import Finding
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
 
 _AWS_EKS_CLUSTER = "aws_eks_cluster"
+_AWS_EKS_ADDON = "aws_eks_addon"
 _STATE_ENABLED = "enabled"
 _STATE_DISABLED = "disabled"
 _STATE_CONFIGURED = "configured"
@@ -17,6 +21,14 @@ _STATE_NOT_CONFIGURED = "not_configured"
 _STATE_UNKNOWN = "unknown"
 _REQUIRED_SECURITY_LOG_TYPES = ("api", "audit", "authenticator")
 _WEAK_AUTHENTICATION_MODES = frozenset({"config_map"})
+_VPC_CNI_ADDON_NAME = "vpc-cni"
+_NETWORK_POLICY_CONFIG_KEYS = frozenset({"enablenetworkpolicy", "enable_network_policy"})
+
+
+@dataclass(frozen=True, slots=True)
+class _NetworkPolicyConfigValue:
+    path: str
+    value: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +282,50 @@ class AwsEksRuleDetectors:
             )
         return findings
 
+    def detect_vpc_cni_network_policy_not_enabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for addon in context.inventory.by_type(_AWS_EKS_ADDON):
+            facts = aws_facts(addon)
+            disabled_config = _vpc_cni_disabled_network_policy_config(facts)
+            if disabled_config is None:
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[addon.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{addon.display_name} explicitly configures EKS VPC CNI network policy support as "
+                        "disabled. EKS network policy enforcement is implementation-dependent, so tfSTRIDE "
+                        "reports only the deterministic add-on configuration represented in Terraform."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _addon_target_resource_evidence(addon, facts)),
+                        evidence_item(
+                            "network_policy_posture", _vpc_cni_network_policy_evidence(facts, disabled_config)
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _target_resource_evidence(cluster, facts: AwsResourceFacts) -> list[str]:
     values = [f"address={cluster.address}", f"type={cluster.resource_type}"]
@@ -359,6 +415,35 @@ def _authentication_evidence(facts: AwsResourceFacts, state: str) -> list[str]:
     return values
 
 
+def _addon_target_resource_evidence(addon, facts: AwsResourceFacts) -> list[str]:
+    values = [f"address={addon.address}", f"type={addon.resource_type}"]
+    if facts.eks_addon_name:
+        values.append(f"addon_name={facts.eks_addon_name}")
+    if facts.eks_addon_cluster_name:
+        values.append(f"cluster_name={facts.eks_addon_cluster_name}")
+    if facts.eks_addon_version:
+        values.append(f"addon_version={facts.eks_addon_version}")
+    if facts.eks_addon_target_class:
+        values.append(f"target_class={facts.eks_addon_target_class}")
+    if facts.eks_addon_service_account_role_arn:
+        values.append(f"service_account_role_arn={facts.eks_addon_service_account_role_arn}")
+    return values
+
+
+def _vpc_cni_network_policy_evidence(
+    facts: AwsResourceFacts,
+    disabled_config: _NetworkPolicyConfigValue,
+) -> list[str]:
+    values = [
+        f"addon_name={facts.eks_addon_name or _STATE_UNKNOWN}",
+        f"configuration_path={disabled_config.path}",
+        f"configured_value={disabled_config.value}",
+    ]
+    if facts.eks_addon_configuration_keys:
+        values.append(f"configuration_keys=[{', '.join(facts.eks_addon_configuration_keys)}]")
+    return values
+
+
 def _public_endpoint_unrestricted(facts: AwsResourceFacts) -> bool:
     restriction = _public_access_restriction(facts)
     return facts.eks_endpoint_public_access_state == _STATE_ENABLED and restriction.state in {
@@ -407,6 +492,62 @@ def _authentication_mode_state(facts: AwsResourceFacts) -> str:
     if normalized in _WEAK_AUTHENTICATION_MODES:
         return "legacy_config_map"
     return _STATE_CONFIGURED
+
+
+def _vpc_cni_disabled_network_policy_config(facts: AwsResourceFacts) -> _NetworkPolicyConfigValue | None:
+    if (facts.eks_addon_name or "").strip().lower() != _VPC_CNI_ADDON_NAME:
+        return None
+    configuration_values = facts.eks_addon_configuration_values
+    if not configuration_values:
+        return None
+    try:
+        parsed = json.loads(configuration_values)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+
+    for path, value in _iter_config_values(parsed):
+        key = _normalized_config_key(path[-1]) if path else ""
+        if key not in _NETWORK_POLICY_CONFIG_KEYS:
+            continue
+        state = _config_bool_state(value)
+        if state is False:
+            return _NetworkPolicyConfigValue(".".join(path), _display_config_value(value))
+    return None
+
+
+def _iter_config_values(value: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[tuple[str, ...], Any]]:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from _iter_config_values(child, (*path, str(key)))
+        return
+    if path:
+        yield path, value
+
+
+def _normalized_config_key(value: str) -> str:
+    return "".join(character for character in value.strip().lower() if character.isalnum() or character == "_")
+
+
+def _config_bool_state(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "enabled", "yes", "on", "1"}:
+            return True
+        if normalized in {"false", "disabled", "no", "off", "0"}:
+            return False
+    return None
+
+
+def _display_config_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
 
 
 def _uncertainty_evidence(facts: AwsResourceFacts, field_markers: tuple[str, ...]) -> list[str]:
