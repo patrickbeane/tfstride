@@ -105,9 +105,9 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 
 | Provider | Status          | Coverage Summary                                                                                                                                     |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | Deepest support | EC2, ECS/Fargate, Lambda, EKS control-plane posture, RDS, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
-| GCP      | Active support  | Compute, GKE, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption posture, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
+| GCP      | Active support  | Compute, GKE control-plane/auth/hardening posture, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
+| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane/auth/add-on posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -149,7 +149,7 @@ AWS support currently includes:
 * `aws_route_table`
 * `aws_route_table_association`
 
-AWS rule coverage includes public compute ingress, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption and control-plane logging posture, S3 public-access/encryption/versioning posture, database encryption and ingress posture, IAM wildcard and workload-role permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
+AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, S3 public-access/encryption/versioning posture, RDS public endpoint, backup retention, deletion protection, and customer-managed KMS posture, IAM wildcard and workload-role permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
 
 </details>
 
@@ -197,9 +197,9 @@ GCP support currently includes normalization and analysis for:
 
 GCP trust-boundary coverage includes public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, GCS buckets, Cloud NAT posture, and workload-to-sensitive-data paths through GCE, Cloud Run, and Cloud Functions service accounts.
 
-GCP rule coverage includes public compute ingress, GKE posture, Cloud SQL exposure and recovery posture, GCS public-access, encryption, versioning, and retention posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
+GCP rule coverage includes public compute ingress, GKE public control-plane and authorized-network posture, Workload Identity, legacy metadata, node identity, control-plane logging, network policy, secrets encryption, legacy ABAC, client-certificate auth, Shielded Nodes, and Binary Authorization posture, Cloud SQL exposure and recovery posture, GCS public-access, encryption, versioning, and retention posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
 
-GCP control observations are not implemented yet.
+GCP currently emphasizes findings and evidence over provider-specific positive observation records; dedicated GCP observation records are still limited.
 
 </details>
 
@@ -250,9 +250,9 @@ AzureRM provider detection uses provider source paths ending in `/azurerm` and T
 
 Azure trust-boundary coverage includes public storage and Key Vault endpoints plus virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
 
-Azure rule coverage includes public storage posture, Key Vault network/recovery/authorization posture, SQL and PostgreSQL public access and transport hardening, App Service public access/TLS/managed-identity/VNet-integration posture, Private Endpoint coverage and public fallback for supported data-plane resources, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
+Azure rule coverage includes public storage posture, Key Vault network/recovery/authorization posture, SQL and PostgreSQL public access and transport hardening, App Service public access/TLS/managed-identity/VNet-integration posture, Private Endpoint coverage and public fallback for supported data-plane resources, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, AKS control-plane, auth, network-policy, workload-identity, KMS, monitoring, Defender, and Azure Policy posture, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
 
-Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage and public-fallback posture for supported Storage, Key Vault, and SQL resources. AKS support currently covers control-plane exposure, authorized IP restrictions, local account usage, RBAC posture, and network policy posture. Private Endpoint DNS correctness, load balancers, deeper AKS workload/node posture, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
+Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage and public-fallback posture for supported Storage, Key Vault, and SQL resources. AKS support covers public/private API posture, authorized IP restrictions, local account usage, RBAC posture, network policy posture, workload identity/OIDC, KMS, monitoring, Defender, and Azure Policy signals when represented in the plan. Private Endpoint DNS correctness, load balancers, deeper AKS workload/node posture, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
 
 Azure observations distinguish restricted network posture, identity authorization posture, private-endpoint uncertainty, and unresolved Azure plan values.
 
@@ -536,9 +536,9 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 ## Limitations
 
 * AWS is currently the deepest provider implementation.
-* GCP support is narrower than AWS today and does not include control-observation coverage yet.
-* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane posture, Private Endpoint posture, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
-* Deeper EKS/AKS workload and node posture, Private Endpoint DNS correctness, load balancers, full App Service routing/access-restriction modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
+* GCP support is narrower than AWS today and currently has limited provider-specific positive observation records compared with its finding coverage.
+* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS posture, Private Endpoint posture, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
+* Deeper managed Kubernetes workload/node posture, Private Endpoint DNS correctness, load balancers, full App Service routing/access-restriction modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
