@@ -152,6 +152,182 @@ class GcpGkeRuleTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
+    def test_gke_logging_network_policy_and_secrets_encryption_rules_detect_explicit_gaps(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    logging_service="logging.googleapis.com/none",
+                    logging_components=[],
+                    network_policy_enabled=False,
+                    network_policy_provider="PROVIDER_UNSPECIFIED",
+                    database_encryption_state="DECRYPTED",
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-control-plane-logging-incomplete",
+                        "gcp-gke-network-policy-disabled",
+                        "gcp-gke-secrets-encryption-not-configured",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "gcp-gke-control-plane-logging-incomplete",
+                "gcp-gke-network-policy-disabled",
+                "gcp-gke-secrets-encryption-not-configured",
+            ],
+        )
+        self.assertEqual([finding.severity.value for finding in findings], ["medium", "medium", "medium"])
+        evidence_by_rule = {
+            finding.rule_id: {item.key: item.values for item in finding.evidence} for finding in findings
+        }
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-control-plane-logging-incomplete"]["logging_posture"],
+            [
+                "control_plane_logging_state=disabled",
+                "logging_service=logging.googleapis.com/none",
+                "logging_components are not represented in planned values",
+                "control-plane logging is disabled",
+            ],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-network-policy-disabled"]["network_policy_posture"],
+            ["network_policy_state=disabled", "network_policy_provider=PROVIDER_UNSPECIFIED"],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-secrets-encryption-not-configured"]["secret_encryption_posture"],
+            [
+                "secrets_encryption_state=disabled",
+                "database_encryption_state=DECRYPTED",
+                "database_encryption_key_name is not represented in planned values",
+            ],
+        )
+
+    def test_gke_logging_rule_detects_missing_security_components(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    logging_service="logging.googleapis.com/kubernetes",
+                    logging_components=["SYSTEM_COMPONENTS", "APISERVER"],
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gke-control-plane-logging-incomplete"})),
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["gcp-gke-control-plane-logging-incomplete"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertIn("missing security logging component: CONTROLLER_MANAGER", evidence["logging_posture"])
+        self.assertIn("missing security logging component: SCHEDULER", evidence["logging_posture"])
+
+    def test_gke_logging_network_policy_and_secrets_encryption_rules_ignore_configured_cluster(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    logging_service="logging.googleapis.com/kubernetes",
+                    logging_components=["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"],
+                    network_policy_enabled=True,
+                    network_policy_provider="CALICO",
+                    database_encryption_state="ENCRYPTED",
+                    database_encryption_key_name=(
+                        "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets"
+                    ),
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-control-plane-logging-incomplete",
+                        "gcp-gke-network-policy-disabled",
+                        "gcp-gke-secrets-encryption-not-configured",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_gke_unknown_posture_rules_emit_low_severity_uncertainty_findings(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _gke_cluster(
+                    logging_components=[],
+                    network_policy_enabled=None,
+                    database_encryption_state=None,
+                    database_encryption_key_name=None,
+                    unknown_values={
+                        "logging_service": True,
+                        "logging_config": [{"enable_components": True}],
+                        "network_policy": [{"enabled": True, "provider": True}],
+                        "database_encryption": [{"state": True, "key_name": True}],
+                    },
+                )
+            ]
+        )
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(
+                enabled_rule_ids=frozenset(
+                    {
+                        "gcp-gke-control-plane-logging-incomplete",
+                        "gcp-gke-network-policy-disabled",
+                        "gcp-gke-secrets-encryption-not-configured",
+                    }
+                )
+            ),
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "gcp-gke-control-plane-logging-incomplete",
+                "gcp-gke-network-policy-disabled",
+                "gcp-gke-secrets-encryption-not-configured",
+            ],
+        )
+        self.assertEqual([finding.severity.value for finding in findings], ["low", "low", "low"])
+        evidence_by_rule = {
+            finding.rule_id: {item.key: item.values for item in finding.evidence} for finding in findings
+        }
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-control-plane-logging-incomplete"]["posture_uncertainty"],
+            [
+                "logging_config.enable_components is unknown after planning",
+                "logging_service is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-network-policy-disabled"]["posture_uncertainty"],
+            [
+                "network_policy.enabled is unknown after planning",
+                "network_policy.provider is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            evidence_by_rule["gcp-gke-secrets-encryption-not-configured"]["posture_uncertainty"],
+            [
+                "database_encryption.state is unknown after planning",
+                "database_encryption.key_name is unknown after planning",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

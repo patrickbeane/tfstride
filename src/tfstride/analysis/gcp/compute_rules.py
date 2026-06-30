@@ -33,7 +33,7 @@ from tfstride.providers.gcp.constants import (
     GCP_GKE_RESOURCE_TYPES,
     PUBLIC_GCP_IAM_MEMBERS,
 )
-from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
 from tfstride.resource_helpers import describe_security_group_rule
 
@@ -46,6 +46,7 @@ _GKE_BROAD_OAUTH_SCOPES = frozenset(
         "https://www.googleapis.com/auth/devstorage.full_control",
     }
 )
+_GKE_SECURITY_LOGGING_COMPONENTS = frozenset({"APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"})
 _GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES = (
     "google_compute_instance",
     "google_compute_backend_service",
@@ -429,6 +430,141 @@ class GcpComputeRuleDetectors:
             )
         return findings
 
+    def detect_gke_control_plane_logging_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            logging_issues = _gke_logging_issues(cluster_facts)
+            if not logging_issues:
+                continue
+            explicit_gap = cluster_facts.gke_control_plane_logging_state in {"disabled", "not_configured"} or any(
+                issue.startswith("missing security logging component") for issue in logging_issues
+            )
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2 if explicit_gap else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show deterministic GKE control-plane logging for key "
+                        "security components. Missing API server, scheduler, or controller manager logs can limit "
+                        "investigation of administrative and cluster-control activity."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("logging_posture", _gke_logging_evidence(cluster_facts, logging_issues)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(cluster_facts, ("logging_service", "logging_config")),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_network_policy_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if cluster_facts.gke_network_policy_state == "enabled":
+                continue
+            explicit_gap = cluster_facts.gke_network_policy_state in {"disabled", "not_configured"}
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=2 if explicit_gap else 0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not deterministically enable GKE network policy. Without a "
+                        "pod network policy provider, Kubernetes workloads have weaker pod-level traffic isolation "
+                        "and lateral-movement controls."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("network_policy_posture", _gke_network_policy_evidence(cluster_facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(cluster_facts, ("network_policy",)),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_gke_secrets_encryption_not_configured(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for cluster in context.inventory.by_type("google_container_cluster"):
+            cluster_facts = gcp_facts(cluster)
+            if cluster_facts.gke_secrets_encryption_state == "enabled":
+                continue
+            explicit_gap = cluster_facts.gke_secrets_encryption_state == "disabled"
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2 if explicit_gap else 1,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[cluster.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{cluster.display_name} does not show deterministic GKE application-layer secrets "
+                        "encryption with a Cloud KMS key. Kubernetes secrets may not have customer-controlled "
+                        "encryption key ownership represented in the Terraform plan."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("secret_encryption_posture", _gke_secrets_encryption_evidence(cluster_facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _gke_uncertainty_evidence(cluster_facts, ("database_encryption",)),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_run_public_invoker(
         self,
         context: RuleEvaluationContext,
@@ -654,6 +790,63 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
         name = str(network.get("display_name") or network.get("name") or "unnamed").strip() or "unnamed"
         descriptions.append(f"{name} ({cidr})")
     return descriptions
+
+
+def _gke_logging_issues(facts: GcpResourceFacts) -> list[str]:
+    state = facts.gke_control_plane_logging_state
+    if state == "unknown":
+        return ["control-plane logging state is unknown"]
+    if state in {"disabled", "not_configured"}:
+        return [f"control-plane logging is {state}"]
+    if not facts.gke_logging_components:
+        return []
+    configured_components = {component.strip().upper() for component in facts.gke_logging_components}
+    missing_components = sorted(_GKE_SECURITY_LOGGING_COMPONENTS - configured_components)
+    return [f"missing security logging component: {component}" for component in missing_components]
+
+
+def _gke_logging_evidence(facts: GcpResourceFacts, issues: list[str]) -> list[str]:
+    values = [f"control_plane_logging_state={facts.gke_control_plane_logging_state or 'unknown'}"]
+    if facts.gke_logging_service:
+        values.append(f"logging_service={facts.gke_logging_service}")
+    else:
+        values.append("logging_service is not represented in planned values")
+    if facts.gke_logging_components:
+        values.append(f"logging_components=[{', '.join(facts.gke_logging_components)}]")
+    else:
+        values.append("logging_components are not represented in planned values")
+    values.extend(issues)
+    return values
+
+
+def _gke_network_policy_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"network_policy_state={facts.gke_network_policy_state or 'unknown'}"]
+    if facts.gke_network_policy_provider:
+        values.append(f"network_policy_provider={facts.gke_network_policy_provider}")
+    else:
+        values.append("network_policy_provider is not represented in planned values")
+    return values
+
+
+def _gke_secrets_encryption_evidence(facts: GcpResourceFacts) -> list[str]:
+    values = [f"secrets_encryption_state={facts.gke_secrets_encryption_state or 'unknown'}"]
+    if facts.gke_database_encryption_state:
+        values.append(f"database_encryption_state={facts.gke_database_encryption_state}")
+    else:
+        values.append("database_encryption_state is not represented in planned values")
+    if facts.gke_database_encryption_key_name:
+        values.append(f"database_encryption_key_name={facts.gke_database_encryption_key_name}")
+    else:
+        values.append("database_encryption_key_name is not represented in planned values")
+    return values
+
+
+def _gke_uncertainty_evidence(facts: GcpResourceFacts, field_paths: tuple[str, ...]) -> list[str]:
+    return [
+        uncertainty
+        for uncertainty in facts.gke_posture_uncertainties
+        if any(field_path in uncertainty for field_path in field_paths)
+    ]
 
 
 def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:

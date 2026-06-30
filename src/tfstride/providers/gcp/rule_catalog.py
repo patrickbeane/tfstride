@@ -279,6 +279,39 @@ GCP_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-gke-control-plane-logging-incomplete",
+        title="GKE control-plane logging is incomplete",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable GKE control-plane logging for security-relevant components such as the API server, scheduler, "
+            "and controller manager, and retain the logs in a monitored logging project."
+        ),
+        tags=("gcp", "gke", "kubernetes", "logging", "monitoring"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-network-policy-disabled",
+        title="GKE network policy is not enabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable a supported GKE network policy provider and define namespace or workload policies that restrict "
+            "pod-to-pod and pod-to-service traffic paths."
+        ),
+        tags=("gcp", "gke", "kubernetes", "network-policy", "segmentation"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-gke-secrets-encryption-not-configured",
+        title="GKE secrets encryption is not configured",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure GKE application-layer secrets encryption with a Cloud KMS key where customer key ownership "
+            "or stronger Kubernetes secret protection is required."
+        ),
+        tags=("gcp", "gke", "kubernetes", "secrets", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-run-public-invoker",
         title="Cloud Run service is publicly invokable",
         category=StrideCategory.SPOOFING,

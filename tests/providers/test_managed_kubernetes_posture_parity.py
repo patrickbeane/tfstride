@@ -38,6 +38,9 @@ GCP_GKE_RULE_IDS = (
     "gcp-gke-workload-identity-disabled",
     "gcp-gke-legacy-metadata-endpoints-enabled",
     "gcp-gke-broad-node-service-account",
+    "gcp-gke-control-plane-logging-incomplete",
+    "gcp-gke-network-policy-disabled",
+    "gcp-gke-secrets-encryption-not-configured",
 )
 ALL_MANAGED_KUBERNETES_RULE_IDS = frozenset(AWS_EKS_RULE_IDS + GCP_GKE_RULE_IDS + AZURE_AKS_RULE_IDS)
 
@@ -152,6 +155,14 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
                     oauth_scopes=["https://www.googleapis.com/auth/logging.write"],
                     disable_legacy_endpoints="true",
                     metadata_mode="GKE_METADATA",
+                    logging_service="logging.googleapis.com/kubernetes",
+                    logging_components=["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"],
+                    network_policy_enabled=True,
+                    network_policy_provider="CALICO",
+                    database_encryption_state="ENCRYPTED",
+                    database_encryption_key_name=(
+                        "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets"
+                    ),
                 ),
                 _gke_node_pool(
                     node_service_account="gke-nodes@tfstride-demo.iam.gserviceaccount.com",

@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 110,
+      "registered_rule_count": 113,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-database-permissive-ingress",
@@ -87,6 +87,9 @@
         "gcp-gke-workload-identity-disabled",
         "gcp-gke-legacy-metadata-endpoints-enabled",
         "gcp-gke-broad-node-service-account",
+        "gcp-gke-control-plane-logging-incomplete",
+        "gcp-gke-network-policy-disabled",
+        "gcp-gke-secrets-encryption-not-configured",
         "gcp-cloud-run-public-invoker",
         "gcp-cloud-functions-public-invoker",
         "gcp-service-account-iam-broad-principal",
@@ -201,6 +204,9 @@
         "gcp-gke-workload-identity-disabled": 0,
         "gcp-gke-legacy-metadata-endpoints-enabled": 0,
         "gcp-gke-broad-node-service-account": 0,
+        "gcp-gke-control-plane-logging-incomplete": 0,
+        "gcp-gke-network-policy-disabled": 0,
+        "gcp-gke-secrets-encryption-not-configured": 0,
         "gcp-cloud-run-public-invoker": 0,
         "gcp-cloud-functions-public-invoker": 0,
         "gcp-service-account-iam-broad-principal": 0,

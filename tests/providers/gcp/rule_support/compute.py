@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from tfstride.models import TerraformResource
 
+_MISSING = object()
+
 
 def _compute_network() -> TerraformResource:
     return TerraformResource(
@@ -91,6 +93,13 @@ def _gke_cluster(
     oauth_scopes: list[str] | None = None,
     disable_legacy_endpoints: str = "false",
     metadata_mode: str | None = None,
+    logging_service: object = _MISSING,
+    logging_components: object = _MISSING,
+    network_policy_enabled: object = _MISSING,
+    network_policy_provider: object = _MISSING,
+    database_encryption_state: object = _MISSING,
+    database_encryption_key_name: object = _MISSING,
+    unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     node_config: dict[str, object] = {
         "metadata": {"disable-legacy-endpoints": disable_legacy_endpoints},
@@ -119,6 +128,24 @@ def _gke_cluster(
         ]
     if workload_identity_pool is not None:
         values["workload_identity_config"] = [{"workload_pool": workload_identity_pool}]
+    if logging_service is not _MISSING:
+        values["logging_service"] = logging_service
+    if logging_components is not _MISSING:
+        values["logging_config"] = [{"enable_components": logging_components}]
+    if network_policy_enabled is not _MISSING or network_policy_provider is not _MISSING:
+        network_policy: dict[str, object] = {}
+        if network_policy_enabled is not _MISSING:
+            network_policy["enabled"] = network_policy_enabled
+        if network_policy_provider is not _MISSING:
+            network_policy["provider"] = network_policy_provider
+        values["network_policy"] = [network_policy]
+    if database_encryption_state is not _MISSING or database_encryption_key_name is not _MISSING:
+        database_encryption: dict[str, object] = {}
+        if database_encryption_state is not _MISSING:
+            database_encryption["state"] = database_encryption_state
+        if database_encryption_key_name is not _MISSING:
+            database_encryption["key_name"] = database_encryption_key_name
+        values["database_encryption"] = [database_encryption]
     return TerraformResource(
         address="google_container_cluster.app",
         mode="managed",
@@ -126,6 +153,7 @@ def _gke_cluster(
         name="app",
         provider_name="registry.terraform.io/hashicorp/google",
         values=values,
+        unknown_values=unknown_values or {},
     )
 
 

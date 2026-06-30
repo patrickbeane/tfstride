@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **34 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **37 findings** across **30 normalized resources**.
 
 - High severity findings: `14`
-- Medium severity findings: `20`
+- Medium severity findings: `23`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **34 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `110`
-- Enabled rules: `110`
+- Registered rules: `113`
+- Enabled rules: `113`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -48,6 +48,9 @@ This run identified **9 trust boundaries** and **34 findings** across **30 norma
   - `gcp-gke-workload-identity-disabled`: `1`
   - `gcp-gke-legacy-metadata-endpoints-enabled`: `1`
   - `gcp-gke-broad-node-service-account`: `1`
+  - `gcp-gke-control-plane-logging-incomplete`: `1`
+  - `gcp-gke-network-policy-disabled`: `1`
+  - `gcp-gke-secrets-encryption-not-configured`: `1`
   - `gcp-cloud-run-public-invoker`: `1`
   - `gcp-cloud-functions-public-invoker`: `1`
   - `gcp-service-account-key-hygiene`: `1`
@@ -520,6 +523,28 @@ This run identified **9 trust boundaries** and **34 findings** across **30 norma
   - configured authorized network count: 1
   - public exposure reasons: authorized network `anywhere` allows 0.0.0.0/0
 
+#### GKE control-plane logging is incomplete
+
+- STRIDE category: Repudiation
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: google_container_cluster.app does not show deterministic GKE control-plane logging for key security components. Missing API server, scheduler, or controller manager logs can limit investigation of administrative and cluster-control activity.
+- Recommended mitigation: Enable GKE control-plane logging for security-relevant components such as the API server, scheduler, and controller manager, and retain the logs in a monitored logging project.
+- Evidence:
+  - logging posture: control_plane_logging_state=not_configured; logging_service is not represented in planned values; logging_components are not represented in planned values; control-plane logging is not_configured
+
+#### GKE network policy is not enabled
+
+- STRIDE category: Tampering
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: google_container_cluster.app does not deterministically enable GKE network policy. Without a pod network policy provider, Kubernetes workloads have weaker pod-level traffic isolation and lateral-movement controls.
+- Recommended mitigation: Enable a supported GKE network policy provider and define namespace or workload policies that restrict pod-to-pod and pod-to-service traffic paths.
+- Evidence:
+  - network policy posture: network_policy_state=not_configured; network_policy_provider is not represented in planned values
+
 #### GKE node metadata exposure is not hardened
 
 - STRIDE category: Elevation of Privilege
@@ -530,6 +555,17 @@ This run identified **9 trust boundaries** and **34 findings** across **30 norma
 - Recommended mitigation: Disable legacy metadata endpoints, use GKE metadata server or Workload Identity controls, and prevent pods from reaching broad node credentials.
 - Evidence:
   - node metadata posture: legacy metadata endpoints are enabled; metadata mode is GCE_METADATA
+
+#### GKE secrets encryption is not configured
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_container_cluster.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_container_cluster.app does not show deterministic GKE application-layer secrets encryption with a Cloud KMS key. Kubernetes secrets may not have customer-controlled encryption key ownership represented in the Terraform plan.
+- Recommended mitigation: Configure GKE application-layer secrets encryption with a Cloud KMS key where customer key ownership or stronger Kubernetes secret protection is required.
+- Evidence:
+  - secret encryption posture: secrets_encryption_state=disabled; database_encryption_state is not represented in planned values; database_encryption_key_name is not represented in planned values
 
 #### Internet-exposed GCP compute instance permits broad ingress
 
