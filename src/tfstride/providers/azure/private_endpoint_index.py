@@ -23,6 +23,9 @@ class AzurePrivateEndpointConnection:
     private_endpoint_address: str
     target_resource_id: str
     subresource_names: tuple[str, ...]
+    private_dns_zone_group_names: tuple[str, ...] = ()
+    private_dns_zone_ids: tuple[str, ...] = ()
+    private_dns_zone_uncertainties: tuple[str, ...] = ()
     service_connection_name: str | None = None
     is_manual_connection: bool | None = None
 
@@ -51,6 +54,22 @@ class AzurePrivateEndpointCoverage:
     def subresource_names(self) -> tuple[str, ...]:
         return _dedupe(
             subresource_name for connection in self.connections for subresource_name in connection.subresource_names
+        )
+
+    @property
+    def private_dns_zone_group_names(self) -> tuple[str, ...]:
+        return _dedupe(
+            group_name for connection in self.connections for group_name in connection.private_dns_zone_group_names
+        )
+
+    @property
+    def private_dns_zone_ids(self) -> tuple[str, ...]:
+        return _dedupe(zone_id for connection in self.connections for zone_id in connection.private_dns_zone_ids)
+
+    @property
+    def private_dns_zone_uncertainties(self) -> tuple[str, ...]:
+        return _dedupe(
+            uncertainty for connection in self.connections for uncertainty in connection.private_dns_zone_uncertainties
         )
 
 
@@ -164,7 +183,8 @@ def _private_endpoint_connections(
     private_endpoint: NormalizedResource,
 ) -> tuple[AzurePrivateEndpointConnection, ...]:
     connections: list[AzurePrivateEndpointConnection] = []
-    for record in azure_facts(private_endpoint).private_service_connections:
+    facts = azure_facts(private_endpoint)
+    for record in facts.private_service_connections:
         target_resource_id = _connection_target_resource_id(record)
         if not target_resource_id:
             continue
@@ -173,6 +193,13 @@ def _private_endpoint_connections(
                 private_endpoint_address=private_endpoint.address,
                 target_resource_id=target_resource_id,
                 subresource_names=tuple(compact_strings(record.get("subresource_names", []))),
+                private_dns_zone_group_names=tuple(facts.private_dns_zone_group_names),
+                private_dns_zone_ids=tuple(facts.private_dns_zone_ids),
+                private_dns_zone_uncertainties=tuple(
+                    uncertainty
+                    for uncertainty in facts.private_endpoint_uncertainties
+                    if "private_dns_zone_group" in uncertainty
+                ),
                 service_connection_name=_optional_string(record.get("name")),
                 is_manual_connection=_optional_bool(record.get("is_manual_connection")),
             )

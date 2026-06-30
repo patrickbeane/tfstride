@@ -16,6 +16,7 @@ _PRIVATE_LINK_RULE_IDS = frozenset(
         "azure-key-vault-missing-private-endpoint",
         "azure-sql-missing-private-endpoint",
         "azure-private-endpoint-public-fallback",
+        "azure-private-endpoint-dns-posture-incomplete",
     }
 )
 
@@ -61,6 +62,7 @@ class AzurePrivateLinkPostureAnalysisTests(unittest.TestCase):
                 {
                     "azure-storage-account-missing-private-endpoint": 2,
                     "azure-private-endpoint-public-fallback": 2,
+                    "azure-private-endpoint-dns-posture-incomplete": 4,
                     "azure-key-vault-missing-private-endpoint": 1,
                     "azure-sql-missing-private-endpoint": 1,
                 }
@@ -68,7 +70,7 @@ class AzurePrivateLinkPostureAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 5, "low": 1}),
+            Counter({"medium": 5, "low": 5}),
         )
 
     def test_storage_private_endpoint_cases_are_distinguished(self) -> None:
@@ -100,10 +102,7 @@ class AzurePrivateLinkPostureAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(storage_fallback_evidence["private_endpoint_subresources"], ["blob"])
         self.assertNotIn("azurerm_storage_account.pe_public", storage_missing_targets)
-        self.assertNotIn(
-            "azurerm_storage_account.pe_private",
-            [_target_address(finding) for finding in result.findings],
-        )
+        self.assertNotIn("azurerm_storage_account.pe_private", storage_missing_targets)
 
     def test_key_vault_and_sql_private_endpoint_cases_are_distinguished(self) -> None:
         result = _analyze_private_link_fixture()
@@ -137,8 +136,30 @@ class AzurePrivateLinkPostureAnalysisTests(unittest.TestCase):
         self.assertNotEqual(key_vault_fallback.severity.value, "high")
         self.assertNotIn(
             "azurerm_mssql_server.pe_private",
-            [_target_address(finding) for finding in result.findings],
+            _target_addresses(findings_by_rule["azure-sql-missing-private-endpoint"]),
         )
+
+    def test_private_endpoint_dns_posture_cases_are_distinguished(self) -> None:
+        result = _analyze_private_link_fixture()
+        findings_by_rule = _findings_by_rule(result)
+
+        dns_findings = findings_by_rule["azure-private-endpoint-dns-posture-incomplete"]
+        self.assertEqual(
+            _target_addresses(dns_findings),
+            [
+                "azurerm_storage_account.pe_public",
+                "azurerm_storage_account.pe_private",
+                "azurerm_key_vault.pe_unknown",
+                "azurerm_mssql_server.pe_private",
+            ],
+        )
+        for finding in dns_findings:
+            evidence = _evidence_by_key(finding)
+            self.assertEqual(finding.severity.value, "low")
+            self.assertEqual(
+                evidence["private_endpoint_dns_posture"],
+                [f"{finding.affected_resources[1]}: no private_dns_zone_group blocks are represented"],
+            )
 
     def test_unresolved_private_endpoint_target_does_not_create_relationship(self) -> None:
         result = _analyze_private_link_fixture()
@@ -171,6 +192,7 @@ class AzurePrivateLinkPostureAnalysisTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertIn("does not have a resolved private endpoint", first)
         self.assertIn("Private Endpoint coverage does not guarantee private-only access", first)
+        self.assertIn("private DNS posture", first)
 
 
 if __name__ == "__main__":

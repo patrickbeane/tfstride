@@ -511,6 +511,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-private-endpoint-dns-posture-incomplete",
+        title="Azure Private Endpoint DNS posture is incomplete",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure a Private DNS zone group for each Private Endpoint, link the Private DNS zone to the "
+            "endpoint VNet where Terraform manages the link, and validate private DNS resolution outside tfSTRIDE "
+            "for live environments."
+        ),
+        tags=("azure", "private-endpoint", "private-dns", "private-link", "network"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-postgresql-public-network-access-enabled",
         title="Azure PostgreSQL Flexible Server has public network access enabled",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -81,22 +81,23 @@ def _private_endpoint(
     *,
     subresources: tuple[str, ...] = ("blob",),
     connection_name: str | None = None,
+    dns_zone_ids: tuple[str, ...] = (),
+    dns_group_name: str = "private-dns",
 ) -> TerraformResource:
-    return _resource(
-        AzureResourceType.PRIVATE_ENDPOINT,
-        name,
-        {
-            "name": f"{name}-pe",
-            "private_service_connection": [
-                {
-                    "name": connection_name or f"{name}-connection",
-                    "private_connection_resource_id": target_id,
-                    "subresource_names": list(subresources),
-                    "is_manual_connection": False,
-                }
-            ],
-        },
-    )
+    values: dict[str, object] = {
+        "name": f"{name}-pe",
+        "private_service_connection": [
+            {
+                "name": connection_name or f"{name}-connection",
+                "private_connection_resource_id": target_id,
+                "subresource_names": list(subresources),
+                "is_manual_connection": False,
+            }
+        ],
+    }
+    if dns_zone_ids:
+        values["private_dns_zone_group"] = [{"name": dns_group_name, "private_dns_zone_ids": list(dns_zone_ids)}]
+    return _resource(AzureResourceType.PRIVATE_ENDPOINT, name, values)
 
 
 def _normalized(*resources: TerraformResource):
@@ -164,6 +165,33 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
 
         self.assertTrue(coverage.has_private_endpoint)
         self.assertEqual(coverage.connections[0].target_resource_id, "azurerm_storage_account.logs.id")
+
+    def test_private_dns_zone_group_evidence_is_preserved(self) -> None:
+        inventory = _normalized(
+            _storage_account(),
+            _private_endpoint(
+                "logs_blob",
+                _STORAGE_ID,
+                subresources=("blob", "file"),
+                dns_zone_ids=("azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"),
+                dns_group_name="storage-dns",
+            ),
+        )
+        storage = inventory.get_by_address("azurerm_storage_account.logs")
+        assert storage is not None
+
+        coverage = build_azure_private_endpoint_index(inventory).coverage_for(storage)
+
+        self.assertEqual(coverage.private_dns_zone_group_names, ("storage-dns",))
+        self.assertEqual(
+            coverage.private_dns_zone_ids,
+            ("azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"),
+        )
+        self.assertEqual(coverage.connections[0].private_dns_zone_group_names, ("storage-dns",))
+        self.assertEqual(
+            coverage.connections[0].private_dns_zone_ids,
+            ("azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"),
+        )
 
     def test_unresolved_private_connection_resource_id_is_retained(self) -> None:
         inventory = _normalized(

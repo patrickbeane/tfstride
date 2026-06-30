@@ -68,6 +68,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-sql-minimum-tls-below-1-2",
         "azure-sql-security-alert-policy-disabled",
         "azure-private-endpoint-public-fallback",
+        "azure-private-endpoint-dns-posture-incomplete",
         "azure-postgresql-public-network-access-enabled",
         "azure-postgresql-firewall-broad-public-access",
         "azure-postgresql-weak-tls-or-ssl",
@@ -154,6 +155,9 @@ def build_azure_rule_contribution(
         "azure-sql-minimum-tls-below-1-2": mssql_detectors.detect_minimum_tls_below_1_2,
         "azure-sql-security-alert-policy-disabled": mssql_detectors.detect_security_alert_policy_disabled,
         "azure-private-endpoint-public-fallback": (private_endpoint_detectors.detect_private_endpoint_public_fallback),
+        "azure-private-endpoint-dns-posture-incomplete": (
+            private_endpoint_detectors.detect_private_endpoint_dns_posture_incomplete
+        ),
         "azure-postgresql-public-network-access-enabled": postgresql_detectors.detect_public_network_access_enabled,
         "azure-postgresql-firewall-broad-public-access": postgresql_detectors.detect_broad_firewall_access,
         "azure-postgresql-weak-tls-or-ssl": postgresql_detectors.detect_weak_tls_or_ssl,

@@ -288,6 +288,12 @@ class AzureRuleDetectorProviderScopeUnitTests(unittest.TestCase):
                 "azure-storage-account-missing-private-endpoint",
             ),
             (
+                AzurePrivateEndpointPostureRuleDetectors(
+                    _FINDING_FACTORY
+                ).detect_private_endpoint_dns_posture_incomplete,
+                "azure-private-endpoint-dns-posture-incomplete",
+            ),
+            (
                 AzureAksRuleDetectors(_FINDING_FACTORY).detect_public_api_server_unrestricted,
                 "azure-aks-api-server-public-unrestricted",
             ),

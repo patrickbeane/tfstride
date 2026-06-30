@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import (
@@ -12,6 +13,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.private_endpoint_index import (
+    AzurePrivateEndpointConnection,
     build_azure_private_endpoint_index,
 )
 from tfstride.providers.azure.public_network import (
@@ -21,12 +23,21 @@ from tfstride.providers.azure.public_network import (
 )
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
 
 _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
     AzureResourceType.KEY_VAULT,
     AzureResourceType.MSSQL_SERVER,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _PrivateDnsZoneLink:
+    address: str
+    zone_reference: str | None
+    virtual_network_reference: str | None
+    virtual_network_keys: tuple[str, ...]
 
 
 class AzurePrivateEndpointPostureRuleDetectors:
@@ -125,6 +136,81 @@ class AzurePrivateEndpointPostureRuleDetectors:
             )
         return findings
 
+    def detect_private_endpoint_dns_posture_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        resources = tuple(context.inventory.resources)
+        resource_by_reference = _resources_by_reference(resources)
+        endpoint_by_address = {
+            resource.address: resource
+            for resource in resources
+            if resource.resource_type == AzureResourceType.PRIVATE_ENDPOINT
+        }
+        links_by_zone_key = _private_dns_zone_links_by_zone_key(resources, resource_by_reference)
+        index = build_azure_private_endpoint_index(context.inventory)
+        severity_reasoning = _private_endpoint_dns_posture_severity()
+        findings: list[Finding] = []
+
+        for resource in context.inventory.by_type(*_PRIVATE_ENDPOINT_TARGET_TYPES):
+            coverage = index.coverage_for(resource)
+            if not coverage.has_private_endpoint:
+                continue
+
+            posture_evidence: list[str] = []
+            zone_group_evidence: list[str] = []
+            link_evidence: list[str] = []
+            endpoint_network_evidence: list[str] = []
+            affected_resources = [resource.address]
+
+            for connection in coverage.connections:
+                endpoint = endpoint_by_address.get(connection.private_endpoint_address)
+                connection_posture, connection_links, connection_network = _private_endpoint_dns_posture_evidence(
+                    connection,
+                    endpoint,
+                    links_by_zone_key,
+                    resource_by_reference,
+                )
+                if not connection_posture:
+                    continue
+                affected_resources.append(connection.private_endpoint_address)
+                posture_evidence.extend(connection_posture)
+                zone_group_evidence.extend(_private_dns_zone_group_evidence(connection))
+                link_evidence.extend(connection_links)
+                endpoint_network_evidence.extend(connection_network)
+
+            if not posture_evidence:
+                continue
+
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses(affected_resources),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{resource.display_name} has resolved Private Endpoint coverage, but one or more "
+                        "Private Endpoints do not have complete private DNS posture represented in the Terraform "
+                        "plan. Missing or unresolved Private DNS zone groups, or modeled zone links that do not "
+                        "target the endpoint VNet, can leave clients relying on public service endpoints or manual "
+                        "DNS configuration. This finding does not validate live DNS records."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(resource)),
+                        evidence_item("private_endpoint_dns_posture", posture_evidence),
+                        evidence_item("private_dns_zone_groups", zone_group_evidence),
+                        evidence_item("private_dns_zone_links", link_evidence),
+                        evidence_item("endpoint_network", endpoint_network_evidence),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def _detect_missing_private_endpoint(
         self,
         context: RuleEvaluationContext,
@@ -170,6 +256,204 @@ class AzurePrivateEndpointPostureRuleDetectors:
                 )
             )
         return findings
+
+
+def _private_endpoint_dns_posture_evidence(
+    connection: AzurePrivateEndpointConnection,
+    endpoint: NormalizedResource | None,
+    links_by_zone_key: Mapping[str, tuple[_PrivateDnsZoneLink, ...]],
+    resource_by_reference: Mapping[str, NormalizedResource],
+) -> tuple[list[str], list[str], list[str]]:
+    posture: list[str] = []
+    link_evidence: list[str] = []
+    network_evidence: list[str] = []
+    if (
+        not connection.private_dns_zone_group_names
+        and not connection.private_dns_zone_ids
+        and not connection.private_dns_zone_uncertainties
+    ):
+        posture.append(f"{connection.private_endpoint_address}: no private_dns_zone_group blocks are represented")
+    elif (
+        connection.private_dns_zone_group_names
+        and not connection.private_dns_zone_ids
+        and not connection.private_dns_zone_uncertainties
+    ):
+        posture.append(
+            f"{connection.private_endpoint_address}: private_dns_zone_group does not include private_dns_zone_ids"
+        )
+    posture.extend(
+        f"{connection.private_endpoint_address}: {uncertainty}"
+        for uncertainty in connection.private_dns_zone_uncertainties
+    )
+
+    link_gap, modeled_links, endpoint_network = _private_dns_zone_link_gap_evidence(
+        connection,
+        endpoint,
+        links_by_zone_key,
+        resource_by_reference,
+    )
+    posture.extend(link_gap)
+    link_evidence.extend(modeled_links)
+    network_evidence.extend(endpoint_network)
+    return posture, link_evidence, network_evidence
+
+
+def _private_dns_zone_link_gap_evidence(
+    connection: AzurePrivateEndpointConnection,
+    endpoint: NormalizedResource | None,
+    links_by_zone_key: Mapping[str, tuple[_PrivateDnsZoneLink, ...]],
+    resource_by_reference: Mapping[str, NormalizedResource],
+) -> tuple[list[str], list[str], list[str]]:
+    if endpoint is None or not connection.private_dns_zone_ids:
+        return [], [], []
+
+    endpoint_vnet_keys, endpoint_network_evidence = _endpoint_virtual_network_keys(endpoint, resource_by_reference)
+    if not endpoint_vnet_keys:
+        return [], [], endpoint_network_evidence
+
+    zone_keys = _expanded_reference_keys(connection.private_dns_zone_ids, resource_by_reference)
+    relevant_links = _dedupe_links(link for zone_key in zone_keys for link in links_by_zone_key.get(zone_key, ()))
+    known_vnet_links = tuple(link for link in relevant_links if link.virtual_network_keys)
+    modeled_link_evidence = _private_dns_zone_link_evidence(relevant_links)
+    if not known_vnet_links:
+        return [], modeled_link_evidence, endpoint_network_evidence
+    if any(_overlaps(link.virtual_network_keys, endpoint_vnet_keys) for link in known_vnet_links):
+        return [], modeled_link_evidence, endpoint_network_evidence
+    return (
+        [
+            f"{connection.private_endpoint_address}: private DNS zone links are modeled for the endpoint zones "
+            "but none target the endpoint VNet"
+        ],
+        modeled_link_evidence,
+        endpoint_network_evidence,
+    )
+
+
+def _private_dns_zone_group_evidence(connection: AzurePrivateEndpointConnection) -> list[str]:
+    values: list[str] = []
+    if connection.private_dns_zone_group_names:
+        values.append(
+            f"{connection.private_endpoint_address}: group_names={', '.join(connection.private_dns_zone_group_names)}"
+        )
+    if connection.private_dns_zone_ids:
+        values.append(f"{connection.private_endpoint_address}: zone_ids={', '.join(connection.private_dns_zone_ids)}")
+    return values
+
+
+def _private_endpoint_dns_posture_severity():
+    return build_severity_reasoning(
+        internet_exposure=False,
+        privilege_breadth=0,
+        data_sensitivity=1,
+        lateral_movement=0,
+        blast_radius=1,
+    )
+
+
+def _resources_by_reference(resources: Iterable[NormalizedResource]) -> dict[str, NormalizedResource]:
+    resources_by_reference: dict[str, NormalizedResource] = {}
+    for resource in resources:
+        for reference in azure_resource_references(resource):
+            resources_by_reference.setdefault(reference, resource)
+    return resources_by_reference
+
+
+def _private_dns_zone_links_by_zone_key(
+    resources: Iterable[NormalizedResource],
+    resource_by_reference: Mapping[str, NormalizedResource],
+) -> dict[str, tuple[_PrivateDnsZoneLink, ...]]:
+    links_by_zone_key: dict[str, list[_PrivateDnsZoneLink]] = {}
+    for resource in resources:
+        if resource.resource_type != AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK:
+            continue
+        facts = azure_facts(resource)
+        zone_keys = _expanded_reference_keys([facts.private_dns_zone_reference], resource_by_reference)
+        if not zone_keys:
+            continue
+        link = _PrivateDnsZoneLink(
+            address=resource.address,
+            zone_reference=facts.private_dns_zone_reference,
+            virtual_network_reference=facts.private_dns_zone_virtual_network_reference,
+            virtual_network_keys=_expanded_reference_keys(
+                [facts.private_dns_zone_virtual_network_reference],
+                resource_by_reference,
+            ),
+        )
+        for zone_key in zone_keys:
+            links_by_zone_key.setdefault(zone_key, []).append(link)
+    return {zone_key: tuple(links) for zone_key, links in links_by_zone_key.items()}
+
+
+def _endpoint_virtual_network_keys(
+    endpoint: NormalizedResource,
+    resource_by_reference: Mapping[str, NormalizedResource],
+) -> tuple[tuple[str, ...], list[str]]:
+    references: list[str] = []
+    evidence: list[str] = []
+    if endpoint.vpc_id:
+        references.append(endpoint.vpc_id)
+        evidence.append(f"{endpoint.address}: vnet={endpoint.vpc_id}")
+    for subnet_reference in endpoint.subnet_ids:
+        evidence.append(f"{endpoint.address}: subnet={subnet_reference}")
+        subnet = resource_by_reference.get(azure_reference_key(subnet_reference))
+        if subnet is None:
+            continue
+        subnet_facts = azure_facts(subnet)
+        for virtual_network_reference in (subnet.vpc_id, subnet_facts.virtual_network_reference):
+            if virtual_network_reference:
+                references.append(virtual_network_reference)
+                evidence.append(f"{endpoint.address}: endpoint_vnet={virtual_network_reference}")
+    return _expanded_reference_keys(references, resource_by_reference), _dedupe_strings(evidence)
+
+
+def _expanded_reference_keys(
+    references: Iterable[str | None],
+    resource_by_reference: Mapping[str, NormalizedResource],
+) -> tuple[str, ...]:
+    keys: list[str] = []
+    for reference in references:
+        reference_key = azure_reference_key(reference)
+        if not reference_key:
+            continue
+        keys.append(reference_key)
+        resolved_resource = resource_by_reference.get(reference_key)
+        if resolved_resource is not None:
+            keys.extend(azure_resource_references(resolved_resource))
+    return _dedupe_strings(keys)
+
+
+def _private_dns_zone_link_evidence(links: Iterable[_PrivateDnsZoneLink]) -> list[str]:
+    return _dedupe_strings(
+        f"{link.address}: zone={link.zone_reference or 'unknown'}; "
+        f"virtual_network={link.virtual_network_reference or 'unknown'}"
+        for link in links
+    )
+
+
+def _dedupe_links(links: Iterable[_PrivateDnsZoneLink]) -> tuple[_PrivateDnsZoneLink, ...]:
+    deduped: list[_PrivateDnsZoneLink] = []
+    seen: set[str] = set()
+    for link in links:
+        if link.address in seen:
+            continue
+        seen.add(link.address)
+        deduped.append(link)
+    return tuple(deduped)
+
+
+def _dedupe_strings(values: Iterable[str]) -> tuple[str, ...]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return tuple(deduped)
+
+
+def _overlaps(left: Iterable[str], right: Iterable[str]) -> bool:
+    return bool(set(left).intersection(right))
 
 
 def _private_endpoint_posture_severity(
