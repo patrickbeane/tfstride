@@ -280,6 +280,23 @@ class GcpProviderTests(unittest.TestCase):
                 "GKE_DATABASE_ENCRYPTION_KEY_NAME",
                 "GKE_SECRETS_ENCRYPTION_STATE",
                 "GKE_DATABASE_ENCRYPTION",
+                "GKE_LEGACY_ABAC_ENABLED",
+                "GKE_LEGACY_ABAC_STATE",
+                "GKE_CLIENT_CERTIFICATE_AUTH_ENABLED",
+                "GKE_CLIENT_CERTIFICATE_AUTH_STATE",
+                "GKE_BASIC_AUTH_STATE",
+                "GKE_BASIC_AUTH_USERNAME",
+                "GKE_BASIC_AUTH_PASSWORD_CONFIGURED",
+                "GKE_MASTER_AUTH",
+                "GKE_CLIENT_CERTIFICATE_CONFIG",
+                "GKE_RELEASE_CHANNEL",
+                "GKE_RELEASE_CHANNEL_CONFIG",
+                "GKE_SHIELDED_NODES_ENABLED",
+                "GKE_SHIELDED_NODES_STATE",
+                "GKE_SHIELDED_NODES_CONFIG",
+                "GKE_BINARY_AUTHORIZATION_EVALUATION_MODE",
+                "GKE_BINARY_AUTHORIZATION_STATE",
+                "GKE_BINARY_AUTHORIZATION",
                 "GKE_POSTURE_UNCERTAINTIES",
             },
         )
@@ -335,6 +352,23 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.gke_database_encryption_key_name)
         self.assertIsNone(facts.gke_secrets_encryption_state)
         self.assertEqual(facts.gke_database_encryption, {})
+        self.assertIsNone(facts.gke_legacy_abac_enabled)
+        self.assertIsNone(facts.gke_legacy_abac_state)
+        self.assertIsNone(facts.gke_client_certificate_auth_enabled)
+        self.assertIsNone(facts.gke_client_certificate_auth_state)
+        self.assertIsNone(facts.gke_basic_auth_state)
+        self.assertIsNone(facts.gke_basic_auth_username)
+        self.assertIsNone(facts.gke_basic_auth_password_configured)
+        self.assertEqual(facts.gke_master_auth, {})
+        self.assertEqual(facts.gke_client_certificate_config, {})
+        self.assertIsNone(facts.gke_release_channel)
+        self.assertEqual(facts.gke_release_channel_config, {})
+        self.assertIsNone(facts.gke_shielded_nodes_enabled)
+        self.assertIsNone(facts.gke_shielded_nodes_state)
+        self.assertEqual(facts.gke_shielded_nodes_config, {})
+        self.assertIsNone(facts.gke_binary_authorization_evaluation_mode)
+        self.assertIsNone(facts.gke_binary_authorization_state)
+        self.assertEqual(facts.gke_binary_authorization, {})
         self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_optional_boolean_facts_preserve_none_and_false(self) -> None:
@@ -389,6 +423,26 @@ class GcpProviderTests(unittest.TestCase):
                     "state": "ENCRYPTED",
                     "key_name": "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets",
                 },
+                GcpResourceMetadata.GKE_LEGACY_ABAC_ENABLED: False,
+                GcpResourceMetadata.GKE_LEGACY_ABAC_STATE: "disabled",
+                GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_ENABLED: False,
+                GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_STATE: "disabled",
+                GcpResourceMetadata.GKE_BASIC_AUTH_STATE: "disabled",
+                GcpResourceMetadata.GKE_BASIC_AUTH_USERNAME: None,
+                GcpResourceMetadata.GKE_BASIC_AUTH_PASSWORD_CONFIGURED: False,
+                GcpResourceMetadata.GKE_MASTER_AUTH: {
+                    "password_configured": False,
+                    "client_certificate_config": {"issue_client_certificate": False},
+                },
+                GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_CONFIG: {"issue_client_certificate": False},
+                GcpResourceMetadata.GKE_RELEASE_CHANNEL: "REGULAR",
+                GcpResourceMetadata.GKE_RELEASE_CHANNEL_CONFIG: {"channel": "REGULAR"},
+                GcpResourceMetadata.GKE_SHIELDED_NODES_ENABLED: True,
+                GcpResourceMetadata.GKE_SHIELDED_NODES_STATE: "enabled",
+                GcpResourceMetadata.GKE_SHIELDED_NODES_CONFIG: {},
+                GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_EVALUATION_MODE: "PROJECT_SINGLETON_POLICY_ENFORCE",
+                GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_STATE: "enabled",
+                GcpResourceMetadata.GKE_BINARY_AUTHORIZATION: {"evaluation_mode": "PROJECT_SINGLETON_POLICY_ENFORCE"},
                 GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES: [],
             },
         )
@@ -431,6 +485,26 @@ class GcpProviderTests(unittest.TestCase):
             facts.gke_database_encryption,
             {"state": "ENCRYPTED", "key_name": "projects/demo/locations/global/keyRings/gke/cryptoKeys/secrets"},
         )
+        self.assertFalse(facts.gke_legacy_abac_enabled)
+        self.assertEqual(facts.gke_legacy_abac_state, "disabled")
+        self.assertFalse(facts.gke_client_certificate_auth_enabled)
+        self.assertEqual(facts.gke_client_certificate_auth_state, "disabled")
+        self.assertEqual(facts.gke_basic_auth_state, "disabled")
+        self.assertIsNone(facts.gke_basic_auth_username)
+        self.assertFalse(facts.gke_basic_auth_password_configured)
+        self.assertEqual(
+            facts.gke_master_auth,
+            {"password_configured": False, "client_certificate_config": {"issue_client_certificate": False}},
+        )
+        self.assertEqual(facts.gke_client_certificate_config, {"issue_client_certificate": False})
+        self.assertEqual(facts.gke_release_channel, "REGULAR")
+        self.assertEqual(facts.gke_release_channel_config, {"channel": "REGULAR"})
+        self.assertTrue(facts.gke_shielded_nodes_enabled)
+        self.assertEqual(facts.gke_shielded_nodes_state, "enabled")
+        self.assertEqual(facts.gke_shielded_nodes_config, {})
+        self.assertEqual(facts.gke_binary_authorization_evaluation_mode, "PROJECT_SINGLETON_POLICY_ENFORCE")
+        self.assertEqual(facts.gke_binary_authorization_state, "enabled")
+        self.assertEqual(facts.gke_binary_authorization, {"evaluation_mode": "PROJECT_SINGLETON_POLICY_ENFORCE"})
         self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_normalizer_reports_resource_ownership(self) -> None:

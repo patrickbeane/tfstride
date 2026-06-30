@@ -117,6 +117,23 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
         self.assertIsNone(facts.gke_database_encryption_key_name)
         self.assertEqual(facts.gke_secrets_encryption_state, "disabled")
         self.assertEqual(facts.gke_database_encryption, {})
+        self.assertIsNone(facts.gke_legacy_abac_enabled)
+        self.assertEqual(facts.gke_legacy_abac_state, "unknown")
+        self.assertIsNone(facts.gke_client_certificate_auth_enabled)
+        self.assertEqual(facts.gke_client_certificate_auth_state, "unknown")
+        self.assertIsNone(facts.gke_basic_auth_username)
+        self.assertIsNone(facts.gke_basic_auth_password_configured)
+        self.assertEqual(facts.gke_basic_auth_state, "unknown")
+        self.assertEqual(facts.gke_master_auth, {})
+        self.assertEqual(facts.gke_client_certificate_config, {})
+        self.assertIsNone(facts.gke_release_channel)
+        self.assertEqual(facts.gke_release_channel_config, {})
+        self.assertIsNone(facts.gke_shielded_nodes_enabled)
+        self.assertEqual(facts.gke_shielded_nodes_state, "unknown")
+        self.assertEqual(facts.gke_shielded_nodes_config, {})
+        self.assertIsNone(facts.gke_binary_authorization_evaluation_mode)
+        self.assertEqual(facts.gke_binary_authorization_state, "unknown")
+        self.assertEqual(facts.gke_binary_authorization, {})
         self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_container_cluster_normalizer_preserves_gke_logging_network_policy_and_encryption(self) -> None:
@@ -139,6 +156,17 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
                             "key_name": "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets",
                         }
                     ],
+                    "enable_legacy_abac": False,
+                    "master_auth": [
+                        {
+                            "username": "",
+                            "password": "",
+                            "client_certificate_config": [{"issue_client_certificate": False}],
+                        }
+                    ],
+                    "release_channel": [{"channel": "REGULAR"}],
+                    "enable_shielded_nodes": True,
+                    "binary_authorization": [{"evaluation_mode": "PROJECT_SINGLETON_POLICY_ENFORCE"}],
                 },
             )
         )
@@ -170,6 +198,76 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
                 "key_name": "projects/tfstride-demo/locations/global/keyRings/gke/cryptoKeys/secrets",
             },
         )
+        self.assertFalse(facts.gke_legacy_abac_enabled)
+        self.assertEqual(facts.gke_legacy_abac_state, "disabled")
+        self.assertFalse(facts.gke_client_certificate_auth_enabled)
+        self.assertEqual(facts.gke_client_certificate_auth_state, "disabled")
+        self.assertIsNone(facts.gke_basic_auth_username)
+        self.assertFalse(facts.gke_basic_auth_password_configured)
+        self.assertEqual(facts.gke_basic_auth_state, "disabled")
+        self.assertEqual(
+            facts.gke_master_auth,
+            {"password_configured": False, "client_certificate_config": {"issue_client_certificate": False}},
+        )
+        self.assertEqual(facts.gke_client_certificate_config, {"issue_client_certificate": False})
+        self.assertEqual(facts.gke_release_channel, "REGULAR")
+        self.assertEqual(facts.gke_release_channel_config, {"channel": "REGULAR"})
+        self.assertTrue(facts.gke_shielded_nodes_enabled)
+        self.assertEqual(facts.gke_shielded_nodes_state, "enabled")
+        self.assertEqual(facts.gke_shielded_nodes_config, {})
+        self.assertEqual(facts.gke_binary_authorization_evaluation_mode, "PROJECT_SINGLETON_POLICY_ENFORCE")
+        self.assertEqual(facts.gke_binary_authorization_state, "enabled")
+        self.assertEqual(facts.gke_binary_authorization, {"evaluation_mode": "PROJECT_SINGLETON_POLICY_ENFORCE"})
+        self.assertEqual(facts.gke_posture_uncertainties, [])
+
+    def test_container_cluster_normalizer_preserves_gke_auth_and_hardening_posture(self) -> None:
+        normalized = normalize_container_cluster(
+            _terraform_resource(
+                "google_container_cluster.weak",
+                "google_container_cluster",
+                {
+                    "name": "weak-gke",
+                    "enable_legacy_abac": True,
+                    "master_auth": [
+                        {
+                            "username": "admin",
+                            "password": "super-secret-password",
+                            "client_certificate_config": [{"issue_client_certificate": True}],
+                        }
+                    ],
+                    "release_channel": [{"channel": "UNSPECIFIED"}],
+                    "shielded_nodes": [{"enabled": False}],
+                    "binary_authorization": [{"evaluation_mode": "DISABLED"}],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertTrue(facts.gke_legacy_abac_enabled)
+        self.assertEqual(facts.gke_legacy_abac_state, "enabled")
+        self.assertTrue(facts.gke_client_certificate_auth_enabled)
+        self.assertEqual(facts.gke_client_certificate_auth_state, "enabled")
+        self.assertEqual(facts.gke_basic_auth_username, "admin")
+        self.assertTrue(facts.gke_basic_auth_password_configured)
+        self.assertEqual(facts.gke_basic_auth_state, "enabled")
+        self.assertEqual(
+            facts.gke_master_auth,
+            {
+                "username": "admin",
+                "password_configured": True,
+                "client_certificate_config": {"issue_client_certificate": True},
+            },
+        )
+        self.assertNotIn("password", facts.gke_master_auth)
+        self.assertEqual(facts.gke_client_certificate_config, {"issue_client_certificate": True})
+        self.assertEqual(facts.gke_release_channel, "UNSPECIFIED")
+        self.assertEqual(facts.gke_release_channel_config, {"channel": "UNSPECIFIED"})
+        self.assertFalse(facts.gke_shielded_nodes_enabled)
+        self.assertEqual(facts.gke_shielded_nodes_state, "disabled")
+        self.assertEqual(facts.gke_shielded_nodes_config, {"enabled": False})
+        self.assertEqual(facts.gke_binary_authorization_evaluation_mode, "DISABLED")
+        self.assertEqual(facts.gke_binary_authorization_state, "disabled")
+        self.assertEqual(facts.gke_binary_authorization, {"evaluation_mode": "DISABLED"})
         self.assertEqual(facts.gke_posture_uncertainties, [])
 
     def test_container_cluster_normalizer_preserves_unknown_gke_addon_posture(self) -> None:
@@ -182,12 +280,27 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
                     "logging_config": [{}],
                     "network_policy": [{}],
                     "database_encryption": [{}],
+                    "master_auth": [{"client_certificate_config": [{}]}],
+                    "release_channel": [{}],
+                    "shielded_nodes": [{}],
+                    "binary_authorization": [{}],
                 },
                 unknown_values={
                     "logging_service": True,
                     "logging_config": [{"enable_components": True}],
                     "network_policy": [{"enabled": True, "provider": True}],
                     "database_encryption": [{"state": True, "key_name": True}],
+                    "enable_legacy_abac": True,
+                    "master_auth": [
+                        {
+                            "username": True,
+                            "password": True,
+                            "client_certificate_config": [{"issue_client_certificate": True}],
+                        }
+                    ],
+                    "release_channel": [{"channel": True}],
+                    "shielded_nodes": [{"enabled": True}],
+                    "binary_authorization": [{"evaluation_mode": True}],
                 },
             )
         )
@@ -201,6 +314,23 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
         self.assertIsNone(facts.gke_database_encryption_state)
         self.assertIsNone(facts.gke_database_encryption_key_name)
         self.assertEqual(facts.gke_secrets_encryption_state, "unknown")
+        self.assertIsNone(facts.gke_legacy_abac_enabled)
+        self.assertEqual(facts.gke_legacy_abac_state, "unknown")
+        self.assertIsNone(facts.gke_client_certificate_auth_enabled)
+        self.assertEqual(facts.gke_client_certificate_auth_state, "unknown")
+        self.assertIsNone(facts.gke_basic_auth_username)
+        self.assertIsNone(facts.gke_basic_auth_password_configured)
+        self.assertEqual(facts.gke_basic_auth_state, "unknown")
+        self.assertEqual(facts.gke_master_auth, {"client_certificate_config": {}})
+        self.assertEqual(facts.gke_client_certificate_config, {})
+        self.assertIsNone(facts.gke_release_channel)
+        self.assertEqual(facts.gke_release_channel_config, {})
+        self.assertIsNone(facts.gke_shielded_nodes_enabled)
+        self.assertEqual(facts.gke_shielded_nodes_state, "unknown")
+        self.assertEqual(facts.gke_shielded_nodes_config, {})
+        self.assertIsNone(facts.gke_binary_authorization_evaluation_mode)
+        self.assertEqual(facts.gke_binary_authorization_state, "unknown")
+        self.assertEqual(facts.gke_binary_authorization, {})
         self.assertEqual(
             facts.gke_posture_uncertainties,
             [
@@ -209,6 +339,13 @@ class GcpWorkloadNormalizerTests(GcpNormalizerTestCase):
                 "network_policy.enabled is unknown after planning",
                 "database_encryption.state is unknown after planning",
                 "database_encryption.key_name is unknown after planning",
+                "enable_legacy_abac is unknown after planning",
+                "master_auth.client_certificate_config.issue_client_certificate is unknown after planning",
+                "master_auth.username is unknown after planning",
+                "master_auth.password is unknown after planning",
+                "release_channel.channel is unknown after planning",
+                "shielded_nodes.enabled is unknown after planning",
+                "binary_authorization.evaluation_mode is unknown after planning",
                 "network_policy.provider is unknown after planning",
             ],
         )

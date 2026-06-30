@@ -301,6 +301,74 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.GKE_DATABASE_ENCRYPTION)
 
     @property
+    def gke_legacy_abac_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_LEGACY_ABAC_ENABLED)
+
+    @property
+    def gke_legacy_abac_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_LEGACY_ABAC_STATE)
+
+    @property
+    def gke_client_certificate_auth_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_ENABLED)
+
+    @property
+    def gke_client_certificate_auth_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_STATE)
+
+    @property
+    def gke_basic_auth_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_BASIC_AUTH_STATE)
+
+    @property
+    def gke_basic_auth_username(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_BASIC_AUTH_USERNAME)
+
+    @property
+    def gke_basic_auth_password_configured(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_BASIC_AUTH_PASSWORD_CONFIGURED)
+
+    @property
+    def gke_master_auth(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_MASTER_AUTH)
+
+    @property
+    def gke_client_certificate_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_CONFIG)
+
+    @property
+    def gke_release_channel(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_RELEASE_CHANNEL)
+
+    @property
+    def gke_release_channel_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_RELEASE_CHANNEL_CONFIG)
+
+    @property
+    def gke_shielded_nodes_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.GKE_SHIELDED_NODES_ENABLED)
+
+    @property
+    def gke_shielded_nodes_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_SHIELDED_NODES_STATE)
+
+    @property
+    def gke_shielded_nodes_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_SHIELDED_NODES_CONFIG)
+
+    @property
+    def gke_binary_authorization_evaluation_mode(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_EVALUATION_MODE)
+
+    @property
+    def gke_binary_authorization_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_STATE)
+
+    @property
+    def gke_binary_authorization(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.GKE_BINARY_AUTHORIZATION)
+
+    @property
     def gke_posture_uncertainties(self) -> list[str]:
         return self.get(GcpResourceMetadata.GKE_POSTURE_UNCERTAINTIES)
 

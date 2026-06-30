@@ -10,6 +10,7 @@ from tfstride.providers.coercion import (
     known_block_bool,
     known_block_string,
     known_block_strings,
+    known_bool,
     known_string,
     unknown_block_at,
 )
@@ -79,6 +80,67 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
         uncertainties,
         path=GcpAttr.DATABASE_ENCRYPTION.key,
     )
+    legacy_abac_enabled = known_bool(
+        resource.values,
+        unknown_values,
+        GcpAttr.ENABLE_LEGACY_ABAC.key,
+        uncertainties,
+        allow_string=False,
+    )
+    master_auth = _optional_first_block(values, GcpAttr.MASTER_AUTH)
+    master_auth_unknown = _first_unknown_block(unknown_values.get(GcpAttr.MASTER_AUTH.key))
+    client_certificate_config = _optional_nested_first_block(master_auth, GcpAttr.CLIENT_CERTIFICATE_CONFIG)
+    client_certificate_config_unknown = _first_unknown_block(
+        _block_value(master_auth_unknown, GcpAttr.CLIENT_CERTIFICATE_CONFIG.key)
+    )
+    client_certificate_auth_enabled = known_block_bool(
+        client_certificate_config,
+        client_certificate_config_unknown,
+        GcpAttr.ISSUE_CLIENT_CERTIFICATE.key,
+        uncertainties,
+        path=f"{GcpAttr.MASTER_AUTH.key}.{GcpAttr.CLIENT_CERTIFICATE_CONFIG.key}",
+    )
+    basic_auth_username = known_block_string(
+        master_auth,
+        master_auth_unknown,
+        GcpAttr.USERNAME.key,
+        uncertainties,
+        path=GcpAttr.MASTER_AUTH.key,
+    )
+    basic_auth_password_configured = _known_block_secret_configured(
+        master_auth,
+        master_auth_unknown,
+        GcpAttr.PASSWORD.key,
+        uncertainties,
+        path=GcpAttr.MASTER_AUTH.key,
+    )
+    release_channel_config = _optional_first_block(values, GcpAttr.RELEASE_CHANNEL)
+    release_channel_unknown = _first_unknown_block(unknown_values.get(GcpAttr.RELEASE_CHANNEL.key))
+    release_channel = known_block_string(
+        release_channel_config,
+        release_channel_unknown,
+        GcpAttr.CHANNEL.key,
+        uncertainties,
+        path=GcpAttr.RELEASE_CHANNEL.key,
+    )
+    shielded_nodes = _optional_first_block(values, GcpAttr.SHIELDED_NODES)
+    shielded_nodes_unknown = _first_unknown_block(unknown_values.get(GcpAttr.SHIELDED_NODES.key))
+    shielded_nodes_enabled = _shielded_nodes_enabled(
+        resource.values,
+        unknown_values,
+        shielded_nodes,
+        shielded_nodes_unknown,
+        uncertainties,
+    )
+    binary_authorization = _optional_first_block(values, GcpAttr.BINARY_AUTHORIZATION)
+    binary_authorization_unknown = _first_unknown_block(unknown_values.get(GcpAttr.BINARY_AUTHORIZATION.key))
+    binary_authorization_evaluation_mode = known_block_string(
+        binary_authorization,
+        binary_authorization_unknown,
+        GcpAttr.EVALUATION_MODE.key,
+        uncertainties,
+        path=GcpAttr.BINARY_AUTHORIZATION.key,
+    )
     public_endpoint = _public_endpoint_enabled(values, private_cluster_config)
     broad_authorized_networks = _broad_authorized_networks(authorized_networks)
     public_exposure = public_endpoint and (
@@ -139,6 +201,42 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
             ),
             GcpResourceMetadata.GKE_DATABASE_ENCRYPTION: (
                 dict(database_encryption) if database_encryption is not None else None
+            ),
+            GcpResourceMetadata.GKE_LEGACY_ABAC_ENABLED: legacy_abac_enabled,
+            GcpResourceMetadata.GKE_LEGACY_ABAC_STATE: _bool_state(legacy_abac_enabled),
+            GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_ENABLED: client_certificate_auth_enabled,
+            GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_STATE: _bool_state(client_certificate_auth_enabled),
+            GcpResourceMetadata.GKE_BASIC_AUTH_USERNAME: basic_auth_username,
+            GcpResourceMetadata.GKE_BASIC_AUTH_PASSWORD_CONFIGURED: basic_auth_password_configured,
+            GcpResourceMetadata.GKE_BASIC_AUTH_STATE: _basic_auth_state(
+                master_auth,
+                master_auth_unknown,
+                basic_auth_username,
+                basic_auth_password_configured,
+            ),
+            GcpResourceMetadata.GKE_MASTER_AUTH: _sanitized_master_auth(
+                basic_auth_username,
+                basic_auth_password_configured,
+                client_certificate_config,
+            ),
+            GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_CONFIG: (
+                dict(client_certificate_config) if client_certificate_config is not None else None
+            ),
+            GcpResourceMetadata.GKE_RELEASE_CHANNEL: release_channel,
+            GcpResourceMetadata.GKE_RELEASE_CHANNEL_CONFIG: (
+                dict(release_channel_config) if release_channel_config is not None else None
+            ),
+            GcpResourceMetadata.GKE_SHIELDED_NODES_ENABLED: shielded_nodes_enabled,
+            GcpResourceMetadata.GKE_SHIELDED_NODES_STATE: _bool_state(shielded_nodes_enabled),
+            GcpResourceMetadata.GKE_SHIELDED_NODES_CONFIG: dict(shielded_nodes) if shielded_nodes is not None else None,
+            GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_EVALUATION_MODE: binary_authorization_evaluation_mode,
+            GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_STATE: _binary_authorization_state(
+                binary_authorization,
+                binary_authorization_unknown,
+                binary_authorization_evaluation_mode,
+            ),
+            GcpResourceMetadata.GKE_BINARY_AUTHORIZATION: (
+                dict(binary_authorization) if binary_authorization is not None else None
             ),
             "private_cluster_config": private_cluster_config_values,
             "master_authorized_networks_config": authorized_networks_config or {},
@@ -229,6 +327,108 @@ def _secrets_encryption_state(
     return _STATE_UNKNOWN
 
 
+def _bool_state(value: bool | None) -> str:
+    if value is None:
+        return _STATE_UNKNOWN
+    return _STATE_ENABLED if value else _STATE_DISABLED
+
+
+def _basic_auth_state(
+    master_auth: Mapping[str, Any] | None,
+    master_auth_unknown: Any,
+    username: str | None,
+    password_configured: bool | None,
+) -> str:
+    if master_auth is None:
+        return _STATE_UNKNOWN
+    if block_attribute_unknown(master_auth_unknown, GcpAttr.USERNAME.key) or block_attribute_unknown(
+        master_auth_unknown,
+        GcpAttr.PASSWORD.key,
+    ):
+        return _STATE_UNKNOWN
+    if username or password_configured:
+        return _STATE_ENABLED
+    if GcpAttr.USERNAME.key in master_auth or GcpAttr.PASSWORD.key in master_auth:
+        return _STATE_DISABLED
+    return _STATE_UNKNOWN
+
+
+def _binary_authorization_state(
+    binary_authorization: Mapping[str, Any] | None,
+    binary_authorization_unknown: Any,
+    evaluation_mode: str | None,
+) -> str:
+    if binary_authorization is None:
+        return _STATE_UNKNOWN
+    if block_attribute_unknown(binary_authorization_unknown, GcpAttr.EVALUATION_MODE.key):
+        return _STATE_UNKNOWN
+    if evaluation_mode is None:
+        return _STATE_UNKNOWN
+    return _STATE_DISABLED if evaluation_mode.strip().upper() == "DISABLED" else _STATE_ENABLED
+
+
+def _known_block_secret_configured(
+    values: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+) -> bool | None:
+    if block_attribute_unknown(unknown_block, key):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        return None
+    if values is None or key not in values or values.get(key) is None:
+        return None
+    value = values.get(key)
+    if isinstance(value, str):
+        return bool(value.strip())
+    uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+    return None
+
+
+def _shielded_nodes_enabled(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any],
+    shielded_nodes: Mapping[str, Any] | None,
+    shielded_nodes_unknown: Any,
+    uncertainties: list[str],
+) -> bool | None:
+    if GcpAttr.ENABLE_SHIELDED_NODES.key in values or block_attribute_unknown(
+        unknown_values,
+        GcpAttr.ENABLE_SHIELDED_NODES.key,
+    ):
+        return known_bool(
+            values,
+            unknown_values,
+            GcpAttr.ENABLE_SHIELDED_NODES.key,
+            uncertainties,
+            allow_string=False,
+        )
+    return known_block_bool(
+        shielded_nodes,
+        shielded_nodes_unknown,
+        GcpAttr.ENABLED.key,
+        uncertainties,
+        path=GcpAttr.SHIELDED_NODES.key,
+    )
+
+
+def _sanitized_master_auth(
+    username: str | None,
+    password_configured: bool | None,
+    client_certificate_config: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    record: dict[str, Any] = {}
+    if username is not None:
+        record["username"] = username
+    if password_configured is not None:
+        record["password_configured"] = password_configured
+    if client_certificate_config is not None:
+        record["client_certificate_config"] = dict(client_certificate_config)
+    return record or None
+
+
 def normalize_container_node_pool(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
     node_config_value = _optional_first_block(values, GcpAttr.NODE_CONFIG)
@@ -312,6 +512,22 @@ def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, A
 
 def _optional_first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any] | None:
     return first_item(values.get(attribute))
+
+
+def _optional_nested_first_block(
+    values: Mapping[str, Any] | None, attribute: GcpAttribute[Any]
+) -> dict[str, Any] | None:
+    if values is None:
+        return None
+    return first_item(values.get(attribute.key))
+
+
+def _block_value(block: Any, key: str) -> Any:
+    if block is True:
+        return True
+    if isinstance(block, Mapping):
+        return block.get(key)
+    return None
 
 
 def _authorized_networks(config: dict[str, Any] | None) -> list[dict[str, Any]]:
