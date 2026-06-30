@@ -37,9 +37,10 @@
       }
     },
     "rules": {
-      "registered_rule_count": 119,
+      "registered_rule_count": 120,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
+        "aws-lambda-public-invocation",
         "aws-database-permissive-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-rds-public-endpoint-enabled",
@@ -163,6 +164,7 @@
       "severity_overrides": {},
       "finding_counts_by_rule": {
         "aws-public-compute-broad-ingress": 1,
+        "aws-lambda-public-invocation": 0,
         "aws-database-permissive-ingress": 1,
         "aws-rds-storage-encryption-disabled": 0,
         "aws-rds-public-endpoint-enabled": 0,

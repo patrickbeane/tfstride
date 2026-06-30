@@ -16,6 +16,18 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-lambda-public-invocation",
+        title="Lambda function allows public invocation",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Require AWS_IAM authorization for Lambda Function URLs unless anonymous invocation is intentional, "
+            "and avoid wildcard Lambda permissions unless they are narrowed by source ARN or source account "
+            "conditions."
+        ),
+        tags=("aws", "lambda", "serverless", "public-access", "invocation"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-database-permissive-ingress",
         title="Database is reachable from overly permissive sources",
         category=StrideCategory.INFORMATION_DISCLOSURE,

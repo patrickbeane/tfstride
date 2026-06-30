@@ -231,9 +231,10 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
         secret = result.inventory.get_by_address("aws_secretsmanager_secret.app")
         lambda_function = result.inventory.get_by_address("aws_lambda_function.processor")
 
-        self.assertEqual(dict(severity_counts), {"high": 3})
+        self.assertEqual(dict(severity_counts), {"high": 4})
         self.assertEqual(title_counts["Sensitive resource policy allows broad or cross-account access"], 2)
         self.assertEqual(title_counts["Service resource policy allows broad or cross-account access"], 1)
+        self.assertEqual(title_counts["Lambda function allows public invocation"], 1)
         self.assertIn(
             "aws_secretsmanager_secret_policy.app", secret.metadata.get("resource_policy_source_addresses", [])
         )
