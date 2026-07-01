@@ -20,6 +20,11 @@ class AzureResourceMetadata:
     APP_SERVICE_ID = OptionalStringMetadataField("app_service_id")
     APP_SERVICE_PLAN_REFERENCE = OptionalStringMetadataField("app_service_plan_reference")
     APP_SERVICE_VNET_INTEGRATION_SUBNET_ID = OptionalStringMetadataField("app_service_vnet_integration_subnet_id")
+    APP_SERVICE_IP_RESTRICTION_DEFAULT_ACTION = OptionalStringMetadataField("app_service_ip_restriction_default_action")
+    APP_SERVICE_SCM_IP_RESTRICTION_DEFAULT_ACTION = OptionalStringMetadataField(
+        "app_service_scm_ip_restriction_default_action"
+    )
+    APP_SERVICE_SCM_USE_MAIN_IP_RESTRICTION = BoolMetadataField("app_service_scm_use_main_ip_restriction")
     AKS_CLUSTER_ID = OptionalStringMetadataField("aks_cluster_id")
     AKS_PRIVATE_CLUSTER_STATE = OptionalStringMetadataField("aks_private_cluster_state")
     AKS_PRIVATE_DNS_ZONE_ID = OptionalStringMetadataField("aks_private_dns_zone_id")
@@ -141,6 +146,8 @@ class AzureResourceMetadata:
     STORAGE_CONTAINER_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_container_delete_retention_days")
     STORAGE_BLOB_RESTORE_POLICY_DAYS = OptionalIntMetadataField("storage_blob_restore_policy_days")
     APP_SERVICE_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_posture_uncertainties")
+    APP_SERVICE_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_access_restrictions")
+    APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
     AKS_AUTHORIZED_IP_RANGES = StringListMetadataField("aks_authorized_ip_ranges")
     AKS_AAD_ADMIN_GROUP_OBJECT_IDS = StringListMetadataField("aks_aad_admin_group_object_ids")
     AKS_USER_ASSIGNED_IDENTITY_IDS = StringListMetadataField("aks_user_assigned_identity_ids")

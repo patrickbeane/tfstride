@@ -217,6 +217,153 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
         )
         self.assertEqual(facts.managed_identity_uncertainties, ["identity is unknown after planning"])
 
+    def test_app_service_access_restrictions_preserve_rule_evidence(self) -> None:
+        web_app = normalize_linux_web_app(
+            _resource(
+                AzureResourceType.LINUX_WEB_APP,
+                {
+                    "name": "api",
+                    "site_config": [
+                        {
+                            "ip_restriction_default_action": "Deny",
+                            "scm_ip_restriction_default_action": "Deny",
+                            "scm_use_main_ip_restriction": False,
+                            "ip_restriction": [
+                                {
+                                    "name": "office",
+                                    "priority": 100,
+                                    "action": "Allow",
+                                    "ip_address": "203.0.113.0/24",
+                                    "description": "Office range",
+                                    "headers": [{"x_forwarded_for": ["203.0.113.10"]}],
+                                },
+                                {
+                                    "name": "azure-devops",
+                                    "priority": 200,
+                                    "action": "Allow",
+                                    "service_tag": "AzureDevOps",
+                                },
+                            ],
+                            "scm_ip_restriction": [
+                                {
+                                    "name": "build-subnet",
+                                    "priority": 100,
+                                    "action": "Allow",
+                                    "virtual_network_subnet_id": "azurerm_subnet.build.id",
+                                }
+                            ],
+                        }
+                    ],
+                },
+                name="api",
+            )
+        )
+        facts = azure_facts(web_app)
+
+        self.assertEqual(facts.app_service_ip_restriction_default_action, "Deny")
+        self.assertEqual(facts.app_service_scm_ip_restriction_default_action, "Deny")
+        self.assertFalse(facts.app_service_scm_use_main_ip_restriction)
+        self.assertEqual(
+            facts.app_service_access_restrictions,
+            [
+                {
+                    "name": "office",
+                    "action": "Allow",
+                    "ip_address": "203.0.113.0/24",
+                    "description": "Office range",
+                    "priority": 100,
+                    "headers": [{"x_forwarded_for": ["203.0.113.10"]}],
+                },
+                {
+                    "name": "azure-devops",
+                    "action": "Allow",
+                    "service_tag": "AzureDevOps",
+                    "priority": 200,
+                },
+            ],
+        )
+        self.assertEqual(
+            facts.app_service_scm_access_restrictions,
+            [
+                {
+                    "name": "build-subnet",
+                    "action": "Allow",
+                    "virtual_network_subnet_id": "azurerm_subnet.build.id",
+                    "priority": 100,
+                }
+            ],
+        )
+        self.assertEqual(facts.app_service_posture_uncertainties, [])
+
+    def test_app_service_access_restriction_unknowns_are_preserved(self) -> None:
+        web_app = normalize_linux_web_app(
+            _resource(
+                AzureResourceType.LINUX_WEB_APP,
+                {
+                    "name": "api",
+                    "site_config": [
+                        {
+                            "ip_restriction": [
+                                {
+                                    "name": "office",
+                                    "priority": None,
+                                    "action": "Allow",
+                                    "ip_address": None,
+                                }
+                            ],
+                            "scm_ip_restriction": [],
+                        }
+                    ],
+                },
+                name="api",
+                unknown_values={
+                    "site_config": [
+                        {
+                            "ip_restriction_default_action": True,
+                            "scm_ip_restriction_default_action": True,
+                            "scm_use_main_ip_restriction": True,
+                            "ip_restriction": [
+                                {
+                                    "priority": True,
+                                    "ip_address": True,
+                                    "headers": True,
+                                }
+                            ],
+                            "scm_ip_restriction": True,
+                        }
+                    ]
+                },
+            )
+        )
+        facts = azure_facts(web_app)
+
+        self.assertIsNone(facts.app_service_ip_restriction_default_action)
+        self.assertIsNone(facts.app_service_scm_ip_restriction_default_action)
+        self.assertIsNone(facts.app_service_scm_use_main_ip_restriction)
+        self.assertEqual(
+            facts.app_service_access_restrictions,
+            [
+                {
+                    "name": "office",
+                    "action": "Allow",
+                    "unknown_fields": ["headers", "ip_address", "priority"],
+                }
+            ],
+        )
+        self.assertEqual(facts.app_service_scm_access_restrictions, [])
+        self.assertEqual(
+            facts.app_service_posture_uncertainties,
+            [
+                "site_config.ip_restriction_default_action is unknown after planning",
+                "site_config.scm_ip_restriction_default_action is unknown after planning",
+                "site_config.scm_use_main_ip_restriction is unknown after planning",
+                "site_config.ip_restriction[0].ip_address is unknown after planning",
+                "site_config.ip_restriction[0].priority is unknown after planning",
+                "site_config.ip_restriction[0].headers is unknown after planning",
+                "site_config.scm_ip_restriction is unknown after planning",
+            ],
+        )
+
     def test_azure_normalizer_supports_app_service_and_function_resource_types(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
