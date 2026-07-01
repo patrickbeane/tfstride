@@ -122,6 +122,8 @@ class AwsNormalizer(ProviderNormalizer):
             if resource.resource_type in SUPPORTED_AWS_TYPES
         ]
         self._resource_decorator.decorate(normalized)
+        for resource in normalized:
+            resource.freeze_decoration_state()
         primary_account_id = _infer_primary_account_id(normalized)
         metadata: dict[str, Any] = {}
         InventoryMetadata.PRIMARY_ACCOUNT_ID.set(metadata, primary_account_id)

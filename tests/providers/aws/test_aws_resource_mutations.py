@@ -47,9 +47,9 @@ class AwsResourceMutationsTests(unittest.TestCase):
         mutations.attach_role_arn(None)
 
         self.assertIsInstance(mutations, AwsResourceMutations)
-        self.assertEqual(resource.network_rules, [network_rule])
-        self.assertEqual(resource.policy_statements, [policy_statement])
-        self.assertEqual(resource.attached_role_arns, ["arn:aws:iam::111122223333:role/app"])
+        self.assertEqual(resource.network_rules, (network_rule,))
+        self.assertEqual(resource.policy_statements, (policy_statement,))
+        self.assertEqual(resource.attached_role_arns, ("arn:aws:iam::111122223333:role/app",))
 
     def test_vpc_inference_sets_only_missing_vpc_ids(self) -> None:
         resource = _resource()

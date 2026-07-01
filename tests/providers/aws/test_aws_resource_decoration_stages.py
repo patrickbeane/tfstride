@@ -862,7 +862,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             aws_facts(service).task_role_arn,
             "arn:aws:iam::111122223333:role/task",
         )
-        self.assertEqual(service.attached_role_arns, ["arn:aws:iam::111122223333:role/task"])
+        self.assertEqual(service.attached_role_arns, ("arn:aws:iam::111122223333:role/task",))
         self.assertEqual(
             service.metadata["resolved_cluster_addresses"],
             ["aws_ecs_cluster.main"],
@@ -906,7 +906,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             aws_facts(instance_profile).resolved_role_references,
             ["arn:aws:iam::111122223333:role/web"],
         )
-        self.assertEqual(instance.attached_role_arns, ["arn:aws:iam::111122223333:role/web"])
+        self.assertEqual(instance.attached_role_arns, ("arn:aws:iam::111122223333:role/web",))
         self.assertEqual(
             instance.metadata["resolved_instance_profile_addresses"],
             ["aws_iam_instance_profile.web"],

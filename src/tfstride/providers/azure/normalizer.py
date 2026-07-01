@@ -142,6 +142,8 @@ class AzureNormalizer(ProviderNormalizer):
             if resource.resource_type in SUPPORTED_AZURE_TYPES
         ]
         self._resource_decorator.decorate(normalized)
+        for resource in normalized:
+            resource.freeze_decoration_state()
 
         metadata: dict[str, Any] = {}
         InventoryMetadata.SUPPORTED_RESOURCE_TYPES.set(metadata, sorted(SUPPORTED_AZURE_TYPES))

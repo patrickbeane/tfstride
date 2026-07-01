@@ -458,7 +458,7 @@ class AzureManagedIdentityNormalizerTests(unittest.TestCase):
 
         self.assertIs(indexes.role_index[identity.address], identity)
         self.assertIsNone(resolve_workload_role(virtual_machine, indexes.role_index))
-        self.assertEqual(virtual_machine.attached_role_arns, [])
+        self.assertEqual(virtual_machine.attached_role_arns, ())
         self.assertIsNone(azure_facts(role_assignment).resolved_key_vault_address)
         self.assertEqual(azure_facts(role_assignment).resolved_managed_identity_address, identity.address)
         self.assertEqual(azure_facts(identity).key_vault_role_assignments, [])

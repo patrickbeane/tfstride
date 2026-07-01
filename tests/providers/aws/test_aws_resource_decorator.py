@@ -234,7 +234,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         AwsResourceDecorator(stages=[RecordingStage()]).decorate([security_group, rule_resource])
 
         self.assertEqual(calls, ["recording:True"])
-        self.assertEqual(security_group.network_rules, [])
+        self.assertEqual(security_group.network_rules, ())
         self.assertNotIn("standalone_rule_addresses", security_group.metadata)
 
     def test_standalone_security_group_rules_merge_into_target_groups(self) -> None:
@@ -344,7 +344,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
 
         self.assertEqual(aws_facts(instance_profile).resolved_role_references, ["arn:aws:iam::111122223333:role/web"])
         self.assertEqual(instance_profile.metadata["resolved_role_addresses"], ["aws_iam_role.web"])
-        self.assertEqual(instance.attached_role_arns, ["arn:aws:iam::111122223333:role/web"])
+        self.assertEqual(instance.attached_role_arns, ("arn:aws:iam::111122223333:role/web",))
         self.assertEqual(
             instance.metadata["resolved_instance_profile_addresses"],
             ["aws_iam_instance_profile.web"],
@@ -462,7 +462,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
         self.assertEqual(aws_facts(service).requires_compatibilities, ["FARGATE"])
         self.assertEqual(aws_facts(service).task_role_arn, "arn:aws:iam::111122223333:role/task")
         self.assertEqual(aws_facts(service).execution_role_arn, "arn:aws:iam::111122223333:role/execution")
-        self.assertEqual(service.attached_role_arns, ["arn:aws:iam::111122223333:role/task"])
+        self.assertEqual(service.attached_role_arns, ("arn:aws:iam::111122223333:role/task",))
         self.assertEqual(service.metadata["resolved_task_definition_addresses"], ["aws_ecs_task_definition.app"])
         self.assertEqual(service.metadata["resolved_task_role_addresses"], ["aws_iam_role.task"])
         self.assertEqual(service.metadata["resolved_execution_role_addresses"], ["aws_iam_role.execution"])

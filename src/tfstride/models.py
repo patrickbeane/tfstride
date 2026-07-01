@@ -157,18 +157,22 @@ class NormalizedResource:
     vpc_id: str | None = None
     subnet_ids: tuple[str, ...] = field(default_factory=tuple)
     security_group_ids: tuple[str, ...] = field(default_factory=tuple)
-    attached_role_arns: list[str] = field(default_factory=list)
-    network_rules: list[SecurityGroupRule] = field(default_factory=list)
-    policy_statements: list[IAMPolicyStatement] = field(default_factory=list)
+    attached_role_arns: tuple[str, ...] = field(default_factory=tuple)
+    network_rules: tuple[SecurityGroupRule, ...] = field(default_factory=tuple)
+    policy_statements: tuple[IAMPolicyStatement, ...] = field(default_factory=tuple)
     public_access_configured: bool = False
     public_exposure: bool = False
     data_sensitivity: str = "standard"
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _decoration_state_frozen: bool = field(default=False, init=False, repr=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
 
     def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self.subnet_ids = tuple(self.subnet_ids)
         self.security_group_ids = tuple(self.security_group_ids)
+        self.attached_role_arns = tuple(self.attached_role_arns)
+        self.network_rules = tuple(self.network_rules)
+        self.policy_statements = tuple(self.policy_statements)
         self._metadata = _normalized_metadata(metadata)
 
     @property
@@ -206,15 +210,28 @@ class NormalizedResource:
         validate_normalized_resource_metadata_write(resource_provider=self.provider, field=field)
 
     def add_attached_role_arn(self, role_arn: str | None) -> None:
+        self._ensure_decoration_state_mutable()
         if not role_arn or role_arn in self.attached_role_arns:
             return
-        self.attached_role_arns.append(role_arn)
+        self.attached_role_arns = (*self.attached_role_arns, role_arn)
 
     def extend_network_rules(self, rules: Sequence[SecurityGroupRule]) -> None:
-        self.network_rules.extend(rules)
+        self._ensure_decoration_state_mutable()
+        self.network_rules = (*self.network_rules, *rules)
 
     def extend_policy_statements(self, statements: Sequence[IAMPolicyStatement]) -> None:
-        self.policy_statements.extend(statements)
+        self._ensure_decoration_state_mutable()
+        self.policy_statements = (*self.policy_statements, *statements)
+
+    def freeze_decoration_state(self) -> None:
+        self.attached_role_arns = tuple(self.attached_role_arns)
+        self.network_rules = tuple(self.network_rules)
+        self.policy_statements = tuple(self.policy_statements)
+        self._decoration_state_frozen = True
+
+    def _ensure_decoration_state_mutable(self) -> None:
+        if self._decoration_state_frozen:
+            raise RuntimeError("NormalizedResource decoration state is frozen.")
 
     def _metadata_view(self) -> Mapping[str, Any]:
         return MappingProxyType(deepcopy(self._metadata))
@@ -225,7 +242,7 @@ class NormalizedResource:
 
     @direct_internet_reachable.setter
     def direct_internet_reachable(self, value: bool) -> None:
-        ResourceMetadata.DIRECT_INTERNET_REACHABLE.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.DIRECT_INTERNET_REACHABLE, value)
 
     @property
     def internet_ingress_capable(self) -> bool:
@@ -233,7 +250,7 @@ class NormalizedResource:
 
     @internet_ingress_capable.setter
     def internet_ingress_capable(self, value: bool) -> None:
-        ResourceMetadata.INTERNET_INGRESS_CAPABLE.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.INTERNET_INGRESS_CAPABLE, value)
 
     @property
     def in_public_subnet(self) -> bool:
@@ -241,7 +258,7 @@ class NormalizedResource:
 
     @in_public_subnet.setter
     def in_public_subnet(self, value: bool) -> None:
-        ResourceMetadata.IN_PUBLIC_SUBNET.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.IN_PUBLIC_SUBNET, value)
 
     @property
     def has_nat_gateway_egress(self) -> bool:
@@ -249,7 +266,7 @@ class NormalizedResource:
 
     @has_nat_gateway_egress.setter
     def has_nat_gateway_egress(self, value: bool) -> None:
-        ResourceMetadata.HAS_NAT_GATEWAY_EGRESS.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.HAS_NAT_GATEWAY_EGRESS, value)
 
     @property
     def is_public_subnet(self) -> bool:
@@ -257,7 +274,7 @@ class NormalizedResource:
 
     @is_public_subnet.setter
     def is_public_subnet(self, value: bool) -> None:
-        ResourceMetadata.IS_PUBLIC_SUBNET.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.IS_PUBLIC_SUBNET, value)
 
     @property
     def has_public_route(self) -> bool:
@@ -265,7 +282,7 @@ class NormalizedResource:
 
     @has_public_route.setter
     def has_public_route(self, value: bool) -> None:
-        ResourceMetadata.HAS_PUBLIC_ROUTE.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.HAS_PUBLIC_ROUTE, value)
 
     @property
     def vpc_enabled(self) -> bool:
@@ -273,7 +290,7 @@ class NormalizedResource:
 
     @vpc_enabled.setter
     def vpc_enabled(self, value: bool) -> None:
-        ResourceMetadata.VPC_ENABLED.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.VPC_ENABLED, value)
 
     @property
     def storage_encrypted(self) -> bool:
@@ -281,7 +298,7 @@ class NormalizedResource:
 
     @storage_encrypted.setter
     def storage_encrypted(self, value: bool) -> None:
-        ResourceMetadata.STORAGE_ENCRYPTED.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.STORAGE_ENCRYPTED, value)
 
     @property
     def publicly_accessible(self) -> bool:
@@ -289,7 +306,7 @@ class NormalizedResource:
 
     @publicly_accessible.setter
     def publicly_accessible(self, value: bool) -> None:
-        ResourceMetadata.PUBLICLY_ACCESSIBLE.set(self._metadata, value)
+        self.set_metadata_field(ResourceMetadata.PUBLICLY_ACCESSIBLE, value)
 
     @property
     def public_access_reasons(self) -> list[str]:
@@ -297,7 +314,7 @@ class NormalizedResource:
 
     @public_access_reasons.setter
     def public_access_reasons(self, values: list[str]) -> None:
-        ResourceMetadata.PUBLIC_ACCESS_REASONS.set(self._metadata, values)
+        self.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_REASONS, values)
 
     @property
     def public_exposure_reasons(self) -> list[str]:
@@ -305,7 +322,7 @@ class NormalizedResource:
 
     @public_exposure_reasons.setter
     def public_exposure_reasons(self, values: list[str]) -> None:
-        ResourceMetadata.PUBLIC_EXPOSURE_REASONS.set(self._metadata, values)
+        self.set_metadata_field(ResourceMetadata.PUBLIC_EXPOSURE_REASONS, values)
 
     @property
     def internet_ingress_reasons(self) -> list[str]:
@@ -313,7 +330,7 @@ class NormalizedResource:
 
     @internet_ingress_reasons.setter
     def internet_ingress_reasons(self, values: list[str]) -> None:
-        ResourceMetadata.INTERNET_INGRESS_REASONS.set(self._metadata, values)
+        self.set_metadata_field(ResourceMetadata.INTERNET_INGRESS_REASONS, values)
 
 
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.

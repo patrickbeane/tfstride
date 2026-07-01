@@ -204,9 +204,36 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         resource.extend_network_rules([network_rule])
         resource.extend_policy_statements([policy_statement])
 
-        self.assertEqual(resource.attached_role_arns, ["arn:aws:iam::111122223333:role/web"])
-        self.assertEqual(resource.network_rules, [network_rule])
-        self.assertEqual(resource.policy_statements, [policy_statement])
+        self.assertEqual(resource.attached_role_arns, ("arn:aws:iam::111122223333:role/web",))
+        self.assertEqual(resource.network_rules, (network_rule,))
+        self.assertEqual(resource.policy_statements, (policy_statement,))
+
+    def test_freeze_decoration_state_wraps_mutable_decoration_fields(self) -> None:
+        resource = _resource(address="aws_instance.web", resource_type="aws_instance")
+        network_rule = SecurityGroupRule(
+            direction="ingress",
+            protocol="tcp",
+            from_port=443,
+            to_port=443,
+            cidr_blocks=["0.0.0.0/0"],
+        )
+        policy_statement = IAMPolicyStatement(effect="Allow", actions=["s3:GetObject"])
+
+        resource.add_attached_role_arn("arn:aws:iam::111122223333:role/web")
+        resource.extend_network_rules([network_rule])
+        resource.extend_policy_statements([policy_statement])
+
+        resource.freeze_decoration_state()
+
+        self.assertEqual(resource.attached_role_arns, ("arn:aws:iam::111122223333:role/web",))
+        self.assertEqual(resource.network_rules, (network_rule,))
+        self.assertEqual(resource.policy_statements, (policy_statement,))
+        with self.assertRaises(RuntimeError):
+            resource.add_attached_role_arn("arn:aws:iam::111122223333:role/late")
+        with self.assertRaises(RuntimeError):
+            resource.extend_network_rules([network_rule])
+        with self.assertRaises(RuntimeError):
+            resource.extend_policy_statements([policy_statement])
 
     def test_posture_property_defaults_do_not_require_metadata_keys(self) -> None:
         resource = _resource(address="aws_instance.web", resource_type="aws_instance")

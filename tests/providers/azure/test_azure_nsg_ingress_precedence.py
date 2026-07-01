@@ -199,7 +199,7 @@ class AzureNsgIngressPrecedenceTests(unittest.TestCase):
             azure_facts(network_security_group).network_security_rules[0].get("unknown_decision_fields"),
             ["priority"],
         )
-        self.assertEqual(network_security_group.network_rules, [])
+        self.assertEqual(network_security_group.network_rules, ())
 
     def test_subnet_and_nic_associations_are_both_required_for_effective_ingress(self) -> None:
         paths = _public_compute_paths(

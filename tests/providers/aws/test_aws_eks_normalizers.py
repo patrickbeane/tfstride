@@ -82,7 +82,7 @@ class AwsEksNormalizerTests(unittest.TestCase):
         self.assertTrue(normalized.public_access_configured)
         self.assertEqual(normalized.subnet_ids, ("subnet-public-a", "subnet-public-b"))
         self.assertEqual(normalized.security_group_ids, ("sg-client",))
-        self.assertEqual(normalized.attached_role_arns, ["arn:aws:iam::111122223333:role/eks-control-plane"])
+        self.assertEqual(normalized.attached_role_arns, ("arn:aws:iam::111122223333:role/eks-control-plane",))
         self.assertEqual(facts.resource_name, "public")
         self.assertEqual(facts.eks_cluster_arn, "arn:aws:eks:us-east-1:111122223333:cluster/public")
         self.assertEqual(facts.eks_cluster_role_arn, "arn:aws:iam::111122223333:role/eks-control-plane")
@@ -278,7 +278,7 @@ class AwsEksNormalizerTests(unittest.TestCase):
         facts = aws_facts(normalized)
 
         self.assertEqual(normalized.identifier, "vpc-cni")
-        self.assertEqual(normalized.attached_role_arns, ["arn:aws:iam::111122223333:role/eks-vpc-cni"])
+        self.assertEqual(normalized.attached_role_arns, ("arn:aws:iam::111122223333:role/eks-vpc-cni",))
         self.assertEqual(facts.resource_name, "vpc-cni")
         self.assertEqual(facts.eks_addon_name, "vpc-cni")
         self.assertEqual(facts.eks_addon_cluster_name, "app")
