@@ -26,6 +26,8 @@ class AzurePrivateEndpointConnection:
     private_dns_zone_group_names: tuple[str, ...] = ()
     private_dns_zone_ids: tuple[str, ...] = ()
     private_dns_zone_uncertainties: tuple[str, ...] = ()
+    private_dns_zone_group_state: str | None = None
+    private_dns_zone_ids_state: str | None = None
     service_connection_name: str | None = None
     is_manual_connection: bool | None = None
 
@@ -200,6 +202,8 @@ def _private_endpoint_connections(
                     for uncertainty in facts.private_endpoint_uncertainties
                     if "private_dns_zone_group" in uncertainty
                 ),
+                private_dns_zone_group_state=facts.private_dns_zone_group_state,
+                private_dns_zone_ids_state=facts.private_dns_zone_ids_state,
                 service_connection_name=_optional_string(record.get("name")),
                 is_manual_connection=_optional_bool(record.get("is_manual_connection")),
             )

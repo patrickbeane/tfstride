@@ -19,6 +19,9 @@ from tfstride.providers.azure.resource_utils import (
 )
 
 AZURE_PROVIDER = "azure"
+_STATE_CONFIGURED = "configured"
+_STATE_NOT_CONFIGURED = "not_configured"
+_STATE_UNKNOWN = "unknown"
 
 
 def normalize_virtual_network(resource: TerraformResource) -> NormalizedResource:
@@ -161,10 +164,13 @@ def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResourc
         resource,
         uncertainties,
     )
-    private_dns_zone_groups, private_dns_zone_ids, private_dns_zone_group_names = _private_dns_zone_groups(
-        resource,
-        uncertainties,
-    )
+    (
+        private_dns_zone_groups,
+        private_dns_zone_ids,
+        private_dns_zone_group_names,
+        private_dns_zone_group_state,
+        private_dns_zone_ids_state,
+    ) = _private_dns_zone_groups(resource, uncertainties)
 
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
@@ -177,6 +183,8 @@ def normalize_private_endpoint(resource: TerraformResource) -> NormalizedResourc
         AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUP_NAMES: private_dns_zone_group_names,
         AzureResourceMetadata.PRIVATE_DNS_ZONE_IDS: private_dns_zone_ids,
         AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUPS: private_dns_zone_groups,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUP_STATE: private_dns_zone_group_state,
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_IDS_STATE: private_dns_zone_ids_state,
     }
     if uncertainties:
         metadata[AzureResourceMetadata.PRIVATE_ENDPOINT_UNCERTAINTIES] = uncertainties
@@ -318,20 +326,22 @@ def _private_service_connections(
 def _private_dns_zone_groups(
     resource: TerraformResource,
     uncertainties: list[str],
-) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], list[str], str, str]:
     values = resource.values
     raw_unknown = resource.unknown_values.get("private_dns_zone_group")
     if raw_unknown is True and not values.get("private_dns_zone_group"):
         uncertainties.append("private_dns_zone_group is unknown after planning")
-        return [], [], []
+        return [], [], [], _STATE_UNKNOWN, _STATE_UNKNOWN
 
     records: list[dict[str, Any]] = []
     all_zone_ids: list[str] = []
     group_names: list[str] = []
+    group_state_unknown = raw_unknown is True
     for index, item in enumerate(as_list(values.get("private_dns_zone_group"))):
         path = f"private_dns_zone_group[{index}]"
         if not isinstance(item, Mapping):
             uncertainties.append(f"{path} has an unrecognized value shape")
+            group_state_unknown = True
             continue
         unknown_item = unknown_block_at(raw_unknown, index)
         record: dict[str, Any] = {}
@@ -354,7 +364,27 @@ def _private_dns_zone_groups(
         if unknown_fields:
             record["unknown_fields"] = unknown_fields
         records.append(record)
-    return records, compact_strings(all_zone_ids), compact_strings(group_names)
+
+    compact_zone_ids = compact_strings(all_zone_ids)
+    group_state = _private_dns_zone_group_state(records, group_state_unknown)
+    zone_ids_state = _private_dns_zone_ids_state(records, compact_zone_ids, group_state_unknown)
+    return records, compact_zone_ids, compact_strings(group_names), group_state, zone_ids_state
+
+
+def _private_dns_zone_group_state(records: list[dict[str, Any]], unknown: bool) -> str:
+    if unknown:
+        return _STATE_UNKNOWN
+    if records:
+        return _STATE_CONFIGURED
+    return _STATE_NOT_CONFIGURED
+
+
+def _private_dns_zone_ids_state(records: list[dict[str, Any]], zone_ids: list[str], unknown: bool) -> str:
+    if unknown or any("private_dns_zone_ids" in record.get("unknown_fields", []) for record in records):
+        return _STATE_UNKNOWN
+    if zone_ids:
+        return _STATE_CONFIGURED
+    return _STATE_NOT_CONFIGURED
 
 
 def _network_resource(

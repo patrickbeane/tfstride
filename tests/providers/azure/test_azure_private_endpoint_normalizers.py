@@ -60,6 +60,8 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.private_endpoint_id, "/subscriptions/example/privateEndpoints/storage")
         self.assertEqual(facts.private_connection_resource_ids, ["azurerm_storage_account.logs.id"])
         self.assertEqual(facts.private_endpoint_subresource_names, ["blob"])
+        self.assertEqual(facts.private_dns_zone_group_state, "not_configured")
+        self.assertEqual(facts.private_dns_zone_ids_state, "not_configured")
         self.assertEqual(
             facts.private_service_connections,
             [
@@ -102,6 +104,8 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
 
         self.assertEqual(facts.private_endpoint_subresource_names, ["blob", "file"])
         self.assertEqual(facts.private_dns_zone_group_names, ["storage-dns"])
+        self.assertEqual(facts.private_dns_zone_group_state, "configured")
+        self.assertEqual(facts.private_dns_zone_ids_state, "configured")
         self.assertEqual(
             facts.private_dns_zone_ids,
             ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
@@ -206,10 +210,37 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
         )
         self.assertEqual(facts.private_dns_zone_group_names, ["pending-dns"])
         self.assertEqual(facts.private_dns_zone_ids, [])
+        self.assertEqual(facts.private_dns_zone_group_state, "configured")
+        self.assertEqual(facts.private_dns_zone_ids_state, "unknown")
         self.assertEqual(
             facts.private_dns_zone_groups,
             [{"name": "pending-dns", "private_dns_zone_ids": [], "unknown_fields": ["private_dns_zone_ids"]}],
         )
+
+    def test_unknown_private_dns_zone_group_state_is_explicit(self) -> None:
+        normalized = normalize_private_endpoint(
+            _resource(
+                {
+                    "name": "pending",
+                    "private_service_connection": [
+                        {
+                            "name": "storage-blob",
+                            "private_connection_resource_id": "azurerm_storage_account.logs.id",
+                            "subresource_names": ["blob"],
+                        }
+                    ],
+                },
+                unknown_values={"private_dns_zone_group": True},
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertEqual(facts.private_dns_zone_group_state, "unknown")
+        self.assertEqual(facts.private_dns_zone_ids_state, "unknown")
+        self.assertEqual(facts.private_dns_zone_groups, [])
+        self.assertEqual(facts.private_dns_zone_group_names, [])
+        self.assertEqual(facts.private_dns_zone_ids, [])
+        self.assertEqual(facts.private_endpoint_uncertainties, ["private_dns_zone_group is unknown after planning"])
 
     def test_private_endpoint_fixture_normalizes_without_findings(self) -> None:
         plan = load_terraform_plan(PRIVATE_ENDPOINT_FIXTURE_PATH)
@@ -227,10 +258,14 @@ class AzurePrivateEndpointNormalizerTests(unittest.TestCase):
             ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
         )
         self.assertEqual(facts.private_dns_zone_group_names, ["storage-dns"])
+        self.assertEqual(facts.private_dns_zone_group_state, "configured")
+        self.assertEqual(facts.private_dns_zone_ids_state, "configured")
         self.assertEqual(
             facts.private_dns_zone_ids,
             ["azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"],
         )
+        self.assertEqual(facts.private_dns_zone_group_state, "configured")
+        self.assertEqual(facts.private_dns_zone_ids_state, "configured")
 
         result = TfStride().analyze_plan(PRIVATE_ENDPOINT_FIXTURE_PATH)
         self.assertEqual(result.findings, [])

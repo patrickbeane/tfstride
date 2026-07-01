@@ -123,6 +123,8 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
         self.assertEqual(index.subresource_names_for(storage), ("blob",))
         self.assertEqual(coverage.connections[0].target_resource_id, _STORAGE_ID)
         self.assertEqual(coverage.connections[0].subresource_names, ("blob",))
+        self.assertEqual(coverage.connections[0].private_dns_zone_group_state, "not_configured")
+        self.assertEqual(coverage.connections[0].private_dns_zone_ids_state, "not_configured")
         self.assertEqual(index.unresolved_targets, ())
 
     def test_resolved_private_endpoint_targets_key_vault(self) -> None:
@@ -188,6 +190,8 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
             ("azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"),
         )
         self.assertEqual(coverage.connections[0].private_dns_zone_group_names, ("storage-dns",))
+        self.assertEqual(coverage.connections[0].private_dns_zone_group_state, "configured")
+        self.assertEqual(coverage.connections[0].private_dns_zone_ids_state, "configured")
         self.assertEqual(
             coverage.connections[0].private_dns_zone_ids,
             ("azurerm_private_dns_zone.blob.id", "azurerm_private_dns_zone.file.id"),

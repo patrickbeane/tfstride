@@ -106,6 +106,8 @@ class AzureResourceMetadata:
         "private_dns_zone_virtual_network_reference"
     )
     PRIVATE_DNS_ZONE_REGISTRATION_STATE = OptionalStringMetadataField("private_dns_zone_registration_state")
+    PRIVATE_DNS_ZONE_GROUP_STATE = OptionalStringMetadataField("private_dns_zone_group_state")
+    PRIVATE_DNS_ZONE_IDS_STATE = OptionalStringMetadataField("private_dns_zone_ids_state")
 
     ALLOW_NESTED_ITEMS_TO_BE_PUBLIC = BoolMetadataField("allow_nested_items_to_be_public")
     SHARED_ACCESS_KEY_ENABLED = BoolMetadataField("shared_access_key_enabled")

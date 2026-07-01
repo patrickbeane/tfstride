@@ -35,5 +35,13 @@ class AzurePrivateEndpointFacts:
         return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUPS)
 
     @property
+    def private_dns_zone_group_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_GROUP_STATE)
+
+    @property
+    def private_dns_zone_ids_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_IDS_STATE)
+
+    @property
     def private_endpoint_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.PRIVATE_ENDPOINT_UNCERTAINTIES)
