@@ -500,6 +500,39 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-sql-short-term-backup-retention-insufficient",
+        title="Azure SQL Database short-term backup retention is insufficient",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure `short_term_retention_policy.retention_days` for Azure SQL databases to meet recovery "
+            "objectives, and keep retention long enough for delayed detection of destructive changes."
+        ),
+        tags=("azure", "sql", "backup", "recovery", "retention"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-sql-long-term-backup-retention-not-configured",
+        title="Azure SQL Database long-term backup retention is not configured",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure `long_term_retention_policy` for Azure SQL databases that require recovery beyond the "
+            "short-term backup window or need compliance retention evidence."
+        ),
+        tags=("azure", "sql", "backup", "recovery", "long-term-retention"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-sql-backup-geo-redundancy-not-enabled",
+        title="Azure SQL Database backup geo-redundancy is not enabled",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Use geo-redundant or geo-zone-redundant backup storage where regional recovery is required, and "
+            "avoid local-only backup redundancy for critical SQL databases."
+        ),
+        tags=("azure", "sql", "backup", "recovery", "geo-redundancy"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-private-endpoint-public-fallback",
         title="Azure resource has private endpoint coverage with public fallback",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 120,
+      "registered_rule_count": 123,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -153,6 +153,9 @@
         "azure-sql-firewall-broad-public-access",
         "azure-sql-minimum-tls-below-1-2",
         "azure-sql-security-alert-policy-disabled",
+        "azure-sql-short-term-backup-retention-insufficient",
+        "azure-sql-long-term-backup-retention-not-configured",
+        "azure-sql-backup-geo-redundancy-not-enabled",
         "azure-private-endpoint-public-fallback",
         "azure-private-endpoint-dns-posture-incomplete",
         "azure-postgresql-public-network-access-enabled",
@@ -277,6 +280,9 @@
         "azure-sql-firewall-broad-public-access": 0,
         "azure-sql-minimum-tls-below-1-2": 0,
         "azure-sql-security-alert-policy-disabled": 0,
+        "azure-sql-short-term-backup-retention-insufficient": 0,
+        "azure-sql-long-term-backup-retention-not-configured": 0,
+        "azure-sql-backup-geo-redundancy-not-enabled": 0,
         "azure-private-endpoint-public-fallback": 0,
         "azure-private-endpoint-dns-posture-incomplete": 0,
         "azure-postgresql-public-network-access-enabled": 0,

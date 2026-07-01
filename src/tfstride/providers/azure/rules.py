@@ -67,6 +67,9 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-sql-firewall-broad-public-access",
         "azure-sql-minimum-tls-below-1-2",
         "azure-sql-security-alert-policy-disabled",
+        "azure-sql-short-term-backup-retention-insufficient",
+        "azure-sql-long-term-backup-retention-not-configured",
+        "azure-sql-backup-geo-redundancy-not-enabled",
         "azure-private-endpoint-public-fallback",
         "azure-private-endpoint-dns-posture-incomplete",
         "azure-postgresql-public-network-access-enabled",
@@ -154,6 +157,13 @@ def build_azure_rule_contribution(
         "azure-sql-firewall-broad-public-access": mssql_detectors.detect_broad_firewall_access,
         "azure-sql-minimum-tls-below-1-2": mssql_detectors.detect_minimum_tls_below_1_2,
         "azure-sql-security-alert-policy-disabled": mssql_detectors.detect_security_alert_policy_disabled,
+        "azure-sql-short-term-backup-retention-insufficient": (
+            mssql_detectors.detect_short_term_backup_retention_insufficient
+        ),
+        "azure-sql-long-term-backup-retention-not-configured": (
+            mssql_detectors.detect_long_term_backup_retention_not_configured
+        ),
+        "azure-sql-backup-geo-redundancy-not-enabled": (mssql_detectors.detect_backup_geo_redundancy_not_enabled),
         "azure-private-endpoint-public-fallback": (private_endpoint_detectors.detect_private_endpoint_public_fallback),
         "azure-private-endpoint-dns-posture-incomplete": (
             private_endpoint_detectors.detect_private_endpoint_dns_posture_incomplete

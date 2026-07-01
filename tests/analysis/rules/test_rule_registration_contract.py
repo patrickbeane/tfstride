@@ -100,6 +100,9 @@ EXPECTED_AZURE_RULE_GROUP_IDS = (
         "azure-sql-firewall-broad-public-access",
         "azure-sql-minimum-tls-below-1-2",
         "azure-sql-security-alert-policy-disabled",
+        "azure-sql-short-term-backup-retention-insufficient",
+        "azure-sql-long-term-backup-retention-not-configured",
+        "azure-sql-backup-geo-redundancy-not-enabled",
         "azure-private-endpoint-public-fallback",
         "azure-private-endpoint-dns-posture-incomplete",
         "azure-postgresql-public-network-access-enabled",
@@ -271,10 +274,12 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
-        self.assertEqual(tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (99, 2, 2, 12, 3, 2))
+        self.assertEqual(
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (102, 2, 2, 12, 3, 2)
+        )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (16, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (32, 0, 0, 10, 1, 0))
-        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (51, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (54, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)

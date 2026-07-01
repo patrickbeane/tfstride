@@ -6,6 +6,7 @@ from tests.providers.aws.test_aws_rds_rules import _db_instance as _aws_db_insta
 from tests.providers.aws.test_aws_rds_rules import _safe_db_instance as _aws_safe_db_instance
 from tests.providers.azure.test_azure_postgresql_rules import _firewall_rule as _azure_postgresql_firewall_rule
 from tests.providers.azure.test_azure_postgresql_rules import _server as _azure_postgresql_server
+from tests.providers.azure.test_azure_sql_rules import _database as _azure_sql_database
 from tests.providers.azure.test_azure_sql_rules import _firewall_rule as _azure_sql_firewall_rule
 from tests.providers.azure.test_azure_sql_rules import _server as _azure_sql_server
 from tests.providers.gcp.rule_support.data import _cloud_sql_instance as _gcp_cloud_sql_instance
@@ -43,6 +44,9 @@ AZURE_DATABASE_RULE_IDS = frozenset(
         "azure-sql-public-network-access-enabled",
         "azure-sql-missing-private-endpoint",
         "azure-sql-firewall-broad-public-access",
+        "azure-sql-short-term-backup-retention-insufficient",
+        "azure-sql-long-term-backup-retention-not-configured",
+        "azure-sql-backup-geo-redundancy-not-enabled",
         "azure-postgresql-public-network-access-enabled",
         "azure-postgresql-firewall-broad-public-access",
         "azure-postgresql-geo-backup-disabled",
@@ -77,7 +81,14 @@ DATABASE_CONCEPT_RULE_IDS = {
                 "gcp-cloud-sql-point-in-time-recovery-disabled",
             }
         ),
-        "azure": frozenset({"azure-postgresql-geo-backup-disabled"}),
+        "azure": frozenset(
+            {
+                "azure-sql-short-term-backup-retention-insufficient",
+                "azure-sql-long-term-backup-retention-not-configured",
+                "azure-sql-backup-geo-redundancy-not-enabled",
+                "azure-postgresql-geo-backup-disabled",
+            }
+        ),
     },
     "deletion_protection": {
         "aws": frozenset({"aws-rds-deletion-protection-disabled"}),
@@ -179,6 +190,14 @@ class DatabasePostureParityTests(unittest.TestCase):
             [
                 _azure_sql_server(public_network=True),
                 _azure_sql_firewall_rule(),
+                _azure_sql_database(
+                    short_term_days=0,
+                    weekly_retention="PT0S",
+                    monthly_retention=None,
+                    yearly_retention=None,
+                    geo_backup=False,
+                    storage_account_type="Local",
+                ),
                 _azure_postgresql_server(public_network=True, geo_backup=False),
                 _azure_postgresql_firewall_rule(),
             ]
@@ -215,6 +234,7 @@ class DatabasePostureParityTests(unittest.TestCase):
             [
                 _azure_sql_server(public_network=False),
                 _azure_sql_firewall_rule(start_ip="198.51.100.10", end_ip="198.51.100.10"),
+                _azure_sql_database(),
                 _azure_postgresql_server(public_network=False, geo_backup=True),
                 _azure_postgresql_firewall_rule(start_ip="198.51.100.10", end_ip="198.51.100.10"),
             ]

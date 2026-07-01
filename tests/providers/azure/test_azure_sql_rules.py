@@ -47,6 +47,55 @@ def _server(
     return _resource(AzureResourceType.MSSQL_SERVER, name, values)
 
 
+def _database(
+    *,
+    name: str = "mydb",
+    server_id: str = _SERVER_ID,
+    short_term_days: int | None = 14,
+    backup_interval_hours: int | None = 12,
+    weekly_retention: str | None = "P4W",
+    monthly_retention: str | None = "P12M",
+    yearly_retention: str | None = "P5Y",
+    geo_backup: bool | None = True,
+    storage_account_type: str | None = "GeoZone",
+    include_short_term: bool = True,
+    include_long_term: bool = True,
+) -> TerraformResource:
+    values: dict[str, object] = {
+        "id": f"/subscriptions/example/providers/Microsoft.Sql/servers/sqlserver/databases/{name}",
+        "name": name,
+        "server_id": server_id,
+    }
+    if include_short_term:
+        values["short_term_retention_policy"] = [
+            {
+                "retention_days": short_term_days,
+                "backup_interval_in_hours": backup_interval_hours,
+            }
+        ]
+    if include_long_term:
+        values["long_term_retention_policy"] = [
+            {
+                "weekly_retention": weekly_retention,
+                "monthly_retention": monthly_retention,
+                "yearly_retention": yearly_retention,
+                "week_of_year": 4,
+            }
+        ]
+    if geo_backup is not None:
+        values["geo_backup_enabled"] = geo_backup
+    if storage_account_type is not None:
+        values["storage_account_type"] = storage_account_type
+    return _resource(AzureResourceType.MSSQL_DATABASE, name, values)
+
+
+def _evidence_values(finding, key: str) -> list[str]:
+    for item in finding.evidence:
+        if item.key == key:
+            return [str(value) for value in item.values]
+    return []
+
+
 def _firewall_rule(
     *,
     name: str = "wide",
@@ -345,6 +394,126 @@ class AzureSqlSecurityAlertPolicyTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+
+class AzureSqlRecoveryPostureTests(unittest.TestCase):
+    def test_unsafe_database_recovery_posture_emits_findings(self) -> None:
+        findings = _evaluate(
+            [
+                _database(
+                    short_term_days=0,
+                    weekly_retention="PT0S",
+                    monthly_retention=None,
+                    yearly_retention=None,
+                    geo_backup=False,
+                    storage_account_type="Local",
+                )
+            ],
+            "azure-sql-short-term-backup-retention-insufficient",
+            "azure-sql-long-term-backup-retention-not-configured",
+            "azure-sql-backup-geo-redundancy-not-enabled",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "azure-sql-short-term-backup-retention-insufficient",
+                "azure-sql-long-term-backup-retention-not-configured",
+                "azure-sql-backup-geo-redundancy-not-enabled",
+            ],
+        )
+        self.assertTrue(all("azurerm_mssql_database.mydb" in finding.affected_resources for finding in findings))
+
+    def test_safe_database_recovery_posture_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [_database()],
+            "azure-sql-short-term-backup-retention-insufficient",
+            "azure-sql-long-term-backup-retention-not-configured",
+            "azure-sql-backup-geo-redundancy-not-enabled",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_short_backup_retention_includes_threshold_evidence(self) -> None:
+        findings = _evaluate(
+            [_database(short_term_days=3)],
+            "azure-sql-short-term-backup-retention-insufficient",
+        )
+
+        self.assertEqual(len(findings), 1)
+        evidence_values = _evidence_values(findings[0], "short_term_backup_posture")
+        self.assertIn("short_term_retention_policy.retention_days_state=short", evidence_values)
+        self.assertIn("retention_days=3", evidence_values)
+        self.assertIn("minimum_retention_days=7", evidence_values)
+        self.assertIn("backup_interval_in_hours=12", evidence_values)
+
+    def test_missing_recovery_blocks_emit_recovery_findings(self) -> None:
+        findings = _evaluate(
+            [_database(include_short_term=False, include_long_term=False, geo_backup=True)],
+            "azure-sql-short-term-backup-retention-insufficient",
+            "azure-sql-long-term-backup-retention-not-configured",
+            "azure-sql-backup-geo-redundancy-not-enabled",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "azure-sql-short-term-backup-retention-insufficient",
+                "azure-sql-long-term-backup-retention-not-configured",
+            ],
+        )
+
+    def test_unknown_recovery_values_emit_uncertainty_findings(self) -> None:
+        findings = _evaluate(
+            [
+                _resource(
+                    AzureResourceType.MSSQL_DATABASE,
+                    "pending",
+                    {
+                        "id": "/subscriptions/example/providers/Microsoft.Sql/servers/sqlserver/databases/pending",
+                        "name": "pending",
+                        "server_id": _SERVER_ID,
+                        "short_term_retention_policy": [{"retention_days": None}],
+                        "long_term_retention_policy": [{"weekly_retention": None}],
+                        "geo_backup_enabled": None,
+                        "storage_account_type": None,
+                    },
+                    unknown_values={
+                        "short_term_retention_policy": [{"retention_days": True}],
+                        "long_term_retention_policy": [{"weekly_retention": True}],
+                        "geo_backup_enabled": True,
+                        "storage_account_type": True,
+                    },
+                )
+            ],
+            "azure-sql-short-term-backup-retention-insufficient",
+            "azure-sql-long-term-backup-retention-not-configured",
+            "azure-sql-backup-geo-redundancy-not-enabled",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                "azure-sql-short-term-backup-retention-insufficient",
+                "azure-sql-long-term-backup-retention-not-configured",
+                "azure-sql-backup-geo-redundancy-not-enabled",
+            ],
+        )
+        self.assertIn(
+            "short_term_retention_policy.retention_days is unknown after planning",
+            _evidence_values(findings[0], "posture_uncertainty"),
+        )
+        self.assertIn(
+            "long_term_retention_policy.weekly_retention is unknown after planning",
+            _evidence_values(findings[1], "posture_uncertainty"),
+        )
+        self.assertEqual(
+            _evidence_values(findings[2], "posture_uncertainty"),
+            [
+                "geo_backup_enabled is unknown after planning",
+                "storage_account_type is unknown after planning",
+            ],
+        )
 
 
 class AzureSqlNormalizationIntegrationTests(unittest.TestCase):
