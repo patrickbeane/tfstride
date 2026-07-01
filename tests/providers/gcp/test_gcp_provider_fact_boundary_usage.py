@@ -23,48 +23,7 @@ from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 
-_EXPECTED_ANALYSIS_GCP_PROVIDER_IMPORTS = frozenset(
-    {
-        ("compute_exposure_rules.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("compute_exposure_rules.py", "tfstride.providers.gcp.constants"),
-        ("compute_exposure_rules.py", "tfstride.providers.gcp.resource_facts"),
-        ("custom_roles.py", "tfstride.providers.gcp.resource_facts"),
-        ("custom_roles.py", "tfstride.providers.gcp.resource_utils"),
-        ("data_rules.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("data_rules.py", "tfstride.providers.gcp.resource_facts"),
-        ("gke_rules.py", "tfstride.providers.gcp.constants"),
-        ("gke_rules.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_access.py", "tfstride.providers.gcp.constants"),
-        ("iam_access.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_access.py", "tfstride.providers.gcp.resource_utils"),
-        ("iam_inheritance.py", "tfstride.providers.gcp.constants"),
-        ("iam_inheritance.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_inheritance.py", "tfstride.providers.gcp.resource_utils"),
-        ("iam_inherited.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("iam_inherited.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_scoped.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("iam_scoped.py", "tfstride.providers.gcp.constants"),
-        ("iam_sensitive_resources.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("iam_sensitive_resources.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_sensitive_resources.py", "tfstride.providers.gcp.resource_utils"),
-        ("iam_service_account_keys.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("iam_service_account_keys.py", "tfstride.providers.gcp.constants"),
-        ("iam_service_account_keys.py", "tfstride.providers.gcp.metadata"),
-        ("iam_service_account_keys.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_service_account_keys.py", "tfstride.providers.gcp.resource_utils"),
-        ("iam_service_accounts.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("iam_service_accounts.py", "tfstride.providers.gcp.constants"),
-        ("iam_service_accounts.py", "tfstride.providers.gcp.resource_facts"),
-        ("iam_service_accounts.py", "tfstride.providers.gcp.resource_utils"),
-        ("org_policy_guardrails.py", "tfstride.providers.gcp.constants"),
-        ("org_policy_guardrails.py", "tfstride.providers.gcp.metadata"),
-        ("org_policy_guardrails.py", "tfstride.providers.gcp.resource_facts"),
-        ("serverless_rules.py", "tfstride.providers.gcp.analysis_indexes"),
-        ("serverless_rules.py", "tfstride.providers.gcp.constants"),
-        ("serverless_rules.py", "tfstride.providers.gcp.resource_facts"),
-        ("serverless_rules.py", "tfstride.providers.gcp.resource_utils"),
-    }
-)
+_EXPECTED_ANALYSIS_GCP_PROVIDER_IMPORTS = frozenset()
 
 
 def _evidence_by_key(finding):
@@ -207,7 +166,7 @@ class GcpProviderFactBoundaryCharacterizationTests(unittest.TestCase):
 
 
 class GcpProviderBoundaryArchitectureTests(unittest.TestCase):
-    def test_current_analysis_gcp_to_provider_gcp_import_debt_is_explicit(self) -> None:
+    def test_analysis_gcp_does_not_import_provider_gcp_modules(self) -> None:
         actual = _analysis_gcp_provider_imports()
 
         self.assertEqual(

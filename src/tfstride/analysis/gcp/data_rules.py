@@ -13,16 +13,20 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.analysis.resource_facts import (
+    AnalysisSqlFacts,
+    AnalysisStorageFacts,
+    analysis_facts,
+)
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
-from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
-from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
@@ -77,7 +81,7 @@ class GcpDataRuleDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
-                                gcp_facts(resource).resource_policy_source_addresses,
+                                analysis_facts(resource).iam.resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -131,7 +135,7 @@ class GcpDataRuleDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
-                                gcp_facts(resource).resource_policy_source_addresses,
+                                analysis_facts(resource).iam.resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -196,7 +200,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = gcp_facts(bucket)
+            bucket_facts = analysis_facts(bucket).storage
             if bucket_facts.uniform_bucket_level_access is True:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -243,7 +247,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = gcp_facts(bucket)
+            bucket_facts = analysis_facts(bucket).storage
             if _gcs_public_access_prevention_enforced(bucket_facts.public_access_prevention):
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -297,7 +301,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = gcp_facts(bucket)
+            bucket_facts = analysis_facts(bucket).storage
             if bucket.data_sensitivity != "sensitive":
                 continue
             if bucket_facts.versioning_enabled is True:
@@ -344,7 +348,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = gcp_facts(bucket)
+            bucket_facts = analysis_facts(bucket).storage
             if bucket.data_sensitivity != "sensitive":
                 continue
             if bucket_facts.customer_managed_encryption:
@@ -394,7 +398,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = gcp_facts(bucket)
+            bucket_facts = analysis_facts(bucket).storage
             if bucket.data_sensitivity != "sensitive":
                 continue
             retention_issues = _gcs_retention_policy_issues(bucket_facts)
@@ -479,7 +483,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = gcp_facts(database)
+            database_facts = analysis_facts(database).sql
             if database_facts.backup_enabled:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -526,7 +530,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = gcp_facts(database)
+            database_facts = analysis_facts(database).sql
             if not database_facts.ipv4_enabled or database_facts.private_network:
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
@@ -574,7 +578,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = gcp_facts(database)
+            database_facts = analysis_facts(database).sql
             if not database_facts.ipv4_enabled or _cloud_sql_ssl_enforced(database_facts):
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
@@ -621,7 +625,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = gcp_facts(database)
+            database_facts = analysis_facts(database).sql
             if not database_facts.backup_enabled:
                 continue
             if database_facts.point_in_time_recovery_enabled is not False:
@@ -669,7 +673,7 @@ class GcpDataRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = gcp_facts(database)
+            database_facts = analysis_facts(database).sql
             if database_facts.deletion_protection is not False:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -705,7 +709,7 @@ def _bool_status(value: bool | None) -> str:
     return str(value).lower()
 
 
-def _gcs_retention_policy_issues(bucket_facts: GcpResourceFacts) -> list[str]:
+def _gcs_retention_policy_issues(bucket_facts: AnalysisStorageFacts) -> list[str]:
     if bucket_facts.gcs_retention_policy_uncertainties:
         return []
 
@@ -725,7 +729,7 @@ def _gcs_retention_policy_issues(bucket_facts: GcpResourceFacts) -> list[str]:
     return issues
 
 
-def _gcs_retention_policy_evidence(bucket_facts: GcpResourceFacts) -> list[str]:
+def _gcs_retention_policy_evidence(bucket_facts: AnalysisStorageFacts) -> list[str]:
     retention_period_seconds = bucket_facts.gcs_retention_period_seconds
     if retention_period_seconds is None:
         retention_state = "missing"
@@ -749,7 +753,7 @@ def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
 
 
-def _cloud_sql_ssl_enforced(sql_facts: GcpResourceFacts) -> bool:
+def _cloud_sql_ssl_enforced(sql_facts: AnalysisSqlFacts) -> bool:
     if sql_facts.require_ssl:
         return True
     ssl_mode = str(sql_facts.ssl_mode or "").strip().upper()
@@ -758,7 +762,7 @@ def _cloud_sql_ssl_enforced(sql_facts: GcpResourceFacts) -> bool:
 
 def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[str]:
     descriptions: list[str] = []
-    for network in gcp_facts(database).authorized_networks:
+    for network in analysis_facts(database).sql.authorized_networks:
         value = str(network.get("value") or "").strip()
         if value not in {"0.0.0.0/0", "::/0"}:
             continue

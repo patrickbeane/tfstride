@@ -39,10 +39,10 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
+from tfstride.analysis.gcp.indexes import gcp_iam_inheritance_index
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.gcp.analysis_indexes import gcp_iam_inheritance_index
-from tfstride.providers.gcp.resource_facts import gcp_facts
 
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {
@@ -418,7 +418,7 @@ def _descendant_scope_values(
 ) -> list[str]:
     values: set[str] = set()
     for resource in descendants:
-        facts = gcp_facts(resource)
+        facts = analysis_facts(resource).iam
         if scope_type == "project" and facts.project:
             values.add(facts.project)
         elif scope_type == "folder" and facts.folder_id:
@@ -476,7 +476,9 @@ def _assess_inherited_gcp_iam_member(
     broad_assessment = assess_gcp_broad_iam_member(member)
     if broad_assessment is not None:
         return broad_assessment
-    projects = sorted({project for project in (gcp_facts(resource).project for resource in descendants) if project})
+    projects = sorted(
+        {project for project in (analysis_facts(resource).iam.project for resource in descendants) if project}
+    )
     for project in projects:
         assessment = assess_gcp_sensitive_iam_member(member, project)
         if assessment is not None:

@@ -5,11 +5,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from tfstride.analysis.gcp.resource_types import GCP_ORGANIZATION_POLICY_RESOURCE_TYPES
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
-from tfstride.providers.gcp.constants import GCP_ORGANIZATION_POLICY_RESOURCE_TYPES
-from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.resource_metadata import MetadataField
 
 GCP_ORG_POLICY_SCOPE_ORGANIZATION = "organization"
 GCP_ORG_POLICY_SCOPE_FOLDER = "folder"
@@ -144,7 +142,8 @@ def build_gcp_org_policy_guardrail_index(
 
 
 def _guardrail_from_resource(resource: NormalizedResource) -> GcpOrgPolicyGuardrail | None:
-    constraint = resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_CONSTRAINT)
+    facts = analysis_facts(resource).iam
+    constraint = facts.org_policy_constraint
     scope = _policy_scope(resource)
     if constraint is None or scope is None:
         return None
@@ -152,35 +151,29 @@ def _guardrail_from_resource(resource: NormalizedResource) -> GcpOrgPolicyGuardr
         resource=resource,
         scope=scope,
         constraint=constraint,
-        rules=tuple(resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_RULES)),
-        allowed_values=tuple(resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES)),
-        denied_values=tuple(resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_DENIED_VALUES)),
-        enforced=_optional_bool_metadata(resource, GcpResourceMetadata.ORG_POLICY_ENFORCED),
-        inherit_from_parent=_optional_bool_metadata(
-            resource,
-            GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT,
-        ),
-        restore_default=resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT),
+        rules=tuple(facts.org_policy_rules),
+        allowed_values=tuple(facts.org_policy_allowed_values),
+        denied_values=tuple(facts.org_policy_denied_values),
+        enforced=facts.org_policy_enforced,
+        inherit_from_parent=facts.org_policy_inherit_from_parent,
+        restore_default=facts.org_policy_restore_default,
     )
 
 
 def _policy_scope(resource: NormalizedResource) -> GcpOrgPolicyScopeKey | None:
-    scope_type = resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE)
-    scope = resource.get_metadata_field(GcpResourceMetadata.ORG_POLICY_SCOPE)
+    facts = analysis_facts(resource).iam
+    scope_type = facts.org_policy_scope_type
+    scope = facts.org_policy_scope
     if scope_type == GCP_ORG_POLICY_SCOPE_PROJECT:
-        identifier = _normalize_project_id(
-            resource.get_metadata_field(GcpResourceMetadata.PROJECT) or _path_segment(scope, "projects") or scope
-        )
+        identifier = _normalize_project_id(facts.project or _path_segment(scope, "projects") or scope)
     elif scope_type == GCP_ORG_POLICY_SCOPE_FOLDER:
         identifier = _normalize_hierarchy_id(
-            resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID) or _path_segment(scope, "folders") or scope,
+            facts.folder_id or _path_segment(scope, "folders") or scope,
             "folders",
         )
     elif scope_type == GCP_ORG_POLICY_SCOPE_ORGANIZATION:
         identifier = _normalize_hierarchy_id(
-            resource.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID)
-            or _path_segment(scope, "organizations")
-            or scope,
+            facts.organization_id or _path_segment(scope, "organizations") or scope,
             "organizations",
         )
     else:
@@ -191,7 +184,7 @@ def _policy_scope(resource: NormalizedResource) -> GcpOrgPolicyScopeKey | None:
 
 
 def _resource_scope_chain(resource: NormalizedResource) -> tuple[GcpOrgPolicyScopeKey, ...]:
-    facts = gcp_facts(resource)
+    facts = analysis_facts(resource).iam
     scopes: list[GcpOrgPolicyScopeKey] = []
     organization_id = _resource_organization_id(resource)
     folder_id = _resource_folder_id(resource)
@@ -232,7 +225,7 @@ def _effective_guardrails_for_scope_chain(
 
 
 def _resource_organization_id(resource: NormalizedResource) -> str | None:
-    facts = gcp_facts(resource)
+    facts = analysis_facts(resource).iam
     organization_id = _normalize_hierarchy_id(facts.organization_id, "organizations")
     if organization_id:
         return organization_id
@@ -244,7 +237,7 @@ def _resource_organization_id(resource: NormalizedResource) -> str | None:
 
 
 def _resource_folder_id(resource: NormalizedResource) -> str | None:
-    facts = gcp_facts(resource)
+    facts = analysis_facts(resource).iam
     folder_id = _normalize_hierarchy_id(facts.folder_id, "folders")
     if folder_id:
         return folder_id
@@ -264,7 +257,7 @@ def _project_from_resource(resource: NormalizedResource) -> str | None:
 
 
 def _scope_candidate_values(resource: NormalizedResource) -> tuple[str, ...]:
-    facts = gcp_facts(resource)
+    facts = analysis_facts(resource).iam
     values: list[str] = []
     for value in (resource.identifier, facts.resource_name):
         if value:
@@ -303,12 +296,6 @@ def _path_segment(value: object, marker: str) -> str | None:
     if value_index >= len(parts):
         return None
     return parts[value_index] or None
-
-
-def _optional_bool_metadata(resource: NormalizedResource, field: MetadataField[bool]) -> bool | None:
-    if not resource.has_metadata_value(field):
-        return None
-    return resource.get_metadata_field(field)
 
 
 def _freeze_guardrail_groups(

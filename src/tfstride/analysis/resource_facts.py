@@ -54,6 +54,22 @@ class AnalysisStorageFacts:
     def customer_managed_encryption(self) -> bool | None:
         return self._facts.customer_managed_encryption
 
+    @property
+    def gcs_retention_period_seconds(self) -> int | None:
+        return self._facts.gcs_retention_period_seconds
+
+    @property
+    def gcs_retention_policy_locked(self) -> bool | None:
+        return self._facts.gcs_retention_policy_locked
+
+    @property
+    def gcs_retention_policy_configuration(self) -> dict[str, Any]:
+        return self._facts.gcs_retention_policy_configuration
+
+    @property
+    def gcs_retention_policy_uncertainties(self) -> list[str]:
+        return self._facts.gcs_retention_policy_uncertainties
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIamFacts:
@@ -126,6 +142,66 @@ class AnalysisIamFacts:
     @property
     def member(self) -> str | None:
         return self._facts.iam_member
+
+    @property
+    def org_policy_constraint(self) -> str | None:
+        return self._facts.org_policy_constraint
+
+    @property
+    def org_policy_rules(self) -> list[dict[str, Any]]:
+        return self._facts.org_policy_rules
+
+    @property
+    def org_policy_allowed_values(self) -> list[str]:
+        return self._facts.org_policy_allowed_values
+
+    @property
+    def org_policy_denied_values(self) -> list[str]:
+        return self._facts.org_policy_denied_values
+
+    @property
+    def org_policy_enforced(self) -> bool | None:
+        return self._facts.org_policy_enforced
+
+    @property
+    def org_policy_inherit_from_parent(self) -> bool | None:
+        return self._facts.org_policy_inherit_from_parent
+
+    @property
+    def org_policy_restore_default(self) -> bool:
+        return self._facts.org_policy_restore_default
+
+    @property
+    def org_policy_scope_type(self) -> str | None:
+        return self._facts.org_policy_scope_type
+
+    @property
+    def org_policy_scope(self) -> str | None:
+        return self._facts.org_policy_scope
+
+    @property
+    def service_account_key_keepers(self) -> dict[str, Any]:
+        return self._facts.service_account_key_keepers
+
+    @property
+    def service_account_key_algorithm(self) -> str | None:
+        return self._facts.service_account_key_algorithm
+
+    @property
+    def service_account_public_key_type(self) -> str | None:
+        return self._facts.service_account_public_key_type
+
+    @property
+    def service_account_id(self) -> str | None:
+        return self._facts.service_account_id
+
+    @property
+    def service_account_key_valid_after(self) -> str | None:
+        return self._facts.service_account_key_valid_after
+
+    @property
+    def service_account_key_valid_before(self) -> str | None:
+        return self._facts.service_account_key_valid_before
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +276,162 @@ class AnalysisComputeFacts:
     @property
     def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
         return self._facts.load_balancer_reachable_backends
+
+    @property
+    def gke_endpoint(self) -> str | None:
+        return self._facts.gke_endpoint
+
+    @property
+    def gke_private_endpoint_enabled(self) -> bool | None:
+        return self._facts.gke_private_endpoint_enabled
+
+    @property
+    def gke_private_nodes_enabled(self) -> bool | None:
+        return self._facts.gke_private_nodes_enabled
+
+    @property
+    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
+        return self._facts.gke_master_authorized_networks
+
+    @property
+    def gke_workload_identity_enabled(self) -> bool | None:
+        return self._facts.gke_workload_identity_enabled
+
+    @property
+    def gke_workload_identity_pool(self) -> str | None:
+        return self._facts.gke_workload_identity_pool
+
+    @property
+    def gke_node_service_account(self) -> str | None:
+        return self._facts.gke_node_service_account
+
+    @property
+    def gke_node_oauth_scopes(self) -> list[str]:
+        return self._facts.gke_node_oauth_scopes
+
+    @property
+    def gke_node_metadata_mode(self) -> str | None:
+        return self._facts.gke_node_metadata_mode
+
+    @property
+    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
+        return self._facts.gke_legacy_metadata_endpoints_enabled
+
+    @property
+    def gke_logging_service(self) -> str | None:
+        return self._facts.gke_logging_service
+
+    @property
+    def gke_logging_components(self) -> list[str]:
+        return self._facts.gke_logging_components
+
+    @property
+    def gke_control_plane_logging_state(self) -> str | None:
+        return self._facts.gke_control_plane_logging_state
+
+    @property
+    def gke_logging_config(self) -> dict[str, Any]:
+        return self._facts.gke_logging_config
+
+    @property
+    def gke_network_policy_state(self) -> str | None:
+        return self._facts.gke_network_policy_state
+
+    @property
+    def gke_network_policy_provider(self) -> str | None:
+        return self._facts.gke_network_policy_provider
+
+    @property
+    def gke_network_policy(self) -> dict[str, Any]:
+        return self._facts.gke_network_policy
+
+    @property
+    def gke_database_encryption_state(self) -> str | None:
+        return self._facts.gke_database_encryption_state
+
+    @property
+    def gke_database_encryption_key_name(self) -> str | None:
+        return self._facts.gke_database_encryption_key_name
+
+    @property
+    def gke_secrets_encryption_state(self) -> str | None:
+        return self._facts.gke_secrets_encryption_state
+
+    @property
+    def gke_database_encryption(self) -> dict[str, Any]:
+        return self._facts.gke_database_encryption
+
+    @property
+    def gke_legacy_abac_enabled(self) -> bool | None:
+        return self._facts.gke_legacy_abac_enabled
+
+    @property
+    def gke_legacy_abac_state(self) -> str | None:
+        return self._facts.gke_legacy_abac_state
+
+    @property
+    def gke_client_certificate_auth_enabled(self) -> bool | None:
+        return self._facts.gke_client_certificate_auth_enabled
+
+    @property
+    def gke_client_certificate_auth_state(self) -> str | None:
+        return self._facts.gke_client_certificate_auth_state
+
+    @property
+    def gke_basic_auth_state(self) -> str | None:
+        return self._facts.gke_basic_auth_state
+
+    @property
+    def gke_basic_auth_username(self) -> str | None:
+        return self._facts.gke_basic_auth_username
+
+    @property
+    def gke_basic_auth_password_configured(self) -> bool | None:
+        return self._facts.gke_basic_auth_password_configured
+
+    @property
+    def gke_master_auth(self) -> dict[str, Any]:
+        return self._facts.gke_master_auth
+
+    @property
+    def gke_client_certificate_config(self) -> dict[str, Any]:
+        return self._facts.gke_client_certificate_config
+
+    @property
+    def gke_release_channel(self) -> str | None:
+        return self._facts.gke_release_channel
+
+    @property
+    def gke_release_channel_config(self) -> dict[str, Any]:
+        return self._facts.gke_release_channel_config
+
+    @property
+    def gke_shielded_nodes_enabled(self) -> bool | None:
+        return self._facts.gke_shielded_nodes_enabled
+
+    @property
+    def gke_shielded_nodes_state(self) -> str | None:
+        return self._facts.gke_shielded_nodes_state
+
+    @property
+    def gke_shielded_nodes_config(self) -> dict[str, Any]:
+        return self._facts.gke_shielded_nodes_config
+
+    @property
+    def gke_binary_authorization_evaluation_mode(self) -> str | None:
+        return self._facts.gke_binary_authorization_evaluation_mode
+
+    @property
+    def gke_binary_authorization_state(self) -> str | None:
+        return self._facts.gke_binary_authorization_state
+
+    @property
+    def gke_binary_authorization(self) -> dict[str, Any]:
+        return self._facts.gke_binary_authorization
+
+    @property
+    def gke_posture_uncertainties(self) -> list[str]:
+        return self._facts.gke_posture_uncertainties
 
 
 @dataclass(frozen=True, slots=True)

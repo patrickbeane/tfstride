@@ -12,16 +12,16 @@ from tfstride.analysis.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.analysis.gcp.resource_utils import binding_members
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
-from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_utils import binding_members
 
 _SENSITIVE_GCP_RESOURCE_TYPES = frozenset({"google_kms_crypto_key", "google_secret_manager_secret"})
 
@@ -38,8 +38,8 @@ class GcpSensitiveResourceIamDetectors:
         findings: list[Finding] = []
         seen: set[tuple[str, str, str]] = set()
         for resource in context.inventory.by_type(*_SENSITIVE_GCP_RESOURCE_TYPES):
-            resource_facts = gcp_facts(resource)
-            for binding in resource_facts.iam_bindings:
+            resource_facts = analysis_facts(resource).iam
+            for binding in resource_facts.bindings:
                 role = str(binding.get("role") or "unknown role")
                 if not _is_sensitive_gcp_resource_role(resource, role):
                     continue

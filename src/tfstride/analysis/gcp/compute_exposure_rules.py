@@ -6,12 +6,19 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
+from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
     ORG_POLICY_REQUIRE_OS_LOGIN,
     ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
 )
 from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.analysis.gcp.resource_types import (
+    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_GKE_RESOURCE_TYPES,
+)
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
     BoundaryType,
@@ -21,13 +28,6 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
-from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
-from tfstride.providers.gcp.constants import (
-    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
-    GCP_CLOUD_RUN_RESOURCE_TYPES,
-    GCP_GKE_RESOURCE_TYPES,
-)
-from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.resource_helpers import describe_security_group_rule
 
 _GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES = (
@@ -83,7 +83,7 @@ class GcpComputeExposureRuleDetectors:
                             "firewall_rules",
                             [describe_security_group_rule(firewall, rule) for firewall, rule in risky_rules],
                         ),
-                        evidence_item("network_tags", gcp_facts(instance).network_tags),
+                        evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                         organization_guardrail_evidence(
@@ -107,7 +107,7 @@ class GcpComputeExposureRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*_GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES):
-            resource_facts = gcp_facts(resource)
+            resource_facts = analysis_facts(resource).compute
             if not resource_facts.fronted_by_internet_facing_load_balancer:
                 continue
             frontends = resource_facts.load_balancer_frontends
@@ -147,7 +147,7 @@ class GcpComputeExposureRuleDetectors:
 
         findings: list[Finding] = []
         for instance in context.inventory.by_type("google_compute_instance"):
-            instance_facts = gcp_facts(instance)
+            instance_facts = analysis_facts(instance).compute
             if instance_facts.os_login_enabled is not False:
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -293,7 +293,7 @@ def _risky_public_firewall_rules(
     instance: NormalizedResource,
     inventory: ResourceInventory,
 ) -> list[tuple[NormalizedResource, SecurityGroupRule]]:
-    firewall_addresses = gcp_facts(instance).internet_ingress_firewalls
+    firewall_addresses = analysis_facts(instance).compute.internet_ingress_firewalls
     risky_rules: list[tuple[NormalizedResource, SecurityGroupRule]] = []
     for firewall_address in firewall_addresses:
         firewall = inventory.get_by_address(firewall_address)

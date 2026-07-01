@@ -177,6 +177,66 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.FOLDER_ID)
 
     @property
+    def org_policy_constraint(self) -> str | None:
+        return self.get(GcpResourceMetadata.ORG_POLICY_CONSTRAINT)
+
+    @property
+    def org_policy_rules(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.ORG_POLICY_RULES)
+
+    @property
+    def org_policy_allowed_values(self) -> list[str]:
+        return self.get(GcpResourceMetadata.ORG_POLICY_ALLOWED_VALUES)
+
+    @property
+    def org_policy_denied_values(self) -> list[str]:
+        return self.get(GcpResourceMetadata.ORG_POLICY_DENIED_VALUES)
+
+    @property
+    def org_policy_enforced(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.ORG_POLICY_ENFORCED)
+
+    @property
+    def org_policy_inherit_from_parent(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.ORG_POLICY_INHERIT_FROM_PARENT)
+
+    @property
+    def org_policy_restore_default(self) -> bool:
+        return self.get(GcpResourceMetadata.ORG_POLICY_RESTORE_DEFAULT)
+
+    @property
+    def org_policy_scope_type(self) -> str | None:
+        return self.get(GcpResourceMetadata.ORG_POLICY_SCOPE_TYPE)
+
+    @property
+    def org_policy_scope(self) -> str | None:
+        return self.get(GcpResourceMetadata.ORG_POLICY_SCOPE)
+
+    @property
+    def service_account_key_keepers(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS)
+
+    @property
+    def service_account_key_algorithm(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_ALGORITHM)
+
+    @property
+    def service_account_public_key_type(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_PUBLIC_KEY_TYPE)
+
+    @property
+    def service_account_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_ID)
+
+    @property
+    def service_account_key_valid_after(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_AFTER)
+
+    @property
+    def service_account_key_valid_before(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_VALID_BEFORE)
+
+    @property
     def engine(self) -> str | None:
         return self.get(GcpResourceMetadata.DATABASE_VERSION)
 

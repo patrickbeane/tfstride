@@ -44,6 +44,22 @@ class NeutralProviderStorageFacts:
     def customer_managed_encryption(self) -> bool | None:
         return None
 
+    @property
+    def gcs_retention_period_seconds(self) -> int | None:
+        return None
+
+    @property
+    def gcs_retention_policy_locked(self) -> bool | None:
+        return None
+
+    @property
+    def gcs_retention_policy_configuration(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gcs_retention_policy_uncertainties(self) -> list[str]:
+        return []
+
 
 class NeutralProviderIamFacts:
     """Neutral IAM facts for providers without IAM hierarchy signals."""
@@ -116,6 +132,66 @@ class NeutralProviderIamFacts:
 
     @property
     def iam_member(self) -> str | None:
+        return None
+
+    @property
+    def org_policy_constraint(self) -> str | None:
+        return None
+
+    @property
+    def org_policy_rules(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def org_policy_allowed_values(self) -> list[str]:
+        return []
+
+    @property
+    def org_policy_denied_values(self) -> list[str]:
+        return []
+
+    @property
+    def org_policy_enforced(self) -> bool | None:
+        return None
+
+    @property
+    def org_policy_inherit_from_parent(self) -> bool | None:
+        return None
+
+    @property
+    def org_policy_restore_default(self) -> bool:
+        return False
+
+    @property
+    def org_policy_scope_type(self) -> str | None:
+        return None
+
+    @property
+    def org_policy_scope(self) -> str | None:
+        return None
+
+    @property
+    def service_account_key_keepers(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def service_account_key_algorithm(self) -> str | None:
+        return None
+
+    @property
+    def service_account_public_key_type(self) -> str | None:
+        return None
+
+    @property
+    def service_account_id(self) -> str | None:
+        return None
+
+    @property
+    def service_account_key_valid_after(self) -> str | None:
+        return None
+
+    @property
+    def service_account_key_valid_before(self) -> str | None:
         return None
 
 
@@ -192,6 +268,162 @@ class NeutralProviderComputeFacts:
 
     @property
     def load_balancer_reachable_backends(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def gke_endpoint(self) -> str | None:
+        return None
+
+    @property
+    def gke_private_endpoint_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_private_nodes_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_master_authorized_networks(self) -> list[dict[str, Any]]:
+        return []
+
+    @property
+    def gke_workload_identity_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_workload_identity_pool(self) -> str | None:
+        return None
+
+    @property
+    def gke_node_service_account(self) -> str | None:
+        return None
+
+    @property
+    def gke_node_oauth_scopes(self) -> list[str]:
+        return []
+
+    @property
+    def gke_node_metadata_mode(self) -> str | None:
+        return None
+
+    @property
+    def gke_legacy_metadata_endpoints_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_logging_service(self) -> str | None:
+        return None
+
+    @property
+    def gke_logging_components(self) -> list[str]:
+        return []
+
+    @property
+    def gke_control_plane_logging_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_logging_config(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_network_policy_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_network_policy_provider(self) -> str | None:
+        return None
+
+    @property
+    def gke_network_policy(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_database_encryption_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_database_encryption_key_name(self) -> str | None:
+        return None
+
+    @property
+    def gke_secrets_encryption_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_database_encryption(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_legacy_abac_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_legacy_abac_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_client_certificate_auth_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_client_certificate_auth_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_basic_auth_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_basic_auth_username(self) -> str | None:
+        return None
+
+    @property
+    def gke_basic_auth_password_configured(self) -> bool | None:
+        return None
+
+    @property
+    def gke_master_auth(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_client_certificate_config(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_release_channel(self) -> str | None:
+        return None
+
+    @property
+    def gke_release_channel_config(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_shielded_nodes_enabled(self) -> bool | None:
+        return None
+
+    @property
+    def gke_shielded_nodes_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_shielded_nodes_config(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_binary_authorization_evaluation_mode(self) -> str | None:
+        return None
+
+    @property
+    def gke_binary_authorization_state(self) -> str | None:
+        return None
+
+    @property
+    def gke_binary_authorization(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def gke_posture_uncertainties(self) -> list[str]:
         return []
 
 
