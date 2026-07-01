@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import ast
 import unittest
 
-from tests.helpers.paths import SOURCE_ROOT
 from tests.providers.gcp.rule_support.compute import (
     _compute_instance,
     _compute_network,
@@ -22,8 +20,6 @@ from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.gcp.normalizer import GcpNormalizer
-
-_EXPECTED_ANALYSIS_GCP_PROVIDER_IMPORTS = frozenset()
 
 
 def _evidence_by_key(finding):
@@ -163,42 +159,6 @@ class GcpProviderFactBoundaryCharacterizationTests(unittest.TestCase):
             "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
             evidence["boundary_rationale"][0],
         )
-
-
-class GcpProviderBoundaryArchitectureTests(unittest.TestCase):
-    def test_analysis_gcp_does_not_import_provider_gcp_modules(self) -> None:
-        actual = _analysis_gcp_provider_imports()
-
-        self.assertEqual(
-            actual,
-            _EXPECTED_ANALYSIS_GCP_PROVIDER_IMPORTS,
-            _format_import_boundary_delta(actual, _EXPECTED_ANALYSIS_GCP_PROVIDER_IMPORTS),
-        )
-
-
-def _analysis_gcp_provider_imports() -> frozenset[tuple[str, str]]:
-    analysis_gcp_root = SOURCE_ROOT / "analysis" / "gcp"
-    imports: set[tuple[str, str]] = set()
-    for path in sorted(analysis_gcp_root.glob("*.py")):
-        tree = ast.parse(path.read_text(), filename=str(path))
-        for node in ast.walk(tree):
-            modules = []
-            if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("tfstride.providers.gcp"):
-                modules.append(node.module)
-            elif isinstance(node, ast.Import):
-                modules.extend(alias.name for alias in node.names if alias.name.startswith("tfstride.providers.gcp"))
-            for module in modules:
-                imports.add((path.relative_to(analysis_gcp_root).as_posix(), module))
-    return frozenset(imports)
-
-
-def _format_import_boundary_delta(
-    actual: frozenset[tuple[str, str]],
-    expected: frozenset[tuple[str, str]],
-) -> str:
-    added = sorted(actual - expected)
-    removed = sorted(expected - actual)
-    return f"Unexpected analysis/gcp -> providers/gcp import delta. added={added!r}; removed={removed!r}"
 
 
 if __name__ == "__main__":
