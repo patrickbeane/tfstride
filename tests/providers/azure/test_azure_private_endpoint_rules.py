@@ -119,6 +119,7 @@ def _private_endpoint(
     dns_group_name: str = "private-dns",
     subnet_id: str | None = None,
     unknown_dns_group: bool = False,
+    unknown_dns_zone_ids: bool = False,
     empty_dns_group: bool = False,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -134,9 +135,14 @@ def _private_endpoint(
     }
     if subnet_id is not None:
         values["subnet_id"] = subnet_id
-    if dns_zone_ids or empty_dns_group:
+    if dns_zone_ids or empty_dns_group or unknown_dns_zone_ids:
         values["private_dns_zone_group"] = [{"name": dns_group_name, "private_dns_zone_ids": list(dns_zone_ids)}]
-    unknown_values = {"private_dns_zone_group": True} if unknown_dns_group else None
+    if unknown_dns_group:
+        unknown_values = {"private_dns_zone_group": True}
+    elif unknown_dns_zone_ids:
+        unknown_values = {"private_dns_zone_group": [{"private_dns_zone_ids": True}]}
+    else:
+        unknown_values = None
     return _resource(
         AzureResourceType.PRIVATE_ENDPOINT,
         name,
@@ -374,6 +380,13 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
             evidence["private_endpoint_dns_posture"],
             ["azurerm_private_endpoint.logs_blob: no private_dns_zone_group blocks are represented"],
         )
+        self.assertEqual(
+            evidence["private_endpoint_dns_state"],
+            [
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_group_state=not_configured",
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_ids_state=not_configured",
+            ],
+        )
 
     def test_private_endpoint_unknown_dns_zone_group_is_detected(self) -> None:
         findings = _evaluate(
@@ -390,9 +403,17 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
         )
 
         self.assertEqual([finding.rule_id for finding in findings], ["azure-private-endpoint-dns-posture-incomplete"])
+        evidence = _evidence_by_key(findings[0])
         self.assertEqual(
-            _evidence_by_key(findings[0])["private_endpoint_dns_posture"],
+            evidence["private_endpoint_dns_posture"],
             ["azurerm_private_endpoint.vault: private_dns_zone_group is unknown after planning"],
+        )
+        self.assertEqual(
+            evidence["private_endpoint_dns_state"],
+            [
+                "azurerm_private_endpoint.vault: private_dns_zone_group_state=unknown",
+                "azurerm_private_endpoint.vault: private_dns_zone_ids_state=unknown",
+            ],
         )
 
     def test_private_endpoint_dns_zone_group_without_zone_ids_is_detected(self) -> None:
@@ -410,9 +431,47 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
         )
 
         self.assertEqual([finding.rule_id for finding in findings], ["azure-private-endpoint-dns-posture-incomplete"])
+        evidence = _evidence_by_key(findings[0])
         self.assertEqual(
-            _evidence_by_key(findings[0])["private_endpoint_dns_posture"],
+            evidence["private_endpoint_dns_posture"],
             ["azurerm_private_endpoint.logs_blob: private_dns_zone_group does not include private_dns_zone_ids"],
+        )
+        self.assertEqual(
+            evidence["private_endpoint_dns_state"],
+            [
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_group_state=configured",
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_ids_state=not_configured",
+            ],
+        )
+
+    def test_private_endpoint_dns_zone_ids_unknown_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _storage_account(public_network=False, default_action="Deny"),
+                _private_endpoint(
+                    "logs_blob",
+                    _STORAGE_ID,
+                    subresources=("blob",),
+                    unknown_dns_zone_ids=True,
+                ),
+            ],
+            "azure-private-endpoint-dns-posture-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-private-endpoint-dns-posture-incomplete"])
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["private_endpoint_dns_posture"],
+            [
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_group[0].private_dns_zone_ids is unknown after planning"
+            ],
+        )
+        self.assertEqual(
+            evidence["private_endpoint_dns_state"],
+            [
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_group_state=configured",
+                "azurerm_private_endpoint.logs_blob: private_dns_zone_ids_state=unknown",
+            ],
         )
 
     def test_private_endpoint_dns_zone_link_to_different_vnet_is_detected(self) -> None:
@@ -453,6 +512,13 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
             [
                 "azurerm_private_endpoint.sql: group_names=private-dns",
                 "azurerm_private_endpoint.sql: zone_ids=azurerm_private_dns_zone.sql.id",
+            ],
+        )
+        self.assertEqual(
+            evidence["private_endpoint_dns_state"],
+            [
+                "azurerm_private_endpoint.sql: private_dns_zone_group_state=configured",
+                "azurerm_private_endpoint.sql: private_dns_zone_ids_state=configured",
             ],
         )
         self.assertEqual(

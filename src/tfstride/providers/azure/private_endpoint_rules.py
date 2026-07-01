@@ -30,6 +30,9 @@ _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.KEY_VAULT,
     AzureResourceType.MSSQL_SERVER,
 )
+_STATE_CONFIGURED = "configured"
+_STATE_NOT_CONFIGURED = "not_configured"
+_STATE_UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +165,7 @@ class AzurePrivateEndpointPostureRuleDetectors:
                 continue
 
             posture_evidence: list[str] = []
+            dns_state_evidence: list[str] = []
             zone_group_evidence: list[str] = []
             link_evidence: list[str] = []
             endpoint_network_evidence: list[str] = []
@@ -169,7 +173,12 @@ class AzurePrivateEndpointPostureRuleDetectors:
 
             for connection in coverage.connections:
                 endpoint = endpoint_by_address.get(connection.private_endpoint_address)
-                connection_posture, connection_links, connection_network = _private_endpoint_dns_posture_evidence(
+                (
+                    connection_posture,
+                    connection_state,
+                    connection_links,
+                    connection_network,
+                ) = _private_endpoint_dns_posture_evidence(
                     connection,
                     endpoint,
                     links_by_zone_key,
@@ -179,6 +188,7 @@ class AzurePrivateEndpointPostureRuleDetectors:
                     continue
                 affected_resources.append(connection.private_endpoint_address)
                 posture_evidence.extend(connection_posture)
+                dns_state_evidence.extend(connection_state)
                 zone_group_evidence.extend(_private_dns_zone_group_evidence(connection))
                 link_evidence.extend(connection_links)
                 endpoint_network_evidence.extend(connection_network)
@@ -202,6 +212,7 @@ class AzurePrivateEndpointPostureRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(resource)),
                         evidence_item("private_endpoint_dns_posture", posture_evidence),
+                        evidence_item("private_endpoint_dns_state", dns_state_evidence),
                         evidence_item("private_dns_zone_groups", zone_group_evidence),
                         evidence_item("private_dns_zone_links", link_evidence),
                         evidence_item("endpoint_network", endpoint_network_evidence),
@@ -263,28 +274,11 @@ def _private_endpoint_dns_posture_evidence(
     endpoint: NormalizedResource | None,
     links_by_zone_key: Mapping[str, tuple[_PrivateDnsZoneLink, ...]],
     resource_by_reference: Mapping[str, NormalizedResource],
-) -> tuple[list[str], list[str], list[str]]:
-    posture: list[str] = []
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    posture = _private_dns_zone_state_posture(connection)
+    state_evidence = _private_dns_state_evidence(connection)
     link_evidence: list[str] = []
     network_evidence: list[str] = []
-    if (
-        not connection.private_dns_zone_group_names
-        and not connection.private_dns_zone_ids
-        and not connection.private_dns_zone_uncertainties
-    ):
-        posture.append(f"{connection.private_endpoint_address}: no private_dns_zone_group blocks are represented")
-    elif (
-        connection.private_dns_zone_group_names
-        and not connection.private_dns_zone_ids
-        and not connection.private_dns_zone_uncertainties
-    ):
-        posture.append(
-            f"{connection.private_endpoint_address}: private_dns_zone_group does not include private_dns_zone_ids"
-        )
-    posture.extend(
-        f"{connection.private_endpoint_address}: {uncertainty}"
-        for uncertainty in connection.private_dns_zone_uncertainties
-    )
 
     link_gap, modeled_links, endpoint_network = _private_dns_zone_link_gap_evidence(
         connection,
@@ -295,7 +289,59 @@ def _private_endpoint_dns_posture_evidence(
     posture.extend(link_gap)
     link_evidence.extend(modeled_links)
     network_evidence.extend(endpoint_network)
-    return posture, link_evidence, network_evidence
+    return posture, state_evidence, link_evidence, network_evidence
+
+
+def _private_dns_zone_state_posture(connection: AzurePrivateEndpointConnection) -> list[str]:
+    address = connection.private_endpoint_address
+    group_state = connection.private_dns_zone_group_state
+    zone_ids_state = connection.private_dns_zone_ids_state
+
+    if group_state == _STATE_NOT_CONFIGURED:
+        return [f"{address}: no private_dns_zone_group blocks are represented"]
+    if group_state == _STATE_UNKNOWN:
+        return _private_dns_uncertainty_posture(connection) or [f"{address}: private_dns_zone_group state is unknown"]
+    if zone_ids_state == _STATE_NOT_CONFIGURED:
+        return [f"{address}: private_dns_zone_group does not include private_dns_zone_ids"]
+    if zone_ids_state == _STATE_UNKNOWN:
+        return _private_dns_uncertainty_posture(connection) or [f"{address}: private_dns_zone_ids state is unknown"]
+
+    # Backward-compatible inference for manually constructed resources that predate the explicit DNS state facts.
+    if group_state is None and zone_ids_state is None:
+        return _legacy_private_dns_zone_posture(connection)
+    return _private_dns_uncertainty_posture(connection)
+
+
+def _legacy_private_dns_zone_posture(connection: AzurePrivateEndpointConnection) -> list[str]:
+    if (
+        not connection.private_dns_zone_group_names
+        and not connection.private_dns_zone_ids
+        and not connection.private_dns_zone_uncertainties
+    ):
+        return [f"{connection.private_endpoint_address}: no private_dns_zone_group blocks are represented"]
+    if (
+        connection.private_dns_zone_group_names
+        and not connection.private_dns_zone_ids
+        and not connection.private_dns_zone_uncertainties
+    ):
+        return [f"{connection.private_endpoint_address}: private_dns_zone_group does not include private_dns_zone_ids"]
+    return _private_dns_uncertainty_posture(connection)
+
+
+def _private_dns_uncertainty_posture(connection: AzurePrivateEndpointConnection) -> list[str]:
+    return [
+        f"{connection.private_endpoint_address}: {uncertainty}"
+        for uncertainty in connection.private_dns_zone_uncertainties
+    ]
+
+
+def _private_dns_state_evidence(connection: AzurePrivateEndpointConnection) -> list[str]:
+    return [
+        f"{connection.private_endpoint_address}: private_dns_zone_group_state="
+        f"{connection.private_dns_zone_group_state or 'unknown'}",
+        f"{connection.private_endpoint_address}: private_dns_zone_ids_state="
+        f"{connection.private_dns_zone_ids_state or 'unknown'}",
+    ]
 
 
 def _private_dns_zone_link_gap_evidence(
