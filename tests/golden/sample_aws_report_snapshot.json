@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 125,
+      "registered_rule_count": 128,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -140,6 +140,9 @@
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
         "azure-app-service-vnet-integration-missing",
+        "azure-app-service-access-restrictions-not-default-deny",
+        "azure-app-service-broad-access-restriction-allow",
+        "azure-app-service-scm-access-unrestricted",
         "azure-aks-api-server-public-unrestricted",
         "azure-aks-private-cluster-not-enabled",
         "azure-aks-local-accounts-not-disabled",
@@ -238,6 +241,8 @@
         "gcp-inherited-iam-sensitive-resource-access": 0,
         "gcp-inherited-iam-blast-radius": 0,
         "azure-public-compute-broad-ingress": 0,
+        "azure-load-balancer-public-frontend": 0,
+        "azure-application-gateway-public-listener": 0,
         "azure-storage-container-public-access": 0,
         "azure-storage-account-nested-public-access-enabled": 0,
         "azure-storage-account-shared-key-enabled": 0,
@@ -267,6 +272,9 @@
         "azure-app-service-minimum-tls-unknown": 0,
         "azure-app-service-managed-identity-missing": 0,
         "azure-app-service-vnet-integration-missing": 0,
+        "azure-app-service-access-restrictions-not-default-deny": 0,
+        "azure-app-service-broad-access-restriction-allow": 0,
+        "azure-app-service-scm-access-unrestricted": 0,
         "azure-aks-api-server-public-unrestricted": 0,
         "azure-aks-private-cluster-not-enabled": 0,
         "azure-aks-local-accounts-not-disabled": 0,
@@ -290,9 +298,7 @@
         "azure-postgresql-public-network-access-enabled": 0,
         "azure-postgresql-firewall-broad-public-access": 0,
         "azure-postgresql-weak-tls-or-ssl": 0,
-        "azure-postgresql-geo-backup-disabled": 0,
-        "azure-load-balancer-public-frontend": 0,
-        "azure-application-gateway-public-listener": 0
+        "azure-postgresql-geo-backup-disabled": 0
       }
     },
     "references": {

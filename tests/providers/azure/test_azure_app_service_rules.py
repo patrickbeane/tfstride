@@ -15,6 +15,9 @@ _APP_RULE_IDS = (
     "azure-app-service-minimum-tls-unknown",
     "azure-app-service-managed-identity-missing",
     "azure-app-service-vnet-integration-missing",
+    "azure-app-service-access-restrictions-not-default-deny",
+    "azure-app-service-broad-access-restriction-allow",
+    "azure-app-service-scm-access-unrestricted",
 )
 _MISSING = object()
 
@@ -45,6 +48,7 @@ def _app(
     tls_version: object = "1.2",
     identity: object = _MISSING,
     vnet_subnet: object = _MISSING,
+    site_config_overrides: dict[str, object] | None = None,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -55,8 +59,13 @@ def _app(
     }
     if public_network is not _MISSING:
         values["public_network_access_enabled"] = public_network
+    site_config: dict[str, object] = {}
     if tls_version is not _MISSING:
-        values["site_config"] = [{"minimum_tls_version": tls_version}]
+        site_config["minimum_tls_version"] = tls_version
+    if site_config_overrides:
+        site_config.update(site_config_overrides)
+    if site_config:
+        values["site_config"] = [site_config]
     if identity is not _MISSING:
         values["identity"] = identity
     if vnet_subnet is not _MISSING:
@@ -269,6 +278,221 @@ class AzureAppServiceVnetIntegrationRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+
+class AzureAppServiceAccessRestrictionRuleTests(unittest.TestCase):
+    def test_public_app_without_access_restrictions_emits_default_deny_finding(self) -> None:
+        findings = _evaluate(
+            [_app(public_network=True, identity=_system_identity())],
+            "azure-app-service-access-restrictions-not-default-deny",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-access-restrictions-not-default-deny"],
+        )
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["access_restrictions"],
+            ["ip_restriction_default_action is not represented", "ip_restriction_count=0"],
+        )
+
+    def test_public_app_with_default_allow_emits_default_deny_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={
+                        "ip_restriction_default_action": "Allow",
+                        "ip_restriction": [
+                            {
+                                "name": "office",
+                                "priority": 100,
+                                "action": "Allow",
+                                "ip_address": "203.0.113.0/24",
+                            }
+                        ],
+                    },
+                )
+            ],
+            "azure-app-service-access-restrictions-not-default-deny",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-access-restrictions-not-default-deny"],
+        )
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn("ip_restriction_default_action is Allow", evidence["access_restrictions"])
+        self.assertIn("ip_restriction_count=1", evidence["access_restrictions"])
+
+    def test_default_deny_with_narrow_allow_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={
+                        "ip_restriction_default_action": "Deny",
+                        "ip_restriction": [
+                            {
+                                "name": "office",
+                                "priority": 100,
+                                "action": "Allow",
+                                "ip_address": "203.0.113.0/24",
+                            }
+                        ],
+                        "scm_use_main_ip_restriction": True,
+                    },
+                )
+            ],
+            "azure-app-service-access-restrictions-not-default-deny",
+            "azure-app-service-broad-access-restriction-allow",
+            "azure-app-service-scm-access-unrestricted",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_private_app_without_access_restrictions_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [_app(public_network=False, identity=_system_identity())],
+            "azure-app-service-access-restrictions-not-default-deny",
+            "azure-app-service-broad-access-restriction-allow",
+            "azure-app-service-scm-access-unrestricted",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_broad_main_site_allow_rule_emits_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={
+                        "ip_restriction_default_action": "Deny",
+                        "ip_restriction": [
+                            {
+                                "name": "internet",
+                                "priority": 100,
+                                "action": "Allow",
+                                "ip_address": "0.0.0.0/0",
+                            }
+                        ],
+                    },
+                )
+            ],
+            "azure-app-service-broad-access-restriction-allow",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-broad-access-restriction-allow"],
+        )
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["broad_allow_rules"],
+            ["rule name=internet action=Allow priority=100 ip_address=0.0.0.0/0 broad_sources=[ip_address=0.0.0.0/0]"],
+        )
+
+    def test_broad_service_tag_allow_rule_emits_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={
+                        "ip_restriction_default_action": "Deny",
+                        "ip_restriction": [
+                            {
+                                "name": "internet-tag",
+                                "priority": 100,
+                                "action": "Allow",
+                                "service_tag": "Internet",
+                            }
+                        ],
+                    },
+                )
+            ],
+            "azure-app-service-broad-access-restriction-allow",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-broad-access-restriction-allow"],
+        )
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["broad_allow_rules"],
+            [
+                "rule name=internet-tag action=Allow priority=100 service_tag=Internet broad_sources=[service_tag=Internet]"
+            ],
+        )
+
+    def test_scm_unrestricted_when_main_restrictions_are_not_inherited_and_scm_rules_absent(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={"scm_use_main_ip_restriction": False},
+                )
+            ],
+            "azure-app-service-scm-access-unrestricted",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-scm-access-unrestricted"],
+        )
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["scm_access_posture"],
+            ["scm_use_main_ip_restriction is false", "scm access restrictions are not configured"],
+        )
+
+    def test_scm_broad_allow_rule_emits_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    identity=_system_identity(),
+                    site_config_overrides={
+                        "scm_ip_restriction_default_action": "Deny",
+                        "scm_ip_restriction": [
+                            {
+                                "name": "any-scm",
+                                "priority": 100,
+                                "action": "Allow",
+                                "ip_address": "0.0.0.0/0",
+                            }
+                        ],
+                    },
+                )
+            ],
+            "azure-app-service-scm-access-unrestricted",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-scm-access-unrestricted"],
+        )
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["scm_access_posture"],
+            ["SCM access restriction includes a broad allow rule"],
+        )
+        self.assertIn(
+            "rule name=any-scm action=Allow priority=100 ip_address=0.0.0.0/0 broad_sources=[ip_address=0.0.0.0/0]",
+            evidence["scm_access_restrictions"],
+        )
 
 
 class AzureAppServiceManagedIdentityRuleTests(unittest.TestCase):

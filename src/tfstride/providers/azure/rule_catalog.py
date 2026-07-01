@@ -359,6 +359,39 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-access-restrictions-not-default-deny",
+        title="Azure App Service access restrictions are not default deny",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set the App Service `ip_restriction_default_action` to `Deny` and allow only reviewed client "
+            "CIDRs, service tags, or subnet-based paths when the app intentionally keeps public network access."
+        ),
+        tags=("azure", "app-service", "function-app", "access-restrictions", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-broad-access-restriction-allow",
+        title="Azure App Service access restriction allows broad public sources",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Replace broad App Service allow rules with narrow trusted CIDRs, service tags, or subnet-backed "
+            "access paths, and keep the default action set to `Deny`."
+        ),
+        tags=("azure", "app-service", "function-app", "access-restrictions", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-scm-access-unrestricted",
+        title="Azure App Service SCM endpoint access is unrestricted",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Restrict SCM/Kudu access with explicit SCM access restrictions or inherit a default-deny main-site "
+            "restriction set, and keep deployment operations behind trusted networks or private build agents."
+        ),
+        tags=("azure", "app-service", "function-app", "scm", "kudu", "access-restrictions"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-aks-api-server-public-unrestricted",
         title="AKS control plane is public without narrow authorized IP ranges",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

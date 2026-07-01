@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
@@ -8,6 +10,7 @@ from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_DISA
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES
 from tfstride.providers.azure.resource_utils import tls_version_below_1_2
+from tfstride.providers.kubernetes import is_broad_public_range
 
 
 class AzureAppServiceRuleDetectors:
@@ -227,6 +230,152 @@ class AzureAppServiceRuleDetectors:
             )
         return findings
 
+    def detect_access_restrictions_not_default_deny(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            if not _public_network_fallback_may_allow_access(facts):
+                continue
+            if not _main_site_access_restrictions_are_not_default_deny(facts):
+                continue
+            public_enabled = facts.public_network_access_enabled is True
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=public_enabled,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} has a public App Service endpoint but does not configure a "
+                        "deterministic default-deny access restriction posture for the main site. Public app "
+                        "traffic may reach the workload unless another front-door control blocks it."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                        evidence_item("access_restrictions", _main_access_restriction_evidence(facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _access_restriction_uncertainty_evidence(facts, ("ip_restriction",)),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_broad_access_restriction_allow(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            if not _public_network_fallback_may_allow_access(facts):
+                continue
+            broad_rules = _broad_allow_records(facts.app_service_access_restrictions)
+            if not broad_rules:
+                continue
+            public_enabled = facts.public_network_access_enabled is True
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=public_enabled,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} has an App Service access restriction allow rule with a broad "
+                        "public source. The rule does not narrow internet-origin traffic to trusted clients."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                        evidence_item("access_restrictions", _main_access_restriction_evidence(facts)),
+                        evidence_item("broad_allow_rules", _restriction_records_evidence(broad_rules)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_scm_access_unrestricted(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            if not _public_network_fallback_may_allow_access(facts):
+                continue
+            scm_posture = _scm_unrestricted_posture_evidence(facts)
+            if not scm_posture:
+                continue
+            public_enabled = facts.public_network_access_enabled is True
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=public_enabled,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} does not configure deterministic SCM/Kudu access restrictions. "
+                        "The deployment endpoint can expose privileged application management operations if it "
+                        "remains reachable from public networks."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                        evidence_item("scm_access_posture", scm_posture),
+                        evidence_item("scm_access_restrictions", _scm_access_restriction_evidence(facts)),
+                        evidence_item(
+                            "posture_uncertainty",
+                            _access_restriction_uncertainty_evidence(
+                                facts,
+                                ("scm_ip_restriction", "scm_use_main_ip_restriction"),
+                            ),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 def _target_resource_evidence(app) -> list[str]:
     return [f"address={app.address}", f"type={app.resource_type}"]
@@ -287,3 +436,143 @@ def _vnet_integration_evidence(facts: AzureResourceFacts) -> list[str]:
 
 def _vnet_integration_is_unknown(facts: AzureResourceFacts) -> bool:
     return any("virtual_network_subnet_id" in uncertainty for uncertainty in facts.app_service_posture_uncertainties)
+
+
+def _public_network_fallback_may_allow_access(facts: AzureResourceFacts) -> bool:
+    return facts.public_network_fallback_state != PUBLIC_NETWORK_FALLBACK_DISABLED
+
+
+def _main_site_access_restrictions_are_not_default_deny(facts: AzureResourceFacts) -> bool:
+    default_action = facts.app_service_ip_restriction_default_action
+    if _default_action_is_deny(default_action):
+        return False
+    if _default_action_is_allow(default_action):
+        return True
+    return not facts.app_service_access_restrictions
+
+
+def _main_access_restriction_evidence(facts: AzureResourceFacts) -> list[str]:
+    values = _access_restriction_default_action_evidence(
+        "ip_restriction_default_action",
+        facts.app_service_ip_restriction_default_action,
+    )
+    values.append(f"ip_restriction_count={len(facts.app_service_access_restrictions)}")
+    values.extend(_restriction_records_evidence(facts.app_service_access_restrictions))
+    return values
+
+
+def _scm_access_restriction_evidence(facts: AzureResourceFacts) -> list[str]:
+    values: list[str] = []
+    if facts.app_service_scm_use_main_ip_restriction is True:
+        values.append("scm_use_main_ip_restriction is true")
+    elif facts.app_service_scm_use_main_ip_restriction is False:
+        values.append("scm_use_main_ip_restriction is false")
+    else:
+        values.append("scm_use_main_ip_restriction is not represented")
+    values.extend(
+        _access_restriction_default_action_evidence(
+            "scm_ip_restriction_default_action",
+            facts.app_service_scm_ip_restriction_default_action,
+        )
+    )
+    values.append(f"scm_ip_restriction_count={len(facts.app_service_scm_access_restrictions)}")
+    values.extend(_restriction_records_evidence(facts.app_service_scm_access_restrictions))
+    return values
+
+
+def _access_restriction_default_action_evidence(field_name: str, default_action: str | None) -> list[str]:
+    if default_action:
+        return [f"{field_name} is {default_action}"]
+    return [f"{field_name} is not represented"]
+
+
+def _scm_unrestricted_posture_evidence(facts: AzureResourceFacts) -> list[str]:
+    if facts.app_service_scm_use_main_ip_restriction is True:
+        if _broad_allow_records(facts.app_service_access_restrictions):
+            return ["SCM inherits a broad main-site allow rule"]
+        if _main_site_access_restrictions_are_not_default_deny(facts):
+            return ["SCM inherits main-site restrictions that are not default-deny"]
+        return []
+
+    broad_scm_rules = _broad_allow_records(facts.app_service_scm_access_restrictions)
+    if broad_scm_rules:
+        return ["SCM access restriction includes a broad allow rule"]
+
+    scm_default_action = facts.app_service_scm_ip_restriction_default_action
+    if _default_action_is_allow(scm_default_action):
+        return ["scm_ip_restriction_default_action is Allow"]
+    if _default_action_is_deny(scm_default_action):
+        return []
+
+    if facts.app_service_scm_use_main_ip_restriction is False and not facts.app_service_scm_access_restrictions:
+        return ["scm_use_main_ip_restriction is false", "scm access restrictions are not configured"]
+
+    return []
+
+
+def _broad_allow_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    broad_records: list[dict[str, object]] = []
+    for record in records:
+        action = str(record.get("action") or "").strip().lower()
+        if action != "allow":
+            continue
+        if _broad_sources(record):
+            broad_records.append(record)
+    return broad_records
+
+
+def _broad_sources(record: Mapping[str, object]) -> list[str]:
+    broad_sources: list[str] = []
+    for key in ("ip_address", "service_tag"):
+        value = record.get(key)
+        if is_broad_public_range(value):
+            broad_sources.append(f"{key}={value}")
+    return broad_sources
+
+
+def _restriction_records_evidence(records: list[dict[str, object]]) -> list[str]:
+    return [_restriction_record_evidence(record) for record in records]
+
+
+def _restriction_record_evidence(record: Mapping[str, object]) -> str:
+    parts: list[str] = []
+    for key in (
+        "name",
+        "action",
+        "priority",
+        "ip_address",
+        "service_tag",
+        "virtual_network_subnet_id",
+        "description",
+    ):
+        value = record.get(key)
+        if value not in (None, "", []):
+            parts.append(f"{key}={value}")
+    broad_sources = _broad_sources(record)
+    if broad_sources:
+        joined_sources = ", ".join(broad_sources)
+        parts.append(f"broad_sources=[{joined_sources}]")
+    unknown_fields = record.get("unknown_fields")
+    if isinstance(unknown_fields, list) and unknown_fields:
+        joined_unknown_fields = ", ".join(str(field) for field in unknown_fields)
+        parts.append(f"unknown_fields=[{joined_unknown_fields}]")
+    return "rule " + " ".join(parts) if parts else "rule has no deterministic fields"
+
+
+def _access_restriction_uncertainty_evidence(
+    facts: AzureResourceFacts,
+    field_markers: tuple[str, ...],
+) -> list[str]:
+    return [
+        uncertainty
+        for uncertainty in facts.app_service_posture_uncertainties
+        if any(marker in uncertainty for marker in field_markers)
+    ]
+
+
+def _default_action_is_allow(default_action: str | None) -> bool:
+    return bool(default_action and default_action.strip().lower() == "allow")
+
+
+def _default_action_is_deny(default_action: str | None) -> bool:
+    return bool(default_action and default_action.strip().lower() == "deny")

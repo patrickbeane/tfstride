@@ -55,6 +55,9 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
         "azure-app-service-vnet-integration-missing",
+        "azure-app-service-access-restrictions-not-default-deny",
+        "azure-app-service-broad-access-restriction-allow",
+        "azure-app-service-scm-access-unrestricted",
         "azure-aks-api-server-public-unrestricted",
         "azure-aks-private-cluster-not-enabled",
         "azure-aks-local-accounts-not-disabled",
@@ -150,6 +153,13 @@ def build_azure_rule_contribution(
         "azure-app-service-minimum-tls-unknown": app_service_detectors.detect_minimum_tls_unknown,
         "azure-app-service-managed-identity-missing": app_service_detectors.detect_managed_identity_missing,
         "azure-app-service-vnet-integration-missing": app_service_detectors.detect_vnet_integration_missing,
+        "azure-app-service-access-restrictions-not-default-deny": (
+            app_service_detectors.detect_access_restrictions_not_default_deny
+        ),
+        "azure-app-service-broad-access-restriction-allow": (
+            app_service_detectors.detect_broad_access_restriction_allow
+        ),
+        "azure-app-service-scm-access-unrestricted": app_service_detectors.detect_scm_access_unrestricted,
         "azure-aks-api-server-public-unrestricted": aks_detectors.detect_public_api_server_unrestricted,
         "azure-aks-private-cluster-not-enabled": aks_detectors.detect_private_cluster_not_enabled,
         "azure-aks-local-accounts-not-disabled": aks_detectors.detect_local_accounts_not_disabled,
