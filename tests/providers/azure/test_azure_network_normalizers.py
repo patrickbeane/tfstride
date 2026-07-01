@@ -4,6 +4,8 @@ import unittest
 
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.azure.network_normalizers import (
+    normalize_application_gateway,
+    normalize_load_balancer,
     normalize_network_interface,
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
@@ -168,6 +170,177 @@ class AzureNetworkNormalizerTests(unittest.TestCase):
         self.assertTrue(network_interface.public_access_configured)
         self.assertEqual(public_ip.category, ResourceCategory.EDGE)
         self.assertEqual(azure_facts(public_ip).public_ip_address, "203.0.113.10")
+
+    def test_load_balancer_normalizes_public_frontend_exposure(self) -> None:
+        load_balancer = normalize_load_balancer(
+            _resource(
+                AzureResourceType.LOAD_BALANCER,
+                {
+                    "id": "/subscriptions/example/loadBalancers/public-web",
+                    "name": "public-web",
+                    "location": "eastus",
+                    "sku": "Standard",
+                    "frontend_ip_configuration": [
+                        {
+                            "name": "public",
+                            "public_ip_address_id": "azurerm_public_ip.web.id",
+                        }
+                    ],
+                },
+                name="public_web",
+            )
+        )
+        facts = azure_facts(load_balancer)
+
+        self.assertEqual(load_balancer.category, ResourceCategory.NETWORK)
+        self.assertTrue(load_balancer.public_access_configured)
+        self.assertEqual(facts.load_balancer_id, "/subscriptions/example/loadBalancers/public-web")
+        self.assertEqual(facts.load_balancer_sku, "Standard")
+        self.assertEqual(facts.load_balancer_exposure_state, "public")
+        self.assertEqual(facts.load_balancer_public_ip_references, ["azurerm_public_ip.web.id"])
+        self.assertEqual(
+            facts.load_balancer_frontends,
+            [{"name": "public", "public_ip_address_id": "azurerm_public_ip.web.id"}],
+        )
+
+    def test_load_balancer_normalizes_private_frontend_exposure(self) -> None:
+        load_balancer = normalize_load_balancer(
+            _resource(
+                AzureResourceType.LOAD_BALANCER,
+                {
+                    "name": "internal-web",
+                    "sku": [{"name": "Standard"}],
+                    "frontend_ip_configuration": [
+                        {
+                            "name": "private",
+                            "subnet_id": "azurerm_subnet.app.id",
+                            "private_ip_address": "10.0.1.20",
+                        }
+                    ],
+                },
+                name="internal_web",
+            )
+        )
+        facts = azure_facts(load_balancer)
+
+        self.assertFalse(load_balancer.public_access_configured)
+        self.assertEqual(load_balancer.subnet_ids, ("azurerm_subnet.app.id",))
+        self.assertEqual(facts.load_balancer_exposure_state, "private")
+        self.assertEqual(facts.load_balancer_subnet_references, ["azurerm_subnet.app.id"])
+        self.assertEqual(facts.load_balancer_private_ip_addresses, ["10.0.1.20"])
+
+    def test_load_balancer_preserves_unknown_frontend_values(self) -> None:
+        load_balancer = normalize_load_balancer(
+            _resource(
+                AzureResourceType.LOAD_BALANCER,
+                {
+                    "name": "pending",
+                    "frontend_ip_configuration": [{"name": "pending"}],
+                },
+                name="pending",
+                unknown_values={
+                    "id": True,
+                    "frontend_ip_configuration": [{"public_ip_address_id": True}],
+                },
+            )
+        )
+        facts = azure_facts(load_balancer)
+
+        self.assertFalse(load_balancer.public_access_configured)
+        self.assertEqual(facts.load_balancer_exposure_state, "unknown")
+        self.assertEqual(
+            facts.load_balancer_posture_uncertainties,
+            [
+                "id is unknown after planning",
+                "frontend_ip_configuration[0].public_ip_address_id is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            facts.load_balancer_frontends, [{"name": "pending", "unknown_fields": ["public_ip_address_id"]}]
+        )
+
+    def test_application_gateway_normalizes_public_frontend_and_listener_evidence(self) -> None:
+        gateway = normalize_application_gateway(
+            _resource(
+                AzureResourceType.APPLICATION_GATEWAY,
+                {
+                    "id": "/subscriptions/example/applicationGateways/web",
+                    "name": "web",
+                    "sku": [{"name": "WAF_v2", "tier": "WAF_v2"}],
+                    "frontend_ip_configuration": [
+                        {
+                            "name": "public",
+                            "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                        }
+                    ],
+                    "http_listener": [
+                        {
+                            "name": "https",
+                            "frontend_ip_configuration_name": "public",
+                            "frontend_port_name": "https",
+                            "protocol": "Https",
+                            "host_names": ["app.example.com"],
+                        }
+                    ],
+                    "request_routing_rule": [
+                        {
+                            "name": "default",
+                            "rule_type": "Basic",
+                            "http_listener_name": "https",
+                            "backend_address_pool_name": "app",
+                            "backend_http_settings_name": "https",
+                            "priority": 100,
+                        }
+                    ],
+                },
+                name="web",
+            )
+        )
+        facts = azure_facts(gateway)
+
+        self.assertTrue(gateway.public_access_configured)
+        self.assertEqual(facts.application_gateway_id, "/subscriptions/example/applicationGateways/web")
+        self.assertEqual(facts.application_gateway_sku, "WAF_v2")
+        self.assertEqual(facts.application_gateway_exposure_state, "public")
+        self.assertEqual(facts.application_gateway_public_ip_references, ["azurerm_public_ip.gateway.id"])
+        self.assertEqual(
+            facts.application_gateway_http_listeners,
+            [
+                {
+                    "name": "https",
+                    "frontend_ip_configuration_name": "public",
+                    "frontend_port_name": "https",
+                    "protocol": "Https",
+                    "host_names": ["app.example.com"],
+                }
+            ],
+        )
+        self.assertEqual(facts.application_gateway_routing_rules[0]["priority"], "100")
+
+    def test_application_gateway_normalizes_private_frontend_exposure(self) -> None:
+        gateway = normalize_application_gateway(
+            _resource(
+                AzureResourceType.APPLICATION_GATEWAY,
+                {
+                    "name": "internal",
+                    "frontend_ip_configuration": [
+                        {
+                            "name": "private",
+                            "subnet_id": "azurerm_subnet.gateway.id",
+                            "private_ip_address": "10.0.2.10",
+                        }
+                    ],
+                },
+                name="internal",
+            )
+        )
+        facts = azure_facts(gateway)
+
+        self.assertFalse(gateway.public_access_configured)
+        self.assertEqual(gateway.subnet_ids, ("azurerm_subnet.gateway.id",))
+        self.assertEqual(facts.application_gateway_exposure_state, "private")
+        self.assertEqual(facts.application_gateway_subnet_references, ["azurerm_subnet.gateway.id"])
+        self.assertEqual(facts.application_gateway_private_ip_addresses, ["10.0.2.10"])
 
     def test_private_dns_zone_normalizes_zone_identity(self) -> None:
         zone = normalize_private_dns_zone(

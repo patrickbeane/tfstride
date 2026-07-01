@@ -62,6 +62,82 @@ class AzureNetworkFacts:
         return self.get(AzureResourceMetadata.PUBLIC_IP_ADDRESS)
 
     @property
+    def load_balancer_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_ID)
+
+    @property
+    def load_balancer_sku(self) -> str | None:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_SKU)
+
+    @property
+    def load_balancer_exposure_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_EXPOSURE_STATE)
+
+    @property
+    def load_balancer_public_ip_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_PUBLIC_IP_REFERENCES)
+
+    @property
+    def load_balancer_public_ip_prefix_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_PUBLIC_IP_PREFIX_REFERENCES)
+
+    @property
+    def load_balancer_subnet_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_SUBNET_REFERENCES)
+
+    @property
+    def load_balancer_private_ip_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_PRIVATE_IP_ADDRESSES)
+
+    @property
+    def load_balancer_frontends(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_FRONTENDS)
+
+    @property
+    def load_balancer_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.LOAD_BALANCER_POSTURE_UNCERTAINTIES)
+
+    @property
+    def application_gateway_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_ID)
+
+    @property
+    def application_gateway_sku(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_SKU)
+
+    @property
+    def application_gateway_exposure_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_EXPOSURE_STATE)
+
+    @property
+    def application_gateway_public_ip_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_PUBLIC_IP_REFERENCES)
+
+    @property
+    def application_gateway_subnet_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_SUBNET_REFERENCES)
+
+    @property
+    def application_gateway_private_ip_addresses(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_PRIVATE_IP_ADDRESSES)
+
+    @property
+    def application_gateway_frontends(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_FRONTENDS)
+
+    @property
+    def application_gateway_http_listeners(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_HTTP_LISTENERS)
+
+    @property
+    def application_gateway_routing_rules(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_ROUTING_RULES)
+
+    @property
+    def application_gateway_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_POSTURE_UNCERTAINTIES)
+
+    @property
     def private_dns_zone_id(self) -> str | None:
         return self.get(AzureResourceMetadata.PRIVATE_DNS_ZONE_ID)
 

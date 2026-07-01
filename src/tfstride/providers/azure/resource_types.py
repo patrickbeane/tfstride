@@ -25,6 +25,8 @@ class AzureResourceType:
     NETWORK_INTERFACE = "azurerm_network_interface"
     NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION = "azurerm_network_interface_security_group_association"
     PUBLIC_IP = "azurerm_public_ip"
+    LOAD_BALANCER = "azurerm_lb"
+    APPLICATION_GATEWAY = "azurerm_application_gateway"
     PRIVATE_ENDPOINT = "azurerm_private_endpoint"
     PRIVATE_DNS_ZONE = "azurerm_private_dns_zone"
     PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK = "azurerm_private_dns_zone_virtual_network_link"
@@ -79,6 +81,8 @@ AZURE_NETWORK_RESOURCE_TYPES = frozenset(
         AzureResourceType.NETWORK_INTERFACE,
         AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION,
         AzureResourceType.PUBLIC_IP,
+        AzureResourceType.LOAD_BALANCER,
+        AzureResourceType.APPLICATION_GATEWAY,
         AzureResourceType.PRIVATE_ENDPOINT,
         AzureResourceType.PRIVATE_DNS_ZONE,
         AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK,

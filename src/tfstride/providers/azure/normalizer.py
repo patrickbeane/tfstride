@@ -41,6 +41,8 @@ from tfstride.providers.azure.mssql_normalizers import (
     normalize_mssql_virtual_network_rule,
 )
 from tfstride.providers.azure.network_normalizers import (
+    normalize_application_gateway,
+    normalize_load_balancer,
     normalize_network_interface,
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
@@ -86,6 +88,8 @@ _AZURE_RESOURCE_NORMALIZERS = {
         normalize_network_interface_security_group_association
     ),
     AzureResourceType.PUBLIC_IP: normalize_public_ip,
+    AzureResourceType.LOAD_BALANCER: normalize_load_balancer,
+    AzureResourceType.APPLICATION_GATEWAY: normalize_application_gateway,
     AzureResourceType.PRIVATE_ENDPOINT: normalize_private_endpoint,
     AzureResourceType.PRIVATE_DNS_ZONE: normalize_private_dns_zone,
     AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK: normalize_private_dns_zone_virtual_network_link,
