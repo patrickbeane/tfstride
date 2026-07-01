@@ -32,8 +32,11 @@ from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.azure.normalizer import AzureNormalizer
+from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
 GCP_GKE_RULE_IDS = (
     "gcp-gke-public-control-plane",
@@ -93,12 +96,21 @@ SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS = {
         "azure": frozenset({"azure-aks-network-policy-missing"}),
     },
 }
+SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER = {
+    provider: frozenset(
+        rule_id
+        for provider_expectations in SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS.values()
+        for rule_id in provider_expectations[provider]
+    )
+    for provider in ("aws", "gcp", "azure")
+}
 SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS = frozenset(
-    rule_id
-    for provider_expectations in SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS.values()
-    for rule_ids in provider_expectations.values()
-    for rule_id in rule_ids
+    rule_id for rule_ids in SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER.values() for rule_id in rule_ids
 )
+
+
+def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> frozenset[str]:
+    return frozenset(rule_id for rule_group in rule_groups for rule_id in rule_group)
 
 
 def _evaluate_aws(resources: list[TerraformResource], rule_ids=ALL_MANAGED_KUBERNETES_RULE_IDS):
@@ -260,6 +272,15 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
         self.assertEqual(gcp_findings, [])
         self.assertEqual(azure_findings, [])
 
+    def test_managed_kubernetes_second_tier_rule_families_are_registered(self) -> None:
+        self.assertLessEqual(SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS, ALL_MANAGED_KUBERNETES_RULE_IDS)
+        self.assertLessEqual(SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER["aws"], _flatten(AWS_RULE_GROUP_IDS))
+        self.assertLessEqual(SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER["gcp"], _flatten(GCP_RULE_GROUP_IDS))
+        self.assertLessEqual(
+            SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER["azure"],
+            _flatten(AZURE_RULE_GROUP_IDS),
+        )
+
     def test_managed_kubernetes_provider_specific_controls_are_preserved(self) -> None:
         aws_private_endpoint_findings = _evaluate_aws(
             [
@@ -360,6 +381,7 @@ class ManagedKubernetesPostureParityTests(unittest.TestCase):
             "gcp": _finding_ids(gcp_findings),
             "azure": _finding_ids(azure_findings),
         }
+        self.assertEqual(findings_by_provider, SECOND_TIER_MANAGED_KUBERNETES_RULE_IDS_BY_PROVIDER)
         for concept, provider_expectations in SECOND_TIER_MANAGED_KUBERNETES_CONCEPT_RULE_IDS.items():
             for provider, expected_rule_ids in provider_expectations.items():
                 with self.subTest(concept=concept, provider=provider):
