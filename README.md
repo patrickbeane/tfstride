@@ -107,7 +107,7 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption posture, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
 | GCP      | Active support  | Compute, GKE control-plane/auth/hardening posture, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS control-plane/auth/add-on posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
+| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL recovery and exposure posture, App Service/Function Apps access posture, AKS control-plane/auth/add-on posture, Load Balancer/Application Gateway exposure, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -227,6 +227,10 @@ Azure support currently includes normalization, decoration, and analysis for Azu
 * `azurerm_network_interface`
 * `azurerm_network_interface_security_group_association`
 * `azurerm_public_ip`
+* `azurerm_lb`
+* `azurerm_application_gateway`
+* `azurerm_private_dns_zone`
+* `azurerm_private_dns_zone_virtual_network_link`
 * `azurerm_linux_virtual_machine`
 * `azurerm_windows_virtual_machine`
 * `azurerm_private_endpoint`
@@ -250,9 +254,9 @@ AzureRM provider detection uses provider source paths ending in `/azurerm` and T
 
 Azure trust-boundary coverage includes public storage and Key Vault endpoints plus virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
 
-Azure rule coverage includes public storage posture, Key Vault network/recovery/authorization posture, SQL and PostgreSQL public access and transport hardening, App Service public access/TLS/managed-identity/VNet-integration posture, Private Endpoint coverage and public fallback for supported data-plane resources, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, AKS control-plane, auth, network-policy, workload-identity, KMS, monitoring, Defender, and Azure Policy posture, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
+Azure rule coverage includes public storage posture, Key Vault network/recovery/authorization posture, SQL and PostgreSQL public access, recovery, and transport hardening, App Service public access, TLS, managed-identity, VNet-integration, access-restriction, and SCM posture, Private Endpoint coverage, DNS posture, and public fallback for supported data-plane resources, Load Balancer and Application Gateway public exposure, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, AKS control-plane, auth, network-policy, workload-identity, KMS, monitoring, Defender, and Azure Policy posture, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
 
-Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage and public-fallback posture for supported Storage, Key Vault, and SQL resources. AKS support covers public/private API posture, authorized IP restrictions, local account usage, RBAC posture, network policy posture, workload identity/OIDC, KMS, monitoring, Defender, and Azure Policy signals when represented in the plan. Private Endpoint DNS correctness, load balancers, deeper AKS workload/node posture, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
+Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage, DNS-zone-group posture, and public-fallback posture for supported Storage, Key Vault, and SQL resources. AKS support covers public/private API posture, authorized IP restrictions, local account usage, RBAC posture, network policy posture, workload identity/OIDC, KMS, monitoring, Defender, and Azure Policy signals when represented in the plan. Deeper AKS workload/node posture, full Private DNS record correctness, App Service routing/auth modeling, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
 
 Azure observations distinguish restricted network posture, identity authorization posture, private-endpoint uncertainty, and unresolved Azure plan values.
 
@@ -537,8 +541,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 * AWS is currently the deepest provider implementation.
 * GCP support is narrower than AWS today and currently has limited provider-specific positive observation records compared with its finding coverage.
-* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS posture, Private Endpoint posture, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
-* Deeper managed Kubernetes workload/node posture, Private Endpoint DNS correctness, load balancers, full App Service routing/access-restriction modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
+* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS posture, Private Endpoint and DNS-zone-group posture, Load Balancer/Application Gateway exposure, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
+* Deeper managed Kubernetes workload/node posture, full Private Endpoint DNS record correctness, App Service routing/auth modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
 * IAM analysis focuses on inline policies, standalone policies, role-policy attachments, and trust policies rather than a full IAM attachment graph.
