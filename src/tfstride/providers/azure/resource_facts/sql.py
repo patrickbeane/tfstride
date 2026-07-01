@@ -9,6 +9,10 @@ class AzureSqlFacts:
     __slots__ = ()
 
     @property
+    def mssql_database_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_DATABASE_ID)
+
+    @property
     def mssql_server_id(self) -> str | None:
         return self.get(AzureResourceMetadata.MSSQL_SERVER_ID)
 
@@ -27,6 +31,46 @@ class AzureSqlFacts:
     @property
     def mssql_security_alert_state(self) -> str | None:
         return self.get(AzureResourceMetadata.MSSQL_SECURITY_ALERT_STATE)
+
+    @property
+    def mssql_short_term_retention_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_SHORT_TERM_RETENTION_STATE)
+
+    @property
+    def mssql_short_term_retention_days(self) -> int | None:
+        return self.get(AzureResourceMetadata.MSSQL_SHORT_TERM_RETENTION_DAYS)
+
+    @property
+    def mssql_backup_interval_hours(self) -> int | None:
+        return self.get(AzureResourceMetadata.MSSQL_BACKUP_INTERVAL_HOURS)
+
+    @property
+    def mssql_long_term_retention_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_LONG_TERM_RETENTION_STATE)
+
+    @property
+    def mssql_long_term_weekly_retention(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_LONG_TERM_WEEKLY_RETENTION)
+
+    @property
+    def mssql_long_term_monthly_retention(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_LONG_TERM_MONTHLY_RETENTION)
+
+    @property
+    def mssql_long_term_yearly_retention(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_LONG_TERM_YEARLY_RETENTION)
+
+    @property
+    def mssql_long_term_week_of_year(self) -> int | None:
+        return self.get(AzureResourceMetadata.MSSQL_LONG_TERM_WEEK_OF_YEAR)
+
+    @property
+    def mssql_geo_backup_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_GEO_BACKUP_STATE)
+
+    @property
+    def mssql_backup_storage_redundancy(self) -> str | None:
+        return self.get(AzureResourceMetadata.MSSQL_BACKUP_STORAGE_REDUNDANCY)
 
     @property
     def mssql_posture_uncertainties(self) -> list[str]:

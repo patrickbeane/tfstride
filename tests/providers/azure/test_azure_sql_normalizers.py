@@ -117,9 +117,121 @@ class AzureMssqlDatabaseNormalizerTests(unittest.TestCase):
         )
         facts = azure_facts(normalized)
 
+        self.assertEqual(
+            facts.mssql_database_id,
+            "/subscriptions/example/providers/Microsoft.Sql/servers/sqlserver/databases/mydb",
+        )
         self.assertEqual(facts.mssql_server_id, "azurerm_mssql_server.sqlserver.id")
+        self.assertEqual(facts.mssql_short_term_retention_state, "not_configured")
+        self.assertEqual(facts.mssql_long_term_retention_state, "not_configured")
+        self.assertEqual(facts.mssql_geo_backup_state, "unknown")
         self.assertFalse(normalized.storage_encrypted)
         self.assertEqual(normalized.data_sensitivity, "sensitive")
+
+    def test_mssql_database_normalizes_recovery_posture(self) -> None:
+        normalized = normalize_mssql_database(
+            _resource(
+                AzureResourceType.MSSQL_DATABASE,
+                {
+                    "id": "/subscriptions/example/providers/Microsoft.Sql/servers/sqlserver/databases/recovery",
+                    "name": "recovery",
+                    "server_id": "azurerm_mssql_server.sqlserver.id",
+                    "short_term_retention_policy": [
+                        {
+                            "retention_days": 14,
+                            "backup_interval_in_hours": 12,
+                        }
+                    ],
+                    "long_term_retention_policy": [
+                        {
+                            "weekly_retention": "P4W",
+                            "monthly_retention": "P12M",
+                            "yearly_retention": "P5Y",
+                            "week_of_year": 4,
+                        }
+                    ],
+                    "geo_backup_enabled": True,
+                    "storage_account_type": "GeoZone",
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertEqual(facts.mssql_short_term_retention_state, "configured")
+        self.assertEqual(facts.mssql_short_term_retention_days, 14)
+        self.assertEqual(facts.mssql_backup_interval_hours, 12)
+        self.assertEqual(facts.mssql_long_term_retention_state, "configured")
+        self.assertEqual(facts.mssql_long_term_weekly_retention, "P4W")
+        self.assertEqual(facts.mssql_long_term_monthly_retention, "P12M")
+        self.assertEqual(facts.mssql_long_term_yearly_retention, "P5Y")
+        self.assertEqual(facts.mssql_long_term_week_of_year, 4)
+        self.assertEqual(facts.mssql_geo_backup_state, "enabled")
+        self.assertEqual(facts.mssql_backup_storage_redundancy, "GeoZone")
+        self.assertEqual(facts.mssql_posture_uncertainties, [])
+
+    def test_mssql_database_preserves_unknown_recovery_posture(self) -> None:
+        normalized = normalize_mssql_database(
+            _resource(
+                AzureResourceType.MSSQL_DATABASE,
+                {
+                    "name": "pending",
+                    "server_id": "azurerm_mssql_server.sqlserver.id",
+                    "short_term_retention_policy": [
+                        {
+                            "retention_days": None,
+                            "backup_interval_in_hours": None,
+                        }
+                    ],
+                    "long_term_retention_policy": [
+                        {
+                            "weekly_retention": None,
+                            "monthly_retention": "P12M",
+                            "week_of_year": None,
+                        }
+                    ],
+                    "geo_backup_enabled": None,
+                    "storage_account_type": None,
+                },
+                unknown_values={
+                    "short_term_retention_policy": [
+                        {
+                            "retention_days": True,
+                            "backup_interval_in_hours": True,
+                        }
+                    ],
+                    "long_term_retention_policy": [
+                        {
+                            "weekly_retention": True,
+                            "week_of_year": True,
+                        }
+                    ],
+                    "geo_backup_enabled": True,
+                    "storage_account_type": True,
+                },
+            )
+        )
+        facts = azure_facts(normalized)
+
+        self.assertEqual(facts.mssql_short_term_retention_state, "unknown")
+        self.assertIsNone(facts.mssql_short_term_retention_days)
+        self.assertIsNone(facts.mssql_backup_interval_hours)
+        self.assertEqual(facts.mssql_long_term_retention_state, "unknown")
+        self.assertIsNone(facts.mssql_long_term_weekly_retention)
+        self.assertEqual(facts.mssql_long_term_monthly_retention, "P12M")
+        self.assertIsNone(facts.mssql_long_term_week_of_year)
+        self.assertEqual(facts.mssql_geo_backup_state, "unknown")
+        self.assertIsNone(facts.mssql_backup_storage_redundancy)
+        self.assertEqual(
+            facts.mssql_posture_uncertainties,
+            [
+                "short_term_retention_policy.retention_days is unknown after planning",
+                "short_term_retention_policy.backup_interval_in_hours is unknown after planning",
+                "long_term_retention_policy.weekly_retention is unknown after planning",
+                "long_term_retention_policy.week_of_year is unknown after planning",
+                "geo_backup_enabled is unknown after planning",
+                "storage_account_type is unknown after planning",
+            ],
+        )
 
 
 class AzureMssqlFirewallRuleNormalizerTests(unittest.TestCase):
