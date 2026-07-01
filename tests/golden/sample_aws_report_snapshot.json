@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 123,
+      "registered_rule_count": 125,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -109,6 +109,8 @@
         "gcp-inherited-iam-sensitive-resource-access",
         "gcp-inherited-iam-blast-radius",
         "azure-public-compute-broad-ingress",
+        "azure-load-balancer-public-frontend",
+        "azure-application-gateway-public-listener",
         "azure-storage-container-public-access",
         "azure-storage-account-nested-public-access-enabled",
         "azure-storage-account-shared-key-enabled",
@@ -288,7 +290,9 @@
         "azure-postgresql-public-network-access-enabled": 0,
         "azure-postgresql-firewall-broad-public-access": 0,
         "azure-postgresql-weak-tls-or-ssl": 0,
-        "azure-postgresql-geo-backup-disabled": 0
+        "azure-postgresql-geo-backup-disabled": 0,
+        "azure-load-balancer-public-frontend": 0,
+        "azure-application-gateway-public-listener": 0
       }
     },
     "references": {

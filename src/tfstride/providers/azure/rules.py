@@ -13,6 +13,7 @@ from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
+from tfstride.providers.azure.load_balancer_rules import AzureLoadBalancerRuleDetectors
 from tfstride.providers.azure.managed_identity_rules import AzureManagedIdentityRuleDetectors
 from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
@@ -23,6 +24,8 @@ from tfstride.providers.azure.storage_rules import AzureStorageRuleDetectors
 AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
         "azure-public-compute-broad-ingress",
+        "azure-load-balancer-public-frontend",
+        "azure-application-gateway-public-listener",
         "azure-storage-container-public-access",
         "azure-storage-account-nested-public-access-enabled",
         "azure-storage-account-shared-key-enabled",
@@ -90,6 +93,7 @@ def build_azure_rule_contribution(
     metadata_registry: RuleRegistry | None = None,
 ) -> RuleContribution:
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
+    load_balancer_detectors = AzureLoadBalancerRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
@@ -101,6 +105,10 @@ def build_azure_rule_contribution(
     private_endpoint_detectors = AzurePrivateEndpointPostureRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "azure-public-compute-broad-ingress": compute_detectors.detect_public_compute_broad_ingress,
+        "azure-load-balancer-public-frontend": (load_balancer_detectors.detect_public_load_balancer_frontend),
+        "azure-application-gateway-public-listener": (
+            load_balancer_detectors.detect_public_application_gateway_listener
+        ),
         "azure-storage-container-public-access": storage_detectors.detect_public_container_access,
         "azure-storage-account-nested-public-access-enabled": (storage_detectors.detect_nested_public_access_enabled),
         "azure-storage-account-shared-key-enabled": storage_detectors.detect_shared_key_enabled,

@@ -16,6 +16,28 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-load-balancer-public-frontend",
+        title="Azure Load Balancer has a public frontend",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Remove the public frontend when the load balancer is intended to be internal, or verify the "
+            "public edge is paired with narrow load-balancing/NAT rules, backend membership, and NSG controls."
+        ),
+        tags=("azure", "network", "load-balancer", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-application-gateway-public-listener",
+        title="Azure Application Gateway has a public listener",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Use a private frontend for internal applications, or ensure public Application Gateway listeners are "
+            "intentional and protected with WAF policy, reviewed routing, authentication, and backend controls."
+        ),
+        tags=("azure", "network", "application-gateway", "load-balancer", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-storage-container-public-access",
         title="Azure Storage container is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,
