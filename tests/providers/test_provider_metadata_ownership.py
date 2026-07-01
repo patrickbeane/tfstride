@@ -39,6 +39,21 @@ def _metadata_fields_by_name(namespace: type) -> dict[str, MetadataField[Any]]:
     return {name: value for name, value in vars(namespace).items() if isinstance(value, MetadataField)}
 
 
+def _string_list_metadata_fields_by_name(namespace: type) -> dict[str, StringListMetadataField]:
+    return {name: value for name, value in vars(namespace).items() if isinstance(value, StringListMetadataField)}
+
+
+def _foreign_provider_cases() -> tuple[tuple[str, Any, type, str, type], ...]:
+    return (
+        ("aws", aws_facts, AwsResourceMetadata, "gcp", GcpResourceMetadata),
+        ("aws", aws_facts, AwsResourceMetadata, "azure", AzureResourceMetadata),
+        ("gcp", gcp_facts, GcpResourceMetadata, "aws", AwsResourceMetadata),
+        ("gcp", gcp_facts, GcpResourceMetadata, "azure", AzureResourceMetadata),
+        ("azure", azure_facts, AzureResourceMetadata, "aws", AwsResourceMetadata),
+        ("azure", azure_facts, AzureResourceMetadata, "gcp", GcpResourceMetadata),
+    )
+
+
 def _sample_metadata_value(field: MetadataField[Any]) -> Any:
     if isinstance(field, BoolMetadataField):
         return True
@@ -145,16 +160,7 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
 
     def test_provider_facts_reject_all_foreign_provider_owned_metadata_fields(self) -> None:
         contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
-        provider_cases = (
-            ("aws", aws_facts, AwsResourceMetadata, "gcp", GcpResourceMetadata),
-            ("aws", aws_facts, AwsResourceMetadata, "azure", AzureResourceMetadata),
-            ("gcp", gcp_facts, GcpResourceMetadata, "aws", AwsResourceMetadata),
-            ("gcp", gcp_facts, GcpResourceMetadata, "azure", AzureResourceMetadata),
-            ("azure", azure_facts, AzureResourceMetadata, "aws", AwsResourceMetadata),
-            ("azure", azure_facts, AzureResourceMetadata, "gcp", GcpResourceMetadata),
-        )
-
-        for provider, facts_factory, own_namespace, foreign_provider, foreign_namespace in provider_cases:
+        for provider, facts_factory, own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
             facts = facts_factory(_resource(provider))
             own_namespace_name = own_namespace.__name__
             foreign_fields = _metadata_fields_by_name(foreign_namespace)
@@ -167,6 +173,46 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
                         f"use a field from {own_namespace_name}",
                     ):
                         facts.set(field, _sample_metadata_value(field))
+
+    def test_provider_facts_reject_foreign_string_list_append_writes(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        for provider, facts_factory, own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
+            own_namespace_name = own_namespace.__name__
+            foreign_fields = _string_list_metadata_fields_by_name(foreign_namespace)
+
+            for field_name in sorted(contract.provider_owned_fields[foreign_provider]):
+                field = foreign_fields.get(field_name)
+                if field is None:
+                    continue
+                resource = _resource(provider)
+                facts = facts_factory(resource)
+                with self.subTest(provider=provider, foreign_provider=foreign_provider, field_name=field_name):
+                    with self.assertRaisesRegex(
+                        ProviderMetadataOwnershipError,
+                        f"use a field from {own_namespace_name}",
+                    ):
+                        facts.append(field, "sample")
+                    self.assertNotIn(field.key, resource.metadata)
+
+    def test_provider_facts_reject_foreign_string_list_extend_writes(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        for provider, facts_factory, own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
+            own_namespace_name = own_namespace.__name__
+            foreign_fields = _string_list_metadata_fields_by_name(foreign_namespace)
+
+            for field_name in sorted(contract.provider_owned_fields[foreign_provider]):
+                field = foreign_fields.get(field_name)
+                if field is None:
+                    continue
+                resource = _resource(provider)
+                facts = facts_factory(resource)
+                with self.subTest(provider=provider, foreign_provider=foreign_provider, field_name=field_name):
+                    with self.assertRaisesRegex(
+                        ProviderMetadataOwnershipError,
+                        f"use a field from {own_namespace_name}",
+                    ):
+                        facts.extend(field, ["sample"])
+                    self.assertNotIn(field.key, resource.metadata)
 
 
 if __name__ == "__main__":
