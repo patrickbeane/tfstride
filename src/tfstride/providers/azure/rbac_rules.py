@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource
+from tfstride.models import Finding, NormalizedResource, ResourceInventory
 from tfstride.providers.azure.rbac_breadth import (
     COMPUTE_MANAGEMENT,
     KEY_VAULT_DATA_PLANE,
@@ -35,6 +36,7 @@ _RESOURCE_GROUP_SCOPE_MARKER = "/resourcegroups/"
 class AzureCustomRoleRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
+        self._custom_role_index_cache: tuple[ResourceInventory, _AzureCustomRoleIndex] | None = None
 
     def detect_wildcard_management_plane(
         self,
@@ -144,7 +146,8 @@ class AzureCustomRoleRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
-        resources_by_address = {resource.address: resource for resource in context.inventory.resources}
+        custom_role_index = self._custom_role_index(context)
+        resources_by_address = custom_role_index.resources_by_address
         findings: list[Finding] = []
         for assignment in context.inventory.by_type(AzureResourceType.ROLE_ASSIGNMENT):
             assignment_facts = azure_facts(assignment)
@@ -217,7 +220,7 @@ class AzureCustomRoleRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        for role in _custom_role_definitions(context.inventory.resources):
+        for role in self._custom_role_index(context).custom_role_definitions:
             facts = azure_facts(role)
             if not predicate(facts):
                 continue
@@ -253,6 +256,28 @@ class AzureCustomRoleRuleDetectors:
                 )
             )
         return findings
+
+    def _custom_role_index(self, context: RuleEvaluationContext) -> _AzureCustomRoleIndex:
+        if self._custom_role_index_cache is None or self._custom_role_index_cache[0] is not context.inventory:
+            self._custom_role_index_cache = (
+                context.inventory,
+                _build_custom_role_index(context.inventory.resources),
+            )
+        return self._custom_role_index_cache[1]
+
+
+@dataclass(frozen=True, slots=True)
+class _AzureCustomRoleIndex:
+    resources_by_address: Mapping[str, NormalizedResource]
+    custom_role_definitions: tuple[NormalizedResource, ...]
+
+
+def _build_custom_role_index(resources: Iterable[NormalizedResource]) -> _AzureCustomRoleIndex:
+    resource_tuple = tuple(resources)
+    return _AzureCustomRoleIndex(
+        resources_by_address={resource.address: resource for resource in resource_tuple},
+        custom_role_definitions=_custom_role_definitions(resource_tuple),
+    )
 
 
 def _assigned_custom_role_breadth_reasons(facts: AzureResourceFacts) -> list[str]:
@@ -400,13 +425,13 @@ def _dedupe_strings(values: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
 
 
-def _custom_role_definitions(resources: Iterable[NormalizedResource]) -> list[NormalizedResource]:
-    return [
+def _custom_role_definitions(resources: Iterable[NormalizedResource]) -> tuple[NormalizedResource, ...]:
+    return tuple(
         resource
         for resource in resources
         if resource.resource_type == AzureResourceType.ROLE_DEFINITION
         and azure_facts(resource).is_custom_role_definition
-    ]
+    )
 
 
 def _custom_role_evidence(role: NormalizedResource, facts: AzureResourceFacts) -> list[str]:

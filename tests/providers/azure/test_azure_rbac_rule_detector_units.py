@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.azure import rbac_rules as azure_rbac_rules
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.rbac_breadth import (
     AUTHORIZATION_MANAGEMENT,
@@ -246,6 +248,36 @@ class AzureCustomRolePostureDetectorUnitTests(unittest.TestCase):
             detectors.detect_authorization_management(_context([role]), "azure-custom-role-authorization-management"),
             [],
         )
+
+    def test_custom_role_index_is_reused_across_detector_methods_for_same_inventory(self) -> None:
+        role = _role_definition(
+            actions=["*", "Microsoft.Authorization/roleAssignments/write"],
+            breadth_signals=[OWNER_LIKE_OR_WILDCARD, AUTHORIZATION_MANAGEMENT, ROLE_ASSIGNMENT_CAPABLE],
+        )
+        assignment = _role_assignment()
+        identity = _managed_identity()
+        context = _context([identity, role, assignment])
+        detectors = AzureCustomRoleRuleDetectors(_FINDING_FACTORY)
+
+        original_builder = azure_rbac_rules._build_custom_role_index
+        with patch.object(azure_rbac_rules, "_build_custom_role_index", wraps=original_builder) as build_index:
+            detectors.detect_wildcard_management_plane(context, "azure-custom-role-wildcard-management-plane")
+            detectors.detect_authorization_management(context, "azure-custom-role-authorization-management")
+            detectors.detect_assigned_custom_role_blast_radius(context, "azure-custom-role-assignment-blast-radius")
+
+        self.assertEqual(build_index.call_count, 1)
+
+    def test_custom_role_index_cache_invalidates_for_different_inventory(self) -> None:
+        first_context = _context([_role_definition(actions=["*"], breadth_signals=[OWNER_LIKE_OR_WILDCARD])])
+        second_context = _context([_role_definition("other", actions=["*"], breadth_signals=[OWNER_LIKE_OR_WILDCARD])])
+        detectors = AzureCustomRoleRuleDetectors(_FINDING_FACTORY)
+
+        original_builder = azure_rbac_rules._build_custom_role_index
+        with patch.object(azure_rbac_rules, "_build_custom_role_index", wraps=original_builder) as build_index:
+            detectors.detect_wildcard_management_plane(first_context, "azure-custom-role-wildcard-management-plane")
+            detectors.detect_wildcard_management_plane(second_context, "azure-custom-role-wildcard-management-plane")
+
+        self.assertEqual(build_index.call_count, 2)
 
 
 class AzureAssignedCustomRoleDetectorUnitTests(unittest.TestCase):
