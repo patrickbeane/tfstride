@@ -189,13 +189,21 @@ class NormalizedResource:
         return self._metadata.get(field.key) is not None
 
     def set_metadata_field(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
+        self._validate_metadata_field_write(field)
         field.set(self._metadata, value)
 
     def append_metadata_field(self, field: StringListMetadataField, value: str | None) -> None:
+        self._validate_metadata_field_write(field)
         field.append_unique(self._metadata, value)
 
     def extend_metadata_field(self, field: StringListMetadataField, values: Sequence[str | None]) -> None:
+        self._validate_metadata_field_write(field)
         field.extend_unique(self._metadata, values)
+
+    def _validate_metadata_field_write(self, field: MetadataField[Any]) -> None:
+        from tfstride.providers.metadata_ownership import validate_normalized_resource_metadata_write
+
+        validate_normalized_resource_metadata_write(resource_provider=self.provider, field=field)
 
     def add_attached_role_arn(self, role_arn: str | None) -> None:
         if not role_arn or role_arn in self.attached_role_arns:

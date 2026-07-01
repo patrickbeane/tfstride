@@ -21,6 +21,7 @@ from tfstride.resource_metadata import (
     MetadataField,
     OptionalIntMetadataField,
     OptionalStringMetadataField,
+    ResourceMetadata,
     StringListMetadataField,
 )
 
@@ -212,6 +213,87 @@ class ProviderMetadataOwnershipTests(unittest.TestCase):
                         f"use a field from {own_namespace_name}",
                     ):
                         facts.extend(field, ["sample"])
+                    self.assertNotIn(field.key, resource.metadata)
+
+    def test_normalized_resource_accepts_direct_shared_and_matching_provider_metadata_writes(self) -> None:
+        resource = _resource("aws")
+
+        resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
+        resource.set_metadata_field(AwsResourceMetadata.TASK_ROLE_ARN, "arn:aws:iam::111122223333:role/task")
+        resource.append_metadata_field(AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES, "missing-role")
+        resource.extend_metadata_field(AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES, ["another-missing-role"])
+
+        self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertEqual(
+            resource.get_metadata_field(AwsResourceMetadata.TASK_ROLE_ARN), "arn:aws:iam::111122223333:role/task"
+        )
+        self.assertEqual(
+            resource.get_metadata_field(AwsResourceMetadata.UNRESOLVED_ROLE_REFERENCES),
+            ["missing-role", "another-missing-role"],
+        )
+
+    def test_normalized_resource_constructor_keeps_metadata_fixture_setup_ergonomic(self) -> None:
+        resource = NormalizedResource(
+            address="aws_resource.app",
+            provider="aws",
+            resource_type="aws_resource",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL: "app@example.com"},
+        )
+
+        self.assertEqual(resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_EMAIL), "app@example.com")
+
+    def test_normalized_resource_rejects_foreign_direct_set_metadata_writes(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        for provider, _facts_factory, _own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
+            foreign_fields = _metadata_fields_by_name(foreign_namespace)
+
+            for field_name in sorted(contract.provider_owned_fields[foreign_provider]):
+                field = foreign_fields[field_name]
+                resource = _resource(provider)
+                with self.subTest(provider=provider, foreign_provider=foreign_provider, field_name=field_name):
+                    with self.assertRaisesRegex(
+                        ProviderMetadataOwnershipError,
+                        f"owned by {foreign_provider}",
+                    ):
+                        resource.set_metadata_field(field, _sample_metadata_value(field))
+                    self.assertNotIn(field.key, resource.metadata)
+
+    def test_normalized_resource_rejects_foreign_direct_append_metadata_writes(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        for provider, _facts_factory, _own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
+            foreign_fields = _string_list_metadata_fields_by_name(foreign_namespace)
+
+            for field_name in sorted(contract.provider_owned_fields[foreign_provider]):
+                field = foreign_fields.get(field_name)
+                if field is None:
+                    continue
+                resource = _resource(provider)
+                with self.subTest(provider=provider, foreign_provider=foreign_provider, field_name=field_name):
+                    with self.assertRaisesRegex(
+                        ProviderMetadataOwnershipError,
+                        f"owned by {foreign_provider}",
+                    ):
+                        resource.append_metadata_field(field, "sample")
+                    self.assertNotIn(field.key, resource.metadata)
+
+    def test_normalized_resource_rejects_foreign_direct_extend_metadata_writes(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        for provider, _facts_factory, _own_namespace, foreign_provider, foreign_namespace in _foreign_provider_cases():
+            foreign_fields = _string_list_metadata_fields_by_name(foreign_namespace)
+
+            for field_name in sorted(contract.provider_owned_fields[foreign_provider]):
+                field = foreign_fields.get(field_name)
+                if field is None:
+                    continue
+                resource = _resource(provider)
+                with self.subTest(provider=provider, foreign_provider=foreign_provider, field_name=field_name):
+                    with self.assertRaisesRegex(
+                        ProviderMetadataOwnershipError,
+                        f"owned by {foreign_provider}",
+                    ):
+                        resource.extend_metadata_field(field, ["sample"])
                     self.assertNotIn(field.key, resource.metadata)
 
 
