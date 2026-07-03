@@ -15,6 +15,8 @@ from tfstride.analysis.resource_concepts import WORKLOAD_RESOURCE_TYPES
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
+from tfstride.providers.aws.policy_documents import parse_policy_statements
+from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
 from tfstride.providers.aws.vpc_endpoint_index import AwsVpcEndpointIndex, build_aws_vpc_endpoint_index
 
 
@@ -67,6 +69,13 @@ _SERVICE_BY_RULE_ID = {
     ),
 }
 
+_SUPPORTED_ENDPOINT_POLICY_SERVICE_NAMES = {
+    "s3": "S3",
+    "secretsmanager": "Secrets Manager",
+    "kms": "KMS",
+}
+_ENDPOINT_POLICY_UNKNOWN_MARKER = "policy is unknown after planning"
+
 
 class AwsSensitiveEndpointRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
@@ -92,6 +101,61 @@ class AwsSensitiveEndpointRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         return self._detect_missing_service_endpoint(context, rule_id)
+
+    def detect_broad_vpc_endpoint_policy(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for endpoint in context.inventory.by_type("aws_vpc_endpoint"):
+            facts = aws_facts(endpoint)
+            service_family = facts.vpc_endpoint_service_family
+            if service_family not in _SUPPORTED_ENDPOINT_POLICY_SERVICE_NAMES:
+                continue
+            if _endpoint_policy_unknown(facts):
+                continue
+
+            posture = _broad_endpoint_policy_posture(facts, service_family)
+            if posture is None:
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=2,
+                data_sensitivity=1,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            service_name = _SUPPORTED_ENDPOINT_POLICY_SERVICE_NAMES[service_family]
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[endpoint.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{endpoint.display_name} is a {service_name} VPC endpoint with a broad or default "
+                        "endpoint policy. VPC endpoint policies do not grant service permissions by themselves, "
+                        "but broad principals, actions, or resources weaken the endpoint-level guardrail for "
+                        "workloads that already have identity permissions. This finding does not imply any S3 "
+                        "bucket, secret, or key is public."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("vpc_endpoint", _endpoint_policy_target_evidence(endpoint, facts)),
+                        evidence_item("policy_posture", list(posture.reasons)),
+                        evidence_item(
+                            "policy_statements",
+                            [describe_policy_statement(statement) for statement in posture.statements],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
 
     def _detect_missing_service_endpoint(
         self,
@@ -158,6 +222,94 @@ class _ServiceDependency:
     actions: tuple[str, ...]
     resources: tuple[str, ...]
     statements: tuple[IAMPolicyStatement, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _EndpointPolicyPosture:
+    reasons: tuple[str, ...]
+    statements: tuple[IAMPolicyStatement, ...]
+
+
+def _endpoint_policy_unknown(facts: AwsResourceFacts) -> bool:
+    return _ENDPOINT_POLICY_UNKNOWN_MARKER in facts.vpc_endpoint_posture_uncertainties
+
+
+def _broad_endpoint_policy_posture(
+    facts: AwsResourceFacts,
+    service_family: str,
+) -> _EndpointPolicyPosture | None:
+    policy_document = facts.vpc_endpoint_policy_document
+    if not policy_document:
+        return _EndpointPolicyPosture(
+            reasons=(
+                "policy_document=absent_or_default",
+                "default endpoint policy allows all principals, actions, and resources for the service",
+            ),
+            statements=(),
+        )
+
+    reasons: list[str] = []
+    statements: list[IAMPolicyStatement] = []
+    for statement in parse_policy_statements(policy_document):
+        if statement.effect.lower() != "allow":
+            continue
+        statement_reasons = _broad_endpoint_policy_statement_reasons(statement, service_family)
+        if not statement_reasons:
+            continue
+        reasons.extend(statement_reasons)
+        statements.append(statement)
+
+    if not reasons:
+        return None
+    return _EndpointPolicyPosture(
+        reasons=_dedupe(reasons),
+        statements=tuple(statements),
+    )
+
+
+def _broad_endpoint_policy_statement_reasons(
+    statement: IAMPolicyStatement,
+    service_family: str,
+) -> list[str]:
+    reasons: list[str] = []
+    for principal in statement.principals:
+        if principal == "*":
+            reasons.append("principal=*")
+    for action in statement.actions:
+        if _is_broad_endpoint_policy_action(action, service_family):
+            reasons.append(f"action={action}")
+    for resource in statement.resources:
+        if _is_broad_endpoint_policy_resource(resource, service_family):
+            reasons.append(f"resource={resource}")
+    return reasons
+
+
+def _is_broad_endpoint_policy_action(action: str, service_family: str) -> bool:
+    normalized_action = action.strip().lower()
+    return normalized_action in {"*", f"{service_family}:*"}
+
+
+def _is_broad_endpoint_policy_resource(resource: str, service_family: str) -> bool:
+    normalized_resource = resource.strip().lower()
+    if normalized_resource == "*":
+        return True
+    if service_family == "s3":
+        return normalized_resource in {"arn:aws:s3:::*", "arn:aws:s3:::*/*"} or normalized_resource.startswith(
+            "arn:aws:s3:::*"
+        )
+    arn_parts = normalized_resource.split(":", 5)
+    if len(arn_parts) != 6:
+        return False
+    arn_marker, _, arn_service, region, account, resource_path = arn_parts
+    if arn_marker != "arn" or arn_service != service_family:
+        return False
+    if region == "*" or account == "*":
+        return True
+    if service_family == "secretsmanager":
+        return resource_path in {"*", "secret:*"}
+    if service_family == "kms":
+        return resource_path in {"*", "key/*", "alias/*"}
+    return False
 
 
 def _service_dependency(role: NormalizedResource, service: _SensitiveEndpointService) -> _ServiceDependency | None:
@@ -233,6 +385,22 @@ def _workload_evidence(workload: NormalizedResource) -> list[str]:
     if workload.public_exposure:
         values.append("public_exposure=true")
         values.extend(workload.public_exposure_reasons)
+    return values
+
+
+def _endpoint_policy_target_evidence(endpoint: NormalizedResource, facts: AwsResourceFacts) -> list[str]:
+    values = [
+        f"address={endpoint.address}",
+        f"service_family={facts.vpc_endpoint_service_family}",
+    ]
+    if facts.vpc_endpoint_service_name:
+        values.append(f"service_name={facts.vpc_endpoint_service_name}")
+    if facts.vpc_endpoint_type:
+        values.append(f"endpoint_type={facts.vpc_endpoint_type}")
+    if facts.vpc_endpoint_vpc_id:
+        values.append(f"vpc_id={facts.vpc_endpoint_vpc_id}")
+    if facts.vpc_endpoint_id:
+        values.append(f"endpoint_id={facts.vpc_endpoint_id}")
     return values
 
 

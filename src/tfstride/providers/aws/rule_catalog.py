@@ -193,6 +193,18 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
     ),
     RuleMetadata(
+        rule_id="aws-vpc-endpoint-policy-broad-access",
+        title="VPC endpoint policy allows broad service access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Attach explicit VPC endpoint policies for S3, Secrets Manager, and KMS endpoints, scope principals, "
+            "actions, and resources to expected workloads and targets, and avoid relying on the default broad "
+            "endpoint policy where private service access is security-sensitive."
+        ),
+        tags=("aws", "vpc-endpoint", "private-connectivity", "policy", "data"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-eks-api-endpoint-public-unrestricted",
         title="EKS Kubernetes API endpoint is public without narrow CIDR restrictions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
