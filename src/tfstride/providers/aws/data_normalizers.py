@@ -343,6 +343,8 @@ def normalize_sqs_queue(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_secretsmanager_secret(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -353,8 +355,23 @@ def normalize_secretsmanager_secret(resource: TerraformResource) -> NormalizedRe
         arn=values.get("arn"),
         data_sensitivity="sensitive",
         metadata={
-            "name": values.get("name"),
-            "kms_key_id": values.get("kms_key_id"),
+            AwsResourceMetadata.NAME: values.get("name"),
+            AwsResourceMetadata.SECRETS_MANAGER_KMS_KEY_ID: known_string(
+                values,
+                unknown_values,
+                "kms_key_id",
+                uncertainties,
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS: _known_top_level_int(
+                values,
+                unknown_values,
+                "recovery_window_in_days",
+                uncertainties,
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_REPLICATION: _secrets_manager_replication(
+                values.get("replica"), unknown_values.get("replica"), uncertainties
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
 
@@ -381,3 +398,41 @@ def _s3_encryption_configuration(rule: Mapping[str, Any] | None) -> dict[str, An
     if rule is None:
         return None
     return {"rule": [dict(rule)]}
+
+
+def _secrets_manager_replication(
+    replica_value: Any,
+    unknown_replica: Any,
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    if unknown_replica is True:
+        uncertainties.append("replica is unknown after planning")
+        return []
+
+    replica_blocks = as_list(replica_value)
+    unknown_blocks = as_list(unknown_replica)
+    replication: list[dict[str, Any]] = []
+    for index, replica in enumerate(replica_blocks):
+        if not isinstance(replica, Mapping):
+            uncertainties.append(f"replica[{index}] has an unrecognized value shape")
+            continue
+
+        unknown_block = unknown_blocks[index] if index < len(unknown_blocks) else None
+        unknown_fields: list[str] = []
+        replica_evidence: dict[str, Any] = {}
+        for key in ("region", "kms_key_id", "status"):
+            value = known_block_string(
+                replica,
+                unknown_block,
+                key,
+                uncertainties,
+                path=f"replica[{index}]",
+                unknown_fields=unknown_fields,
+            )
+            if value is not None:
+                replica_evidence[key] = value
+        if unknown_fields:
+            replica_evidence["unknown_fields"] = unknown_fields
+        if replica_evidence:
+            replication.append(replica_evidence)
+    return replication

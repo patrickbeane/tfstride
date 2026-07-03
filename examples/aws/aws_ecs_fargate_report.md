@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **6 trust boundaries** and **6 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **7 findings** across **21 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `6`
+- Medium severity findings: `7`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **6 trust boundaries** and **6 findings** across **21 normal
 - Provider resources considered: `21`
 - Normalized resources: `21`
 - Unsupported resources: `0`
-- Registered rules: `139`
-- Enabled rules: `139`
+- Registered rules: `141`
+- Enabled rules: `141`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `aws-secretsmanager-customer-managed-kms-key-missing`: `1`
   - `aws-workload-secretsmanager-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-workload-role-sensitive-permissions`: `1`
@@ -105,6 +106,18 @@ No findings in this severity band.
 - Evidence:
   - iam resources: *
   - policy statements: Allow actions=[logs:CreateLogStream, logs:PutLogEvents] resources=[*]
+
+#### Secrets Manager secret does not use a customer-managed KMS key
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_secretsmanager_secret.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: aws_secretsmanager_secret.app does not show a deterministic customer-managed KMS key in the Terraform plan. Secrets Manager AWS-managed encryption may still apply; this finding concerns customer key ownership, rotation, audit separation, and compliance posture.
+- Recommended mitigation: Configure `kms_key_id` with a customer-managed KMS key for secrets where key ownership, rotation, audit separation, or compliance controls are required.
+- Evidence:
+  - target resource: address=aws_secretsmanager_secret.app; type=aws_secretsmanager_secret; identifier=ecs-app-secret; arn=arn:aws:secretsmanager:us-east-1:111122223333:secret:ecs-app-secret
+  - encryption ownership: customer_managed_kms_state=not_configured; kms_key_id is unset; AWS-managed encryption may still apply; this finding concerns customer key control
 
 #### Sensitive data tier is transitively reachable from an internet-exposed path
 

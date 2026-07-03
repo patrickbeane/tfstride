@@ -14,6 +14,7 @@ from tfstride.providers.aws.path_chain_rules import AwsPathChainRuleDetectors
 from tfstride.providers.aws.policy_trust_rules import AwsPolicyTrustRuleDetectors
 from tfstride.providers.aws.posture_rules import AwsPostureRuleDetectors
 from tfstride.providers.aws.rds_rules import AwsRdsPostureRuleDetectors
+from tfstride.providers.aws.secrets_rules import AwsSecretsManagerPostureRuleDetectors
 from tfstride.providers.aws.sensitive_endpoint_rules import AwsSensitiveEndpointRuleDetectors
 from tfstride.providers.aws.storage_rules import AwsS3PostureRuleDetectors
 
@@ -32,6 +33,8 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-secretsmanager-customer-managed-kms-key-missing",
+        "aws-secretsmanager-recovery-window-too-short",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -77,6 +80,7 @@ def build_aws_rule_contribution(
     policy_trust_detectors = AwsPolicyTrustRuleDetectors(finding_factory)
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
+    secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     eks_detectors = AwsEksRuleDetectors(finding_factory)
     lambda_detectors = AwsLambdaRuleDetectors(finding_factory)
     load_balancer_detectors = AwsLoadBalancerRuleDetectors(finding_factory)
@@ -97,6 +101,10 @@ def build_aws_rule_contribution(
         "aws-s3-public-access": posture_detectors.detect_public_object_storage,
         "aws-s3-customer-managed-encryption-missing": (s3_posture_detectors.detect_customer_managed_encryption_missing),
         "aws-s3-versioning-disabled": s3_posture_detectors.detect_versioning_disabled_or_unknown,
+        "aws-secretsmanager-customer-managed-kms-key-missing": (
+            secrets_manager_detectors.detect_customer_managed_kms_key_missing
+        ),
+        "aws-secretsmanager-recovery-window-too-short": (secrets_manager_detectors.detect_recovery_window_too_short),
         "aws-workload-secretsmanager-vpc-endpoint-missing": (
             sensitive_endpoint_detectors.detect_missing_secretsmanager_endpoint
         ),

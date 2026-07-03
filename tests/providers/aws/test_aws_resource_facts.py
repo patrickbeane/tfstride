@@ -56,6 +56,15 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "s3_encryption_source_address": "aws_s3_bucket_server_side_encryption_configuration.logs",
                 "s3_server_side_encryption_configuration": {"rule": []},
                 "s3_posture_uncertainties": ["aws_s3_bucket_versioning.logs: status is unknown"],
+                "secrets_manager_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/secrets",
+                "secrets_manager_recovery_window_in_days": 14,
+                "secrets_manager_replication": [
+                    {
+                        "region": "us-west-2",
+                        "kms_key_id": "arn:aws:kms:us-west-2:111122223333:key/secrets-replica",
+                    }
+                ],
+                "secrets_manager_posture_uncertainties": ["kms_key_id is unknown after planning"],
                 "eks_cluster_arn": "arn:aws:eks:us-east-1:111122223333:cluster/app",
                 "eks_cluster_role_arn": "arn:aws:iam::111122223333:role/eks-control-plane",
                 "eks_kubernetes_version": "1.29",
@@ -161,6 +170,18 @@ class AwsResourceFactsTests(unittest.TestCase):
         )
         self.assertEqual(facts.s3_server_side_encryption_configuration, {"rule": []})
         self.assertEqual(facts.s3_posture_uncertainties, ["aws_s3_bucket_versioning.logs: status is unknown"])
+        self.assertEqual(facts.secrets_manager_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/secrets")
+        self.assertEqual(facts.secrets_manager_recovery_window_in_days, 14)
+        self.assertEqual(
+            facts.secrets_manager_replication,
+            [
+                {
+                    "region": "us-west-2",
+                    "kms_key_id": "arn:aws:kms:us-west-2:111122223333:key/secrets-replica",
+                }
+            ],
+        )
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, ["kms_key_id is unknown after planning"])
         self.assertEqual(facts.eks_cluster_arn, "arn:aws:eks:us-east-1:111122223333:cluster/app")
         self.assertEqual(facts.eks_cluster_role_arn, "arn:aws:iam::111122223333:role/eks-control-plane")
         self.assertEqual(facts.eks_kubernetes_version, "1.29")
@@ -311,6 +332,10 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.s3_encryption_source_address)
         self.assertEqual(facts.s3_server_side_encryption_configuration, {})
         self.assertEqual(facts.s3_posture_uncertainties, [])
+        self.assertIsNone(facts.secrets_manager_kms_key_id)
+        self.assertIsNone(facts.secrets_manager_recovery_window_in_days)
+        self.assertEqual(facts.secrets_manager_replication, [])
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, [])
         self.assertIsNone(facts.eks_cluster_arn)
         self.assertIsNone(facts.eks_cluster_role_arn)
         self.assertIsNone(facts.eks_kubernetes_version)

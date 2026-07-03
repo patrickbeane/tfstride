@@ -101,6 +101,7 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                     "id": "app-secret",
                                     "name": "app-secret",
                                     "arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:app-secret",
+                                    "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/secret",
                                 },
                             },
                         ]
@@ -148,6 +149,7 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                     "id": "app-secret",
                                     "name": "app-secret",
                                     "arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:app-secret",
+                                    "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/secret",
                                 },
                             },
                             {

@@ -122,6 +122,22 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.SECRET_ARN)
 
     @property
+    def secrets_manager_kms_key_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.SECRETS_MANAGER_KMS_KEY_ID)
+
+    @property
+    def secrets_manager_recovery_window_in_days(self) -> int | None:
+        return self.get(AwsResourceMetadata.SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS)
+
+    @property
+    def secrets_manager_replication(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.SECRETS_MANAGER_REPLICATION)
+
+    @property
+    def secrets_manager_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.SECRETS_MANAGER_POSTURE_UNCERTAINTIES)
+
+    @property
     def function_name(self) -> str | None:
         return self.get(AwsResourceMetadata.FUNCTION_NAME)
 

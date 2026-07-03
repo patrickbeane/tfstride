@@ -15,6 +15,7 @@ from tfstride.models import (
     StrideCategory,
     TrustBoundary,
 )
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 
 
 class RuleRegistryIntegrationTests(unittest.TestCase):
@@ -233,6 +234,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             resource_type="aws_secretsmanager_secret",
             name="customer",
             category=ResourceCategory.DATA,
+            metadata={AwsResourceMetadata.SECRETS_MANAGER_KMS_KEY_ID: "arn:aws:kms:us-east-1:111122223333:key/secret"},
             policy_statements=[
                 IAMPolicyStatement(
                     effect="Allow",

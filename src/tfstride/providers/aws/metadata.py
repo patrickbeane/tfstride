@@ -75,6 +75,7 @@ class AwsResourceMetadata:
     LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES = StringListMetadataField("lambda_function_url_posture_uncertainties")
     LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES = StringListMetadataField("load_balancer_listener_tls_uncertainties")
     UNRESOLVED_SECRET_ARNS = StringListMetadataField("unresolved_secret_arns")
+    SECRETS_MANAGER_POSTURE_UNCERTAINTIES = StringListMetadataField("secrets_manager_posture_uncertainties")
     UNRESOLVED_FUNCTION_REFERENCES = StringListMetadataField("unresolved_function_references")
     REQUIRES_COMPATIBILITIES = StringListMetadataField("requires_compatibilities")
     TRUST_PRINCIPALS = StringListMetadataField("trust_principals")
@@ -93,6 +94,7 @@ class AwsResourceMetadata:
     TASK_ROLE_ARN = OptionalStringMetadataField("task_role_arn")
     EXECUTION_ROLE_ARN = OptionalStringMetadataField("execution_role_arn")
     SECRET_ARN = OptionalStringMetadataField("secret_arn")
+    SECRETS_MANAGER_KMS_KEY_ID = OptionalStringMetadataField("secrets_manager_kms_key_id")
     FUNCTION_NAME = OptionalStringMetadataField("function_name")
     ROUTE_TABLE_ID = OptionalStringMetadataField("route_table_id")
     SUBNET_ID = OptionalStringMetadataField("subnet_id")
@@ -150,6 +152,7 @@ class AwsResourceMetadata:
     ENGINE = OptionalStringMetadataField("engine")
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
+    SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS = OptionalIntMetadataField("secrets_manager_recovery_window_in_days")
     LAMBDA_FUNCTION_URL_CORS_MAX_AGE = OptionalIntMetadataField("lambda_function_url_cors_max_age")
     TASK_DEFINITION_REVISION = OptionalIntMetadataField("revision")
 
@@ -164,6 +167,7 @@ class AwsResourceMetadata:
     TRUST_STATEMENTS = DictListMetadataField("trust_statements")
     EKS_ENCRYPTION_CONFIG = DictListMetadataField("eks_encryption_config")
     VPC_ENDPOINT_DNS_ENTRIES = DictListMetadataField("vpc_endpoint_dns_entries")
+    SECRETS_MANAGER_REPLICATION = DictListMetadataField("secrets_manager_replication")
     PUBLIC_ACCESS_BLOCK = BoolDictMetadataField("public_access_block")
 
     PUBLIC_ACCESS_CONFIGURED = ResourceMetadata.PUBLIC_ACCESS_CONFIGURED

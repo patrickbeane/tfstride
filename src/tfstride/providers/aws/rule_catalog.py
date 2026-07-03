@@ -160,6 +160,28 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-secretsmanager-customer-managed-kms-key-missing",
+        title="Secrets Manager secret does not use a customer-managed KMS key",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `kms_key_id` with a customer-managed KMS key for secrets where key ownership, "
+            "rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "secretsmanager", "secrets", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-secretsmanager-recovery-window-too-short",
+        title="Secrets Manager deletion recovery window is too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Use a Secrets Manager recovery window that gives operators enough time to detect and restore "
+            "accidental or malicious secret deletion before permanent removal."
+        ),
+        tags=("aws", "secretsmanager", "secrets", "recovery", "deletion-protection"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-workload-secretsmanager-vpc-endpoint-missing",
         title="Workload uses Secrets Manager without a VPC endpoint",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -8,6 +8,7 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_db_instance,
     normalize_s3_bucket_server_side_encryption_configuration,
     normalize_s3_bucket_versioning,
+    normalize_secretsmanager_secret,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -109,6 +110,84 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "multi_az is unknown after planning",
                 "backup_retention_period is unknown after planning",
                 "kms_key_id is unknown after planning",
+            ],
+        )
+
+    def test_secretsmanager_secret_normalizes_key_recovery_and_replication_posture(self) -> None:
+        resource = _terraform_resource(
+            "aws_secretsmanager_secret",
+            {
+                "id": "app",
+                "name": "app",
+                "arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
+                "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/secrets",
+                "recovery_window_in_days": 14,
+                "replica": [
+                    {
+                        "region": "us-west-2",
+                        "kms_key_id": "arn:aws:kms:us-west-2:111122223333:key/secrets-replica",
+                        "status": "InSync",
+                    }
+                ],
+            },
+        )
+
+        normalized = normalize_secretsmanager_secret(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "app")
+        self.assertEqual(normalized.arn, "arn:aws:secretsmanager:us-east-1:111122223333:secret:app")
+        self.assertEqual(facts.name, "app")
+        self.assertEqual(facts.secrets_manager_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/secrets")
+        self.assertEqual(facts.secrets_manager_recovery_window_in_days, 14)
+        self.assertEqual(
+            facts.secrets_manager_replication,
+            [
+                {
+                    "region": "us-west-2",
+                    "kms_key_id": "arn:aws:kms:us-west-2:111122223333:key/secrets-replica",
+                    "status": "InSync",
+                }
+            ],
+        )
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, [])
+
+    def test_secretsmanager_secret_missing_posture_fields_are_explicitly_absent(self) -> None:
+        facts = aws_facts(normalize_secretsmanager_secret(_terraform_resource("aws_secretsmanager_secret", {})))
+
+        self.assertIsNone(facts.secrets_manager_kms_key_id)
+        self.assertIsNone(facts.secrets_manager_recovery_window_in_days)
+        self.assertEqual(facts.secrets_manager_replication, [])
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, [])
+
+    def test_secretsmanager_secret_preserves_unknown_posture_values(self) -> None:
+        resource = _terraform_resource(
+            "aws_secretsmanager_secret",
+            {
+                "name": "app",
+                "replica": [{"region": "us-west-2"}],
+            },
+            unknown_values={
+                "kms_key_id": True,
+                "recovery_window_in_days": True,
+                "replica": [{"kms_key_id": True}],
+            },
+        )
+
+        facts = aws_facts(normalize_secretsmanager_secret(resource))
+
+        self.assertIsNone(facts.secrets_manager_kms_key_id)
+        self.assertIsNone(facts.secrets_manager_recovery_window_in_days)
+        self.assertEqual(
+            facts.secrets_manager_replication,
+            [{"region": "us-west-2", "unknown_fields": ["kms_key_id"]}],
+        )
+        self.assertEqual(
+            facts.secrets_manager_posture_uncertainties,
+            [
+                "kms_key_id is unknown after planning",
+                "recovery_window_in_days is unknown after planning",
+                "replica[0].kms_key_id is unknown after planning",
             ],
         )
 

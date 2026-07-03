@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 139,
+      "registered_rule_count": 141,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -53,6 +53,8 @@
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-secretsmanager-customer-managed-kms-key-missing",
+        "aws-secretsmanager-recovery-window-too-short",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -196,6 +198,8 @@
         "aws-s3-public-access": 1,
         "aws-s3-customer-managed-encryption-missing": 0,
         "aws-s3-versioning-disabled": 0,
+        "aws-secretsmanager-customer-managed-kms-key-missing": 0,
+        "aws-secretsmanager-recovery-window-too-short": 0,
         "aws-workload-secretsmanager-vpc-endpoint-missing": 0,
         "aws-workload-kms-vpc-endpoint-missing": 1,
         "aws-workload-s3-vpc-endpoint-missing": 1,
