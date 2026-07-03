@@ -8,19 +8,19 @@
     "normalized_resources": 23,
     "unsupported_resources": 1,
     "trust_boundaries": 9,
-    "active_findings": 9,
-    "total_findings": 9,
+    "active_findings": 11,
+    "total_findings": 11,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "severity_counts": {
       "high": 3,
-      "medium": 6,
+      "medium": 8,
       "low": 0
     }
   },
   "filtering": {
-    "total_findings": 9,
-    "active_findings": 9,
+    "total_findings": 11,
+    "active_findings": 11,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "suppressions_path": null,
@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 133,
+      "registered_rule_count": 136,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -53,6 +53,9 @@
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-workload-secretsmanager-vpc-endpoint-missing",
+        "aws-workload-kms-vpc-endpoint-missing",
+        "aws-workload-s3-vpc-endpoint-missing",
         "aws-eks-api-endpoint-public-unrestricted",
         "aws-eks-private-endpoint-not-enabled",
         "aws-eks-secrets-encryption-not-configured",
@@ -190,6 +193,9 @@
         "aws-s3-public-access": 1,
         "aws-s3-customer-managed-encryption-missing": 0,
         "aws-s3-versioning-disabled": 0,
+        "aws-workload-secretsmanager-vpc-endpoint-missing": 0,
+        "aws-workload-kms-vpc-endpoint-missing": 1,
+        "aws-workload-s3-vpc-endpoint-missing": 1,
         "aws-eks-api-endpoint-public-unrestricted": 0,
         "aws-eks-private-endpoint-not-enabled": 0,
         "aws-eks-secrets-encryption-not-configured": 0,
@@ -573,6 +579,28 @@
         "aws_iam_role.workload"
       ],
       "trust_boundary_id": "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload"
+    },
+    {
+      "rule_id": "aws-workload-kms-vpc-endpoint-missing",
+      "title": "Workload uses KMS without a VPC endpoint",
+      "category": "Information Disclosure",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_lambda_function.processor",
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": null
+    },
+    {
+      "rule_id": "aws-workload-s3-vpc-endpoint-missing",
+      "title": "Workload uses S3 without a VPC endpoint",
+      "category": "Information Disclosure",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_lambda_function.processor",
+        "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": null
     }
   ],
   "observations": [],

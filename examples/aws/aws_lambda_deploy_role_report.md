@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **3 findings** across **13 normalized resources**.
+This run identified **4 trust boundaries** and **4 findings** across **13 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `3`
+- Medium severity findings: `4`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **4 trust boundaries** and **3 findings** across **13 normal
 - Provider resources considered: `13`
 - Normalized resources: `13`
 - Unsupported resources: `0`
-- Registered rules: `133`
-- Enabled rules: `133`
+- Registered rules: `136`
+- Enabled rules: `136`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `aws-workload-s3-vpc-endpoint-missing`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-role-trust-expansion`: `1`
   - `aws-role-trust-missing-narrowing`: `1`
@@ -102,6 +103,20 @@ No findings in this severity band.
 - Recommended mitigation: Split high-privilege actions into separate roles, scope permissions to named resources, and remove role-passing or cross-role permissions from general application identities.
 - Evidence:
   - iam actions: iam:PassRole
+  - policy statements: Allow actions=[lambda:UpdateFunctionCode, lambda:UpdateAlias, iam:PassRole, s3:GetObject] resources=[arn:aws:lambda:us-east-1:333344445555:function:release-deployer, arn:aws:iam::333344445555:role/lambda-runtime-role, arn:aws:s3:::lambda-deploy-artifacts/*]
+
+#### Workload uses S3 without a VPC endpoint
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_lambda_function.deployer`, `aws_iam_role.deployer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lambda_function.deployer runs in VPC `vpc-lambda-001` and inherits S3 data-plane permissions from aws_iam_role.deployer, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
+- Recommended mitigation: Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private subnets through it, and use endpoint policies where possible.
+- Evidence:
+  - target workload: address=aws_lambda_function.deployer; type=aws_lambda_function; vpc_id=vpc-lambda-001; subnet_ids=[subnet-lambda-private-app-001]; security_group_ids=[sg-lambda-app-001]
+  - sensitive service dependency: service=s3; role=aws_iam_role.deployer; actions=[s3:GetObject]; resources=[arn:aws:lambda:us-east-1:333344445555:function:release-deployer, arn:aws:iam::333344445555:role/lambda-runtime-role, arn:aws:s3:::lambda-deploy-artifacts/*]
+  - vpc endpoint coverage: vpc_id=vpc-lambda-001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[lambda:UpdateFunctionCode, lambda:UpdateAlias, iam:PassRole, s3:GetObject] resources=[arn:aws:lambda:us-east-1:333344445555:function:release-deployer, arn:aws:iam::333344445555:role/lambda-runtime-role, arn:aws:s3:::lambda-deploy-artifacts/*]
 
 ### Low

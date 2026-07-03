@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **9 findings** across **23 normalized resources**.
+This run identified **9 trust boundaries** and **11 findings** across **23 normalized resources**.
 
 - High severity findings: `3`
-- Medium severity findings: `6`
+- Medium severity findings: `8`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **9 findings** across **23 normal
 - Provider resources considered: `24`
 - Normalized resources: `23`
 - Unsupported resources: `1`
-- Registered rules: `133`
-- Enabled rules: `133`
+- Registered rules: `136`
+- Enabled rules: `136`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -30,6 +30,8 @@ This run identified **9 trust boundaries** and **9 findings** across **23 normal
   - `aws-public-compute-broad-ingress`: `1`
   - `aws-database-permissive-ingress`: `1`
   - `aws-s3-public-access`: `1`
+  - `aws-workload-kms-vpc-endpoint-missing`: `1`
+  - `aws-workload-s3-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-missing-tier-segmentation`: `1`
@@ -219,6 +221,34 @@ This run identified **9 trust boundaries** and **9 findings** across **23 normal
 - Evidence:
   - trust principals: arn:aws:iam::999988887777:root
   - trust path: trust principal belongs to foreign account 999988887777
+
+#### Workload uses KMS without a VPC endpoint
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_lambda_function.processor`, `aws_iam_role.workload`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lambda_function.processor runs in VPC `vpc-001` and inherits KMS cryptographic key access from aws_iam_role.workload, but the Terraform plan does not show a KMS interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
+- Recommended mitigation: Add a KMS interface VPC endpoint with private DNS enabled for VPC workloads that perform key operations, and narrow endpoint policies where possible.
+- Evidence:
+  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
+  - sensitive service dependency: service=kms; role=aws_iam_role.workload; actions=[kms:Decrypt]; resources=[*]
+  - vpc endpoint coverage: vpc_id=vpc-001; service=kms; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
+  - policy statements: Allow actions=[s3:*, kms:Decrypt, iam:PassRole, sts:AssumeRole] resources=[*]
+
+#### Workload uses S3 without a VPC endpoint
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_lambda_function.processor`, `aws_iam_role.workload`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lambda_function.processor runs in VPC `vpc-001` and inherits S3 data-plane permissions from aws_iam_role.workload, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
+- Recommended mitigation: Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private subnets through it, and use endpoint policies where possible.
+- Evidence:
+  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
+  - sensitive service dependency: service=s3; role=aws_iam_role.workload; actions=[s3:*]; resources=[*]
+  - vpc endpoint coverage: vpc_id=vpc-001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
+  - policy statements: Allow actions=[s3:*, kms:Decrypt, iam:PassRole, sts:AssumeRole] resources=[*]
 
 ### Low
 

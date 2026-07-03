@@ -14,6 +14,7 @@ from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
 from tfstride.providers.aws.load_balancer_rules import AwsLoadBalancerRuleDetectors
 from tfstride.providers.aws.rds_rules import AwsRdsPostureRuleDetectors
+from tfstride.providers.aws.sensitive_endpoint_rules import AwsSensitiveEndpointRuleDetectors
 from tfstride.providers.aws.storage_rules import AwsS3PostureRuleDetectors
 
 AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
@@ -31,6 +32,9 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-workload-secretsmanager-vpc-endpoint-missing",
+        "aws-workload-kms-vpc-endpoint-missing",
+        "aws-workload-s3-vpc-endpoint-missing",
         "aws-eks-api-endpoint-public-unrestricted",
         "aws-eks-private-endpoint-not-enabled",
         "aws-eks-secrets-encryption-not-configured",
@@ -75,6 +79,7 @@ def build_aws_rule_contribution(
     eks_detectors = AwsEksRuleDetectors(finding_factory)
     lambda_detectors = AwsLambdaRuleDetectors(finding_factory)
     load_balancer_detectors = AwsLoadBalancerRuleDetectors(finding_factory)
+    sensitive_endpoint_detectors = AwsSensitiveEndpointRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
         "aws-lambda-public-invocation": lambda_detectors.detect_public_invocation,
@@ -91,6 +96,11 @@ def build_aws_rule_contribution(
         "aws-s3-public-access": posture_detectors.detect_public_object_storage,
         "aws-s3-customer-managed-encryption-missing": (s3_posture_detectors.detect_customer_managed_encryption_missing),
         "aws-s3-versioning-disabled": s3_posture_detectors.detect_versioning_disabled_or_unknown,
+        "aws-workload-secretsmanager-vpc-endpoint-missing": (
+            sensitive_endpoint_detectors.detect_missing_secretsmanager_endpoint
+        ),
+        "aws-workload-kms-vpc-endpoint-missing": sensitive_endpoint_detectors.detect_missing_kms_endpoint,
+        "aws-workload-s3-vpc-endpoint-missing": sensitive_endpoint_detectors.detect_missing_s3_endpoint,
         "aws-eks-api-endpoint-public-unrestricted": eks_detectors.detect_public_api_endpoint_unrestricted,
         "aws-eks-private-endpoint-not-enabled": eks_detectors.detect_private_endpoint_not_enabled,
         "aws-eks-secrets-encryption-not-configured": eks_detectors.detect_secrets_encryption_not_configured,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **6 trust boundaries** and **5 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **6 findings** across **21 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `5`
+- Medium severity findings: `6`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **6 trust boundaries** and **5 findings** across **21 normal
 - Provider resources considered: `21`
 - Normalized resources: `21`
 - Unsupported resources: `0`
-- Registered rules: `133`
-- Enabled rules: `133`
+- Registered rules: `136`
+- Enabled rules: `136`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `aws-workload-secretsmanager-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `2`
@@ -145,6 +146,20 @@ No findings in this severity band.
 - Recommended mitigation: Split high-privilege actions into separate roles, scope permissions to named resources, and remove role-passing or cross-role permissions from general application identities.
 - Evidence:
   - iam actions: secretsmanager:GetSecretValue
+  - policy statements: Allow actions=[secretsmanager:GetSecretValue] resources=[*]
+
+#### Workload uses Secrets Manager without a VPC endpoint
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_ecs_service.app`, `aws_iam_role.task`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_ecs_service.app runs in VPC `vpc-ecs-001` and inherits Secrets Manager secret retrieval from aws_iam_role.task, but the Terraform plan does not show a Secrets Manager interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
+- Recommended mitigation: Add a Secrets Manager interface VPC endpoint with private DNS enabled for VPC workloads that retrieve secrets, and narrow endpoint policies where possible.
+- Evidence:
+  - target workload: address=aws_ecs_service.app; type=aws_ecs_service; vpc_id=vpc-ecs-001; subnet_ids=[subnet-ecs-private-app]; security_group_ids=[sg-ecs-service]
+  - sensitive service dependency: service=secretsmanager; role=aws_iam_role.task; actions=[secretsmanager:GetSecretValue]; resources=[*]
+  - vpc endpoint coverage: vpc_id=vpc-ecs-001; service=secretsmanager; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[secretsmanager:GetSecretValue] resources=[*]
 
 ### Low

@@ -98,9 +98,9 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
             "safe": (SAFE_FIXTURE_PATH, 0, {}),
-            "baseline": (BASELINE_FIXTURE_PATH, 2, {"medium": 2}),
-            "mixed": (FIXTURE_PATH, 9, {"high": 3, "medium": 6}),
-            "nightmare": (NIGHTMARE_FIXTURE_PATH, 18, {"high": 5, "medium": 13}),
+            "baseline": (BASELINE_FIXTURE_PATH, 3, {"medium": 3}),
+            "mixed": (FIXTURE_PATH, 11, {"high": 3, "medium": 8}),
+            "nightmare": (NIGHTMARE_FIXTURE_PATH, 20, {"high": 5, "medium": 15}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
             "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
@@ -122,6 +122,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "baseline": {
                 "IAM policy grants wildcard privileges": 1,
                 "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
+                "Workload uses S3 without a VPC endpoint": 1,
             },
             "mixed": {
                 "Cross-account or broad role trust lacks narrowing conditions": 1,
@@ -132,6 +133,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Internet-exposed compute service permits overly broad ingress": 1,
                 "Object storage is publicly accessible": 1,
                 "Role trust relationship expands blast radius": 1,
+                "Workload uses KMS without a VPC endpoint": 1,
+                "Workload uses S3 without a VPC endpoint": 1,
             },
             "nightmare": {
                 "Cross-account or broad role trust lacks narrowing conditions": 2,
@@ -145,6 +148,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "IAM policy grants wildcard privileges": 3,
                 "Internet-exposed compute service permits overly broad ingress": 2,
                 "Object storage is publicly accessible": 2,
+                "Workload uses KMS without a VPC endpoint": 1,
+                "Workload uses S3 without a VPC endpoint": 1,
             },
             "gcp-safe": {},
             "gcp-baseline": {

@@ -271,21 +271,22 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
         )
         self.assertEqual(findings_by_title["Workload role carries sensitive permissions"], 1)
 
-    def test_realistic_lambda_deploy_role_fixture_surfaces_three_medium_findings(self) -> None:
+    def test_realistic_lambda_deploy_role_fixture_surfaces_four_medium_findings(self) -> None:
         result = self.engine.analyze_plan(LAMBDA_DEPLOY_ROLE_FIXTURE_PATH)
         boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
         severity_counts = Counter(finding.severity.value for finding in result.findings)
         title_counts = Counter(finding.title for finding in result.findings)
 
         self.assertEqual(len(result.inventory.resources), 13)
-        self.assertEqual(len(result.findings), 3)
-        self.assertEqual(dict(severity_counts), {"medium": 3})
+        self.assertEqual(len(result.findings), 4)
+        self.assertEqual(dict(severity_counts), {"medium": 4})
         self.assertEqual(
             dict(title_counts),
             {
                 "Cross-account or broad role trust lacks narrowing conditions": 1,
                 "Role trust relationship expands blast radius": 1,
                 "Workload role carries sensitive permissions": 1,
+                "Workload uses S3 without a VPC endpoint": 1,
             },
         )
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 0)

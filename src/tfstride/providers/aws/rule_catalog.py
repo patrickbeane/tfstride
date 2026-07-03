@@ -160,6 +160,39 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-workload-secretsmanager-vpc-endpoint-missing",
+        title="Workload uses Secrets Manager without a VPC endpoint",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a Secrets Manager interface VPC endpoint with private DNS enabled for VPC workloads that retrieve "
+            "secrets, and narrow endpoint policies where possible."
+        ),
+        tags=("aws", "vpc-endpoint", "private-connectivity", "secretsmanager", "workload"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="aws-workload-kms-vpc-endpoint-missing",
+        title="Workload uses KMS without a VPC endpoint",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a KMS interface VPC endpoint with private DNS enabled for VPC workloads that perform key "
+            "operations, and narrow endpoint policies where possible."
+        ),
+        tags=("aws", "vpc-endpoint", "private-connectivity", "kms", "workload"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="aws-workload-s3-vpc-endpoint-missing",
+        title="Workload uses S3 without a VPC endpoint",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private "
+            "subnets through it, and use endpoint policies where possible."
+        ),
+        tags=("aws", "vpc-endpoint", "private-connectivity", "s3", "workload"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
         rule_id="aws-eks-api-endpoint-public-unrestricted",
         title="EKS Kubernetes API endpoint is public without narrow CIDR restrictions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **7 trust boundaries** and **2 findings** across **26 normalized resources**.
+This run identified **7 trust boundaries** and **3 findings** across **26 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `2`
+- Medium severity findings: `3`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **7 trust boundaries** and **2 findings** across **26 normal
 - Provider resources considered: `26`
 - Normalized resources: `26`
 - Unsupported resources: `0`
-- Registered rules: `133`
-- Enabled rules: `133`
+- Registered rules: `136`
+- Enabled rules: `136`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `aws-workload-s3-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `1`
 
@@ -114,6 +115,20 @@ No findings in this severity band.
   - subnet posture: aws_lb.web sits in public subnet aws_subnet.public_edge with an internet route; aws_instance.app sits in private subnet aws_subnet.private_app with NAT-backed egress
   - data tier posture: aws_db_instance.app is not directly public; database has no direct internet ingress path
   - boundary rationale: Application or function workloads cross into a higher-sensitivity data plane when database ingress security groups explicitly trust the workload security group.
+
+#### Workload uses S3 without a VPC endpoint
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_lambda_function.processor`, `aws_iam_role.workload`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lambda_function.processor runs in VPC `vpc-safe-001` and inherits S3 data-plane permissions from aws_iam_role.workload, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
+- Recommended mitigation: Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private subnets through it, and use endpoint policies where possible.
+- Evidence:
+  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-safe-001; subnet_ids=[subnet-safe-private-app-001]; security_group_ids=[sg-safe-app-001]
+  - sensitive service dependency: service=s3; role=aws_iam_role.workload; actions=[s3:GetObject]; resources=[arn:aws:s3:::safe-artifacts/*]
+  - vpc endpoint coverage: vpc_id=vpc-safe-001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
+  - policy statements: Allow actions=[s3:GetObject] resources=[arn:aws:s3:::safe-artifacts/*]
 
 ### Low
 

@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_aws_safe_plan.json`
 - Provider: `aws`
-- Normalized resources: `26`
+- Normalized resources: `27`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **6 trust boundaries** and **0 findings** across **26 normalized resources**.
+This run identified **6 trust boundaries** and **0 findings** across **27 normalized resources**.
 
 - High severity findings: `0`
 - Medium severity findings: `0`
@@ -15,12 +15,12 @@ This run identified **6 trust boundaries** and **0 findings** across **26 normal
 
 ## Analysis Coverage
 
-- Terraform resources seen: `26`
-- Provider resources considered: `26`
-- Normalized resources: `26`
+- Terraform resources seen: `27`
+- Provider resources considered: `27`
+- Normalized resources: `27`
 - Unsupported resources: `0`
-- Registered rules: `133`
-- Enabled rules: `133`
+- Registered rules: `136`
+- Enabled rules: `136`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
