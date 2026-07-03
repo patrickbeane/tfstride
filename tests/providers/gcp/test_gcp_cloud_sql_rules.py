@@ -6,7 +6,24 @@ from tests.providers.gcp.rule_support.data import _cloud_sql_instance
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
+from tfstride.models import TerraformResource
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+
+
+def _service_networking_connection() -> TerraformResource:
+    return TerraformResource(
+        address="google_service_networking_connection.private_services",
+        mode="managed",
+        resource_type="google_service_networking_connection",
+        name="private_services",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values={
+            "network": "google_compute_network.main.id",
+            "service": "servicenetworking.googleapis.com",
+            "reserved_peering_ranges": ["private-services-range"],
+            "peering": "servicenetworking-googleapis-com",
+        },
+    )
 
 
 class GcpCloudSqlRuleTests(unittest.TestCase):
@@ -54,7 +71,11 @@ class GcpCloudSqlRuleTests(unittest.TestCase):
             ]
         )
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-backup-disabled"})),
+        )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -74,12 +95,13 @@ class GcpCloudSqlRuleTests(unittest.TestCase):
     def test_private_backed_up_cloud_sql_instance_is_not_flagged(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
+                _service_networking_connection(),
                 _cloud_sql_instance(
                     ipv4_enabled=False,
                     backup_enabled=True,
                     pitr_enabled=True,
                     private_network="google_compute_network.main.id",
-                )
+                ),
             ]
         )
 

@@ -139,6 +139,7 @@ EXPECTED_GCP_RULE_GROUP_IDS = (
         "gcp-cloud-sql-ssl-not-required",
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
+        "gcp-cloud-sql-private-connectivity-not-modeled",
         "gcp-gcs-public-access",
         "gcp-gcs-uniform-bucket-level-access-disabled",
         "gcp-gcs-public-access-prevention-not-enforced",
@@ -288,10 +289,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (115, 2, 2, 12, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (116, 2, 2, 12, 3, 2)
         )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (22, 2, 2, 2, 2, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (34, 0, 0, 10, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (35, 0, 0, 10, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (59, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:

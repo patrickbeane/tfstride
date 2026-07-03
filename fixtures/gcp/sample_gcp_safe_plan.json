@@ -18,6 +18,21 @@
           }
         },
         {
+          "address": "google_service_networking_connection.private_services",
+          "mode": "managed",
+          "type": "google_service_networking_connection",
+          "name": "private_services",
+          "provider_name": "registry.terraform.io/hashicorp/google",
+          "values": {
+            "network": "google_compute_network.main.id",
+            "service": "servicenetworking.googleapis.com",
+            "reserved_peering_ranges": [
+              "private-services-range"
+            ],
+            "peering": "servicenetworking-googleapis-com"
+          }
+        },
+        {
           "address": "google_compute_subnetwork.app",
           "mode": "managed",
           "type": "google_compute_subnetwork",

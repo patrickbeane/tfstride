@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_gcp_lb_compute_sql_plan.json`
 - Provider: `gcp`
-- Normalized resources: `10`
+- Normalized resources: `11`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **2 trust boundaries** and **0 findings** across **10 normalized resources**.
+This run identified **2 trust boundaries** and **0 findings** across **11 normalized resources**.
 
 - High severity findings: `0`
 - Medium severity findings: `0`
@@ -15,12 +15,12 @@ This run identified **2 trust boundaries** and **0 findings** across **10 normal
 
 ## Analysis Coverage
 
-- Terraform resources seen: `10`
-- Provider resources considered: `10`
-- Normalized resources: `10`
+- Terraform resources seen: `11`
+- Provider resources considered: `11`
+- Normalized resources: `11`
 - Unsupported resources: `0`
-- Registered rules: `136`
-- Enabled rules: `136`
+- Registered rules: `137`
+- Enabled rules: `137`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`

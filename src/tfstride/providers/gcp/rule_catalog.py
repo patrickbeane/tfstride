@@ -122,6 +122,18 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-sql-private-connectivity-not-modeled",
+        title="Cloud SQL private network lacks modeled private service access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Model the Private Service Access connection or Cloud SQL Private Service Connect policy for the "
+            "Cloud SQL private network in Terraform, or attach review evidence showing that private connectivity "
+            "is managed outside this plan. Disable public IPv4 where private connectivity should be mandatory."
+        ),
+        tags=("gcp", "cloud-sql", "database", "private-connectivity", "private-service-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gcs-public-access",
         title="GCS bucket is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,
