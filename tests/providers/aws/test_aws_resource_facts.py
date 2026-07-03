@@ -107,6 +107,24 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "load_balancer_listener_certificate_arn": ("arn:aws:acm:us-east-1:111122223333:certificate/listener"),
                 "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
                 "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
+                "vpc_endpoint_id": "vpce-secrets",
+                "vpc_endpoint_service_name": "com.amazonaws.us-east-1.secretsmanager",
+                "vpc_endpoint_service_family": "secretsmanager",
+                "vpc_endpoint_type": "Interface",
+                "vpc_endpoint_vpc_id": "vpc-123",
+                "vpc_endpoint_route_table_ids": ["rtb-private"],
+                "vpc_endpoint_subnet_ids": ["subnet-a", "subnet-b"],
+                "vpc_endpoint_security_group_ids": ["sg-endpoint"],
+                "vpc_endpoint_private_dns_enabled_state": "enabled",
+                "vpc_endpoint_policy_document": {"Statement": [{"Effect": "Allow"}]},
+                "vpc_endpoint_dns_entries": [
+                    {
+                        "dns_name": "vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com",
+                        "hosted_zone_id": "Z1HUB23UULQXV",
+                    }
+                ],
+                "vpc_endpoint_dns_names": ["vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com"],
+                "vpc_endpoint_posture_uncertainties": ["private_dns_enabled is unknown after planning"],
                 "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
@@ -203,6 +221,31 @@ class AwsResourceFactsTests(unittest.TestCase):
             facts.load_balancer_listener_tls_uncertainties,
             ["ssl_policy is unknown after planning"],
         )
+        self.assertEqual(facts.vpc_endpoint_id, "vpce-secrets")
+        self.assertEqual(facts.vpc_endpoint_service_name, "com.amazonaws.us-east-1.secretsmanager")
+        self.assertEqual(facts.vpc_endpoint_service_family, "secretsmanager")
+        self.assertEqual(facts.vpc_endpoint_type, "Interface")
+        self.assertEqual(facts.vpc_endpoint_vpc_id, "vpc-123")
+        self.assertEqual(facts.vpc_endpoint_route_table_ids, ["rtb-private"])
+        self.assertEqual(facts.vpc_endpoint_subnet_ids, ["subnet-a", "subnet-b"])
+        self.assertEqual(facts.vpc_endpoint_security_group_ids, ["sg-endpoint"])
+        self.assertEqual(facts.vpc_endpoint_private_dns_enabled_state, "enabled")
+        self.assertTrue(facts.vpc_endpoint_private_dns_enabled)
+        self.assertEqual(facts.vpc_endpoint_policy_document, {"Statement": [{"Effect": "Allow"}]})
+        self.assertEqual(
+            facts.vpc_endpoint_dns_entries,
+            [
+                {
+                    "dns_name": "vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com",
+                    "hosted_zone_id": "Z1HUB23UULQXV",
+                }
+            ],
+        )
+        self.assertEqual(
+            facts.vpc_endpoint_dns_names,
+            ["vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com"],
+        )
+        self.assertEqual(facts.vpc_endpoint_posture_uncertainties, ["private_dns_enabled is unknown after planning"])
         self.assertEqual(
             facts.eks_posture_uncertainties,
             ["vpc_config.endpoint_public_access is unknown after planning"],
@@ -316,6 +359,20 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.load_balancer_listener_certificate_arn)
         self.assertIsNone(facts.load_balancer_listener_ssl_policy)
         self.assertEqual(facts.load_balancer_listener_tls_uncertainties, [])
+        self.assertIsNone(facts.vpc_endpoint_id)
+        self.assertIsNone(facts.vpc_endpoint_service_name)
+        self.assertIsNone(facts.vpc_endpoint_service_family)
+        self.assertIsNone(facts.vpc_endpoint_type)
+        self.assertIsNone(facts.vpc_endpoint_vpc_id)
+        self.assertEqual(facts.vpc_endpoint_route_table_ids, [])
+        self.assertEqual(facts.vpc_endpoint_subnet_ids, [])
+        self.assertEqual(facts.vpc_endpoint_security_group_ids, [])
+        self.assertIsNone(facts.vpc_endpoint_private_dns_enabled_state)
+        self.assertIsNone(facts.vpc_endpoint_private_dns_enabled)
+        self.assertEqual(facts.vpc_endpoint_policy_document, {})
+        self.assertEqual(facts.vpc_endpoint_dns_entries, [])
+        self.assertEqual(facts.vpc_endpoint_dns_names, [])
+        self.assertEqual(facts.vpc_endpoint_posture_uncertainties, [])
         self.assertIsNone(facts.rds_publicly_accessible_state)
         self.assertIsNone(facts.rds_publicly_accessible)
         self.assertIsNone(facts.rds_backup_retention_period)

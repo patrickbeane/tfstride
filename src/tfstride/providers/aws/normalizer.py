@@ -48,6 +48,7 @@ from tfstride.providers.aws.network_normalizers import (
     normalize_security_group_rule,
     normalize_subnet,
     normalize_vpc,
+    normalize_vpc_endpoint,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.base import ProviderNormalizer
@@ -94,6 +95,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_sqs_queue": normalize_sqs_queue,
     "aws_subnet": normalize_subnet,
     "aws_vpc": normalize_vpc,
+    "aws_vpc_endpoint": normalize_vpc_endpoint,
 }
 SUPPORTED_AWS_TYPES = set(_AWS_RESOURCE_NORMALIZERS)
 

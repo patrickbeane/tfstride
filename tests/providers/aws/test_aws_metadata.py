@@ -95,6 +95,19 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "LOAD_BALANCER_LISTENER_CERTIFICATE_ARN": "load_balancer_listener_certificate_arn",
             "LOAD_BALANCER_LISTENER_SSL_POLICY": "load_balancer_listener_ssl_policy",
             "LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES": "load_balancer_listener_tls_uncertainties",
+            "VPC_ENDPOINT_ID": "vpc_endpoint_id",
+            "VPC_ENDPOINT_SERVICE_NAME": "vpc_endpoint_service_name",
+            "VPC_ENDPOINT_SERVICE_FAMILY": "vpc_endpoint_service_family",
+            "VPC_ENDPOINT_TYPE": "vpc_endpoint_type",
+            "VPC_ENDPOINT_VPC_ID": "vpc_endpoint_vpc_id",
+            "VPC_ENDPOINT_ROUTE_TABLE_IDS": "vpc_endpoint_route_table_ids",
+            "VPC_ENDPOINT_SUBNET_IDS": "vpc_endpoint_subnet_ids",
+            "VPC_ENDPOINT_SECURITY_GROUP_IDS": "vpc_endpoint_security_group_ids",
+            "VPC_ENDPOINT_PRIVATE_DNS_ENABLED_STATE": "vpc_endpoint_private_dns_enabled_state",
+            "VPC_ENDPOINT_POLICY_DOCUMENT": "vpc_endpoint_policy_document",
+            "VPC_ENDPOINT_DNS_ENTRIES": "vpc_endpoint_dns_entries",
+            "VPC_ENDPOINT_DNS_NAMES": "vpc_endpoint_dns_names",
+            "VPC_ENDPOINT_POSTURE_UNCERTAINTIES": "vpc_endpoint_posture_uncertainties",
         }
 
         for field_name, key in expected_keys.items():

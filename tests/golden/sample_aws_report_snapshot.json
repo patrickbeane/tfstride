@@ -360,7 +360,8 @@
         "aws_sns_topic",
         "aws_sqs_queue",
         "aws_subnet",
-        "aws_vpc"
+        "aws_vpc",
+        "aws_vpc_endpoint"
       ],
       "total_input_resources": 24,
       "provider_resource_count": 24,
