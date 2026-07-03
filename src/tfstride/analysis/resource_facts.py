@@ -278,6 +278,46 @@ class AnalysisComputeFacts:
         return self._facts.load_balancer_reachable_backends
 
     @property
+    def forwarding_rule_target(self) -> str | None:
+        return self._facts.forwarding_rule_target
+
+    @property
+    def forwarding_rule_load_balancing_scheme(self) -> str | None:
+        return self._facts.forwarding_rule_load_balancing_scheme
+
+    @property
+    def forwarding_rule_ip_address(self) -> str | None:
+        return self._facts.forwarding_rule_ip_address
+
+    @property
+    def forwarding_rule_ports(self) -> list[str]:
+        return self._facts.forwarding_rule_ports
+
+    @property
+    def load_balancer_ssl_policy(self) -> str | None:
+        return self._facts.load_balancer_ssl_policy
+
+    @property
+    def load_balancer_certificate_map(self) -> str | None:
+        return self._facts.load_balancer_certificate_map
+
+    @property
+    def ssl_policy_min_tls_version(self) -> str | None:
+        return self._facts.ssl_policy_min_tls_version
+
+    @property
+    def ssl_policy_profile(self) -> str | None:
+        return self._facts.ssl_policy_profile
+
+    @property
+    def ssl_policy_custom_features(self) -> list[str]:
+        return self._facts.ssl_policy_custom_features
+
+    @property
+    def ssl_policy_enabled_features(self) -> list[str]:
+        return self._facts.ssl_policy_enabled_features
+
+    @property
     def gke_endpoint(self) -> str | None:
         return self._facts.gke_endpoint
 

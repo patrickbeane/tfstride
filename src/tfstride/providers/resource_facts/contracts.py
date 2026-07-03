@@ -263,6 +263,46 @@ class ProviderComputeFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def forwarding_rule_target(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def forwarding_rule_load_balancing_scheme(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def forwarding_rule_ip_address(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def forwarding_rule_ports(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def load_balancer_ssl_policy(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def load_balancer_certificate_map(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def ssl_policy_min_tls_version(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def ssl_policy_profile(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def ssl_policy_custom_features(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def ssl_policy_enabled_features(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
     def gke_endpoint(self) -> str | None:
         raise NotImplementedError
 

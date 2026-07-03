@@ -213,6 +213,28 @@ GCP_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-load-balancer-http-public-proxy",
+        title="Public GCP load balancer frontend uses plaintext HTTP",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Terminate HTTPS on public GCP load balancer frontends, redirect HTTP to HTTPS where possible, "
+            "and keep plaintext target proxies internal or behind another explicit TLS termination layer."
+        ),
+        tags=("gcp", "load-balancer", "tls", "http", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-load-balancer-ssl-policy-missing-or-weak",
+        title="Public GCP HTTPS load balancer has missing or weak SSL policy",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Attach a GCP SSL policy to public HTTPS target proxies, require TLS 1.2 or newer, and keep the "
+            "policy resource deterministic in Terraform so public edge TLS posture is reviewable."
+        ),
+        tags=("gcp", "load-balancer", "tls", "ssl-policy", "public-access"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-compute-os-login-disabled",
         title="GCP compute instance disables OS Login",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

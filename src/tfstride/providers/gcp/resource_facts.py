@@ -494,6 +494,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
 
     @property
+    def forwarding_rule_target(self) -> str | None:
+        return self.get(GcpResourceMetadata.FORWARDING_RULE_TARGET)
+
+    @property
+    def forwarding_rule_load_balancing_scheme(self) -> str | None:
+        return self.get(GcpResourceMetadata.FORWARDING_RULE_LOAD_BALANCING_SCHEME)
+
+    @property
+    def forwarding_rule_ip_address(self) -> str | None:
+        return self.get(GcpResourceMetadata.FORWARDING_RULE_IP_ADDRESS)
+
+    @property
+    def forwarding_rule_ports(self) -> list[str]:
+        return self.get(GcpResourceMetadata.FORWARDING_RULE_PORTS)
+
+    @property
     def load_balancer_ssl_certificates(self) -> list[str]:
         return self.get(GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES)
 

@@ -30,6 +30,29 @@ from tfstride.models import (
 )
 from tfstride.resource_helpers import describe_security_group_rule
 
+_GCP_FORWARDING_RULE_RESOURCE_TYPES = ("google_compute_forwarding_rule", "google_compute_global_forwarding_rule")
+_GCP_HTTP_TARGET_PROXY_RESOURCE_TYPES = (
+    "google_compute_target_http_proxy",
+    "google_compute_region_target_http_proxy",
+)
+_GCP_HTTPS_TARGET_PROXY_RESOURCE_TYPES = (
+    "google_compute_target_https_proxy",
+    "google_compute_region_target_https_proxy",
+)
+_GCP_SSL_POLICY_REFERENCE_SUFFIXES = (".id", ".name", ".self_link")
+_WEAK_GCP_SSL_POLICY_MIN_TLS_VERSIONS = frozenset(
+    {
+        "tls_1_0",
+        "tls1_0",
+        "tlsv1_0",
+        "tls10",
+        "tls_1_1",
+        "tls1_1",
+        "tlsv1_1",
+        "tls11",
+    }
+)
+
 _GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES = (
     "google_compute_instance",
     "google_compute_backend_service",
@@ -137,6 +160,93 @@ class GcpComputeExposureRuleDetectors:
             )
         return findings
 
+    def detect_public_load_balancer_http_frontend(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for forwarding_rule, target_proxy in _public_forwarding_rule_target_proxies(
+            context.inventory,
+            _GCP_HTTP_TARGET_PROXY_RESOURCE_TYPES,
+        ):
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            boundary = _forwarding_rule_boundary(context, forwarding_rule)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([forwarding_rule.address, target_proxy.address]),
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{forwarding_rule.display_name} is public and targets {target_proxy.display_name}, "
+                        "an HTTP target proxy. Public load balancer frontends should terminate HTTPS or "
+                        "redirect HTTP to HTTPS so clients do not rely on cleartext transport."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("frontend_forwarding_rule", _forwarding_rule_evidence(forwarding_rule)),
+                        evidence_item("target_proxy", _target_proxy_evidence(target_proxy)),
+                        evidence_item("proxy_transport", _http_proxy_transport_evidence(target_proxy)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_public_load_balancer_ssl_policy_missing_or_weak(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for forwarding_rule, target_proxy in _public_forwarding_rule_target_proxies(
+            context.inventory,
+            _GCP_HTTPS_TARGET_PROXY_RESOURCE_TYPES,
+        ):
+            policy_state, ssl_policy = _target_proxy_ssl_policy_state(context.inventory, target_proxy)
+            if policy_state in {"configured", "unresolved", "unknown"}:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            boundary = _forwarding_rule_boundary(context, forwarding_rule)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses(
+                        [forwarding_rule.address, target_proxy.address, ssl_policy.address if ssl_policy else ""]
+                    ),
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=_ssl_policy_rationale(target_proxy, ssl_policy, policy_state),
+                    evidence=collect_evidence(
+                        evidence_item("frontend_forwarding_rule", _forwarding_rule_evidence(forwarding_rule)),
+                        evidence_item("target_proxy", _target_proxy_evidence(target_proxy)),
+                        evidence_item(
+                            "ssl_policy_posture", _ssl_policy_evidence(target_proxy, ssl_policy, policy_state)
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_compute_os_login_disabled(
         self,
         context: RuleEvaluationContext,
@@ -184,6 +294,146 @@ class GcpComputeExposureRuleDetectors:
                 )
             )
         return findings
+
+
+def _public_forwarding_rule_target_proxies(
+    inventory: ResourceInventory,
+    target_proxy_types: tuple[str, ...],
+) -> list[tuple[NormalizedResource, NormalizedResource]]:
+    matches: list[tuple[NormalizedResource, NormalizedResource]] = []
+    for forwarding_rule in inventory.by_type(*_GCP_FORWARDING_RULE_RESOURCE_TYPES):
+        if not forwarding_rule.public_access_configured:
+            continue
+        target_reference = analysis_facts(forwarding_rule).compute.forwarding_rule_target
+        if not target_reference:
+            continue
+        target_proxy = _resolve_inventory_reference(inventory, target_reference)
+        if target_proxy is not None and target_proxy.resource_type in target_proxy_types:
+            matches.append((forwarding_rule, target_proxy))
+    return matches
+
+
+def _resolve_inventory_reference(inventory: ResourceInventory, reference: str) -> NormalizedResource | None:
+    for candidate in _reference_candidates(reference):
+        resource = inventory.get_by_address(candidate) or inventory.get_by_identifier(candidate)
+        if resource is not None:
+            return resource
+    return None
+
+
+def _reference_candidates(reference: str) -> list[str]:
+    text = str(reference).strip()
+    candidates = [text]
+    for suffix in _GCP_SSL_POLICY_REFERENCE_SUFFIXES:
+        if text.endswith(suffix):
+            candidates.append(text[: -len(suffix)])
+    return dedupe_addresses(candidates)
+
+
+def _forwarding_rule_boundary(
+    context: RuleEvaluationContext,
+    forwarding_rule: NormalizedResource,
+) -> TrustBoundary | None:
+    return context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", forwarding_rule.address))
+
+
+def _forwarding_rule_evidence(forwarding_rule: NormalizedResource) -> list[str]:
+    facts = analysis_facts(forwarding_rule).compute
+    values = [f"address={forwarding_rule.address}", f"type={forwarding_rule.resource_type}"]
+    if facts.forwarding_rule_load_balancing_scheme:
+        values.append(f"scheme={facts.forwarding_rule_load_balancing_scheme}")
+    if facts.forwarding_rule_ip_address:
+        values.append(f"ip_address={facts.forwarding_rule_ip_address}")
+    if facts.forwarding_rule_ports:
+        values.append("ports=" + ",".join(facts.forwarding_rule_ports))
+    if facts.forwarding_rule_target:
+        values.append(f"target={facts.forwarding_rule_target}")
+    values.append("public_exposure=true")
+    values.extend(forwarding_rule.public_exposure_reasons)
+    return values
+
+
+def _target_proxy_evidence(target_proxy: NormalizedResource) -> list[str]:
+    facts = analysis_facts(target_proxy).compute
+    values = [f"address={target_proxy.address}", f"type={target_proxy.resource_type}"]
+    if facts.load_balancer_ssl_policy:
+        values.append(f"ssl_policy={facts.load_balancer_ssl_policy}")
+    if facts.load_balancer_certificate_map:
+        values.append(f"certificate_map={facts.load_balancer_certificate_map}")
+    return values
+
+
+def _http_proxy_transport_evidence(target_proxy: NormalizedResource) -> list[str]:
+    return [f"target_proxy_type={target_proxy.resource_type}", "HTTP target proxy does not terminate TLS"]
+
+
+def _target_proxy_ssl_policy_state(
+    inventory: ResourceInventory,
+    target_proxy: NormalizedResource,
+) -> tuple[str, NormalizedResource | None]:
+    ssl_policy_reference = analysis_facts(target_proxy).compute.load_balancer_ssl_policy
+    if not ssl_policy_reference:
+        return "missing", None
+    ssl_policy = _resolve_inventory_reference(inventory, ssl_policy_reference)
+    if ssl_policy is None:
+        return "unresolved", None
+    min_tls_state = _ssl_policy_min_tls_state(ssl_policy)
+    if min_tls_state == "weak":
+        return "weak", ssl_policy
+    return min_tls_state, ssl_policy
+
+
+def _ssl_policy_min_tls_state(ssl_policy: NormalizedResource) -> str:
+    min_tls_version = analysis_facts(ssl_policy).compute.ssl_policy_min_tls_version
+    if not min_tls_version:
+        return "unknown"
+    normalized = min_tls_version.strip().lower().replace("-", "_").replace(".", "_")
+    if normalized in _WEAK_GCP_SSL_POLICY_MIN_TLS_VERSIONS:
+        return "weak"
+    return "configured"
+
+
+def _ssl_policy_evidence(
+    target_proxy: NormalizedResource,
+    ssl_policy: NormalizedResource | None,
+    policy_state: str,
+) -> list[str]:
+    proxy_facts = analysis_facts(target_proxy).compute
+    values = [f"ssl_policy_state={policy_state}"]
+    if proxy_facts.load_balancer_ssl_policy:
+        values.append(f"ssl_policy_reference={proxy_facts.load_balancer_ssl_policy}")
+    else:
+        values.append("ssl_policy is unset")
+    if ssl_policy is not None:
+        policy_facts = analysis_facts(ssl_policy).compute
+        values.append(f"ssl_policy_resource={ssl_policy.address}")
+        if policy_facts.ssl_policy_min_tls_version:
+            values.append(f"min_tls_version={policy_facts.ssl_policy_min_tls_version}")
+        if policy_facts.ssl_policy_profile:
+            values.append(f"profile={policy_facts.ssl_policy_profile}")
+        if policy_facts.ssl_policy_custom_features:
+            values.append("custom_features=" + ",".join(policy_facts.ssl_policy_custom_features))
+        if policy_facts.ssl_policy_enabled_features:
+            values.append("enabled_features=" + ",".join(policy_facts.ssl_policy_enabled_features))
+    return values
+
+
+def _ssl_policy_rationale(
+    target_proxy: NormalizedResource,
+    ssl_policy: NormalizedResource | None,
+    policy_state: str,
+) -> str:
+    if policy_state == "weak" and ssl_policy is not None:
+        min_tls_version = analysis_facts(ssl_policy).compute.ssl_policy_min_tls_version or "an older TLS version"
+        return (
+            f"{target_proxy.display_name} uses {ssl_policy.display_name}, whose minimum TLS version is "
+            f"`{min_tls_version}`. Public HTTPS load balancers should require TLS 1.2 or newer."
+        )
+    return (
+        f"{target_proxy.display_name} is on a public HTTPS load balancer path but does not attach an explicit "
+        "GCP SSL policy. tfSTRIDE cannot prove the public frontend enforces a modern minimum TLS version from "
+        "the available plan data."
+    )
 
 
 def _load_balancer_frontend_boundary(

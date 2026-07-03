@@ -271,6 +271,46 @@ class NeutralProviderComputeFacts:
         return []
 
     @property
+    def forwarding_rule_target(self) -> str | None:
+        return None
+
+    @property
+    def forwarding_rule_load_balancing_scheme(self) -> str | None:
+        return None
+
+    @property
+    def forwarding_rule_ip_address(self) -> str | None:
+        return None
+
+    @property
+    def forwarding_rule_ports(self) -> list[str]:
+        return []
+
+    @property
+    def load_balancer_ssl_policy(self) -> str | None:
+        return None
+
+    @property
+    def load_balancer_certificate_map(self) -> str | None:
+        return None
+
+    @property
+    def ssl_policy_min_tls_version(self) -> str | None:
+        return None
+
+    @property
+    def ssl_policy_profile(self) -> str | None:
+        return None
+
+    @property
+    def ssl_policy_custom_features(self) -> list[str]:
+        return []
+
+    @property
+    def ssl_policy_enabled_features(self) -> list[str]:
+        return []
+
+    @property
     def gke_endpoint(self) -> str | None:
         return None
 

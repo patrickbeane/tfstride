@@ -27,6 +27,8 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gcs-retention-policy-insufficient",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
+        "gcp-load-balancer-http-public-proxy",
+        "gcp-load-balancer-ssl-policy-missing-or-weak",
         "gcp-compute-os-login-disabled",
         "gcp-gke-public-control-plane",
         "gcp-gke-broad-authorized-networks",
@@ -92,6 +94,10 @@ def build_gcp_rule_contribution(
         "gcp-gcs-retention-policy-insufficient": gcp_detectors.detect_gcs_retention_policy_insufficient,
         "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
         "gcp-public-load-balanced-workload": gcp_detectors.detect_public_load_balanced_workload,
+        "gcp-load-balancer-http-public-proxy": gcp_detectors.detect_public_load_balancer_http_frontend,
+        "gcp-load-balancer-ssl-policy-missing-or-weak": (
+            gcp_detectors.detect_public_load_balancer_ssl_policy_missing_or_weak
+        ),
         "gcp-compute-os-login-disabled": gcp_detectors.detect_compute_os_login_disabled,
         "gcp-gke-public-control-plane": gcp_detectors.detect_gke_public_control_plane,
         "gcp-gke-broad-authorized-networks": gcp_detectors.detect_gke_broad_authorized_networks,
