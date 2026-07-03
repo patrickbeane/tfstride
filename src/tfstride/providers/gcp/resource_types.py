@@ -38,6 +38,7 @@ class GcpResourceType:
     COMPUTE_FIREWALL_POLICY_RULE = "google_compute_firewall_policy_rule"
     COMPUTE_FORWARDING_RULE = "google_compute_forwarding_rule"
     COMPUTE_GLOBAL_FORWARDING_RULE = "google_compute_global_forwarding_rule"
+    COMPUTE_MANAGED_SSL_CERTIFICATE = "google_compute_managed_ssl_certificate"
     COMPUTE_INSTANCE = "google_compute_instance"
     COMPUTE_NETWORK = "google_compute_network"
     COMPUTE_NETWORK_ENDPOINT_GROUP = "google_compute_network_endpoint_group"
@@ -50,6 +51,7 @@ class GcpResourceType:
     COMPUTE_ROUTER = "google_compute_router"
     COMPUTE_ROUTER_NAT = "google_compute_router_nat"
     COMPUTE_SUBNETWORK = "google_compute_subnetwork"
+    COMPUTE_SSL_POLICY = "google_compute_ssl_policy"
     COMPUTE_TARGET_HTTP_PROXY = "google_compute_target_http_proxy"
     COMPUTE_TARGET_HTTPS_PROXY = "google_compute_target_https_proxy"
     COMPUTE_URL_MAP = "google_compute_url_map"
@@ -341,6 +343,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE,
         GcpResourceType.COMPUTE_FORWARDING_RULE,
         GcpResourceType.COMPUTE_GLOBAL_FORWARDING_RULE,
+        GcpResourceType.COMPUTE_MANAGED_SSL_CERTIFICATE,
         GcpResourceType.COMPUTE_INSTANCE,
         GcpResourceType.COMPUTE_NETWORK,
         GcpResourceType.COMPUTE_NETWORK_ENDPOINT_GROUP,
@@ -353,6 +356,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_ROUTER,
         GcpResourceType.COMPUTE_ROUTER_NAT,
         GcpResourceType.COMPUTE_SUBNETWORK,
+        GcpResourceType.COMPUTE_SSL_POLICY,
         GcpResourceType.COMPUTE_TARGET_HTTP_PROXY,
         GcpResourceType.COMPUTE_TARGET_HTTPS_PROXY,
         GcpResourceType.COMPUTE_URL_MAP,

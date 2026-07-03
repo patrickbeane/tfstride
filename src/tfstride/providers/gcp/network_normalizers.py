@@ -157,6 +157,52 @@ def normalize_compute_target_https_proxy(resource: TerraformResource) -> Normali
     return _normalize_target_proxy(resource)
 
 
+def normalize_compute_ssl_policy(resource: TerraformResource) -> NormalizedResource:
+    values = GcpValues(resource.values)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.SSL_POLICY_NAME: first_non_empty(values.get(GcpAttr.NAME), resource.name),
+                GcpResourceMetadata.SSL_POLICY_MIN_TLS_VERSION: values.get(GcpAttr.MIN_TLS_VERSION),
+                GcpResourceMetadata.SSL_POLICY_PROFILE: values.get(GcpAttr.PROFILE),
+                GcpResourceMetadata.SSL_POLICY_CUSTOM_FEATURES: values.get(GcpAttr.CUSTOM_FEATURES),
+                GcpResourceMetadata.SSL_POLICY_ENABLED_FEATURES: values.get(GcpAttr.ENABLED_FEATURES),
+            },
+        ),
+    )
+
+
+def normalize_compute_managed_ssl_certificate(resource: TerraformResource) -> NormalizedResource:
+    values = GcpValues(resource.values)
+    managed = first_item(values.get(GcpAttr.MANAGED)) or {}
+    managed_values = GcpValues(managed)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=resource_identifier(resource),
+        metadata=_load_balancer_metadata(
+            values,
+            {
+                GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_NAME: first_non_empty(
+                    values.get(GcpAttr.NAME), resource.name
+                ),
+                GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_DOMAINS: managed_values.get(GcpAttr.DOMAINS),
+                GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_STATUS: managed_values.get(GcpAttr.STATUS_TEXT),
+            },
+        ),
+    )
+
+
 def normalize_compute_region_target_http_proxy(resource: TerraformResource) -> NormalizedResource:
     return _normalize_target_proxy(resource)
 
@@ -337,6 +383,8 @@ def _normalize_target_proxy(resource: TerraformResource) -> NormalizedResource:
             {
                 GcpResourceMetadata.LOAD_BALANCER_URL_MAP: values.get(GcpAttr.URL_MAP),
                 GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES: values.get(GcpAttr.SSL_CERTIFICATES),
+                GcpResourceMetadata.LOAD_BALANCER_SSL_POLICY: values.get(GcpAttr.SSL_POLICY),
+                GcpResourceMetadata.LOAD_BALANCER_CERTIFICATE_MAP: values.get(GcpAttr.CERTIFICATE_MAP),
             },
         ),
     )

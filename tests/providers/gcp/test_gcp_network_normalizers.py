@@ -17,12 +17,14 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_firewall_policy_rule,
     normalize_compute_forwarding_rule,
     normalize_compute_global_forwarding_rule,
+    normalize_compute_managed_ssl_certificate,
     normalize_compute_network,
     normalize_compute_network_endpoint_group,
     normalize_compute_region_network_endpoint_group,
     normalize_compute_route,
     normalize_compute_router,
     normalize_compute_router_nat,
+    normalize_compute_ssl_policy,
     normalize_compute_subnetwork,
     normalize_compute_target_https_proxy,
     normalize_compute_url_map,
@@ -30,6 +32,8 @@ from tfstride.providers.gcp.network_normalizers import (
     parse_firewall_policy_allow_rules,
     parse_firewall_policy_rules,
 )
+from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 
 class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
@@ -186,6 +190,8 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
                     "name": "web-proxy",
                     "url_map": "google_compute_url_map.web.id",
                     "ssl_certificates": ["google_compute_managed_ssl_certificate.web.id"],
+                    "ssl_policy": "google_compute_ssl_policy.modern.id",
+                    "certificate_map": "//certificatemanager.googleapis.com/projects/demo/locations/global/certificateMaps/web",
                 },
             )
         )
@@ -256,6 +262,20 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
             ["google_compute_managed_ssl_certificate.web.id"],
         )
         self.assertEqual(
+            target_proxy.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_SSL_POLICY),
+            "google_compute_ssl_policy.modern.id",
+        )
+        self.assertEqual(
+            target_proxy.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_CERTIFICATE_MAP),
+            "//certificatemanager.googleapis.com/projects/demo/locations/global/certificateMaps/web",
+        )
+        target_proxy_facts = gcp_facts(target_proxy)
+        self.assertEqual(target_proxy_facts.load_balancer_ssl_policy, "google_compute_ssl_policy.modern.id")
+        self.assertEqual(
+            target_proxy_facts.load_balancer_certificate_map,
+            "//certificatemanager.googleapis.com/projects/demo/locations/global/certificateMaps/web",
+        )
+        self.assertEqual(
             backend_service.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL),
             "HTTP",
         )
@@ -287,6 +307,92 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
             compute_neg.get_metadata_field(GcpResourceMetadata.LOAD_BALANCER_NETWORK_ENDPOINTS),
             [{"instance": "google_compute_instance.web.id", "port": 8080}],
         )
+
+    def test_load_balancer_tls_posture_normalizers_preserve_policy_and_certificate_facts(self) -> None:
+        ssl_policy = normalize_compute_ssl_policy(
+            _terraform_resource(
+                "google_compute_ssl_policy.modern",
+                "google_compute_ssl_policy",
+                {
+                    "name": "modern-tls",
+                    "min_tls_version": "TLS_1_2",
+                    "profile": "MODERN",
+                    "custom_features": ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],
+                    "enabled_features": ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],
+                },
+            )
+        )
+        managed_certificate = normalize_compute_managed_ssl_certificate(
+            _terraform_resource(
+                "google_compute_managed_ssl_certificate.web",
+                "google_compute_managed_ssl_certificate",
+                {
+                    "name": "web-cert",
+                    "managed": [
+                        {
+                            "domains": ["app.example.com", "api.example.com"],
+                            "status": "ACTIVE",
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(ssl_policy.category, ResourceCategory.EDGE)
+        self.assertEqual(
+            ssl_policy.get_metadata_field(GcpResourceMetadata.SSL_POLICY_NAME),
+            "modern-tls",
+        )
+        self.assertEqual(
+            ssl_policy.get_metadata_field(GcpResourceMetadata.SSL_POLICY_MIN_TLS_VERSION),
+            "TLS_1_2",
+        )
+        self.assertEqual(ssl_policy.get_metadata_field(GcpResourceMetadata.SSL_POLICY_PROFILE), "MODERN")
+        self.assertEqual(
+            ssl_policy.get_metadata_field(GcpResourceMetadata.SSL_POLICY_CUSTOM_FEATURES),
+            ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],
+        )
+        self.assertEqual(gcp_facts(ssl_policy).ssl_policy_min_tls_version, "TLS_1_2")
+        self.assertEqual(gcp_facts(ssl_policy).ssl_policy_profile, "MODERN")
+
+        self.assertEqual(managed_certificate.category, ResourceCategory.EDGE)
+        self.assertEqual(
+            managed_certificate.get_metadata_field(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_NAME),
+            "web-cert",
+        )
+        self.assertEqual(
+            managed_certificate.get_metadata_field(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_DOMAINS),
+            ["app.example.com", "api.example.com"],
+        )
+        self.assertEqual(
+            managed_certificate.get_metadata_field(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_STATUS),
+            "ACTIVE",
+        )
+        self.assertEqual(
+            gcp_facts(managed_certificate).managed_ssl_certificate_domains,
+            ["app.example.com", "api.example.com"],
+        )
+
+    def test_gcp_normalizer_supports_tls_posture_resource_types(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_ssl_policy.modern",
+                    "google_compute_ssl_policy",
+                    {"name": "modern-tls", "min_tls_version": "TLS_1_2"},
+                ),
+                _terraform_resource(
+                    "google_compute_managed_ssl_certificate.web",
+                    "google_compute_managed_ssl_certificate",
+                    {"name": "web-cert", "managed": [{"domains": ["app.example.com"]}]},
+                ),
+            ]
+        )
+
+        resources_by_address = {resource.address: resource for resource in inventory.resources}
+        self.assertEqual(inventory.unsupported_resources, [])
+        self.assertIn("google_compute_ssl_policy.modern", resources_by_address)
+        self.assertIn("google_compute_managed_ssl_certificate.web", resources_by_address)
 
     def test_compute_firewall_normalizer_builds_allow_rules(self) -> None:
         normalized = normalize_compute_firewall(self.resources["google_compute_firewall.public_ssh"])

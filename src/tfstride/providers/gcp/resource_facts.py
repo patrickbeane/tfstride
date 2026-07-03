@@ -494,6 +494,42 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
 
     @property
+    def load_balancer_ssl_certificates(self) -> list[str]:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_SSL_CERTIFICATES)
+
+    @property
+    def load_balancer_ssl_policy(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_SSL_POLICY)
+
+    @property
+    def load_balancer_certificate_map(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_CERTIFICATE_MAP)
+
+    @property
+    def ssl_policy_min_tls_version(self) -> str | None:
+        return self.get(GcpResourceMetadata.SSL_POLICY_MIN_TLS_VERSION)
+
+    @property
+    def ssl_policy_profile(self) -> str | None:
+        return self.get(GcpResourceMetadata.SSL_POLICY_PROFILE)
+
+    @property
+    def ssl_policy_custom_features(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SSL_POLICY_CUSTOM_FEATURES)
+
+    @property
+    def ssl_policy_enabled_features(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SSL_POLICY_ENABLED_FEATURES)
+
+    @property
+    def managed_ssl_certificate_domains(self) -> list[str]:
+        return self.get(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_DOMAINS)
+
+    @property
+    def managed_ssl_certificate_status(self) -> str | None:
+        return self.get(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_STATUS)
+
+    @property
     def iam_role(self) -> str | None:
         return self.get(GcpResourceMetadata.IAM_ROLE)
 
