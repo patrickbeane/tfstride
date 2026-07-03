@@ -6,6 +6,7 @@ from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
+    AZURE_APP_SERVICE_RESOURCE_TYPES,
     AZURE_COMPUTE_RESOURCE_TYPES,
     AZURE_POSTGRESQL_RESOURCE_TYPES,
     AZURE_SQL_RESOURCE_TYPES,
@@ -16,6 +17,8 @@ _STORAGE_POSTURE_RESOURCE_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
     AzureResourceType.STORAGE_CONTAINER,
 )
+
+_AZURE_WORKLOAD_RESOURCE_TYPES = tuple(sorted(AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES))
 
 
 def observe_azure_posture(inventory: ResourceInventory) -> list[Observation]:
@@ -36,7 +39,7 @@ def observe_azure_posture(inventory: ResourceInventory) -> list[Observation]:
 
 def _observe_managed_identity_principals(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
-    resource_types = (*AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType.USER_ASSIGNED_IDENTITY)
+    resource_types = (*_AZURE_WORKLOAD_RESOURCE_TYPES, AzureResourceType.USER_ASSIGNED_IDENTITY)
     for resource in inventory.by_type(*resource_types):
         facts = azure_facts(resource)
         if facts.identity_type:

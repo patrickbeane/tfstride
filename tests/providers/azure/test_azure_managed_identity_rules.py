@@ -7,6 +7,7 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
 from tfstride.providers.azure.normalizer import AzureNormalizer
+from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 
@@ -225,6 +226,45 @@ def _public_vm_without_identity(port: str = "22") -> list[TerraformResource]:
     ]
 
 
+def _app_service(
+    *,
+    resource_type: str = AzureResourceType.LINUX_WEB_APP,
+    name: str = "app",
+    public_network: bool = True,
+    identity: list[dict[str, object]] | None = None,
+) -> TerraformResource:
+    values: dict[str, object] = {
+        "id": f"/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Web/sites/{name}",
+        "name": name,
+        "service_plan_id": "azurerm_service_plan.apps.id",
+        "public_network_access_enabled": public_network,
+        "site_config": [{"minimum_tls_version": "1.2"}],
+    }
+    if identity is not None:
+        values["identity"] = identity
+    return _resource(resource_type, name, values)
+
+
+def _system_assigned_app_identity(principal_id: str = "principal-id") -> list[dict[str, object]]:
+    return [
+        {
+            "type": "SystemAssigned",
+            "principal_id": principal_id,
+            "tenant_id": "tenant-id",
+            "identity_ids": [],
+        }
+    ]
+
+
+def _user_assigned_app_identity() -> list[dict[str, object]]:
+    return [
+        {
+            "type": "UserAssigned",
+            "identity_ids": ["azurerm_user_assigned_identity.deploy.id"],
+        }
+    ]
+
+
 def _evaluate(resources: list[TerraformResource], *rule_ids: str):
     inventory = AzureNormalizer().normalize(resources)
     boundaries = detect_trust_boundaries(inventory)
@@ -273,6 +313,26 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+    def test_app_service_system_identity_broad_rbac_is_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _app_service(identity=_system_assigned_app_identity()),
+                _role_assignment(role_definition_name="Owner"),
+            ],
+            "azure-managed-identity-broad-rbac",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-managed-identity-broad-rbac"])
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            ["azurerm_linux_web_app.app", "azurerm_role_assignment.assignment"],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertIn("address=azurerm_linux_web_app.app", evidence["managed_identity"])
+        self.assertIn("identity_type=SystemAssigned", evidence["managed_identity"])
+        self.assertEqual(evidence["breadth_signals"], ["subscription_scope", "broad_builtin_role"])
 
     def test_unknown_role_assignment_data_does_not_infer_broad_rbac(self) -> None:
         _, _, findings = _evaluate(
@@ -329,12 +389,121 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
         self.assertIn("address=azurerm_linux_virtual_machine.web", evidence["public_workloads"][0])
         self.assertIn("target=azurerm_storage_account.logs", evidence["sensitive_resource_assignments"][0])
 
+    def test_public_app_service_system_identity_path_to_storage_is_detected(self) -> None:
+        inventory, boundaries, findings = _evaluate(
+            [
+                _storage_account(),
+                _app_service(identity=_system_assigned_app_identity()),
+                _role_assignment(
+                    role_definition_name="Storage Blob Data Owner",
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        app = inventory.get_by_address("azurerm_linux_web_app.app")
+        assert app is not None
+        self.assertEqual(len(azure_facts(app).managed_identity_role_assignments), 1)
+        self.assertEqual(boundaries, [])
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-public-workload-sensitive-resource-access"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_web_app.app",
+                "azurerm_role_assignment.assignment",
+                "azurerm_storage_account.logs",
+            ],
+        )
+        self.assertIsNone(finding.trust_boundary_id)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_workloads"],
+            ["address=azurerm_linux_web_app.app; public_network_access_enabled=true"],
+        )
+        self.assertIn("address=azurerm_linux_web_app.app", evidence["managed_identity"])
+        self.assertIn("target=azurerm_storage_account.logs", evidence["sensitive_resource_assignments"][0])
+
+    def test_public_function_user_assigned_identity_path_to_storage_is_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _storage_account(),
+                _user_assigned_identity(),
+                _app_service(
+                    resource_type=AzureResourceType.LINUX_FUNCTION_APP,
+                    name="fn",
+                    identity=_user_assigned_app_identity(),
+                ),
+                _role_assignment(
+                    role_definition_name="Storage Blob Data Owner",
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-public-workload-sensitive-resource-access"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_function_app.fn",
+                "azurerm_user_assigned_identity.deploy",
+                "azurerm_role_assignment.assignment",
+                "azurerm_storage_account.logs",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["public_workloads"],
+            ["address=azurerm_linux_function_app.fn; public_network_access_enabled=true"],
+        )
+        self.assertIn("address=azurerm_user_assigned_identity.deploy", evidence["managed_identity"])
+
     def test_private_workload_sensitive_assignment_is_not_public_path(self) -> None:
         _, _, findings = _evaluate(
             [
                 _storage_account(),
                 _user_assigned_identity(),
                 _role_assignment(
+                    role_definition_name="Storage Blob Data Owner",
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_private_app_service_sensitive_assignment_is_not_public_path(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _storage_account(),
+                _app_service(public_network=False, identity=_system_assigned_app_identity()),
+                _role_assignment(
+                    role_definition_name="Storage Blob Data Owner",
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_public_app_without_identity_does_not_invent_sensitive_path(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _storage_account(),
+                _app_service(identity=None),
+                _role_assignment(
+                    principal_id="external-principal-id",
                     role_definition_name="Storage Blob Data Owner",
                     scope="azurerm_storage_account.logs.id",
                 ),

@@ -7,9 +7,12 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import (
+    AZURE_APP_SERVICE_RESOURCE_TYPES,
     AZURE_COMPUTE_RESOURCE_TYPES,
     AzureResourceType,
 )
+
+_AZURE_WORKLOAD_RESOURCE_TYPES = AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES
 
 _BROAD_BUILT_IN_ROLE_NAMES = frozenset(
     {
@@ -117,7 +120,7 @@ def _managed_identities_by_principal_id(
         facts = azure_facts(resource)
         if resource.resource_type == AzureResourceType.USER_ASSIGNED_IDENTITY:
             principal_id = facts.principal_id
-        elif resource.resource_type in AZURE_COMPUTE_RESOURCE_TYPES and facts.has_system_assigned_identity:
+        elif resource.resource_type in _AZURE_WORKLOAD_RESOURCE_TYPES and facts.has_system_assigned_identity:
             principal_id = facts.principal_id
         else:
             continue

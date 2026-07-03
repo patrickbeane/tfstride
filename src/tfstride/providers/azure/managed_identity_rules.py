@@ -13,8 +13,14 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
+from tfstride.providers.azure.resource_types import (
+    AZURE_APP_SERVICE_RESOURCE_TYPES,
+    AZURE_COMPUTE_RESOURCE_TYPES,
+    AzureResourceType,
+)
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
+
+_AZURE_WORKLOAD_RESOURCE_TYPES = tuple(sorted(AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES))
 
 
 class AzureManagedIdentityRuleDetectors:
@@ -133,7 +139,7 @@ class AzureManagedIdentityRuleDetectors:
 
 
 def _managed_identity_resources(inventory) -> list[Any]:
-    return inventory.by_type(*AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType.USER_ASSIGNED_IDENTITY)
+    return inventory.by_type(*_AZURE_WORKLOAD_RESOURCE_TYPES, AzureResourceType.USER_ASSIGNED_IDENTITY)
 
 
 def _is_broad_managed_identity_assignment(assignment: Mapping[str, Any]) -> bool:
@@ -209,8 +215,8 @@ def _managed_identity_evidence(identity) -> list[str]:
 def _public_workloads_by_identity_address(inventory) -> dict[str, list[Any]]:
     identity_by_reference = _identity_resources_by_reference(inventory)
     public_workloads_by_identity: dict[str, list[Any]] = {}
-    for workload in inventory.by_type(*AZURE_COMPUTE_RESOURCE_TYPES):
-        if not workload.public_exposure:
+    for workload in inventory.by_type(*_AZURE_WORKLOAD_RESOURCE_TYPES):
+        if not _is_public_workload(workload):
             continue
         facts = azure_facts(workload)
         if facts.has_system_assigned_identity and facts.principal_id:
@@ -231,6 +237,14 @@ def _identity_resources_by_reference(inventory) -> dict[str, Any]:
     return references
 
 
+def _is_public_workload(workload: Any) -> bool:
+    if workload.resource_type in AZURE_COMPUTE_RESOURCE_TYPES:
+        return bool(workload.public_exposure)
+    if workload.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES:
+        return azure_facts(workload).public_network_access_enabled is True
+    return False
+
+
 def _append_unique_resource(resources: list[Any], resource: Any) -> None:
     if all(existing.address != resource.address for existing in resources):
         resources.append(resource)
@@ -242,7 +256,10 @@ def _public_workload_evidence(workloads: list[Any]) -> list[str]:
             part
             for part in (
                 f"address={workload.address}",
-                "public_exposure=true",
+                "public_exposure=true" if workload.public_exposure else None,
+                "public_network_access_enabled=true"
+                if azure_facts(workload).public_network_access_enabled is True
+                else None,
                 f"public_exposure_reasons={','.join(workload.public_exposure_reasons)}"
                 if workload.public_exposure_reasons
                 else None,
