@@ -4,7 +4,9 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
+from tfstride.providers.coercion import known_string
 
 AWS_PROVIDER = "aws"
 
@@ -162,6 +164,11 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    protocol = known_string(values, unknown_values, "protocol", uncertainties)
+    certificate_arn = known_string(values, unknown_values, "certificate_arn", uncertainties)
+    ssl_policy = known_string(values, unknown_values, "ssl_policy", uncertainties)
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -174,7 +181,11 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
             "load_balancer_arn": values.get("load_balancer_arn"),
             "target_group_arns": _load_balancer_action_target_group_arns(values.get("default_action")),
             "port": as_optional_int(values.get("port")),
-            "protocol": values.get("protocol"),
+            "protocol": protocol,
+            AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL: protocol,
+            AwsResourceMetadata.LOAD_BALANCER_LISTENER_CERTIFICATE_ARN: certificate_arn,
+            AwsResourceMetadata.LOAD_BALANCER_LISTENER_SSL_POLICY: ssl_policy,
+            AwsResourceMetadata.LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES: uncertainties,
         },
     )
 

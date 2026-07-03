@@ -68,6 +68,7 @@ class AwsResourceMetadata:
     LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS = StringListMetadataField("lambda_function_url_cors_allow_origins")
     LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS = StringListMetadataField("lambda_function_url_cors_expose_headers")
     LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES = StringListMetadataField("lambda_function_url_posture_uncertainties")
+    LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES = StringListMetadataField("load_balancer_listener_tls_uncertainties")
     UNRESOLVED_SECRET_ARNS = StringListMetadataField("unresolved_secret_arns")
     UNRESOLVED_FUNCTION_REFERENCES = StringListMetadataField("unresolved_function_references")
     REQUIRES_COMPATIBILITIES = StringListMetadataField("requires_compatibilities")
@@ -128,6 +129,9 @@ class AwsResourceMetadata:
     LAMBDA_FUNCTION_URL_CORS_ALLOW_CREDENTIALS_STATE = OptionalStringMetadataField(
         "lambda_function_url_cors_allow_credentials_state"
     )
+    LOAD_BALANCER_LISTENER_PROTOCOL = OptionalStringMetadataField("load_balancer_listener_protocol")
+    LOAD_BALANCER_LISTENER_CERTIFICATE_ARN = OptionalStringMetadataField("load_balancer_listener_certificate_arn")
+    LOAD_BALANCER_LISTENER_SSL_POLICY = OptionalStringMetadataField("load_balancer_listener_ssl_policy")
     RDS_PUBLICLY_ACCESSIBLE_STATE = OptionalStringMetadataField("rds_publicly_accessible_state")
     RDS_DELETION_PROTECTION_STATE = OptionalStringMetadataField("rds_deletion_protection_state")
     RDS_MULTI_AZ_STATE = OptionalStringMetadataField("rds_multi_az_state")

@@ -91,6 +91,10 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "LAMBDA_FUNCTION_URL_CORS_EXPOSE_HEADERS": "lambda_function_url_cors_expose_headers",
             "LAMBDA_FUNCTION_URL_CORS_MAX_AGE": "lambda_function_url_cors_max_age",
             "LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES": "lambda_function_url_posture_uncertainties",
+            "LOAD_BALANCER_LISTENER_PROTOCOL": "load_balancer_listener_protocol",
+            "LOAD_BALANCER_LISTENER_CERTIFICATE_ARN": "load_balancer_listener_certificate_arn",
+            "LOAD_BALANCER_LISTENER_SSL_POLICY": "load_balancer_listener_ssl_policy",
+            "LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES": "load_balancer_listener_tls_uncertainties",
         }
 
         for field_name, key in expected_keys.items():

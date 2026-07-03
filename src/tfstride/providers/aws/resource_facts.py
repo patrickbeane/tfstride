@@ -182,6 +182,22 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES)
 
     @property
+    def load_balancer_listener_protocol(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL)
+
+    @property
+    def load_balancer_listener_certificate_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_CERTIFICATE_ARN)
+
+    @property
+    def load_balancer_listener_ssl_policy(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_SSL_POLICY)
+
+    @property
+    def load_balancer_listener_tls_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES)
+
+    @property
     def route_table_id(self) -> str | None:
         return self.get(AwsResourceMetadata.ROUTE_TABLE_ID)
 

@@ -103,6 +103,10 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "lambda_function_url_cors_expose_headers": ["x-request-id"],
                 "lambda_function_url_cors_max_age": 3600,
                 "lambda_function_url_posture_uncertainties": ["authorization_type is unknown after planning"],
+                "load_balancer_listener_protocol": "HTTPS",
+                "load_balancer_listener_certificate_arn": ("arn:aws:acm:us-east-1:111122223333:certificate/listener"),
+                "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+                "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
                 "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
@@ -188,6 +192,16 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(
             facts.lambda_function_url_posture_uncertainties,
             ["authorization_type is unknown after planning"],
+        )
+        self.assertEqual(facts.load_balancer_listener_protocol, "HTTPS")
+        self.assertEqual(
+            facts.load_balancer_listener_certificate_arn,
+            "arn:aws:acm:us-east-1:111122223333:certificate/listener",
+        )
+        self.assertEqual(facts.load_balancer_listener_ssl_policy, "ELBSecurityPolicy-TLS13-1-2-2021-06")
+        self.assertEqual(
+            facts.load_balancer_listener_tls_uncertainties,
+            ["ssl_policy is unknown after planning"],
         )
         self.assertEqual(
             facts.eks_posture_uncertainties,
@@ -298,6 +312,10 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.lambda_function_url_cors_expose_headers, [])
         self.assertIsNone(facts.lambda_function_url_cors_max_age)
         self.assertEqual(facts.lambda_function_url_posture_uncertainties, [])
+        self.assertIsNone(facts.load_balancer_listener_protocol)
+        self.assertIsNone(facts.load_balancer_listener_certificate_arn)
+        self.assertIsNone(facts.load_balancer_listener_ssl_policy)
+        self.assertEqual(facts.load_balancer_listener_tls_uncertainties, [])
         self.assertIsNone(facts.rds_publicly_accessible_state)
         self.assertIsNone(facts.rds_publicly_accessible)
         self.assertIsNone(facts.rds_backup_retention_period)
