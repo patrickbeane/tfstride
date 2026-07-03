@@ -37,10 +37,13 @@
       }
     },
     "rules": {
-      "registered_rule_count": 128,
+      "registered_rule_count": 131,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
+        "aws-load-balancer-http-public-listener",
+        "aws-load-balancer-listener-tls-certificate-missing",
+        "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
         "aws-database-permissive-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-rds-public-endpoint-enabled",
@@ -173,6 +176,9 @@
       "finding_counts_by_rule": {
         "aws-public-compute-broad-ingress": 1,
         "aws-lambda-public-invocation": 0,
+        "aws-load-balancer-http-public-listener": 0,
+        "aws-load-balancer-listener-tls-certificate-missing": 0,
+        "aws-load-balancer-listener-ssl-policy-weak-or-unknown": 0,
         "aws-database-permissive-ingress": 1,
         "aws-rds-storage-encryption-disabled": 0,
         "aws-rds-public-endpoint-enabled": 0,

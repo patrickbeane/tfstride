@@ -28,6 +28,39 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-load-balancer-http-public-listener",
+        title="Public AWS load balancer listener uses plaintext HTTP",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Terminate HTTPS on public ALB or NLB listeners, redirect HTTP to HTTPS where possible, "
+            "and keep plaintext listeners internal or behind another explicit TLS termination layer."
+        ),
+        tags=("aws", "load-balancer", "alb", "tls", "public-access"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-load-balancer-listener-tls-certificate-missing",
+        title="Public AWS load balancer TLS listener lacks deterministic certificate evidence",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Attach an ACM or IAM server certificate to public HTTPS/TLS listeners and keep certificate "
+            "references explicit in Terraform so planned listener posture is reviewable."
+        ),
+        tags=("aws", "load-balancer", "alb", "tls", "certificate"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-load-balancer-listener-ssl-policy-weak-or-unknown",
+        title="Public AWS load balancer TLS listener has weak or unknown SSL policy",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Use a current ELB security policy that enforces TLS 1.2 or newer, retire legacy SSL/TLS clients, "
+            "and keep `ssl_policy` deterministic in Terraform for public HTTPS/TLS listeners."
+        ),
+        tags=("aws", "load-balancer", "alb", "tls", "ssl-policy"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-database-permissive-ingress",
         title="Database is reachable from overly permissive sources",
         category=StrideCategory.INFORMATION_DISCLOSURE,
