@@ -195,7 +195,8 @@ class ProviderCatalogTests(unittest.TestCase):
     def test_default_observation_factories_register_only_contributing_providers(self) -> None:
         factories = default_provider_observation_factories_by_provider()
 
-        self.assertEqual(tuple(factories), ("azure",))
+        self.assertEqual(tuple(factories), ("aws", "azure"))
+        self.assertTrue(callable(factories["aws"][0]))
         self.assertIs(factories["azure"][0], observe_azure_posture)
 
     def test_default_rule_contribution_merges_builtin_provider_rules(self) -> None:

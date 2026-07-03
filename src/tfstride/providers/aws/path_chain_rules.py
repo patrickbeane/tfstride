@@ -7,11 +7,6 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.indexes import AnalysisIndexes
-from tfstride.analysis.policy_conditions import (
-    describe_trust_narrowing_for_principal,
-    trust_statement_has_effective_narrowing_for_principal,
-    trust_statement_principal_assessments,
-)
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
@@ -28,6 +23,11 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
     TrustBoundary,
+)
+from tfstride.providers.aws.policy_conditions import (
+    describe_trust_narrowing_for_principal,
+    trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_principal_assessments,
 )
 from tfstride.resource_helpers import describe_security_group_rule
 

@@ -1,11 +1,6 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
-from tfstride.analysis.policy_conditions import (
-    describe_trust_narrowing_for_principal,
-    trust_statement_has_effective_narrowing_for_principal,
-    trust_statement_principal_assessments,
-)
 from tfstride.analysis.resource_concepts import (
     DATABASE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -14,10 +9,15 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource, Observation, ResourceInventory
+from tfstride.providers.aws.policy_conditions import (
+    describe_trust_narrowing_for_principal,
+    trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_principal_assessments,
+)
 from tfstride.resource_helpers import policy_allows_public_access
 
 
-def observe_controls(inventory: ResourceInventory) -> list[Observation]:
+def observe_aws_controls(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
     observations.extend(_observe_bucket_public_access_blocks(inventory))
     observations.extend(_observe_narrowed_trust(inventory))

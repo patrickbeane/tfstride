@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_registry import RuleRegistry
 from tfstride.models import (
@@ -16,11 +15,12 @@ from tfstride.models import (
     Severity,
     TrustBoundary,
 )
+from tfstride.providers.aws.policy_trust_rules import AwsPolicyTrustRuleDetectors
 
 
-class PolicyTrustRuleDetectorsTests(unittest.TestCase):
+class AwsPolicyTrustRuleDetectorsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.detectors = PolicyTrustRuleDetectors(FindingFactory())
+        self.detectors = AwsPolicyTrustRuleDetectors(FindingFactory())
 
     def test_detect_resource_policy_exposure_uses_policy_sources_and_boundary(self) -> None:
         principal = "arn:aws:iam::444455556666:root"

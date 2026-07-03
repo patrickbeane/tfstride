@@ -7,15 +7,6 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
-from tfstride.analysis.policy_conditions import (
-    PrincipalAssessment,
-    describe_trust_narrowing_for_principal,
-    policy_statement_principal_assessments,
-    resource_policy_statement_has_effective_narrowing,
-    trust_statement_has_effective_narrowing_for_principal,
-    trust_statement_has_supported_narrowing_for_principal,
-    trust_statement_principal_assessments,
-)
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     SENSITIVE_RESOURCE_POLICY_RESOURCE_TYPES,
@@ -26,9 +17,18 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.aws.policy_conditions import (
+    PrincipalAssessment,
+    describe_trust_narrowing_for_principal,
+    policy_statement_principal_assessments,
+    resource_policy_statement_has_effective_narrowing,
+    trust_statement_has_effective_narrowing_for_principal,
+    trust_statement_has_supported_narrowing_for_principal,
+    trust_statement_principal_assessments,
+)
 
 
-class PolicyTrustRuleDetectors:
+class AwsPolicyTrustRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 

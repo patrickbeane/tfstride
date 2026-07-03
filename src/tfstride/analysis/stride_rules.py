@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from tfstride.analysis.control_observations import observe_controls as collect_control_observations
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.rule_definitions import (
@@ -12,7 +11,7 @@ from tfstride.analysis.rule_definitions import (
     build_rule_registry_from_contribution,
 )
 from tfstride.analysis.rule_registry import RulePolicy, RuleRegistry
-from tfstride.models import Finding, Observation, ResourceInventory, TrustBoundary
+from tfstride.models import Finding, ResourceInventory, TrustBoundary
 from tfstride.providers.catalog import default_rule_contribution
 
 
@@ -75,6 +74,3 @@ class StrideRuleEngine:
 
     def _rule_groups(self) -> tuple[tuple[RuleDefinition, ...], ...]:
         return self._rule_contribution.rule_groups
-
-    def observe_controls(self, inventory: ResourceInventory) -> list[Observation]:
-        return collect_control_observations(inventory)

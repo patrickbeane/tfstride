@@ -6,12 +6,6 @@ from dataclasses import dataclass
 from tfstride.analysis.boundaries.shared import contribute_control_to_workload_boundary
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.indexes import AnalysisIndexes
-from tfstride.analysis.policy_conditions import (
-    PrincipalAssessment,
-    federated_provider_description,
-    policy_statement_principal_assessments,
-    trust_statement_principal_assessments,
-)
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -25,6 +19,12 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
+from tfstride.providers.aws.policy_conditions import (
+    PrincipalAssessment,
+    federated_provider_description,
+    policy_statement_principal_assessments,
+    trust_statement_principal_assessments,
+)
 
 
 @dataclass(frozen=True, slots=True)

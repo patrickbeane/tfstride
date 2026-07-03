@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.policy_trust_rules import PolicyTrustRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
@@ -12,6 +11,7 @@ from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
 from tfstride.providers.aws.load_balancer_rules import AwsLoadBalancerRuleDetectors
 from tfstride.providers.aws.network_data_rules import AwsNetworkDataRuleDetectors
 from tfstride.providers.aws.path_chain_rules import AwsPathChainRuleDetectors
+from tfstride.providers.aws.policy_trust_rules import AwsPolicyTrustRuleDetectors
 from tfstride.providers.aws.posture_rules import AwsPostureRuleDetectors
 from tfstride.providers.aws.rds_rules import AwsRdsPostureRuleDetectors
 from tfstride.providers.aws.sensitive_endpoint_rules import AwsSensitiveEndpointRuleDetectors
@@ -73,7 +73,7 @@ def build_aws_rule_contribution(
     network_data_detectors = AwsNetworkDataRuleDetectors(finding_factory)
     path_chain_detectors = AwsPathChainRuleDetectors(finding_factory)
     iam_detectors = AwsIamRuleDetectors(finding_factory)
-    policy_trust_detectors = PolicyTrustRuleDetectors(finding_factory)
+    policy_trust_detectors = AwsPolicyTrustRuleDetectors(finding_factory)
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     eks_detectors = AwsEksRuleDetectors(finding_factory)

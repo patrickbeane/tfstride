@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.policy_conditions import (
+from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
+from tfstride.providers.aws.policy_conditions import (
     assess_principal,
     describe_trust_narrowing,
     describe_trust_narrowing_for_principal,
@@ -17,7 +18,6 @@ from tfstride.analysis.policy_conditions import (
     trust_statement_narrowing_keys,
     trust_statement_principal_assessments,
 )
-from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
 
 
 class PolicyConditionsTests(unittest.TestCase):

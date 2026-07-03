@@ -95,10 +95,7 @@ class TfStride:
             ),
             self._rule_policy,
         )
-        observations = [
-            *self._rule_engine.observe_controls(inventory),
-            *self._observations_for_provider(inventory),
-        ]
+        observations = self._observations_for_provider(inventory)
         observations.sort(
             key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id)
         )

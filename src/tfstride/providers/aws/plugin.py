@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
+    from tfstride.models import Observation, ResourceInventory
 
 
 def _aws_rule_metadata() -> tuple[RuleMetadata, ...]:
@@ -35,6 +36,12 @@ def _aws_rule_contribution(finding_factory: FindingFactory) -> RuleContribution:
     return build_aws_rule_contribution(finding_factory)
 
 
+def _aws_observation_factory(inventory: ResourceInventory) -> list[Observation]:
+    from tfstride.providers.aws.observations import observe_aws_controls
+
+    return observe_aws_controls(inventory)
+
+
 def aws_provider_plugin() -> ProviderPlugin:
     return ProviderPlugin(
         provider="aws",
@@ -48,4 +55,5 @@ def aws_provider_plugin() -> ProviderPlugin:
         rule_metadata_factory=_aws_rule_metadata,
         rule_contribution_factory=_aws_rule_contribution,
         boundary_contributor_factory=_aws_boundary_contributor,
+        observation_factory=_aws_observation_factory,
     )
