@@ -18,7 +18,7 @@ from tfstride.models import BoundaryType, Finding
 from tfstride.resource_helpers import describe_security_group_rule
 
 
-class PostureRuleDetectors:
+class AwsPostureRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 

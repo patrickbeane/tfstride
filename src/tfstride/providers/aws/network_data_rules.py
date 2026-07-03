@@ -13,7 +13,7 @@ from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityG
 from tfstride.resource_helpers import describe_security_group_rule
 
 
-class NetworkDataRuleDetectors:
+class AwsNetworkDataRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 
