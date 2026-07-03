@@ -16,6 +16,7 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_firewall_policy_association,
     normalize_compute_firewall_policy_rule,
     normalize_compute_forwarding_rule,
+    normalize_compute_global_address,
     normalize_compute_global_forwarding_rule,
     normalize_compute_managed_ssl_certificate,
     normalize_compute_network,
@@ -24,10 +25,13 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_route,
     normalize_compute_router,
     normalize_compute_router_nat,
+    normalize_compute_service_attachment,
     normalize_compute_ssl_policy,
     normalize_compute_subnetwork,
     normalize_compute_target_https_proxy,
     normalize_compute_url_map,
+    normalize_network_connectivity_service_connection_policy,
+    normalize_service_networking_connection,
     parse_firewall_allow_rules,
     parse_firewall_policy_allow_rules,
     parse_firewall_policy_rules,
@@ -123,6 +127,168 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
             router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS),
             [{"name": "google_compute_subnetwork.app.id", "source_ip_ranges_to_nat": ["ALL_IP_RANGES"]}],
         )
+
+    def test_private_service_access_address_normalizer_preserves_reserved_range_context(self) -> None:
+        normalized = normalize_compute_global_address(
+            _terraform_resource(
+                "google_compute_global_address.private_services",
+                "google_compute_global_address",
+                {
+                    "name": "private-services-range",
+                    "project": "demo",
+                    "self_link": "projects/demo/global/addresses/private-services-range",
+                    "purpose": "VPC_PEERING",
+                    "address_type": "INTERNAL",
+                    "address": "10.30.0.0",
+                    "prefix_length": 16,
+                    "network": "google_compute_network.main.id",
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(facts.private_connectivity_purpose, "VPC_PEERING")
+        self.assertEqual(facts.private_connectivity_address_type, "INTERNAL")
+        self.assertEqual(facts.private_connectivity_address, "10.30.0.0")
+        self.assertEqual(facts.private_connectivity_prefix_length, 16)
+        self.assertEqual(facts.private_connectivity_uncertainties, [])
+
+    def test_service_networking_connection_normalizer_preserves_psa_connection_context(self) -> None:
+        normalized = normalize_service_networking_connection(
+            _terraform_resource(
+                "google_service_networking_connection.private_services",
+                "google_service_networking_connection",
+                {
+                    "network": "google_compute_network.main.id",
+                    "service": "servicenetworking.googleapis.com",
+                    "reserved_peering_ranges": ["private-services-range"],
+                    "peering": "servicenetworking-googleapis-com",
+                    "deletion_policy": "ABANDON",
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(facts.private_connectivity_service, "servicenetworking.googleapis.com")
+        self.assertEqual(facts.private_connectivity_reserved_ranges, ["private-services-range"])
+        self.assertEqual(facts.private_connectivity_peering, "servicenetworking-googleapis-com")
+        self.assertEqual(normalized.metadata_snapshot()["deletion_policy"], "ABANDON")
+        self.assertEqual(facts.private_connectivity_uncertainties, [])
+
+    def test_service_networking_connection_preserves_unknown_values_as_uncertainty(self) -> None:
+        normalized = normalize_service_networking_connection(
+            _terraform_resource(
+                "google_service_networking_connection.private_services",
+                "google_service_networking_connection",
+                {},
+                unknown_values={"network": True, "service": True, "reserved_peering_ranges": True},
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(normalized.vpc_id)
+        self.assertIsNone(facts.private_connectivity_service)
+        self.assertEqual(facts.private_connectivity_reserved_ranges, [])
+        self.assertEqual(
+            facts.private_connectivity_uncertainties,
+            [
+                "network is unknown after planning",
+                "service is unknown after planning",
+                "reserved_peering_ranges is unknown after planning",
+            ],
+        )
+
+    def test_psc_forwarding_rule_evidence_is_preserved_without_changing_public_posture(self) -> None:
+        normalized = normalize_compute_forwarding_rule(
+            _terraform_resource(
+                "google_compute_forwarding_rule.sql_psc",
+                "google_compute_forwarding_rule",
+                {
+                    "name": "sql-psc",
+                    "load_balancing_scheme": "INTERNAL",
+                    "network": "google_compute_network.main.id",
+                    "subnetwork": "google_compute_subnetwork.private.id",
+                    "target": "projects/prod/regions/us-central1/serviceAttachments/sql",
+                    "psc_connection_id": 12345,
+                    "psc_connection_status": "ACCEPTED",
+                    "service_label": "sql",
+                    "service_name": "projects/prod/regions/us-central1/serviceAttachments/sql",
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertFalse(normalized.public_access_configured)
+        self.assertFalse(normalized.direct_internet_reachable)
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(normalized.subnet_ids, ("google_compute_subnetwork.private.id",))
+        self.assertEqual(facts.forwarding_rule_target, "projects/prod/regions/us-central1/serviceAttachments/sql")
+        self.assertEqual(facts.psc_connection_id, "12345")
+        self.assertEqual(facts.psc_connection_status, "ACCEPTED")
+        self.assertEqual(facts.psc_service_label, "sql")
+        self.assertEqual(facts.psc_service_name, "projects/prod/regions/us-central1/serviceAttachments/sql")
+
+    def test_psc_service_attachment_normalizer_preserves_producer_context(self) -> None:
+        normalized = normalize_compute_service_attachment(
+            _terraform_resource(
+                "google_compute_service_attachment.sql",
+                "google_compute_service_attachment",
+                {
+                    "name": "sql-attachment",
+                    "self_link": "projects/prod/regions/us-central1/serviceAttachments/sql",
+                    "project": "prod",
+                    "region": "us-central1",
+                    "target_service": "google_compute_forwarding_rule.sql_ilb.id",
+                    "connection_preference": "ACCEPT_AUTOMATIC",
+                    "nat_subnets": ["google_compute_subnetwork.psc_nat.id"],
+                    "domain_names": ["sql.internal.example.com"],
+                    "consumer_accept_lists": [{"project_id_or_num": "consumer", "connection_limit": 10}],
+                    "consumer_reject_lists": [{"project_id_or_num": "blocked"}],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.subnet_ids, ("google_compute_subnetwork.psc_nat.id",))
+        self.assertEqual(facts.private_connectivity_target_service, "google_compute_forwarding_rule.sql_ilb.id")
+        self.assertEqual(facts.psc_connection_preference, "ACCEPT_AUTOMATIC")
+        self.assertEqual(facts.private_connectivity_nat_subnets, ["google_compute_subnetwork.psc_nat.id"])
+        self.assertEqual(facts.private_connectivity_domain_names, ["sql.internal.example.com"])
+        self.assertEqual(facts.psc_consumer_accept_list, [{"project_id_or_num": "consumer", "connection_limit": 10}])
+        self.assertEqual(facts.psc_consumer_reject_list, [{"project_id_or_num": "blocked"}])
+
+    def test_service_connection_policy_normalizer_preserves_psc_config(self) -> None:
+        normalized = normalize_network_connectivity_service_connection_policy(
+            _terraform_resource(
+                "google_network_connectivity_service_connection_policy.sql",
+                "google_network_connectivity_service_connection_policy",
+                {
+                    "name": "sql-policy",
+                    "location": "us-central1",
+                    "network": "google_compute_network.main.id",
+                    "service_class": "gcp-cloud-sql",
+                    "psc_config": [
+                        {
+                            "subnetworks": ["google_compute_subnetwork.psc.id"],
+                            "limit": 8,
+                        }
+                    ],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
+        self.assertEqual(normalized.subnet_ids, ("google_compute_subnetwork.psc.id",))
+        self.assertEqual(facts.psc_service_class, "gcp-cloud-sql")
+        self.assertEqual(facts.psc_config, {"subnetworks": ["google_compute_subnetwork.psc.id"], "limit": 8})
+        self.assertEqual(facts.private_connectivity_subnetworks, ["google_compute_subnetwork.psc.id"])
 
     def test_forwarding_rule_normalizers_classify_public_edges(self) -> None:
         regional = normalize_compute_forwarding_rule(

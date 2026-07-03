@@ -148,6 +148,27 @@ class GcpProviderTests(unittest.TestCase):
                 "ZONE",
                 "NETWORK",
                 "NETWORK_TAGS",
+                "PRIVATE_CONNECTIVITY_PURPOSE",
+                "PRIVATE_CONNECTIVITY_ADDRESS_TYPE",
+                "PRIVATE_CONNECTIVITY_ADDRESS",
+                "PRIVATE_CONNECTIVITY_PREFIX_LENGTH",
+                "PRIVATE_CONNECTIVITY_SERVICE",
+                "PRIVATE_CONNECTIVITY_RESERVED_RANGES",
+                "PRIVATE_CONNECTIVITY_PEERING",
+                "PRIVATE_CONNECTIVITY_TARGET_SERVICE",
+                "PRIVATE_CONNECTIVITY_NAT_SUBNETS",
+                "PRIVATE_CONNECTIVITY_SUBNETWORKS",
+                "PRIVATE_CONNECTIVITY_DOMAIN_NAMES",
+                "PRIVATE_CONNECTIVITY_UNCERTAINTIES",
+                "PSC_CONNECTION_ID",
+                "PSC_CONNECTION_STATUS",
+                "PSC_CONNECTION_PREFERENCE",
+                "PSC_SERVICE_LABEL",
+                "PSC_SERVICE_NAME",
+                "PSC_SERVICE_CLASS",
+                "PSC_CONFIG",
+                "PSC_CONSUMER_ACCEPT_LIST",
+                "PSC_CONSUMER_REJECT_LIST",
                 "FIREWALL_ALLOW",
                 "FIREWALL_TARGET_SERVICE_ACCOUNTS",
                 "FIREWALL_POLICY_REFERENCE",
@@ -336,6 +357,27 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.organization_id)
         self.assertIsNone(facts.folder_id)
         self.assertIsNone(facts.os_login_enabled)
+        self.assertIsNone(facts.private_connectivity_purpose)
+        self.assertIsNone(facts.private_connectivity_address_type)
+        self.assertIsNone(facts.private_connectivity_address)
+        self.assertIsNone(facts.private_connectivity_prefix_length)
+        self.assertIsNone(facts.private_connectivity_service)
+        self.assertEqual(facts.private_connectivity_reserved_ranges, [])
+        self.assertIsNone(facts.private_connectivity_peering)
+        self.assertIsNone(facts.private_connectivity_target_service)
+        self.assertEqual(facts.private_connectivity_nat_subnets, [])
+        self.assertEqual(facts.private_connectivity_subnetworks, [])
+        self.assertEqual(facts.private_connectivity_domain_names, [])
+        self.assertEqual(facts.private_connectivity_uncertainties, [])
+        self.assertIsNone(facts.psc_connection_id)
+        self.assertIsNone(facts.psc_connection_status)
+        self.assertIsNone(facts.psc_connection_preference)
+        self.assertIsNone(facts.psc_service_label)
+        self.assertIsNone(facts.psc_service_name)
+        self.assertIsNone(facts.psc_service_class)
+        self.assertEqual(facts.psc_config, {})
+        self.assertEqual(facts.psc_consumer_accept_list, [])
+        self.assertEqual(facts.psc_consumer_reject_list, [])
         self.assertIsNone(facts.service_account_email)
         self.assertIsNone(facts.service_account_member)
         self.assertIsNone(facts.service_account_reference)

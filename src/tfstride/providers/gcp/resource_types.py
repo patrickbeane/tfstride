@@ -37,6 +37,7 @@ class GcpResourceType:
     COMPUTE_FIREWALL_POLICY_ASSOCIATION = "google_compute_firewall_policy_association"
     COMPUTE_FIREWALL_POLICY_RULE = "google_compute_firewall_policy_rule"
     COMPUTE_FORWARDING_RULE = "google_compute_forwarding_rule"
+    COMPUTE_GLOBAL_ADDRESS = "google_compute_global_address"
     COMPUTE_GLOBAL_FORWARDING_RULE = "google_compute_global_forwarding_rule"
     COMPUTE_MANAGED_SSL_CERTIFICATE = "google_compute_managed_ssl_certificate"
     COMPUTE_INSTANCE = "google_compute_instance"
@@ -47,6 +48,7 @@ class GcpResourceType:
     COMPUTE_REGION_TARGET_HTTP_PROXY = "google_compute_region_target_http_proxy"
     COMPUTE_REGION_TARGET_HTTPS_PROXY = "google_compute_region_target_https_proxy"
     COMPUTE_REGION_URL_MAP = "google_compute_region_url_map"
+    COMPUTE_SERVICE_ATTACHMENT = "google_compute_service_attachment"
     COMPUTE_ROUTE = "google_compute_route"
     COMPUTE_ROUTER = "google_compute_router"
     COMPUTE_ROUTER_NAT = "google_compute_router_nat"
@@ -79,6 +81,7 @@ class GcpResourceType:
     PROJECT_IAM_MEMBER = "google_project_iam_member"
     PROJECT_IAM_POLICY = "google_project_iam_policy"
     PROJECT_ORGANIZATION_POLICY = "google_project_organization_policy"
+    NETWORK_CONNECTIVITY_SERVICE_CONNECTION_POLICY = "google_network_connectivity_service_connection_policy"
     PUBSUB_SUBSCRIPTION = "google_pubsub_subscription"
     PUBSUB_SUBSCRIPTION_IAM_BINDING = "google_pubsub_subscription_iam_binding"
     PUBSUB_SUBSCRIPTION_IAM_MEMBER = "google_pubsub_subscription_iam_member"
@@ -91,6 +94,7 @@ class GcpResourceType:
     SECRET_MANAGER_SECRET_IAM_BINDING = "google_secret_manager_secret_iam_binding"
     SECRET_MANAGER_SECRET_IAM_MEMBER = "google_secret_manager_secret_iam_member"
     SECRET_MANAGER_SECRET_IAM_POLICY = "google_secret_manager_secret_iam_policy"
+    SERVICE_NETWORKING_CONNECTION = "google_service_networking_connection"
     SERVICE_ACCOUNT = "google_service_account"
     SERVICE_ACCOUNT_IAM_BINDING = "google_service_account_iam_binding"
     SERVICE_ACCOUNT_IAM_MEMBER = "google_service_account_iam_member"
@@ -342,6 +346,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION,
         GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE,
         GcpResourceType.COMPUTE_FORWARDING_RULE,
+        GcpResourceType.COMPUTE_GLOBAL_ADDRESS,
         GcpResourceType.COMPUTE_GLOBAL_FORWARDING_RULE,
         GcpResourceType.COMPUTE_MANAGED_SSL_CERTIFICATE,
         GcpResourceType.COMPUTE_INSTANCE,
@@ -352,6 +357,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_REGION_TARGET_HTTP_PROXY,
         GcpResourceType.COMPUTE_REGION_TARGET_HTTPS_PROXY,
         GcpResourceType.COMPUTE_REGION_URL_MAP,
+        GcpResourceType.COMPUTE_SERVICE_ATTACHMENT,
         GcpResourceType.COMPUTE_ROUTE,
         GcpResourceType.COMPUTE_ROUTER,
         GcpResourceType.COMPUTE_ROUTER_NAT,
@@ -401,6 +407,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.ORGANIZATION_IAM_MEMBER,
         GcpResourceType.ORGANIZATION_IAM_POLICY,
         GcpResourceType.FOLDER_ORGANIZATION_POLICY,
+        GcpResourceType.NETWORK_CONNECTIVITY_SERVICE_CONNECTION_POLICY,
         GcpResourceType.ORG_POLICY_POLICY,
         GcpResourceType.ORGANIZATION_POLICY,
         GcpResourceType.PROJECT_ORGANIZATION_POLICY,
@@ -420,6 +427,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.SECRET_MANAGER_SECRET_IAM_BINDING,
         GcpResourceType.SECRET_MANAGER_SECRET_IAM_MEMBER,
         GcpResourceType.SECRET_MANAGER_SECRET_IAM_POLICY,
+        GcpResourceType.SERVICE_NETWORKING_CONNECTION,
         GcpResourceType.SERVICE_ACCOUNT,
         GcpResourceType.SERVICE_ACCOUNT_IAM_BINDING,
         GcpResourceType.SERVICE_ACCOUNT_IAM_MEMBER,
