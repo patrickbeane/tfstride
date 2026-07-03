@@ -4,9 +4,9 @@ from collections.abc import Mapping
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.gcp.rules import GcpRuleDetectors
-from tfstride.analysis.path_chain_rules import PathChainRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors
 
 GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
@@ -72,7 +72,7 @@ def build_gcp_rule_contribution(
 ) -> RuleContribution:
     gcp_detectors = GcpRuleDetectors(finding_factory)
     private_connectivity_detectors = GcpPrivateConnectivityRuleDetectors(finding_factory)
-    path_chain_detectors = PathChainRuleDetectors(finding_factory)
+    path_chain_detectors = GcpPathChainRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "gcp-sensitive-resource-iam-external-access": gcp_detectors.detect_sensitive_iam_external_access,
         "gcp-pubsub-public-access": gcp_detectors.detect_pubsub_public_access,
