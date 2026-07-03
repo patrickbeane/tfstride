@@ -21,6 +21,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-cloud-sql-private-connectivity-not-modeled",
+        "gcp-private-workload-private-google-access-disabled",
         "gcp-gcs-public-access",
         "gcp-gcs-uniform-bucket-level-access-disabled",
         "gcp-gcs-public-access-prevention-not-enforced",
@@ -89,6 +90,9 @@ def build_gcp_rule_contribution(
         "gcp-cloud-sql-deletion-protection-disabled": gcp_detectors.detect_cloud_sql_deletion_protection_disabled,
         "gcp-cloud-sql-private-connectivity-not-modeled": (
             private_connectivity_detectors.detect_cloud_sql_private_connectivity_not_modeled
+        ),
+        "gcp-private-workload-private-google-access-disabled": (
+            private_connectivity_detectors.detect_private_workload_private_google_access_disabled
         ),
         "gcp-gcs-public-access": gcp_detectors.detect_gcs_public_access,
         "gcp-gcs-uniform-bucket-level-access-disabled": gcp_detectors.detect_gcs_uniform_bucket_level_access_disabled,

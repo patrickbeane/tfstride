@@ -285,6 +285,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.PRIVATE_CONNECTIVITY_UNCERTAINTIES)
 
     @property
+    def private_ip_google_access(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS)
+
+    @property
     def psc_connection_id(self) -> str | None:
         return self.get(GcpResourceMetadata.PSC_CONNECTION_ID)
 

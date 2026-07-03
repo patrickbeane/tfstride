@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 138,
+      "registered_rule_count": 139,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -83,6 +83,7 @@
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
         "gcp-cloud-sql-private-connectivity-not-modeled",
+        "gcp-private-workload-private-google-access-disabled",
         "gcp-gcs-public-access",
         "gcp-gcs-uniform-bucket-level-access-disabled",
         "gcp-gcs-public-access-prevention-not-enforced",
@@ -225,6 +226,7 @@
         "gcp-cloud-sql-point-in-time-recovery-disabled": 0,
         "gcp-cloud-sql-deletion-protection-disabled": 0,
         "gcp-cloud-sql-private-connectivity-not-modeled": 0,
+        "gcp-private-workload-private-google-access-disabled": 0,
         "gcp-gcs-public-access": 0,
         "gcp-gcs-uniform-bucket-level-access-disabled": 0,
         "gcp-gcs-public-access-prevention-not-enforced": 0,

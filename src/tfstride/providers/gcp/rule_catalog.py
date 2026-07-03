@@ -134,6 +134,18 @@ GCP_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement"),
     ),
     RuleMetadata(
+        rule_id="gcp-private-workload-private-google-access-disabled",
+        title="Private GCP workload subnet disables Private Google Access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable Private Google Access on private subnets used by workloads that call Google APIs, or model "
+            "Private Service Connect/Private Service Access coverage where applicable. Avoid relying on NAT or "
+            "other public egress paths for sensitive Google API access unless that path is intentional and reviewed."
+        ),
+        tags=("gcp", "network", "private-google-access", "private-connectivity", "data-access"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gcs-public-access",
         title="GCS bucket is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

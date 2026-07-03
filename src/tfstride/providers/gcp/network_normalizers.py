@@ -50,7 +50,11 @@ def normalize_compute_subnetwork(resource: TerraformResource) -> NormalizedResou
             GcpResourceMetadata.REGION: values.get(GcpAttr.REGION),
             GcpResourceMetadata.NETWORK: values.get(GcpAttr.NETWORK),
             GcpResourceMetadata.CIDR_RANGE: values.get(GcpAttr.IP_CIDR_RANGE),
-            GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS: values.get(GcpAttr.PRIVATE_IP_GOOGLE_ACCESS),
+            GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS: (
+                None
+                if attribute_unknown(resource.unknown_values, GcpAttr.PRIVATE_IP_GOOGLE_ACCESS.key)
+                else values.get(GcpAttr.PRIVATE_IP_GOOGLE_ACCESS)
+            ),
             "purpose": values.get(GcpAttr.PURPOSE),
             "stack_type": values.get(GcpAttr.STACK_TYPE),
             "secondary_ip_ranges": values.get(GcpAttr.SECONDARY_IP_RANGE),
