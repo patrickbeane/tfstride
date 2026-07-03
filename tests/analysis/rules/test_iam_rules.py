@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.iam_rules import IAMRuleDetectors
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_registry import RuleRegistry
 from tfstride.models import (
@@ -16,11 +15,12 @@ from tfstride.models import (
     Severity,
     TrustBoundary,
 )
+from tfstride.providers.aws.iam_rules import AwsIamRuleDetectors
 
 
-class IAMRuleDetectorsTests(unittest.TestCase):
+class AwsIamRuleDetectorsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.detectors = IAMRuleDetectors(FindingFactory())
+        self.detectors = AwsIamRuleDetectors(FindingFactory())
 
     def test_detect_wildcard_permissions_builds_finding_from_policy_statements(self) -> None:
         policy = NormalizedResource(

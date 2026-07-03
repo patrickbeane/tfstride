@@ -16,7 +16,7 @@ from tfstride.models import (
     IAMPolicyStatement,
 )
 
-SENSITIVE_ACTION_PREFIXES = {
+AWS_SENSITIVE_ACTION_PREFIXES = {
     "kms:Decrypt",
     "secretsmanager:GetSecretValue",
     "ssm:GetParameter",
@@ -28,7 +28,7 @@ SENSITIVE_ACTION_PREFIXES = {
 }
 
 
-class IAMRuleDetectors:
+class AwsIamRuleDetectors:
     def __init__(self, finding_factory: FindingFactory) -> None:
         self._finding_factory = finding_factory
 
@@ -149,7 +149,7 @@ def _sensitive_actions(statements: list[IAMPolicyStatement]) -> set[str]:
         if statement.effect != "Allow":
             continue
         for action in statement.actions:
-            if action in SENSITIVE_ACTION_PREFIXES:
+            if action in AWS_SENSITIVE_ACTION_PREFIXES:
                 sensitive.add(action)
                 continue
             if action.startswith("ssm:GetParameter"):
