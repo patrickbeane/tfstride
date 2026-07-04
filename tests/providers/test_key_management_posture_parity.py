@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.test_aws_kms_rules import _KMS_DELETION_WINDOW_RULE as _AWS_KMS_DELETION_WINDOW_RULE
 from tests.providers.aws.test_aws_kms_rules import _KMS_ROTATION_RULE as _AWS_KMS_ROTATION_RULE
-from tests.providers.aws.test_aws_kms_rules import _findings as _aws_kms_findings
 from tests.providers.aws.test_aws_kms_rules import _kms_key as _aws_kms_key
 from tests.providers.azure.test_azure_key_vault_rules import _evaluate as _azure_findings
 from tests.providers.azure.test_azure_key_vault_rules import _key as _azure_key
@@ -21,7 +21,7 @@ from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
 _AZURE_KEY_ROTATION_RULE = "azure-key-vault-key-rotation-policy-incomplete"
-AWS_KEY_MANAGEMENT_RULE_IDS = frozenset({_AWS_KMS_ROTATION_RULE})
+AWS_KEY_MANAGEMENT_RULE_IDS = frozenset({_AWS_KMS_ROTATION_RULE, _AWS_KMS_DELETION_WINDOW_RULE})
 GCP_KEY_MANAGEMENT_RULE_IDS = frozenset({_GCP_KMS_ROTATION_RULE})
 AZURE_KEY_MANAGEMENT_RULE_IDS = frozenset({_AZURE_KEY_ROTATION_RULE})
 ALL_KEY_MANAGEMENT_RULE_IDS = AWS_KEY_MANAGEMENT_RULE_IDS | GCP_KEY_MANAGEMENT_RULE_IDS | AZURE_KEY_MANAGEMENT_RULE_IDS
@@ -68,8 +68,11 @@ class KeyManagementPostureParityTests(unittest.TestCase):
         self.assertLessEqual(GCP_KEY_MANAGEMENT_RULE_IDS, _flatten(GCP_RULE_GROUP_IDS))
         self.assertLessEqual(AZURE_KEY_MANAGEMENT_RULE_IDS, _flatten(AZURE_RULE_GROUP_IDS))
 
-    def test_missing_or_disabled_key_rotation_findings_are_pinned_by_provider(self) -> None:
-        aws_findings = _aws_kms_findings([_aws_kms_key(enable_key_rotation=False)])
+    def test_missing_or_weak_key_lifecycle_findings_are_pinned_by_provider(self) -> None:
+        aws_findings = _evaluate_aws(
+            [_aws_kms_key(enable_key_rotation=False, deletion_window_in_days=7)],
+            AWS_KEY_MANAGEMENT_RULE_IDS,
+        )
         gcp_findings = _gcp_kms_findings([_gcp_kms_key()])
         _, _, azure_findings = _azure_findings(
             [_azure_key()],
@@ -79,12 +82,17 @@ class KeyManagementPostureParityTests(unittest.TestCase):
         self.assertEqual(_finding_ids(aws_findings), AWS_KEY_MANAGEMENT_RULE_IDS)
         self.assertEqual(_finding_ids(gcp_findings), GCP_KEY_MANAGEMENT_RULE_IDS)
         self.assertEqual(_finding_ids(azure_findings), AZURE_KEY_MANAGEMENT_RULE_IDS)
-        self.assertIn("rotation", aws_findings[0].rationale.lower())
+        aws_findings_by_rule = {finding.rule_id: finding for finding in aws_findings}
+        self.assertIn("rotation", aws_findings_by_rule[_AWS_KMS_ROTATION_RULE].rationale.lower())
+        self.assertIn("deletion", aws_findings_by_rule[_AWS_KMS_DELETION_WINDOW_RULE].rationale.lower())
         self.assertIn("rotation", gcp_findings[0].rationale.lower())
         self.assertIn("rotation", azure_findings[0].rationale.lower())
 
     def test_configured_key_rotation_posture_stays_quiet_across_providers(self) -> None:
-        aws_findings = _aws_kms_findings([_aws_kms_key(key_spec="SYMMETRIC_DEFAULT", enable_key_rotation=True)])
+        aws_findings = _evaluate_aws(
+            [_aws_kms_key(key_spec="SYMMETRIC_DEFAULT", enable_key_rotation=True, deletion_window_in_days=30)],
+            AWS_KEY_MANAGEMENT_RULE_IDS,
+        )
         gcp_findings = _gcp_kms_findings([_gcp_kms_key(rotation_period="7776000s")])
         _, _, azure_findings = _azure_findings(
             [
@@ -102,11 +110,20 @@ class KeyManagementPostureParityTests(unittest.TestCase):
         self.assertEqual(azure_findings, [])
 
     def test_asymmetric_or_unknown_key_shapes_are_not_overclaimed(self) -> None:
-        aws_findings = _aws_kms_findings(
+        aws_findings = _evaluate_aws(
             [
                 _aws_kms_key(name="signing", key_usage="SIGN_VERIFY", key_spec="ECC_NIST_P256"),
-                _aws_kms_key(name="unknown", unknown_values={"key_spec": True, "enable_key_rotation": True}),
-            ]
+                _aws_kms_key(
+                    name="unknown",
+                    deletion_window_in_days=7,
+                    unknown_values={
+                        "key_spec": True,
+                        "enable_key_rotation": True,
+                        "deletion_window_in_days": True,
+                    },
+                ),
+            ],
+            AWS_KEY_MANAGEMENT_RULE_IDS,
         )
         gcp_findings = _gcp_kms_findings(
             [
@@ -138,7 +155,7 @@ class KeyManagementPostureParityTests(unittest.TestCase):
     def test_key_management_posture_rules_remain_provider_local(self) -> None:
         findings_by_provider = {
             "aws": _evaluate_aws(
-                [_aws_kms_key(enable_key_rotation=False)],
+                [_aws_kms_key(enable_key_rotation=False, deletion_window_in_days=7)],
                 ALL_KEY_MANAGEMENT_RULE_IDS,
             ),
             "gcp": _evaluate_gcp(

@@ -591,6 +591,10 @@ class AwsResourceFacts:
         return _bool_from_state(self.kms_enable_key_rotation_state)
 
     @property
+    def kms_deletion_window_in_days(self) -> int | None:
+        return self.get(AwsResourceMetadata.KMS_DELETION_WINDOW_IN_DAYS)
+
+    @property
     def kms_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.KMS_POSTURE_UNCERTAINTIES)
 

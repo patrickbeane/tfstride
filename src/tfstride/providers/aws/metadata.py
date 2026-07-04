@@ -165,6 +165,7 @@ class AwsResourceMetadata:
     ENGINE = OptionalStringMetadataField("engine")
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
+    KMS_DELETION_WINDOW_IN_DAYS = OptionalIntMetadataField("kms_deletion_window_in_days")
     SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS = OptionalIntMetadataField("secrets_manager_recovery_window_in_days")
     SECRETS_MANAGER_ROTATION_AUTOMATICALLY_AFTER_DAYS = OptionalIntMetadataField(
         "secrets_manager_rotation_automatically_after_days"

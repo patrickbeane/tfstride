@@ -15,6 +15,8 @@ _KMS_STATE_ENABLED = "enabled"
 _KMS_STATE_DISABLED = "disabled"
 _KMS_STATE_UNKNOWN = "unknown"
 _SYMMETRIC_KEY_SPECS = frozenset({"SYMMETRIC_DEFAULT"})
+_KMS_MIN_DELETION_WINDOW_DAYS = 14
+_KMS_DEFAULT_DELETION_WINDOW_DAYS = 30
 
 
 class AwsKmsRuleDetectors:
@@ -58,6 +60,53 @@ class AwsKmsRuleDetectors:
                         evidence_item("key_posture", _kms_key_posture_evidence(facts)),
                         evidence_item("rotation_posture", _kms_rotation_evidence(facts, state)),
                         evidence_item("posture_uncertainty", _kms_uncertainty_evidence(facts, "enable_key_rotation")),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_deletion_window_too_short(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for key in context.inventory.by_type(_AWS_KMS_KEY):
+            facts = aws_facts(key)
+            if _kms_uncertainty_evidence(facts, "deletion_window_in_days"):
+                continue
+            deletion_window_days = facts.kms_deletion_window_in_days
+            if deletion_window_days is None or deletion_window_days >= _KMS_MIN_DELETION_WINDOW_DAYS:
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[key.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{key.display_name} configures a {deletion_window_days}-day KMS deletion window, "
+                        f"which is shorter than the {_KMS_MIN_DELETION_WINDOW_DAYS}-day tfSTRIDE baseline. "
+                        "A short scheduled-deletion window gives operators less time to detect and cancel "
+                        "accidental or malicious key deletion before dependent encrypted data becomes unrecoverable. "
+                        "This finding concerns key recovery governance; it does not inspect key policies or grants."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _kms_target_evidence(key)),
+                        evidence_item("key_posture", _kms_key_posture_evidence(facts)),
+                        evidence_item("deletion_window_posture", _kms_deletion_window_evidence(facts)),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -115,6 +164,19 @@ def _kms_rotation_evidence(facts: AwsResourceFacts, state: str) -> list[str]:
     else:
         values.append("enable_key_rotation is unknown")
     values.append("automatic annual rotation is evaluated for customer-managed symmetric KMS keys")
+    return values
+
+
+def _kms_deletion_window_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [
+        f"deletion_window_in_days={facts.kms_deletion_window_in_days}",
+        f"minimum_deletion_window_days={_KMS_MIN_DELETION_WINDOW_DAYS}",
+        f"default_deletion_window_days={_KMS_DEFAULT_DELETION_WINDOW_DAYS}",
+    ]
+    values.extend(
+        "posture_uncertainty=" + uncertainty
+        for uncertainty in _kms_uncertainty_evidence(facts, "deletion_window_in_days")
+    )
     return values
 
 

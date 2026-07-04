@@ -31,6 +31,7 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
         "aws-kms-key-rotation-disabled-or-unknown",
+        "aws-kms-key-deletion-window-too-short",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -300,9 +301,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (127, 2, 2, 12, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (128, 2, 2, 12, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (27, 2, 2, 2, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (28, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (39, 0, 0, 10, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (61, 0, 0, 0, 0, 0))
 

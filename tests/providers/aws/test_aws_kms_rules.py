@@ -9,6 +9,7 @@ from tfstride.models import TerraformResource
 from tfstride.providers.aws.normalizer import AwsNormalizer
 
 _KMS_ROTATION_RULE = "aws-kms-key-rotation-disabled-or-unknown"
+_KMS_DELETION_WINDOW_RULE = "aws-kms-key-deletion-window-too-short"
 _MISSING = object()
 
 
@@ -19,6 +20,7 @@ def _kms_key(
     key_spec: object = _MISSING,
     customer_master_key_spec: object = _MISSING,
     enable_key_rotation: object = _MISSING,
+    deletion_window_in_days: object = _MISSING,
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -34,6 +36,8 @@ def _kms_key(
         values["customer_master_key_spec"] = customer_master_key_spec
     if enable_key_rotation is not _MISSING:
         values["enable_key_rotation"] = enable_key_rotation
+    if deletion_window_in_days is not _MISSING:
+        values["deletion_window_in_days"] = deletion_window_in_days
     return TerraformResource(
         address=f"aws_kms_key.{name}",
         mode="managed",
@@ -45,12 +49,12 @@ def _kms_key(
     )
 
 
-def _findings(resources: list[TerraformResource]):
+def _findings(resources: list[TerraformResource], *rule_ids: str):
     inventory = AwsNormalizer().normalize(resources)
     return StrideRuleEngine().evaluate(
         inventory,
         [],
-        rule_policy=RulePolicy(enabled_rule_ids=frozenset({_KMS_ROTATION_RULE})),
+        rule_policy=RulePolicy(enabled_rule_ids=frozenset(rule_ids or {_KMS_ROTATION_RULE})),
     )
 
 
@@ -119,6 +123,53 @@ class AwsKmsRuleTests(unittest.TestCase):
                 _kms_key(name="signing", key_usage="SIGN_VERIFY", key_spec="ECC_NIST_P256"),
                 _kms_key(name="rsa", key_usage="ENCRYPT_DECRYPT", key_spec="RSA_2048"),
             ]
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_short_deletion_window_is_detected_as_recovery_governance_risk(self) -> None:
+        findings = _findings(
+            [_kms_key(enable_key_rotation=True, deletion_window_in_days=7)],
+            _KMS_DELETION_WINDOW_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_KMS_DELETION_WINDOW_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        self.assertEqual(findings[0].affected_resources, ["aws_kms_key.customer"])
+        self.assertIn("key recovery governance", findings[0].rationale)
+        self.assertIn("does not inspect key policies or grants", findings[0].rationale)
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["deletion_window_posture"],
+            [
+                "deletion_window_in_days=7",
+                "minimum_deletion_window_days=14",
+                "default_deletion_window_days=30",
+            ],
+        )
+
+    def test_default_or_long_deletion_window_stays_quiet(self) -> None:
+        findings = _findings(
+            [
+                _kms_key(name="default", enable_key_rotation=True),
+                _kms_key(name="baseline", enable_key_rotation=True, deletion_window_in_days=14),
+                _kms_key(name="long", enable_key_rotation=True, deletion_window_in_days=30),
+            ],
+            _KMS_DELETION_WINDOW_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unknown_deletion_window_is_not_overclaimed_as_short(self) -> None:
+        findings = _findings(
+            [
+                _kms_key(
+                    enable_key_rotation=True,
+                    deletion_window_in_days=7,
+                    unknown_values={"deletion_window_in_days": True},
+                )
+            ],
+            _KMS_DELETION_WINDOW_RULE,
         )
 
         self.assertEqual(findings, [])

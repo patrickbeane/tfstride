@@ -126,6 +126,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "key_spec": "SYMMETRIC_DEFAULT",
                 "customer_master_key_spec": "SYMMETRIC_DEFAULT",
                 "enable_key_rotation": True,
+                "deletion_window_in_days": 30,
             },
         )
 
@@ -139,6 +140,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.kms_customer_master_key_spec, "SYMMETRIC_DEFAULT")
         self.assertEqual(facts.kms_enable_key_rotation_state, "enabled")
         self.assertTrue(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_deletion_window_in_days, 30)
         self.assertEqual(facts.kms_posture_uncertainties, [])
 
     def test_kms_key_missing_rotation_defaults_to_disabled(self) -> None:
@@ -149,6 +151,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertIsNone(facts.kms_customer_master_key_spec)
         self.assertEqual(facts.kms_enable_key_rotation_state, "disabled")
         self.assertFalse(facts.kms_enable_key_rotation)
+        self.assertIsNone(facts.kms_deletion_window_in_days)
         self.assertEqual(facts.kms_posture_uncertainties, [])
 
     def test_kms_key_preserves_unknown_rotation_and_spec_values(self) -> None:
@@ -160,6 +163,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "key_spec": True,
                 "customer_master_key_spec": True,
                 "enable_key_rotation": True,
+                "deletion_window_in_days": True,
             },
         )
 
@@ -170,6 +174,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertIsNone(facts.kms_customer_master_key_spec)
         self.assertEqual(facts.kms_enable_key_rotation_state, "unknown")
         self.assertIsNone(facts.kms_enable_key_rotation)
+        self.assertIsNone(facts.kms_deletion_window_in_days)
         self.assertEqual(
             facts.kms_posture_uncertainties,
             [
@@ -177,6 +182,7 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "key_spec is unknown after planning",
                 "customer_master_key_spec is unknown after planning",
                 "enable_key_rotation is unknown after planning",
+                "deletion_window_in_days is unknown after planning",
             ],
         )
 

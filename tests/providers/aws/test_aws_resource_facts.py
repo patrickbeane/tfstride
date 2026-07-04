@@ -50,6 +50,7 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "kms_key_spec": "SYMMETRIC_DEFAULT",
                 "kms_customer_master_key_spec": "SYMMETRIC_DEFAULT",
                 "kms_enable_key_rotation_state": "enabled",
+                "kms_deletion_window_in_days": 30,
                 "kms_posture_uncertainties": ["enable_key_rotation is unknown after planning"],
                 "trust_statements": [{"Effect": "Allow"}],
                 "s3_versioning_status": "Enabled",
@@ -173,6 +174,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.kms_customer_master_key_spec, "SYMMETRIC_DEFAULT")
         self.assertEqual(facts.kms_enable_key_rotation_state, "enabled")
         self.assertTrue(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_deletion_window_in_days, 30)
         self.assertEqual(facts.kms_posture_uncertainties, ["enable_key_rotation is unknown after planning"])
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.s3_versioning_status, "Enabled")
@@ -473,6 +475,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.kms_customer_master_key_spec)
         self.assertIsNone(facts.kms_enable_key_rotation_state)
         self.assertIsNone(facts.kms_enable_key_rotation)
+        self.assertIsNone(facts.kms_deletion_window_in_days)
         self.assertEqual(facts.kms_posture_uncertainties, [])
         self.assertEqual(facts.eks_posture_uncertainties, [])
 

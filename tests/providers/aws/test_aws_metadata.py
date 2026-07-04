@@ -64,6 +64,7 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "KMS_KEY_SPEC": "kms_key_spec",
             "KMS_CUSTOMER_MASTER_KEY_SPEC": "kms_customer_master_key_spec",
             "KMS_ENABLE_KEY_ROTATION_STATE": "kms_enable_key_rotation_state",
+            "KMS_DELETION_WINDOW_IN_DAYS": "kms_deletion_window_in_days",
             "KMS_POSTURE_UNCERTAINTIES": "kms_posture_uncertainties",
             "EKS_CLUSTER_ARN": "eks_cluster_arn",
             "EKS_CLUSTER_ROLE_ARN": "eks_cluster_role_arn",

@@ -316,6 +316,12 @@ def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
                 unknown_values,
                 uncertainties,
             ),
+            AwsResourceMetadata.KMS_DELETION_WINDOW_IN_DAYS: _known_top_level_int(
+                values,
+                unknown_values,
+                "deletion_window_in_days",
+                uncertainties,
+            ),
             AwsResourceMetadata.KMS_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )

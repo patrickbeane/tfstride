@@ -205,6 +205,18 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-kms-key-deletion-window-too-short",
+        title="KMS key deletion window is too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Use a longer KMS deletion window for customer-managed keys so operators have enough time to detect "
+            "and cancel accidental or malicious scheduled key deletion before dependent encrypted data becomes "
+            "unrecoverable."
+        ),
+        tags=("aws", "kms", "encryption", "recovery", "deletion-protection"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-workload-secretsmanager-vpc-endpoint-missing",
         title="Workload uses Secrets Manager without a VPC endpoint",
         category=StrideCategory.INFORMATION_DISCLOSURE,
