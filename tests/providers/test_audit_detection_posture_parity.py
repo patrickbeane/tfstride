@@ -53,7 +53,14 @@ AWS_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
         "aws_config_configuration_recorder",
     }
 )
-GCP_AUDIT_DETECTION_RULE_IDS = frozenset({"gcp-gke-control-plane-logging-incomplete"})
+GCP_AUDIT_DETECTION_RULE_IDS = frozenset(
+    {
+        "gcp-gke-control-plane-logging-incomplete",
+        "gcp-scc-asset-discovery-disabled",
+        "gcp-logging-exclusion-drops-audit-security-logs",
+        "gcp-central-audit-sink-not-modeled",
+    }
+)
 AZURE_AUDIT_DETECTION_RULE_IDS = frozenset(
     {
         "azure-diagnostic-settings-missing",
@@ -256,6 +263,21 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
             [
                 _gke_cluster(logging_service="logging.googleapis.com/none", logging_components=[]),
                 _gke_node_pool(),
+                _gcp_resource(
+                    "google_scc_organization_settings.main",
+                    GcpResourceType.SCC_ORGANIZATION_SETTINGS,
+                    {"organization": "1234567890", "enable_asset_discovery": False},
+                ),
+                _gcp_resource(
+                    "google_logging_project_exclusion.audit",
+                    GcpResourceType.LOGGING_PROJECT_EXCLUSION,
+                    {
+                        "name": "drop-audit",
+                        "project": "tfstride-demo",
+                        "filter": "logName:cloudaudit.googleapis.com",
+                        "disabled": False,
+                    },
+                ),
             ],
             GCP_AUDIT_DETECTION_RULE_IDS,
         )

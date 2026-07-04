@@ -6,6 +6,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.gcp.rules import GcpRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.gcp.audit_rules import GcpAuditRuleDetectors
 from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors
 
@@ -43,6 +44,9 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gke-legacy-metadata-endpoints-enabled",
         "gcp-gke-broad-node-service-account",
         "gcp-gke-control-plane-logging-incomplete",
+        "gcp-scc-asset-discovery-disabled",
+        "gcp-logging-exclusion-drops-audit-security-logs",
+        "gcp-central-audit-sink-not-modeled",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
         "gcp-gke-legacy-abac-enabled-or-unknown",
@@ -76,6 +80,7 @@ def build_gcp_rule_contribution(
     metadata_registry: RuleRegistry | None = None,
 ) -> RuleContribution:
     gcp_detectors = GcpRuleDetectors(finding_factory)
+    audit_detectors = GcpAuditRuleDetectors(finding_factory)
     private_connectivity_detectors = GcpPrivateConnectivityRuleDetectors(finding_factory)
     path_chain_detectors = GcpPathChainRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
@@ -131,6 +136,11 @@ def build_gcp_rule_contribution(
         "gcp-gke-legacy-metadata-endpoints-enabled": gcp_detectors.detect_gke_legacy_metadata_endpoints_enabled,
         "gcp-gke-broad-node-service-account": gcp_detectors.detect_gke_broad_node_service_account,
         "gcp-gke-control-plane-logging-incomplete": gcp_detectors.detect_gke_control_plane_logging_incomplete,
+        "gcp-scc-asset-discovery-disabled": audit_detectors.detect_scc_asset_discovery_disabled,
+        "gcp-logging-exclusion-drops-audit-security-logs": (
+            audit_detectors.detect_logging_exclusion_drops_audit_security_logs
+        ),
+        "gcp-central-audit-sink-not-modeled": audit_detectors.detect_central_audit_sink_not_modeled,
         "gcp-gke-network-policy-disabled": gcp_detectors.detect_gke_network_policy_disabled,
         "gcp-gke-secrets-encryption-not-configured": gcp_detectors.detect_gke_secrets_encryption_not_configured,
         "gcp-gke-legacy-abac-enabled-or-unknown": gcp_detectors.detect_gke_legacy_abac_enabled_or_unknown,

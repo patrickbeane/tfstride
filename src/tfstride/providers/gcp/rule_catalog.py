@@ -381,6 +381,39 @@ GCP_RULE_METADATA = (
         severity_factors=("lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-scc-asset-discovery-disabled",
+        title="Security Command Center asset discovery is disabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable SCC asset discovery for the organization so Security Command Center can inventory assets, "
+            "correlate findings, and support security posture review."
+        ),
+        tags=("gcp", "scc", "security-command-center", "asset-discovery", "monitoring"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-logging-exclusion-drops-audit-security-logs",
+        title="Logging exclusion drops audit or security logs",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Disable or narrow logging exclusions that match Cloud Audit Logs, Security Command Center logs, "
+            "or firewall/security records. Retain those streams in a monitored logging project or approved archive."
+        ),
+        tags=("gcp", "logging", "audit", "security-logs", "exclusion"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-central-audit-sink-not-modeled",
+        title="Central GCP audit logging sink is not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Model a project or organization logging sink that exports audit and security logs to a retained "
+            "destination, or attach review evidence showing that central log export is managed outside this plan."
+        ),
+        tags=("gcp", "logging", "audit", "sink", "monitoring"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gke-network-policy-disabled",
         title="GKE network policy is not enabled",
         category=StrideCategory.TAMPERING,
