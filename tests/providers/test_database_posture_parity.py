@@ -10,6 +10,9 @@ from tests.providers.azure.test_azure_sql_rules import _database as _azure_sql_d
 from tests.providers.azure.test_azure_sql_rules import _firewall_rule as _azure_sql_firewall_rule
 from tests.providers.azure.test_azure_sql_rules import _server as _azure_sql_server
 from tests.providers.gcp.rule_support.data import _cloud_sql_instance as _gcp_cloud_sql_instance
+from tests.providers.gcp.test_gcp_cloud_sql_rules import (
+    _service_networking_connection as _gcp_service_networking_connection,
+)
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
@@ -37,6 +40,7 @@ GCP_DATABASE_RULE_IDS = frozenset(
         "gcp-cloud-sql-public-ip-without-private-network",
         "gcp-cloud-sql-point-in-time-recovery-disabled",
         "gcp-cloud-sql-deletion-protection-disabled",
+        "gcp-cloud-sql-private-connectivity-not-modeled",
     }
 )
 AZURE_DATABASE_RULE_IDS = frozenset(
@@ -55,12 +59,13 @@ AZURE_DATABASE_RULE_IDS = frozenset(
 ALL_DATABASE_RULE_IDS = AWS_DATABASE_RULE_IDS | GCP_DATABASE_RULE_IDS | AZURE_DATABASE_RULE_IDS
 
 DATABASE_CONCEPT_RULE_IDS = {
-    "public_endpoint_or_network_access": {
+    "public_endpoint_or_private_connectivity_posture": {
         "aws": frozenset({"aws-rds-public-endpoint-enabled"}),
         "gcp": frozenset(
             {
                 "gcp-cloud-sql-public-authorized-network",
                 "gcp-cloud-sql-public-ip-without-private-network",
+                "gcp-cloud-sql-private-connectivity-not-modeled",
             }
         ),
         "azure": frozenset(
@@ -220,6 +225,7 @@ class DatabasePostureParityTests(unittest.TestCase):
         aws_findings = _evaluate_aws([_aws_safe_db_instance()])
         gcp_findings = _evaluate_gcp(
             [
+                _gcp_service_networking_connection(),
                 _gcp_cloud_sql_instance(
                     ipv4_enabled=False,
                     authorized_networks=[],
@@ -227,7 +233,7 @@ class DatabasePostureParityTests(unittest.TestCase):
                     pitr_enabled=True,
                     private_network="google_compute_network.main.id",
                     deletion_protection=True,
-                )
+                ),
             ]
         )
         azure_findings = _evaluate_azure(
