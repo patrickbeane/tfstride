@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.iam_rules import AwsIamRuleDetectors
 from tfstride.providers.aws.kms_rules import AwsKmsRuleDetectors
@@ -26,6 +27,10 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-load-balancer-http-public-listener",
         "aws-load-balancer-listener-tls-certificate-missing",
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
+        "aws-cloudtrail-multi-region-disabled",
+        "aws-cloudtrail-log-file-validation-disabled",
+        "aws-guardduty-detector-disabled-or-missing",
+        "aws-securityhub-account-missing",
         "aws-rds-storage-encryption-disabled",
         "aws-rds-public-endpoint-enabled",
         "aws-rds-backup-retention-insufficient",
@@ -77,6 +82,7 @@ def build_aws_rule_contribution(
     finding_factory: FindingFactory,
     metadata_registry: RuleRegistry | None = None,
 ) -> RuleContribution:
+    audit_detectors = AwsAccountAuditRuleDetectors(finding_factory)
     posture_detectors = AwsPostureRuleDetectors(finding_factory)
     network_data_detectors = AwsNetworkDataRuleDetectors(finding_factory)
     path_chain_detectors = AwsPathChainRuleDetectors(finding_factory)
@@ -98,6 +104,10 @@ def build_aws_rule_contribution(
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown": (
             load_balancer_detectors.detect_ssl_policy_weak_or_unknown
         ),
+        "aws-cloudtrail-multi-region-disabled": audit_detectors.detect_cloudtrail_multi_region_disabled,
+        "aws-cloudtrail-log-file-validation-disabled": audit_detectors.detect_cloudtrail_log_file_validation_disabled,
+        "aws-guardduty-detector-disabled-or-missing": (audit_detectors.detect_guardduty_detector_disabled_or_missing),
+        "aws-securityhub-account-missing": audit_detectors.detect_securityhub_account_missing,
         "aws-rds-storage-encryption-disabled": posture_detectors.detect_unencrypted_databases,
         "aws-rds-public-endpoint-enabled": rds_posture_detectors.detect_public_endpoint_enabled,
         "aws-rds-backup-retention-insufficient": rds_posture_detectors.detect_backup_retention_insufficient,

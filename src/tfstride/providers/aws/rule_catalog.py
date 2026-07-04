@@ -61,6 +61,50 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-cloudtrail-multi-region-disabled",
+        title="CloudTrail is not configured for multi-region auditing",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure account-level CloudTrail trails with `is_multi_region_trail = true`, include global "
+            "service events where appropriate, and centralize logs in a protected S3 bucket or logging account."
+        ),
+        tags=("aws", "cloudtrail", "audit", "logging", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-cloudtrail-log-file-validation-disabled",
+        title="CloudTrail log file validation is disabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable CloudTrail log file validation so delivered log files can be integrity-checked during incident "
+            "response, forensics, or compliance review."
+        ),
+        tags=("aws", "cloudtrail", "audit", "log-integrity", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-guardduty-detector-disabled-or-missing",
+        title="GuardDuty detector is disabled or not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable GuardDuty detectors in active regions and keep detector resources or account-baseline modules "
+            "visible in Terraform so threat-detection posture is reviewable before deployment."
+        ),
+        tags=("aws", "guardduty", "threat-detection", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-securityhub-account-missing",
+        title="Security Hub account enablement is not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable Security Hub for the account baseline and keep `aws_securityhub_account` or an equivalent "
+            "account-control module represented in Terraform so control findings are consistently aggregated."
+        ),
+        tags=("aws", "securityhub", "security-monitoring", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-database-permissive-ingress",
         title="Database is reachable from overly permissive sources",
         category=StrideCategory.INFORMATION_DISCLOSURE,
