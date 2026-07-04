@@ -100,6 +100,9 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "secret_manager_replication_mode",
                 "secret_manager_kms_key_names",
                 "secret_manager_replication",
+                "secret_manager_ttl",
+                "secret_manager_expire_time",
+                "secret_manager_version_destroy_ttl",
                 "secret_manager_posture_uncertainties",
             },
             "iam": {

@@ -29,6 +29,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
         "gcp-secret-manager-customer-managed-encryption-missing",
+        "gcp-secret-manager-lifecycle-posture-incomplete",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
@@ -105,6 +106,9 @@ def build_gcp_rule_contribution(
         "gcp-gcs-retention-policy-insufficient": gcp_detectors.detect_gcs_retention_policy_insufficient,
         "gcp-secret-manager-customer-managed-encryption-missing": (
             gcp_detectors.detect_secret_manager_customer_managed_encryption_missing
+        ),
+        "gcp-secret-manager-lifecycle-posture-incomplete": (
+            gcp_detectors.detect_secret_manager_lifecycle_posture_incomplete
         ),
         "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
         "gcp-public-load-balanced-workload": gcp_detectors.detect_public_load_balanced_workload,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **40 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **41 findings** across **30 normalized resources**.
 
 - High severity findings: `14`
-- Medium severity findings: `24`
+- Medium severity findings: `25`
 - Low severity findings: `2`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **40 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `143`
-- Enabled rules: `143`
+- Registered rules: `144`
+- Enabled rules: `144`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -42,6 +42,7 @@ This run identified **9 trust boundaries** and **40 findings** across **30 norma
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-gcs-retention-policy-insufficient`: `1`
   - `gcp-secret-manager-customer-managed-encryption-missing`: `1`
+  - `gcp-secret-manager-lifecycle-posture-incomplete`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
   - `gcp-gke-public-control-plane`: `1`
@@ -583,6 +584,19 @@ This run identified **9 trust boundaries** and **40 findings** across **30 norma
   - network tags: web
   - internet ingress reasons: google_compute_firewall.public_admin ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_admin ingress tcp 3389 from 0.0.0.0/0; google_compute_firewall.public_all ingress tcp unspecified ports from 0.0.0.0/0
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### Secret Manager lifecycle posture is incomplete
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_secret_manager_secret.api_key`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_secret_manager_secret.api_key does not show deterministic Secret Manager lifecycle posture for secret expiry or delayed version destruction. Expiry and version-destroy TTL controls reduce the lifetime of stale or accidentally destroyed secret material, but do not replace access review or rotation.
+- Recommended mitigation: Configure Secret Manager `ttl` or `expire_time` where secret-level expiry is expected, and set `version_destroy_ttl` to a retention window that gives operators enough time to recover from accidental or malicious secret version destruction.
+- Evidence:
+  - target resource: address=google_secret_manager_secret.api_key; type=google_secret_manager_secret; identifier=projects/tfstride-demo/secrets/tfstride-api-key
+  - lifecycle issues: secret has no ttl, expire_time, or version_destroy_ttl lifecycle guardrail; version_destroy_ttl is missing
+  - lifecycle posture: ttl=unset; expire_time=unset; version_destroy_ttl=unset; minimum_version_destroy_ttl_days=7; minimum_version_destroy_ttl_seconds=604800
 
 #### Secret Manager secret does not use customer-managed encryption
 

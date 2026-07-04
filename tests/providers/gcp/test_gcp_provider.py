@@ -273,6 +273,9 @@ class GcpProviderTests(unittest.TestCase):
                 "DELETION_PROTECTION",
                 "SECRET_ID",
                 "SECRET_REFERENCE",
+                "SECRET_MANAGER_TTL",
+                "SECRET_MANAGER_EXPIRE_TIME",
+                "SECRET_MANAGER_VERSION_DESTROY_TTL",
                 "KMS_CRYPTO_KEY_REFERENCE",
                 "KMS_KEY_RING",
                 "KMS_PURPOSE",
@@ -343,6 +346,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.trust_statements, [])
         self.assertIsNone(facts.engine)
         self.assertEqual(facts.resource_policy_source_addresses, [])
+        self.assertIsNone(facts.secret_manager_ttl)
+        self.assertIsNone(facts.secret_manager_expire_time)
+        self.assertIsNone(facts.secret_manager_version_destroy_ttl)
         self.assertIsNone(facts.project)
         self.assertEqual(facts.iam_bindings, [])
         self.assertEqual(facts.authorized_networks, [])

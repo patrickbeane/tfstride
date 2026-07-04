@@ -126,6 +126,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.SECRET_MANAGER_REPLICATION)
 
     @property
+    def secret_manager_ttl(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_TTL)
+
+    @property
+    def secret_manager_expire_time(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_EXPIRE_TIME)
+
+    @property
+    def secret_manager_version_destroy_ttl(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_VERSION_DESTROY_TTL)
+
+    @property
     def secret_manager_posture_uncertainties(self) -> list[str]:
         return self.get(GcpResourceMetadata.SECRET_MANAGER_POSTURE_UNCERTAINTIES)
 

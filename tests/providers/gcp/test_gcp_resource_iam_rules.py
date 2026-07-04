@@ -26,7 +26,11 @@ class GcpResourceIamRuleTests(unittest.TestCase):
     def test_sensitive_secret_public_iam_binding_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_secret_manager_secret(), _secret_manager_secret_iam_member()])
 
-        findings = StrideRuleEngine().evaluate(inventory, [])
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-sensitive-resource-iam-external-access"})),
+        )
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]

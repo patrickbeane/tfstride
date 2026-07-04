@@ -73,6 +73,18 @@ class NeutralProviderStorageFacts:
         return {}
 
     @property
+    def secret_manager_ttl(self) -> str | None:
+        return None
+
+    @property
+    def secret_manager_expire_time(self) -> str | None:
+        return None
+
+    @property
+    def secret_manager_version_destroy_ttl(self) -> str | None:
+        return None
+
+    @property
     def secret_manager_posture_uncertainties(self) -> list[str]:
         return []
 

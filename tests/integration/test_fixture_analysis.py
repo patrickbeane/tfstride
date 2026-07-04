@@ -106,8 +106,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 5, {"high": 3, "medium": 2}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 21, {"high": 6, "medium": 15}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 40, {"high": 14, "medium": 24, "low": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 22, {"high": 6, "medium": 16}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 41, {"high": 14, "medium": 25, "low": 2}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
@@ -190,6 +190,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Secret Manager secret does not use customer-managed encryption": 1,
+                "Secret Manager lifecycle posture is incomplete": 1,
             },
             "gcp-nightmare": {
                 "BigQuery IAM binding allows public or broad data access": 1,
@@ -229,6 +230,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Pub/Sub IAM binding allows public or broad data access": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Secret Manager secret does not use customer-managed encryption": 1,
+                "Secret Manager lifecycle posture is incomplete": 1,
             },
             "azure-safe": {},
             "azure-compute": {
@@ -466,7 +468,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             result.analysis_coverage.resources.unsupported_resource_types,
             {"google_logging_project_sink": 1},
         )
-        self.assertEqual(len(result.findings), 21)
+        self.assertEqual(len(result.findings), 22)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)

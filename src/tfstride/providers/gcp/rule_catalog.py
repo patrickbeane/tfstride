@@ -225,6 +225,18 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-secret-manager-lifecycle-posture-incomplete",
+        title="Secret Manager lifecycle posture is incomplete",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure Secret Manager `ttl` or `expire_time` where secret-level expiry is expected, and set "
+            "`version_destroy_ttl` to a retention window that gives operators enough time to recover from accidental "
+            "or malicious secret version destruction."
+        ),
+        tags=("gcp", "secret-manager", "secrets", "lifecycle", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,

@@ -75,6 +75,14 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
     replication_mode, replication, kms_key_names, uncertainties, customer_managed_encryption = (
         _secret_manager_replication_posture(values, resource.unknown_values)
     )
+    ttl = _secret_manager_lifecycle_value(values, resource.unknown_values, GcpAttr.TTL, uncertainties)
+    expire_time = _secret_manager_lifecycle_value(values, resource.unknown_values, GcpAttr.EXPIRE_TIME, uncertainties)
+    version_destroy_ttl = _secret_manager_lifecycle_value(
+        values,
+        resource.unknown_values,
+        GcpAttr.VERSION_DESTROY_TTL,
+        uncertainties,
+    )
     metadata: dict[object, object] = {
         GcpResourceMetadata.NAME: name,
         GcpResourceMetadata.SECRET_ID: secret_id,
@@ -84,11 +92,11 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
         GcpResourceMetadata.SECRET_MANAGER_KMS_KEY_NAMES: kms_key_names,
         GcpResourceMetadata.SECRET_MANAGER_REPLICATION: replication,
         GcpResourceMetadata.SECRET_MANAGER_POSTURE_UNCERTAINTIES: uncertainties,
+        GcpResourceMetadata.SECRET_MANAGER_TTL: ttl,
+        GcpResourceMetadata.SECRET_MANAGER_EXPIRE_TIME: expire_time,
+        GcpResourceMetadata.SECRET_MANAGER_VERSION_DESTROY_TTL: version_destroy_ttl,
         "annotations": values.get(GcpAttr.ANNOTATIONS),
         "topics": values.get(GcpAttr.TOPICS),
-        "expire_time": values.get(GcpAttr.EXPIRE_TIME),
-        "ttl": values.get(GcpAttr.TTL),
-        "version_destroy_ttl": values.get(GcpAttr.VERSION_DESTROY_TTL),
     }
     if customer_managed_encryption is not None:
         metadata[GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION] = customer_managed_encryption
@@ -379,6 +387,18 @@ def _retention_policy_uncertainties(unknown_values: Mapping[str, Any]) -> list[s
         if retention_block.get(field_name) is True:
             uncertainties.append(f"retention_policy.{field_name} is unknown after planning")
     return uncertainties
+
+
+def _secret_manager_lifecycle_value(
+    values: GcpValues,
+    unknown_values: Mapping[str, Any],
+    attribute: GcpAttribute[str | None],
+    uncertainties: list[str],
+) -> str | None:
+    if value_is_unknown(unknown_values.get(attribute.key)):
+        uncertainties.append(f"{attribute.key} is unknown after planning")
+        return None
+    return values.get(attribute)
 
 
 def _secret_manager_replication_posture(

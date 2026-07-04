@@ -61,6 +61,8 @@
             "name": "projects/tfstride-demo/secrets/tfstride-api-key",
             "id": "projects/tfstride-demo/secrets/tfstride-api-key",
             "project": "tfstride-demo",
+            "ttl": "2592000s",
+            "version_destroy_ttl": "604800s",
             "replication": [
               {
                 "auto": [

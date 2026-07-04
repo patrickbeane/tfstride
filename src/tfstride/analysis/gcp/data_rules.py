@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
     collect_evidence,
@@ -32,6 +34,9 @@ _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscr
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
 _GCS_MIN_RETENTION_PERIOD_DAYS = 7
 _GCS_MIN_RETENTION_PERIOD_SECONDS = _GCS_MIN_RETENTION_PERIOD_DAYS * 24 * 60 * 60
+_SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS = 7
+_SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS = _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS * 24 * 60 * 60
+_GCP_DURATION_SECONDS = re.compile(r"^\s*(\d+(?:\.\d+)?)s\s*$")
 
 
 class GcpDataRuleDetectors:
@@ -482,6 +487,51 @@ class GcpDataRuleDetectors:
             )
         return findings
 
+    def detect_secret_manager_lifecycle_posture_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for secret in context.inventory.by_type("google_secret_manager_secret"):
+            secret_facts = analysis_facts(secret).storage
+            if secret.data_sensitivity != "sensitive":
+                continue
+            lifecycle_issues = _secret_manager_lifecycle_issues(secret_facts)
+            if not lifecycle_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[secret.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{secret.display_name} does not show deterministic Secret Manager lifecycle posture "
+                        "for secret expiry or delayed version destruction. Expiry and version-destroy TTL controls "
+                        "reduce the lifetime of stale or accidentally destroyed secret material, but do not replace "
+                        "access review or rotation."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _secret_manager_target_evidence(secret)),
+                        evidence_item("lifecycle_issues", lifecycle_issues),
+                        evidence_item("lifecycle_posture", _secret_manager_lifecycle_evidence(secret_facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_public_authorized_network(
         self,
         context: RuleEvaluationContext,
@@ -801,6 +851,63 @@ def _gcs_retention_policy_evidence(bucket_facts: AnalysisStorageFacts) -> list[s
 
 def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
+
+
+def _secret_manager_lifecycle_issues(secret_facts: AnalysisStorageFacts) -> list[str]:
+    if _secret_manager_lifecycle_uncertainties(secret_facts):
+        return []
+
+    issues: list[str] = []
+    has_expiry = bool(secret_facts.secret_manager_ttl or secret_facts.secret_manager_expire_time)
+    has_destroy_ttl = bool(secret_facts.secret_manager_version_destroy_ttl)
+    if not has_expiry and not has_destroy_ttl:
+        issues.append("secret has no ttl, expire_time, or version_destroy_ttl lifecycle guardrail")
+
+    if not has_destroy_ttl:
+        issues.append("version_destroy_ttl is missing")
+        return issues
+
+    destroy_ttl_seconds = _gcp_duration_seconds(secret_facts.secret_manager_version_destroy_ttl)
+    if destroy_ttl_seconds is None:
+        return issues
+    if destroy_ttl_seconds < _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS:
+        issues.append(
+            "version_destroy_ttl is "
+            f"{destroy_ttl_seconds} seconds; minimum is {_SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS} seconds"
+        )
+    return issues
+
+
+def _secret_manager_lifecycle_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+    evidence = [
+        f"ttl={secret_facts.secret_manager_ttl or 'unset'}",
+        f"expire_time={secret_facts.secret_manager_expire_time or 'unset'}",
+        f"version_destroy_ttl={secret_facts.secret_manager_version_destroy_ttl or 'unset'}",
+        f"minimum_version_destroy_ttl_days={_SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS}",
+        f"minimum_version_destroy_ttl_seconds={_SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS}",
+    ]
+    destroy_ttl_seconds = _gcp_duration_seconds(secret_facts.secret_manager_version_destroy_ttl)
+    if destroy_ttl_seconds is not None:
+        evidence.append(f"version_destroy_ttl_seconds={destroy_ttl_seconds}")
+    return evidence
+
+
+def _secret_manager_lifecycle_uncertainties(secret_facts: AnalysisStorageFacts) -> list[str]:
+    return [
+        uncertainty
+        for uncertainty in secret_facts.secret_manager_posture_uncertainties
+        if any(field in uncertainty for field in ("ttl", "expire_time", "version_destroy_ttl"))
+    ]
+
+
+def _gcp_duration_seconds(value: str | None) -> int | None:
+    if not isinstance(value, str) or not value:
+        return None
+    match = _GCP_DURATION_SECONDS.match(value)
+    if not match:
+        return None
+    seconds = float(match.group(1))
+    return int(seconds) if seconds.is_integer() else int(seconds) + 1
 
 
 def _secret_manager_target_evidence(secret: NormalizedResource) -> list[str]:

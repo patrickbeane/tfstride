@@ -83,6 +83,18 @@ class AnalysisStorageFacts:
         return self._facts.secret_manager_replication
 
     @property
+    def secret_manager_ttl(self) -> str | None:
+        return self._facts.secret_manager_ttl
+
+    @property
+    def secret_manager_expire_time(self) -> str | None:
+        return self._facts.secret_manager_expire_time
+
+    @property
+    def secret_manager_version_destroy_ttl(self) -> str | None:
+        return self._facts.secret_manager_version_destroy_ttl
+
+    @property
     def secret_manager_posture_uncertainties(self) -> list[str]:
         return self._facts.secret_manager_posture_uncertainties
 

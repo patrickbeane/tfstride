@@ -167,8 +167,66 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(facts.secret_manager_replication_mode, "automatic")
         self.assertEqual(facts.secret_manager_kms_key_names, [])
         self.assertEqual(facts.secret_manager_replication, {"mode": "automatic"})
+        self.assertIsNone(facts.secret_manager_ttl)
+        self.assertIsNone(facts.secret_manager_expire_time)
+        self.assertIsNone(facts.secret_manager_version_destroy_ttl)
         self.assertFalse(facts.customer_managed_encryption)
         self.assertEqual(facts.secret_manager_posture_uncertainties, [])
+
+    def test_secret_manager_secret_normalizer_preserves_lifecycle_posture(self) -> None:
+        normalized = normalize_secret_manager_secret(
+            _terraform_resource(
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret",
+                {
+                    "secret_id": "tfstride-api-key",
+                    "project": "tfstride-demo",
+                    "ttl": "2592000s",
+                    "expire_time": "2026-12-31T00:00:00Z",
+                    "version_destroy_ttl": "604800s",
+                    "replication": [{"auto": [{}]}],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.secret_manager_ttl, "2592000s")
+        self.assertEqual(facts.secret_manager_expire_time, "2026-12-31T00:00:00Z")
+        self.assertEqual(facts.secret_manager_version_destroy_ttl, "604800s")
+        self.assertEqual(facts.secret_manager_posture_uncertainties, [])
+
+    def test_secret_manager_secret_normalizer_preserves_unknown_lifecycle_posture(self) -> None:
+        normalized = normalize_secret_manager_secret(
+            _terraform_resource(
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret",
+                {
+                    "secret_id": "tfstride-api-key",
+                    "project": "tfstride-demo",
+                    "replication": [{"auto": [{}]}],
+                },
+                unknown_values={
+                    "ttl": True,
+                    "expire_time": True,
+                    "version_destroy_ttl": True,
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.secret_manager_ttl)
+        self.assertIsNone(facts.secret_manager_expire_time)
+        self.assertIsNone(facts.secret_manager_version_destroy_ttl)
+        self.assertEqual(
+            facts.secret_manager_posture_uncertainties,
+            [
+                "ttl is unknown after planning",
+                "expire_time is unknown after planning",
+                "version_destroy_ttl is unknown after planning",
+            ],
+        )
 
     def test_secret_manager_secret_normalizer_preserves_auto_cmek(self) -> None:
         normalized = normalize_secret_manager_secret(
