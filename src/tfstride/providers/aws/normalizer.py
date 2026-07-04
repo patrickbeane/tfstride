@@ -5,6 +5,12 @@ from collections.abc import Callable
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
+from tfstride.providers.aws.audit_normalizers import (
+    normalize_cloudtrail,
+    normalize_config_configuration_recorder,
+    normalize_guardduty_detector,
+    normalize_securityhub_account,
+)
 from tfstride.providers.aws.compute_normalizers import (
     normalize_ecs_cluster,
     normalize_ecs_service,
@@ -59,6 +65,8 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    "aws_cloudtrail": normalize_cloudtrail,
+    "aws_config_configuration_recorder": normalize_config_configuration_recorder,
     "aws_db_instance": normalize_db_instance,
     "aws_ecs_cluster": normalize_ecs_cluster,
     "aws_ecs_service": normalize_ecs_service,
@@ -69,6 +77,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_iam_policy": normalize_iam_policy,
     "aws_iam_role": normalize_iam_role,
     "aws_iam_role_policy": normalize_iam_role_policy,
+    "aws_guardduty_detector": normalize_guardduty_detector,
     "aws_iam_role_policy_attachment": normalize_iam_role_policy_attachment,
     "aws_instance": normalize_instance,
     "aws_internet_gateway": normalize_internet_gateway,
@@ -91,6 +100,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_secretsmanager_secret": normalize_secretsmanager_secret,
     "aws_secretsmanager_secret_policy": normalize_secretsmanager_secret_policy,
     "aws_secretsmanager_secret_rotation": normalize_secretsmanager_secret_rotation,
+    "aws_securityhub_account": normalize_securityhub_account,
     "aws_security_group": normalize_security_group,
     "aws_security_group_rule": normalize_security_group_rule,
     "aws_sns_topic": normalize_sns_topic,

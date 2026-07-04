@@ -360,12 +360,15 @@
     "metadata": {
       "primary_account_id": "111122223333",
       "supported_resource_types": [
+        "aws_cloudtrail",
+        "aws_config_configuration_recorder",
         "aws_db_instance",
         "aws_ecs_cluster",
         "aws_ecs_service",
         "aws_ecs_task_definition",
         "aws_eks_addon",
         "aws_eks_cluster",
+        "aws_guardduty_detector",
         "aws_iam_instance_profile",
         "aws_iam_policy",
         "aws_iam_role",
@@ -394,6 +397,7 @@
         "aws_secretsmanager_secret_rotation",
         "aws_security_group",
         "aws_security_group_rule",
+        "aws_securityhub_account",
         "aws_sns_topic",
         "aws_sqs_queue",
         "aws_subnet",

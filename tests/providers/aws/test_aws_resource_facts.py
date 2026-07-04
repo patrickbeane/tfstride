@@ -130,6 +130,36 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "load_balancer_listener_certificate_arn": ("arn:aws:acm:us-east-1:111122223333:certificate/listener"),
                 "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
                 "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
+                "audit_detection_posture_uncertainties": ["enable_logging is unknown after planning"],
+                "cloudtrail_s3_bucket_name": "audit-logs",
+                "cloudtrail_s3_key_prefix": "cloudtrail",
+                "cloudtrail_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/audit",
+                "cloudtrail_cloudwatch_logs_group_arn": (
+                    "arn:aws:logs:us-east-1:111122223333:log-group:/aws/cloudtrail"
+                ),
+                "cloudtrail_cloudwatch_logs_role_arn": "arn:aws:iam::111122223333:role/cloudtrail-logs",
+                "cloudtrail_enable_logging_state": "enabled",
+                "cloudtrail_log_file_validation_state": "enabled",
+                "cloudtrail_multi_region_state": "enabled",
+                "cloudtrail_global_service_events_state": "enabled",
+                "cloudtrail_organization_trail_state": "disabled",
+                "cloudtrail_event_selectors": [{"read_write_type": "All"}],
+                "cloudtrail_insight_selectors": ["ApiCallRateInsight"],
+                "guardduty_enable_state": "enabled",
+                "guardduty_finding_publishing_frequency": "FIFTEEN_MINUTES",
+                "guardduty_datasources": {"s3_logs": [{"enable": True}]},
+                "guardduty_features": [{"name": "EKS_AUDIT_LOGS", "status": "ENABLED"}],
+                "securityhub_enable_default_standards_state": "disabled",
+                "securityhub_auto_enable_controls_state": "enabled",
+                "securityhub_control_finding_generator": "SECURITY_CONTROL",
+                "config_recorder_name": "default",
+                "config_recorder_role_arn": "arn:aws:iam::111122223333:role/config",
+                "config_recorder_all_supported_state": "enabled",
+                "config_recorder_include_global_resource_types_state": "enabled",
+                "config_recorder_resource_types": ["AWS::S3::Bucket"],
+                "config_recorder_recording_strategy_use_only": "ALL_SUPPORTED_RESOURCE_TYPES",
+                "config_recorder_recording_group": {"all_supported": True},
+                "config_recorder_recording_strategy": {"use_only": "ALL_SUPPORTED_RESOURCE_TYPES"},
                 "vpc_endpoint_id": "vpce-secrets",
                 "vpc_endpoint_service_name": "com.amazonaws.us-east-1.secretsmanager",
                 "vpc_endpoint_service_family": "secretsmanager",
@@ -274,6 +304,47 @@ class AwsResourceFactsTests(unittest.TestCase):
             facts.load_balancer_listener_tls_uncertainties,
             ["ssl_policy is unknown after planning"],
         )
+        self.assertEqual(facts.audit_detection_posture_uncertainties, ["enable_logging is unknown after planning"])
+        self.assertEqual(facts.cloudtrail_s3_bucket_name, "audit-logs")
+        self.assertEqual(facts.cloudtrail_s3_key_prefix, "cloudtrail")
+        self.assertEqual(facts.cloudtrail_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/audit")
+        self.assertEqual(
+            facts.cloudtrail_cloudwatch_logs_group_arn,
+            "arn:aws:logs:us-east-1:111122223333:log-group:/aws/cloudtrail",
+        )
+        self.assertEqual(facts.cloudtrail_cloudwatch_logs_role_arn, "arn:aws:iam::111122223333:role/cloudtrail-logs")
+        self.assertEqual(facts.cloudtrail_enable_logging_state, "enabled")
+        self.assertTrue(facts.cloudtrail_enable_logging)
+        self.assertEqual(facts.cloudtrail_log_file_validation_state, "enabled")
+        self.assertTrue(facts.cloudtrail_log_file_validation_enabled)
+        self.assertEqual(facts.cloudtrail_multi_region_state, "enabled")
+        self.assertTrue(facts.cloudtrail_multi_region)
+        self.assertEqual(facts.cloudtrail_global_service_events_state, "enabled")
+        self.assertTrue(facts.cloudtrail_global_service_events)
+        self.assertEqual(facts.cloudtrail_organization_trail_state, "disabled")
+        self.assertFalse(facts.cloudtrail_organization_trail)
+        self.assertEqual(facts.cloudtrail_event_selectors, [{"read_write_type": "All"}])
+        self.assertEqual(facts.cloudtrail_insight_selectors, ["ApiCallRateInsight"])
+        self.assertEqual(facts.guardduty_enable_state, "enabled")
+        self.assertTrue(facts.guardduty_enabled)
+        self.assertEqual(facts.guardduty_finding_publishing_frequency, "FIFTEEN_MINUTES")
+        self.assertEqual(facts.guardduty_datasources, {"s3_logs": [{"enable": True}]})
+        self.assertEqual(facts.guardduty_features, [{"name": "EKS_AUDIT_LOGS", "status": "ENABLED"}])
+        self.assertEqual(facts.securityhub_enable_default_standards_state, "disabled")
+        self.assertFalse(facts.securityhub_enable_default_standards)
+        self.assertEqual(facts.securityhub_auto_enable_controls_state, "enabled")
+        self.assertTrue(facts.securityhub_auto_enable_controls)
+        self.assertEqual(facts.securityhub_control_finding_generator, "SECURITY_CONTROL")
+        self.assertEqual(facts.config_recorder_name, "default")
+        self.assertEqual(facts.config_recorder_role_arn, "arn:aws:iam::111122223333:role/config")
+        self.assertEqual(facts.config_recorder_all_supported_state, "enabled")
+        self.assertTrue(facts.config_recorder_all_supported)
+        self.assertEqual(facts.config_recorder_include_global_resource_types_state, "enabled")
+        self.assertTrue(facts.config_recorder_include_global_resource_types)
+        self.assertEqual(facts.config_recorder_resource_types, ["AWS::S3::Bucket"])
+        self.assertEqual(facts.config_recorder_recording_strategy_use_only, "ALL_SUPPORTED_RESOURCE_TYPES")
+        self.assertEqual(facts.config_recorder_recording_group, {"all_supported": True})
+        self.assertEqual(facts.config_recorder_recording_strategy, {"use_only": "ALL_SUPPORTED_RESOURCE_TYPES"})
         self.assertEqual(facts.vpc_endpoint_id, "vpce-secrets")
         self.assertEqual(facts.vpc_endpoint_service_name, "com.amazonaws.us-east-1.secretsmanager")
         self.assertEqual(facts.vpc_endpoint_service_family, "secretsmanager")
@@ -447,6 +518,44 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.load_balancer_listener_certificate_arn)
         self.assertIsNone(facts.load_balancer_listener_ssl_policy)
         self.assertEqual(facts.load_balancer_listener_tls_uncertainties, [])
+        self.assertEqual(facts.audit_detection_posture_uncertainties, [])
+        self.assertIsNone(facts.cloudtrail_s3_bucket_name)
+        self.assertIsNone(facts.cloudtrail_s3_key_prefix)
+        self.assertIsNone(facts.cloudtrail_kms_key_id)
+        self.assertIsNone(facts.cloudtrail_cloudwatch_logs_group_arn)
+        self.assertIsNone(facts.cloudtrail_cloudwatch_logs_role_arn)
+        self.assertIsNone(facts.cloudtrail_enable_logging_state)
+        self.assertIsNone(facts.cloudtrail_enable_logging)
+        self.assertIsNone(facts.cloudtrail_log_file_validation_state)
+        self.assertIsNone(facts.cloudtrail_log_file_validation_enabled)
+        self.assertIsNone(facts.cloudtrail_multi_region_state)
+        self.assertIsNone(facts.cloudtrail_multi_region)
+        self.assertIsNone(facts.cloudtrail_global_service_events_state)
+        self.assertIsNone(facts.cloudtrail_global_service_events)
+        self.assertIsNone(facts.cloudtrail_organization_trail_state)
+        self.assertIsNone(facts.cloudtrail_organization_trail)
+        self.assertEqual(facts.cloudtrail_event_selectors, [])
+        self.assertEqual(facts.cloudtrail_insight_selectors, [])
+        self.assertIsNone(facts.guardduty_enable_state)
+        self.assertIsNone(facts.guardduty_enabled)
+        self.assertIsNone(facts.guardduty_finding_publishing_frequency)
+        self.assertEqual(facts.guardduty_datasources, {})
+        self.assertEqual(facts.guardduty_features, [])
+        self.assertIsNone(facts.securityhub_enable_default_standards_state)
+        self.assertIsNone(facts.securityhub_enable_default_standards)
+        self.assertIsNone(facts.securityhub_auto_enable_controls_state)
+        self.assertIsNone(facts.securityhub_auto_enable_controls)
+        self.assertIsNone(facts.securityhub_control_finding_generator)
+        self.assertIsNone(facts.config_recorder_name)
+        self.assertIsNone(facts.config_recorder_role_arn)
+        self.assertIsNone(facts.config_recorder_all_supported_state)
+        self.assertIsNone(facts.config_recorder_all_supported)
+        self.assertIsNone(facts.config_recorder_include_global_resource_types_state)
+        self.assertIsNone(facts.config_recorder_include_global_resource_types)
+        self.assertEqual(facts.config_recorder_resource_types, [])
+        self.assertIsNone(facts.config_recorder_recording_strategy_use_only)
+        self.assertEqual(facts.config_recorder_recording_group, {})
+        self.assertEqual(facts.config_recorder_recording_strategy, {})
         self.assertIsNone(facts.vpc_endpoint_id)
         self.assertIsNone(facts.vpc_endpoint_service_name)
         self.assertIsNone(facts.vpc_endpoint_service_family)
