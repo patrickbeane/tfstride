@@ -25,6 +25,7 @@ from tfstride.providers.aws.resource_decoration.public_exposure import (
 from tfstride.providers.aws.resource_decoration.resource_policies import (
     ApplyS3PostureResourcesStage,
     ApplyS3PublicAccessBlocksStage,
+    ApplySecretsManagerPostureResourcesStage,
     MergeResourcePolicyResourcesStage,
 )
 from tfstride.providers.aws.resource_decoration.security_groups import (
@@ -812,6 +813,63 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         ApplyS3PostureResourcesStage().apply([versioning], _context([versioning]))
 
         self.assertEqual(versioning.metadata["unresolved_bucket_references"], ["logs"])
+
+    def test_secrets_manager_posture_stage_applies_rotation_to_secret(self) -> None:
+        secret = _resource(
+            "aws_secretsmanager_secret.app",
+            "aws_secretsmanager_secret",
+            ResourceCategory.DATA,
+            identifier="app",
+            arn="arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
+            metadata={"name": "app"},
+        )
+        rotation = _resource(
+            "aws_secretsmanager_secret_rotation.app",
+            "aws_secretsmanager_secret_rotation",
+            ResourceCategory.DATA,
+            metadata={
+                "secrets_manager_rotation_secret_id": "aws_secretsmanager_secret.app.id",
+                "secrets_manager_rotation_lambda_arn": ("arn:aws:lambda:us-east-1:111122223333:function:rotate-secret"),
+                "secrets_manager_rotation_automatically_after_days": 30,
+                "secrets_manager_rotation_duration": "2h",
+                "secrets_manager_rotation_schedule_expression": "rate(30 days)",
+                "secrets_manager_rotation_rules": {"automatically_after_days": 30},
+                "secrets_manager_posture_uncertainties": [
+                    "rotation_rules.schedule_expression is unknown after planning"
+                ],
+            },
+        )
+        resources = [secret, rotation]
+
+        ApplySecretsManagerPostureResourcesStage().apply(resources, _context(resources))
+
+        secret_facts = aws_facts(secret)
+        self.assertEqual(secret_facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertEqual(secret_facts.secrets_manager_rotation_source_address, "aws_secretsmanager_secret_rotation.app")
+        self.assertEqual(
+            secret_facts.secrets_manager_rotation_lambda_arn,
+            "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+        )
+        self.assertEqual(secret_facts.secrets_manager_rotation_automatically_after_days, 30)
+        self.assertEqual(secret_facts.secrets_manager_rotation_duration, "2h")
+        self.assertEqual(secret_facts.secrets_manager_rotation_schedule_expression, "rate(30 days)")
+        self.assertEqual(secret_facts.secrets_manager_rotation_rules, {"automatically_after_days": 30})
+        self.assertEqual(
+            secret_facts.secrets_manager_posture_uncertainties,
+            ["aws_secretsmanager_secret_rotation.app: rotation_rules.schedule_expression is unknown after planning"],
+        )
+
+    def test_secrets_manager_posture_stage_records_unresolved_secret_references(self) -> None:
+        rotation = _resource(
+            "aws_secretsmanager_secret_rotation.app",
+            "aws_secretsmanager_secret_rotation",
+            ResourceCategory.DATA,
+            metadata={"secrets_manager_rotation_secret_id": "aws_secretsmanager_secret.missing.id"},
+        )
+
+        ApplySecretsManagerPostureResourcesStage().apply([rotation], _context([rotation]))
+
+        self.assertEqual(rotation.metadata["unresolved_secret_references"], ["aws_secretsmanager_secret.missing.id"])
 
     def test_ecs_stage_resolves_task_definition_roles_and_runtime_metadata(self) -> None:
         cluster = _resource(

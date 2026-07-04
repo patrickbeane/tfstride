@@ -24,6 +24,7 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_s3_bucket_versioning,
     normalize_secretsmanager_secret,
     normalize_secretsmanager_secret_policy,
+    normalize_secretsmanager_secret_rotation,
     normalize_sns_topic,
     normalize_sqs_queue,
 )
@@ -89,6 +90,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_s3_bucket_versioning": normalize_s3_bucket_versioning,
     "aws_secretsmanager_secret": normalize_secretsmanager_secret,
     "aws_secretsmanager_secret_policy": normalize_secretsmanager_secret_policy,
+    "aws_secretsmanager_secret_rotation": normalize_secretsmanager_secret_rotation,
     "aws_security_group": normalize_security_group,
     "aws_security_group_rule": normalize_security_group_rule,
     "aws_sns_topic": normalize_sns_topic,

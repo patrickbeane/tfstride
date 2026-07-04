@@ -182,6 +182,17 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-secretsmanager-rotation-not-configured-or-too-long",
+        title="Secrets Manager rotation is not configured or too infrequent",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `aws_secretsmanager_secret_rotation` with a rotation Lambda and a rotation interval aligned "
+            "to the organization secret lifecycle policy, such as 90 days or less for sensitive application secrets."
+        ),
+        tags=("aws", "secretsmanager", "secrets", "rotation", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-workload-secretsmanager-vpc-endpoint-missing",
         title="Workload uses Secrets Manager without a VPC endpoint",
         category=StrideCategory.INFORMATION_DISCLOSURE,

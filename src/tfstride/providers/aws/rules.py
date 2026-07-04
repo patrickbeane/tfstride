@@ -35,6 +35,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-versioning-disabled",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
+        "aws-secretsmanager-rotation-not-configured-or-too-long",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -105,6 +106,9 @@ def build_aws_rule_contribution(
             secrets_manager_detectors.detect_customer_managed_kms_key_missing
         ),
         "aws-secretsmanager-recovery-window-too-short": (secrets_manager_detectors.detect_recovery_window_too_short),
+        "aws-secretsmanager-rotation-not-configured-or-too-long": (
+            secrets_manager_detectors.detect_rotation_not_configured_or_too_long
+        ),
         "aws-workload-secretsmanager-vpc-endpoint-missing": (
             sensitive_endpoint_detectors.detect_missing_secretsmanager_endpoint
         ),

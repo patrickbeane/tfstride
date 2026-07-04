@@ -83,6 +83,8 @@ class AwsResourceIndexBuilder:
                     (
                         resource.identifier,
                         resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.arn",
                         resource.arn,
                         facts.name,
                     ),

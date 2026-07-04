@@ -75,6 +75,7 @@ class AwsResourceMetadata:
     LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES = StringListMetadataField("lambda_function_url_posture_uncertainties")
     LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES = StringListMetadataField("load_balancer_listener_tls_uncertainties")
     UNRESOLVED_SECRET_ARNS = StringListMetadataField("unresolved_secret_arns")
+    UNRESOLVED_SECRET_REFERENCES = StringListMetadataField("unresolved_secret_references")
     SECRETS_MANAGER_POSTURE_UNCERTAINTIES = StringListMetadataField("secrets_manager_posture_uncertainties")
     UNRESOLVED_FUNCTION_REFERENCES = StringListMetadataField("unresolved_function_references")
     REQUIRES_COMPATIBILITIES = StringListMetadataField("requires_compatibilities")
@@ -95,6 +96,13 @@ class AwsResourceMetadata:
     EXECUTION_ROLE_ARN = OptionalStringMetadataField("execution_role_arn")
     SECRET_ARN = OptionalStringMetadataField("secret_arn")
     SECRETS_MANAGER_KMS_KEY_ID = OptionalStringMetadataField("secrets_manager_kms_key_id")
+    SECRETS_MANAGER_ROTATION_SECRET_ID = OptionalStringMetadataField("secrets_manager_rotation_secret_id")
+    SECRETS_MANAGER_ROTATION_SOURCE_ADDRESS = OptionalStringMetadataField("secrets_manager_rotation_source_address")
+    SECRETS_MANAGER_ROTATION_LAMBDA_ARN = OptionalStringMetadataField("secrets_manager_rotation_lambda_arn")
+    SECRETS_MANAGER_ROTATION_DURATION = OptionalStringMetadataField("secrets_manager_rotation_duration")
+    SECRETS_MANAGER_ROTATION_SCHEDULE_EXPRESSION = OptionalStringMetadataField(
+        "secrets_manager_rotation_schedule_expression"
+    )
     FUNCTION_NAME = OptionalStringMetadataField("function_name")
     ROUTE_TABLE_ID = OptionalStringMetadataField("route_table_id")
     SUBNET_ID = OptionalStringMetadataField("subnet_id")
@@ -153,6 +161,9 @@ class AwsResourceMetadata:
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
     SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS = OptionalIntMetadataField("secrets_manager_recovery_window_in_days")
+    SECRETS_MANAGER_ROTATION_AUTOMATICALLY_AFTER_DAYS = OptionalIntMetadataField(
+        "secrets_manager_rotation_automatically_after_days"
+    )
     LAMBDA_FUNCTION_URL_CORS_MAX_AGE = OptionalIntMetadataField("lambda_function_url_cors_max_age")
     TASK_DEFINITION_REVISION = OptionalIntMetadataField("revision")
 
@@ -167,6 +178,7 @@ class AwsResourceMetadata:
     TRUST_STATEMENTS = DictListMetadataField("trust_statements")
     EKS_ENCRYPTION_CONFIG = DictListMetadataField("eks_encryption_config")
     VPC_ENDPOINT_DNS_ENTRIES = DictListMetadataField("vpc_endpoint_dns_entries")
+    SECRETS_MANAGER_ROTATION_RULES = DictMetadataField("secrets_manager_rotation_rules")
     SECRETS_MANAGER_REPLICATION = DictListMetadataField("secrets_manager_replication")
     PUBLIC_ACCESS_BLOCK = BoolDictMetadataField("public_access_block")
 

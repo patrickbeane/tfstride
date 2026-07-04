@@ -234,7 +234,13 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             resource_type="aws_secretsmanager_secret",
             name="customer",
             category=ResourceCategory.DATA,
-            metadata={AwsResourceMetadata.SECRETS_MANAGER_KMS_KEY_ID: "arn:aws:kms:us-east-1:111122223333:key/secret"},
+            metadata={
+                AwsResourceMetadata.SECRETS_MANAGER_KMS_KEY_ID: "arn:aws:kms:us-east-1:111122223333:key/secret",
+                AwsResourceMetadata.SECRETS_MANAGER_ROTATION_SOURCE_ADDRESS: (
+                    "aws_secretsmanager_secret_rotation.customer"
+                ),
+                AwsResourceMetadata.SECRETS_MANAGER_ROTATION_AUTOMATICALLY_AFTER_DAYS: 30,
+            },
             policy_statements=[
                 IAMPolicyStatement(
                     effect="Allow",

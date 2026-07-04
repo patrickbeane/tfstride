@@ -15,6 +15,7 @@ from tfstride.providers.coercion import (
     attribute_unknown,
     first_mapping,
     known_block_bool_state,
+    known_block_int,
     known_block_string,
     known_bool,
     known_string,
@@ -376,6 +377,65 @@ def normalize_secretsmanager_secret(resource: TerraformResource) -> NormalizedRe
     )
 
 
+def normalize_secretsmanager_secret_rotation(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    rotation_rules = first_mapping(values.get("rotation_rules"), scan_all=True)
+    raw_unknown_rotation_rules = unknown_values.get("rotation_rules")
+    unknown_rotation_rules = (
+        None if raw_unknown_rotation_rules is True else first_mapping(raw_unknown_rotation_rules, scan_all=True)
+    )
+    if rotation_rules is None and raw_unknown_rotation_rules is True:
+        uncertainties.append("rotation_rules is unknown after planning")
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("secret_id") or resource.address,
+        metadata={
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_SECRET_ID: known_string(
+                values,
+                unknown_values,
+                "secret_id",
+                uncertainties,
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_LAMBDA_ARN: known_string(
+                values,
+                unknown_values,
+                "rotation_lambda_arn",
+                uncertainties,
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_AUTOMATICALLY_AFTER_DAYS: known_block_int(
+                rotation_rules,
+                unknown_rotation_rules,
+                "automatically_after_days",
+                uncertainties,
+                path="rotation_rules",
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_DURATION: known_block_string(
+                rotation_rules,
+                unknown_rotation_rules,
+                "duration",
+                uncertainties,
+                path="rotation_rules",
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_SCHEDULE_EXPRESSION: known_block_string(
+                rotation_rules,
+                unknown_rotation_rules,
+                "schedule_expression",
+                uncertainties,
+                path="rotation_rules",
+            ),
+            AwsResourceMetadata.SECRETS_MANAGER_ROTATION_RULES: _secrets_manager_rotation_rules(rotation_rules),
+            AwsResourceMetadata.SECRETS_MANAGER_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
 def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     policy_document = load_json_document(values.get("policy"))
@@ -392,6 +452,12 @@ def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> Norma
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
+
+
+def _secrets_manager_rotation_rules(rotation_rules: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if rotation_rules is None:
+        return None
+    return dict(rotation_rules)
 
 
 def _s3_encryption_configuration(rule: Mapping[str, Any] | None) -> dict[str, Any] | None:

@@ -9,6 +9,7 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_s3_bucket_server_side_encryption_configuration,
     normalize_s3_bucket_versioning,
     normalize_secretsmanager_secret,
+    normalize_secretsmanager_secret_rotation,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -189,6 +190,98 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "recovery_window_in_days is unknown after planning",
                 "replica[0].kms_key_id is unknown after planning",
             ],
+        )
+
+    def test_secretsmanager_secret_rotation_normalizes_schedule_posture(self) -> None:
+        resource = _terraform_resource(
+            "aws_secretsmanager_secret_rotation",
+            {
+                "id": "app-rotation",
+                "secret_id": "aws_secretsmanager_secret.app.id",
+                "rotation_lambda_arn": "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+                "rotation_rules": [
+                    {
+                        "automatically_after_days": 30,
+                        "duration": "2h",
+                        "schedule_expression": "rate(30 days)",
+                    }
+                ],
+            },
+        )
+
+        normalized = normalize_secretsmanager_secret_rotation(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "app-rotation")
+        self.assertEqual(facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertEqual(
+            facts.secrets_manager_rotation_lambda_arn,
+            "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+        )
+        self.assertEqual(facts.secrets_manager_rotation_automatically_after_days, 30)
+        self.assertEqual(facts.secrets_manager_rotation_duration, "2h")
+        self.assertEqual(facts.secrets_manager_rotation_schedule_expression, "rate(30 days)")
+        self.assertEqual(
+            facts.secrets_manager_rotation_rules,
+            {
+                "automatically_after_days": 30,
+                "duration": "2h",
+                "schedule_expression": "rate(30 days)",
+            },
+        )
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, [])
+
+    def test_secretsmanager_secret_rotation_preserves_unknown_schedule_fields(self) -> None:
+        resource = _terraform_resource(
+            "aws_secretsmanager_secret_rotation",
+            {
+                "secret_id": "aws_secretsmanager_secret.app.id",
+                "rotation_rules": [{}],
+            },
+            unknown_values={
+                "rotation_lambda_arn": True,
+                "rotation_rules": [
+                    {
+                        "automatically_after_days": True,
+                        "duration": True,
+                        "schedule_expression": True,
+                    }
+                ],
+            },
+        )
+
+        facts = aws_facts(normalize_secretsmanager_secret_rotation(resource))
+
+        self.assertEqual(facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertIsNone(facts.secrets_manager_rotation_lambda_arn)
+        self.assertIsNone(facts.secrets_manager_rotation_automatically_after_days)
+        self.assertIsNone(facts.secrets_manager_rotation_duration)
+        self.assertIsNone(facts.secrets_manager_rotation_schedule_expression)
+        self.assertEqual(facts.secrets_manager_rotation_rules, {})
+        self.assertEqual(
+            facts.secrets_manager_posture_uncertainties,
+            [
+                "rotation_lambda_arn is unknown after planning",
+                "rotation_rules.automatically_after_days is unknown after planning",
+                "rotation_rules.duration is unknown after planning",
+                "rotation_rules.schedule_expression is unknown after planning",
+            ],
+        )
+
+    def test_secretsmanager_secret_rotation_preserves_unknown_rotation_rules_block(self) -> None:
+        resource = _terraform_resource(
+            "aws_secretsmanager_secret_rotation",
+            {"secret_id": "aws_secretsmanager_secret.app.id"},
+            unknown_values={"rotation_rules": True},
+        )
+
+        facts = aws_facts(normalize_secretsmanager_secret_rotation(resource))
+
+        self.assertEqual(facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertEqual(facts.secrets_manager_rotation_rules, {})
+        self.assertEqual(
+            facts.secrets_manager_posture_uncertainties,
+            ["rotation_rules is unknown after planning"],
         )
 
     def test_s3_bucket_versioning_normalizes_enabled_status(self) -> None:

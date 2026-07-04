@@ -153,6 +153,21 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                 },
                             },
                             {
+                                "address": "aws_secretsmanager_secret_rotation.app",
+                                "mode": "managed",
+                                "type": "aws_secretsmanager_secret_rotation",
+                                "name": "app",
+                                "provider_name": "registry.terraform.io/hashicorp/aws",
+                                "values": {
+                                    "id": "app-rotation",
+                                    "secret_id": "aws_secretsmanager_secret.app.id",
+                                    "rotation_lambda_arn": (
+                                        "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret"
+                                    ),
+                                    "rotation_rules": [{"automatically_after_days": 30}],
+                                },
+                            },
+                            {
                                 "address": "aws_secretsmanager_secret_policy.app",
                                 "mode": "managed",
                                 "type": "aws_secretsmanager_secret_policy",

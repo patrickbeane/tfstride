@@ -167,6 +167,33 @@ class ApplyS3PostureResourcesStage:
         )
 
 
+class ApplySecretsManagerPostureResourcesStage:
+    name = "apply_secrets_manager_posture_resources"
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        for posture_resource in resources:
+            if posture_resource.resource_type != "aws_secretsmanager_secret_rotation":
+                continue
+            posture_facts = aws_facts(posture_resource)
+            secret_id = posture_facts.secrets_manager_rotation_secret_id
+            secret = context.index.secrets.get(secret_id)
+            if secret is None:
+                posture_facts.add_unresolved_secret_reference(secret_id)
+                continue
+            aws_facts(secret).set_secrets_manager_rotation_posture(
+                secret_id=secret_id,
+                source_address=posture_resource.address,
+                rotation_lambda_arn=posture_facts.secrets_manager_rotation_lambda_arn,
+                automatically_after_days=posture_facts.secrets_manager_rotation_automatically_after_days,
+                duration=posture_facts.secrets_manager_rotation_duration,
+                schedule_expression=posture_facts.secrets_manager_rotation_schedule_expression,
+                rotation_rules=posture_facts.secrets_manager_rotation_rules,
+            )
+            aws_facts(secret).extend_secrets_manager_posture_uncertainties(
+                _source_uncertainties(posture_resource, posture_facts.secrets_manager_posture_uncertainties)
+            )
+
+
 def _source_uncertainties(resource: NormalizedResource, uncertainties: list[str]) -> list[str]:
     return [f"{resource.address}: {uncertainty}" for uncertainty in uncertainties]
 

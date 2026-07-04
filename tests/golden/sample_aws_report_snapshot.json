@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 142,
+      "registered_rule_count": 143,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -55,6 +55,7 @@
         "aws-s3-versioning-disabled",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
+        "aws-secretsmanager-rotation-not-configured-or-too-long",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -201,6 +202,7 @@
         "aws-s3-versioning-disabled": 0,
         "aws-secretsmanager-customer-managed-kms-key-missing": 0,
         "aws-secretsmanager-recovery-window-too-short": 0,
+        "aws-secretsmanager-rotation-not-configured-or-too-long": 0,
         "aws-workload-secretsmanager-vpc-endpoint-missing": 0,
         "aws-workload-kms-vpc-endpoint-missing": 1,
         "aws-workload-s3-vpc-endpoint-missing": 1,
@@ -373,6 +375,7 @@
         "aws_s3_bucket_versioning",
         "aws_secretsmanager_secret",
         "aws_secretsmanager_secret_policy",
+        "aws_secretsmanager_secret_rotation",
         "aws_security_group",
         "aws_security_group_rule",
         "aws_sns_topic",

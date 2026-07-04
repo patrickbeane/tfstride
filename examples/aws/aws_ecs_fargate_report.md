@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **6 trust boundaries** and **7 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **8 findings** across **21 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `7`
+- Medium severity findings: `8`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **6 trust boundaries** and **7 findings** across **21 normal
 - Provider resources considered: `21`
 - Normalized resources: `21`
 - Unsupported resources: `0`
-- Registered rules: `142`
-- Enabled rules: `142`
+- Registered rules: `143`
+- Enabled rules: `143`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `aws-secretsmanager-customer-managed-kms-key-missing`: `1`
+  - `aws-secretsmanager-rotation-not-configured-or-too-long`: `1`
   - `aws-workload-secretsmanager-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-workload-role-sensitive-permissions`: `1`
@@ -106,6 +107,18 @@ No findings in this severity band.
 - Evidence:
   - iam resources: *
   - policy statements: Allow actions=[logs:CreateLogStream, logs:PutLogEvents] resources=[*]
+
+#### Secrets Manager rotation is not configured or too infrequent
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_secretsmanager_secret.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: aws_secretsmanager_secret.app does not show a deterministic Secrets Manager rotation resource in the Terraform plan. Static or manually rotated secrets can remain valid longer after disclosure, service compromise, or operator error.
+- Recommended mitigation: Configure `aws_secretsmanager_secret_rotation` with a rotation Lambda and a rotation interval aligned to the organization secret lifecycle policy, such as 90 days or less for sensitive application secrets.
+- Evidence:
+  - target resource: address=aws_secretsmanager_secret.app; type=aws_secretsmanager_secret; identifier=ecs-app-secret; arn=arn:aws:secretsmanager:us-east-1:111122223333:secret:ecs-app-secret
+  - rotation posture: rotation_state=not_configured; maximum_rotation_interval_days=90; aws_secretsmanager_secret_rotation resource was not resolved for this secret
 
 #### Secrets Manager secret does not use a customer-managed KMS key
 

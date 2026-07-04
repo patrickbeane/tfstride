@@ -21,6 +21,7 @@ from tfstride.providers.aws.resource_decoration.public_exposure import (
 from tfstride.providers.aws.resource_decoration.resource_policies import (
     ApplyS3PostureResourcesStage,
     ApplyS3PublicAccessBlocksStage,
+    ApplySecretsManagerPostureResourcesStage,
     MergeResourcePolicyResourcesStage,
 )
 from tfstride.providers.aws.resource_decoration.security_groups import (
@@ -46,6 +47,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         MergeResourcePolicyResourcesStage(),
         ApplyS3PublicAccessBlocksStage(),
         ApplyS3PostureResourcesStage(),
+        ApplySecretsManagerPostureResourcesStage(),
         DeriveSubnetPostureStage(),
         InferVpcIdsStage(),
         DerivePublicExposureStage(),

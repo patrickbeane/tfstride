@@ -10,6 +10,7 @@ from tfstride.providers.aws.normalizer import AwsNormalizer
 
 _SECRET_CMK_RULE = "aws-secretsmanager-customer-managed-kms-key-missing"
 _SECRET_RECOVERY_RULE = "aws-secretsmanager-recovery-window-too-short"
+_SECRET_ROTATION_RULE = "aws-secretsmanager-rotation-not-configured-or-too-long"
 _SECRET_RULE_IDS = (_SECRET_CMK_RULE, _SECRET_RECOVERY_RULE)
 _MISSING = object()
 
@@ -52,6 +53,39 @@ def _safe_secret(*, name: str = "safe", **overrides: object) -> TerraformResourc
     }
     defaults.update(overrides)
     return _secret(**defaults)
+
+
+def _rotation(
+    *,
+    name: str = "app",
+    secret_id: str | None = None,
+    automatically_after_days: object = _MISSING,
+    duration: object = _MISSING,
+    schedule_expression: object = _MISSING,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    rotation_rules: dict[str, object] = {}
+    if automatically_after_days is not _MISSING:
+        rotation_rules["automatically_after_days"] = automatically_after_days
+    if duration is not _MISSING:
+        rotation_rules["duration"] = duration
+    if schedule_expression is not _MISSING:
+        rotation_rules["schedule_expression"] = schedule_expression
+    values: dict[str, object] = {
+        "id": f"{name}-rotation",
+        "secret_id": secret_id or f"aws_secretsmanager_secret.{name}.id",
+        "rotation_lambda_arn": "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+        "rotation_rules": [rotation_rules],
+    }
+    return TerraformResource(
+        address=f"aws_secretsmanager_secret_rotation.{name}",
+        mode="managed",
+        resource_type="aws_secretsmanager_secret_rotation",
+        name=name,
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
 
 
 def _secret_policy() -> TerraformResource:
@@ -168,6 +202,118 @@ class AwsSecretsManagerPostureRuleTests(unittest.TestCase):
         findings = _findings([_safe_secret(name="app"), _secret_policy()], *_SECRET_RULE_IDS)
 
         self.assertEqual(findings, [])
+
+    def test_secret_rotation_missing_is_detected(self) -> None:
+        findings = _findings([_safe_secret(name="app")], _SECRET_ROTATION_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_SECRET_ROTATION_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["rotation_posture"],
+            [
+                "rotation_state=not_configured",
+                "maximum_rotation_interval_days=90",
+                "aws_secretsmanager_secret_rotation resource was not resolved for this secret",
+            ],
+        )
+
+    def test_secret_rotation_with_acceptable_interval_is_quiet(self) -> None:
+        findings = _findings(
+            [_safe_secret(name="app"), _rotation(name="app", automatically_after_days=30)],
+            _SECRET_ROTATION_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_secret_rotation_interval_above_baseline_is_detected(self) -> None:
+        findings = _findings(
+            [_safe_secret(name="app"), _rotation(name="app", automatically_after_days=120)],
+            _SECRET_ROTATION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_SECRET_ROTATION_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["rotation_posture"],
+            [
+                "rotation_state=too_long",
+                "maximum_rotation_interval_days=90",
+                "rotation_source=aws_secretsmanager_secret_rotation.app",
+                "rotation_lambda_arn=arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+                "automatically_after_days=120",
+                "effective_rotation_interval_days=120",
+            ],
+        )
+
+    def test_secret_rotation_rate_expression_is_compared_when_deterministic(self) -> None:
+        findings = _findings(
+            [_safe_secret(name="app"), _rotation(name="app", schedule_expression="rate(16 weeks)")],
+            _SECRET_ROTATION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_SECRET_ROTATION_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn("schedule_expression=rate(16 weeks)", evidence["rotation_posture"])
+        self.assertIn("effective_rotation_interval_days=112", evidence["rotation_posture"])
+
+    def test_secret_rotation_unknown_interval_is_reported_without_overclaiming(self) -> None:
+        findings = _findings(
+            [
+                _safe_secret(name="app"),
+                _rotation(
+                    name="app",
+                    unknown_values={
+                        "rotation_rules": [
+                            {
+                                "automatically_after_days": True,
+                                "schedule_expression": True,
+                            }
+                        ]
+                    },
+                ),
+            ],
+            _SECRET_ROTATION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_SECRET_ROTATION_RULE])
+        self.assertEqual(findings[0].severity.value, "low")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["rotation_posture"],
+            [
+                "rotation_state=unknown",
+                "maximum_rotation_interval_days=90",
+                "rotation_source=aws_secretsmanager_secret_rotation.app",
+                "rotation_lambda_arn=arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+                "effective_rotation_interval_days=unknown",
+            ],
+        )
+        self.assertEqual(
+            evidence["posture_uncertainty"],
+            [
+                "aws_secretsmanager_secret_rotation.app: "
+                "rotation_rules.automatically_after_days is unknown after planning",
+                "aws_secretsmanager_secret_rotation.app: rotation_rules.schedule_expression is unknown after planning",
+            ],
+        )
+
+    def test_unresolved_rotation_target_does_not_suppress_secret_rotation_finding(self) -> None:
+        findings = _findings(
+            [
+                _safe_secret(name="app"),
+                _rotation(name="other", secret_id="aws_secretsmanager_secret.missing.id", automatically_after_days=30),
+            ],
+            _SECRET_ROTATION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_SECRET_ROTATION_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn(
+            "aws_secretsmanager_secret_rotation resource was not resolved for this secret",
+            evidence["rotation_posture"],
+        )
 
 
 if __name__ == "__main__":

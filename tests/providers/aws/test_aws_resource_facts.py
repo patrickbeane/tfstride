@@ -58,6 +58,14 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "s3_posture_uncertainties": ["aws_s3_bucket_versioning.logs: status is unknown"],
                 "secrets_manager_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/secrets",
                 "secrets_manager_recovery_window_in_days": 14,
+                "secrets_manager_rotation_secret_id": "aws_secretsmanager_secret.app.id",
+                "secrets_manager_rotation_source_address": "aws_secretsmanager_secret_rotation.app",
+                "secrets_manager_rotation_lambda_arn": ("arn:aws:lambda:us-east-1:111122223333:function:rotate-secret"),
+                "secrets_manager_rotation_automatically_after_days": 30,
+                "secrets_manager_rotation_duration": "2h",
+                "secrets_manager_rotation_schedule_expression": "rate(30 days)",
+                "secrets_manager_rotation_rules": {"automatically_after_days": 30},
+                "unresolved_secret_references": ["aws_secretsmanager_secret.missing.id"],
                 "secrets_manager_replication": [
                     {
                         "region": "us-west-2",
@@ -172,6 +180,17 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.s3_posture_uncertainties, ["aws_s3_bucket_versioning.logs: status is unknown"])
         self.assertEqual(facts.secrets_manager_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/secrets")
         self.assertEqual(facts.secrets_manager_recovery_window_in_days, 14)
+        self.assertEqual(facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertEqual(facts.secrets_manager_rotation_source_address, "aws_secretsmanager_secret_rotation.app")
+        self.assertEqual(
+            facts.secrets_manager_rotation_lambda_arn,
+            "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+        )
+        self.assertEqual(facts.secrets_manager_rotation_automatically_after_days, 30)
+        self.assertEqual(facts.secrets_manager_rotation_duration, "2h")
+        self.assertEqual(facts.secrets_manager_rotation_schedule_expression, "rate(30 days)")
+        self.assertEqual(facts.secrets_manager_rotation_rules, {"automatically_after_days": 30})
+        self.assertEqual(facts.unresolved_secret_references, ["aws_secretsmanager_secret.missing.id"])
         self.assertEqual(
             facts.secrets_manager_replication,
             [
@@ -294,6 +313,17 @@ class AwsResourceFactsTests(unittest.TestCase):
             source_address="aws_s3_bucket_server_side_encryption_configuration.logs",
         )
         facts.extend_s3_posture_uncertainties(["status is unknown", "status is unknown"])
+        facts.set_secrets_manager_rotation_posture(
+            secret_id="aws_secretsmanager_secret.app.id",
+            source_address="aws_secretsmanager_secret_rotation.app",
+            rotation_lambda_arn="arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+            automatically_after_days=30,
+            duration="2h",
+            schedule_expression="rate(30 days)",
+            rotation_rules={"automatically_after_days": 30},
+        )
+        facts.extend_secrets_manager_posture_uncertainties(["rotation_rules is unknown", "rotation_rules is unknown"])
+        facts.add_unresolved_secret_reference("aws_secretsmanager_secret.missing.id")
 
         self.assertEqual(facts.network_mode, "awsvpc")
         self.assertEqual(facts.task_role_arn, "arn:aws:iam::111122223333:role/task")
@@ -316,6 +346,18 @@ class AwsResourceFactsTests(unittest.TestCase):
         )
         self.assertEqual(facts.s3_server_side_encryption_configuration, {"rule": []})
         self.assertEqual(facts.s3_posture_uncertainties, ["status is unknown"])
+        self.assertEqual(facts.secrets_manager_rotation_secret_id, "aws_secretsmanager_secret.app.id")
+        self.assertEqual(facts.secrets_manager_rotation_source_address, "aws_secretsmanager_secret_rotation.app")
+        self.assertEqual(
+            facts.secrets_manager_rotation_lambda_arn,
+            "arn:aws:lambda:us-east-1:111122223333:function:rotate-secret",
+        )
+        self.assertEqual(facts.secrets_manager_rotation_automatically_after_days, 30)
+        self.assertEqual(facts.secrets_manager_rotation_duration, "2h")
+        self.assertEqual(facts.secrets_manager_rotation_schedule_expression, "rate(30 days)")
+        self.assertEqual(facts.secrets_manager_rotation_rules, {"automatically_after_days": 30})
+        self.assertEqual(facts.secrets_manager_posture_uncertainties, ["rotation_rules is unknown"])
+        self.assertEqual(facts.unresolved_secret_references, ["aws_secretsmanager_secret.missing.id"])
         self.assertFalse(hasattr(resource, "task_role_arn"))
 
     def test_s3_posture_facts_default_to_missing_when_not_modeled(self) -> None:
@@ -335,6 +377,14 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.secrets_manager_kms_key_id)
         self.assertIsNone(facts.secrets_manager_recovery_window_in_days)
         self.assertEqual(facts.secrets_manager_replication, [])
+        self.assertIsNone(facts.secrets_manager_rotation_secret_id)
+        self.assertIsNone(facts.secrets_manager_rotation_source_address)
+        self.assertIsNone(facts.secrets_manager_rotation_lambda_arn)
+        self.assertIsNone(facts.secrets_manager_rotation_automatically_after_days)
+        self.assertIsNone(facts.secrets_manager_rotation_duration)
+        self.assertIsNone(facts.secrets_manager_rotation_schedule_expression)
+        self.assertEqual(facts.secrets_manager_rotation_rules, {})
+        self.assertEqual(facts.unresolved_secret_references, [])
         self.assertEqual(facts.secrets_manager_posture_uncertainties, [])
         self.assertIsNone(facts.eks_cluster_arn)
         self.assertIsNone(facts.eks_cluster_role_arn)
