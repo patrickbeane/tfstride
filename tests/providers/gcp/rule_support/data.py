@@ -162,6 +162,7 @@ def _kms_crypto_key() -> TerraformResource:
             "id": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-customer-key",
             "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
             "purpose": "ENCRYPT_DECRYPT",
+            "rotation_period": "7776000s",
         },
     )
 

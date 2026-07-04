@@ -86,6 +86,18 @@ class ProviderStorageFacts(Protocol):
     def secret_manager_posture_uncertainties(self) -> list[str]:
         raise NotImplementedError
 
+    @property
+    def kms_purpose(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def kms_rotation_period(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def kms_posture_uncertainties(self) -> list[str]:
+        raise NotImplementedError
+
 
 class ProviderIamFacts(Protocol):
     """IAM, policy, hierarchy, and identity facts from provider adapters."""

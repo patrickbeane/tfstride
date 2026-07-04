@@ -104,6 +104,9 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "secret_manager_expire_time",
                 "secret_manager_version_destroy_ttl",
                 "secret_manager_posture_uncertainties",
+                "kms_purpose",
+                "kms_rotation_period",
+                "kms_posture_uncertainties",
             },
             "iam": {
                 "policy_document",

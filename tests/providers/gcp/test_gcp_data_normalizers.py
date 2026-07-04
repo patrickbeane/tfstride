@@ -403,7 +403,29 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.KMS_PURPOSE), "ENCRYPT_DECRYPT")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.KMS_ROTATION_PERIOD), "7776000s")
+        facts = gcp_facts(normalized)
+        self.assertEqual(facts.kms_purpose, "ENCRYPT_DECRYPT")
+        self.assertEqual(facts.kms_rotation_period, "7776000s")
+        self.assertEqual(facts.kms_posture_uncertainties, [])
         self.assertTrue(normalized.storage_encrypted)
+
+    def test_kms_crypto_key_normalizer_preserves_unknown_rotation_period(self) -> None:
+        normalized = normalize_kms_crypto_key(
+            _terraform_resource(
+                "google_kms_crypto_key.customer",
+                "google_kms_crypto_key",
+                {
+                    "name": "tfstride-customer-key",
+                    "key_ring": "projects/tfstride-demo/locations/global/keyRings/tfstride-app",
+                    "purpose": "ENCRYPT_DECRYPT",
+                },
+                unknown_values={"rotation_period": True},
+            )
+        )
+
+        facts = gcp_facts(normalized)
+        self.assertIsNone(facts.kms_rotation_period)
+        self.assertEqual(facts.kms_posture_uncertainties, ["rotation_period is unknown after planning"])
 
     def test_sql_database_instance_normalizer_preserves_database_posture(self) -> None:
         normalized = normalize_sql_database_instance(self.resources["google_sql_database_instance.app"])

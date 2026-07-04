@@ -260,6 +260,7 @@ def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
     key_ring = first_non_empty(values.get(GcpAttr.KEY_RING))
     name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
     identifier = first_non_empty(values.get(GcpAttr.ID), values.get(GcpAttr.SELF_LINK), name, resource.address)
+    rotation_period, posture_uncertainties = _kms_rotation_period(values, resource.unknown_values)
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -279,7 +280,8 @@ def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
                 GcpResourceMetadata.KMS_CRYPTO_KEY_REFERENCE: identifier,
                 GcpResourceMetadata.KMS_KEY_RING: key_ring,
                 GcpResourceMetadata.KMS_PURPOSE: values.get(GcpAttr.PURPOSE),
-                GcpResourceMetadata.KMS_ROTATION_PERIOD: values.get(GcpAttr.ROTATION_PERIOD),
+                GcpResourceMetadata.KMS_ROTATION_PERIOD: rotation_period,
+                GcpResourceMetadata.KMS_POSTURE_UNCERTAINTIES: posture_uncertainties,
                 GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
                 "destroy_scheduled_duration": values.raw(GcpAttr.DESTROY_SCHEDULED_DURATION),
                 "import_only": as_bool(values.get(GcpAttr.IMPORT_ONLY)),
@@ -372,6 +374,12 @@ def _optional_raw_bool(values: Mapping[str, Any], key: str) -> bool | None:
     if key not in values:
         return None
     return as_bool(values.get(key))
+
+
+def _kms_rotation_period(values: GcpValues, unknown_values: Mapping[str, Any]) -> tuple[str | None, list[str]]:
+    if value_is_unknown(unknown_values.get(GcpAttr.ROTATION_PERIOD.key)):
+        return None, ["rotation_period is unknown after planning"]
+    return values.get(GcpAttr.ROTATION_PERIOD), []
 
 
 def _retention_policy_uncertainties(unknown_values: Mapping[str, Any]) -> list[str]:

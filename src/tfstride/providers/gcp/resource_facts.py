@@ -142,6 +142,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.SECRET_MANAGER_POSTURE_UNCERTAINTIES)
 
     @property
+    def kms_purpose(self) -> str | None:
+        return self.get(GcpResourceMetadata.KMS_PURPOSE)
+
+    @property
+    def kms_rotation_period(self) -> str | None:
+        return self.get(GcpResourceMetadata.KMS_ROTATION_PERIOD)
+
+    @property
+    def kms_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.KMS_POSTURE_UNCERTAINTIES)
+
+    @property
     def default_kms_key_name(self) -> str | None:
         return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
 

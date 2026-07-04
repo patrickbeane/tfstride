@@ -237,6 +237,17 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-kms-key-rotation-not-configured-or-too-long",
+        title="Cloud KMS key rotation is missing or too infrequent",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `rotation_period` for symmetric Cloud KMS crypto keys and keep the interval aligned to "
+            "the organization key lifecycle policy, such as 90 days or less for keys protecting sensitive data."
+        ),
+        tags=("gcp", "kms", "encryption", "rotation", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,

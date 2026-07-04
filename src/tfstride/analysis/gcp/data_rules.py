@@ -36,6 +36,8 @@ _GCS_MIN_RETENTION_PERIOD_DAYS = 7
 _GCS_MIN_RETENTION_PERIOD_SECONDS = _GCS_MIN_RETENTION_PERIOD_DAYS * 24 * 60 * 60
 _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS = 7
 _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS = _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS * 24 * 60 * 60
+_KMS_MAX_ROTATION_PERIOD_DAYS = 90
+_KMS_MAX_ROTATION_PERIOD_SECONDS = _KMS_MAX_ROTATION_PERIOD_DAYS * 24 * 60 * 60
 _GCP_DURATION_SECONDS = re.compile(r"^\s*(\d+(?:\.\d+)?)s\s*$")
 
 
@@ -532,6 +534,51 @@ class GcpDataRuleDetectors:
             )
         return findings
 
+    def detect_kms_key_rotation_not_configured_or_too_long(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for key in context.inventory.by_type("google_kms_crypto_key"):
+            key_facts = analysis_facts(key).storage
+            if key.data_sensitivity != "sensitive":
+                continue
+            rotation_issues = _kms_rotation_issues(key_facts)
+            if not rotation_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[key.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{key.display_name} does not show deterministic Cloud KMS key rotation posture "
+                        f"within the {_KMS_MAX_ROTATION_PERIOD_DAYS}-day baseline used by tfSTRIDE. "
+                        "Weak key rotation governance can undermine the customer-managed encryption posture "
+                        "of services that depend on this key."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _kms_target_evidence(key)),
+                        evidence_item("rotation_issues", rotation_issues),
+                        evidence_item("rotation_posture", _kms_rotation_evidence(key_facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_public_authorized_network(
         self,
         context: RuleEvaluationContext,
@@ -908,6 +955,59 @@ def _gcp_duration_seconds(value: str | None) -> int | None:
         return None
     seconds = float(match.group(1))
     return int(seconds) if seconds.is_integer() else int(seconds) + 1
+
+
+def _kms_rotation_issues(key_facts: AnalysisStorageFacts) -> list[str]:
+    if key_facts.kms_posture_uncertainties:
+        return []
+    if not _kms_rotation_supported_for_purpose(key_facts.kms_purpose):
+        return []
+
+    rotation_period = key_facts.kms_rotation_period
+    if not rotation_period:
+        return ["rotation_period is missing"]
+
+    rotation_seconds = _gcp_duration_seconds(rotation_period)
+    if rotation_seconds is None:
+        return []
+    if rotation_seconds > _KMS_MAX_ROTATION_PERIOD_SECONDS:
+        return [f"rotation_period is {rotation_seconds} seconds; maximum is {_KMS_MAX_ROTATION_PERIOD_SECONDS} seconds"]
+    return []
+
+
+def _kms_rotation_evidence(key_facts: AnalysisStorageFacts) -> list[str]:
+    rotation_period = key_facts.kms_rotation_period
+    rotation_seconds = _gcp_duration_seconds(rotation_period)
+    if not rotation_period:
+        rotation_state = "missing"
+    elif rotation_seconds is None:
+        rotation_state = "unknown"
+    elif rotation_seconds > _KMS_MAX_ROTATION_PERIOD_SECONDS:
+        rotation_state = "too_long"
+    else:
+        rotation_state = "configured"
+
+    evidence = [
+        f"purpose={key_facts.kms_purpose or 'unknown'}",
+        f"rotation_period={rotation_period or 'unset'}",
+        f"rotation_period_state={rotation_state}",
+        f"maximum_rotation_period_days={_KMS_MAX_ROTATION_PERIOD_DAYS}",
+        f"maximum_rotation_period_seconds={_KMS_MAX_ROTATION_PERIOD_SECONDS}",
+    ]
+    if rotation_seconds is not None:
+        evidence.append(f"rotation_period_seconds={rotation_seconds}")
+    return evidence
+
+
+def _kms_rotation_supported_for_purpose(purpose: str | None) -> bool:
+    return str(purpose or "ENCRYPT_DECRYPT").strip().upper() == "ENCRYPT_DECRYPT"
+
+
+def _kms_target_evidence(key: NormalizedResource) -> list[str]:
+    evidence = [f"address={key.address}", f"type={key.resource_type}"]
+    if key.identifier:
+        evidence.append(f"identifier={key.identifier}")
+    return evidence
 
 
 def _secret_manager_target_evidence(secret: NormalizedResource) -> list[str]:

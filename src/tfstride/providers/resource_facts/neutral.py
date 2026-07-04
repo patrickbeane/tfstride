@@ -88,6 +88,18 @@ class NeutralProviderStorageFacts:
     def secret_manager_posture_uncertainties(self) -> list[str]:
         return []
 
+    @property
+    def kms_purpose(self) -> str | None:
+        return None
+
+    @property
+    def kms_rotation_period(self) -> str | None:
+        return None
+
+    @property
+    def kms_posture_uncertainties(self) -> list[str]:
+        return []
+
 
 class NeutralProviderIamFacts:
     """Neutral IAM facts for providers without IAM hierarchy signals."""

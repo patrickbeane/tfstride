@@ -175,6 +175,7 @@ class GcpResourceMetadata:
     GCS_RETENTION_POLICY_UNCERTAINTIES = StringListMetadataField("gcs_retention_policy_uncertainties")
     SECRET_MANAGER_KMS_KEY_NAMES = StringListMetadataField("secret_manager_kms_key_names")
     SECRET_MANAGER_POSTURE_UNCERTAINTIES = StringListMetadataField("secret_manager_posture_uncertainties")
+    KMS_POSTURE_UNCERTAINTIES = StringListMetadataField("kms_posture_uncertainties")
     PRIVATE_CONNECTIVITY_RESERVED_RANGES = StringListMetadataField("private_connectivity_reserved_ranges")
     PRIVATE_CONNECTIVITY_NAT_SUBNETS = StringListMetadataField("private_connectivity_nat_subnets")
     PRIVATE_CONNECTIVITY_SUBNETWORKS = StringListMetadataField("private_connectivity_subnetworks")

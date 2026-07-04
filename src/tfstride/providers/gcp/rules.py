@@ -30,6 +30,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gcs-retention-policy-insufficient",
         "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-secret-manager-lifecycle-posture-incomplete",
+        "gcp-kms-key-rotation-not-configured-or-too-long",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
@@ -109,6 +110,9 @@ def build_gcp_rule_contribution(
         ),
         "gcp-secret-manager-lifecycle-posture-incomplete": (
             gcp_detectors.detect_secret_manager_lifecycle_posture_incomplete
+        ),
+        "gcp-kms-key-rotation-not-configured-or-too-long": (
+            gcp_detectors.detect_kms_key_rotation_not_configured_or_too_long
         ),
         "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
         "gcp-public-load-balanced-workload": gcp_detectors.detect_public_load_balanced_workload,

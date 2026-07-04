@@ -98,6 +98,18 @@ class AnalysisStorageFacts:
     def secret_manager_posture_uncertainties(self) -> list[str]:
         return self._facts.secret_manager_posture_uncertainties
 
+    @property
+    def kms_purpose(self) -> str | None:
+        return self._facts.kms_purpose
+
+    @property
+    def kms_rotation_period(self) -> str | None:
+        return self._facts.kms_rotation_period
+
+    @property
+    def kms_posture_uncertainties(self) -> list[str]:
+        return self._facts.kms_posture_uncertainties
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIamFacts:
