@@ -37,6 +37,7 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "aws-secretsmanager-customer-managed-kms-key-missing",
     "aws-secretsmanager-recovery-window-too-short",
     "aws-secretsmanager-rotation-not-configured-or-too-long",
+    "aws-kms-key-rotation-disabled-or-unknown",
     "aws-workload-secretsmanager-vpc-endpoint-missing",
     "aws-workload-kms-vpc-endpoint-missing",
     "aws-workload-s3-vpc-endpoint-missing",
@@ -212,7 +213,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 146)
+        self.assertEqual(len(metadata), 147)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -221,7 +222,7 @@ class RuleRegistryTests(unittest.TestCase):
         azure_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("azure-"))
 
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
-        self.assertEqual(len(aws_metadata_ids), 36)
+        self.assertEqual(len(aws_metadata_ids), 37)
         self.assertEqual(len(gcp_metadata_ids), 50)
         self.assertEqual(len(azure_metadata_ids), 60)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))

@@ -193,6 +193,18 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-kms-key-rotation-disabled-or-unknown",
+        title="KMS key rotation is disabled or unknown",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable automatic annual rotation for customer-managed symmetric KMS keys that protect sensitive "
+            "storage, secrets, databases, or Kubernetes secrets, and keep key usage and key spec deterministic in "
+            "Terraform for review."
+        ),
+        tags=("aws", "kms", "encryption", "rotation", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-workload-secretsmanager-vpc-endpoint-missing",
         title="Workload uses Secrets Manager without a VPC endpoint",
         category=StrideCategory.INFORMATION_DISCLOSURE,

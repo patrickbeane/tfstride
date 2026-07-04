@@ -7,6 +7,7 @@ from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, b
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.iam_rules import AwsIamRuleDetectors
+from tfstride.providers.aws.kms_rules import AwsKmsRuleDetectors
 from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
 from tfstride.providers.aws.load_balancer_rules import AwsLoadBalancerRuleDetectors
 from tfstride.providers.aws.network_data_rules import AwsNetworkDataRuleDetectors
@@ -36,6 +37,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
+        "aws-kms-key-rotation-disabled-or-unknown",
         "aws-workload-secretsmanager-vpc-endpoint-missing",
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
@@ -82,6 +84,7 @@ def build_aws_rule_contribution(
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
+    kms_detectors = AwsKmsRuleDetectors(finding_factory)
     eks_detectors = AwsEksRuleDetectors(finding_factory)
     lambda_detectors = AwsLambdaRuleDetectors(finding_factory)
     load_balancer_detectors = AwsLoadBalancerRuleDetectors(finding_factory)
@@ -109,6 +112,7 @@ def build_aws_rule_contribution(
         "aws-secretsmanager-rotation-not-configured-or-too-long": (
             secrets_manager_detectors.detect_rotation_not_configured_or_too_long
         ),
+        "aws-kms-key-rotation-disabled-or-unknown": kms_detectors.detect_key_rotation_disabled_or_unknown,
         "aws-workload-secretsmanager-vpc-endpoint-missing": (
             sensitive_endpoint_detectors.detect_missing_secretsmanager_endpoint
         ),

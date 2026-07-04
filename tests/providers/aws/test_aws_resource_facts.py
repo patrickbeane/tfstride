@@ -46,6 +46,11 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "rds_multi_az_state": "disabled",
                 "rds_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/rds",
                 "rds_posture_uncertainties": ["backup_retention_period is unknown after planning"],
+                "kms_key_usage": "ENCRYPT_DECRYPT",
+                "kms_key_spec": "SYMMETRIC_DEFAULT",
+                "kms_customer_master_key_spec": "SYMMETRIC_DEFAULT",
+                "kms_enable_key_rotation_state": "enabled",
+                "kms_posture_uncertainties": ["enable_key_rotation is unknown after planning"],
                 "trust_statements": [{"Effect": "Allow"}],
                 "s3_versioning_status": "Enabled",
                 "s3_versioning_source_address": "aws_s3_bucket_versioning.logs",
@@ -163,6 +168,12 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertFalse(facts.rds_multi_az)
         self.assertEqual(facts.rds_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/rds")
         self.assertEqual(facts.rds_posture_uncertainties, ["backup_retention_period is unknown after planning"])
+        self.assertEqual(facts.kms_key_usage, "ENCRYPT_DECRYPT")
+        self.assertEqual(facts.kms_key_spec, "SYMMETRIC_DEFAULT")
+        self.assertEqual(facts.kms_customer_master_key_spec, "SYMMETRIC_DEFAULT")
+        self.assertEqual(facts.kms_enable_key_rotation_state, "enabled")
+        self.assertTrue(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_posture_uncertainties, ["enable_key_rotation is unknown after planning"])
         self.assertEqual(facts.trust_statements, [{"Effect": "Allow"}])
         self.assertEqual(facts.s3_versioning_status, "Enabled")
         self.assertTrue(facts.s3_versioning_enabled)
@@ -457,6 +468,12 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.rds_multi_az)
         self.assertIsNone(facts.rds_kms_key_id)
         self.assertEqual(facts.rds_posture_uncertainties, [])
+        self.assertIsNone(facts.kms_key_usage)
+        self.assertIsNone(facts.kms_key_spec)
+        self.assertIsNone(facts.kms_customer_master_key_spec)
+        self.assertIsNone(facts.kms_enable_key_rotation_state)
+        self.assertIsNone(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_posture_uncertainties, [])
         self.assertEqual(facts.eks_posture_uncertainties, [])
 
     def test_policy_document_is_mutated_only_through_facts_facade(self) -> None:

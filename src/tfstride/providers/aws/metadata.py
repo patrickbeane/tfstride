@@ -56,6 +56,7 @@ class AwsResourceMetadata:
     UNRESOLVED_BUCKET_REFERENCES = StringListMetadataField("unresolved_bucket_references")
     S3_POSTURE_UNCERTAINTIES = StringListMetadataField("s3_posture_uncertainties")
     RDS_POSTURE_UNCERTAINTIES = StringListMetadataField("rds_posture_uncertainties")
+    KMS_POSTURE_UNCERTAINTIES = StringListMetadataField("kms_posture_uncertainties")
     EKS_PUBLIC_ACCESS_CIDRS = StringListMetadataField("eks_public_access_cidrs")
     EKS_SUBNET_IDS = StringListMetadataField("eks_subnet_ids")
     EKS_SECURITY_GROUP_IDS = StringListMetadataField("eks_security_group_ids")
@@ -157,6 +158,10 @@ class AwsResourceMetadata:
     RDS_DELETION_PROTECTION_STATE = OptionalStringMetadataField("rds_deletion_protection_state")
     RDS_MULTI_AZ_STATE = OptionalStringMetadataField("rds_multi_az_state")
     RDS_KMS_KEY_ID = OptionalStringMetadataField("rds_kms_key_id")
+    KMS_KEY_USAGE = OptionalStringMetadataField("kms_key_usage")
+    KMS_KEY_SPEC = OptionalStringMetadataField("kms_key_spec")
+    KMS_CUSTOMER_MASTER_KEY_SPEC = OptionalStringMetadataField("kms_customer_master_key_spec")
+    KMS_ENABLE_KEY_ROTATION_STATE = OptionalStringMetadataField("kms_enable_key_rotation_state")
     ENGINE = OptionalStringMetadataField("engine")
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")

@@ -571,6 +571,30 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.RDS_POSTURE_UNCERTAINTIES)
 
     @property
+    def kms_key_usage(self) -> str | None:
+        return self.get(AwsResourceMetadata.KMS_KEY_USAGE)
+
+    @property
+    def kms_key_spec(self) -> str | None:
+        return self.get(AwsResourceMetadata.KMS_KEY_SPEC)
+
+    @property
+    def kms_customer_master_key_spec(self) -> str | None:
+        return self.get(AwsResourceMetadata.KMS_CUSTOMER_MASTER_KEY_SPEC)
+
+    @property
+    def kms_enable_key_rotation_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.KMS_ENABLE_KEY_ROTATION_STATE)
+
+    @property
+    def kms_enable_key_rotation(self) -> bool | None:
+        return _bool_from_state(self.kms_enable_key_rotation_state)
+
+    @property
+    def kms_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.KMS_POSTURE_UNCERTAINTIES)
+
+    @property
     def engine(self) -> str | None:
         return self.get(AwsResourceMetadata.ENGINE)
 

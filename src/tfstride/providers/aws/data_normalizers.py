@@ -26,6 +26,9 @@ from tfstride.resource_helpers import policy_allows_public_access
 _RDS_STATE_ENABLED = "enabled"
 _RDS_STATE_DISABLED = "disabled"
 _RDS_STATE_UNKNOWN = "unknown"
+_KMS_STATE_ENABLED = "enabled"
+_KMS_STATE_DISABLED = "disabled"
+_KMS_STATE_UNKNOWN = "unknown"
 
 
 def _rds_bool_state(value: bool | None) -> str:
@@ -285,6 +288,8 @@ def normalize_s3_bucket_server_side_encryption_configuration(resource: Terraform
 
 def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
     policy_document = load_json_document(values.get("policy"))
     return NormalizedResource(
         address=resource.address,
@@ -298,8 +303,20 @@ def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         metadata={
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
-            "key_usage": values.get("key_usage"),
-            "enable_key_rotation": bool(values.get("enable_key_rotation", False)),
+            AwsResourceMetadata.KMS_KEY_USAGE: known_string(values, unknown_values, "key_usage", uncertainties),
+            AwsResourceMetadata.KMS_KEY_SPEC: known_string(values, unknown_values, "key_spec", uncertainties),
+            AwsResourceMetadata.KMS_CUSTOMER_MASTER_KEY_SPEC: known_string(
+                values,
+                unknown_values,
+                "customer_master_key_spec",
+                uncertainties,
+            ),
+            AwsResourceMetadata.KMS_ENABLE_KEY_ROTATION_STATE: _kms_rotation_state(
+                values,
+                unknown_values,
+                uncertainties,
+            ),
+            AwsResourceMetadata.KMS_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
 
@@ -452,6 +469,28 @@ def normalize_secretsmanager_secret_policy(resource: TerraformResource) -> Norma
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
         },
     )
+
+
+def _kms_rotation_state(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> str:
+    previous_uncertainty_count = len(uncertainties)
+    rotation_enabled = known_bool(
+        values,
+        unknown_values,
+        "enable_key_rotation",
+        uncertainties,
+        allow_string=False,
+    )
+    if rotation_enabled is True:
+        return _KMS_STATE_ENABLED
+    if rotation_enabled is False:
+        return _KMS_STATE_DISABLED
+    if len(uncertainties) > previous_uncertainty_count:
+        return _KMS_STATE_UNKNOWN
+    return _KMS_STATE_DISABLED
 
 
 def _secrets_manager_rotation_rules(rotation_rules: Mapping[str, Any] | None) -> dict[str, Any] | None:

@@ -198,6 +198,7 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                 "values": {
                                     "id": "kms-shared",
                                     "arn": "arn:aws:kms:us-east-1:111122223333:key/1234",
+                                    "enable_key_rotation": True,
                                     "policy": {
                                         "Version": "2012-10-17",
                                         "Statement": [
@@ -276,6 +277,7 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                 "values": {
                                     "id": "kms-shared",
                                     "arn": "arn:aws:kms:us-east-1:111122223333:key/1234",
+                                    "enable_key_rotation": True,
                                     "policy": {
                                         "Version": "2012-10-17",
                                         "Statement": [

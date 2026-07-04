@@ -6,6 +6,7 @@ from typing import Any
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.data_normalizers import (
     normalize_db_instance,
+    normalize_kms_key,
     normalize_s3_bucket_server_side_encryption_configuration,
     normalize_s3_bucket_versioning,
     normalize_secretsmanager_secret,
@@ -111,6 +112,71 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "multi_az is unknown after planning",
                 "backup_retention_period is unknown after planning",
                 "kms_key_id is unknown after planning",
+            ],
+        )
+
+    def test_kms_key_normalizes_rotation_usage_and_spec_posture(self) -> None:
+        resource = _terraform_resource(
+            "aws_kms_key",
+            {
+                "id": "key/customer",
+                "key_id": "customer",
+                "arn": "arn:aws:kms:us-east-1:111122223333:key/customer",
+                "key_usage": "ENCRYPT_DECRYPT",
+                "key_spec": "SYMMETRIC_DEFAULT",
+                "customer_master_key_spec": "SYMMETRIC_DEFAULT",
+                "enable_key_rotation": True,
+            },
+        )
+
+        normalized = normalize_kms_key(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "customer")
+        self.assertEqual(normalized.arn, "arn:aws:kms:us-east-1:111122223333:key/customer")
+        self.assertEqual(facts.kms_key_usage, "ENCRYPT_DECRYPT")
+        self.assertEqual(facts.kms_key_spec, "SYMMETRIC_DEFAULT")
+        self.assertEqual(facts.kms_customer_master_key_spec, "SYMMETRIC_DEFAULT")
+        self.assertEqual(facts.kms_enable_key_rotation_state, "enabled")
+        self.assertTrue(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_posture_uncertainties, [])
+
+    def test_kms_key_missing_rotation_defaults_to_disabled(self) -> None:
+        facts = aws_facts(normalize_kms_key(_terraform_resource("aws_kms_key", {"key_id": "customer"})))
+
+        self.assertIsNone(facts.kms_key_usage)
+        self.assertIsNone(facts.kms_key_spec)
+        self.assertIsNone(facts.kms_customer_master_key_spec)
+        self.assertEqual(facts.kms_enable_key_rotation_state, "disabled")
+        self.assertFalse(facts.kms_enable_key_rotation)
+        self.assertEqual(facts.kms_posture_uncertainties, [])
+
+    def test_kms_key_preserves_unknown_rotation_and_spec_values(self) -> None:
+        resource = _terraform_resource(
+            "aws_kms_key",
+            {"key_id": "customer"},
+            unknown_values={
+                "key_usage": True,
+                "key_spec": True,
+                "customer_master_key_spec": True,
+                "enable_key_rotation": True,
+            },
+        )
+
+        facts = aws_facts(normalize_kms_key(resource))
+
+        self.assertIsNone(facts.kms_key_usage)
+        self.assertIsNone(facts.kms_key_spec)
+        self.assertIsNone(facts.kms_customer_master_key_spec)
+        self.assertEqual(facts.kms_enable_key_rotation_state, "unknown")
+        self.assertIsNone(facts.kms_enable_key_rotation)
+        self.assertEqual(
+            facts.kms_posture_uncertainties,
+            [
+                "key_usage is unknown after planning",
+                "key_spec is unknown after planning",
+                "customer_master_key_spec is unknown after planning",
+                "enable_key_rotation is unknown after planning",
             ],
         )
 
