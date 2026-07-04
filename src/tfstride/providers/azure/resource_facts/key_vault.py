@@ -33,6 +33,46 @@ class AzureKeyVaultFacts:
         return self.get(AzureResourceMetadata.KEY_VAULT_CERTIFICATE_VALIDITY_MONTHS)
 
     @property
+    def key_vault_key_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_KEY_TYPE)
+
+    @property
+    def key_vault_key_size(self) -> int | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_KEY_SIZE)
+
+    @property
+    def key_vault_key_curve(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_KEY_CURVE)
+
+    @property
+    def key_vault_key_ops(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_KEY_OPS)
+
+    @property
+    def key_vault_rotation_policy(self) -> dict:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY)
+
+    @property
+    def key_vault_rotation_policy_expire_after(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_EXPIRE_AFTER)
+
+    @property
+    def key_vault_rotation_policy_notify_before_expiry(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_NOTIFY_BEFORE_EXPIRY)
+
+    @property
+    def key_vault_rotation_policy_automatic_time_after_creation(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_AFTER_CREATION)
+
+    @property
+    def key_vault_rotation_policy_automatic_time_before_expiry(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_BEFORE_EXPIRY)
+
+    @property
+    def key_vault_key_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_KEY_POSTURE_UNCERTAINTIES)
+
+    @property
     def purge_protection_enabled(self) -> bool | None:
         return self.optional_bool(AzureResourceMetadata.PURGE_PROTECTION_ENABLED)
 

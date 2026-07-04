@@ -8,6 +8,7 @@ from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
     normalize_key_vault_certificate,
+    normalize_key_vault_key,
     normalize_key_vault_secret,
 )
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -226,6 +227,114 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.key_vault_not_before_date, "2026-01-01T00:00:00Z")
         self.assertIsNone(facts.key_vault_certificate_validity_months)
         self.assertEqual(facts.key_vault_lifecycle_uncertainties, [])
+
+    def test_key_vault_key_preserves_rotation_policy_and_key_shape(self) -> None:
+        key = normalize_key_vault_key(
+            _resource(
+                AzureResourceType.KEY_VAULT_KEY,
+                {
+                    "id": "azurerm_key_vault_key.signing.id",
+                    "name": "signing",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                    "key_type": "RSA",
+                    "key_size": 2048,
+                    "key_opts": ["decrypt", "encrypt", "sign", "verify"],
+                    "not_before_date": "2026-01-01T00:00:00Z",
+                    "expiration_date": "2027-01-01T00:00:00Z",
+                    "rotation_policy": [
+                        {
+                            "expire_after": "P90D",
+                            "notify_before_expiry": "P30D",
+                            "automatic": [
+                                {
+                                    "time_after_creation": "P30D",
+                                    "time_before_expiry": "P15D",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(key)
+
+        self.assertEqual(key.identifier, "azurerm_key_vault_key.signing.id")
+        self.assertEqual(facts.key_vault_reference, "azurerm_key_vault.application.id")
+        self.assertEqual(facts.key_vault_expiration_date, "2027-01-01T00:00:00Z")
+        self.assertEqual(facts.key_vault_not_before_date, "2026-01-01T00:00:00Z")
+        self.assertEqual(facts.key_vault_key_type, "RSA")
+        self.assertEqual(facts.key_vault_key_size, 2048)
+        self.assertIsNone(facts.key_vault_key_curve)
+        self.assertEqual(facts.key_vault_key_ops, ["decrypt", "encrypt", "sign", "verify"])
+        self.assertEqual(facts.key_vault_rotation_policy_expire_after, "P90D")
+        self.assertEqual(facts.key_vault_rotation_policy_notify_before_expiry, "P30D")
+        self.assertEqual(facts.key_vault_rotation_policy_automatic_time_after_creation, "P30D")
+        self.assertEqual(facts.key_vault_rotation_policy_automatic_time_before_expiry, "P15D")
+        self.assertEqual(
+            facts.key_vault_rotation_policy,
+            {
+                "expire_after": "P90D",
+                "notify_before_expiry": "P30D",
+                "automatic": {
+                    "time_after_creation": "P30D",
+                    "time_before_expiry": "P15D",
+                },
+            },
+        )
+        self.assertEqual(facts.key_vault_key_posture_uncertainties, [])
+        self.assertTrue(key.storage_encrypted)
+        self.assertEqual(key.data_sensitivity, "sensitive")
+
+    def test_key_vault_key_preserves_unknown_rotation_policy_and_key_shape(self) -> None:
+        key = normalize_key_vault_key(
+            _resource(
+                AzureResourceType.KEY_VAULT_KEY,
+                {
+                    "name": "pending",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                    "rotation_policy": [{"automatic": [{}]}],
+                },
+                unknown_values={
+                    "key_type": True,
+                    "key_size": True,
+                    "key_opts": True,
+                    "rotation_policy": [
+                        {
+                            "expire_after": True,
+                            "notify_before_expiry": True,
+                            "automatic": [
+                                {
+                                    "time_after_creation": True,
+                                    "time_before_expiry": True,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(key)
+
+        self.assertIsNone(facts.key_vault_key_type)
+        self.assertIsNone(facts.key_vault_key_size)
+        self.assertEqual(facts.key_vault_key_ops, [])
+        self.assertEqual(facts.key_vault_rotation_policy, {})
+        self.assertIsNone(facts.key_vault_rotation_policy_expire_after)
+        self.assertIsNone(facts.key_vault_rotation_policy_notify_before_expiry)
+        self.assertIsNone(facts.key_vault_rotation_policy_automatic_time_after_creation)
+        self.assertIsNone(facts.key_vault_rotation_policy_automatic_time_before_expiry)
+        self.assertEqual(
+            facts.key_vault_key_posture_uncertainties,
+            [
+                "key_type is unknown after planning",
+                "key_size is unknown after planning",
+                "key_opts is unknown after planning",
+                "rotation_policy.expire_after is unknown after planning",
+                "rotation_policy.notify_before_expiry is unknown after planning",
+                "rotation_policy.automatic.time_after_creation is unknown after planning",
+                "rotation_policy.automatic.time_before_expiry is unknown after planning",
+            ],
+        )
 
     def test_key_vault_certificate_preserves_lifecycle_posture(self) -> None:
         certificate = normalize_key_vault_certificate(

@@ -16,7 +16,9 @@ from tfstride.providers.azure.resource_utils import (
     first_mapping,
     first_non_empty,
     known_block_int,
+    known_block_string,
     known_string,
+    known_string_list,
     unknown_block_at,
 )
 from tfstride.providers.azure.resource_utils import (
@@ -197,6 +199,9 @@ def _set_key_vault_child_lifecycle(
     if not_before_date:
         metadata[AzureResourceMetadata.KEY_VAULT_NOT_BEFORE_DATE] = not_before_date
 
+    if resource.resource_type == AzureResourceType.KEY_VAULT_KEY:
+        _set_key_vault_key_posture(metadata, resource, values)
+
     if resource.resource_type == AzureResourceType.KEY_VAULT_CERTIFICATE:
         certificate_policy = first_mapping(values.get("certificate_policy"))
         certificate_policy_unknown = unknown_block_at(resource.unknown_values.get("certificate_policy"), 0)
@@ -212,6 +217,159 @@ def _set_key_vault_child_lifecycle(
 
     if uncertainties:
         metadata[AzureResourceMetadata.KEY_VAULT_LIFECYCLE_UNCERTAINTIES] = uncertainties
+
+
+def _set_key_vault_key_posture(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+) -> None:
+    uncertainties: list[str] = []
+    key_type = known_string(values, resource.unknown_values, "key_type", uncertainties, require_string=True)
+    key_curve = known_string(values, resource.unknown_values, "curve", uncertainties, require_string=True)
+    key_size = _known_top_level_int(resource, values, "key_size", uncertainties)
+    key_ops = known_string_list(values, resource.unknown_values, "key_opts", uncertainties)
+
+    if key_type:
+        metadata[AzureResourceMetadata.KEY_VAULT_KEY_TYPE] = key_type
+    if key_curve:
+        metadata[AzureResourceMetadata.KEY_VAULT_KEY_CURVE] = key_curve
+    if key_size is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_KEY_SIZE] = key_size
+    if key_ops:
+        metadata[AzureResourceMetadata.KEY_VAULT_KEY_OPS] = key_ops
+
+    _set_key_vault_key_rotation_policy(metadata, resource, values, uncertainties)
+
+    if uncertainties:
+        metadata[AzureResourceMetadata.KEY_VAULT_KEY_POSTURE_UNCERTAINTIES] = uncertainties
+
+
+def _set_key_vault_key_rotation_policy(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> None:
+    raw_unknown_policy = resource.unknown_values.get("rotation_policy")
+    if raw_unknown_policy is True:
+        uncertainties.append("rotation_policy is unknown after planning")
+        return
+
+    rotation_policy = first_mapping(values.get("rotation_policy"))
+    unknown_policy = _unknown_mapping_block(raw_unknown_policy)
+    if rotation_policy is None:
+        return
+
+    expire_after = known_block_string(
+        rotation_policy,
+        unknown_policy,
+        "expire_after",
+        uncertainties,
+        path="rotation_policy",
+    )
+    notify_before_expiry = known_block_string(
+        rotation_policy,
+        unknown_policy,
+        "notify_before_expiry",
+        uncertainties,
+        path="rotation_policy",
+    )
+    automatic = first_mapping(rotation_policy.get("automatic"))
+    automatic_unknown = _unknown_child_block(unknown_policy, "automatic")
+    time_after_creation = known_block_string(
+        automatic,
+        automatic_unknown,
+        "time_after_creation",
+        uncertainties,
+        path="rotation_policy.automatic",
+    )
+    time_before_expiry = known_block_string(
+        automatic,
+        automatic_unknown,
+        "time_before_expiry",
+        uncertainties,
+        path="rotation_policy.automatic",
+    )
+
+    if expire_after:
+        metadata[AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_EXPIRE_AFTER] = expire_after
+    if notify_before_expiry:
+        metadata[AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_NOTIFY_BEFORE_EXPIRY] = notify_before_expiry
+    if time_after_creation:
+        metadata[AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_AFTER_CREATION] = time_after_creation
+    if time_before_expiry:
+        metadata[AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_BEFORE_EXPIRY] = time_before_expiry
+
+    policy_record = _rotation_policy_record(
+        expire_after=expire_after,
+        notify_before_expiry=notify_before_expiry,
+        time_after_creation=time_after_creation,
+        time_before_expiry=time_before_expiry,
+    )
+    if policy_record:
+        metadata[AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY] = policy_record
+
+
+def _rotation_policy_record(
+    *,
+    expire_after: str | None,
+    notify_before_expiry: str | None,
+    time_after_creation: str | None,
+    time_before_expiry: str | None,
+) -> dict[str, Any]:
+    record: dict[str, Any] = {}
+    if expire_after:
+        record["expire_after"] = expire_after
+    if notify_before_expiry:
+        record["notify_before_expiry"] = notify_before_expiry
+    automatic = {}
+    if time_after_creation:
+        automatic["time_after_creation"] = time_after_creation
+    if time_before_expiry:
+        automatic["time_before_expiry"] = time_before_expiry
+    if automatic:
+        record["automatic"] = automatic
+    return record
+
+
+def _known_top_level_int(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    key: str,
+    uncertainties: list[str],
+) -> int | None:
+    if attribute_unknown(resource.unknown_values, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    value = values.get(key)
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        uncertainties.append(f"{key} has an unrecognized value shape")
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        uncertainties.append(f"{key} has an unrecognized value shape")
+        return None
+
+
+def _unknown_mapping_block(value: Any) -> Any:
+    if isinstance(value, Mapping) or value is True:
+        return value
+    return unknown_block_at(value, 0)
+
+
+def _unknown_child_block(value: Any, key: str) -> Any:
+    if value is True:
+        return True
+    if not isinstance(value, Mapping):
+        return None
+    child = value.get(key)
+    if isinstance(child, Mapping) or child is True:
+        return child
+    return unknown_block_at(child, 0)
 
 
 def _inline_access_policies(resource: TerraformResource, values: Mapping[str, Any]) -> list[dict[str, Any]]:

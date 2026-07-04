@@ -34,6 +34,21 @@ class AzureResourceFactsTests(unittest.TestCase):
                 AzureResourceMetadata.STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID: (
                     "azurerm_user_assigned_identity.storage.id"
                 ),
+                AzureResourceMetadata.KEY_VAULT_KEY_TYPE: "RSA",
+                AzureResourceMetadata.KEY_VAULT_KEY_SIZE: 2048,
+                AzureResourceMetadata.KEY_VAULT_KEY_CURVE: "P-256",
+                AzureResourceMetadata.KEY_VAULT_KEY_OPS: ["encrypt", "decrypt"],
+                AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY: {
+                    "expire_after": "P90D",
+                    "automatic": {"time_after_creation": "P30D"},
+                },
+                AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_EXPIRE_AFTER: "P90D",
+                AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_NOTIFY_BEFORE_EXPIRY: "P30D",
+                AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_AFTER_CREATION: "P30D",
+                AzureResourceMetadata.KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_BEFORE_EXPIRY: "P15D",
+                AzureResourceMetadata.KEY_VAULT_KEY_POSTURE_UNCERTAINTIES: [
+                    "rotation_policy.expire_after is unknown after planning"
+                ],
                 AzureResourceMetadata.STORAGE_BLOB_VERSIONING_ENABLED: True,
                 AzureResourceMetadata.STORAGE_BLOB_DELETE_RETENTION_DAYS: 30,
                 AzureResourceMetadata.STORAGE_CONTAINER_DELETE_RETENTION_DAYS: 14,
@@ -56,6 +71,22 @@ class AzureResourceFactsTests(unittest.TestCase):
         self.assertEqual(
             facts.storage_customer_managed_key_identity_id,
             "azurerm_user_assigned_identity.storage.id",
+        )
+        self.assertEqual(facts.key_vault_key_type, "RSA")
+        self.assertEqual(facts.key_vault_key_size, 2048)
+        self.assertEqual(facts.key_vault_key_curve, "P-256")
+        self.assertEqual(facts.key_vault_key_ops, ["encrypt", "decrypt"])
+        self.assertEqual(
+            facts.key_vault_rotation_policy,
+            {"expire_after": "P90D", "automatic": {"time_after_creation": "P30D"}},
+        )
+        self.assertEqual(facts.key_vault_rotation_policy_expire_after, "P90D")
+        self.assertEqual(facts.key_vault_rotation_policy_notify_before_expiry, "P30D")
+        self.assertEqual(facts.key_vault_rotation_policy_automatic_time_after_creation, "P30D")
+        self.assertEqual(facts.key_vault_rotation_policy_automatic_time_before_expiry, "P15D")
+        self.assertEqual(
+            facts.key_vault_key_posture_uncertainties,
+            ["rotation_policy.expire_after is unknown after planning"],
         )
         self.assertTrue(facts.storage_blob_versioning_enabled)
         self.assertEqual(facts.storage_blob_delete_retention_days, 30)

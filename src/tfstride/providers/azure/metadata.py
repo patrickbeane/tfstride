@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.resource_metadata import (
     BoolMetadataField,
     DictListMetadataField,
+    DictMetadataField,
     OptionalIntMetadataField,
     OptionalStringMetadataField,
     StringListMetadataField,
@@ -58,6 +59,18 @@ class AzureResourceMetadata:
     RESOLVED_KEY_VAULT_ADDRESS = OptionalStringMetadataField("resolved_key_vault_address")
     KEY_VAULT_EXPIRATION_DATE = OptionalStringMetadataField("key_vault_expiration_date")
     KEY_VAULT_NOT_BEFORE_DATE = OptionalStringMetadataField("key_vault_not_before_date")
+    KEY_VAULT_KEY_TYPE = OptionalStringMetadataField("key_vault_key_type")
+    KEY_VAULT_KEY_CURVE = OptionalStringMetadataField("key_vault_key_curve")
+    KEY_VAULT_ROTATION_POLICY_EXPIRE_AFTER = OptionalStringMetadataField("key_vault_rotation_policy_expire_after")
+    KEY_VAULT_ROTATION_POLICY_NOTIFY_BEFORE_EXPIRY = OptionalStringMetadataField(
+        "key_vault_rotation_policy_notify_before_expiry"
+    )
+    KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_AFTER_CREATION = OptionalStringMetadataField(
+        "key_vault_rotation_policy_automatic_time_after_creation"
+    )
+    KEY_VAULT_ROTATION_POLICY_AUTOMATIC_TIME_BEFORE_EXPIRY = OptionalStringMetadataField(
+        "key_vault_rotation_policy_automatic_time_before_expiry"
+    )
     CONTAINER_ACCESS_TYPE = OptionalStringMetadataField("container_access_type")
     STORAGE_CUSTOMER_MANAGED_KEY_ID = OptionalStringMetadataField("storage_customer_managed_key_id")
     STORAGE_CUSTOMER_MANAGED_KEY_IDENTITY_ID = OptionalStringMetadataField("storage_customer_managed_key_identity_id")
@@ -162,6 +175,9 @@ class AzureResourceMetadata:
     KEY_VAULT_RECOVERY_UNCERTAINTIES = StringListMetadataField("key_vault_recovery_uncertainties")
     KEY_VAULT_LIFECYCLE_UNCERTAINTIES = StringListMetadataField("key_vault_lifecycle_uncertainties")
     KEY_VAULT_CERTIFICATE_VALIDITY_MONTHS = OptionalIntMetadataField("key_vault_certificate_validity_months")
+    KEY_VAULT_KEY_SIZE = OptionalIntMetadataField("key_vault_key_size")
+    KEY_VAULT_KEY_OPS = StringListMetadataField("key_vault_key_ops")
+    KEY_VAULT_KEY_POSTURE_UNCERTAINTIES = StringListMetadataField("key_vault_key_posture_uncertainties")
     ATTACHED_IDENTITY_REFERENCES = StringListMetadataField("attached_identity_references")
     MANAGED_IDENTITY_UNCERTAINTIES = StringListMetadataField("managed_identity_uncertainties")
     ROLE_ASSIGNMENT_BREADTH_SIGNALS = StringListMetadataField("role_assignment_breadth_signals")
@@ -217,6 +233,7 @@ class AzureResourceMetadata:
     PUBLIC_COMPUTE_EXPOSURE_PATHS = DictListMetadataField("public_compute_exposure_paths")
     KEY_VAULT_ACCESS_POLICIES = DictListMetadataField("key_vault_access_policies")
     KEY_VAULT_ROLE_ASSIGNMENTS = DictListMetadataField("key_vault_role_assignments")
+    KEY_VAULT_ROTATION_POLICY = DictMetadataField("key_vault_rotation_policy")
     MANAGED_IDENTITY_ROLE_ASSIGNMENTS = DictListMetadataField("managed_identity_role_assignments")
     ROLE_DEFINITION_PERMISSIONS = DictListMetadataField("role_definition_permissions")
     PRIVATE_SERVICE_CONNECTIONS = DictListMetadataField("private_service_connections")
