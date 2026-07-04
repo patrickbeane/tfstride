@@ -358,7 +358,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "fixture_path": GCP_FIXTURE_PATH,
                 "severity": Severity.MEDIUM,
                 "source": "google_project_iam_member.web_viewer",
-                "affected_count": 17,
+                "affected_count": 18,
                 "iam_binding": [
                     "source=google_project_iam_member.web_viewer",
                     "scope=project:tfstride-demo",
@@ -370,18 +370,18 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 ],
                 "descendant_scope": [
                     "scope=project:tfstride-demo",
-                    "descendant_count=16",
-                    "resource_type_count=15",
+                    "descendant_count=17",
+                    "resource_type_count=16",
                     "projects=tfstride-demo",
                 ],
                 "descendant_type": "google_compute_firewall: 2",
-                "descendant_resource": "and 6 more descendant resources",
+                "descendant_resource": "and 7 more descendant resources",
             },
             "gcp-nightmare": {
                 "fixture_path": GCP_NIGHTMARE_FIXTURE_PATH,
                 "severity": Severity.HIGH,
                 "source": "google_project_iam_member.public_owner",
-                "affected_count": 21,
+                "affected_count": 22,
                 "iam_binding": [
                     "source=google_project_iam_member.public_owner",
                     "scope=project:tfstride-demo",
@@ -392,12 +392,12 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "trust_scope": ["member is public GCP principal `allUsers`"],
                 "descendant_scope": [
                     "scope=project:tfstride-demo",
-                    "descendant_count=20",
-                    "resource_type_count=19",
+                    "descendant_count=21",
+                    "resource_type_count=20",
                     "projects=tfstride-demo",
                 ],
                 "descendant_type": "google_cloud_run_v2_service: 1",
-                "descendant_resource": "and 10 more descendant resources",
+                "descendant_resource": "and 11 more descendant resources",
             },
         }
 
@@ -459,15 +459,12 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         result = self.engine.analyze_plan(GCP_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "gcp")
-        self.assertEqual(len(result.inventory.resources), 22)
-        self.assertEqual(result.inventory.unsupported_resources, ["google_logging_project_sink.processor"])
+        self.assertEqual(len(result.inventory.resources), 23)
+        self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.analysis_coverage.resources.provider_resources, 23)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 22)
-        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 1)
-        self.assertEqual(
-            result.analysis_coverage.resources.unsupported_resource_types,
-            {"google_logging_project_sink": 1},
-        )
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 23)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
+        self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
         self.assertEqual(len(result.findings), 22)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]

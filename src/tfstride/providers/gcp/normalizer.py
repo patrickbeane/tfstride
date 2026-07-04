@@ -6,6 +6,13 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.gcp.audit_normalizers import (
+    normalize_logging_organization_exclusion,
+    normalize_logging_organization_sink,
+    normalize_logging_project_exclusion,
+    normalize_logging_project_sink,
+    normalize_scc_organization_settings,
+)
 from tfstride.providers.gcp.compute_normalizers import normalize_compute_instance
 from tfstride.providers.gcp.container_normalizers import (
     normalize_container_cluster,
@@ -185,6 +192,10 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     GcpResourceType.KMS_KEY_RING_IAM_BINDING: normalize_kms_key_ring_iam_binding,
     GcpResourceType.KMS_KEY_RING_IAM_MEMBER: normalize_kms_key_ring_iam_member,
     GcpResourceType.KMS_KEY_RING_IAM_POLICY: normalize_kms_key_ring_iam_policy,
+    GcpResourceType.LOGGING_ORGANIZATION_EXCLUSION: normalize_logging_organization_exclusion,
+    GcpResourceType.LOGGING_ORGANIZATION_SINK: normalize_logging_organization_sink,
+    GcpResourceType.LOGGING_PROJECT_EXCLUSION: normalize_logging_project_exclusion,
+    GcpResourceType.LOGGING_PROJECT_SINK: normalize_logging_project_sink,
     GcpResourceType.FOLDER_IAM_BINDING: normalize_folder_iam_binding,
     GcpResourceType.FOLDER_IAM_MEMBER: normalize_folder_iam_member,
     GcpResourceType.FOLDER_IAM_POLICY: normalize_folder_iam_policy,
@@ -221,6 +232,7 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     GcpResourceType.SERVICE_ACCOUNT_IAM_MEMBER: normalize_service_account_iam_member,
     GcpResourceType.SERVICE_ACCOUNT_IAM_POLICY: normalize_service_account_iam_policy,
     GcpResourceType.SERVICE_ACCOUNT_KEY: normalize_service_account_key,
+    GcpResourceType.SCC_ORGANIZATION_SETTINGS: normalize_scc_organization_settings,
     GcpResourceType.SQL_DATABASE_INSTANCE: normalize_sql_database_instance,
     GcpResourceType.STORAGE_BUCKET: normalize_storage_bucket,
     GcpResourceType.STORAGE_BUCKET_IAM_BINDING: normalize_storage_bucket_iam_binding,

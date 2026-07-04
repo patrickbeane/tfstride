@@ -334,6 +334,28 @@ class GcpProviderTests(unittest.TestCase):
                 "GKE_BINARY_AUTHORIZATION_STATE",
                 "GKE_BINARY_AUTHORIZATION",
                 "GKE_POSTURE_UNCERTAINTIES",
+                "LOGGING_SINK_NAME",
+                "LOGGING_SINK_DESTINATION",
+                "LOGGING_SINK_FILTER",
+                "LOGGING_SINK_WRITER_IDENTITY",
+                "LOGGING_SINK_SCOPE_TYPE",
+                "LOGGING_SINK_SCOPE",
+                "LOGGING_SINK_INCLUDE_CHILDREN",
+                "LOGGING_SINK_UNIQUE_WRITER_IDENTITY",
+                "LOGGING_EXCLUSION_NAME",
+                "LOGGING_EXCLUSION_DESCRIPTION",
+                "LOGGING_EXCLUSION_FILTER",
+                "LOGGING_EXCLUSION_SCOPE_TYPE",
+                "LOGGING_EXCLUSION_SCOPE",
+                "LOGGING_EXCLUSION_DISABLED",
+                "SCC_ORGANIZATION",
+                "SCC_ENABLE_ASSET_DISCOVERY",
+                "SCC_ASSET_DISCOVERY_STATE",
+                "SCC_ASSET_DISCOVERY_INCLUSION_MODE",
+                "SCC_ASSET_DISCOVERY_PROJECT_IDS",
+                "SCC_ASSET_DISCOVERY_FOLDER_IDS",
+                "SCC_ASSET_DISCOVERY_CONFIG",
+                "AUDIT_SECURITY_POSTURE_UNCERTAINTIES",
             },
         )
 
@@ -434,6 +456,28 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.gke_binary_authorization_state)
         self.assertEqual(facts.gke_binary_authorization, {})
         self.assertEqual(facts.gke_posture_uncertainties, [])
+        self.assertEqual(facts.audit_security_posture_uncertainties, [])
+        self.assertIsNone(facts.logging_sink_name)
+        self.assertIsNone(facts.logging_sink_destination)
+        self.assertIsNone(facts.logging_sink_filter)
+        self.assertIsNone(facts.logging_sink_writer_identity)
+        self.assertIsNone(facts.logging_sink_scope_type)
+        self.assertIsNone(facts.logging_sink_scope)
+        self.assertIsNone(facts.logging_sink_include_children)
+        self.assertIsNone(facts.logging_sink_unique_writer_identity)
+        self.assertIsNone(facts.logging_exclusion_name)
+        self.assertIsNone(facts.logging_exclusion_description)
+        self.assertIsNone(facts.logging_exclusion_filter)
+        self.assertIsNone(facts.logging_exclusion_scope_type)
+        self.assertIsNone(facts.logging_exclusion_scope)
+        self.assertIsNone(facts.logging_exclusion_disabled)
+        self.assertIsNone(facts.scc_organization)
+        self.assertIsNone(facts.scc_enable_asset_discovery)
+        self.assertIsNone(facts.scc_asset_discovery_state)
+        self.assertIsNone(facts.scc_asset_discovery_inclusion_mode)
+        self.assertEqual(facts.scc_asset_discovery_project_ids, [])
+        self.assertEqual(facts.scc_asset_discovery_folder_ids, [])
+        self.assertEqual(facts.scc_asset_discovery_config, {})
 
     def test_optional_boolean_facts_preserve_none_and_false(self) -> None:
         resource = NormalizedResource(

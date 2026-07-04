@@ -70,6 +70,10 @@ class GcpResourceType:
     KMS_KEY_RING_IAM_BINDING = "google_kms_key_ring_iam_binding"
     KMS_KEY_RING_IAM_MEMBER = "google_kms_key_ring_iam_member"
     KMS_KEY_RING_IAM_POLICY = "google_kms_key_ring_iam_policy"
+    LOGGING_ORGANIZATION_EXCLUSION = "google_logging_organization_exclusion"
+    LOGGING_ORGANIZATION_SINK = "google_logging_organization_sink"
+    LOGGING_PROJECT_EXCLUSION = "google_logging_project_exclusion"
+    LOGGING_PROJECT_SINK = "google_logging_project_sink"
     ORGANIZATION_IAM_BINDING = "google_organization_iam_binding"
     ORGANIZATION_IAM_CUSTOM_ROLE = "google_organization_iam_custom_role"
     ORGANIZATION_IAM_MEMBER = "google_organization_iam_member"
@@ -100,6 +104,7 @@ class GcpResourceType:
     SERVICE_ACCOUNT_IAM_MEMBER = "google_service_account_iam_member"
     SERVICE_ACCOUNT_IAM_POLICY = "google_service_account_iam_policy"
     SERVICE_ACCOUNT_KEY = "google_service_account_key"
+    SCC_ORGANIZATION_SETTINGS = "google_scc_organization_settings"
     SQL_DATABASE_INSTANCE = "google_sql_database_instance"
     STORAGE_BUCKET = "google_storage_bucket"
     STORAGE_BUCKET_IAM_BINDING = "google_storage_bucket_iam_binding"
@@ -399,6 +404,10 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.KMS_KEY_RING_IAM_BINDING,
         GcpResourceType.KMS_KEY_RING_IAM_MEMBER,
         GcpResourceType.KMS_KEY_RING_IAM_POLICY,
+        GcpResourceType.LOGGING_ORGANIZATION_EXCLUSION,
+        GcpResourceType.LOGGING_ORGANIZATION_SINK,
+        GcpResourceType.LOGGING_PROJECT_EXCLUSION,
+        GcpResourceType.LOGGING_PROJECT_SINK,
         GcpResourceType.FOLDER_IAM_BINDING,
         GcpResourceType.FOLDER_IAM_MEMBER,
         GcpResourceType.FOLDER_IAM_POLICY,
@@ -433,6 +442,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.SERVICE_ACCOUNT_IAM_MEMBER,
         GcpResourceType.SERVICE_ACCOUNT_IAM_POLICY,
         GcpResourceType.SERVICE_ACCOUNT_KEY,
+        GcpResourceType.SCC_ORGANIZATION_SETTINGS,
         GcpResourceType.SQL_DATABASE_INSTANCE,
         GcpResourceType.STORAGE_BUCKET,
         GcpResourceType.STORAGE_BUCKET_IAM_BINDING,

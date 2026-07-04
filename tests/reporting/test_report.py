@@ -260,18 +260,18 @@ class JsonReportTests(unittest.TestCase):
         payload = json.loads(render_json(engine.analyze_plan(GCP_FIXTURE_PATH)))
 
         self.assertEqual(payload["inventory"]["provider"], "gcp")
-        self.assertEqual(payload["summary"]["normalized_resources"], 22)
-        self.assertEqual(payload["summary"]["unsupported_resources"], 1)
+        self.assertEqual(payload["summary"]["normalized_resources"], 23)
+        self.assertEqual(payload["summary"]["unsupported_resources"], 0)
         self.assertEqual(payload["summary"]["trust_boundaries"], 4)
         self.assertEqual(payload["summary"]["active_findings"], 22)
         self.assertEqual(payload["summary"]["severity_counts"], {"high": 6, "medium": 16, "low": 0})
-        self.assertEqual(payload["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
+        self.assertEqual(payload["inventory"]["unsupported_resources"], [])
         self.assertEqual(
             payload["inventory"]["metadata"]["supported_resource_types"],
             sorted(SUPPORTED_GCP_TYPES),
         )
-        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 22)
-        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 1)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["normalized_resources"], 23)
+        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resources"], 0)
         self.assertEqual(
             [resource["address"] for resource in payload["inventory"]["resources"]],
             [
@@ -286,6 +286,7 @@ class JsonReportTests(unittest.TestCase):
                 "google_compute_subnetwork.app",
                 "google_kms_crypto_key.customer",
                 "google_kms_crypto_key_iam_member.partner_decrypter",
+                "google_logging_project_sink.processor",
                 "google_project_iam_member.web_viewer",
                 "google_pubsub_subscription.events",
                 "google_pubsub_topic.events",
@@ -299,10 +300,7 @@ class JsonReportTests(unittest.TestCase):
                 "google_storage_bucket_iam_member.public_logs_reader",
             ],
         )
-        self.assertEqual(
-            payload["analysis_coverage"]["resources"]["unsupported_resource_types"],
-            {"google_logging_project_sink": 1},
-        )
+        self.assertEqual(payload["analysis_coverage"]["resources"]["unsupported_resource_types"], {})
         self.assertEqual(
             payload["trust_boundaries"][0]["identifier"],
             "internet-to-service:internet->google_compute_instance.web",

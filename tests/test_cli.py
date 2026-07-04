@@ -235,8 +235,8 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "gcp")
-        self.assertEqual(len(report["inventory"]["resources"]), 22)
-        self.assertEqual(report["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
+        self.assertEqual(len(report["inventory"]["resources"]), 23)
+        self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 22)
         self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
 
