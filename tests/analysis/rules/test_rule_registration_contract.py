@@ -109,6 +109,10 @@ EXPECTED_AZURE_RULE_GROUP_IDS = (
         "azure-app-service-access-restrictions-not-default-deny",
         "azure-app-service-broad-access-restriction-allow",
         "azure-app-service-scm-access-unrestricted",
+        "azure-diagnostic-settings-missing",
+        "azure-diagnostic-setting-no-log-destination",
+        "azure-defender-pricing-tier-not-standard",
+        "azure-security-center-auto-provisioning-disabled",
         "azure-aks-api-server-public-unrestricted",
         "azure-aks-private-cluster-not-enabled",
         "azure-aks-local-accounts-not-disabled",
@@ -307,11 +311,11 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (134, 2, 2, 12, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (138, 2, 2, 12, 3, 2)
         )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (32, 2, 2, 2, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (40, 0, 0, 10, 1, 0))
-        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (62, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (66, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)

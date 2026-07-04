@@ -90,6 +90,19 @@ def _container(access_type: str = "private") -> TerraformResource:
     )
 
 
+def _diagnostic_setting() -> TerraformResource:
+    return _resource(
+        AzureResourceType.MONITOR_DIAGNOSTIC_SETTING,
+        "logs",
+        {
+            "name": "logs-audit",
+            "target_resource_id": "azurerm_storage_account.logs.id",
+            "log_analytics_workspace_id": "azurerm_log_analytics_workspace.security.id",
+            "enabled_log": [{"category_group": "audit"}],
+        },
+    )
+
+
 def _evaluate(resources: list[TerraformResource], *rule_ids: str):
     inventory = AzureNormalizer().normalize(resources)
     boundaries = detect_trust_boundaries(inventory)
@@ -416,6 +429,7 @@ class AzureStorageRuleTests(unittest.TestCase):
                     **_storage_safe_posture(),
                 ),
                 _container("private"),
+                _diagnostic_setting(),
             ],
             *rule_ids,
         )

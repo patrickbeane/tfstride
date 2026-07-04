@@ -56,6 +56,10 @@ AWS_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
 GCP_AUDIT_DETECTION_RULE_IDS = frozenset({"gcp-gke-control-plane-logging-incomplete"})
 AZURE_AUDIT_DETECTION_RULE_IDS = frozenset(
     {
+        "azure-diagnostic-settings-missing",
+        "azure-diagnostic-setting-no-log-destination",
+        "azure-defender-pricing-tier-not-standard",
+        "azure-security-center-auto-provisioning-disabled",
         "azure-aks-monitoring-agent-not-enabled",
         "azure-aks-defender-not-enabled",
         "azure-aks-azure-policy-not-enabled",
@@ -96,6 +100,24 @@ def _evaluate_azure(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETEC
         [],
         rule_policy=RulePolicy(enabled_rule_ids=frozenset(rule_ids)),
     )
+
+
+def _azure_diagnostic_setting(
+    name: str,
+    target_resource_id: object,
+    *,
+    log_analytics_workspace_id: str
+    | None = "/subscriptions/example/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/sec",
+) -> TerraformResource:
+    values: dict[str, object] = {
+        "name": name,
+        "target_resource_id": target_resource_id,
+        "enabled_log": [{"category": "AuditEvent"}],
+        "metric": [{"category": "AllMetrics", "enabled": True}],
+    }
+    if log_analytics_workspace_id is not None:
+        values["log_analytics_workspace_id"] = log_analytics_workspace_id
+    return _azure_resource(AzureResourceType.MONITOR_DIAGNOSTIC_SETTING, values, name=name)
 
 
 def _azure_resource(resource_type: str, values: dict[str, object], *, name: str = "example") -> TerraformResource:
@@ -240,6 +262,17 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
         azure_findings = _evaluate_azure(
             [
                 _azure_aks_cluster(oms_workspace_id=None, defender=False, azure_policy=False),
+                _azure_diagnostic_setting("audit", "azurerm_key_vault.app.id", log_analytics_workspace_id=None),
+                _azure_resource(
+                    AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
+                    {"resource_type": "StorageAccounts", "tier": "Free"},
+                    name="storage",
+                ),
+                _azure_resource(
+                    AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING,
+                    {"auto_provision": "Off"},
+                    name="auto",
+                ),
             ],
             AZURE_AUDIT_DETECTION_RULE_IDS,
         )
@@ -284,20 +317,16 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
                     defender=True,
                     azure_policy=True,
                 ),
-                _azure_resource(
-                    AzureResourceType.MONITOR_DIAGNOSTIC_SETTING,
-                    {
-                        "name": "audit",
-                        "target_resource_id": "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/app",
-                        "log_analytics_workspace_id": "/subscriptions/example/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/sec",
-                        "enabled_log": [{"category": "AuditEvent"}],
-                    },
-                    name="audit",
-                ),
+                _azure_diagnostic_setting("aks_audit", "azurerm_kubernetes_cluster.cluster.id"),
                 _azure_resource(
                     AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
                     {"resource_type": "VirtualMachines", "tier": "Standard"},
                     name="vm",
+                ),
+                _azure_resource(
+                    AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING,
+                    {"auto_provision": "On"},
+                    name="auto",
                 ),
             ],
             AZURE_AUDIT_DETECTION_RULE_IDS,

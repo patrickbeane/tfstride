@@ -11,6 +11,7 @@ from tfstride.analysis.rule_definitions import (
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
+from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.load_balancer_rules import AzureLoadBalancerRuleDetectors
@@ -61,6 +62,10 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-access-restrictions-not-default-deny",
         "azure-app-service-broad-access-restriction-allow",
         "azure-app-service-scm-access-unrestricted",
+        "azure-diagnostic-settings-missing",
+        "azure-diagnostic-setting-no-log-destination",
+        "azure-defender-pricing-tier-not-standard",
+        "azure-security-center-auto-provisioning-disabled",
         "azure-aks-api-server-public-unrestricted",
         "azure-aks-private-cluster-not-enabled",
         "azure-aks-local-accounts-not-disabled",
@@ -101,6 +106,7 @@ def build_azure_rule_contribution(
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
     load_balancer_detectors = AzureLoadBalancerRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
+    audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
@@ -168,6 +174,12 @@ def build_azure_rule_contribution(
             app_service_detectors.detect_broad_access_restriction_allow
         ),
         "azure-app-service-scm-access-unrestricted": app_service_detectors.detect_scm_access_unrestricted,
+        "azure-diagnostic-settings-missing": audit_detectors.detect_missing_diagnostic_settings,
+        "azure-diagnostic-setting-no-log-destination": audit_detectors.detect_diagnostic_setting_no_log_destination,
+        "azure-defender-pricing-tier-not-standard": audit_detectors.detect_defender_pricing_tier_not_standard,
+        "azure-security-center-auto-provisioning-disabled": (
+            audit_detectors.detect_security_center_auto_provisioning_disabled
+        ),
         "azure-aks-api-server-public-unrestricted": aks_detectors.detect_public_api_server_unrestricted,
         "azure-aks-private-cluster-not-enabled": aks_detectors.detect_private_cluster_not_enabled,
         "azure-aks-local-accounts-not-disabled": aks_detectors.detect_local_accounts_not_disabled,

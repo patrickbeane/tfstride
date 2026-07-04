@@ -48,6 +48,9 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
                 "azure-key-vault-purge-protection-disabled",
                 "azure-key-vault-secret-certificate-lifecycle-incomplete",
                 "azure-key-vault-secret-certificate-lifecycle-incomplete",
+                "azure-diagnostic-settings-missing",
+                "azure-diagnostic-settings-missing",
+                "azure-diagnostic-settings-missing",
                 "azure-key-vault-missing-private-endpoint",
             ],
         )

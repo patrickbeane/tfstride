@@ -15,12 +15,13 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(len(result.inventory.resources), 27)
-        self.assertEqual(len(result.findings), 29)
+        self.assertEqual(len(result.findings), 33)
         self.assertEqual(
             Counter(finding.rule_id for finding in result.findings),
             Counter(
                 {
                     "azure-storage-container-public-access": 3,
+                    "azure-diagnostic-settings-missing": 4,
                     "azure-storage-account-shared-key-enabled": 2,
                     "azure-storage-account-nested-public-access-enabled": 2,
                     "azure-storage-account-minimum-tls-below-1-2": 2,
@@ -46,7 +47,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 17, "high": 7, "low": 5}),
+            Counter({"medium": 21, "high": 7, "low": 5}),
         )
 
     def test_nightmare_fixture_stresses_distinct_ssh_and_rdp_nsg_paths(self) -> None:

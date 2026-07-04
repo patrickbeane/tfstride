@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 155,
+      "registered_rule_count": 159,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -170,6 +170,10 @@
         "azure-app-service-access-restrictions-not-default-deny",
         "azure-app-service-broad-access-restriction-allow",
         "azure-app-service-scm-access-unrestricted",
+        "azure-diagnostic-settings-missing",
+        "azure-diagnostic-setting-no-log-destination",
+        "azure-defender-pricing-tier-not-standard",
+        "azure-security-center-auto-provisioning-disabled",
         "azure-aks-api-server-public-unrestricted",
         "azure-aks-private-cluster-not-enabled",
         "azure-aks-local-accounts-not-disabled",
@@ -329,6 +333,10 @@
         "azure-app-service-access-restrictions-not-default-deny": 0,
         "azure-app-service-broad-access-restriction-allow": 0,
         "azure-app-service-scm-access-unrestricted": 0,
+        "azure-diagnostic-settings-missing": 0,
+        "azure-diagnostic-setting-no-log-destination": 0,
+        "azure-defender-pricing-tier-not-standard": 0,
+        "azure-security-center-auto-provisioning-disabled": 0,
         "azure-aks-api-server-public-unrestricted": 0,
         "azure-aks-private-cluster-not-enabled": 0,
         "azure-aks-local-accounts-not-disabled": 0,

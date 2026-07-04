@@ -75,6 +75,29 @@
             "storage_account_id": "azurerm_storage_account.logs.id",
             "container_access_type": "private"
           }
+        },
+        {
+          "address": "azurerm_monitor_diagnostic_setting.logs",
+          "mode": "managed",
+          "type": "azurerm_monitor_diagnostic_setting",
+          "name": "logs",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "name": "logs-audit",
+            "target_resource_id": "azurerm_storage_account.logs.id",
+            "log_analytics_workspace_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.OperationalInsights/workspaces/tfstride-logs",
+            "enabled_log": [
+              {
+                "category_group": "audit"
+              }
+            ],
+            "metric": [
+              {
+                "category": "AllMetrics",
+                "enabled": true
+              }
+            ]
+          }
         }
       ]
     }

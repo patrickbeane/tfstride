@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **8 findings** across **8 normalized resources**.
+This run identified **1 trust boundaries** and **11 findings** across **8 normalized resources**.
 
 - High severity findings: `1`
-- Medium severity findings: `6`
+- Medium severity findings: `9`
 - Low severity findings: `1`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **8 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `155`
-- Enabled rules: `155`
+- Registered rules: `159`
+- Enabled rules: `159`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -31,6 +31,7 @@ This run identified **1 trust boundaries** and **8 findings** across **8 normali
   - `azure-key-vault-purge-protection-disabled`: `1`
   - `azure-key-vault-secret-certificate-lifecycle-incomplete`: `2`
   - `azure-key-vault-key-rotation-policy-incomplete`: `1`
+  - `azure-diagnostic-settings-missing`: `3`
 
 ## Discovered Trust Boundaries
 
@@ -135,6 +136,42 @@ This run identified **1 trust boundaries** and **8 findings** across **8 normali
   - target resource: address=azurerm_key_vault_certificate.tls; type=azurerm_key_vault_certificate; identifier=tls; key_vault_reference=azurerm_key_vault.public.id; resolved_key_vault_address=azurerm_key_vault.public
   - lifecycle issues: certificate has no expiration_date
   - lifecycle posture: expiration_date=unset; not_before_date=unset; certificate_policy.validity_in_months=unset; maximum_lifetime_days=730; maximum_certificate_validity_months=24
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_key_vault.private`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault.private has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_key_vault.private; type=azurerm_key_vault; name=tfstride-private; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-private
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_key_vault.restricted`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault.restricted has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_key_vault.restricted; type=azurerm_key_vault; name=tfstride-restricted; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-restricted
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_key_vault.public`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_key_vault.public has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_key_vault.public; type=azurerm_key_vault; name=tfstride-public; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-public
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
 
 ### Low
 

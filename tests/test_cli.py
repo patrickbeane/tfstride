@@ -259,7 +259,7 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["inventory"]["provider"], "azure")
-        self.assertEqual(len(report["inventory"]["resources"]), 3)
+        self.assertEqual(len(report["inventory"]["resources"]), 4)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 0)
         self.assertIn("covers AzureRM storage posture", report["limitations"][0])

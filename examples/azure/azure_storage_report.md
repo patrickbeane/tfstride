@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **6 findings** across **3 normalized resources**.
+This run identified **1 trust boundaries** and **7 findings** across **3 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `4`
+- Medium severity findings: `5`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **6 findings** across **3 normali
 - Provider resources considered: `4`
 - Normalized resources: `3`
 - Unsupported resources: `1`
-- Registered rules: `155`
-- Enabled rules: `155`
+- Registered rules: `159`
+- Enabled rules: `159`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -33,6 +33,7 @@ This run identified **1 trust boundaries** and **6 findings** across **3 normali
   - `azure-storage-account-minimum-tls-below-1-2`: `1`
   - `azure-storage-account-public-network-unrestricted`: `1`
   - `azure-storage-account-missing-private-endpoint`: `1`
+  - `azure-diagnostic-settings-missing`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -117,6 +118,18 @@ This run identified **1 trust boundaries** and **6 findings** across **3 normali
 - Recommended mitigation: Set the container access type to `private`, disable nested public access on the storage account, and use scoped identities or time-limited access mechanisms for intentional object sharing.
 - Evidence:
   - public exposure reasons: container_access_type is blob; azurerm_storage_account.assets allows nested items to be public; azurerm_storage_account.assets is reachable through its public network endpoint
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_storage_account.assets`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_storage_account.assets has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_storage_account.assets; type=azurerm_storage_account; name=tfstridepublicassets; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Storage/storageAccounts/tfstridepublicassets
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
 
 ### Low
 

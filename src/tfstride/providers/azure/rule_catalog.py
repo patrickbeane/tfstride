@@ -425,6 +425,50 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-diagnostic-settings-missing",
+        title="Azure resource lacks diagnostic settings",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics "
+            "to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination."
+        ),
+        tags=("azure", "diagnostic-settings", "logging", "monitoring"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-diagnostic-setting-no-log-destination",
+        title="Azure diagnostic setting has no log destination",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure the diagnostic setting with a Log Analytics workspace, storage account, Event Hub "
+            "authorization rule, or marketplace partner destination so emitted logs and metrics are retained."
+        ),
+        tags=("azure", "diagnostic-settings", "logging", "monitoring"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-defender-pricing-tier-not-standard",
+        title="Microsoft Defender for Cloud pricing tier is not Standard",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set the modeled Defender for Cloud subscription pricing tier to Standard for service plans that "
+            "need threat detection and security posture recommendations."
+        ),
+        tags=("azure", "defender", "security-center", "monitoring"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-security-center-auto-provisioning-disabled",
+        title="Security Center auto-provisioning is disabled",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Enable Security Center auto-provisioning where monitored workloads should receive supported security "
+            "agents automatically, or document the external deployment mechanism that replaces it."
+        ),
+        tags=("azure", "security-center", "defender", "monitoring", "auto-provisioning"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-aks-api-server-public-unrestricted",
         title="AKS control plane is public without narrow authorized IP ranges",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

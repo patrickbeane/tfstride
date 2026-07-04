@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.azure.aks_normalizers import normalize_kubernetes_cluster
@@ -27,9 +28,25 @@ def _cluster(
     )
 
 
+_AKS_RULE_IDS = frozenset(
+    {
+        "azure-aks-api-server-public-unrestricted",
+        "azure-aks-private-cluster-not-enabled",
+        "azure-aks-local-accounts-not-disabled",
+        "azure-aks-rbac-posture-weak",
+        "azure-aks-network-policy-missing",
+        "azure-aks-workload-identity-not-enabled",
+        "azure-aks-key-management-service-not-configured",
+        "azure-aks-monitoring-agent-not-enabled",
+        "azure-aks-defender-not-enabled",
+        "azure-aks-azure-policy-not-enabled",
+    }
+)
+
+
 def _azure_findings(resources: list[TerraformResource]) -> list[object]:
     inventory = AzureNormalizer().normalize(resources)
-    return StrideRuleEngine().evaluate(inventory, [])
+    return StrideRuleEngine().evaluate(inventory, [], rule_policy=RulePolicy(enabled_rule_ids=_AKS_RULE_IDS))
 
 
 class AzureAksNormalizerTests(unittest.TestCase):
@@ -339,7 +356,9 @@ class AzureAksNormalizerTests(unittest.TestCase):
 
         self.assertEqual([resource.address for resource in inventory.resources], ["azurerm_kubernetes_cluster.cluster"])
         self.assertEqual(inventory.unsupported_resources, [])
-        self.assertEqual(StrideRuleEngine().evaluate(inventory, []), [])
+        self.assertEqual(
+            StrideRuleEngine().evaluate(inventory, [], rule_policy=RulePolicy(enabled_rule_ids=_AKS_RULE_IDS)), []
+        )
 
 
 if __name__ == "__main__":

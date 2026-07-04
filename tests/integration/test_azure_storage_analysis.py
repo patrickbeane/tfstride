@@ -18,13 +18,13 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
         result = TfStride().analyze_plan(AZURE_SAFE_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "azure")
-        self.assertEqual(len(result.inventory.resources), 3)
+        self.assertEqual(len(result.inventory.resources), 4)
         self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.trust_boundaries, [])
         self.assertEqual(result.findings, [])
-        self.assertEqual(result.analysis_coverage.resources.total_resources, 3)
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 3)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 3)
+        self.assertEqual(result.analysis_coverage.resources.total_resources, 4)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 4)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 4)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
 
@@ -41,11 +41,12 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-public-network-unrestricted",
                 "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
+                "azure-diagnostic-settings-missing",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 4, "high": 2}),
+            Counter({"medium": 5, "high": 2}),
         )
         self.assertEqual(len(result.trust_boundaries), 1)
         self.assertEqual(result.trust_boundaries[0].boundary_type, BoundaryType.INTERNET_TO_SERVICE)
@@ -72,7 +73,8 @@ class AzureStorageAnalysisIntegrationTests(unittest.TestCase):
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(result.trust_boundaries, [])
         self.assertEqual(
-            [finding.rule_id for finding in result.findings], ["azure-storage-account-missing-private-endpoint"]
+            [finding.rule_id for finding in result.findings],
+            ["azure-storage-account-missing-private-endpoint", "azure-diagnostic-settings-missing"],
         )
         finding_evidence = {item.key: item.values for item in result.findings[0].evidence}
         self.assertEqual(

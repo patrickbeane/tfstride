@@ -106,6 +106,19 @@ def _storage_container(access_type: str = "private") -> TerraformResource:
     )
 
 
+def _diagnostic_setting() -> TerraformResource:
+    return _resource(
+        AzureResourceType.MONITOR_DIAGNOSTIC_SETTING,
+        "logs",
+        {
+            "name": "logs-audit",
+            "target_resource_id": "azurerm_storage_account.logs.id",
+            "log_analytics_workspace_id": "azurerm_log_analytics_workspace.security.id",
+            "enabled_log": [{"category_group": "audit"}],
+        },
+    )
+
+
 def _network_security_group(port: str = "443") -> TerraformResource:
     return _resource(
         AzureResourceType.NETWORK_SECURITY_GROUP,
@@ -568,6 +581,7 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
                     },
                 ),
                 _storage_container("blob"),
+                _diagnostic_setting(),
             ],
             *_all_azure_rule_ids(),
         )

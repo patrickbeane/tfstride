@@ -155,7 +155,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                                     }
                                 ],
                             },
-                        }
+                        },
                     ]
                 }
             },
@@ -205,7 +205,20 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                                     }
                                 ],
                             },
-                        }
+                        },
+                        {
+                            "address": "azurerm_monitor_diagnostic_setting.logs",
+                            "mode": "managed",
+                            "type": "azurerm_monitor_diagnostic_setting",
+                            "name": "logs",
+                            "provider_name": "registry.terraform.io/hashicorp/azurerm",
+                            "values": {
+                                "name": "logs-audit",
+                                "target_resource_id": "azurerm_storage_account.logs.id",
+                                "log_analytics_workspace_id": "azurerm_log_analytics_workspace.security.id",
+                                "enabled_log": [{"category_group": "audit"}],
+                            },
+                        },
                     ]
                 }
             },
@@ -216,12 +229,12 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(
             [resource.address for resource in result.inventory.resources],
-            ["azurerm_storage_account.logs"],
+            ["azurerm_storage_account.logs", "azurerm_monitor_diagnostic_setting.logs"],
         )
         self.assertEqual(result.inventory.unsupported_resources, [])
-        self.assertEqual(result.analysis_coverage.resources.total_resources, 1)
-        self.assertEqual(result.analysis_coverage.resources.provider_resources, 1)
-        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 1)
+        self.assertEqual(result.analysis_coverage.resources.total_resources, 2)
+        self.assertEqual(result.analysis_coverage.resources.provider_resources, 2)
+        self.assertEqual(result.analysis_coverage.resources.normalized_resources, 2)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
         self.assertEqual(result.trust_boundaries, [])
@@ -232,7 +245,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         result = TfStride(provider="azure").analyze_plan(AZURE_SAFE_FIXTURE_PATH)
 
         self.assertEqual(result.inventory.provider, "azure")
-        self.assertEqual(len(result.inventory.resources), 3)
+        self.assertEqual(len(result.inventory.resources), 4)
         self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.findings, [])
 

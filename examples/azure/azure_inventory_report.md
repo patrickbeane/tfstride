@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **19 findings** across **15 normalized resources**.
+This run identified **3 trust boundaries** and **22 findings** across **15 normalized resources**.
 
 - High severity findings: `3`
-- Medium severity findings: `11`
+- Medium severity findings: `14`
 - Low severity findings: `5`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **3 trust boundaries** and **19 findings** across **15 norma
 - Provider resources considered: `15`
 - Normalized resources: `15`
 - Unsupported resources: `0`
-- Registered rules: `155`
-- Enabled rules: `155`
+- Registered rules: `159`
+- Enabled rules: `159`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -35,6 +35,7 @@ This run identified **3 trust boundaries** and **19 findings** across **15 norma
   - `azure-key-vault-public-network-access`: `1`
   - `azure-key-vault-missing-private-endpoint`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
+  - `azure-diagnostic-settings-missing`: `3`
   - `azure-aks-api-server-public-unrestricted`: `1`
   - `azure-aks-local-accounts-not-disabled`: `1`
   - `azure-aks-rbac-posture-weak`: `1`
@@ -226,6 +227,42 @@ This run identified **3 trust boundaries** and **19 findings** across **15 norma
 - Recommended mitigation: Set the container access type to `private`, disable nested public access on the storage account, and use scoped identities or time-limited access mechanisms for intentional object sharing.
 - Evidence:
   - public exposure reasons: container_access_type is blob; azurerm_storage_account.assets allows nested items to be public; azurerm_storage_account.assets is reachable through its public network endpoint
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_storage_account.assets`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_storage_account.assets has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_storage_account.assets; type=azurerm_storage_account; name=tfstridepublicassets; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Storage/storageAccounts/tfstridepublicassets
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_kubernetes_cluster.platform`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_kubernetes_cluster.platform has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_kubernetes_cluster.platform; type=azurerm_kubernetes_cluster; name=tfstride-platform; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.ContainerService/managedClusters/tfstride-platform
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
+
+#### Azure resource lacks diagnostic settings
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_key_vault.application`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 5 => medium
+- Rationale: azurerm_key_vault.application has no resolved Azure Monitor diagnostic setting in this Terraform plan. Security-relevant data-plane, control-plane, or platform logs may not be routed to a retained logging destination for investigation and alerting.
+- Recommended mitigation: Add an Azure Monitor diagnostic setting for the resource and route security-relevant logs and metrics to a retained Log Analytics workspace, storage account, Event Hub, or approved partner destination.
+- Evidence:
+  - target resource: address=azurerm_key_vault.application; type=azurerm_key_vault; name=tfstride-application; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.KeyVault/vaults/tfstride-application
+  - diagnostic coverage: no resolved azurerm_monitor_diagnostic_setting targets this resource
 
 #### Internet-exposed Azure virtual machine permits broad ingress
 

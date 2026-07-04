@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_azure_safe_plan.json`
 - Provider: `azure`
-- Normalized resources: `3`
+- Normalized resources: `4`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **0 trust boundaries** and **0 findings** across **3 normalized resources**.
+This run identified **0 trust boundaries** and **0 findings** across **4 normalized resources**.
 
 - High severity findings: `0`
 - Medium severity findings: `0`
@@ -15,12 +15,12 @@ This run identified **0 trust boundaries** and **0 findings** across **3 normali
 
 ## Analysis Coverage
 
-- Terraform resources seen: `3`
-- Provider resources considered: `3`
-- Normalized resources: `3`
+- Terraform resources seen: `4`
+- Provider resources considered: `4`
+- Normalized resources: `4`
 - Unsupported resources: `0`
-- Registered rules: `155`
-- Enabled rules: `155`
+- Registered rules: `159`
+- Enabled rules: `159`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`

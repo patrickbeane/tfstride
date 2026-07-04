@@ -29,6 +29,9 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-storage-account-public-network-unrestricted",
                 "azure-storage-account-missing-private-endpoint",
                 "azure-storage-container-public-access",
+                "azure-diagnostic-settings-missing",
+                "azure-diagnostic-settings-missing",
+                "azure-diagnostic-settings-missing",
                 "azure-public-compute-broad-ingress",
                 "azure-aks-azure-policy-not-enabled",
                 "azure-aks-rbac-posture-weak",
@@ -39,7 +42,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 11, "high": 3, "low": 5}),
+            Counter({"medium": 14, "high": 3, "low": 5}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],
