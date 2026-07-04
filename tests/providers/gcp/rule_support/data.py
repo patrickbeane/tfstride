@@ -112,7 +112,22 @@ def _secret_manager_secret(project: str = "tfstride-demo") -> TerraformResource:
             "secret_id": "tfstride-api-key",
             "id": "projects/tfstride-demo/secrets/tfstride-api-key",
             "project": project,
-            "replication": [{"auto": [{}]}],
+            "replication": [
+                {
+                    "auto": [
+                        {
+                            "customer_managed_encryption": [
+                                {
+                                    "kms_key_name": (
+                                        "projects/tfstride-demo/locations/global/keyRings/app/"
+                                        "cryptoKeys/tfstride-secret-manager"
+                                    )
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
         },
     )
 

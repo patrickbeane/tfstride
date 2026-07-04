@@ -58,6 +58,22 @@ class ProviderStorageFacts(Protocol):
     def gcs_retention_policy_uncertainties(self) -> list[str]:
         raise NotImplementedError
 
+    @property
+    def secret_manager_replication_mode(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def secret_manager_kms_key_names(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def secret_manager_replication(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @property
+    def secret_manager_posture_uncertainties(self) -> list[str]:
+        raise NotImplementedError
+
 
 class ProviderIamFacts(Protocol):
     """IAM, policy, hierarchy, and identity facts from provider adapters."""

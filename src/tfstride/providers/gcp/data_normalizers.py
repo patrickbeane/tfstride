@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.coercion import as_list, value_is_unknown
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_bool, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -71,6 +72,26 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
         _project_from_resource_path(values.get(GcpAttr.ID)),
     )
     name = first_non_empty(values.get(GcpAttr.NAME), _secret_resource_name(project, secret_id))
+    replication_mode, replication, kms_key_names, uncertainties, customer_managed_encryption = (
+        _secret_manager_replication_posture(values, resource.unknown_values)
+    )
+    metadata: dict[object, object] = {
+        GcpResourceMetadata.NAME: name,
+        GcpResourceMetadata.SECRET_ID: secret_id,
+        GcpResourceMetadata.PROJECT: project,
+        GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
+        GcpResourceMetadata.SECRET_MANAGER_REPLICATION_MODE: replication_mode,
+        GcpResourceMetadata.SECRET_MANAGER_KMS_KEY_NAMES: kms_key_names,
+        GcpResourceMetadata.SECRET_MANAGER_REPLICATION: replication,
+        GcpResourceMetadata.SECRET_MANAGER_POSTURE_UNCERTAINTIES: uncertainties,
+        "annotations": values.get(GcpAttr.ANNOTATIONS),
+        "topics": values.get(GcpAttr.TOPICS),
+        "expire_time": values.get(GcpAttr.EXPIRE_TIME),
+        "ttl": values.get(GcpAttr.TTL),
+        "version_destroy_ttl": values.get(GcpAttr.VERSION_DESTROY_TTL),
+    }
+    if customer_managed_encryption is not None:
+        metadata[GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION] = customer_managed_encryption
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -80,18 +101,7 @@ def normalize_secret_manager_secret(resource: TerraformResource) -> NormalizedRe
             category=ResourceCategory.DATA,
             identifier=first_non_empty(values.get(GcpAttr.ID), name, secret_id, resource.address),
             data_sensitivity="sensitive",
-            metadata={
-                GcpResourceMetadata.NAME: name,
-                GcpResourceMetadata.SECRET_ID: secret_id,
-                GcpResourceMetadata.PROJECT: project,
-                GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-                "annotations": values.get(GcpAttr.ANNOTATIONS),
-                "replication": values.get(GcpAttr.REPLICATION),
-                "topics": values.get(GcpAttr.TOPICS),
-                "expire_time": values.get(GcpAttr.EXPIRE_TIME),
-                "ttl": values.get(GcpAttr.TTL),
-                "version_destroy_ttl": values.get(GcpAttr.VERSION_DESTROY_TTL),
-            },
+            metadata=metadata,
         )
     )
 
@@ -369,6 +379,195 @@ def _retention_policy_uncertainties(unknown_values: Mapping[str, Any]) -> list[s
         if retention_block.get(field_name) is True:
             uncertainties.append(f"retention_policy.{field_name} is unknown after planning")
     return uncertainties
+
+
+def _secret_manager_replication_posture(
+    values: GcpValues,
+    unknown_values: Mapping[str, Any],
+) -> tuple[str, dict[str, Any], list[str], list[str], bool | None]:
+    uncertainties: list[str] = []
+    replication_unknown = unknown_values.get(GcpAttr.REPLICATION.key)
+    if replication_unknown is True:
+        uncertainties.append("replication is unknown after planning")
+        return "unknown", {}, [], uncertainties, None
+
+    replication_blocks = values.get(GcpAttr.REPLICATION)
+    if not replication_blocks:
+        uncertainties.append("replication is not represented in the Terraform plan")
+        return "unknown", {}, [], uncertainties, None
+
+    replication_block = first_item(replication_blocks)
+    unknown_block = _first_unknown_mapping(replication_unknown)
+    if not isinstance(replication_block, Mapping):
+        uncertainties.append("replication has an unrecognized value shape")
+        return "unknown", {}, [], uncertainties, None
+
+    if "auto" in replication_block:
+        return _automatic_secret_replication_posture(replication_block, unknown_block, uncertainties)
+    if "user_managed" in replication_block:
+        return _user_managed_secret_replication_posture(replication_block, unknown_block, uncertainties)
+
+    uncertainties.append("replication mode is not represented in the Terraform plan")
+    return "unknown", {}, [], uncertainties, None
+
+
+def _automatic_secret_replication_posture(
+    replication_block: Mapping[str, Any],
+    unknown_block: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str, dict[str, Any], list[str], list[str], bool | None]:
+    unknown_auto = _unknown_child(unknown_block, "auto")
+    if unknown_auto is True:
+        uncertainties.append("replication.auto is unknown after planning")
+        return "automatic", {"mode": "automatic"}, [], uncertainties, None
+
+    auto_block = first_item(replication_block.get("auto")) or {}
+    auto_unknown = _first_unknown_mapping(unknown_auto)
+    kms_key_names = _secret_manager_cmek_key_names(
+        auto_block.get("customer_managed_encryption"),
+        _unknown_child(auto_unknown, "customer_managed_encryption"),
+        "replication.auto.customer_managed_encryption",
+        uncertainties,
+    )
+    replication = {"mode": "automatic"}
+    if kms_key_names:
+        replication["kms_key_names"] = kms_key_names
+    return (
+        "automatic",
+        replication,
+        kms_key_names,
+        uncertainties,
+        _customer_managed_encryption_state(
+            kms_key_names,
+            uncertainties,
+        ),
+    )
+
+
+def _user_managed_secret_replication_posture(
+    replication_block: Mapping[str, Any],
+    unknown_block: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str, dict[str, Any], list[str], list[str], bool | None]:
+    unknown_user_managed = _unknown_child(unknown_block, "user_managed")
+    if unknown_user_managed is True:
+        uncertainties.append("replication.user_managed is unknown after planning")
+        return "user_managed", {"mode": "user_managed"}, [], uncertainties, None
+
+    user_managed_block = first_item(replication_block.get("user_managed")) or {}
+    user_managed_unknown = _first_unknown_mapping(unknown_user_managed)
+    replicas = as_list(user_managed_block.get("replicas"))
+    unknown_replicas = _unknown_child(user_managed_unknown, "replicas")
+    if unknown_replicas is True:
+        uncertainties.append("replication.user_managed.replicas is unknown after planning")
+        return "user_managed", {"mode": "user_managed"}, [], uncertainties, None
+
+    replication: dict[str, Any] = {"mode": "user_managed"}
+    replica_evidence: list[dict[str, Any]] = []
+    kms_key_names: list[str] = []
+    unknown_replica_blocks = as_list(unknown_replicas)
+    for index, replica in enumerate(replicas):
+        if not isinstance(replica, Mapping):
+            uncertainties.append(f"replication.user_managed.replicas[{index}] has an unrecognized value shape")
+            continue
+        unknown_replica = unknown_replica_blocks[index] if index < len(unknown_replica_blocks) else None
+        unknown_fields: list[str] = []
+        item: dict[str, Any] = {}
+        location = first_non_empty(replica.get(GcpAttr.LOCATION.key))
+        if location is not None:
+            item["location"] = location
+        replica_kms_key_names = _secret_manager_cmek_key_names(
+            replica.get("customer_managed_encryption"),
+            _unknown_child(_first_unknown_mapping(unknown_replica), "customer_managed_encryption"),
+            f"replication.user_managed.replicas[{index}].customer_managed_encryption",
+            uncertainties,
+            unknown_fields=unknown_fields,
+        )
+        if replica_kms_key_names:
+            item["kms_key_names"] = replica_kms_key_names
+            kms_key_names.extend(replica_kms_key_names)
+        if unknown_fields:
+            item["unknown_fields"] = unknown_fields
+        if item:
+            replica_evidence.append(item)
+    if replica_evidence:
+        replication["replicas"] = replica_evidence
+    if kms_key_names:
+        replication["kms_key_names"] = _dedupe(kms_key_names)
+    return (
+        "user_managed",
+        replication,
+        _dedupe(kms_key_names),
+        uncertainties,
+        _customer_managed_encryption_state(
+            kms_key_names,
+            uncertainties,
+        ),
+    )
+
+
+def _secret_manager_cmek_key_names(
+    blocks: Any,
+    unknown_blocks: Any,
+    path: str,
+    uncertainties: list[str],
+    *,
+    unknown_fields: list[str] | None = None,
+) -> list[str]:
+    if unknown_blocks is True:
+        uncertainties.append(f"{path} is unknown after planning")
+        if unknown_fields is not None:
+            unknown_fields.append("customer_managed_encryption")
+        return []
+
+    key_names: list[str] = []
+    unknown_block_values = as_list(unknown_blocks)
+    for index, block in enumerate(as_list(blocks)):
+        if not isinstance(block, Mapping):
+            uncertainties.append(f"{path}[{index}] has an unrecognized value shape")
+            continue
+        unknown_block = unknown_block_values[index] if index < len(unknown_block_values) else None
+        if value_is_unknown(_unknown_child(_first_unknown_mapping(unknown_block), GcpAttr.KMS_KEY_NAME.key)):
+            uncertainties.append(f"{path}[{index}].kms_key_name is unknown after planning")
+            if unknown_fields is not None:
+                unknown_fields.append("kms_key_name")
+            continue
+        kms_key_name = first_non_empty(block.get(GcpAttr.KMS_KEY_NAME.key))
+        if kms_key_name is not None:
+            key_names.append(kms_key_name)
+    return _dedupe(key_names)
+
+
+def _customer_managed_encryption_state(kms_key_names: list[str], uncertainties: list[str]) -> bool | None:
+    if kms_key_names:
+        return True
+    if uncertainties:
+        return None
+    return False
+
+
+def _first_unknown_mapping(value: Any) -> Mapping[str, Any] | None:
+    if isinstance(value, Mapping):
+        return value
+    item = first_item(value)
+    return item if isinstance(item, Mapping) else None
+
+
+def _unknown_child(value: Mapping[str, Any] | None, key: str) -> Any:
+    if value is None:
+        return None
+    return value.get(key)
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        deduped.append(value)
+        seen.add(value)
+    return deduped
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:

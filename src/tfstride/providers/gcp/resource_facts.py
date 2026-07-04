@@ -114,6 +114,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.GCS_RETENTION_POLICY_UNCERTAINTIES)
 
     @property
+    def secret_manager_replication_mode(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_REPLICATION_MODE)
+
+    @property
+    def secret_manager_kms_key_names(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_KMS_KEY_NAMES)
+
+    @property
+    def secret_manager_replication(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_REPLICATION)
+
+    @property
+    def secret_manager_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SECRET_MANAGER_POSTURE_UNCERTAINTIES)
+
+    @property
     def default_kms_key_name(self) -> str | None:
         return self.get(GcpResourceMetadata.GCS_DEFAULT_KMS_KEY_NAME)
 

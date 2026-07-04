@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **39 findings** across **30 normalized resources**.
+This run identified **9 trust boundaries** and **40 findings** across **30 normalized resources**.
 
 - High severity findings: `14`
-- Medium severity findings: `23`
+- Medium severity findings: `24`
 - Low severity findings: `2`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **39 findings** across **30 norma
 - Provider resources considered: `31`
 - Normalized resources: `30`
 - Unsupported resources: `1`
-- Registered rules: `141`
-- Enabled rules: `141`
+- Registered rules: `142`
+- Enabled rules: `142`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -41,6 +41,7 @@ This run identified **9 trust boundaries** and **39 findings** across **30 norma
   - `gcp-gcs-versioning-disabled`: `1`
   - `gcp-gcs-customer-managed-encryption-missing`: `1`
   - `gcp-gcs-retention-policy-insufficient`: `1`
+  - `gcp-secret-manager-customer-managed-encryption-missing`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
   - `gcp-gke-public-control-plane`: `1`
@@ -582,6 +583,19 @@ This run identified **9 trust boundaries** and **39 findings** across **30 norma
   - network tags: web
   - internet ingress reasons: google_compute_firewall.public_admin ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_admin ingress tcp 3389 from 0.0.0.0/0; google_compute_firewall.public_all ingress tcp unspecified ports from 0.0.0.0/0
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### Secret Manager secret does not use customer-managed encryption
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_secret_manager_secret.api_key`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_secret_manager_secret.api_key relies on Google-managed Secret Manager encryption rather than a customer-managed Cloud KMS key. Google-managed encryption still applies; this finding concerns customer key ownership, rotation, audit separation, and compliance posture for sensitive secrets.
+- Recommended mitigation: Configure Secret Manager replication with Cloud KMS customer-managed encryption for secrets that require customer key ownership, independent rotation, audit separation, or compliance controls.
+- Evidence:
+  - target resource: address=google_secret_manager_secret.api_key; type=google_secret_manager_secret; identifier=projects/tfstride-demo/secrets/tfstride-api-key
+  - encryption ownership: customer_managed_encryption is false; secret_manager_replication_mode=automatic; secret_manager_kms_key_names is empty
+  - replication posture: replication.mode=automatic
 
 #### Sensitive GCP resource IAM binding allows broad or external access
 

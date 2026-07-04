@@ -97,6 +97,10 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "gcs_retention_policy_locked",
                 "gcs_retention_policy_configuration",
                 "gcs_retention_policy_uncertainties",
+                "secret_manager_replication_mode",
+                "secret_manager_kms_key_names",
+                "secret_manager_replication",
+                "secret_manager_posture_uncertainties",
             },
             "iam": {
                 "policy_document",

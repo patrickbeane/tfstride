@@ -214,6 +214,17 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-secret-manager-customer-managed-encryption-missing",
+        title="Secret Manager secret does not use customer-managed encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure Secret Manager replication with Cloud KMS customer-managed encryption for secrets that "
+            "require customer key ownership, independent rotation, audit separation, or compliance controls."
+        ),
+        tags=("gcp", "secret-manager", "secrets", "kms", "encryption"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,

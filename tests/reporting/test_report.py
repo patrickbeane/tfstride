@@ -84,7 +84,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `141`", report)
+        self.assertIn("- Registered rules: `142`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -263,8 +263,8 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["normalized_resources"], 22)
         self.assertEqual(payload["summary"]["unsupported_resources"], 1)
         self.assertEqual(payload["summary"]["trust_boundaries"], 4)
-        self.assertEqual(payload["summary"]["active_findings"], 20)
-        self.assertEqual(payload["summary"]["severity_counts"], {"high": 6, "medium": 14, "low": 0})
+        self.assertEqual(payload["summary"]["active_findings"], 21)
+        self.assertEqual(payload["summary"]["severity_counts"], {"high": 6, "medium": 15, "low": 0})
         self.assertEqual(payload["inventory"]["unsupported_resources"], ["google_logging_project_sink.processor"])
         self.assertEqual(
             payload["inventory"]["metadata"]["supported_resource_types"],
@@ -326,6 +326,7 @@ class JsonReportTests(unittest.TestCase):
                 "gcp-service-account-key-hygiene",
                 "gcp-service-account-key-effective-access",
                 "gcp-sensitive-resource-iam-external-access",
+                "gcp-secret-manager-customer-managed-encryption-missing",
                 "gcp-public-compute-broad-ingress",
                 "gcp-public-workload-sensitive-data-access",
                 "gcp-pubsub-public-access",
@@ -501,7 +502,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 141)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 142)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})

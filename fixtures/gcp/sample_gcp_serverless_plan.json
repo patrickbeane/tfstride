@@ -106,7 +106,13 @@
             "replication": [
               {
                 "auto": [
-                  {}
+                  {
+                    "customer_managed_encryption": [
+                      {
+                        "kms_key_name": "projects/tfstride-demo/locations/global/keyRings/tfstride-app/cryptoKeys/tfstride-secret-manager"
+                      }
+                    ]
+                  }
                 ]
               }
             ],

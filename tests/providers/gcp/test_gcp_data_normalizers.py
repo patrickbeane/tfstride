@@ -156,6 +156,7 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
 
     def test_secret_manager_secret_normalizer_preserves_secret_context(self) -> None:
         normalized = normalize_secret_manager_secret(self.resources["google_secret_manager_secret.api_key"])
+        facts = gcp_facts(normalized)
 
         self.assertEqual(normalized.category, ResourceCategory.DATA)
         self.assertEqual(normalized.identifier, "projects/tfstride-demo/secrets/tfstride-api-key")
@@ -163,7 +164,174 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.SECRET_ID), "tfstride-api-key")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.PROJECT), "tfstride-demo")
         self.assertTrue(normalized.storage_encrypted)
-        self.assertEqual(normalized.metadata_snapshot()["replication"], [{"auto": [{}]}])
+        self.assertEqual(facts.secret_manager_replication_mode, "automatic")
+        self.assertEqual(facts.secret_manager_kms_key_names, [])
+        self.assertEqual(facts.secret_manager_replication, {"mode": "automatic"})
+        self.assertFalse(facts.customer_managed_encryption)
+        self.assertEqual(facts.secret_manager_posture_uncertainties, [])
+
+    def test_secret_manager_secret_normalizer_preserves_auto_cmek(self) -> None:
+        normalized = normalize_secret_manager_secret(
+            _terraform_resource(
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret",
+                {
+                    "secret_id": "tfstride-api-key",
+                    "project": "tfstride-demo",
+                    "replication": [
+                        {
+                            "auto": [
+                                {
+                                    "customer_managed_encryption": [
+                                        {
+                                            "kms_key_name": (
+                                                "projects/tfstride-demo/locations/global/keyRings/app/"
+                                                "cryptoKeys/secrets"
+                                            )
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.secret_manager_replication_mode, "automatic")
+        self.assertEqual(
+            facts.secret_manager_kms_key_names,
+            ["projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/secrets"],
+        )
+        self.assertEqual(
+            facts.secret_manager_replication,
+            {
+                "mode": "automatic",
+                "kms_key_names": ["projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/secrets"],
+            },
+        )
+        self.assertTrue(facts.customer_managed_encryption)
+        self.assertEqual(facts.secret_manager_posture_uncertainties, [])
+
+    def test_secret_manager_secret_normalizer_preserves_user_managed_replica_cmek(self) -> None:
+        normalized = normalize_secret_manager_secret(
+            _terraform_resource(
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret",
+                {
+                    "secret_id": "tfstride-api-key",
+                    "project": "tfstride-demo",
+                    "replication": [
+                        {
+                            "user_managed": [
+                                {
+                                    "replicas": [
+                                        {
+                                            "location": "us-east1",
+                                            "customer_managed_encryption": [
+                                                {
+                                                    "kms_key_name": (
+                                                        "projects/tfstride-demo/locations/us-east1/keyRings/app/"
+                                                        "cryptoKeys/secrets-east"
+                                                    )
+                                                }
+                                            ],
+                                        },
+                                        {
+                                            "location": "us-west1",
+                                            "customer_managed_encryption": [
+                                                {
+                                                    "kms_key_name": (
+                                                        "projects/tfstride-demo/locations/us-west1/keyRings/app/"
+                                                        "cryptoKeys/secrets-west"
+                                                    )
+                                                }
+                                            ],
+                                        },
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.secret_manager_replication_mode, "user_managed")
+        self.assertEqual(
+            facts.secret_manager_kms_key_names,
+            [
+                "projects/tfstride-demo/locations/us-east1/keyRings/app/cryptoKeys/secrets-east",
+                "projects/tfstride-demo/locations/us-west1/keyRings/app/cryptoKeys/secrets-west",
+            ],
+        )
+        self.assertEqual(
+            facts.secret_manager_replication,
+            {
+                "mode": "user_managed",
+                "replicas": [
+                    {
+                        "location": "us-east1",
+                        "kms_key_names": [
+                            "projects/tfstride-demo/locations/us-east1/keyRings/app/cryptoKeys/secrets-east"
+                        ],
+                    },
+                    {
+                        "location": "us-west1",
+                        "kms_key_names": [
+                            "projects/tfstride-demo/locations/us-west1/keyRings/app/cryptoKeys/secrets-west"
+                        ],
+                    },
+                ],
+                "kms_key_names": [
+                    "projects/tfstride-demo/locations/us-east1/keyRings/app/cryptoKeys/secrets-east",
+                    "projects/tfstride-demo/locations/us-west1/keyRings/app/cryptoKeys/secrets-west",
+                ],
+            },
+        )
+        self.assertTrue(facts.customer_managed_encryption)
+        self.assertEqual(facts.secret_manager_posture_uncertainties, [])
+
+    def test_secret_manager_secret_normalizer_preserves_unknown_cmek(self) -> None:
+        normalized = normalize_secret_manager_secret(
+            _terraform_resource(
+                "google_secret_manager_secret.api_key",
+                "google_secret_manager_secret",
+                {
+                    "secret_id": "tfstride-api-key",
+                    "project": "tfstride-demo",
+                    "replication": [{"auto": [{"customer_managed_encryption": [{}]}]}],
+                },
+                unknown_values={
+                    "replication": [
+                        {
+                            "auto": [
+                                {
+                                    "customer_managed_encryption": [
+                                        {"kms_key_name": True},
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.secret_manager_replication_mode, "automatic")
+        self.assertEqual(facts.secret_manager_kms_key_names, [])
+        self.assertEqual(facts.secret_manager_replication, {"mode": "automatic"})
+        self.assertIsNone(facts.customer_managed_encryption)
+        self.assertEqual(
+            facts.secret_manager_posture_uncertainties,
+            ["replication.auto.customer_managed_encryption[0].kms_key_name is unknown after planning"],
+        )
 
     def test_kms_crypto_key_normalizer_preserves_key_context(self) -> None:
         normalized = normalize_kms_crypto_key(self.resources["google_kms_crypto_key.customer"])

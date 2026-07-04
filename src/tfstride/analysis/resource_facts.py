@@ -70,6 +70,22 @@ class AnalysisStorageFacts:
     def gcs_retention_policy_uncertainties(self) -> list[str]:
         return self._facts.gcs_retention_policy_uncertainties
 
+    @property
+    def secret_manager_replication_mode(self) -> str | None:
+        return self._facts.secret_manager_replication_mode
+
+    @property
+    def secret_manager_kms_key_names(self) -> list[str]:
+        return self._facts.secret_manager_kms_key_names
+
+    @property
+    def secret_manager_replication(self) -> dict[str, Any]:
+        return self._facts.secret_manager_replication
+
+    @property
+    def secret_manager_posture_uncertainties(self) -> list[str]:
+        return self._facts.secret_manager_posture_uncertainties
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIamFacts:

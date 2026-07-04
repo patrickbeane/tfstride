@@ -432,6 +432,56 @@ class GcpDataRuleDetectors:
             )
         return findings
 
+    def detect_secret_manager_customer_managed_encryption_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for secret in context.inventory.by_type("google_secret_manager_secret"):
+            secret_facts = analysis_facts(secret).storage
+            if secret.data_sensitivity != "sensitive":
+                continue
+            if secret_facts.customer_managed_encryption is not False:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[secret.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{secret.display_name} relies on Google-managed Secret Manager encryption rather "
+                        "than a customer-managed Cloud KMS key. Google-managed encryption still applies; "
+                        "this finding concerns customer key ownership, rotation, audit separation, and "
+                        "compliance posture for sensitive secrets."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _secret_manager_target_evidence(secret)),
+                        evidence_item(
+                            "encryption_ownership",
+                            _secret_manager_encryption_evidence(secret_facts),
+                        ),
+                        evidence_item(
+                            "replication_posture",
+                            _secret_manager_replication_evidence(secret_facts),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_public_authorized_network(
         self,
         context: RuleEvaluationContext,
@@ -751,6 +801,52 @@ def _gcs_retention_policy_evidence(bucket_facts: AnalysisStorageFacts) -> list[s
 
 def _gcs_public_access_prevention_enforced(value: str | None) -> bool:
     return str(value or "").strip().lower() == "enforced"
+
+
+def _secret_manager_target_evidence(secret: NormalizedResource) -> list[str]:
+    evidence = [f"address={secret.address}", f"type={secret.resource_type}"]
+    if secret.identifier:
+        evidence.append(f"identifier={secret.identifier}")
+    return evidence
+
+
+def _secret_manager_encryption_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+    evidence = [
+        "customer_managed_encryption is false",
+        f"secret_manager_replication_mode={secret_facts.secret_manager_replication_mode or 'unknown'}",
+    ]
+    key_names = secret_facts.secret_manager_kms_key_names
+    if key_names:
+        evidence.append("secret_manager_kms_key_names=" + "; ".join(key_names))
+    else:
+        evidence.append("secret_manager_kms_key_names is empty")
+    return evidence
+
+
+def _secret_manager_replication_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+    replication = secret_facts.secret_manager_replication
+    evidence = [
+        f"replication.mode={replication.get('mode') or secret_facts.secret_manager_replication_mode or 'unknown'}"
+    ]
+    if secret_facts.secret_manager_kms_key_names:
+        evidence.append("replication.kms_key_names=" + "; ".join(secret_facts.secret_manager_kms_key_names))
+    replicas = replication.get("replicas")
+    if isinstance(replicas, list):
+        for index, replica in enumerate(replicas):
+            if not isinstance(replica, dict):
+                continue
+            parts = [f"replica[{index}]"]
+            location = replica.get("location")
+            if location:
+                parts.append(f"location={location}")
+            kms_key_names = replica.get("kms_key_names")
+            if isinstance(kms_key_names, list) and kms_key_names:
+                parts.append("kms_key_names=" + "; ".join(str(item) for item in kms_key_names))
+            unknown_fields = replica.get("unknown_fields")
+            if isinstance(unknown_fields, list) and unknown_fields:
+                parts.append("unknown_fields=" + "; ".join(str(item) for item in unknown_fields))
+            evidence.append("; ".join(parts))
+    return evidence
 
 
 def _cloud_sql_ssl_enforced(sql_facts: AnalysisSqlFacts) -> bool:

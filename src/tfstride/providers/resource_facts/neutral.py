@@ -60,6 +60,22 @@ class NeutralProviderStorageFacts:
     def gcs_retention_policy_uncertainties(self) -> list[str]:
         return []
 
+    @property
+    def secret_manager_replication_mode(self) -> str | None:
+        return None
+
+    @property
+    def secret_manager_kms_key_names(self) -> list[str]:
+        return []
+
+    @property
+    def secret_manager_replication(self) -> dict[str, Any]:
+        return {}
+
+    @property
+    def secret_manager_posture_uncertainties(self) -> list[str]:
+        return []
+
 
 class NeutralProviderIamFacts:
     """Neutral IAM facts for providers without IAM hierarchy signals."""

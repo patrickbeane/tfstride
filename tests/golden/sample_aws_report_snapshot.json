@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 141,
+      "registered_rule_count": 142,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -92,6 +92,7 @@
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
+        "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
@@ -237,6 +238,7 @@
         "gcp-gcs-versioning-disabled": 0,
         "gcp-gcs-customer-managed-encryption-missing": 0,
         "gcp-gcs-retention-policy-insufficient": 0,
+        "gcp-secret-manager-customer-managed-encryption-missing": 0,
         "gcp-public-compute-broad-ingress": 0,
         "gcp-public-load-balanced-workload": 0,
         "gcp-load-balancer-http-public-proxy": 0,

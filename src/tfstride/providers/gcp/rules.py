@@ -28,6 +28,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
+        "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
@@ -102,6 +103,9 @@ def build_gcp_rule_contribution(
         "gcp-gcs-versioning-disabled": gcp_detectors.detect_gcs_versioning_disabled,
         "gcp-gcs-customer-managed-encryption-missing": gcp_detectors.detect_gcs_customer_managed_encryption_missing,
         "gcp-gcs-retention-policy-insufficient": gcp_detectors.detect_gcs_retention_policy_insufficient,
+        "gcp-secret-manager-customer-managed-encryption-missing": (
+            gcp_detectors.detect_secret_manager_customer_managed_encryption_missing
+        ),
         "gcp-public-compute-broad-ingress": gcp_detectors.detect_public_compute_broad_ingress,
         "gcp-public-load-balanced-workload": gcp_detectors.detect_public_load_balanced_workload,
         "gcp-load-balancer-http-public-proxy": gcp_detectors.detect_public_load_balancer_http_frontend,
