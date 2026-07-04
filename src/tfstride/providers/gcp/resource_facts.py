@@ -150,6 +150,10 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.KMS_ROTATION_PERIOD)
 
     @property
+    def kms_destroy_scheduled_duration(self) -> str | None:
+        return self.get(GcpResourceMetadata.KMS_DESTROY_SCHEDULED_DURATION)
+
+    @property
     def kms_posture_uncertainties(self) -> list[str]:
         return self.get(GcpResourceMetadata.KMS_POSTURE_UNCERTAINTIES)
 

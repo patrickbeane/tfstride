@@ -106,6 +106,7 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "secret_manager_posture_uncertainties",
                 "kms_purpose",
                 "kms_rotation_period",
+                "kms_destroy_scheduled_duration",
                 "kms_posture_uncertainties",
             },
             "iam": {

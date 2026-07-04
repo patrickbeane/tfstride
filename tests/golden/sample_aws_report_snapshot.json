@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 149,
+      "registered_rule_count": 150,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -98,6 +98,7 @@
         "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-secret-manager-lifecycle-posture-incomplete",
         "gcp-kms-key-rotation-not-configured-or-too-long",
+        "gcp-kms-key-destroy-scheduled-duration-too-short",
         "gcp-public-compute-broad-ingress",
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
@@ -251,6 +252,7 @@
         "gcp-secret-manager-customer-managed-encryption-missing": 0,
         "gcp-secret-manager-lifecycle-posture-incomplete": 0,
         "gcp-kms-key-rotation-not-configured-or-too-long": 0,
+        "gcp-kms-key-destroy-scheduled-duration-too-short": 0,
         "gcp-public-compute-broad-ingress": 0,
         "gcp-public-load-balanced-workload": 0,
         "gcp-load-balancer-http-public-proxy": 0,

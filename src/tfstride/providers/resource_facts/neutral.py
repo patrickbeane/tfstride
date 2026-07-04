@@ -97,6 +97,10 @@ class NeutralProviderStorageFacts:
         return None
 
     @property
+    def kms_destroy_scheduled_duration(self) -> str | None:
+        return None
+
+    @property
     def kms_posture_uncertainties(self) -> list[str]:
         return []
 

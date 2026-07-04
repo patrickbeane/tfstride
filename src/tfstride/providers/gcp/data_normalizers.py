@@ -261,6 +261,11 @@ def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
     name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
     identifier = first_non_empty(values.get(GcpAttr.ID), values.get(GcpAttr.SELF_LINK), name, resource.address)
     rotation_period, posture_uncertainties = _kms_rotation_period(values, resource.unknown_values)
+    destroy_scheduled_duration = _kms_destroy_scheduled_duration(
+        values,
+        resource.unknown_values,
+        posture_uncertainties,
+    )
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -281,9 +286,9 @@ def normalize_kms_crypto_key(resource: TerraformResource) -> NormalizedResource:
                 GcpResourceMetadata.KMS_KEY_RING: key_ring,
                 GcpResourceMetadata.KMS_PURPOSE: values.get(GcpAttr.PURPOSE),
                 GcpResourceMetadata.KMS_ROTATION_PERIOD: rotation_period,
+                GcpResourceMetadata.KMS_DESTROY_SCHEDULED_DURATION: destroy_scheduled_duration,
                 GcpResourceMetadata.KMS_POSTURE_UNCERTAINTIES: posture_uncertainties,
                 GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-                "destroy_scheduled_duration": values.raw(GcpAttr.DESTROY_SCHEDULED_DURATION),
                 "import_only": as_bool(values.get(GcpAttr.IMPORT_ONLY)),
                 "skip_initial_version_creation": as_bool(values.get(GcpAttr.SKIP_INITIAL_VERSION_CREATION)),
             },
@@ -380,6 +385,21 @@ def _kms_rotation_period(values: GcpValues, unknown_values: Mapping[str, Any]) -
     if value_is_unknown(unknown_values.get(GcpAttr.ROTATION_PERIOD.key)):
         return None, ["rotation_period is unknown after planning"]
     return values.get(GcpAttr.ROTATION_PERIOD), []
+
+
+def _kms_destroy_scheduled_duration(
+    values: GcpValues,
+    unknown_values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> str | None:
+    if value_is_unknown(unknown_values.get(GcpAttr.DESTROY_SCHEDULED_DURATION.key)):
+        uncertainties.append("destroy_scheduled_duration is unknown after planning")
+        return None
+    value = values.raw(GcpAttr.DESTROY_SCHEDULED_DURATION)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _retention_policy_uncertainties(unknown_values: Mapping[str, Any]) -> list[str]:

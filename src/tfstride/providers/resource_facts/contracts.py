@@ -95,6 +95,10 @@ class ProviderStorageFacts(Protocol):
         raise NotImplementedError
 
     @property
+    def kms_destroy_scheduled_duration(self) -> str | None:
+        raise NotImplementedError
+
+    @property
     def kms_posture_uncertainties(self) -> list[str]:
         raise NotImplementedError
 

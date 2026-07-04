@@ -79,6 +79,7 @@ class GcpResourceMetadata:
     KMS_KEY_RING = OptionalStringMetadataField("kms_key_ring")
     KMS_PURPOSE = OptionalStringMetadataField("kms_purpose")
     KMS_ROTATION_PERIOD = OptionalStringMetadataField("kms_rotation_period")
+    KMS_DESTROY_SCHEDULED_DURATION = OptionalStringMetadataField("kms_destroy_scheduled_duration")
     PUBLIC_ACCESS_PREVENTION = OptionalStringMetadataField("public_access_prevention")
     GCS_DEFAULT_KMS_KEY_NAME = OptionalStringMetadataField("gcs_default_kms_key_name")
     GCS_RETENTION_PERIOD_SECONDS = OptionalIntMetadataField("gcs_retention_period_seconds")

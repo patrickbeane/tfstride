@@ -280,6 +280,7 @@ class GcpProviderTests(unittest.TestCase):
                 "KMS_KEY_RING",
                 "KMS_PURPOSE",
                 "KMS_ROTATION_PERIOD",
+                "KMS_DESTROY_SCHEDULED_DURATION",
                 "KMS_POSTURE_UNCERTAINTIES",
                 "RESOURCE_POLICY_SOURCE_ADDRESSES",
                 "SERVICE_ACCOUNT_ACCOUNT_ID",
@@ -352,6 +353,7 @@ class GcpProviderTests(unittest.TestCase):
         self.assertIsNone(facts.secret_manager_version_destroy_ttl)
         self.assertIsNone(facts.kms_purpose)
         self.assertIsNone(facts.kms_rotation_period)
+        self.assertIsNone(facts.kms_destroy_scheduled_duration)
         self.assertEqual(facts.kms_posture_uncertainties, [])
         self.assertIsNone(facts.project)
         self.assertEqual(facts.iam_bindings, [])

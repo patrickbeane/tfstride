@@ -248,6 +248,17 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-kms-key-destroy-scheduled-duration-too-short",
+        title="Cloud KMS key-version destruction schedule is too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure `destroy_scheduled_duration` for Cloud KMS crypto keys to give operators enough "
+            "time to cancel accidental or malicious key version destruction before it completes."
+        ),
+        tags=("gcp", "kms", "encryption", "recovery", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-public-compute-broad-ingress",
         title="Internet-exposed GCP compute instance permits broad ingress",
         category=StrideCategory.SPOOFING,

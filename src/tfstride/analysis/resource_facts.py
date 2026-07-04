@@ -107,6 +107,10 @@ class AnalysisStorageFacts:
         return self._facts.kms_rotation_period
 
     @property
+    def kms_destroy_scheduled_duration(self) -> str | None:
+        return self._facts.kms_destroy_scheduled_duration
+
+    @property
     def kms_posture_uncertainties(self) -> list[str]:
         return self._facts.kms_posture_uncertainties
 
