@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from tests.providers.aws.test_aws_audit_rules import _AUDIT_RULE_IDS as AWS_AUDIT_RULE_IDS
+from tests.providers.aws.test_aws_audit_rules import _AUDIT_RULE_IDS as AWS_ACCOUNT_AUDIT_RULE_IDS
 from tests.providers.aws.test_aws_audit_rules import _cloudtrail as _aws_cloudtrail
 from tests.providers.aws.test_aws_audit_rules import _config_recorder as _aws_config_recorder
 from tests.providers.aws.test_aws_audit_rules import _guardduty as _aws_guardduty
 from tests.providers.aws.test_aws_audit_rules import _securityhub as _aws_securityhub
-from tests.providers.azure.test_azure_aks_rules import _cluster as _azure_aks_cluster
 from tests.providers.gcp.normalizer_support import _terraform_resource as _gcp_resource
-from tests.providers.gcp.rule_support.compute import _gke_cluster, _gke_node_pool
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
@@ -53,28 +51,35 @@ AWS_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
         "aws_config_configuration_recorder",
     }
 )
-GCP_AUDIT_DETECTION_RULE_IDS = frozenset(
-    {
-        "gcp-gke-control-plane-logging-incomplete",
-        "gcp-scc-asset-discovery-disabled",
-        "gcp-logging-exclusion-drops-audit-security-logs",
-        "gcp-central-audit-sink-not-modeled",
-    }
+
+GCP_ACCOUNT_AUDIT_RULE_CONCEPTS = {
+    "central_audit_export": frozenset({"gcp-central-audit-sink-not-modeled"}),
+    "audit_log_exclusion": frozenset({"gcp-logging-exclusion-drops-audit-security-logs"}),
+    "security_posture_inventory": frozenset({"gcp-scc-asset-discovery-disabled"}),
+}
+AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS = {
+    "resource_diagnostics": frozenset(
+        {"azure-diagnostic-settings-missing", "azure-diagnostic-setting-no-log-destination"}
+    ),
+    "defender_plan": frozenset({"azure-defender-pricing-tier-not-standard"}),
+    "security_agent_provisioning": frozenset({"azure-security-center-auto-provisioning-disabled"}),
+}
+AWS_ACCOUNT_AUDIT_RULE_CONCEPTS = {
+    "account_audit_trail": frozenset(
+        {"aws-cloudtrail-multi-region-disabled", "aws-cloudtrail-log-file-validation-disabled"}
+    ),
+    "threat_detection": frozenset({"aws-guardduty-detector-disabled-or-missing"}),
+    "security_posture_management": frozenset({"aws-securityhub-account-missing"}),
+}
+
+GCP_ACCOUNT_AUDIT_RULE_IDS = frozenset().union(*GCP_ACCOUNT_AUDIT_RULE_CONCEPTS.values())
+AZURE_ACCOUNT_AUDIT_RULE_IDS = frozenset().union(*AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS.values())
+ALL_ACCOUNT_AUDIT_RULE_IDS = (
+    frozenset(AWS_ACCOUNT_AUDIT_RULE_IDS) | GCP_ACCOUNT_AUDIT_RULE_IDS | AZURE_ACCOUNT_AUDIT_RULE_IDS
 )
-AZURE_AUDIT_DETECTION_RULE_IDS = frozenset(
-    {
-        "azure-diagnostic-settings-missing",
-        "azure-diagnostic-setting-no-log-destination",
-        "azure-defender-pricing-tier-not-standard",
-        "azure-security-center-auto-provisioning-disabled",
-        "azure-aks-monitoring-agent-not-enabled",
-        "azure-aks-defender-not-enabled",
-        "azure-aks-azure-policy-not-enabled",
-    }
-)
-ALL_AUDIT_DETECTION_RULE_IDS = (
-    frozenset(AWS_AUDIT_RULE_IDS) | GCP_AUDIT_DETECTION_RULE_IDS | AZURE_AUDIT_DETECTION_RULE_IDS
-)
+
+_AZURE_STORAGE_ID = "/subscriptions/example/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs"
+_AZURE_KEY_VAULT_ID = "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/app"
 
 
 def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> frozenset[str]:
@@ -85,7 +90,7 @@ def _finding_ids(findings) -> frozenset[str]:
     return frozenset(finding.rule_id for finding in findings)
 
 
-def _evaluate_aws(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETECTION_RULE_IDS):
+def _evaluate_aws(resources: list[TerraformResource], rule_ids=ALL_ACCOUNT_AUDIT_RULE_IDS):
     return StrideRuleEngine().evaluate(
         AwsNormalizer().normalize(resources),
         [],
@@ -93,7 +98,7 @@ def _evaluate_aws(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETECTI
     )
 
 
-def _evaluate_gcp(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETECTION_RULE_IDS):
+def _evaluate_gcp(resources: list[TerraformResource], rule_ids=ALL_ACCOUNT_AUDIT_RULE_IDS):
     return StrideRuleEngine().evaluate(
         GcpNormalizer().normalize(resources),
         [],
@@ -101,12 +106,21 @@ def _evaluate_gcp(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETECTI
     )
 
 
-def _evaluate_azure(resources: list[TerraformResource], rule_ids=ALL_AUDIT_DETECTION_RULE_IDS):
+def _evaluate_azure(resources: list[TerraformResource], rule_ids=ALL_ACCOUNT_AUDIT_RULE_IDS):
     return StrideRuleEngine().evaluate(
         AzureNormalizer().normalize(resources),
         [],
         rule_policy=RulePolicy(enabled_rule_ids=frozenset(rule_ids)),
     )
+
+
+def _assert_concepts_emit(test_case: unittest.TestCase, findings, concepts: dict[str, frozenset[str]]) -> None:
+    finding_ids = _finding_ids(findings)
+    for concept, rule_ids in concepts.items():
+        with test_case.subTest(concept=concept):
+            test_case.assertLessEqual(rule_ids, finding_ids)
+    expected_ids = frozenset().union(*concepts.values())
+    test_case.assertEqual(finding_ids, expected_ids)
 
 
 def _azure_diagnostic_setting(
@@ -127,6 +141,20 @@ def _azure_diagnostic_setting(
     return _azure_resource(AzureResourceType.MONITOR_DIAGNOSTIC_SETTING, values, name=name)
 
 
+def _azure_storage_account() -> TerraformResource:
+    return _azure_resource(
+        AzureResourceType.STORAGE_ACCOUNT,
+        {
+            "id": _AZURE_STORAGE_ID,
+            "name": "logs",
+            "public_network_access_enabled": False,
+            "allow_nested_items_to_be_public": False,
+            "shared_access_key_enabled": False,
+        },
+        name="logs",
+    )
+
+
 def _azure_resource(resource_type: str, values: dict[str, object], *, name: str = "example") -> TerraformResource:
     return TerraformResource(
         address=f"{resource_type}.{name}",
@@ -138,14 +166,63 @@ def _azure_resource(resource_type: str, values: dict[str, object], *, name: str 
     )
 
 
+def _unsafe_aws_account_audit_resources() -> list[TerraformResource]:
+    return [
+        _aws_cloudtrail(multi_region=False, log_file_validation=False),
+        _aws_guardduty(enabled=False),
+        _aws_config_recorder(),
+    ]
+
+
+def _unsafe_gcp_account_audit_resources() -> list[TerraformResource]:
+    return [
+        _gcp_resource(
+            "google_scc_organization_settings.main",
+            GcpResourceType.SCC_ORGANIZATION_SETTINGS,
+            {"organization": "1234567890", "enable_asset_discovery": False},
+        ),
+        _gcp_resource(
+            "google_logging_project_exclusion.audit",
+            GcpResourceType.LOGGING_PROJECT_EXCLUSION,
+            {
+                "name": "drop-audit",
+                "project": "tfstride-demo",
+                "filter": "logName:cloudaudit.googleapis.com",
+                "disabled": False,
+            },
+        ),
+    ]
+
+
+def _unsafe_azure_account_audit_resources() -> list[TerraformResource]:
+    return [
+        _azure_storage_account(),
+        _azure_diagnostic_setting("audit", _AZURE_KEY_VAULT_ID, log_analytics_workspace_id=None),
+        _azure_resource(
+            AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
+            {"resource_type": "StorageAccounts", "tier": "Free"},
+            name="storage",
+        ),
+        _azure_resource(
+            AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING,
+            {"auto_provision": "Off"},
+            name="auto",
+        ),
+    ]
+
+
 class AuditDetectionPostureParityTests(unittest.TestCase):
-    def test_audit_detection_resource_types_and_rule_families_are_registered(self) -> None:
+    def test_account_audit_detection_resource_types_and_rule_concepts_are_registered(self) -> None:
         self.assertLessEqual(AWS_AUDIT_SECURITY_RESOURCE_TYPES, SUPPORTED_AWS_TYPES)
         self.assertLessEqual(GCP_AUDIT_SECURITY_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(AZURE_AUDIT_SECURITY_RESOURCE_TYPES, SUPPORTED_AZURE_TYPES)
-        self.assertLessEqual(frozenset(AWS_AUDIT_RULE_IDS), _flatten(AWS_RULE_GROUP_IDS))
-        self.assertLessEqual(GCP_AUDIT_DETECTION_RULE_IDS, _flatten(GCP_RULE_GROUP_IDS))
-        self.assertLessEqual(AZURE_AUDIT_DETECTION_RULE_IDS, _flatten(AZURE_RULE_GROUP_IDS))
+        self.assertEqual(
+            frozenset(AWS_ACCOUNT_AUDIT_RULE_IDS),
+            frozenset().union(*AWS_ACCOUNT_AUDIT_RULE_CONCEPTS.values()),
+        )
+        self.assertLessEqual(frozenset(AWS_ACCOUNT_AUDIT_RULE_IDS), _flatten(AWS_RULE_GROUP_IDS))
+        self.assertLessEqual(GCP_ACCOUNT_AUDIT_RULE_IDS, _flatten(GCP_RULE_GROUP_IDS))
+        self.assertLessEqual(AZURE_ACCOUNT_AUDIT_RULE_IDS, _flatten(AZURE_RULE_GROUP_IDS))
 
     def test_audit_logging_and_security_monitoring_facts_are_pinned_by_provider(self) -> None:
         aws_inventory = AwsNormalizer().normalize(
@@ -186,8 +263,11 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
                     AzureResourceType.MONITOR_DIAGNOSTIC_SETTING,
                     {
                         "name": "audit",
-                        "target_resource_id": "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/app",
-                        "log_analytics_workspace_id": "/subscriptions/example/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/sec",
+                        "target_resource_id": _AZURE_KEY_VAULT_ID,
+                        "log_analytics_workspace_id": (
+                            "/subscriptions/example/resourceGroups/obs/providers/"
+                            "Microsoft.OperationalInsights/workspaces/sec"
+                        ),
                         "enabled_log": [{"category": "AuditEvent"}],
                         "metric": [{"category": "AllMetrics", "enabled": True}],
                     },
@@ -250,71 +330,22 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
             "enabled",
         )
 
-    def test_audit_logging_and_security_monitoring_findings_are_pinned_where_rules_exist(self) -> None:
-        aws_findings = _evaluate_aws(
-            [
-                _aws_cloudtrail(multi_region=False, log_file_validation=False),
-                _aws_guardduty(enabled=False),
-                _aws_config_recorder(),
-            ],
-            AWS_AUDIT_RULE_IDS,
-        )
-        gcp_findings = _evaluate_gcp(
-            [
-                _gke_cluster(logging_service="logging.googleapis.com/none", logging_components=[]),
-                _gke_node_pool(),
-                _gcp_resource(
-                    "google_scc_organization_settings.main",
-                    GcpResourceType.SCC_ORGANIZATION_SETTINGS,
-                    {"organization": "1234567890", "enable_asset_discovery": False},
-                ),
-                _gcp_resource(
-                    "google_logging_project_exclusion.audit",
-                    GcpResourceType.LOGGING_PROJECT_EXCLUSION,
-                    {
-                        "name": "drop-audit",
-                        "project": "tfstride-demo",
-                        "filter": "logName:cloudaudit.googleapis.com",
-                        "disabled": False,
-                    },
-                ),
-            ],
-            GCP_AUDIT_DETECTION_RULE_IDS,
-        )
-        azure_findings = _evaluate_azure(
-            [
-                _azure_aks_cluster(oms_workspace_id=None, defender=False, azure_policy=False),
-                _azure_diagnostic_setting("audit", "azurerm_key_vault.app.id", log_analytics_workspace_id=None),
-                _azure_resource(
-                    AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
-                    {"resource_type": "StorageAccounts", "tier": "Free"},
-                    name="storage",
-                ),
-                _azure_resource(
-                    AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING,
-                    {"auto_provision": "Off"},
-                    name="auto",
-                ),
-            ],
-            AZURE_AUDIT_DETECTION_RULE_IDS,
-        )
+    def test_account_audit_and_detection_findings_are_pinned_by_provider_concept(self) -> None:
+        aws_findings = _evaluate_aws(_unsafe_aws_account_audit_resources(), AWS_ACCOUNT_AUDIT_RULE_IDS)
+        gcp_findings = _evaluate_gcp(_unsafe_gcp_account_audit_resources(), GCP_ACCOUNT_AUDIT_RULE_IDS)
+        azure_findings = _evaluate_azure(_unsafe_azure_account_audit_resources(), AZURE_ACCOUNT_AUDIT_RULE_IDS)
 
-        self.assertEqual(_finding_ids(aws_findings), frozenset(AWS_AUDIT_RULE_IDS))
-        self.assertEqual(_finding_ids(gcp_findings), GCP_AUDIT_DETECTION_RULE_IDS)
-        self.assertEqual(_finding_ids(azure_findings), AZURE_AUDIT_DETECTION_RULE_IDS)
+        _assert_concepts_emit(self, aws_findings, AWS_ACCOUNT_AUDIT_RULE_CONCEPTS)
+        _assert_concepts_emit(self, gcp_findings, GCP_ACCOUNT_AUDIT_RULE_CONCEPTS)
+        _assert_concepts_emit(self, azure_findings, AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS)
 
-    def test_safe_audit_logging_and_security_monitoring_posture_stays_quiet(self) -> None:
+    def test_safe_account_audit_and_detection_posture_stays_quiet(self) -> None:
         aws_findings = _evaluate_aws(
             [_aws_cloudtrail(), _aws_guardduty(), _aws_securityhub(), _aws_config_recorder()],
-            AWS_AUDIT_RULE_IDS,
+            AWS_ACCOUNT_AUDIT_RULE_IDS,
         )
         gcp_findings = _evaluate_gcp(
             [
-                _gke_cluster(
-                    logging_service="logging.googleapis.com/kubernetes",
-                    logging_components=["SYSTEM_COMPONENTS", "APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"],
-                ),
-                _gke_node_pool(),
                 _gcp_resource(
                     "google_logging_project_sink.audit",
                     GcpResourceType.LOGGING_PROJECT_SINK,
@@ -330,16 +361,12 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
                     {"organization": "1234567890", "enable_asset_discovery": True},
                 ),
             ],
-            GCP_AUDIT_DETECTION_RULE_IDS,
+            GCP_ACCOUNT_AUDIT_RULE_IDS,
         )
         azure_findings = _evaluate_azure(
             [
-                _azure_aks_cluster(
-                    oms_workspace_id="azurerm_log_analytics_workspace.aks.id",
-                    defender=True,
-                    azure_policy=True,
-                ),
-                _azure_diagnostic_setting("aks_audit", "azurerm_kubernetes_cluster.cluster.id"),
+                _azure_storage_account(),
+                _azure_diagnostic_setting("storage_audit", _AZURE_STORAGE_ID),
                 _azure_resource(
                     AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
                     {"resource_type": "VirtualMachines", "tier": "Standard"},
@@ -351,27 +378,18 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
                     name="auto",
                 ),
             ],
-            AZURE_AUDIT_DETECTION_RULE_IDS,
+            AZURE_ACCOUNT_AUDIT_RULE_IDS,
         )
 
         self.assertEqual(aws_findings, [])
         self.assertEqual(gcp_findings, [])
         self.assertEqual(azure_findings, [])
 
-    def test_audit_detection_findings_remain_provider_local(self) -> None:
+    def test_account_audit_detection_findings_remain_provider_local(self) -> None:
         findings_by_provider = {
-            "aws": _evaluate_aws(
-                [_aws_cloudtrail(multi_region=False, log_file_validation=False), _aws_guardduty(enabled=False)],
-                ALL_AUDIT_DETECTION_RULE_IDS,
-            ),
-            "gcp": _evaluate_gcp(
-                [_gke_cluster(logging_service="logging.googleapis.com/none", logging_components=[])],
-                ALL_AUDIT_DETECTION_RULE_IDS,
-            ),
-            "azure": _evaluate_azure(
-                [_azure_aks_cluster(oms_workspace_id=None, defender=False, azure_policy=False)],
-                ALL_AUDIT_DETECTION_RULE_IDS,
-            ),
+            "aws": _evaluate_aws(_unsafe_aws_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
+            "gcp": _evaluate_gcp(_unsafe_gcp_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
+            "azure": _evaluate_azure(_unsafe_azure_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
         }
 
         for provider, findings in findings_by_provider.items():
