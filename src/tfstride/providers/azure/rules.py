@@ -43,6 +43,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
         "azure-key-vault-secret-certificate-lifecycle-incomplete",
+        "azure-key-vault-key-strength-weak",
         "azure-key-vault-key-rotation-policy-incomplete",
         "azure-custom-role-wildcard-management-plane",
         "azure-custom-role-authorization-management",
@@ -141,6 +142,7 @@ def build_azure_rule_contribution(
         "azure-key-vault-secret-certificate-lifecycle-incomplete": (
             key_vault_detectors.detect_secret_certificate_lifecycle_incomplete
         ),
+        "azure-key-vault-key-strength-weak": key_vault_detectors.detect_key_strength_weak,
         "azure-key-vault-key-rotation-policy-incomplete": (key_vault_detectors.detect_key_rotation_policy_incomplete),
         "azure-custom-role-wildcard-management-plane": (custom_role_detectors.detect_wildcard_management_plane),
         "azure-custom-role-authorization-management": custom_role_detectors.detect_authorization_management,

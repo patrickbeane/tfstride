@@ -99,6 +99,10 @@ def _certificate(
 def _key(
     *,
     name: str = "signing",
+    key_type: object = "RSA",
+    key_size: object = 2048,
+    curve: object = _MISSING,
+    key_opts: object = _MISSING,
     rotation_policy: object = _MISSING,
     expiration_date: object = _MISSING,
     not_before_date: object = _MISSING,
@@ -107,10 +111,14 @@ def _key(
     values: dict[str, object] = {
         "name": name,
         "key_vault_id": "azurerm_key_vault.application.id",
-        "key_type": "RSA",
-        "key_size": 2048,
-        "key_opts": ["encrypt", "decrypt", "sign", "verify"],
     }
+    if key_type is not _MISSING:
+        values["key_type"] = key_type
+    if key_size is not _MISSING:
+        values["key_size"] = key_size
+    if curve is not _MISSING:
+        values["curve"] = curve
+    values["key_opts"] = key_opts if key_opts is not _MISSING else ["encrypt", "decrypt", "sign", "verify"]
     if rotation_policy is not _MISSING:
         values["rotation_policy"] = rotation_policy
     if expiration_date is not _MISSING:
@@ -360,6 +368,63 @@ class AzureKeyVaultRuleTests(unittest.TestCase):
                 _certificate(unknown_values={"certificate_policy": [{"validity_in_months": True}]}),
             ],
             "azure-key-vault-secret-certificate-lifecycle-incomplete",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_key_with_small_rsa_size_is_detected_as_weak_strength(self) -> None:
+        _, _, findings = _evaluate(
+            [_vault(public_network=False), _key(key_size=1024)],
+            "azure-key-vault-key-strength-weak",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-strength-weak"])
+        self.assertEqual(findings[0].severity.value, "medium")
+        self.assertEqual(
+            findings[0].affected_resources,
+            ["azurerm_key_vault_key.signing", "azurerm_key_vault.application"],
+        )
+        self.assertIn(
+            "does not evaluate key operations, identity access, or data-plane exposure", findings[0].rationale
+        )
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["key_strength_issues"],
+            ["key_type=RSA uses key_size=1024; minimum_rsa_key_size_bits=2048"],
+        )
+        self.assertIn("key_type=RSA", evidence["key_posture"])
+        self.assertIn("key_size=1024", evidence["key_posture"])
+        self.assertIn("minimum_rsa_key_size_bits=2048", evidence["key_posture"])
+
+    def test_key_strength_accepts_rsa_baseline_and_ec_curves(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(name="rsa", key_size=2048),
+                _key(name="rsa_hsm", key_type="RSA-HSM", key_size=3072),
+                _key(name="ec", key_type="EC", key_size=_MISSING, curve="P-256"),
+            ],
+            "azure-key-vault-key-strength-weak",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unknown_key_strength_shape_is_not_overclaimed(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(
+                    key_size=1024,
+                    unknown_values={"key_type": True, "key_size": True},
+                )
+            ],
+            "azure-key-vault-key-strength-weak",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_key_strength_does_not_flag_broad_key_ops_without_size_issue(self) -> None:
+        _, _, findings = _evaluate(
+            [_key(key_size=2048, key_opts=["encrypt", "decrypt", "sign", "verify", "wrapKey", "unwrapKey"])],
+            "azure-key-vault-key-strength-weak",
         )
 
         self.assertEqual(findings, [])

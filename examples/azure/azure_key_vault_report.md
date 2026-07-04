@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **8 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `150`
-- Enabled rules: `150`
+- Registered rules: `151`
+- Enabled rules: `151`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -82,7 +82,7 @@ This run identified **1 trust boundaries** and **8 findings** across **8 normali
 - Evidence:
   - target resource: address=azurerm_key_vault_key.signing; type=azurerm_key_vault_key; identifier=signing; key_vault_reference=azurerm_key_vault.public.id; resolved_key_vault_address=azurerm_key_vault.public
   - rotation issues: key has no rotation_policy
-  - key posture: key_type=RSA; key_size=unset; curve=unset; key_ops=unset; expiration_date=unset; not_before_date=unset; maximum_key_expiry_days=730; maximum_rotation_interval_days=365
+  - key posture: key_type=RSA; key_size=unset; curve=unset; key_ops=unset; minimum_rsa_key_size_bits=2048; expiration_date=unset; not_before_date=unset; maximum_key_expiry_days=730; maximum_rotation_interval_days=365
   - rotation policy: rotation_policy_present=false; expire_after=unset; notify_before_expiry=unset; automatic.time_after_creation=unset; automatic.time_before_expiry=unset
 
 #### Azure Key Vault lacks resolved private endpoint coverage

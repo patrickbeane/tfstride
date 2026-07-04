@@ -224,6 +224,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-key-vault-key-strength-weak",
+        title="Azure Key Vault key strength is weak",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Use RSA Key Vault keys of at least 2048 bits, or stronger approved key types and curves where "
+            "appropriate for the workload and compliance baseline."
+        ),
+        tags=("azure", "key-vault", "keys", "cryptography", "key-strength"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-key-vault-key-rotation-policy-incomplete",
         title="Azure Key Vault key rotation posture is incomplete",
         category=StrideCategory.INFORMATION_DISCLOSURE,

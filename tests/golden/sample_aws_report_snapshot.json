@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 150,
+      "registered_rule_count": 151,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -148,6 +148,7 @@
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
         "azure-key-vault-secret-certificate-lifecycle-incomplete",
+        "azure-key-vault-key-strength-weak",
         "azure-key-vault-key-rotation-policy-incomplete",
         "azure-custom-role-wildcard-management-plane",
         "azure-custom-role-authorization-management",
@@ -302,6 +303,7 @@
         "azure-key-vault-privileged-access": 0,
         "azure-key-vault-purge-protection-disabled": 0,
         "azure-key-vault-secret-certificate-lifecycle-incomplete": 0,
+        "azure-key-vault-key-strength-weak": 0,
         "azure-key-vault-key-rotation-policy-incomplete": 0,
         "azure-custom-role-wildcard-management-plane": 0,
         "azure-custom-role-authorization-management": 0,

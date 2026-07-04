@@ -217,6 +217,49 @@ class AzureKeyVaultRuleDetectors:
             )
         return findings
 
+    def detect_key_strength_weak(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for key in context.inventory.by_type(AzureResourceType.KEY_VAULT_KEY):
+            facts = azure_facts(key)
+            strength_issues = _key_vault_key_strength_issues(facts)
+            if not strength_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([key.address, facts.resolved_key_vault_address]),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{key.display_name} has deterministic Key Vault key shape evidence below the "
+                        f"{_KEY_VAULT_MIN_RSA_KEY_SIZE_BITS}-bit RSA baseline used by tfSTRIDE. This finding "
+                        "concerns cryptographic key strength posture; it does not evaluate key operations, "
+                        "identity access, or data-plane exposure."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _key_vault_lifecycle_target_evidence(key, facts)),
+                        evidence_item("key_strength_issues", strength_issues),
+                        evidence_item("key_posture", _key_vault_key_posture_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_key_rotation_policy_incomplete(
         self,
         context: RuleEvaluationContext,
@@ -271,6 +314,7 @@ _KEY_VAULT_MAX_LIFETIME_DAYS = 730
 _KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS = 24
 _KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS = 365
 _KEY_VAULT_MAX_KEY_EXPIRY_DAYS = 730
+_KEY_VAULT_MIN_RSA_KEY_SIZE_BITS = 2048
 _ISO_PERIOD_RE = re.compile(r"^P(?:(?P<years>\d+)Y)?(?:(?P<months>\d+)M)?(?:(?P<weeks>\d+)W)?(?:(?P<days>\d+)D)?$")
 
 
@@ -307,6 +351,20 @@ _PRIVILEGED_KEY_VAULT_PERMISSIONS = frozenset(
         "setsas",
     }
 )
+
+
+def _key_vault_key_strength_issues(facts: AzureResourceFacts) -> list[str]:
+    if facts.key_vault_key_posture_uncertainties:
+        return []
+
+    key_type = str(facts.key_vault_key_type or "").strip().upper()
+    key_size = facts.key_vault_key_size
+    if key_type in {"RSA", "RSA-HSM"} and key_size is not None and key_size < _KEY_VAULT_MIN_RSA_KEY_SIZE_BITS:
+        return [
+            f"key_type={facts.key_vault_key_type} uses key_size={key_size}; "
+            f"minimum_rsa_key_size_bits={_KEY_VAULT_MIN_RSA_KEY_SIZE_BITS}"
+        ]
+    return []
 
 
 def _key_vault_key_rotation_issues(facts: AzureResourceFacts) -> list[str]:
@@ -392,6 +450,7 @@ def _key_vault_key_posture_evidence(facts: AzureResourceFacts) -> list[str]:
         f"key_size={facts.key_vault_key_size if facts.key_vault_key_size is not None else 'unset'}",
         f"curve={facts.key_vault_key_curve or 'unset'}",
         f"key_ops={', '.join(facts.key_vault_key_ops) if facts.key_vault_key_ops else 'unset'}",
+        f"minimum_rsa_key_size_bits={_KEY_VAULT_MIN_RSA_KEY_SIZE_BITS}",
         f"expiration_date={facts.key_vault_expiration_date or 'unset'}",
         f"not_before_date={facts.key_vault_not_before_date or 'unset'}",
         f"maximum_key_expiry_days={_KEY_VAULT_MAX_KEY_EXPIRY_DAYS}",
