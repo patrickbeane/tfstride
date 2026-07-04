@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 from tfstride.analysis.finding_factory import FindingFactory
@@ -11,8 +12,8 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import BoundaryType, Finding
-from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
 
@@ -173,6 +174,58 @@ class AzureKeyVaultRuleDetectors:
             )
         return findings
 
+    def detect_secret_certificate_lifecycle_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for item in context.inventory.by_type(*_KEY_VAULT_LIFECYCLE_RESOURCE_TYPES):
+            facts = azure_facts(item)
+            lifecycle_issues = _key_vault_lifecycle_issues(item.resource_type, facts)
+            if not lifecycle_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([item.address, facts.resolved_key_vault_address]),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{item.display_name} does not show deterministic Key Vault secret or certificate "
+                        "lifecycle posture. Explicit expiry and bounded validity reduce stale secret and "
+                        "certificate material, but do not replace identity review or rotation automation."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _key_vault_lifecycle_target_evidence(item, facts)),
+                        evidence_item("lifecycle_issues", lifecycle_issues),
+                        evidence_item("lifecycle_posture", _key_vault_lifecycle_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+
+_KEY_VAULT_LIFECYCLE_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.KEY_VAULT_SECRET,
+        AzureResourceType.KEY_VAULT_CERTIFICATE,
+    }
+)
+_KEY_VAULT_MAX_LIFETIME_DAYS = 730
+_KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS = 24
+
 
 _PRIVILEGED_KEY_VAULT_ROLE_NAMES = frozenset(
     {
@@ -207,6 +260,86 @@ _PRIVILEGED_KEY_VAULT_PERMISSIONS = frozenset(
         "setsas",
     }
 )
+
+
+def _key_vault_lifecycle_issues(resource_type: str, facts: AzureResourceFacts) -> list[str]:
+    if facts.key_vault_lifecycle_uncertainties:
+        return []
+
+    issues: list[str] = []
+    expiration_date = facts.key_vault_expiration_date
+    validity_months = facts.key_vault_certificate_validity_months
+    if not expiration_date and not (
+        resource_type == AzureResourceType.KEY_VAULT_CERTIFICATE and validity_months is not None
+    ):
+        issues.append(f"{_key_vault_lifecycle_label(resource_type)} has no expiration_date")
+
+    lifetime_days = _key_vault_lifetime_days(facts.key_vault_not_before_date, expiration_date)
+    if lifetime_days is not None and lifetime_days > _KEY_VAULT_MAX_LIFETIME_DAYS:
+        issues.append(f"configured lifetime is {lifetime_days} days; maximum is {_KEY_VAULT_MAX_LIFETIME_DAYS} days")
+    if (
+        resource_type == AzureResourceType.KEY_VAULT_CERTIFICATE
+        and validity_months is not None
+        and validity_months > _KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS
+    ):
+        issues.append(
+            "certificate_policy.validity_in_months is "
+            f"{validity_months}; maximum is {_KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS}"
+        )
+    return issues
+
+
+def _key_vault_lifecycle_target_evidence(resource: NormalizedResource, facts: AzureResourceFacts) -> list[str]:
+    values = [f"address={resource.address}", f"type={resource.resource_type}"]
+    if resource.identifier:
+        values.append(f"identifier={resource.identifier}")
+    if facts.key_vault_reference:
+        values.append(f"key_vault_reference={facts.key_vault_reference}")
+    if facts.resolved_key_vault_address:
+        values.append(f"resolved_key_vault_address={facts.resolved_key_vault_address}")
+    return values
+
+
+def _key_vault_lifecycle_evidence(facts: AzureResourceFacts) -> list[str]:
+    validity_months = facts.key_vault_certificate_validity_months
+    values = [
+        f"expiration_date={facts.key_vault_expiration_date or 'unset'}",
+        f"not_before_date={facts.key_vault_not_before_date or 'unset'}",
+        f"certificate_policy.validity_in_months={validity_months if validity_months is not None else 'unset'}",
+        f"maximum_lifetime_days={_KEY_VAULT_MAX_LIFETIME_DAYS}",
+        f"maximum_certificate_validity_months={_KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS}",
+    ]
+    lifetime_days = _key_vault_lifetime_days(facts.key_vault_not_before_date, facts.key_vault_expiration_date)
+    if lifetime_days is not None:
+        values.append(f"configured_lifetime_days={lifetime_days}")
+    return values
+
+
+def _key_vault_lifetime_days(not_before_date: str | None, expiration_date: str | None) -> int | None:
+    start = _parse_iso_datetime(not_before_date)
+    end = _parse_iso_datetime(expiration_date)
+    if start is None or end is None or end <= start:
+        return None
+    return (end - start).days
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=None)
+
+
+def _key_vault_lifecycle_label(resource_type: str) -> str:
+    if resource_type == AzureResourceType.KEY_VAULT_CERTIFICATE:
+        return "certificate"
+    return "secret"
 
 
 def _access_policy_is_privileged(policy: Mapping[str, Any]) -> bool:

@@ -124,6 +124,7 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "azure-key-vault-missing-private-endpoint",
     "azure-key-vault-privileged-access",
     "azure-key-vault-purge-protection-disabled",
+    "azure-key-vault-secret-certificate-lifecycle-incomplete",
     "azure-custom-role-wildcard-management-plane",
     "azure-custom-role-authorization-management",
     "azure-custom-role-broad-management-plane",
@@ -210,7 +211,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 144)
+        self.assertEqual(len(metadata), 145)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -221,7 +222,7 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 36)
         self.assertEqual(len(gcp_metadata_ids), 49)
-        self.assertEqual(len(azure_metadata_ids), 59)
+        self.assertEqual(len(azure_metadata_ids), 60)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
         self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))

@@ -7,6 +7,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import (
     as_list,
     attribute_unknown,
@@ -14,6 +15,9 @@ from tfstride.providers.azure.resource_utils import (
     first_block_attribute_unknown,
     first_mapping,
     first_non_empty,
+    known_block_int,
+    known_string,
+    unknown_block_at,
 )
 from tfstride.providers.azure.resource_utils import (
     known_bool as known_optional_bool,
@@ -149,6 +153,11 @@ def normalize_key_vault_certificate(resource: TerraformResource) -> NormalizedRe
 def _normalize_key_vault_child(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     name = first_non_empty(values.get("name"), resource.name)
+    metadata: dict[Any, Any] = {
+        AzureResourceMetadata.NAME: name,
+        AzureResourceMetadata.KEY_VAULT_REFERENCE: first_non_empty(values.get("key_vault_id")),
+    }
+    _set_key_vault_child_lifecycle(metadata, resource, values)
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -158,12 +167,51 @@ def _normalize_key_vault_child(resource: TerraformResource) -> NormalizedResourc
             category=ResourceCategory.DATA,
             identifier=first_non_empty(values.get("id"), name, resource.address),
             data_sensitivity="sensitive",
-            metadata={
-                AzureResourceMetadata.NAME: name,
-                AzureResourceMetadata.KEY_VAULT_REFERENCE: first_non_empty(values.get("key_vault_id")),
-            },
+            metadata=metadata,
         )
     )
+
+
+def _set_key_vault_child_lifecycle(
+    metadata: dict[Any, Any],
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+) -> None:
+    uncertainties: list[str] = []
+    expiration_date = known_string(
+        values,
+        resource.unknown_values,
+        "expiration_date",
+        uncertainties,
+        require_string=True,
+    )
+    not_before_date = known_string(
+        values,
+        resource.unknown_values,
+        "not_before_date",
+        uncertainties,
+        require_string=True,
+    )
+    if expiration_date:
+        metadata[AzureResourceMetadata.KEY_VAULT_EXPIRATION_DATE] = expiration_date
+    if not_before_date:
+        metadata[AzureResourceMetadata.KEY_VAULT_NOT_BEFORE_DATE] = not_before_date
+
+    if resource.resource_type == AzureResourceType.KEY_VAULT_CERTIFICATE:
+        certificate_policy = first_mapping(values.get("certificate_policy"))
+        certificate_policy_unknown = unknown_block_at(resource.unknown_values.get("certificate_policy"), 0)
+        validity_months = known_block_int(
+            certificate_policy,
+            certificate_policy_unknown,
+            "validity_in_months",
+            uncertainties,
+            path="certificate_policy",
+        )
+        if validity_months is not None:
+            metadata[AzureResourceMetadata.KEY_VAULT_CERTIFICATE_VALIDITY_MONTHS] = validity_months
+
+    if uncertainties:
+        metadata[AzureResourceMetadata.KEY_VAULT_LIFECYCLE_UNCERTAINTIES] = uncertainties
 
 
 def _inline_access_policies(resource: TerraformResource, values: Mapping[str, Any]) -> list[dict[str, Any]]:

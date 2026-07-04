@@ -213,6 +213,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-key-vault-secret-certificate-lifecycle-incomplete",
+        title="Azure Key Vault secret or certificate lifecycle posture is incomplete",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure explicit expiry for Key Vault secrets and certificates, keep validity windows bounded, "
+            "and pair lifecycle settings with rotation automation appropriate for the secret or certificate type."
+        ),
+        tags=("azure", "key-vault", "secrets", "certificates", "lifecycle", "expiry"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-custom-role-wildcard-management-plane",
         title="Custom Azure role grants wildcard management-plane permissions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

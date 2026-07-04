@@ -42,6 +42,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
         "azure-key-vault-purge-protection-disabled",
+        "azure-key-vault-secret-certificate-lifecycle-incomplete",
         "azure-custom-role-wildcard-management-plane",
         "azure-custom-role-authorization-management",
         "azure-custom-role-broad-management-plane",
@@ -136,6 +137,9 @@ def build_azure_rule_contribution(
         ),
         "azure-key-vault-privileged-access": key_vault_detectors.detect_privileged_access,
         "azure-key-vault-purge-protection-disabled": (key_vault_detectors.detect_purge_protection_disabled),
+        "azure-key-vault-secret-certificate-lifecycle-incomplete": (
+            key_vault_detectors.detect_secret_certificate_lifecycle_incomplete
+        ),
         "azure-custom-role-wildcard-management-plane": (custom_role_detectors.detect_wildcard_management_plane),
         "azure-custom-role-authorization-management": custom_role_detectors.detect_authorization_management,
         "azure-custom-role-broad-management-plane": custom_role_detectors.detect_broad_management_plane,

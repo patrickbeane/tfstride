@@ -7,6 +7,7 @@ from tfstride.providers.azure.identity_normalizers import normalize_role_assignm
 from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault,
     normalize_key_vault_access_policy,
+    normalize_key_vault_certificate,
     normalize_key_vault_secret,
 )
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -206,6 +207,67 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         self.assertEqual(azure_facts(secret).key_vault_reference, "azurerm_key_vault.application.id")
         self.assertTrue(secret.storage_encrypted)
         self.assertEqual(secret.data_sensitivity, "sensitive")
+
+    def test_key_vault_secret_preserves_lifecycle_posture(self) -> None:
+        secret = normalize_key_vault_secret(
+            _resource(
+                AzureResourceType.KEY_VAULT_SECRET,
+                {
+                    "name": "api-key",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                    "expiration_date": "2027-01-01T00:00:00Z",
+                    "not_before_date": "2026-01-01T00:00:00Z",
+                },
+            )
+        )
+        facts = azure_facts(secret)
+
+        self.assertEqual(facts.key_vault_expiration_date, "2027-01-01T00:00:00Z")
+        self.assertEqual(facts.key_vault_not_before_date, "2026-01-01T00:00:00Z")
+        self.assertIsNone(facts.key_vault_certificate_validity_months)
+        self.assertEqual(facts.key_vault_lifecycle_uncertainties, [])
+
+    def test_key_vault_certificate_preserves_lifecycle_posture(self) -> None:
+        certificate = normalize_key_vault_certificate(
+            _resource(
+                AzureResourceType.KEY_VAULT_CERTIFICATE,
+                {
+                    "name": "tls",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                    "certificate_policy": [{"validity_in_months": 12}],
+                },
+            )
+        )
+        facts = azure_facts(certificate)
+
+        self.assertEqual(facts.key_vault_certificate_validity_months, 12)
+        self.assertEqual(facts.key_vault_lifecycle_uncertainties, [])
+
+    def test_key_vault_child_preserves_unknown_lifecycle_posture(self) -> None:
+        certificate = normalize_key_vault_certificate(
+            _resource(
+                AzureResourceType.KEY_VAULT_CERTIFICATE,
+                {"name": "tls", "key_vault_id": "azurerm_key_vault.application.id"},
+                unknown_values={
+                    "expiration_date": True,
+                    "not_before_date": True,
+                    "certificate_policy": [{"validity_in_months": True}],
+                },
+            )
+        )
+        facts = azure_facts(certificate)
+
+        self.assertIsNone(facts.key_vault_expiration_date)
+        self.assertIsNone(facts.key_vault_not_before_date)
+        self.assertIsNone(facts.key_vault_certificate_validity_months)
+        self.assertEqual(
+            facts.key_vault_lifecycle_uncertainties,
+            [
+                "expiration_date is unknown after planning",
+                "not_before_date is unknown after planning",
+                "certificate_policy.validity_in_months is unknown after planning",
+            ],
+        )
 
 
 if __name__ == "__main__":

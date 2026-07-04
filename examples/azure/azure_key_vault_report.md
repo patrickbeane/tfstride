@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **5 findings** across **8 normalized resources**.
+This run identified **1 trust boundaries** and **7 findings** across **8 normalized resources**.
 
 - High severity findings: `1`
-- Medium severity findings: `3`
+- Medium severity findings: `5`
 - Low severity findings: `1`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **5 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `144`
-- Enabled rules: `144`
+- Registered rules: `145`
+- Enabled rules: `145`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -29,6 +29,7 @@ This run identified **1 trust boundaries** and **5 findings** across **8 normali
   - `azure-key-vault-missing-private-endpoint`: `2`
   - `azure-key-vault-privileged-access`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
+  - `azure-key-vault-secret-certificate-lifecycle-incomplete`: `2`
 
 ## Discovered Trust Boundaries
 
@@ -93,6 +94,32 @@ This run identified **1 trust boundaries** and **5 findings** across **8 normali
 - Recommended mitigation: Enable purge protection and retain soft-deleted vault objects long enough to recover from accidental or malicious deletion.
 - Evidence:
   - recovery posture: purge_protection_enabled is false
+
+#### Azure Key Vault secret or certificate lifecycle posture is incomplete
+
+- STRIDE category: Denial of Service
+- Affected resources: `azurerm_key_vault_secret.api_key`, `azurerm_key_vault.public`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault_secret.api_key does not show deterministic Key Vault secret or certificate lifecycle posture. Explicit expiry and bounded validity reduce stale secret and certificate material, but do not replace identity review or rotation automation.
+- Recommended mitigation: Configure explicit expiry for Key Vault secrets and certificates, keep validity windows bounded, and pair lifecycle settings with rotation automation appropriate for the secret or certificate type.
+- Evidence:
+  - target resource: address=azurerm_key_vault_secret.api_key; type=azurerm_key_vault_secret; identifier=api-key; key_vault_reference=azurerm_key_vault.public.id; resolved_key_vault_address=azurerm_key_vault.public
+  - lifecycle issues: secret has no expiration_date
+  - lifecycle posture: expiration_date=unset; not_before_date=unset; certificate_policy.validity_in_months=unset; maximum_lifetime_days=730; maximum_certificate_validity_months=24
+
+#### Azure Key Vault secret or certificate lifecycle posture is incomplete
+
+- STRIDE category: Denial of Service
+- Affected resources: `azurerm_key_vault_certificate.tls`, `azurerm_key_vault.public`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault_certificate.tls does not show deterministic Key Vault secret or certificate lifecycle posture. Explicit expiry and bounded validity reduce stale secret and certificate material, but do not replace identity review or rotation automation.
+- Recommended mitigation: Configure explicit expiry for Key Vault secrets and certificates, keep validity windows bounded, and pair lifecycle settings with rotation automation appropriate for the secret or certificate type.
+- Evidence:
+  - target resource: address=azurerm_key_vault_certificate.tls; type=azurerm_key_vault_certificate; identifier=tls; key_vault_reference=azurerm_key_vault.public.id; resolved_key_vault_address=azurerm_key_vault.public
+  - lifecycle issues: certificate has no expiration_date
+  - lifecycle posture: expiration_date=unset; not_before_date=unset; certificate_policy.validity_in_months=unset; maximum_lifetime_days=730; maximum_certificate_validity_months=24
 
 ### Low
 

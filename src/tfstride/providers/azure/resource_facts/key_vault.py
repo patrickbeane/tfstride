@@ -21,6 +21,18 @@ class AzureKeyVaultFacts:
         return self.get(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS)
 
     @property
+    def key_vault_expiration_date(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_EXPIRATION_DATE)
+
+    @property
+    def key_vault_not_before_date(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_NOT_BEFORE_DATE)
+
+    @property
+    def key_vault_certificate_validity_months(self) -> int | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_CERTIFICATE_VALIDITY_MONTHS)
+
+    @property
     def purge_protection_enabled(self) -> bool | None:
         return self.optional_bool(AzureResourceMetadata.PURGE_PROTECTION_ENABLED)
 
@@ -59,6 +71,10 @@ class AzureKeyVaultFacts:
     @property
     def key_vault_recovery_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.KEY_VAULT_RECOVERY_UNCERTAINTIES)
+
+    @property
+    def key_vault_lifecycle_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_LIFECYCLE_UNCERTAINTIES)
 
     def set_resolved_key_vault_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS, address)

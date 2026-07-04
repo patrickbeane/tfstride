@@ -45,6 +45,8 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
                 "azure-key-vault-public-network-access",
                 "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
+                "azure-key-vault-secret-certificate-lifecycle-incomplete",
+                "azure-key-vault-secret-certificate-lifecycle-incomplete",
                 "azure-key-vault-missing-private-endpoint",
             ],
         )
@@ -53,6 +55,18 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
             ["internet-to-service:internet->azurerm_key_vault.public"],
         )
         findings = {finding.rule_id: finding for finding in result.findings}
+        lifecycle_findings = [
+            finding
+            for finding in result.findings
+            if finding.rule_id == "azure-key-vault-secret-certificate-lifecycle-incomplete"
+        ]
+        self.assertEqual(
+            [finding.affected_resources for finding in lifecycle_findings],
+            [
+                ["azurerm_key_vault_secret.api_key", "azurerm_key_vault.public"],
+                ["azurerm_key_vault_certificate.tls", "azurerm_key_vault.public"],
+            ],
+        )
         self.assertIsNone(findings["azure-key-vault-privileged-access"].trust_boundary_id)
         self.assertEqual(
             findings["azure-key-vault-public-network-access"].trust_boundary_id,
