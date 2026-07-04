@@ -12,6 +12,15 @@ from tfstride.providers.azure.app_service_normalizers import (
     normalize_windows_function_app,
     normalize_windows_web_app,
 )
+from tfstride.providers.azure.audit_normalizers import (
+    normalize_advanced_threat_protection,
+    normalize_monitor_diagnostic_setting,
+    normalize_security_center_auto_provisioning,
+    normalize_security_center_contact,
+    normalize_security_center_setting,
+    normalize_security_center_subscription_pricing,
+    normalize_security_center_workspace,
+)
 from tfstride.providers.azure.compute_normalizers import (
     normalize_linux_virtual_machine,
     normalize_windows_virtual_machine,
@@ -110,6 +119,13 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_DATABASE: normalize_postgresql_flexible_server_database,
     AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE: normalize_postgresql_flexible_server_firewall_rule,
     AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION: normalize_postgresql_flexible_server_configuration,
+    AzureResourceType.MONITOR_DIAGNOSTIC_SETTING: normalize_monitor_diagnostic_setting,
+    AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING: normalize_security_center_subscription_pricing,
+    AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING: normalize_security_center_auto_provisioning,
+    AzureResourceType.SECURITY_CENTER_CONTACT: normalize_security_center_contact,
+    AzureResourceType.SECURITY_CENTER_WORKSPACE: normalize_security_center_workspace,
+    AzureResourceType.SECURITY_CENTER_SETTING: normalize_security_center_setting,
+    AzureResourceType.ADVANCED_THREAT_PROTECTION: normalize_advanced_threat_protection,
 }
 SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 

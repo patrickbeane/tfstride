@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts.aks import AzureAksFacts
 from tfstride.providers.azure.resource_facts.app_service import AzureAppServiceFacts
+from tfstride.providers.azure.resource_facts.audit import AzureAuditFacts
 from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 from tfstride.providers.azure.resource_facts.compute import AzureComputeFacts
 from tfstride.providers.azure.resource_facts.identity import AzureIdentityFacts
@@ -26,6 +27,7 @@ class AzureResourceFacts(
     AzureSqlFacts,
     AzurePostgresqlFacts,
     AzurePrivateEndpointFacts,
+    AzureAuditFacts,
     AzureNetworkFacts,
     AzureComputeFacts,
     AzureBaseFacts,

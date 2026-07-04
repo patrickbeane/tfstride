@@ -47,6 +47,13 @@ class AzureResourceType:
     POSTGRESQL_FLEXIBLE_SERVER_DATABASE = "azurerm_postgresql_flexible_server_database"
     POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE = "azurerm_postgresql_flexible_server_firewall_rule"
     POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION = "azurerm_postgresql_flexible_server_configuration"
+    MONITOR_DIAGNOSTIC_SETTING = "azurerm_monitor_diagnostic_setting"
+    SECURITY_CENTER_SUBSCRIPTION_PRICING = "azurerm_security_center_subscription_pricing"
+    SECURITY_CENTER_AUTO_PROVISIONING = "azurerm_security_center_auto_provisioning"
+    SECURITY_CENTER_CONTACT = "azurerm_security_center_contact"
+    SECURITY_CENTER_WORKSPACE = "azurerm_security_center_workspace"
+    SECURITY_CENTER_SETTING = "azurerm_security_center_setting"
+    ADVANCED_THREAT_PROTECTION = "azurerm_advanced_threat_protection"
 
 
 AZURE_STORAGE_RESOURCE_TYPES = frozenset(
@@ -127,6 +134,18 @@ AZURE_POSTGRESQL_RESOURCE_TYPES = frozenset(
     }
 )
 
+AZURE_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.MONITOR_DIAGNOSTIC_SETTING,
+        AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
+        AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING,
+        AzureResourceType.SECURITY_CENTER_CONTACT,
+        AzureResourceType.SECURITY_CENTER_WORKSPACE,
+        AzureResourceType.SECURITY_CENTER_SETTING,
+        AzureResourceType.ADVANCED_THREAT_PROTECTION,
+    }
+)
+
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
@@ -138,4 +157,5 @@ AZURE_SUPPORTED_RESOURCE_TYPES = (
     | AZURE_APP_SERVICE_RESOURCE_TYPES
     | AZURE_SQL_RESOURCE_TYPES
     | AZURE_POSTGRESQL_RESOURCE_TYPES
+    | AZURE_AUDIT_SECURITY_RESOURCE_TYPES
 )

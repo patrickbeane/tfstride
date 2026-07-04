@@ -71,6 +71,13 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_WEB_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LINUX_FUNCTION_APP))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KUBERNETES_CLUSTER))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.MONITOR_DIAGNOSTIC_SETTING))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SECURITY_CENTER_CONTACT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SECURITY_CENTER_WORKSPACE))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SECURITY_CENTER_SETTING))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.ADVANCED_THREAT_PROTECTION))
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
