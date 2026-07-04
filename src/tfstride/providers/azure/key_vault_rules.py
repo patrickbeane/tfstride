@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -216,6 +217,49 @@ class AzureKeyVaultRuleDetectors:
             )
         return findings
 
+    def detect_key_rotation_policy_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for key in context.inventory.by_type(AzureResourceType.KEY_VAULT_KEY):
+            facts = azure_facts(key)
+            rotation_issues = _key_vault_key_rotation_issues(facts)
+            if not rotation_issues:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([key.address, facts.resolved_key_vault_address]),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{key.display_name} does not show bounded Key Vault key rotation and expiry "
+                        "governance. This finding concerns cryptographic key lifecycle posture for dependent "
+                        "data; it does not assert access to secrets or data-plane compromise."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _key_vault_lifecycle_target_evidence(key, facts)),
+                        evidence_item("rotation_issues", rotation_issues),
+                        evidence_item("key_posture", _key_vault_key_posture_evidence(facts)),
+                        evidence_item("rotation_policy", _key_vault_key_rotation_policy_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
 
 _KEY_VAULT_LIFECYCLE_RESOURCE_TYPES = frozenset(
     {
@@ -225,6 +269,9 @@ _KEY_VAULT_LIFECYCLE_RESOURCE_TYPES = frozenset(
 )
 _KEY_VAULT_MAX_LIFETIME_DAYS = 730
 _KEY_VAULT_MAX_CERTIFICATE_VALIDITY_MONTHS = 24
+_KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS = 365
+_KEY_VAULT_MAX_KEY_EXPIRY_DAYS = 730
+_ISO_PERIOD_RE = re.compile(r"^P(?:(?P<years>\d+)Y)?(?:(?P<months>\d+)M)?(?:(?P<weeks>\d+)W)?(?:(?P<days>\d+)D)?$")
 
 
 _PRIVILEGED_KEY_VAULT_ROLE_NAMES = frozenset(
@@ -260,6 +307,45 @@ _PRIVILEGED_KEY_VAULT_PERMISSIONS = frozenset(
         "setsas",
     }
 )
+
+
+def _key_vault_key_rotation_issues(facts: AzureResourceFacts) -> list[str]:
+    if facts.key_vault_key_posture_uncertainties:
+        return []
+
+    issues: list[str] = []
+    if not facts.key_vault_rotation_policy:
+        issues.append("key has no rotation_policy")
+    else:
+        if not facts.key_vault_rotation_policy_expire_after:
+            issues.append("rotation_policy.expire_after is not configured")
+        if not (
+            facts.key_vault_rotation_policy_automatic_time_after_creation
+            or facts.key_vault_rotation_policy_automatic_time_before_expiry
+        ):
+            issues.append("rotation_policy.automatic is not configured")
+
+    expire_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_expire_after)
+    if expire_after_days is not None and expire_after_days > _KEY_VAULT_MAX_KEY_EXPIRY_DAYS:
+        issues.append(
+            f"rotation_policy.expire_after is {facts.key_vault_rotation_policy_expire_after} "
+            f"({expire_after_days} days); maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
+        )
+
+    rotate_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_automatic_time_after_creation)
+    if rotate_after_days is not None and rotate_after_days > _KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS:
+        issues.append(
+            "rotation_policy.automatic.time_after_creation is "
+            f"{facts.key_vault_rotation_policy_automatic_time_after_creation} ({rotate_after_days} days); "
+            f"maximum is {_KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS} days"
+        )
+
+    lifetime_days = _key_vault_lifetime_days(facts.key_vault_not_before_date, facts.key_vault_expiration_date)
+    if lifetime_days is not None and lifetime_days > _KEY_VAULT_MAX_KEY_EXPIRY_DAYS:
+        issues.append(
+            f"configured key lifetime is {lifetime_days} days; maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
+        )
+    return issues
 
 
 def _key_vault_lifecycle_issues(resource_type: str, facts: AzureResourceFacts) -> list[str]:
@@ -300,6 +386,42 @@ def _key_vault_lifecycle_target_evidence(resource: NormalizedResource, facts: Az
     return values
 
 
+def _key_vault_key_posture_evidence(facts: AzureResourceFacts) -> list[str]:
+    values = [
+        f"key_type={facts.key_vault_key_type or 'unset'}",
+        f"key_size={facts.key_vault_key_size if facts.key_vault_key_size is not None else 'unset'}",
+        f"curve={facts.key_vault_key_curve or 'unset'}",
+        f"key_ops={', '.join(facts.key_vault_key_ops) if facts.key_vault_key_ops else 'unset'}",
+        f"expiration_date={facts.key_vault_expiration_date or 'unset'}",
+        f"not_before_date={facts.key_vault_not_before_date or 'unset'}",
+        f"maximum_key_expiry_days={_KEY_VAULT_MAX_KEY_EXPIRY_DAYS}",
+        f"maximum_rotation_interval_days={_KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS}",
+    ]
+    lifetime_days = _key_vault_lifetime_days(facts.key_vault_not_before_date, facts.key_vault_expiration_date)
+    if lifetime_days is not None:
+        values.append(f"configured_key_lifetime_days={lifetime_days}")
+    return values
+
+
+def _key_vault_key_rotation_policy_evidence(facts: AzureResourceFacts) -> list[str]:
+    values = [
+        f"rotation_policy_present={str(bool(facts.key_vault_rotation_policy)).lower()}",
+        f"expire_after={facts.key_vault_rotation_policy_expire_after or 'unset'}",
+        f"notify_before_expiry={facts.key_vault_rotation_policy_notify_before_expiry or 'unset'}",
+        f"automatic.time_after_creation={facts.key_vault_rotation_policy_automatic_time_after_creation or 'unset'}",
+        f"automatic.time_before_expiry={facts.key_vault_rotation_policy_automatic_time_before_expiry or 'unset'}",
+    ]
+    for label, value in (
+        ("expire_after_days", facts.key_vault_rotation_policy_expire_after),
+        ("automatic_time_after_creation_days", facts.key_vault_rotation_policy_automatic_time_after_creation),
+        ("automatic_time_before_expiry_days", facts.key_vault_rotation_policy_automatic_time_before_expiry),
+    ):
+        parsed_days = _parse_iso_period_days(value)
+        if parsed_days is not None:
+            values.append(f"{label}={parsed_days}")
+    return values
+
+
 def _key_vault_lifecycle_evidence(facts: AzureResourceFacts) -> list[str]:
     validity_months = facts.key_vault_certificate_validity_months
     values = [
@@ -321,6 +443,19 @@ def _key_vault_lifetime_days(not_before_date: str | None, expiration_date: str |
     if start is None or end is None or end <= start:
         return None
     return (end - start).days
+
+
+def _parse_iso_period_days(value: str | None) -> int | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    match = _ISO_PERIOD_RE.fullmatch(value.strip().upper())
+    if match is None or not any(match.groupdict().values()):
+        return None
+    years = int(match.group("years") or 0)
+    months = int(match.group("months") or 0)
+    weeks = int(match.group("weeks") or 0)
+    days = int(match.group("days") or 0)
+    return years * 365 + months * 30 + weeks * 7 + days
 
 
 def _parse_iso_datetime(value: str | None) -> datetime | None:

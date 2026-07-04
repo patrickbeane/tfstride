@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **7 findings** across **8 normalized resources**.
+This run identified **1 trust boundaries** and **8 findings** across **8 normalized resources**.
 
 - High severity findings: `1`
-- Medium severity findings: `5`
+- Medium severity findings: `6`
 - Low severity findings: `1`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **7 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `147`
-- Enabled rules: `147`
+- Registered rules: `148`
+- Enabled rules: `148`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -30,6 +30,7 @@ This run identified **1 trust boundaries** and **7 findings** across **8 normali
   - `azure-key-vault-privileged-access`: `1`
   - `azure-key-vault-purge-protection-disabled`: `1`
   - `azure-key-vault-secret-certificate-lifecycle-incomplete`: `2`
+  - `azure-key-vault-key-rotation-policy-incomplete`: `1`
 
 ## Discovered Trust Boundaries
 
@@ -69,6 +70,20 @@ This run identified **1 trust boundaries** and **7 findings** across **8 normali
 - Recommended mitigation: Disable public network access where possible, or configure Key Vault network ACLs with a default action of `Deny` and use reviewed subnets, IP ranges, or private endpoints.
 - Evidence:
   - network exposure: public_network_access_enabled is true; effective network_acls.default_action is Allow; network exposure is evaluated separately from identity authorization
+
+#### Azure Key Vault key rotation posture is incomplete
+
+- STRIDE category: Information Disclosure
+- Affected resources: `azurerm_key_vault_key.signing`, `azurerm_key_vault.public`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_key_vault_key.signing does not show bounded Key Vault key rotation and expiry governance. This finding concerns cryptographic key lifecycle posture for dependent data; it does not assert access to secrets or data-plane compromise.
+- Recommended mitigation: Configure Key Vault key rotation policies with bounded expiry and automatic rotation intervals, and keep key validity windows aligned with cryptographic lifecycle and compliance requirements.
+- Evidence:
+  - target resource: address=azurerm_key_vault_key.signing; type=azurerm_key_vault_key; identifier=signing; key_vault_reference=azurerm_key_vault.public.id; resolved_key_vault_address=azurerm_key_vault.public
+  - rotation issues: key has no rotation_policy
+  - key posture: key_type=RSA; key_size=unset; curve=unset; key_ops=unset; expiration_date=unset; not_before_date=unset; maximum_key_expiry_days=730; maximum_rotation_interval_days=365
+  - rotation policy: rotation_policy_present=false; expire_after=unset; notify_before_expiry=unset; automatic.time_after_creation=unset; automatic.time_before_expiry=unset
 
 #### Azure Key Vault lacks resolved private endpoint coverage
 

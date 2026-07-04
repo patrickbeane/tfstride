@@ -43,6 +43,7 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
             [
                 "azure-key-vault-privileged-access",
                 "azure-key-vault-public-network-access",
+                "azure-key-vault-key-rotation-policy-incomplete",
                 "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
                 "azure-key-vault-secret-certificate-lifecycle-incomplete",
@@ -67,6 +68,10 @@ class AzureKeyVaultAnalysisIntegrationTests(unittest.TestCase):
                 ["azurerm_key_vault_certificate.tls", "azurerm_key_vault.public"],
             ],
         )
+        key_rotation_evidence = {
+            item.key: item.values for item in findings["azure-key-vault-key-rotation-policy-incomplete"].evidence
+        }
+        self.assertEqual(key_rotation_evidence["rotation_issues"], ["key has no rotation_policy"])
         self.assertIsNone(findings["azure-key-vault-privileged-access"].trust_boundary_id)
         self.assertEqual(
             findings["azure-key-vault-public-network-access"].trust_boundary_id,

@@ -96,6 +96,56 @@ def _certificate(
     )
 
 
+def _key(
+    *,
+    name: str = "signing",
+    rotation_policy: object = _MISSING,
+    expiration_date: object = _MISSING,
+    not_before_date: object = _MISSING,
+    unknown_values: dict[str, object] | None = None,
+) -> TerraformResource:
+    values: dict[str, object] = {
+        "name": name,
+        "key_vault_id": "azurerm_key_vault.application.id",
+        "key_type": "RSA",
+        "key_size": 2048,
+        "key_opts": ["encrypt", "decrypt", "sign", "verify"],
+    }
+    if rotation_policy is not _MISSING:
+        values["rotation_policy"] = rotation_policy
+    if expiration_date is not _MISSING:
+        values["expiration_date"] = expiration_date
+    if not_before_date is not _MISSING:
+        values["not_before_date"] = not_before_date
+    return _resource(
+        AzureResourceType.KEY_VAULT_KEY,
+        name,
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _rotation_policy(
+    *,
+    expire_after: str = "P365D",
+    notify_before_expiry: str = "P30D",
+    time_after_creation: object = "P180D",
+    time_before_expiry: object = _MISSING,
+) -> list[dict[str, object]]:
+    automatic: dict[str, object] = {}
+    if time_after_creation is not _MISSING:
+        automatic["time_after_creation"] = time_after_creation
+    if time_before_expiry is not _MISSING:
+        automatic["time_before_expiry"] = time_before_expiry
+    policy: dict[str, object] = {
+        "expire_after": expire_after,
+        "notify_before_expiry": notify_before_expiry,
+    }
+    if automatic:
+        policy["automatic"] = [automatic]
+    return [policy]
+
+
 def _evaluate(resources: list[TerraformResource], *rule_ids: str):
     inventory = AzureNormalizer().normalize(resources)
     boundaries = detect_trust_boundaries(inventory)
@@ -310,6 +360,127 @@ class AzureKeyVaultRuleTests(unittest.TestCase):
                 _certificate(unknown_values={"certificate_policy": [{"validity_in_months": True}]}),
             ],
             "azure-key-vault-secret-certificate-lifecycle-incomplete",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_key_missing_rotation_policy_is_detected_as_governance_posture(self) -> None:
+        _, _, findings = _evaluate(
+            [_vault(public_network=False), _key()],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-rotation-policy-incomplete"])
+        self.assertEqual(findings[0].severity.value, "medium")
+        self.assertEqual(
+            findings[0].affected_resources,
+            ["azurerm_key_vault_key.signing", "azurerm_key_vault.application"],
+        )
+        self.assertNotIn("secret exposure", findings[0].rationale.lower())
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["rotation_issues"], ["key has no rotation_policy"])
+        self.assertIn("rotation_policy_present=false", evidence["rotation_policy"])
+        self.assertIn("key_type=RSA", evidence["key_posture"])
+
+    def test_key_with_bounded_rotation_policy_is_quiet(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _vault(public_network=False),
+                _key(
+                    rotation_policy=_rotation_policy(),
+                    not_before_date="2026-01-01T00:00:00Z",
+                    expiration_date="2026-12-31T00:00:00Z",
+                ),
+            ],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_key_long_expiry_and_rotation_interval_are_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(
+                    rotation_policy=_rotation_policy(expire_after="P3Y", time_after_creation="P18M"),
+                )
+            ],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-rotation-policy-incomplete"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["rotation_issues"],
+            [
+                "rotation_policy.expire_after is P3Y (1095 days); maximum is 730 days",
+                "rotation_policy.automatic.time_after_creation is P18M (540 days); maximum is 365 days",
+            ],
+        )
+        self.assertIn("expire_after_days=1095", evidence["rotation_policy"])
+        self.assertIn("automatic_time_after_creation_days=540", evidence["rotation_policy"])
+
+    def test_key_policy_without_automatic_rotation_is_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [_key(rotation_policy=_rotation_policy(time_after_creation=_MISSING))],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-rotation-policy-incomplete"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["rotation_issues"], ["rotation_policy.automatic is not configured"])
+
+    def test_key_policy_without_expiry_governance_is_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(
+                    rotation_policy=[
+                        {
+                            "notify_before_expiry": "P30D",
+                            "automatic": [{"time_after_creation": "P180D"}],
+                        }
+                    ]
+                )
+            ],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-rotation-policy-incomplete"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["rotation_issues"], ["rotation_policy.expire_after is not configured"])
+
+    def test_key_long_explicit_lifetime_is_detected(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(
+                    rotation_policy=_rotation_policy(),
+                    not_before_date="2026-01-01T00:00:00Z",
+                    expiration_date="2029-01-01T00:00:00Z",
+                )
+            ],
+            "azure-key-vault-key-rotation-policy-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-key-vault-key-rotation-policy-incomplete"])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(evidence["rotation_issues"], ["configured key lifetime is 1096 days; maximum is 730 days"])
+        self.assertIn("configured_key_lifetime_days=1096", evidence["key_posture"])
+
+    def test_unknown_key_rotation_posture_is_not_overclaimed(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _key(
+                    rotation_policy=[{"automatic": [{}]}],
+                    unknown_values={
+                        "rotation_policy": [
+                            {
+                                "expire_after": True,
+                                "automatic": [{"time_after_creation": True}],
+                            }
+                        ]
+                    },
+                )
+            ],
+            "azure-key-vault-key-rotation-policy-incomplete",
         )
 
         self.assertEqual(findings, [])

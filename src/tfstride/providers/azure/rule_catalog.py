@@ -224,6 +224,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-key-vault-key-rotation-policy-incomplete",
+        title="Azure Key Vault key rotation posture is incomplete",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure Key Vault key rotation policies with bounded expiry and automatic rotation intervals, "
+            "and keep key validity windows aligned with cryptographic lifecycle and compliance requirements."
+        ),
+        tags=("azure", "key-vault", "keys", "rotation", "lifecycle"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-custom-role-wildcard-management-plane",
         title="Custom Azure role grants wildcard management-plane permissions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
