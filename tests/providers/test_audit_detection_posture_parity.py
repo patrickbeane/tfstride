@@ -83,6 +83,26 @@ AWS_ACCOUNT_AUDIT_RULE_CONCEPTS = {
     "threat_detection": frozenset({"aws-guardduty-detector-disabled-or-missing"}),
     "security_posture_management": frozenset({"aws-securityhub-account-missing"}),
 }
+AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER = {
+    "gcp": frozenset({"gcp-logging-sink-audit-export-incomplete"}),
+    "azure": frozenset({"azure-diagnostic-setting-no-log-destination"}),
+}
+AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER = {
+    "aws": frozenset(
+        {
+            "aws-cloudtrail-management-events-disabled",
+            "aws-cloudtrail-data-events-not-modeled",
+            "aws-cloudtrail-insight-selectors-missing",
+        }
+    ),
+    "gcp": frozenset(
+        {
+            "gcp-logging-exclusion-drops-audit-security-logs",
+            "gcp-logging-sink-audit-export-incomplete",
+        }
+    ),
+    "azure": frozenset({"azure-diagnostic-setting-audit-logs-incomplete"}),
+}
 
 GCP_ACCOUNT_AUDIT_RULE_IDS = frozenset().union(*GCP_ACCOUNT_AUDIT_RULE_CONCEPTS.values())
 AZURE_ACCOUNT_AUDIT_RULE_IDS = frozenset().union(*AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS.values())
@@ -227,14 +247,22 @@ def _unsafe_gcp_account_audit_resources() -> list[TerraformResource]:
     ]
 
 
+def _gcp_project_sink(
+    name: str,
+    values: dict[str, object] | None = None,
+) -> TerraformResource:
+    return _gcp_resource(
+        f"google_logging_project_sink.{name}",
+        GcpResourceType.LOGGING_PROJECT_SINK,
+        {"name": name, "project": "tfstride-demo", **(values or {})},
+    )
+
+
 def _unsafe_gcp_sink_audit_export_resources() -> list[TerraformResource]:
     return [
-        _gcp_resource(
-            "google_logging_project_sink.errors_only",
-            GcpResourceType.LOGGING_PROJECT_SINK,
+        _gcp_project_sink(
+            "errors_only",
             {
-                "name": "errors-only",
-                "project": "tfstride-demo",
                 "destination": "storage.googleapis.com/tfstride-audit-logs",
                 "filter": "severity>=ERROR",
             },
@@ -390,6 +418,92 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
         _assert_concepts_emit(self, aws_findings, AWS_ACCOUNT_AUDIT_RULE_CONCEPTS)
         _assert_concepts_emit(self, gcp_findings, GCP_ACCOUNT_AUDIT_RULE_CONCEPTS)
         _assert_concepts_emit(self, azure_findings, AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS)
+
+    def test_audit_destination_findings_are_pinned_where_provider_models_destinations(self) -> None:
+        gcp_findings = _evaluate_gcp(
+            [_gcp_project_sink("missing_destination")],
+            AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["gcp"],
+        )
+        azure_findings = _evaluate_azure(
+            [_azure_diagnostic_setting("storage_audit", _AZURE_STORAGE_ID, log_analytics_workspace_id=None)],
+            AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["azure"],
+        )
+
+        self.assertEqual(_finding_ids(gcp_findings), AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["gcp"])
+        self.assertEqual(_finding_ids(azure_findings), AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["azure"])
+
+    def test_audit_event_and_category_coverage_findings_are_pinned_by_provider(self) -> None:
+        aws_findings = _evaluate_aws(
+            [
+                _aws_cloudtrail(
+                    event_selectors=[{"read_write_type": "All", "include_management_events": False}],
+                    insight_selectors=[],
+                )
+            ],
+            AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["aws"],
+        )
+        gcp_findings = _evaluate_gcp(
+            [
+                _gcp_project_sink(
+                    "errors_only",
+                    {
+                        "destination": "storage.googleapis.com/tfstride-audit-logs",
+                        "filter": "severity>=ERROR",
+                    },
+                ),
+                _gcp_resource(
+                    "google_logging_project_exclusion.audit",
+                    GcpResourceType.LOGGING_PROJECT_EXCLUSION,
+                    {
+                        "name": "drop-audit",
+                        "project": "tfstride-demo",
+                        "filter": "logName:cloudaudit.googleapis.com",
+                        "disabled": False,
+                    },
+                ),
+            ],
+            AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["gcp"],
+        )
+        azure_findings = _evaluate_azure(
+            [
+                _azure_web_app(),
+                _azure_diagnostic_setting("app_metrics", _AZURE_APP_ID, log_records=[]),
+            ],
+            AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["azure"],
+        )
+
+        self.assertEqual(_finding_ids(aws_findings), AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["aws"])
+        self.assertEqual(_finding_ids(gcp_findings), AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["gcp"])
+        self.assertEqual(_finding_ids(azure_findings), AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["azure"])
+
+    def test_audit_destination_and_event_category_safe_cases_stay_quiet(self) -> None:
+        aws_findings = _evaluate_aws(
+            [_aws_cloudtrail()],
+            AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["aws"],
+        )
+        gcp_findings = _evaluate_gcp(
+            [
+                _gcp_project_sink(
+                    "audit",
+                    {
+                        "destination": "storage.googleapis.com/tfstride-audit-logs",
+                        "filter": "logName:cloudaudit.googleapis.com",
+                    },
+                )
+            ],
+            AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["gcp"] | AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["gcp"],
+        )
+        azure_findings = _evaluate_azure(
+            [
+                _azure_storage_account(),
+                _azure_diagnostic_setting("storage_audit", _AZURE_STORAGE_ID),
+            ],
+            AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER["azure"] | AUDIT_EVENT_CATEGORY_RULE_IDS_BY_PROVIDER["azure"],
+        )
+
+        self.assertEqual(aws_findings, [])
+        self.assertEqual(gcp_findings, [])
+        self.assertEqual(azure_findings, [])
 
     def test_safe_account_audit_and_detection_posture_stays_quiet(self) -> None:
         aws_findings = _evaluate_aws(
