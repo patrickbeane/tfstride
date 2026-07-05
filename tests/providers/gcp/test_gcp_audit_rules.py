@@ -13,10 +13,12 @@ from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 
 _SCC_ASSET_DISCOVERY_RULE = "gcp-scc-asset-discovery-disabled"
 _LOGGING_EXCLUSION_RULE = "gcp-logging-exclusion-drops-audit-security-logs"
+_LOGGING_SINK_RULE = "gcp-logging-sink-audit-export-incomplete"
 _CENTRAL_AUDIT_SINK_RULE = "gcp-central-audit-sink-not-modeled"
 _AUDIT_RULE_IDS = (
     _SCC_ASSET_DISCOVERY_RULE,
     _LOGGING_EXCLUSION_RULE,
+    _LOGGING_SINK_RULE,
     _CENTRAL_AUDIT_SINK_RULE,
 )
 _MISSING = object()
@@ -82,16 +84,23 @@ def _project_exclusion(
     )
 
 
-def _project_sink() -> TerraformResource:
+def _project_sink(
+    *,
+    name: str = "audit",
+    destination: object = "storage.googleapis.com/tfstride-audit-logs",
+    filter_text: object = "logName:cloudaudit.googleapis.com",
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, object] = {"name": name, "project": "tfstride-demo"}
+    if destination is not _MISSING:
+        values["destination"] = destination
+    if filter_text is not _MISSING:
+        values["filter"] = filter_text
     return _terraform_resource(
-        "google_logging_project_sink.audit",
+        f"google_logging_project_sink.{name}",
         GcpResourceType.LOGGING_PROJECT_SINK,
-        {
-            "name": "audit",
-            "project": "tfstride-demo",
-            "destination": "storage.googleapis.com/tfstride-audit-logs",
-            "filter": "logName:cloudaudit.googleapis.com",
-        },
+        values,
+        unknown_values=unknown_values,
     )
 
 
@@ -164,6 +173,59 @@ class GcpAuditRuleTests(unittest.TestCase):
                 ),
             ],
             _LOGGING_EXCLUSION_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_logging_sink_missing_destination_or_unknown_destination_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _project_sink(name="missing_destination", destination=_MISSING, filter_text=_MISSING),
+                _project_sink(
+                    name="unknown_destination",
+                    destination=_MISSING,
+                    filter_text=_MISSING,
+                    unknown_values={"destination": True},
+                ),
+            ],
+            _LOGGING_SINK_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_LOGGING_SINK_RULE, _LOGGING_SINK_RULE])
+        findings_by_address = {finding.affected_resources[0]: finding for finding in findings}
+        missing_evidence = _evidence_by_key(findings_by_address["google_logging_project_sink.missing_destination"])
+        unknown_evidence = _evidence_by_key(findings_by_address["google_logging_project_sink.unknown_destination"])
+        self.assertIn("destination=not_configured", missing_evidence["logging_sink"])
+        self.assertIn("filter=not_configured", missing_evidence["logging_sink"])
+        self.assertEqual(missing_evidence["audit_export_posture"], ["destination is not configured"])
+        self.assertIn(
+            "destination uncertainty: destination is unknown after planning",
+            unknown_evidence["audit_export_posture"],
+        )
+        self.assertIn("uncertainty=destination is unknown after planning", unknown_evidence["logging_sink"])
+
+    def test_logging_sink_with_too_narrow_filter_is_detected(self) -> None:
+        findings = _evaluate(
+            [_project_sink(name="errors_only", filter_text="severity>=ERROR")],
+            _LOGGING_SINK_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_LOGGING_SINK_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn("destination=storage.googleapis.com/tfstride-audit-logs", evidence["logging_sink"])
+        self.assertIn("filter=severity>=ERROR", evidence["logging_sink"])
+        self.assertEqual(
+            evidence["audit_export_posture"],
+            ["filter does not clearly include audit or security log streams"],
+        )
+
+    def test_logging_sink_with_destination_and_audit_filter_or_no_filter_is_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _project_sink(name="all_logs", filter_text=_MISSING),
+                _project_sink(name="audit", filter_text="logName:cloudaudit.googleapis.com"),
+            ],
+            _LOGGING_SINK_RULE,
         )
 
         self.assertEqual(findings, [])

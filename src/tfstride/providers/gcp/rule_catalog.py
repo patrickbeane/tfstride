@@ -403,6 +403,18 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-logging-sink-audit-export-incomplete",
+        title="Logging sink audit export is incomplete",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure logging sinks with deterministic retained destinations and filters that include Cloud Audit "
+            "Logs or other security-relevant streams. Leave the filter unset when the sink should export all logs "
+            "from its scope."
+        ),
+        tags=("gcp", "logging", "audit", "sink", "monitoring"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-central-audit-sink-not-modeled",
         title="Central GCP audit logging sink is not modeled",
         category=StrideCategory.REPUDIATION,

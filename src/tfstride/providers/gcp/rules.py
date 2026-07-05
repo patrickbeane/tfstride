@@ -46,6 +46,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gke-control-plane-logging-incomplete",
         "gcp-scc-asset-discovery-disabled",
         "gcp-logging-exclusion-drops-audit-security-logs",
+        "gcp-logging-sink-audit-export-incomplete",
         "gcp-central-audit-sink-not-modeled",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
@@ -140,6 +141,7 @@ def build_gcp_rule_contribution(
         "gcp-logging-exclusion-drops-audit-security-logs": (
             audit_detectors.detect_logging_exclusion_drops_audit_security_logs
         ),
+        "gcp-logging-sink-audit-export-incomplete": (audit_detectors.detect_logging_sink_audit_export_incomplete),
         "gcp-central-audit-sink-not-modeled": audit_detectors.detect_central_audit_sink_not_modeled,
         "gcp-gke-network-policy-disabled": gcp_detectors.detect_gke_network_policy_disabled,
         "gcp-gke-secrets-encryption-not-configured": gcp_detectors.detect_gke_secrets_encryption_not_configured,

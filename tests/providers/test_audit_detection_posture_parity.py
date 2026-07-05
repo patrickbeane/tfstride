@@ -53,7 +53,9 @@ AWS_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
 )
 
 GCP_ACCOUNT_AUDIT_RULE_CONCEPTS = {
-    "central_audit_export": frozenset({"gcp-central-audit-sink-not-modeled"}),
+    "central_audit_export": frozenset(
+        {"gcp-central-audit-sink-not-modeled", "gcp-logging-sink-audit-export-incomplete"}
+    ),
     "audit_log_exclusion": frozenset({"gcp-logging-exclusion-drops-audit-security-logs"}),
     "security_posture_inventory": frozenset({"gcp-scc-asset-discovery-disabled"}),
 }
@@ -191,6 +193,21 @@ def _unsafe_gcp_account_audit_resources() -> list[TerraformResource]:
                 "disabled": False,
             },
         ),
+    ]
+
+
+def _unsafe_gcp_sink_audit_export_resources() -> list[TerraformResource]:
+    return [
+        _gcp_resource(
+            "google_logging_project_sink.errors_only",
+            GcpResourceType.LOGGING_PROJECT_SINK,
+            {
+                "name": "errors-only",
+                "project": "tfstride-demo",
+                "destination": "storage.googleapis.com/tfstride-audit-logs",
+                "filter": "severity>=ERROR",
+            },
+        )
     ]
 
 
@@ -332,7 +349,9 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
 
     def test_account_audit_and_detection_findings_are_pinned_by_provider_concept(self) -> None:
         aws_findings = _evaluate_aws(_unsafe_aws_account_audit_resources(), AWS_ACCOUNT_AUDIT_RULE_IDS)
-        gcp_findings = _evaluate_gcp(_unsafe_gcp_account_audit_resources(), GCP_ACCOUNT_AUDIT_RULE_IDS)
+        gcp_findings = _evaluate_gcp(_unsafe_gcp_account_audit_resources(), GCP_ACCOUNT_AUDIT_RULE_IDS) + _evaluate_gcp(
+            _unsafe_gcp_sink_audit_export_resources(), GCP_ACCOUNT_AUDIT_RULE_IDS
+        )
         azure_findings = _evaluate_azure(_unsafe_azure_account_audit_resources(), AZURE_ACCOUNT_AUDIT_RULE_IDS)
 
         _assert_concepts_emit(self, aws_findings, AWS_ACCOUNT_AUDIT_RULE_CONCEPTS)
@@ -388,7 +407,8 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
     def test_account_audit_detection_findings_remain_provider_local(self) -> None:
         findings_by_provider = {
             "aws": _evaluate_aws(_unsafe_aws_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
-            "gcp": _evaluate_gcp(_unsafe_gcp_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
+            "gcp": _evaluate_gcp(_unsafe_gcp_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS)
+            + _evaluate_gcp(_unsafe_gcp_sink_audit_export_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
             "azure": _evaluate_azure(_unsafe_azure_account_audit_resources(), ALL_ACCOUNT_AUDIT_RULE_IDS),
         }
 

@@ -116,6 +116,42 @@ class GcpAuditRuleDetectors:
             )
         return findings
 
+    def detect_logging_sink_audit_export_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for sink in context.inventory.by_type(*_LOGGING_SINK_TYPES):
+            facts = gcp_facts(sink)
+            posture_issues = _logging_sink_audit_export_issues(facts)
+            if not posture_issues:
+                continue
+
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[sink.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{sink.display_name} does not clearly export audit or security logs to a retained "
+                        "destination. A modeled sink without a deterministic destination or with a narrow filter "
+                        "can leave investigation and alerting coverage incomplete."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("logging_sink", _logging_sink_evidence(sink, facts)),
+                        evidence_item("audit_export_posture", posture_issues),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_central_audit_sink_not_modeled(
         self,
         context: RuleEvaluationContext,
@@ -195,6 +231,45 @@ def _scc_asset_discovery_evidence(resource: NormalizedResource, facts: GcpResour
     if facts.scc_asset_discovery_inclusion_mode:
         values.append(f"inclusion_mode={facts.scc_asset_discovery_inclusion_mode}")
     values.extend(_uncertainty_evidence(facts.audit_security_posture_uncertainties, ("enable_asset_discovery",)))
+    return values
+
+
+def _logging_sink_audit_export_issues(facts: GcpResourceFacts) -> list[str]:
+    issues: list[str] = []
+    destination_uncertainties = _matching_uncertainties(facts.audit_security_posture_uncertainties, ("destination",))
+    filter_uncertainties = _matching_uncertainties(facts.audit_security_posture_uncertainties, ("filter",))
+
+    if not facts.logging_sink_destination:
+        if destination_uncertainties:
+            issues.extend(f"destination uncertainty: {uncertainty}" for uncertainty in destination_uncertainties)
+        else:
+            issues.append("destination is not configured")
+
+    if filter_uncertainties:
+        issues.extend(f"filter uncertainty: {uncertainty}" for uncertainty in filter_uncertainties)
+    elif facts.logging_sink_filter and not _audit_security_filter_signals(facts.logging_sink_filter):
+        issues.append("filter does not clearly include audit or security log streams")
+
+    return issues
+
+
+def _logging_sink_evidence(resource: NormalizedResource, facts: GcpResourceFacts) -> list[str]:
+    values = _target_resource_evidence(resource, facts)
+    destination = facts.logging_sink_destination or "not_configured"
+    sink_filter = facts.logging_sink_filter or "not_configured"
+    values.append(f"destination={destination}")
+    values.append(f"filter={sink_filter}")
+    if facts.logging_sink_scope_type:
+        values.append(f"scope_type={facts.logging_sink_scope_type}")
+    if facts.logging_sink_scope:
+        values.append(f"scope={facts.logging_sink_scope}")
+    if facts.logging_sink_writer_identity:
+        values.append(f"writer_identity={facts.logging_sink_writer_identity}")
+    if facts.logging_sink_include_children is not None:
+        values.append(f"include_children={_bool_status(facts.logging_sink_include_children)}")
+    if facts.logging_sink_unique_writer_identity is not None:
+        values.append(f"unique_writer_identity={_bool_status(facts.logging_sink_unique_writer_identity)}")
+    values.extend(_uncertainty_evidence(facts.audit_security_posture_uncertainties, ("destination", "filter")))
     return values
 
 

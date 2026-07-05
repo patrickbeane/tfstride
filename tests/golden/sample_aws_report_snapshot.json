@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 162,
+      "registered_rule_count": 163,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -116,6 +116,7 @@
         "gcp-gke-control-plane-logging-incomplete",
         "gcp-scc-asset-discovery-disabled",
         "gcp-logging-exclusion-drops-audit-security-logs",
+        "gcp-logging-sink-audit-export-incomplete",
         "gcp-central-audit-sink-not-modeled",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
@@ -282,6 +283,7 @@
         "gcp-gke-control-plane-logging-incomplete": 0,
         "gcp-scc-asset-discovery-disabled": 0,
         "gcp-logging-exclusion-drops-audit-security-logs": 0,
+        "gcp-logging-sink-audit-export-incomplete": 0,
         "gcp-central-audit-sink-not-modeled": 0,
         "gcp-gke-network-policy-disabled": 0,
         "gcp-gke-secrets-encryption-not-configured": 0,
