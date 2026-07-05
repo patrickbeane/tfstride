@@ -10,7 +10,10 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.azure.diagnostic_index import build_azure_diagnostic_setting_index
+from tfstride.providers.azure.diagnostic_index import (
+    AzureDiagnosticSettingCoverage,
+    build_azure_diagnostic_setting_index,
+)
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -40,6 +43,8 @@ _DIAGNOSTIC_DESTINATION_FIELDS = (
     "eventhub_authorization_rule_id",
     "marketplace_partner_resource_id",
 )
+_DIAGNOSTIC_CATEGORY_FIELDS = ("enabled_log", "log", "category", "category_group")
+_AUDIT_SECURITY_CATEGORY_GROUPS = frozenset({"audit", "alllogs"})
 
 
 class AzureAuditRuleDetectors:
@@ -116,6 +121,45 @@ class AzureAuditRuleDetectors:
                         evidence_item("diagnostic_setting", _diagnostic_setting_evidence(setting, facts)),
                         evidence_item("diagnostic_categories", _diagnostic_category_evidence(facts)),
                         evidence_item("destination_posture", _diagnostic_destination_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_diagnostic_setting_audit_logs_incomplete(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        diagnostic_index = build_azure_diagnostic_setting_index(context.inventory)
+        findings: list[Finding] = []
+        for resource in context.inventory.by_type(*_DIAGNOSTIC_TARGET_TYPES):
+            coverage = diagnostic_index.coverage_for(resource)
+            if not coverage.has_diagnostic_settings or _has_audit_or_security_log_coverage(coverage):
+                continue
+
+            facts = azure_facts(resource)
+            severity_reasoning = _diagnostic_coverage_severity(resource)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[resource.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{resource.display_name} has resolved Azure Monitor diagnostic settings, but none clearly "
+                        "enable audit or security log categories or category groups. Metrics-only or incomplete "
+                        "diagnostics can leave security-relevant activity without retained audit logs."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(resource, facts)),
+                        evidence_item("diagnostic_settings", _diagnostic_setting_coverage_evidence(coverage)),
+                        evidence_item("diagnostic_categories", _diagnostic_coverage_category_evidence(coverage)),
+                        evidence_item("audit_log_posture", _audit_security_log_posture_evidence(coverage)),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -259,6 +303,54 @@ def _diagnostic_destination_evidence(facts: AzureResourceFacts) -> list[str]:
         values.append(f"eventhub_name={facts.diagnostic_eventhub_name}")
         values.append("eventhub_name without eventhub_authorization_rule_id is not treated as a log destination")
     values.extend(_uncertainty_evidence(facts.azure_security_posture_uncertainties, _DIAGNOSTIC_DESTINATION_FIELDS))
+    return values
+
+
+def _has_audit_or_security_log_coverage(coverage: AzureDiagnosticSettingCoverage) -> bool:
+    return any(_is_audit_or_security_log_category(category) for category in coverage.enabled_log_categories) or any(
+        _is_audit_or_security_log_category_group(group) for group in coverage.enabled_log_category_groups
+    )
+
+
+def _is_audit_or_security_log_category(value: str) -> bool:
+    normalized = _normalized_category_token(value)
+    return "audit" in normalized or "security" in normalized
+
+
+def _is_audit_or_security_log_category_group(value: str) -> bool:
+    normalized = _normalized_category_token(value)
+    return normalized in _AUDIT_SECURITY_CATEGORY_GROUPS or "audit" in normalized or "security" in normalized
+
+
+def _normalized_category_token(value: str) -> str:
+    return "".join(character for character in value.strip().lower() if character.isalnum())
+
+
+def _diagnostic_setting_coverage_evidence(coverage: AzureDiagnosticSettingCoverage) -> list[str]:
+    values = [f"diagnostic_setting={address}" for address in coverage.diagnostic_setting_addresses]
+    values.extend(f"destination={destination}" for destination in coverage.destinations)
+    if not coverage.destinations:
+        values.append("destination=not_configured")
+    return values
+
+
+def _diagnostic_coverage_category_evidence(coverage: AzureDiagnosticSettingCoverage) -> list[str]:
+    values: list[str] = []
+    values.extend(f"log_category={category}" for category in coverage.enabled_log_categories)
+    values.extend(f"log_category_group={group}" for group in coverage.enabled_log_category_groups)
+    values.extend(f"metric_category={category}" for category in coverage.metric_categories)
+    if not values:
+        values.append("no enabled log or metric categories were modeled")
+    return values
+
+
+def _audit_security_log_posture_evidence(coverage: AzureDiagnosticSettingCoverage) -> list[str]:
+    values = ["audit_or_security_log_category=not_confirmed"]
+    category_uncertainties = _uncertainty_evidence(coverage.uncertainties, _DIAGNOSTIC_CATEGORY_FIELDS)
+    if category_uncertainties:
+        values.extend(category_uncertainties)
+    else:
+        values.append("no audit or security log category/group is enabled")
     return values
 
 

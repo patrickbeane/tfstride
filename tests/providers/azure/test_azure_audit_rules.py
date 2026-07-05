@@ -12,6 +12,7 @@ from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 _AUDIT_RULE_IDS = (
     "azure-diagnostic-settings-missing",
     "azure-diagnostic-setting-no-log-destination",
+    "azure-diagnostic-setting-audit-logs-incomplete",
     "azure-defender-pricing-tier-not-standard",
     "azure-security-center-auto-provisioning-disabled",
 )
@@ -127,13 +128,15 @@ def _diagnostic_setting(
     storage_account_id: str | None = None,
     eventhub_authorization_rule_id: str | None = None,
     eventhub_name: str | None = None,
+    log_records: list[dict[str, object]] | None = None,
+    metric_records: list[dict[str, object]] | None = None,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
         "name": name,
         "target_resource_id": target_resource_id,
-        "enabled_log": [{"category": "AuditEvent"}],
-        "metric": [{"category": "AllMetrics", "enabled": True}],
+        "enabled_log": log_records if log_records is not None else [{"category": "AuditEvent"}],
+        "metric": metric_records if metric_records is not None else [{"category": "AllMetrics", "enabled": True}],
     }
     if log_analytics_workspace_id is not None:
         values["log_analytics_workspace_id"] = log_analytics_workspace_id
@@ -259,6 +262,68 @@ class AzureAuditRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+    def test_diagnostic_setting_without_audit_or_security_logs_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _key_vault(),
+                _diagnostic_setting("vault_metrics", _KEY_VAULT_ID, log_records=[]),
+            ],
+            "azure-diagnostic-setting-audit-logs-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-diagnostic-setting-audit-logs-incomplete"])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn(
+            "diagnostic_setting=azurerm_monitor_diagnostic_setting.vault_metrics", evidence["diagnostic_settings"]
+        )
+        self.assertEqual(evidence["diagnostic_categories"], ["metric_category=AllMetrics"])
+        self.assertIn(
+            "no audit or security log category/group is enabled",
+            evidence["audit_log_posture"],
+        )
+
+    def test_audit_security_categories_and_category_groups_suppress_incomplete_diagnostic_findings(self) -> None:
+        findings = _evaluate(
+            [
+                _mssql_server(),
+                _key_vault(),
+                _diagnostic_setting(
+                    "sql_security",
+                    _SQL_ID,
+                    log_records=[{"category": "SQLSecurityAuditEvents"}],
+                ),
+                _diagnostic_setting(
+                    "vault_all_logs",
+                    _KEY_VAULT_ID,
+                    log_records=[{"category_group": "allLogs"}],
+                ),
+            ],
+            "azure-diagnostic-setting-audit-logs-incomplete",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unknown_diagnostic_log_category_is_reported_with_uncertainty(self) -> None:
+        findings = _evaluate(
+            [
+                _storage_account(),
+                _diagnostic_setting(
+                    "storage_pending",
+                    _STORAGE_ID,
+                    log_records=[{"category": None}],
+                    unknown_values={"enabled_log": [{"category": True}]},
+                ),
+            ],
+            "azure-diagnostic-setting-audit-logs-incomplete",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-diagnostic-setting-audit-logs-incomplete"])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn(
+            "uncertainty=enabled_log.category is unknown after planning",
+            evidence["audit_log_posture"],
+        )
 
     def test_defender_pricing_tier_and_auto_provisioning_posture_are_detected(self) -> None:
         findings = _evaluate(

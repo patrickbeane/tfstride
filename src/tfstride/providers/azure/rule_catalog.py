@@ -447,6 +447,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-diagnostic-setting-audit-logs-incomplete",
+        title="Azure diagnostic setting does not enable audit logs",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable high-confidence audit or security log categories, or an audit/allLogs category group, for "
+            "diagnostic settings on sensitive Azure resources and route them to a retained logging destination."
+        ),
+        tags=("azure", "diagnostic-settings", "audit-logs", "logging", "monitoring"),
+        severity_factors=("internet_exposure", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-defender-pricing-tier-not-standard",
         title="Microsoft Defender for Cloud pricing tier is not Standard",
         category=StrideCategory.INFORMATION_DISCLOSURE,

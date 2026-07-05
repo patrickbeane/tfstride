@@ -64,6 +64,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-scm-access-unrestricted",
         "azure-diagnostic-settings-missing",
         "azure-diagnostic-setting-no-log-destination",
+        "azure-diagnostic-setting-audit-logs-incomplete",
         "azure-defender-pricing-tier-not-standard",
         "azure-security-center-auto-provisioning-disabled",
         "azure-aks-api-server-public-unrestricted",
@@ -176,6 +177,9 @@ def build_azure_rule_contribution(
         "azure-app-service-scm-access-unrestricted": app_service_detectors.detect_scm_access_unrestricted,
         "azure-diagnostic-settings-missing": audit_detectors.detect_missing_diagnostic_settings,
         "azure-diagnostic-setting-no-log-destination": audit_detectors.detect_diagnostic_setting_no_log_destination,
+        "azure-diagnostic-setting-audit-logs-incomplete": (
+            audit_detectors.detect_diagnostic_setting_audit_logs_incomplete
+        ),
         "azure-defender-pricing-tier-not-standard": audit_detectors.detect_defender_pricing_tier_not_standard,
         "azure-security-center-auto-provisioning-disabled": (
             audit_detectors.detect_security_center_auto_provisioning_disabled

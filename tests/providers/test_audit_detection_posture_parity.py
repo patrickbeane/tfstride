@@ -61,7 +61,11 @@ GCP_ACCOUNT_AUDIT_RULE_CONCEPTS = {
 }
 AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS = {
     "resource_diagnostics": frozenset(
-        {"azure-diagnostic-settings-missing", "azure-diagnostic-setting-no-log-destination"}
+        {
+            "azure-diagnostic-settings-missing",
+            "azure-diagnostic-setting-no-log-destination",
+            "azure-diagnostic-setting-audit-logs-incomplete",
+        }
     ),
     "defender_plan": frozenset({"azure-defender-pricing-tier-not-standard"}),
     "security_agent_provisioning": frozenset({"azure-security-center-auto-provisioning-disabled"}),
@@ -82,6 +86,7 @@ ALL_ACCOUNT_AUDIT_RULE_IDS = (
 
 _AZURE_STORAGE_ID = "/subscriptions/example/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs"
 _AZURE_KEY_VAULT_ID = "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/app"
+_AZURE_APP_ID = "/subscriptions/example/resourceGroups/app/providers/Microsoft.Web/sites/app"
 
 
 def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> frozenset[str]:
@@ -131,12 +136,14 @@ def _azure_diagnostic_setting(
     *,
     log_analytics_workspace_id: str
     | None = "/subscriptions/example/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/sec",
+    log_records: list[dict[str, object]] | None = None,
+    metric_records: list[dict[str, object]] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
         "name": name,
         "target_resource_id": target_resource_id,
-        "enabled_log": [{"category": "AuditEvent"}],
-        "metric": [{"category": "AllMetrics", "enabled": True}],
+        "enabled_log": log_records if log_records is not None else [{"category": "AuditEvent"}],
+        "metric": metric_records if metric_records is not None else [{"category": "AllMetrics", "enabled": True}],
     }
     if log_analytics_workspace_id is not None:
         values["log_analytics_workspace_id"] = log_analytics_workspace_id
@@ -154,6 +161,19 @@ def _azure_storage_account() -> TerraformResource:
             "shared_access_key_enabled": False,
         },
         name="logs",
+    )
+
+
+def _azure_web_app() -> TerraformResource:
+    return _azure_resource(
+        AzureResourceType.LINUX_WEB_APP,
+        {
+            "id": _AZURE_APP_ID,
+            "name": "app",
+            "public_network_access_enabled": False,
+            "site_config": [{"minimum_tls_version": "1.2"}],
+        },
+        name="app",
     )
 
 
@@ -215,6 +235,8 @@ def _unsafe_azure_account_audit_resources() -> list[TerraformResource]:
     return [
         _azure_storage_account(),
         _azure_diagnostic_setting("audit", _AZURE_KEY_VAULT_ID, log_analytics_workspace_id=None),
+        _azure_web_app(),
+        _azure_diagnostic_setting("app_metrics", _AZURE_APP_ID, log_records=[]),
         _azure_resource(
             AzureResourceType.SECURITY_CENTER_SUBSCRIPTION_PRICING,
             {"resource_type": "StorageAccounts", "tier": "Free"},
