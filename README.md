@@ -105,9 +105,9 @@ Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 
 | Provider | Status          | Coverage Summary                                                                                                                                     |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption posture, S3 public/encryption/versioning posture, IAM, KMS, SNS/SQS, Secrets Manager, VPC routing, security groups, trust boundaries, and control observations. |
-| GCP      | Active support  | Compute, GKE control-plane/auth/hardening posture, Cloud SQL, GCS public/encryption/versioning/retention posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, Secret Manager, KMS, firewall posture, and workload-to-data paths. |
-| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault, SQL/PostgreSQL recovery and exposure posture, App Service/Function Apps access posture, AKS control-plane/auth/add-on posture, Load Balancer/Application Gateway exposure, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, ALB listener TLS posture, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption posture, S3 public/encryption/versioning posture, Secrets Manager recovery/encryption/rotation posture, KMS rotation/deletion posture, VPC endpoint/private service posture, account audit/detection posture, IAM, SNS/SQS, VPC routing, security groups, trust boundaries, and control observations. |
+| GCP      | Active support  | Compute, GKE control-plane/auth/hardening posture, Cloud SQL, GCS public/encryption/versioning/retention posture, load balancer TLS posture, Private Service Access and Private Google Access posture, Secret Manager lifecycle/encryption posture, KMS rotation/destruction posture, audit logging/SCC posture, IAM, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, firewall posture, and workload-to-data paths. |
+| Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault network/key/secret lifecycle posture, SQL/PostgreSQL recovery and exposure posture, App Service/Function Apps access posture, AKS control-plane/auth/add-on posture, Load Balancer/Application Gateway exposure, diagnostic settings/Defender posture, managed identity/custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
 Unsupported resources are skipped and called out in the report.
 
@@ -121,10 +121,14 @@ AWS support currently includes:
 * `aws_ecs_task_definition`
 * `aws_ecs_cluster`
 * `aws_eks_cluster`
+* `aws_eks_addon`
 * `aws_security_group`
 * `aws_security_group_rule`
 * `aws_nat_gateway`
 * `aws_lb`
+* `aws_lb_listener`
+* `aws_lb_listener_rule`
+* `aws_lb_target_group`
 * `aws_db_instance`
 * `aws_s3_bucket`
 * `aws_s3_bucket_policy`
@@ -137,19 +141,26 @@ AWS support currently includes:
 * `aws_iam_role_policy_attachment`
 * `aws_iam_instance_profile`
 * `aws_lambda_function`
+* `aws_lambda_function_url`
 * `aws_lambda_permission`
 * `aws_kms_key`
 * `aws_sns_topic`
 * `aws_sqs_queue`
 * `aws_secretsmanager_secret`
+* `aws_secretsmanager_secret_rotation`
 * `aws_secretsmanager_secret_policy`
 * `aws_subnet`
 * `aws_vpc`
 * `aws_internet_gateway`
 * `aws_route_table`
 * `aws_route_table_association`
+* `aws_vpc_endpoint`
+* `aws_cloudtrail`
+* `aws_guardduty_detector`
+* `aws_securityhub_account`
+* `aws_config_configuration_recorder`
 
-AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, S3 public-access/encryption/versioning posture, RDS public endpoint, backup retention, deletion protection, and customer-managed KMS posture, IAM wildcard and workload-role permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
+AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, ALB listener HTTP/TLS certificate/SSL-policy posture, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, S3 public-access/encryption/versioning posture, RDS public endpoint, backup retention, deletion protection, and customer-managed KMS posture, Secrets Manager customer-managed key, recovery-window, and rotation posture, KMS key rotation and deletion-window posture, workload use of S3, KMS, or Secrets Manager without modeled VPC endpoint coverage, broad VPC endpoint policies, CloudTrail multi-region, log-validation, event-selector, data-event, and Insights posture, GuardDuty, Security Hub, and AWS Config baseline posture, IAM wildcard and workload-role permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
 
 </details>
 
@@ -170,6 +181,20 @@ GCP support currently includes normalization and analysis for:
 * `google_compute_router_nat`
 * `google_compute_forwarding_rule`
 * `google_compute_global_forwarding_rule`
+* `google_compute_backend_service`
+* `google_compute_backend_bucket`
+* `google_compute_url_map`
+* `google_compute_region_url_map`
+* `google_compute_target_http_proxy`
+* `google_compute_target_https_proxy`
+* `google_compute_region_target_http_proxy`
+* `google_compute_region_target_https_proxy`
+* `google_compute_ssl_policy`
+* `google_compute_managed_ssl_certificate`
+* `google_compute_service_attachment`
+* `google_compute_global_address`
+* `google_service_networking_connection`
+* `google_network_connectivity_service_connection_policy`
 * `google_cloud_run_service`
 * `google_cloud_run_v2_service`
 * Cloud Run IAM member, binding, and policy resources
@@ -194,10 +219,15 @@ GCP support currently includes normalization and analysis for:
 * Cloud KMS crypto-key and key-ring IAM member, binding, and policy resources
 * `google_storage_bucket`
 * GCS bucket IAM member, binding, and policy resources
+* `google_logging_project_sink`
+* `google_logging_organization_sink`
+* `google_logging_project_exclusion`
+* `google_logging_organization_exclusion`
+* `google_scc_organization_settings`
 
 GCP trust-boundary coverage includes public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, GCS buckets, Cloud NAT posture, and workload-to-sensitive-data paths through GCE, Cloud Run, and Cloud Functions service accounts.
 
-GCP rule coverage includes public compute ingress, GKE public control-plane and authorized-network posture, Workload Identity, legacy metadata, node identity, control-plane logging, network policy, secrets encryption, legacy ABAC, client-certificate auth, Shielded Nodes, and Binary Authorization posture, Cloud SQL exposure and recovery posture, GCS public-access, encryption, versioning, and retention posture, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
+GCP rule coverage includes public compute ingress, external load balancer HTTP/TLS and SSL-policy posture, GKE public control-plane and authorized-network posture, Workload Identity, legacy metadata, node identity, control-plane logging, network policy, secrets encryption, legacy ABAC, client-certificate auth, Shielded Nodes, and Binary Authorization posture, Cloud SQL exposure, private-service-access, and recovery posture, Private Google Access posture for private workloads, GCS public-access, encryption, versioning, and retention posture, Secret Manager customer-managed encryption and lifecycle posture, Cloud KMS rotation and key-version destruction posture, Security Command Center asset-discovery posture, logging exclusions that drop audit/security logs, logging sink destination/filter coverage, central audit sink modeling, broad IAM access to sensitive services, internet-exposed workloads with sensitive data access, broad organization/folder/project IAM principals, service-account key hygiene, and custom-role permission expansion.
 
 GCP currently emphasizes findings and evidence over provider-specific positive observation records; dedicated GCP observation records are still limited.
 
@@ -249,14 +279,21 @@ Azure support currently includes normalization, decoration, and analysis for Azu
 * `azurerm_postgresql_flexible_server_database`
 * `azurerm_postgresql_flexible_server_firewall_rule`
 * `azurerm_postgresql_flexible_server_configuration`
+* `azurerm_monitor_diagnostic_setting`
+* `azurerm_security_center_subscription_pricing`
+* `azurerm_security_center_auto_provisioning`
+* `azurerm_security_center_contact`
+* `azurerm_security_center_workspace`
+* `azurerm_security_center_setting`
+* `azurerm_advanced_threat_protection`
 
 AzureRM provider detection uses provider source paths ending in `/azurerm` and Terraform resource types prefixed with `azurerm_`. Adjacent providers such as AzAPI, AzureAD, and Azure DevOps are not claimed as AzureRM support.
 
 Azure trust-boundary coverage includes public storage and Key Vault endpoints plus virtual machines that are reachable through a public IP and effective subnet/NIC NSG decisions.
 
-Azure rule coverage includes public storage posture, Key Vault network/recovery/authorization posture, SQL and PostgreSQL public access, recovery, and transport hardening, App Service public access, TLS, managed-identity, VNet-integration, access-restriction, and SCM posture, Private Endpoint coverage, DNS posture, and public fallback for supported data-plane resources, Load Balancer and Application Gateway public exposure, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, AKS control-plane, auth, network-policy, workload-identity, KMS, monitoring, Defender, and Azure Policy posture, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
+Azure rule coverage includes public storage posture, storage encryption ownership and recovery posture, Key Vault network/recovery/authorization posture, Key Vault key rotation and key-strength posture, Key Vault secret and certificate lifecycle posture, SQL and PostgreSQL public access, recovery, and transport hardening, App Service public access, TLS, managed-identity, VNet-integration, access-restriction, and SCM posture, Private Endpoint coverage, DNS posture, and public fallback for supported data-plane resources, Load Balancer and Application Gateway public exposure, diagnostic settings coverage, diagnostic log destination and audit-category completeness, Defender pricing and auto-provisioning posture, custom RBAC role breadth and assigned blast radius, managed identity broad RBAC assignments, AKS control-plane, auth, network-policy, workload-identity, KMS, monitoring, Defender, and Azure Policy posture, precedence-aware broad NSG ingress, public virtual machines with broad administrative or all-port ingress, and deterministic public-workload-to-sensitive-resource exposure paths where the required plan facts are available.
 
-Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage, DNS-zone-group posture, and public-fallback posture for supported Storage, Key Vault, and SQL resources. AKS support covers public/private API posture, authorized IP restrictions, local account usage, RBAC posture, network policy posture, workload identity/OIDC, KMS, monitoring, Defender, and Azure Policy signals when represented in the plan. Deeper AKS workload/node posture, full Private DNS record correctness, App Service routing/auth modeling, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
+Azure identity analysis is scoped to managed identities, role assignments, custom role definitions, Key Vault access policies, and vault-scoped role assignments when they resolve deterministically in the Terraform plan. Private Endpoint analysis is scoped to deterministic coverage, DNS-zone-group posture, and public-fallback posture for supported Storage, Key Vault, and SQL resources. Diagnostic analysis is scoped to resolved diagnostic settings for supported sensitive resources and modeled Defender/Security Center resources. AKS support covers public/private API posture, authorized IP restrictions, local account usage, RBAC posture, network policy posture, workload identity/OIDC, KMS, monitoring, Defender, and Azure Policy signals when represented in the plan. Deeper AKS workload/node posture, full Private DNS record correctness, App Service routing/auth modeling, and broader unsupported platform services are reported as unsupported rather than silently treated as analyzed.
 
 Azure observations distinguish restricted network posture, identity authorization posture, private-endpoint uncertainty, and unresolved Azure plan values.
 
@@ -540,8 +577,9 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 ## Limitations
 
 * AWS is currently the deepest provider implementation.
-* GCP support is narrower than AWS today and currently has limited provider-specific positive observation records compared with its finding coverage.
-* Azure support is narrower than AWS and GCP today and focuses on Azure Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS posture, Private Endpoint and DNS-zone-group posture, Load Balancer/Application Gateway exposure, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
+* GCP support is broad across core workload, data, Kubernetes, private-connectivity, public-edge TLS, and audit/security-posture checks, but still has limited provider-specific positive observation records compared with its finding coverage.
+* Azure service breadth is intentionally scoped, but now covers Storage, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS posture, Private Endpoint and DNS-zone-group posture, Load Balancer/Application Gateway exposure, diagnostics/Defender posture, managed identity/custom RBAC posture, NSG-based public ingress, public virtual-machine exposure, and deterministic sensitive-resource exposure paths.
+* Audit, detection, and private-connectivity checks are based on modeled Terraform resources. They do not prove runtime log delivery, DNS resolution, endpoint routing, or cloud-control state outside the plan.
 * Deeper managed Kubernetes workload/node posture, full Private Endpoint DNS record correctness, App Service routing/auth modeling, and broader Azure RBAC hierarchy modeling are not covered yet.
 * Terraform resource coverage is scoped to security-relevant resources, relationships, and trust paths rather than exhaustive provider parity.
 * Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
