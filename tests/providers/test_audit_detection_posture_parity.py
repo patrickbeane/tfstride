@@ -72,7 +72,13 @@ AZURE_ACCOUNT_AUDIT_RULE_CONCEPTS = {
 }
 AWS_ACCOUNT_AUDIT_RULE_CONCEPTS = {
     "account_audit_trail": frozenset(
-        {"aws-cloudtrail-multi-region-disabled", "aws-cloudtrail-log-file-validation-disabled"}
+        {
+            "aws-cloudtrail-multi-region-disabled",
+            "aws-cloudtrail-log-file-validation-disabled",
+            "aws-cloudtrail-management-events-disabled",
+            "aws-cloudtrail-data-events-not-modeled",
+            "aws-cloudtrail-insight-selectors-missing",
+        }
     ),
     "threat_detection": frozenset({"aws-guardduty-detector-disabled-or-missing"}),
     "security_posture_management": frozenset({"aws-securityhub-account-missing"}),
@@ -190,7 +196,12 @@ def _azure_resource(resource_type: str, values: dict[str, object], *, name: str 
 
 def _unsafe_aws_account_audit_resources() -> list[TerraformResource]:
     return [
-        _aws_cloudtrail(multi_region=False, log_file_validation=False),
+        _aws_cloudtrail(
+            multi_region=False,
+            log_file_validation=False,
+            event_selectors=[{"read_write_type": "All", "include_management_events": False}],
+            insight_selectors=[],
+        ),
         _aws_guardduty(enabled=False),
         _aws_config_recorder(),
     ]

@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 164,
+      "registered_rule_count": 167,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -46,6 +46,9 @@
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
+        "aws-cloudtrail-management-events-disabled",
+        "aws-cloudtrail-data-events-not-modeled",
+        "aws-cloudtrail-insight-selectors-missing",
         "aws-guardduty-detector-disabled-or-missing",
         "aws-securityhub-account-missing",
         "aws-database-permissive-ingress",
@@ -214,6 +217,9 @@
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown": 0,
         "aws-cloudtrail-multi-region-disabled": 0,
         "aws-cloudtrail-log-file-validation-disabled": 0,
+        "aws-cloudtrail-management-events-disabled": 0,
+        "aws-cloudtrail-data-events-not-modeled": 0,
+        "aws-cloudtrail-insight-selectors-missing": 0,
         "aws-guardduty-detector-disabled-or-missing": 0,
         "aws-securityhub-account-missing": 0,
         "aws-database-permissive-ingress": 1,

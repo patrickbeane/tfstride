@@ -83,6 +83,39 @@ AWS_RULE_METADATA = (
         severity_factors=("lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-cloudtrail-management-events-disabled",
+        title="CloudTrail management events are explicitly disabled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable CloudTrail management events for account and control-plane API activity, and avoid selector "
+            "configurations that explicitly exclude management events from the trail."
+        ),
+        tags=("aws", "cloudtrail", "audit", "management-events", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-cloudtrail-data-events-not-modeled",
+        title="CloudTrail data event selectors are not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Add CloudTrail data event selectors for sensitive data-plane resources such as S3 objects or Lambda "
+            "functions when those operations need retained audit coverage."
+        ),
+        tags=("aws", "cloudtrail", "audit", "data-events", "account-posture"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-cloudtrail-insight-selectors-missing",
+        title="CloudTrail Insights selectors are not configured",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure CloudTrail Insights selectors such as ApiCallRateInsight or ApiErrorRateInsight where "
+            "control-plane anomaly detection is expected for the account trail."
+        ),
+        tags=("aws", "cloudtrail", "audit", "insights", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-guardduty-detector-disabled-or-missing",
         title="GuardDuty detector is disabled or not modeled",
         category=StrideCategory.REPUDIATION,

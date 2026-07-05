@@ -96,6 +96,110 @@ class AwsAccountAuditRuleDetectors:
             )
         return findings
 
+    def detect_cloudtrail_management_events_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for trail in context.inventory.by_type(_AWS_CLOUDTRAIL):
+            facts = aws_facts(trail)
+            if _event_selectors_unknown(facts) or not _management_events_explicitly_disabled(
+                facts.cloudtrail_event_selectors
+            ):
+                continue
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[trail.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{trail.display_name} has modeled CloudTrail event selectors that explicitly disable "
+                        "management events. Control-plane API activity may not have the expected audit coverage "
+                        "from this trail."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _account_resource_evidence(trail, facts)),
+                        evidence_item("event_selectors", _cloudtrail_event_selector_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloudtrail_data_events_not_modeled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for trail in context.inventory.by_type(_AWS_CLOUDTRAIL):
+            facts = aws_facts(trail)
+            event_selectors = facts.cloudtrail_event_selectors
+            if _event_selectors_unknown(facts) or not event_selectors or _has_data_event_selector(event_selectors):
+                continue
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[trail.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{trail.display_name} models CloudTrail event selectors, but none include data event "
+                        "resources. Data-plane operations for resources such as S3 objects or Lambda functions may "
+                        "not have retained CloudTrail data event coverage from this trail."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _account_resource_evidence(trail, facts)),
+                        evidence_item("data_event_coverage", _cloudtrail_data_event_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloudtrail_insight_selectors_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for trail in context.inventory.by_type(_AWS_CLOUDTRAIL):
+            facts = aws_facts(trail)
+            if facts.cloudtrail_insight_selectors or _insight_selectors_unknown(facts):
+                continue
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[trail.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{trail.display_name} does not model CloudTrail Insights selectors. Control-plane anomaly "
+                        "detection for unusual API call rates or error rates may be outside this trail coverage."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _account_resource_evidence(trail, facts)),
+                        evidence_item("insight_selectors", _cloudtrail_insight_selector_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_guardduty_detector_disabled_or_missing(
         self,
         context: RuleEvaluationContext,
@@ -244,6 +348,99 @@ def _cloudtrail_log_validation_evidence(facts: AwsResourceFacts) -> list[str]:
     else:
         values.append("enable_log_file_validation is unknown")
     return values
+
+
+def _event_selectors_unknown(facts: AwsResourceFacts) -> bool:
+    return bool(_matching_uncertainties(facts.audit_detection_posture_uncertainties, ("event_selector",)))
+
+
+def _insight_selectors_unknown(facts: AwsResourceFacts) -> bool:
+    return bool(_matching_uncertainties(facts.audit_detection_posture_uncertainties, ("insight_selector",)))
+
+
+def _management_events_explicitly_disabled(selectors: list[dict]) -> bool:
+    include_values = [_known_boolish(selector.get("include_management_events")) for selector in selectors]
+    return bool(include_values) and all(value is False for value in include_values)
+
+
+def _has_data_event_selector(selectors: list[dict]) -> bool:
+    return any(bool(_data_resource_records(selector)) for selector in selectors)
+
+
+def _known_boolish(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+    return None
+
+
+def _data_resource_records(selector: dict) -> list[dict]:
+    records = selector.get("data_resource")
+    if not isinstance(records, list):
+        return []
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _cloudtrail_event_selector_evidence(facts: AwsResourceFacts) -> list[str]:
+    selectors = facts.cloudtrail_event_selectors
+    if not selectors:
+        values = ["event_selectors=not_modeled"]
+    else:
+        values = [f"event_selector_count={len(selectors)}"]
+        for index, selector in enumerate(selectors):
+            prefix = f"event_selector[{index}]"
+            values.append(f"{prefix}.read_write_type={selector.get('read_write_type', 'unknown')}")
+            values.append(f"{prefix}.include_management_events={selector.get('include_management_events', 'unknown')}")
+            data_resources = _data_resource_records(selector)
+            values.append(f"{prefix}.data_resource_count={len(data_resources)}")
+            for resource_index, data_resource in enumerate(data_resources):
+                resource_prefix = f"{prefix}.data_resource[{resource_index}]"
+                values.append(f"{resource_prefix}.type={data_resource.get('type', 'unknown')}")
+                values.append(f"{resource_prefix}.value_count={len(_selector_values(data_resource))}")
+    values.extend(_uncertainty_evidence(facts, ("event_selector",)))
+    return values
+
+
+def _cloudtrail_data_event_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [
+        f"event_selector_count={len(facts.cloudtrail_event_selectors)}",
+        f"data_resource_selectors={_data_resource_selector_count(facts.cloudtrail_event_selectors)}",
+    ]
+    values.extend(_cloudtrail_event_selector_evidence(facts))
+    return values
+
+
+def _cloudtrail_insight_selector_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [f"insight_selector={selector}" for selector in facts.cloudtrail_insight_selectors]
+    if not values:
+        values.append("insight_selectors=not_configured")
+    values.extend(_uncertainty_evidence(facts, ("insight_selector",)))
+    return values
+
+
+def _data_resource_selector_count(selectors: list[dict]) -> int:
+    return sum(len(_data_resource_records(selector)) for selector in selectors)
+
+
+def _selector_values(data_resource: dict) -> list[object]:
+    values = data_resource.get("values")
+    return values if isinstance(values, list) else []
+
+
+def _uncertainty_evidence(facts: AwsResourceFacts, fields: tuple[str, ...]) -> list[str]:
+    return [
+        f"uncertainty={uncertainty}"
+        for uncertainty in _matching_uncertainties(facts.audit_detection_posture_uncertainties, fields)
+    ]
+
+
+def _matching_uncertainties(uncertainties: Iterable[str], fields: tuple[str, ...]) -> list[str]:
+    return [uncertainty for uncertainty in uncertainties if any(field in uncertainty for field in fields)]
 
 
 def _guardduty_evidence(facts: AwsResourceFacts) -> list[str]:

@@ -10,15 +10,29 @@ from tfstride.providers.aws.normalizer import AwsNormalizer
 
 _CLOUDTRAIL_MULTI_REGION_RULE = "aws-cloudtrail-multi-region-disabled"
 _CLOUDTRAIL_LOG_VALIDATION_RULE = "aws-cloudtrail-log-file-validation-disabled"
+_CLOUDTRAIL_MANAGEMENT_EVENTS_RULE = "aws-cloudtrail-management-events-disabled"
+_CLOUDTRAIL_DATA_EVENTS_RULE = "aws-cloudtrail-data-events-not-modeled"
+_CLOUDTRAIL_INSIGHT_SELECTORS_RULE = "aws-cloudtrail-insight-selectors-missing"
 _GUARDDUTY_RULE = "aws-guardduty-detector-disabled-or-missing"
 _SECURITYHUB_RULE = "aws-securityhub-account-missing"
 _AUDIT_RULE_IDS = (
     _CLOUDTRAIL_MULTI_REGION_RULE,
     _CLOUDTRAIL_LOG_VALIDATION_RULE,
+    _CLOUDTRAIL_MANAGEMENT_EVENTS_RULE,
+    _CLOUDTRAIL_DATA_EVENTS_RULE,
+    _CLOUDTRAIL_INSIGHT_SELECTORS_RULE,
     _GUARDDUTY_RULE,
     _SECURITYHUB_RULE,
 )
 _MISSING = object()
+_SAFE_EVENT_SELECTORS = [
+    {
+        "read_write_type": "All",
+        "include_management_events": True,
+        "data_resource": [{"type": "AWS::S3::Object", "values": ["arn:aws:s3:::audit/*"]}],
+    }
+]
+_SAFE_INSIGHT_SELECTORS = [{"insight_type": "ApiCallRateInsight"}]
 
 
 def _resource(
@@ -44,6 +58,8 @@ def _cloudtrail(
     name: str = "audit",
     multi_region: object = True,
     log_file_validation: object = True,
+    event_selectors: object = _MISSING,
+    insight_selectors: object = _MISSING,
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     values: dict[str, Any] = {
@@ -58,6 +74,14 @@ def _cloudtrail(
         values["is_multi_region_trail"] = multi_region
     if log_file_validation is not _MISSING:
         values["enable_log_file_validation"] = log_file_validation
+    if event_selectors is _MISSING:
+        values["event_selector"] = _SAFE_EVENT_SELECTORS
+    elif event_selectors is not None:
+        values["event_selector"] = event_selectors
+    if insight_selectors is _MISSING:
+        values["insight_selector"] = _SAFE_INSIGHT_SELECTORS
+    elif insight_selectors is not None:
+        values["insight_selector"] = insight_selectors
     return _resource("aws_cloudtrail", values, name=name, unknown_values=unknown_values)
 
 
@@ -167,6 +191,58 @@ class AwsAccountAuditRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_cloudtrail_event_coverage_findings_are_detected(self) -> None:
+        findings = _findings(
+            [
+                _cloudtrail(
+                    name="limited",
+                    event_selectors=[{"read_write_type": "All", "include_management_events": False}],
+                    insight_selectors=[],
+                )
+            ],
+            _CLOUDTRAIL_MANAGEMENT_EVENTS_RULE,
+            _CLOUDTRAIL_DATA_EVENTS_RULE,
+            _CLOUDTRAIL_INSIGHT_SELECTORS_RULE,
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [
+                _CLOUDTRAIL_MANAGEMENT_EVENTS_RULE,
+                _CLOUDTRAIL_DATA_EVENTS_RULE,
+                _CLOUDTRAIL_INSIGHT_SELECTORS_RULE,
+            ],
+        )
+        findings_by_rule = {finding.rule_id: finding for finding in findings}
+        management_evidence = _evidence_by_key(findings_by_rule[_CLOUDTRAIL_MANAGEMENT_EVENTS_RULE])
+        data_evidence = _evidence_by_key(findings_by_rule[_CLOUDTRAIL_DATA_EVENTS_RULE])
+        insights_evidence = _evidence_by_key(findings_by_rule[_CLOUDTRAIL_INSIGHT_SELECTORS_RULE])
+        self.assertIn(
+            "event_selector[0].include_management_events=False",
+            management_evidence["event_selectors"],
+        )
+        self.assertIn("data_resource_selectors=0", data_evidence["data_event_coverage"])
+        self.assertEqual(insights_evidence["insight_selectors"], ["insight_selectors=not_configured"])
+
+    def test_cloudtrail_event_coverage_safe_selectors_are_quiet(self) -> None:
+        findings = _findings(
+            [_cloudtrail()],
+            _CLOUDTRAIL_MANAGEMENT_EVENTS_RULE,
+            _CLOUDTRAIL_DATA_EVENTS_RULE,
+            _CLOUDTRAIL_INSIGHT_SELECTORS_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_absent_event_selectors_do_not_overclaim_management_or_data_event_coverage(self) -> None:
+        findings = _findings(
+            [_cloudtrail(event_selectors=None)],
+            _CLOUDTRAIL_MANAGEMENT_EVENTS_RULE,
+            _CLOUDTRAIL_DATA_EVENTS_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
     def test_missing_guardduty_and_securityhub_are_detected_when_account_controls_are_modeled(self) -> None:
         findings = _findings([_cloudtrail(), _config_recorder()], _GUARDDUTY_RULE, _SECURITYHUB_RULE)
 
@@ -198,7 +274,14 @@ class AwsAccountAuditRuleTests(unittest.TestCase):
                 _cloudtrail(
                     multi_region=False,
                     log_file_validation=False,
-                    unknown_values={"is_multi_region_trail": True, "enable_log_file_validation": True},
+                    event_selectors=[{"read_write_type": "All", "include_management_events": False}],
+                    insight_selectors=[],
+                    unknown_values={
+                        "is_multi_region_trail": True,
+                        "enable_log_file_validation": True,
+                        "event_selector": True,
+                        "insight_selector": True,
+                    },
                 ),
                 _guardduty(enabled=False, unknown_values={"enable": True}),
                 _securityhub(),
