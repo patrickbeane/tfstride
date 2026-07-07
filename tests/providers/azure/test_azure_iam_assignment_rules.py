@@ -78,6 +78,39 @@ def _role_definition() -> TerraformResource:
     )
 
 
+def _storage_account() -> TerraformResource:
+    return _resource(
+        AzureResourceType.STORAGE_ACCOUNT,
+        "logs",
+        {
+            "id": "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs",
+            "name": "logs",
+            "allow_nested_items_to_be_public": False,
+            "shared_access_key_enabled": False,
+            "min_tls_version": "TLS1_2",
+            "public_network_access_enabled": False,
+            "network_rules": [{"default_action": "Deny"}],
+        },
+    )
+
+
+def _key_vault() -> TerraformResource:
+    return _resource(
+        AzureResourceType.KEY_VAULT,
+        "application",
+        {
+            "id": "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.KeyVault/vaults/application",
+            "name": "application",
+            "tenant_id": "tenant-id",
+            "sku_name": "standard",
+            "enable_rbac_authorization": True,
+            "public_network_access_enabled": False,
+            "network_acls": [{"default_action": "Deny"}],
+            "purge_protection_enabled": True,
+        },
+    )
+
+
 def _findings(resources: list[TerraformResource]):
     inventory = AzureNormalizer().normalize(resources)
     return StrideRuleEngine().evaluate(
@@ -122,6 +155,59 @@ class AzureIamAssignmentRuleTests(unittest.TestCase):
         self.assertEqual(evidence["grant_confidence"], ["high"])
         self.assertIn("breadth_signal=subscription_scope", evidence["assignment_facts"])
 
+    def test_resource_scoped_storage_data_assignment_is_detected(self) -> None:
+        findings = _findings(
+            [
+                _storage_account(),
+                _role_assignment(
+                    role_definition_name="Storage Blob Data Owner",
+                    role_definition_id=(
+                        "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/storage-blob-owner"
+                    ),
+                    scope="azurerm_storage_account.logs.id",
+                ),
+            ]
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["azurerm_role_assignment.assignment", "azurerm_storage_account.logs"],
+        )
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(evidence["privilege_categories"], ["data-admin"])
+        self.assertEqual(
+            evidence["grant_scopes"],
+            ["scope_kind=resource; scope_value=azurerm_storage_account.logs.id"],
+        )
+        self.assertIn("target_resource=azurerm_storage_account.logs", evidence["assignment_facts"])
+
+    def test_resource_scoped_user_access_administrator_assignment_is_detected(self) -> None:
+        findings = _findings(
+            [
+                _role_assignment(
+                    role_definition_name="User Access Administrator",
+                    role_definition_id=(
+                        "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/user-access-admin"
+                    ),
+                    scope="/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs",
+                )
+            ]
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(evidence["privilege_categories"], ["iam-admin", "role-assignment"])
+        self.assertEqual(
+            evidence["grant_scopes"],
+            [
+                "scope_kind=resource; "
+                "scope_value=/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs"
+            ],
+        )
+
     def test_managed_identity_assignment_stays_with_managed_identity_rule(self) -> None:
         findings = _findings(
             [
@@ -150,6 +236,22 @@ class AzureIamAssignmentRuleTests(unittest.TestCase):
     def test_resource_scoped_key_vault_admin_stays_with_key_vault_rule(self) -> None:
         findings = _findings(
             [
+                _key_vault(),
+                _role_assignment(
+                    role_definition_name="Key Vault Administrator",
+                    role_definition_id=(
+                        "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/key-vault-admin"
+                    ),
+                    scope="azurerm_key_vault.application.id",
+                ),
+            ]
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_unresolved_resource_scoped_key_vault_admin_assignment_is_detected(self) -> None:
+        findings = _findings(
+            [
                 _role_assignment(
                     role_definition_name="Key Vault Administrator",
                     role_definition_id=(
@@ -160,7 +262,13 @@ class AzureIamAssignmentRuleTests(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(findings, [])
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(evidence["privilege_categories"], ["key-admin", "secrets-admin"])
+        self.assertEqual(
+            evidence["grant_scopes"],
+            ["scope_kind=resource; scope_value=azurerm_key_vault.application.id"],
+        )
 
     def test_reader_assignment_stays_quiet(self) -> None:
         findings = _findings(

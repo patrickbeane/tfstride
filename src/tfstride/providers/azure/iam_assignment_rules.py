@@ -5,9 +5,9 @@ from collections.abc import Iterable
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.identity import PrivilegeCategory, PrivilegeConfidence, PrivilegedAccessGrant
+from tfstride.identity import AssignmentScopeKind, PrivilegeCategory, PrivilegeConfidence, PrivilegedAccessGrant
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
 _HIGH_IMPACT_CATEGORIES = frozenset(
@@ -33,6 +33,26 @@ _CONTROL_PLANE_CATEGORIES = frozenset(
         PrivilegeCategory.AUDIT_ADMIN,
     }
 )
+_RESOURCE_SCOPED_DATA_ROLE_NAMES = frozenset(
+    {
+        "key vault administrator",
+        "key vault certificates officer",
+        "key vault crypto officer",
+        "key vault data access administrator",
+        "key vault secrets officer",
+        "storage account contributor",
+        "storage blob data contributor",
+        "storage blob data owner",
+    }
+)
+_TARGET_RULE_OWNED_TYPES = frozenset(
+    {
+        AzureResourceType.KEY_VAULT,
+        AzureResourceType.KEY_VAULT_CERTIFICATE,
+        AzureResourceType.KEY_VAULT_KEY,
+        AzureResourceType.KEY_VAULT_SECRET,
+    }
+)
 
 
 class AzureIamAssignmentRuleDetectors:
@@ -52,7 +72,7 @@ class AzureIamAssignmentRuleDetectors:
             facts = azure_facts(assignment)
             if facts.resolved_managed_identity_address or facts.resolved_role_definition_address:
                 continue
-            grants = tuple(grant for grant in facts.privileged_access_grants if _reportable_grant(grant))
+            grants = tuple(grant for grant in facts.privileged_access_grants if _reportable_grant(grant, facts))
             if not grants:
                 continue
             severity_reasoning = _severity_for_grants(grants)
@@ -60,7 +80,7 @@ class AzureIamAssignmentRuleDetectors:
                 self._finding_factory.build(
                     rule_id=rule_id,
                     severity=severity_reasoning.severity,
-                    affected_resources=[assignment.address],
+                    affected_resources=_affected_resources(assignment, grants),
                     trust_boundary_id=None,
                     rationale=(
                         f"{assignment.display_name} grants deterministic privileged Azure RBAC assignment "
@@ -84,12 +104,28 @@ class AzureIamAssignmentRuleDetectors:
         return findings
 
 
-def _reportable_grant(grant: PrivilegedAccessGrant) -> bool:
-    if not grant.has_broad_scope:
+def _reportable_grant(grant: PrivilegedAccessGrant, facts: AzureResourceFacts) -> bool:
+    if facts.role_assignment_target_resource_type in _TARGET_RULE_OWNED_TYPES:
         return False
-    return bool(
-        _grant_categories((grant,)) & (_HIGH_IMPACT_CATEGORIES | _DATA_ACCESS_CATEGORIES | _CONTROL_PLANE_CATEGORIES)
-    )
+
+    categories = _grant_categories((grant,))
+    if categories & _HIGH_IMPACT_CATEGORIES:
+        return True
+    if grant.has_broad_scope and categories & (_DATA_ACCESS_CATEGORIES | _CONTROL_PLANE_CATEGORIES):
+        return True
+    if "sensitive_resource_scope" in facts.role_assignment_breadth_signals and categories & (
+        _DATA_ACCESS_CATEGORIES | _CONTROL_PLANE_CATEGORIES
+    ):
+        return True
+    return _is_resource_scoped_data_role(grant, categories)
+
+
+def _is_resource_scoped_data_role(grant: PrivilegedAccessGrant, categories: set[PrivilegeCategory]) -> bool:
+    if grant.assignment_scope.scope_kind != AssignmentScopeKind.RESOURCE:
+        return False
+    if not categories & _DATA_ACCESS_CATEGORIES:
+        return False
+    return (grant.role_name or "").strip().lower() in _RESOURCE_SCOPED_DATA_ROLE_NAMES
 
 
 def _severity_for_grants(grants: tuple[PrivilegedAccessGrant, ...]):
@@ -178,6 +214,10 @@ def _confidence_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]
 
 def _provider_fact_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
     return _dedupe(value for grant in grants for value in grant.evidence)
+
+
+def _affected_resources(assignment: NormalizedResource, grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
+    return _dedupe([assignment.address, *(grant.assignment_scope.source_address for grant in grants)])
 
 
 def _dedupe(values: Iterable[str | None]) -> list[str]:
