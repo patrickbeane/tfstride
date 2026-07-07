@@ -4,7 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
+from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import (
@@ -76,6 +78,18 @@ class AwsResourceFacts:
     @property
     def policy_name(self) -> str | None:
         return self.get(AwsResourceMetadata.POLICY_NAME)
+
+    @property
+    def unresolved_attached_policy_arns(self) -> list[str]:
+        return self.get(AwsResourceMetadata.UNRESOLVED_ATTACHED_POLICY_ARNS)
+
+    @property
+    def attached_policy_arns(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ATTACHED_POLICY_ARNS)
+
+    @property
+    def attached_policy_addresses(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ATTACHED_POLICY_ADDRESSES)
 
     @property
     def cluster_reference(self) -> str | None:
@@ -248,6 +262,22 @@ class AwsResourceFacts:
     @property
     def audit_detection_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES)
+
+    @property
+    def privileged_access_grants(self) -> tuple[PrivilegedAccessGrant, ...]:
+        return deserialize_privileged_access_grants(self.get(AwsResourceMetadata.PRIVILEGED_ACCESS_GRANTS))
+
+    @property
+    def iam_assignment_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES)
+
+    @property
+    def privileged_access_posture(self) -> PrivilegedAccessPosture:
+        return PrivilegedAccessPosture(
+            provider="aws",
+            grants=self.privileged_access_grants,
+            unresolved_assignments=self.iam_assignment_posture_uncertainties,
+        )
 
     @property
     def cloudtrail_s3_bucket_name(self) -> str | None:
@@ -853,6 +883,12 @@ class AwsResourceFacts:
 
     def extend_secrets_manager_posture_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(AwsResourceMetadata.SECRETS_MANAGER_POSTURE_UNCERTAINTIES, values)
+
+    def set_privileged_access_grants(self, values: Sequence[dict[str, Any]]) -> None:
+        self.set(AwsResourceMetadata.PRIVILEGED_ACCESS_GRANTS, list(values))
+
+    def extend_iam_assignment_posture_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AwsResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES, values)
 
     def add_standalone_rule_address(self, value: str | None) -> None:
         self.append(AwsResourceMetadata.STANDALONE_RULE_ADDRESSES, value)

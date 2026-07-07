@@ -160,6 +160,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             [
                 "merge_standalone_security_group_rules",
                 "merge_role_policy_resources",
+                "normalize_iam_assignment_posture",
                 "resolve_instance_profile_roles",
                 "resolve_ecs_service_relationships",
                 "merge_resource_policy_resources",

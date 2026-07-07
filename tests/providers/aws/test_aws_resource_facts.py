@@ -131,6 +131,27 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
                 "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
                 "audit_detection_posture_uncertainties": ["enable_logging is unknown after planning"],
+                "privileged_access_grants": [
+                    {
+                        "provider": "aws",
+                        "principal_type": "role",
+                        "principal_identifier": "arn:aws:iam::111122223333:role/app",
+                        "principal_display_name": "aws_iam_role.app",
+                        "principal_source_address": "aws_iam_role.app",
+                        "scope_kind": "account",
+                        "scope_value": "*",
+                        "scope_source_address": None,
+                        "privilege_categories": ["full-admin"],
+                        "confidence": "high",
+                        "assignment_source_address": "aws_iam_role.app",
+                        "role_name": "app",
+                        "role_id": "arn:aws:iam::111122223333:role/app",
+                        "permission_patterns": ["*"],
+                        "evidence": ["action=*", "resource=*"],
+                        "uncertainties": [],
+                    }
+                ],
+                "iam_assignment_posture_uncertainties": ["arn:aws:iam::111122223333:policy/pending"],
                 "cloudtrail_s3_bucket_name": "audit-logs",
                 "cloudtrail_s3_key_prefix": "cloudtrail",
                 "cloudtrail_kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/audit",
@@ -305,6 +326,17 @@ class AwsResourceFactsTests(unittest.TestCase):
             ["ssl_policy is unknown after planning"],
         )
         self.assertEqual(facts.audit_detection_posture_uncertainties, ["enable_logging is unknown after planning"])
+        self.assertEqual(len(facts.privileged_access_grants), 1)
+        self.assertEqual(facts.privileged_access_grants[0].privilege_categories[0].value, "full-admin")
+        self.assertEqual(
+            facts.iam_assignment_posture_uncertainties,
+            ["arn:aws:iam::111122223333:policy/pending"],
+        )
+        self.assertEqual(facts.privileged_access_posture.provider, "aws")
+        self.assertEqual(
+            facts.privileged_access_posture.unresolved_assignments,
+            ("arn:aws:iam::111122223333:policy/pending",),
+        )
         self.assertEqual(facts.cloudtrail_s3_bucket_name, "audit-logs")
         self.assertEqual(facts.cloudtrail_s3_key_prefix, "cloudtrail")
         self.assertEqual(facts.cloudtrail_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/audit")

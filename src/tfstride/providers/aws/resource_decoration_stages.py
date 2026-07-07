@@ -9,6 +9,7 @@ from tfstride.providers.aws.resource_decoration.ecs import (
 )
 from tfstride.providers.aws.resource_decoration.iam import (
     MergeRolePolicyResourcesStage,
+    NormalizeIamAssignmentPostureStage,
     ResolveInstanceProfileRolesStage,
 )
 from tfstride.providers.aws.resource_decoration.network_posture import (
@@ -42,6 +43,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
     return (
         MergeStandaloneSecurityGroupRulesStage(),
         MergeRolePolicyResourcesStage(),
+        NormalizeIamAssignmentPostureStage(),
         ResolveInstanceProfileRolesStage(),
         ResolveEcsServiceRelationshipsStage(),
         MergeResourcePolicyResourcesStage(),

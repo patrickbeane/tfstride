@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.iam_assignment_posture import (
+    build_aws_privileged_access_posture,
+    serialize_privileged_access_posture,
+)
 from tfstride.providers.aws.resource_decoration.policies import clone_policy_statements
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
@@ -41,6 +45,22 @@ class MergeRolePolicyResourcesStage:
             aws_mutations(role).merge_policy_statements(clone_policy_statements(policy.policy_statements))
             aws_facts(role).add_attached_policy_arn(policy.arn or policy.identifier or policy.address)
             aws_facts(role).add_attached_policy_address(policy.address)
+
+
+class NormalizeIamAssignmentPostureStage:
+    name = "normalize_iam_assignment_posture"
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        for role in resources:
+            if role.resource_type != "aws_iam_role":
+                continue
+            facts = aws_facts(role)
+            posture = build_aws_privileged_access_posture(
+                role,
+                unresolved_assignments=facts.unresolved_attached_policy_arns,
+            )
+            facts.set_privileged_access_grants(serialize_privileged_access_posture(posture))
+            facts.extend_iam_assignment_posture_uncertainties(posture.unresolved_assignments)
 
 
 class ResolveInstanceProfileRolesStage:
