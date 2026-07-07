@@ -7,6 +7,7 @@ from tfstride.analysis.gcp.rules import GcpRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.gcp.audit_rules import GcpAuditRuleDetectors
+from tfstride.providers.gcp.iam_assignment_rules import GcpIamAssignmentRuleDetectors
 from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors
 
@@ -68,6 +69,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-org-folder-iam-privileged-role",
         "gcp-project-iam-broad-principal",
         "gcp-project-iam-privileged-role",
+        "gcp-iam-privileged-assignment",
         "gcp-inherited-iam-sensitive-resource-access",
         "gcp-inherited-iam-blast-radius",
     ),
@@ -82,6 +84,7 @@ def build_gcp_rule_contribution(
 ) -> RuleContribution:
     gcp_detectors = GcpRuleDetectors(finding_factory)
     audit_detectors = GcpAuditRuleDetectors(finding_factory)
+    iam_assignment_detectors = GcpIamAssignmentRuleDetectors(finding_factory)
     private_connectivity_detectors = GcpPrivateConnectivityRuleDetectors(finding_factory)
     path_chain_detectors = GcpPathChainRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
@@ -161,6 +164,7 @@ def build_gcp_rule_contribution(
         "gcp-org-folder-iam-privileged-role": gcp_detectors.detect_org_folder_iam_privileged_role,
         "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
         "gcp-project-iam-privileged-role": gcp_detectors.detect_project_iam_privileged_role,
+        "gcp-iam-privileged-assignment": iam_assignment_detectors.detect_privileged_assignment,
         "gcp-inherited-iam-sensitive-resource-access": gcp_detectors.detect_inherited_iam_sensitive_resource_access,
         "gcp-inherited-iam-blast-radius": gcp_detectors.detect_inherited_iam_blast_radius,
         "gcp-public-workload-sensitive-data-access": (

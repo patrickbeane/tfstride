@@ -606,6 +606,18 @@ GCP_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-iam-privileged-assignment",
+        title="GCP IAM assignment has privileged access posture",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Review high-impact GCP IAM assignments, replace owner/admin/service-account impersonation grants "
+            "with narrowly scoped predefined or custom roles, and keep broad project, folder, and organization "
+            "assignments limited to controlled break-glass or platform identities."
+        ),
+        tags=("gcp", "iam", "privileged-access", "role-assignment"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-inherited-iam-sensitive-resource-access",
         title="Inherited GCP IAM grant reaches sensitive resources",
         category=StrideCategory.INFORMATION_DISCLOSURE,
