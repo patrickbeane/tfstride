@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_decoration.iam_assignment import NormalizeIamAssignmentPostureStage
 from tfstride.providers.gcp.resource_decoration.iam_bindings import DecorateSensitiveIamBindingsStage
 from tfstride.providers.gcp.resource_decoration.load_balancer import DeriveLoadBalancerReachabilityStage
 from tfstride.providers.gcp.resource_decoration.network_posture import DeriveNetworkPostureStage
@@ -24,4 +25,5 @@ def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
         DeriveNetworkPostureStage(),
         DerivePublicExposureStage(),
         DecorateSensitiveIamBindingsStage(),
+        NormalizeIamAssignmentPostureStage(),
     )

@@ -20,6 +20,9 @@ def serverless_iam_resources(
 
 
 def resource_iam_target_reference(resource: NormalizedResource) -> str | None:
+    service_account_reference = resource.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE)
+    if service_account_reference:
+        return service_account_reference
     bucket_name = resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
     if bucket_name:
         return bucket_name

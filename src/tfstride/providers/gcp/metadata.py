@@ -189,6 +189,7 @@ class GcpResourceMetadata:
 
     NETWORK_TAGS = StringListMetadataField("network_tags")
     IAM_MEMBERS = StringListMetadataField("iam_members")
+    IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES = StringListMetadataField("iam_assignment_posture_uncertainties")
     CUSTOM_ROLE_PERMISSIONS = StringListMetadataField("custom_role_permissions")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("gcp_resource_policy_source_addresses")
     GCS_RETENTION_POLICY_UNCERTAINTIES = StringListMetadataField("gcs_retention_policy_uncertainties")
@@ -230,6 +231,7 @@ class GcpResourceMetadata:
     FIREWALL_DENY = DictListMetadataField("deny")
     FIREWALL_POLICY_MATCH = DictMetadataField("firewall_policy_match")
     IAM_BINDINGS = DictListMetadataField("iam_bindings")
+    PRIVILEGED_ACCESS_GRANTS = DictListMetadataField("privileged_access_grants")
     LOAD_BALANCER_BACKENDS = DictListMetadataField("load_balancer_backends")
     LOAD_BALANCER_HOST_RULES = DictListMetadataField("load_balancer_host_rules")
     LOAD_BALANCER_PATH_MATCHERS = DictListMetadataField("load_balancer_path_matchers")

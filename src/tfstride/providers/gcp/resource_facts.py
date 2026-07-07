@@ -4,7 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
+from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_utils import dedupe, service_account_member
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
@@ -203,6 +205,22 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     @property
     def iam_bindings(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.IAM_BINDINGS)
+
+    @property
+    def privileged_access_grants(self) -> tuple[PrivilegedAccessGrant, ...]:
+        return deserialize_privileged_access_grants(self.get(GcpResourceMetadata.PRIVILEGED_ACCESS_GRANTS))
+
+    @property
+    def iam_assignment_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES)
+
+    @property
+    def privileged_access_posture(self) -> PrivilegedAccessPosture:
+        return PrivilegedAccessPosture(
+            provider="gcp",
+            grants=self.privileged_access_grants,
+            unresolved_assignments=self.iam_assignment_posture_uncertainties,
+        )
 
     @property
     def custom_role_id(self) -> str | None:
@@ -772,6 +790,12 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     @property
     def iam_member(self) -> str | None:
         return self.get(GcpResourceMetadata.IAM_MEMBER)
+
+    def set_privileged_access_grants(self, values: Sequence[dict[str, Any]]) -> None:
+        self.set(GcpResourceMetadata.PRIVILEGED_ACCESS_GRANTS, list(values))
+
+    def extend_iam_assignment_posture_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(GcpResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES, values)
 
 
 def gcp_facts(resource: NormalizedResource) -> GcpResourceFacts:

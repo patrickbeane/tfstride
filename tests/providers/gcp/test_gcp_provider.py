@@ -235,6 +235,7 @@ class GcpProviderTests(unittest.TestCase):
                 "IAM_MEMBER",
                 "IAM_CONDITION",
                 "IAM_MEMBERS",
+                "IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES",
                 "CUSTOM_ROLE_ID",
                 "CUSTOM_ROLE_PERMISSIONS",
                 "CUSTOM_ROLE_STAGE",
@@ -244,6 +245,7 @@ class GcpProviderTests(unittest.TestCase):
                 "ORG_POLICY_SCOPE",
                 "ORG_POLICY_SCOPE_TYPE",
                 "IAM_BINDINGS",
+                "PRIVILEGED_ACCESS_GRANTS",
                 "ORG_POLICY_ENFORCED",
                 "ORG_POLICY_INHERIT_FROM_PARENT",
                 "ORG_POLICY_RESTORE_DEFAULT",
@@ -379,6 +381,9 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.kms_posture_uncertainties, [])
         self.assertIsNone(facts.project)
         self.assertEqual(facts.iam_bindings, [])
+        self.assertEqual(facts.privileged_access_grants, ())
+        self.assertEqual(facts.iam_assignment_posture_uncertainties, [])
+        self.assertFalse(facts.privileged_access_posture.has_privileged_grants)
         self.assertEqual(facts.authorized_networks, [])
         self.assertIsNone(facts.backup_enabled)
         self.assertIsNone(facts.point_in_time_recovery_enabled)
