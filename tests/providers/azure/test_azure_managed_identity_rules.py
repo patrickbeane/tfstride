@@ -311,6 +311,8 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
         self.assertIn("principal_id=principal-id", evidence["managed_identity"])
         self.assertEqual(evidence["breadth_signals"], ["subscription_scope", "broad_builtin_role"])
         self.assertIn("role=Owner", evidence["role_assignments"][0])
+        self.assertEqual(evidence["privilege_categories"], ["full-admin", "iam-admin", "policy-admin"])
+        self.assertIn("grant_1=role=Owner", evidence["privileged_access"][0])
 
     def test_reader_at_resource_scope_is_not_broad_rbac(self) -> None:
         _, _, findings = _evaluate(

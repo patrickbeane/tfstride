@@ -19,8 +19,8 @@ This run identified **1 trust boundaries** and **4 findings** across **13 normal
 - Provider resources considered: `13`
 - Normalized resources: `13`
 - Unsupported resources: `0`
-- Registered rules: `169`
-- Enabled rules: `169`
+- Registered rules: `170`
+- Enabled rules: `170`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -55,6 +55,8 @@ This run identified **1 trust boundaries** and **4 findings** across **13 normal
   - managed identity: address=azurerm_user_assigned_identity.deploy; identity_type=UserAssigned; principal_id=11111111-1111-1111-1111-111111111111; client_id=22222222-2222-2222-2222-222222222222
   - role assignments: source=azurerm_role_assignment.subscription_owner; role=Owner; scope=/subscriptions/00000000-0000-0000-0000-000000000000; scope_kind=subscription; signals=subscription_scope,broad_builtin_role; source=azurerm_role_assignment.storage_owner; role=Storage Blob Data Owner; scope=azurerm_storage_account.logs.id; scope_kind=resource; target=azurerm_storage_account.logs; signals=broad_builtin_role,sensitive_resource_scope
   - breadth signals: subscription_scope; broad_builtin_role; sensitive_resource_scope
+  - privileged access: grant_1=role=Owner; categories=full-admin,iam-admin,policy-admin; scope_kind=subscription; confidence=high; grant_2=role=Storage Blob Data Owner; categories=data-admin; scope_kind=resource; confidence=high
+  - privilege categories: full-admin; iam-admin; policy-admin; data-admin
 
 #### Internet-exposed Azure workload can access sensitive resources
 

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
+from tfstride.providers.azure.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 
 
@@ -21,6 +25,22 @@ class AzureIdentityFacts:
     @property
     def managed_identity_role_assignments(self) -> list[dict]:
         return self.get(AzureResourceMetadata.MANAGED_IDENTITY_ROLE_ASSIGNMENTS)
+
+    @property
+    def privileged_access_grants(self) -> tuple[PrivilegedAccessGrant, ...]:
+        return deserialize_privileged_access_grants(self.get(AzureResourceMetadata.PRIVILEGED_ACCESS_GRANTS))
+
+    @property
+    def iam_assignment_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES)
+
+    @property
+    def privileged_access_posture(self) -> PrivilegedAccessPosture:
+        return PrivilegedAccessPosture(
+            provider="azure",
+            grants=self.privileged_access_grants,
+            unresolved_assignments=self.iam_assignment_posture_uncertainties,
+        )
 
     @property
     def client_id(self) -> str | None:
@@ -58,6 +78,23 @@ class AzureIdentityFacts:
         if assignment not in assignments:
             assignments.append(assignment)
             self.set(AzureResourceMetadata.MANAGED_IDENTITY_ROLE_ASSIGNMENTS, assignments)
+
+    def set_privileged_access_grants(self, values: Sequence[dict[str, object]]) -> None:
+        self.set(AzureResourceMetadata.PRIVILEGED_ACCESS_GRANTS, list(values))
+
+    def add_privileged_access_grants(self, values: Sequence[dict[str, object]]) -> None:
+        grants = self.get(AzureResourceMetadata.PRIVILEGED_ACCESS_GRANTS)
+        changed = False
+        for value in values:
+            if value in grants:
+                continue
+            grants.append(dict(value))
+            changed = True
+        if changed:
+            self.set(AzureResourceMetadata.PRIVILEGED_ACCESS_GRANTS, grants)
+
+    def extend_iam_assignment_posture_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AzureResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES, values)
 
 
 def _identity_type_includes(identity_type: str | None, expected: str) -> bool:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tfstride.identity import AssignmentScopeKind, PrincipalType, PrivilegeCategory, PrivilegeConfidence
 from tfstride.models import TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import AzureNormalizer
@@ -257,6 +258,37 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             ["subscription", "resource_group"],
         )
 
+        grants = azure_facts(identity).privileged_access_grants
+        self.assertEqual(len(grants), 2)
+        self.assertEqual([grant.role_name for grant in grants], ["Owner", "Contributor"])
+        self.assertEqual(grants[0].provider, "azure")
+        self.assertEqual(grants[0].principal.principal_type, PrincipalType.MANAGED_IDENTITY)
+        self.assertEqual(grants[0].principal.identifier, "managed-principal-id")
+        self.assertEqual(grants[0].principal.source_address, identity.address)
+        self.assertEqual(grants[0].assignment_scope.scope_kind, AssignmentScopeKind.SUBSCRIPTION)
+        self.assertEqual(grants[0].assignment_scope.value, "/subscriptions/sub-0001")
+        self.assertEqual(
+            grants[0].privilege_categories,
+            (
+                PrivilegeCategory.FULL_ADMIN,
+                PrivilegeCategory.IAM_ADMIN,
+                PrivilegeCategory.POLICY_ADMIN,
+            ),
+        )
+        self.assertEqual(grants[0].confidence, PrivilegeConfidence.HIGH)
+        self.assertIn("Owner", grants[0].permission_patterns)
+        self.assertIn("breadth_signal=subscription_scope", grants[0].evidence)
+        self.assertEqual(grants[1].assignment_scope.scope_kind, AssignmentScopeKind.RESOURCE_GROUP)
+        self.assertEqual(
+            grants[1].privilege_categories,
+            (
+                PrivilegeCategory.COMPUTE_ADMIN,
+                PrivilegeCategory.NETWORK_ADMIN,
+                PrivilegeCategory.DATA_ADMIN,
+            ),
+        )
+        self.assertTrue(azure_facts(identity).privileged_access_posture.has_privileged_grants)
+
     def test_sensitive_resource_scope_resolves_target_resource_context(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
@@ -293,6 +325,20 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             azure_facts(identity).managed_identity_role_assignments[0]["target_resource_address"],
             "azurerm_storage_account.logs",
         )
+
+        assignment_grants = assignment_facts.privileged_access_grants
+        identity_grants = azure_facts(identity).privileged_access_grants
+        self.assertEqual(identity_grants, assignment_grants)
+        self.assertEqual(len(assignment_grants), 1)
+        grant = assignment_grants[0]
+        self.assertEqual(grant.principal.principal_type, PrincipalType.MANAGED_IDENTITY)
+        self.assertEqual(grant.assignment_scope.scope_kind, AssignmentScopeKind.RESOURCE)
+        self.assertEqual(grant.assignment_scope.value, "azurerm_storage_account.logs.id")
+        self.assertEqual(grant.assignment_scope.source_address, "azurerm_storage_account.logs")
+        self.assertEqual(grant.privilege_categories, (PrivilegeCategory.DATA_ADMIN,))
+        self.assertEqual(grant.role_name, "Storage Blob Data Owner")
+        self.assertIn("Storage Blob Data Owner", grant.permission_patterns)
+        self.assertIn("target_resource=azurerm_storage_account.logs", grant.evidence)
 
     def test_role_assignment_resolves_custom_role_definition_by_role_definition_id(self) -> None:
         role_definition_id = "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role"
@@ -375,6 +421,31 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             },
         )
 
+        grants = assignment_facts.privileged_access_grants
+        self.assertEqual(grants, azure_facts(identity).privileged_access_grants)
+        self.assertEqual(len(grants), 1)
+        grant = grants[0]
+        self.assertEqual(grant.principal.principal_type, PrincipalType.MANAGED_IDENTITY)
+        self.assertEqual(grant.assignment_scope.scope_kind, AssignmentScopeKind.SUBSCRIPTION)
+        self.assertEqual(
+            grant.privilege_categories,
+            (
+                PrivilegeCategory.IAM_ADMIN,
+                PrivilegeCategory.POLICY_ADMIN,
+                PrivilegeCategory.ROLE_ASSIGNMENT,
+                PrivilegeCategory.DATA_ADMIN,
+            ),
+        )
+        self.assertEqual(grant.confidence, PrivilegeConfidence.HIGH)
+        self.assertEqual(
+            grant.permission_patterns,
+            (
+                "Microsoft.Authorization/roleAssignments/write",
+                "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/*",
+            ),
+        )
+        self.assertIn("resolved_role_definition=azurerm_role_definition.custom_role", grant.evidence)
+
     def test_role_assignment_resolves_custom_role_definition_by_terraform_reference(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
@@ -431,6 +502,22 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
         assignment = azure_facts(identity).managed_identity_role_assignments[0]
         self.assertNotIn("resolved_role_definition_address", assignment)
         self.assertNotIn("role_definition_breadth_signals", assignment)
+        self.assertEqual(assignment_facts.privileged_access_grants, ())
+        self.assertEqual(azure_facts(identity).privileged_access_grants, ())
+        self.assertEqual(
+            assignment_facts.iam_assignment_posture_uncertainties,
+            [
+                "azurerm_role_assignment.unresolved_custom_role: custom role "
+                "azurerm_role_definition.missing.role_definition_resource_id was not resolved"
+            ],
+        )
+        self.assertEqual(
+            assignment_facts.privileged_access_posture.unresolved_assignments,
+            (
+                "azurerm_role_assignment.unresolved_custom_role: custom role "
+                "azurerm_role_definition.missing.role_definition_resource_id was not resolved",
+            ),
+        )
 
 
 if __name__ == "__main__":

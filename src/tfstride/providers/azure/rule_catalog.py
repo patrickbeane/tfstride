@@ -314,6 +314,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-rbac-privileged-assignment",
+        title="Azure principal has privileged RBAC assignment posture",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace broad built-in Azure RBAC assignments with least-privilege roles, scope assignments to the "
+            "smallest resource group or resource, and reserve subscription-wide administrative grants for tightly "
+            "controlled break-glass or deployment principals."
+        ),
+        tags=("azure", "rbac", "privileged-access", "role-assignment"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-managed-identity-broad-rbac",
         title="Azure managed identity has broad RBAC authority",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

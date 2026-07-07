@@ -11,6 +11,7 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.identity import PrivilegedAccessGrant
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
@@ -74,6 +75,14 @@ class AzureManagedIdentityRuleDetectors:
                         evidence_item("managed_identity", _managed_identity_evidence(identity)),
                         evidence_item("role_assignments", _describe_role_assignments(assignments)),
                         evidence_item("breadth_signals", signals),
+                        evidence_item(
+                            "privileged_access",
+                            _privileged_access_evidence(facts.privileged_access_grants),
+                        ),
+                        evidence_item(
+                            "privilege_categories",
+                            _privileged_access_categories(facts.privileged_access_grants),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -210,6 +219,29 @@ def _managed_identity_evidence(identity) -> list[str]:
         )
         if value
     ]
+
+
+def _privileged_access_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
+    values: list[str] = []
+    for index, grant in enumerate(grants, start=1):
+        categories = ",".join(category.value for category in grant.privilege_categories)
+        values.append(
+            "; ".join(
+                part
+                for part in (
+                    f"grant_{index}=role={grant.role_name or grant.role_id}",
+                    f"categories={categories}",
+                    f"scope_kind={grant.assignment_scope.scope_kind.value}",
+                    f"confidence={grant.confidence.value}",
+                )
+                if part and not part.endswith("=None") and not part.endswith("=")
+            )
+        )
+    return values
+
+
+def _privileged_access_categories(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
+    return _dedupe_strings(category.value for grant in grants for category in grant.privilege_categories)
 
 
 def _public_workloads_by_identity_address(inventory) -> dict[str, list[Any]]:

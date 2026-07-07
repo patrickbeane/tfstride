@@ -4,6 +4,10 @@ import re
 from collections.abc import Iterable
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.azure.iam_assignment_posture import (
+    build_azure_privileged_access_posture,
+    serialize_privileged_access_posture,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import (
@@ -93,15 +97,26 @@ class DecorateManagedIdentityRoleAssignmentsStage:
         )
 
         principal_id = facts.principal_id
-        if not principal_id:
-            return
-        matches = principal_index.get(_principal_key(principal_id), [])
-        if len(matches) != 1:
+        matches = principal_index.get(_principal_key(principal_id), []) if principal_id else []
+        identity = matches[0] if len(matches) == 1 else None
+        privileged_posture = build_azure_privileged_access_posture(
+            role_assignment,
+            scope_kind=scope_kind,
+            breadth_signals=breadth_signals,
+            target_resource=target_resource,
+            role_definition=role_definition,
+            principal=identity,
+        )
+        privileged_grants = serialize_privileged_access_posture(privileged_posture)
+        facts.set_privileged_access_grants(privileged_grants)
+        facts.extend_iam_assignment_posture_uncertainties(privileged_posture.unresolved_assignments)
+
+        if not principal_id or identity is None:
             return
 
-        identity = matches[0]
         facts.set_resolved_managed_identity_address(identity.address)
-        azure_facts(identity).add_managed_identity_role_assignment(
+        identity_facts = azure_facts(identity)
+        identity_facts.add_managed_identity_role_assignment(
             _role_assignment_record(
                 role_assignment,
                 scope_kind=scope_kind,
@@ -110,6 +125,8 @@ class DecorateManagedIdentityRoleAssignmentsStage:
                 role_definition=role_definition,
             )
         )
+        identity_facts.add_privileged_access_grants(privileged_grants)
+        identity_facts.extend_iam_assignment_posture_uncertainties(privileged_posture.unresolved_assignments)
 
 
 def _managed_identities_by_principal_id(
