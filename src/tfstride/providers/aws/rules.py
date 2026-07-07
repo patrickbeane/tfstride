@@ -7,6 +7,7 @@ from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, b
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
+from tfstride.providers.aws.iam_assignment_rules import AwsIamAssignmentRuleDetectors
 from tfstride.providers.aws.iam_rules import AwsIamRuleDetectors
 from tfstride.providers.aws.kms_rules import AwsKmsRuleDetectors
 from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
@@ -68,6 +69,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     ),
     (
         "aws-iam-wildcard-permissions",
+        "aws-iam-privileged-role-assignment",
         "aws-workload-role-sensitive-permissions",
     ),
     (
@@ -90,6 +92,7 @@ def build_aws_rule_contribution(
     network_data_detectors = AwsNetworkDataRuleDetectors(finding_factory)
     path_chain_detectors = AwsPathChainRuleDetectors(finding_factory)
     iam_detectors = AwsIamRuleDetectors(finding_factory)
+    iam_assignment_detectors = AwsIamAssignmentRuleDetectors(finding_factory)
     policy_trust_detectors = AwsPolicyTrustRuleDetectors(finding_factory)
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
@@ -150,6 +153,7 @@ def build_aws_rule_contribution(
         ),
         "aws-service-resource-policy-external-access": policy_trust_detectors.detect_service_resource_policy_exposure,
         "aws-iam-wildcard-permissions": iam_detectors.detect_wildcard_permissions,
+        "aws-iam-privileged-role-assignment": iam_assignment_detectors.detect_privileged_role_assignment,
         "aws-workload-role-sensitive-permissions": iam_detectors.detect_workload_role_sensitive_permissions,
         "aws-private-data-transitive-exposure": path_chain_detectors.detect_transitive_private_data_exposure,
         "aws-control-plane-sensitive-workload-chain": (

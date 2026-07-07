@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **19 trust boundaries** and **20 findings** across **25 normalized resources**.
+This run identified **19 trust boundaries** and **22 findings** across **25 normalized resources**.
 
-- High severity findings: `5`
+- High severity findings: `7`
 - Medium severity findings: `15`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **19 trust boundaries** and **20 findings** across **25 norm
 - Provider resources considered: `25`
 - Normalized resources: `25`
 - Unsupported resources: `0`
-- Registered rules: `167`
-- Enabled rules: `167`
+- Registered rules: `168`
+- Enabled rules: `168`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -34,6 +34,7 @@ This run identified **19 trust boundaries** and **20 findings** across **25 norm
   - `aws-workload-kms-vpc-endpoint-missing`: `1`
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `3`
+  - `aws-iam-privileged-role-assignment`: `2`
   - `aws-workload-role-sensitive-permissions`: `2`
   - `aws-missing-tier-segmentation`: `1`
   - `aws-role-trust-expansion`: `2`
@@ -190,6 +191,40 @@ This run identified **19 trust boundaries** and **20 findings** across **25 norm
   - security group rules: aws_security_group.db ingress tcp 5432 from 0.0.0.0/0 (Postgres from internet); aws_security_group.db ingress tcp 5432 from sg-bad-admin-001, sg-bad-front-001 (Postgres from public tiers)
   - network path: database is not marked directly internet reachable, but its security groups allow internet-origin ingress; database trusts security groups attached to internet-exposed workloads; aws_security_group.db allows sg-bad-front-001, sg-bad-admin-001 attached to aws_instance.admin, aws_instance.frontend, aws_lb.web
   - subnet posture: aws_instance.admin sits in public subnet aws_subnet.public_web with an internet route; aws_instance.frontend sits in public subnet aws_subnet.public_web with an internet route; aws_lb.web sits in public subnet aws_subnet.public_web with an internet route
+
+#### IAM role has privileged assignment posture
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `aws_iam_role.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +3, data_sensitivity +2, lateral_movement +2, blast_radius +3, final_score 10 => high
+- Rationale: aws_iam_role.app has deterministic privileged IAM assignment posture: full-admin, key-admin, privilege-escalation. If this role is attached to a workload or assumable by a control-plane principal, those privileges increase blast radius.
+- Recommended mitigation: Review high-impact IAM role permissions, split administrative and runtime duties, scope resources to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit administration permissions to general workload roles.
+- Evidence:
+  - iam role: address=aws_iam_role.app; type=aws_iam_role; arn=arn:aws:iam::555566667777:role/nightmare-app-role; identifier=nightmare-app-role
+  - privileged access: grant_1=categories=[full-admin, key-admin, privilege-escalation]; scope=account; confidence=high
+  - privilege categories: full-admin; key-admin; privilege-escalation
+  - permission patterns: *; sts:AssumeRole
+  - grant scopes: scope_kind=account; scope_value=*
+  - grant confidence: high
+  - inline policy sources: inline_policy_name=nightmare-app-inline
+
+#### IAM role has privileged assignment posture
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `aws_iam_role.pipeline`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +3, data_sensitivity +2, lateral_movement +2, blast_radius +3, final_score 10 => high
+- Rationale: aws_iam_role.pipeline has deterministic privileged IAM assignment posture: data-admin, iam-admin, privilege-escalation. If this role is attached to a workload or assumable by a control-plane principal, those privileges increase blast radius.
+- Recommended mitigation: Review high-impact IAM role permissions, split administrative and runtime duties, scope resources to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit administration permissions to general workload roles.
+- Evidence:
+  - iam role: address=aws_iam_role.pipeline; type=aws_iam_role; arn=arn:aws:iam::555566667777:role/nightmare-pipeline-role; identifier=nightmare-pipeline-role
+  - privileged access: grant_1=categories=[iam-admin, privilege-escalation, data-admin]; scope=account; confidence=high
+  - privilege categories: data-admin; iam-admin; privilege-escalation
+  - permission patterns: iam:*; iam:PassRole; s3:*
+  - grant scopes: scope_kind=account; scope_value=*
+  - grant confidence: high
+  - inline policy sources: inline_policy_name=nightmare-pipeline-inline
 
 #### Private data tier directly trusts the public application tier
 

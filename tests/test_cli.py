@@ -144,7 +144,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, POLICY_VIOLATION_EXIT_CODE)
         self.assertIn("## Findings", stdout_buffer.getvalue())
         self.assertIn("Policy gate failed", stderr_buffer.getvalue())
-        self.assertIn("3 high", stderr_buffer.getvalue())
+        self.assertIn("4 high", stderr_buffer.getvalue())
 
     def test_cli_fail_on_high_does_not_fail_safe_fixture(self) -> None:
         stdout_buffer = io.StringIO()
@@ -211,9 +211,9 @@ class CliTests(unittest.TestCase):
 
             payload = json.loads(json_output_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["tool"]["name"], "tfstride")
-            self.assertEqual(payload["summary"]["active_findings"], 11)
-            self.assertEqual(payload["summary"]["total_findings"], 11)
-            self.assertEqual(len(payload["findings"]), 11)
+            self.assertEqual(payload["summary"]["active_findings"], 12)
+            self.assertEqual(payload["summary"]["total_findings"], 12)
+            self.assertEqual(len(payload["findings"]), 12)
             self.assertEqual(payload["findings"][0]["fingerprint"].split(":")[0], "sha256")
 
     def test_cli_provider_option_can_select_gcp_inventory(self) -> None:
@@ -336,7 +336,7 @@ class CliTests(unittest.TestCase):
             self.assertTrue(baseline_path.exists())
 
             baseline_payload = json.loads(baseline_path.read_text(encoding="utf-8"))
-            self.assertEqual(len(baseline_payload["findings"]), 11)
+            self.assertEqual(len(baseline_payload["findings"]), 12)
 
             with redirect_stderr(stderr_buffer):
                 second_exit_code = main(
@@ -401,12 +401,12 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(first_exit_code, 0)
         self.assertEqual(second_exit_code, 0)
-        self.assertEqual(payload["summary"]["total_findings"], 11)
+        self.assertEqual(payload["summary"]["total_findings"], 12)
         self.assertEqual(payload["summary"]["active_findings"], 0)
         self.assertEqual(payload["summary"]["suppressed_findings"], 1)
-        self.assertEqual(payload["summary"]["baselined_findings"], 10)
+        self.assertEqual(payload["summary"]["baselined_findings"], 11)
         self.assertEqual(len(payload["suppressed_findings"]), 1)
-        self.assertEqual(len(payload["baselined_findings"]), 10)
+        self.assertEqual(len(payload["baselined_findings"]), 11)
 
     def test_cli_suppressions_can_filter_findings_before_policy_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

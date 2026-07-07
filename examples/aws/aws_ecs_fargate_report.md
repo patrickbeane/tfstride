@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **6 trust boundaries** and **8 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **9 findings** across **21 normalized resources**.
 
-- High severity findings: `0`
+- High severity findings: `1`
 - Medium severity findings: `8`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **6 trust boundaries** and **8 findings** across **21 normal
 - Provider resources considered: `21`
 - Normalized resources: `21`
 - Unsupported resources: `0`
-- Registered rules: `167`
-- Enabled rules: `167`
+- Registered rules: `168`
+- Enabled rules: `168`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -29,6 +29,7 @@ This run identified **6 trust boundaries** and **8 findings** across **21 normal
   - `aws-secretsmanager-rotation-not-configured-or-too-long`: `1`
   - `aws-workload-secretsmanager-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
+  - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `2`
 
@@ -80,7 +81,21 @@ This run identified **6 trust boundaries** and **8 findings** across **21 normal
 
 ### High
 
-No findings in this severity band.
+#### IAM role has privileged assignment posture
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `aws_iam_role.task`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +2, lateral_movement +0, blast_radius +3, final_score 7 => high
+- Rationale: aws_iam_role.task has deterministic privileged IAM assignment posture: secrets-admin. If this role is attached to a workload or assumable by a control-plane principal, those privileges increase blast radius.
+- Recommended mitigation: Review high-impact IAM role permissions, split administrative and runtime duties, scope resources to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit administration permissions to general workload roles.
+- Evidence:
+  - iam role: address=aws_iam_role.task; type=aws_iam_role; arn=arn:aws:iam::111122223333:role/app-task-role; identifier=app-task-role
+  - privileged access: grant_1=categories=[secrets-admin]; scope=account; confidence=high
+  - privilege categories: secrets-admin
+  - grant scopes: scope_kind=account; scope_value=*
+  - grant confidence: high
+  - inline policy sources: inline_policy_name=task-data-access
 
 ### Medium
 

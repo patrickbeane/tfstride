@@ -8,19 +8,19 @@
     "normalized_resources": 23,
     "unsupported_resources": 1,
     "trust_boundaries": 9,
-    "active_findings": 11,
-    "total_findings": 11,
+    "active_findings": 12,
+    "total_findings": 12,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "severity_counts": {
-      "high": 3,
+      "high": 4,
       "medium": 8,
       "low": 0
     }
   },
   "filtering": {
-    "total_findings": 11,
-    "active_findings": 11,
+    "total_findings": 12,
+    "active_findings": 12,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "suppressions_path": null,
@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 167,
+      "registered_rule_count": 168,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -78,6 +78,7 @@
         "aws-sensitive-resource-policy-external-access",
         "aws-service-resource-policy-external-access",
         "aws-iam-wildcard-permissions",
+        "aws-iam-privileged-role-assignment",
         "aws-workload-role-sensitive-permissions",
         "aws-missing-tier-segmentation",
         "aws-private-data-transitive-exposure",
@@ -249,6 +250,7 @@
         "aws-sensitive-resource-policy-external-access": 0,
         "aws-service-resource-policy-external-access": 0,
         "aws-iam-wildcard-permissions": 2,
+        "aws-iam-privileged-role-assignment": 1,
         "aws-workload-role-sensitive-permissions": 1,
         "aws-missing-tier-segmentation": 1,
         "aws-private-data-transitive-exposure": 0,
@@ -561,6 +563,17 @@
         "aws_security_group.db"
       ],
       "trust_boundary_id": "workload-to-data-store:aws_instance.app->aws_db_instance.app"
+    },
+    {
+      "rule_id": "aws-iam-privileged-role-assignment",
+      "title": "IAM role has privileged assignment posture",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "aws_iam_role.workload",
+        "aws_iam_policy.admin_like"
+      ],
+      "trust_boundary_id": null
     },
     {
       "rule_id": "aws-missing-tier-segmentation",

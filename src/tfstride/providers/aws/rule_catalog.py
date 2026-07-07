@@ -445,6 +445,18 @@ AWS_RULE_METADATA = (
         severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-iam-privileged-role-assignment",
+        title="IAM role has privileged assignment posture",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Review high-impact IAM role permissions, split administrative and runtime duties, scope resources "
+            "to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit "
+            "administration permissions to general workload roles."
+        ),
+        tags=("aws", "iam", "privileged-access", "role-assignment"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-workload-role-sensitive-permissions",
         title="Workload role carries sensitive permissions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

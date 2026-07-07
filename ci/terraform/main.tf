@@ -10,8 +10,9 @@ terraform {
 }
 
 # This smoke config is intentionally plan-only: it generates a stable AWS plan
-# with an inline wildcard IAM policy so GitHub Actions can exercise the README
-# threat-model flow without requiring provider API access.
+# with an inline wildcard-resource IAM policy so GitHub Actions can exercise the
+# README threat-model flow without requiring provider API access or tripping the
+# high-severity policy gate.
 provider "aws" {
   region                      = "us-east-1"
   access_key                  = "mock"
@@ -44,13 +45,13 @@ resource "aws_iam_role" "smoke" {
   })
 
   inline_policy {
-    name = "wildcard"
+    name = "wildcard-resource"
     policy = jsonencode({
       Version = "2012-10-17"
       Statement = [
         {
           Effect   = "Allow"
-          Action   = "*"
+          Action   = "iam:GetRole"
           Resource = "*"
         }
       ]

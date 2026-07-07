@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **4 findings** across **13 normalized resources**.
+This run identified **4 trust boundaries** and **5 findings** across **13 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `4`
+- Medium severity findings: `5`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **4 trust boundaries** and **4 findings** across **13 normal
 - Provider resources considered: `13`
 - Normalized resources: `13`
 - Unsupported resources: `0`
-- Registered rules: `167`
-- Enabled rules: `167`
+- Registered rules: `168`
+- Enabled rules: `168`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
+  - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-role-trust-expansion`: `1`
   - `aws-role-trust-missing-narrowing`: `1`
@@ -80,6 +81,23 @@ No findings in this severity band.
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
   - trust scope: principal belongs to foreign account 777788889999
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
+
+#### IAM role has privileged assignment posture
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `aws_iam_role.deployer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +2, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 5 => medium
+- Rationale: aws_iam_role.deployer has deterministic privileged IAM assignment posture: privilege-escalation. If this role is attached to a workload or assumable by a control-plane principal, those privileges increase blast radius.
+- Recommended mitigation: Review high-impact IAM role permissions, split administrative and runtime duties, scope resources to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit administration permissions to general workload roles.
+- Evidence:
+  - iam role: address=aws_iam_role.deployer; type=aws_iam_role; arn=arn:aws:iam::333344445555:role/lambda-deployer-role; identifier=lambda-deployer-role
+  - privileged access: grant_1=categories=[privilege-escalation]; scope=resource; confidence=medium
+  - privilege categories: privilege-escalation
+  - permission patterns: iam:PassRole
+  - grant scopes: scope_kind=resource; scope_value=arn:aws:iam::333344445555:role/lambda-runtime-role,arn:aws:lambda:us-east-1:333344445555:function:release-deployer,arn:aws:s3:::lambda-deploy-artifacts/*
+  - grant confidence: medium
+  - inline policy sources: inline_policy_name=lambda-deployer-inline
 
 #### Role trust relationship expands blast radius
 

@@ -7,9 +7,9 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **11 findings** across **23 normalized resources**.
+This run identified **9 trust boundaries** and **12 findings** across **23 normalized resources**.
 
-- High severity findings: `3`
+- High severity findings: `4`
 - Medium severity findings: `8`
 - Low severity findings: `0`
 
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **11 findings** across **23 norma
 - Provider resources considered: `24`
 - Normalized resources: `23`
 - Unsupported resources: `1`
-- Registered rules: `167`
-- Enabled rules: `167`
+- Registered rules: `168`
+- Enabled rules: `168`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -33,6 +33,7 @@ This run identified **9 trust boundaries** and **11 findings** across **23 norma
   - `aws-workload-kms-vpc-endpoint-missing`: `1`
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
   - `aws-iam-wildcard-permissions`: `2`
+  - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-missing-tier-segmentation`: `1`
   - `aws-role-trust-expansion`: `1`
@@ -119,6 +120,24 @@ This run identified **9 trust boundaries** and **11 findings** across **23 norma
   - security group rules: aws_security_group.db ingress tcp 5432 from 0.0.0.0/0 (Postgres from internet); aws_security_group.db ingress tcp 5432 from sg-app-001 (Postgres from public app tier)
   - network path: database is not marked directly internet reachable, but its security groups allow internet-origin ingress; database trusts security groups attached to internet-exposed workloads; aws_security_group.db allows sg-app-001 attached to aws_instance.app, aws_lb.web
   - subnet posture: aws_instance.app sits in public subnet aws_subnet.public_app with an internet route; aws_lb.web sits in public subnet aws_subnet.public_app with an internet route
+
+#### IAM role has privileged assignment posture
+
+- STRIDE category: Elevation of Privilege
+- Affected resources: `aws_iam_role.workload`, `aws_iam_policy.admin_like`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +3, data_sensitivity +2, lateral_movement +2, blast_radius +3, final_score 10 => high
+- Rationale: aws_iam_role.workload has deterministic privileged IAM assignment posture: compute-admin, data-admin, iam-admin, key-admin, privilege-escalation. If this role is attached to a workload or assumable by a control-plane principal, those privileges increase blast radius.
+- Recommended mitigation: Review high-impact IAM role permissions, split administrative and runtime duties, scope resources to named ARNs, and avoid attaching broad IAM, role-passing, secrets, KMS, data, network, or audit administration permissions to general workload roles.
+- Evidence:
+  - iam role: address=aws_iam_role.workload; type=aws_iam_role; arn=arn:aws:iam::111122223333:role/workload-role; identifier=workload-role
+  - privileged access: grant_1=categories=[data-admin, key-admin, privilege-escalation]; scope=account; confidence=high; grant_2=categories=[compute-admin, iam-admin]; scope=account; confidence=high
+  - privilege categories: compute-admin; data-admin; iam-admin; key-admin; privilege-escalation
+  - permission patterns: s3:*; iam:PassRole; sts:AssumeRole; ec2:*; iam:*
+  - grant scopes: scope_kind=account; scope_value=*
+  - grant confidence: high
+  - attached policies: attached_policy_arn=arn:aws:iam::111122223333:policy/admin-like; attached_policy_address=aws_iam_policy.admin_like
+  - inline policy sources: inline_policy_name=workload-inline
 
 #### Private data tier directly trusts the public application tier
 

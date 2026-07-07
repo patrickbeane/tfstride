@@ -92,6 +92,14 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.ATTACHED_POLICY_ADDRESSES)
 
     @property
+    def inline_policy_resource_addresses(self) -> list[str]:
+        return self.get(AwsResourceMetadata.INLINE_POLICY_RESOURCE_ADDRESSES)
+
+    @property
+    def inline_policy_names(self) -> list[str]:
+        return self.get(AwsResourceMetadata.INLINE_POLICY_NAMES)
+
+    @property
     def cluster_reference(self) -> str | None:
         return self.get(AwsResourceMetadata.CLUSTER_REFERENCE)
 
