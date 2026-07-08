@@ -227,18 +227,23 @@ class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
         moved_detector_modules = sorted(
             _relative(provider_dir / name)
             for name in {
+                "cloud_sql_rules.py",
                 "compute_exposure_rules.py",
                 "compute_rules.py",
                 "data_rules.py",
                 "detectors.py",
                 "gke_rules.py",
                 "iam_inherited.py",
+                "kms_rules.py",
+                "pubsub_bigquery_rules.py",
                 "iam_rules.py",
                 "iam_scoped.py",
                 "iam_sensitive_resources.py",
                 "iam_service_account_keys.py",
                 "iam_service_accounts.py",
+                "secret_manager_rules.py",
                 "serverless_rules.py",
+                "storage_rules.py",
             }
         )
 
@@ -246,6 +251,7 @@ class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
         self.assertEqual(
             moved_detector_modules,
             [
+                "src/tfstride/providers/gcp/cloud_sql_rules.py",
                 "src/tfstride/providers/gcp/compute_exposure_rules.py",
                 "src/tfstride/providers/gcp/compute_rules.py",
                 "src/tfstride/providers/gcp/data_rules.py",
@@ -257,7 +263,11 @@ class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
                 "src/tfstride/providers/gcp/iam_sensitive_resources.py",
                 "src/tfstride/providers/gcp/iam_service_account_keys.py",
                 "src/tfstride/providers/gcp/iam_service_accounts.py",
+                "src/tfstride/providers/gcp/kms_rules.py",
+                "src/tfstride/providers/gcp/pubsub_bigquery_rules.py",
+                "src/tfstride/providers/gcp/secret_manager_rules.py",
                 "src/tfstride/providers/gcp/serverless_rules.py",
+                "src/tfstride/providers/gcp/storage_rules.py",
             ],
         )
 
