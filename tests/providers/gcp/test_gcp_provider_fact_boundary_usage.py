@@ -197,6 +197,94 @@ class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
 
         self.assertEqual(provider_imports, {})
 
+    def test_current_provider_gcp_analysis_helper_imports_are_pinned(self) -> None:
+        provider_dir = _repo_root() / "src" / "tfstride" / "providers" / "gcp"
+        analysis_imports_by_file = {
+            _relative(path): tuple(sorted({module for module, _name in imports}))
+            for path in sorted(provider_dir.rglob("*.py"))
+            if (imports := _imports_from(path, "tfstride.analysis.gcp"))
+        }
+
+        self.assertEqual(
+            analysis_imports_by_file,
+            {
+                "src/tfstride/providers/gcp/analysis_indexes.py": (
+                    "tfstride.analysis.gcp.iam_inheritance",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                ),
+                "src/tfstride/providers/gcp/boundaries.py": ("tfstride.analysis.gcp.custom_roles",),
+                "src/tfstride/providers/gcp/compute_exposure_rules.py": (
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_types",
+                ),
+                "src/tfstride/providers/gcp/data_rules.py": (
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                ),
+                "src/tfstride/providers/gcp/gke_rules.py": ("tfstride.analysis.gcp.resource_types",),
+                "src/tfstride/providers/gcp/iam_inherited.py": (
+                    "tfstride.analysis.gcp.custom_roles",
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.iam_inheritance",
+                    "tfstride.analysis.gcp.iam_role_risk",
+                    "tfstride.analysis.gcp.indexes",
+                ),
+                "src/tfstride/providers/gcp/iam_scoped.py": (
+                    "tfstride.analysis.gcp.custom_roles",
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.iam_role_risk",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_types",
+                ),
+                "src/tfstride/providers/gcp/iam_sensitive_resources.py": (
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_utils",
+                ),
+                "src/tfstride/providers/gcp/iam_service_account_keys.py": (
+                    "tfstride.analysis.gcp.custom_roles",
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.iam_role_risk",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_types",
+                    "tfstride.analysis.gcp.resource_utils",
+                ),
+                "src/tfstride/providers/gcp/iam_service_accounts.py": (
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_types",
+                    "tfstride.analysis.gcp.resource_utils",
+                ),
+                "src/tfstride/providers/gcp/serverless_rules.py": (
+                    "tfstride.analysis.gcp.iam_access",
+                    "tfstride.analysis.gcp.indexes",
+                    "tfstride.analysis.gcp.org_policy_evidence",
+                    "tfstride.analysis.gcp.org_policy_guardrails",
+                    "tfstride.analysis.gcp.org_policy_severity",
+                    "tfstride.analysis.gcp.resource_types",
+                    "tfstride.analysis.gcp.resource_utils",
+                ),
+            },
+        )
+
     def test_provider_rule_root_uses_provider_owned_detector_import(self) -> None:
         provider_rule_root = _repo_root() / "src" / "tfstride" / "providers" / "gcp" / "rules.py"
 
