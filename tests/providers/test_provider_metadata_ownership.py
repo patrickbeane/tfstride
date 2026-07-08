@@ -76,6 +76,34 @@ def _sample_metadata_value(field: MetadataField[Any]) -> Any:
 
 
 class ProviderMetadataOwnershipTests(unittest.TestCase):
+    def test_metadata_ownership_contract_is_generated_from_metadata_namespaces(self) -> None:
+        contract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT
+        shared_fields = _metadata_fields_by_name(ResourceMetadata)
+        provider_cases = {
+            "aws": AwsResourceMetadata,
+            "gcp": GcpResourceMetadata,
+            "azure": AzureResourceMetadata,
+        }
+
+        self.assertEqual(contract.shared_core_fields, frozenset(shared_fields))
+        for provider, namespace in provider_cases.items():
+            namespace_fields = _metadata_fields_by_name(namespace)
+            shared_aliases = {
+                field_name
+                for field_name in namespace_fields.keys() & shared_fields.keys()
+                if namespace_fields[field_name] is shared_fields[field_name]
+            }
+
+            with self.subTest(provider=provider):
+                self.assertEqual(
+                    contract.provider_owned_fields[provider],
+                    frozenset(namespace_fields) - contract.shared_core_fields,
+                )
+                self.assertEqual(
+                    contract.provider_owned_fields[provider] | shared_aliases,
+                    frozenset(namespace_fields),
+                )
+
     def test_aws_facts_accept_aws_owned_metadata_writes(self) -> None:
         resource = _resource("aws")
         facts = aws_facts(resource)
