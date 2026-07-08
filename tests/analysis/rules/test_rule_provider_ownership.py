@@ -110,7 +110,7 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
         self.assertEqual(violations, [])
 
     def test_stride_rule_engine_does_not_import_gcp_rule_detectors(self) -> None:
-        self.assertNotIn("tfstride.analysis.gcp.rules", _imported_modules(STRIDE_RULES_PATH))
+        self.assertNotIn("tfstride.providers.gcp.detectors", _imported_modules(STRIDE_RULES_PATH))
 
     def test_plugin_contributed_rules_are_unique_and_have_metadata(self) -> None:
         contributed_rule_ids: list[str] = []

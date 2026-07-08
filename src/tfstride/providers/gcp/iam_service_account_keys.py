@@ -26,10 +26,6 @@ from tfstride.analysis.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
-from tfstride.analysis.gcp.iam_service_accounts import (
-    high_risk_service_account_role_risk,
-    service_account_iam_target,
-)
 from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
 from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.analysis.gcp.org_policy_guardrails import (
@@ -45,6 +41,10 @@ from tfstride.analysis.gcp.resource_utils import binding_members
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.iam_service_accounts import (
+    high_risk_service_account_role_risk,
+    service_account_iam_target,
+)
 
 _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
 _KEYED_SERVICE_ACCOUNT_DATA_RESOURCE_ACCESS = {

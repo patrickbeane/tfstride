@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.gcp.compute_rules import GcpComputeRuleDetectors
-from tfstride.analysis.gcp.data_rules import GcpDataRuleDetectors
-from tfstride.analysis.gcp.iam_rules import GcpIamRuleDetectors
+from tfstride.providers.gcp.compute_rules import GcpComputeRuleDetectors
+from tfstride.providers.gcp.data_rules import GcpDataRuleDetectors
+from tfstride.providers.gcp.iam_rules import GcpIamRuleDetectors
 
 
 class GcpRuleDetectors(GcpComputeRuleDetectors, GcpIamRuleDetectors, GcpDataRuleDetectors):

@@ -18,6 +18,8 @@ _GKE_BROAD_OAUTH_SCOPES = frozenset(
     }
 )
 _GKE_SECURITY_LOGGING_COMPONENTS = frozenset({"APISERVER", "SCHEDULER", "CONTROLLER_MANAGER"})
+_GKE_POSTURE_DISABLED = "disabled"
+_GKE_POSTURE_UNKNOWN = "unknown"
 
 
 class GcpGkeRuleDetectors:
@@ -397,9 +399,9 @@ class GcpGkeRuleDetectors:
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
             cluster_facts = analysis_facts(cluster).compute
-            if cluster_facts.gke_legacy_abac_state == "disabled":
+            if cluster_facts.gke_legacy_abac_state == _GKE_POSTURE_DISABLED:
                 continue
-            unknown = cluster_facts.gke_legacy_abac_state == "unknown"
+            unknown = cluster_facts.gke_legacy_abac_state == _GKE_POSTURE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0 if unknown else 2,
@@ -443,9 +445,9 @@ class GcpGkeRuleDetectors:
             cluster_facts = analysis_facts(cluster).compute
             if not _gke_client_certificate_auth_represented(cluster_facts):
                 continue
-            if cluster_facts.gke_client_certificate_auth_state == "disabled":
+            if cluster_facts.gke_client_certificate_auth_state == _GKE_POSTURE_DISABLED:
                 continue
-            unknown = cluster_facts.gke_client_certificate_auth_state == "unknown"
+            unknown = cluster_facts.gke_client_certificate_auth_state == _GKE_POSTURE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0 if unknown else 1,

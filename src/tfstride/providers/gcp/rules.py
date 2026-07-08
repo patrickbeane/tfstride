@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.analysis.gcp.rules import GcpRuleDetectors
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.gcp.audit_rules import GcpAuditRuleDetectors
+from tfstride.providers.gcp.detectors import GcpRuleDetectors
 from tfstride.providers.gcp.iam_assignment_rules import GcpIamAssignmentRuleDetectors
 from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors

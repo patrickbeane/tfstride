@@ -197,34 +197,57 @@ class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
 
         self.assertEqual(provider_imports, {})
 
-    def test_provider_rule_root_documents_analysis_owned_detector_import(self) -> None:
+    def test_provider_rule_root_uses_provider_owned_detector_import(self) -> None:
         provider_rule_root = _repo_root() / "src" / "tfstride" / "providers" / "gcp" / "rules.py"
 
-        self.assertEqual(
-            _imports_from(provider_rule_root, "tfstride.analysis.gcp"),
-            [("tfstride.analysis.gcp.rules", "GcpRuleDetectors")],
+        self.assertEqual(_imports_from(provider_rule_root, "tfstride.analysis.gcp"), [])
+        self.assertIn(
+            ("tfstride.providers.gcp.detectors", "GcpRuleDetectors"),
+            _imports_from(provider_rule_root, "tfstride.providers.gcp"),
         )
 
-    def test_current_analysis_owned_detector_modules_are_pinned(self) -> None:
+    def test_gcp_detector_modules_are_provider_owned(self) -> None:
         analysis_dir = _repo_root() / "src" / "tfstride" / "analysis" / "gcp"
-        detector_modules = sorted(
+        provider_dir = _repo_root() / "src" / "tfstride" / "providers" / "gcp"
+        analysis_detector_modules = sorted(
             _relative(path)
             for path in analysis_dir.glob("*.py")
             if path.name.endswith("_rules.py") or path.name in {"rules.py", "iam_inherited.py", "iam_scoped.py"}
         )
+        moved_detector_modules = sorted(
+            _relative(provider_dir / name)
+            for name in {
+                "compute_exposure_rules.py",
+                "compute_rules.py",
+                "data_rules.py",
+                "detectors.py",
+                "gke_rules.py",
+                "iam_inherited.py",
+                "iam_rules.py",
+                "iam_scoped.py",
+                "iam_sensitive_resources.py",
+                "iam_service_account_keys.py",
+                "iam_service_accounts.py",
+                "serverless_rules.py",
+            }
+        )
 
+        self.assertEqual(analysis_detector_modules, [])
         self.assertEqual(
-            detector_modules,
+            moved_detector_modules,
             [
-                "src/tfstride/analysis/gcp/compute_exposure_rules.py",
-                "src/tfstride/analysis/gcp/compute_rules.py",
-                "src/tfstride/analysis/gcp/data_rules.py",
-                "src/tfstride/analysis/gcp/gke_rules.py",
-                "src/tfstride/analysis/gcp/iam_inherited.py",
-                "src/tfstride/analysis/gcp/iam_rules.py",
-                "src/tfstride/analysis/gcp/iam_scoped.py",
-                "src/tfstride/analysis/gcp/rules.py",
-                "src/tfstride/analysis/gcp/serverless_rules.py",
+                "src/tfstride/providers/gcp/compute_exposure_rules.py",
+                "src/tfstride/providers/gcp/compute_rules.py",
+                "src/tfstride/providers/gcp/data_rules.py",
+                "src/tfstride/providers/gcp/detectors.py",
+                "src/tfstride/providers/gcp/gke_rules.py",
+                "src/tfstride/providers/gcp/iam_inherited.py",
+                "src/tfstride/providers/gcp/iam_rules.py",
+                "src/tfstride/providers/gcp/iam_scoped.py",
+                "src/tfstride/providers/gcp/iam_sensitive_resources.py",
+                "src/tfstride/providers/gcp/iam_service_account_keys.py",
+                "src/tfstride/providers/gcp/iam_service_accounts.py",
+                "src/tfstride/providers/gcp/serverless_rules.py",
             ],
         )
 
