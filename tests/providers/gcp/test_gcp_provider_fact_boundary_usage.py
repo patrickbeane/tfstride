@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import unittest
+from pathlib import Path
 
 from tests.providers.gcp.rule_support.compute import (
     _compute_instance,
@@ -20,6 +22,29 @@ from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _imports_from(path: Path, package_prefix: str) -> list[tuple[str, str]]:
+    tree = ast.parse(path.read_text(), filename=str(path))
+    imports: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == package_prefix or alias.name.startswith(f"{package_prefix}."):
+                    imports.append((alias.name, alias.asname or ""))
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            if node.module == package_prefix or node.module.startswith(f"{package_prefix}."):
+                for alias in node.names:
+                    imports.append((node.module, alias.name))
+    return imports
+
+
+def _relative(path: Path) -> str:
+    return path.relative_to(_repo_root()).as_posix()
 
 
 def _evidence_by_key(finding):
@@ -158,6 +183,49 @@ class GcpProviderFactBoundaryCharacterizationTests(unittest.TestCase):
         self.assertIn(
             "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
             evidence["boundary_rationale"][0],
+        )
+
+
+class GcpDetectorOwnershipBoundaryTests(unittest.TestCase):
+    def test_analysis_gcp_currently_has_no_direct_provider_imports(self) -> None:
+        analysis_dir = _repo_root() / "src" / "tfstride" / "analysis" / "gcp"
+        provider_imports = {
+            _relative(path): imports
+            for path in sorted(analysis_dir.glob("*.py"))
+            if (imports := _imports_from(path, "tfstride.providers.gcp"))
+        }
+
+        self.assertEqual(provider_imports, {})
+
+    def test_provider_rule_root_documents_analysis_owned_detector_import(self) -> None:
+        provider_rule_root = _repo_root() / "src" / "tfstride" / "providers" / "gcp" / "rules.py"
+
+        self.assertEqual(
+            _imports_from(provider_rule_root, "tfstride.analysis.gcp"),
+            [("tfstride.analysis.gcp.rules", "GcpRuleDetectors")],
+        )
+
+    def test_current_analysis_owned_detector_modules_are_pinned(self) -> None:
+        analysis_dir = _repo_root() / "src" / "tfstride" / "analysis" / "gcp"
+        detector_modules = sorted(
+            _relative(path)
+            for path in analysis_dir.glob("*.py")
+            if path.name.endswith("_rules.py") or path.name in {"rules.py", "iam_inherited.py", "iam_scoped.py"}
+        )
+
+        self.assertEqual(
+            detector_modules,
+            [
+                "src/tfstride/analysis/gcp/compute_exposure_rules.py",
+                "src/tfstride/analysis/gcp/compute_rules.py",
+                "src/tfstride/analysis/gcp/data_rules.py",
+                "src/tfstride/analysis/gcp/gke_rules.py",
+                "src/tfstride/analysis/gcp/iam_inherited.py",
+                "src/tfstride/analysis/gcp/iam_rules.py",
+                "src/tfstride/analysis/gcp/iam_scoped.py",
+                "src/tfstride/analysis/gcp/rules.py",
+                "src/tfstride/analysis/gcp/serverless_rules.py",
+            ],
         )
 
 
