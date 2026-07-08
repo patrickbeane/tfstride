@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tfstride.analysis.gcp.custom_roles import GcpCustomRoleIndex, custom_role_privilege_risk
+from tfstride.providers.gcp.custom_roles import GcpCustomRoleIndex, custom_role_privilege_risk
 
 _PRIVILEGED_GCP_PROJECT_ROLES: dict[str, str] = {
     "roles/owner": "full project administration",

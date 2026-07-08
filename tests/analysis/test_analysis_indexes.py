@@ -4,11 +4,11 @@ import inspect
 import unittest
 
 from tfstride.analysis import indexes as analysis_indexes_module
-from tfstride.analysis.gcp.iam_inheritance import GcpIamInheritanceIndex
-from tfstride.analysis.gcp.org_policy_guardrails import GcpOrgPolicyGuardrailIndex
 from tfstride.analysis.indexes import AnalysisIndexExtensionError, build_analysis_indexes
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
+from tfstride.providers.gcp.iam_inheritance import GcpIamInheritanceIndex
+from tfstride.providers.gcp.org_policy_guardrails import GcpOrgPolicyGuardrailIndex
 
 
 def _resource(

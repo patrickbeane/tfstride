@@ -4,7 +4,6 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from tfstride.analysis.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 from tfstride.analysis.resource_concepts import (
     is_database_resource,
     is_key_management_resource,
@@ -13,6 +12,7 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
 GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset({"google_project_iam_custom_role", "google_organization_iam_custom_role"})
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from tfstride.analysis.gcp.iam_inheritance import GcpIamInheritanceIndex, empty_gcp_iam_inheritance_index
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.analysis.indexes import AnalysisIndexes
+from tfstride.providers.gcp.iam_inheritance import GcpIamInheritanceIndex, empty_gcp_iam_inheritance_index
+from tfstride.providers.gcp.org_policy_guardrails import (
     GcpOrgPolicyGuardrailIndex,
     empty_gcp_org_policy_guardrail_index,
 )
-from tfstride.analysis.indexes import AnalysisIndexes
 
 
 def gcp_iam_inheritance_index(indexes: AnalysisIndexes) -> GcpIamInheritanceIndex:

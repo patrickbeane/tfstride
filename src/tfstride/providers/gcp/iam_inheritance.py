@@ -5,15 +5,15 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TypeVar
 
-from tfstride.analysis.gcp.resource_types import (
+from tfstride.analysis.resource_facts import analysis_facts
+from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_types import (
     GCP_FOLDER_IAM_RESOURCE_TYPES,
     GCP_IAM_GRANT_RESOURCE_TYPES,
     GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
 )
-from tfstride.analysis.gcp.resource_utils import gcp_reference_key
-from tfstride.analysis.resource_facts import analysis_facts
-from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_utils import gcp_reference_key
 
 _T = TypeVar("_T")
 

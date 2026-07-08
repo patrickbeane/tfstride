@@ -8,20 +8,6 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.gcp.iam_access import (
-    GCP_BIGQUERY_DATA_ACCESS_ROLES,
-    GCP_PUBSUB_DATA_ACCESS_ROLES,
-    broad_resource_iam_bindings,
-    gcp_iam_condition_evidence_values,
-    gcp_iam_condition_limited_score,
-)
-from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import (
-    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
-    ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
-)
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.analysis.resource_facts import (
     AnalysisSqlFacts,
     AnalysisStorageFacts,
@@ -29,6 +15,20 @@ from tfstride.analysis.resource_facts import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.iam_access import (
+    GCP_BIGQUERY_DATA_ACCESS_ROLES,
+    GCP_PUBSUB_DATA_ACCESS_ROLES,
+    broad_resource_iam_bindings,
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+)
+from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import (
+    ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
+    ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
+)
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})

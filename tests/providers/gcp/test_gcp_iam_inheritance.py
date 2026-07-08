@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.gcp.iam_inheritance import (
+from tfstride.analysis.indexes import build_analysis_indexes
+from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_iam_inheritance_index
+from tfstride.providers.gcp.iam_inheritance import (
     GCP_IAM_SCOPE_FOLDER,
     GCP_IAM_SCOPE_ORGANIZATION,
     GCP_IAM_SCOPE_PROJECT,
     GCP_IAM_SCOPE_RESOURCE,
     GcpIamScopeKey,
 )
-from tfstride.analysis.indexes import build_analysis_indexes
-from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
-from tfstride.providers.gcp.analysis_indexes import gcp_iam_inheritance_index
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 
 

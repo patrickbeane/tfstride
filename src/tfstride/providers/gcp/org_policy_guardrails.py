@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from tfstride.analysis.gcp.resource_types import GCP_ORGANIZATION_POLICY_RESOURCE_TYPES
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_types import GCP_ORGANIZATION_POLICY_RESOURCE_TYPES
 
 GCP_ORG_POLICY_SCOPE_ORGANIZATION = "organization"
 GCP_ORG_POLICY_SCOPE_FOLDER = "folder"

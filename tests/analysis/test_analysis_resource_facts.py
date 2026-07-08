@@ -655,20 +655,11 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_gcp_analysis_uses_shared_fact_facade(self) -> None:
+    def test_gcp_provider_specific_analysis_helpers_are_provider_owned(self) -> None:
         gcp_analysis_root = SOURCE_ROOT / "analysis" / "gcp"
-        provider_fact_imports: list[str] = []
-        facade_users: list[str] = []
+        helper_modules = sorted(path.name for path in gcp_analysis_root.glob("*.py"))
 
-        for path in sorted(gcp_analysis_root.glob("*.py")):
-            text = path.read_text(encoding="utf-8")
-            if "tfstride.providers.gcp.resource_facts" in text:
-                provider_fact_imports.append(path.name)
-            if "analysis_facts(" in text:
-                facade_users.append(path.name)
-
-        self.assertEqual(provider_fact_imports, [])
-        self.assertTrue(facade_users)
+        self.assertEqual(helper_modules, [])
 
     def test_analysis_resource_facts_does_not_import_aws_directly(self) -> None:
         analysis_root = SOURCE_ROOT / "analysis"

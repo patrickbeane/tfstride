@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import collect_evidence, dedupe_addresses, evidence_item
-from tfstride.analysis.gcp.iam_access import (
-    gcp_iam_condition_evidence_values,
-    gcp_iam_condition_limited_score,
-)
-from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import ORG_POLICY_ALLOWED_MEMBER_DOMAINS
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.gcp.resource_types import (
-    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
-    GCP_CLOUD_RUN_RESOURCE_TYPES,
-    PUBLIC_GCP_IAM_MEMBERS,
-)
-from tfstride.analysis.gcp.resource_utils import binding_members
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
+from tfstride.providers.gcp.iam_access import (
+    gcp_iam_condition_evidence_values,
+    gcp_iam_condition_limited_score,
+)
+from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import ORG_POLICY_ALLOWED_MEMBER_DOMAINS
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_types import (
+    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
+)
+from tfstride.providers.gcp.resource_utils import binding_members
 
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})

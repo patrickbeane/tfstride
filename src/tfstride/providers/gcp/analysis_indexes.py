@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tfstride.analysis.gcp.iam_inheritance import (
+from tfstride.analysis.indexes import AnalysisIndexes
+from tfstride.models import ResourceInventory
+from tfstride.providers.gcp.iam_inheritance import (
     GcpIamInheritanceIndex,
     build_gcp_iam_inheritance_index,
     empty_gcp_iam_inheritance_index,
 )
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.providers.gcp.org_policy_guardrails import (
     GcpOrgPolicyGuardrailIndex,
     build_gcp_org_policy_guardrail_index,
     empty_gcp_org_policy_guardrail_index,
 )
-from tfstride.analysis.indexes import AnalysisIndexes
-from tfstride.models import ResourceInventory
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,12 +8,15 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.gcp.custom_roles import (
+from tfstride.analysis.resource_facts import analysis_facts
+from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,
 )
-from tfstride.analysis.gcp.iam_access import (
+from tfstride.providers.gcp.iam_access import (
     GCP_BIGQUERY_DATA_ACCESS_ROLES,
     GCP_GCS_DATA_ACCESS_ROLES,
     GCP_KMS_ACCESS_ROLES,
@@ -22,29 +25,26 @@ from tfstride.analysis.gcp.iam_access import (
     iam_resource_binding_members,
     org_folder_scope_description,
 )
-from tfstride.analysis.gcp.iam_role_risk import (
+from tfstride.providers.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
-from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import (
-    ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
-)
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.gcp.resource_types import (
-    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
-    GCP_PROJECT_IAM_RESOURCE_TYPES,
-    GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
-)
-from tfstride.analysis.gcp.resource_utils import binding_members
-from tfstride.analysis.resource_facts import analysis_facts
-from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource, ResourceInventory
 from tfstride.providers.gcp.iam_service_accounts import (
     high_risk_service_account_role_risk,
     service_account_iam_target,
 )
+from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import (
+    ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
+)
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_types import (
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_PROJECT_IAM_RESOURCE_TYPES,
+    GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
+)
+from tfstride.providers.gcp.resource_utils import binding_members
 
 _SERVICE_ACCOUNT_KEY_MAX_VALIDITY_DAYS = 180
 _KEYED_SERVICE_ACCOUNT_DATA_RESOURCE_ACCESS = {

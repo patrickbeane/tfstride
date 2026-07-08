@@ -6,24 +6,24 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.gcp.iam_access import (
+from tfstride.analysis.resource_facts import analysis_facts
+from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.iam_access import (
     assess_gcp_broad_iam_member,
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
     iam_binding_condition,
     iam_resource_binding_members,
 )
-from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.gcp.resource_types import GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES
-from tfstride.analysis.gcp.resource_utils import gcp_reference_key
-from tfstride.analysis.resource_facts import analysis_facts
-from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_types import GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES
+from tfstride.providers.gcp.resource_utils import gcp_reference_key
 
 HIGH_RISK_SERVICE_ACCOUNT_ROLES: dict[str, str] = {
     "roles/iam.serviceAccountAdmin": "service account administration and IAM policy control",

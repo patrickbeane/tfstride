@@ -4,10 +4,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from tfstride.analysis.gcp.resource_types import PUBLIC_GCP_IAM_MEMBERS
-from tfstride.analysis.gcp.resource_utils import binding_members
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
+from tfstride.providers.gcp.resource_utils import binding_members
 
 GCP_PUBSUB_DATA_ACCESS_ROLES = frozenset(
     {

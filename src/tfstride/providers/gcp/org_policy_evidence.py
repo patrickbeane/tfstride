@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import evidence_item
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.models import EvidenceItem, NormalizedResource
+from tfstride.providers.gcp.org_policy_guardrails import (
     GcpOrgPolicyGuardrail,
     GcpOrgPolicyGuardrailIndex,
 )
-from tfstride.models import EvidenceItem, NormalizedResource
 
 
 def organization_guardrail_evidence(

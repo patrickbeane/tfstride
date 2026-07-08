@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.models import NormalizedResource, SeverityReasoning
+from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
     ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
     ORG_POLICY_REQUIRE_OS_LOGIN,
@@ -10,7 +11,6 @@ from tfstride.analysis.gcp.org_policy_guardrails import (
     GcpOrgPolicyGuardrail,
     GcpOrgPolicyGuardrailIndex,
 )
-from tfstride.models import NormalizedResource, SeverityReasoning
 
 
 def guardrail_adjusted_severity_reasoning(

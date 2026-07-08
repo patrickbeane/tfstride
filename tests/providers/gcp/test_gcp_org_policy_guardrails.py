@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.analysis.indexes import build_analysis_indexes
+from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import (
     GCP_ORG_POLICY_SCOPE_FOLDER,
     GCP_ORG_POLICY_SCOPE_ORGANIZATION,
     GCP_ORG_POLICY_SCOPE_PROJECT,
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
     GcpOrgPolicyScopeKey,
 )
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.indexes import build_analysis_indexes
-from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
-from tfstride.providers.gcp.analysis_indexes import gcp_org_policy_guardrail_index
-from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 
 
 def _gcp_resource(

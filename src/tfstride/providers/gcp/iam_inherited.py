@@ -8,13 +8,16 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.gcp.custom_roles import (
+from tfstride.analysis.resource_facts import analysis_facts
+from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,
     custom_role_permissions,
 )
-from tfstride.analysis.gcp.iam_access import (
+from tfstride.providers.gcp.iam_access import (
     GCP_BIGQUERY_DATA_ACCESS_ROLES,
     GCP_CLOUD_SQL_DATA_ACCESS_ROLES,
     GCP_GCS_DATA_ACCESS_ROLES,
@@ -29,20 +32,17 @@ from tfstride.analysis.gcp.iam_access import (
     iam_binding_condition,
     iam_resource_binding_members,
 )
-from tfstride.analysis.gcp.iam_inheritance import (
+from tfstride.providers.gcp.iam_inheritance import (
     GCP_IAM_SCOPE_FOLDER,
     GCP_IAM_SCOPE_ORGANIZATION,
     GCP_IAM_SCOPE_PROJECT,
     GcpIamScopeKey,
 )
-from tfstride.analysis.gcp.iam_role_risk import (
+from tfstride.providers.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
-from tfstride.analysis.gcp.indexes import gcp_iam_inheritance_index
-from tfstride.analysis.resource_facts import analysis_facts
-from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.gcp.indexes import gcp_iam_inheritance_index
 
 _INHERITED_GCP_IAM_SCOPE_TYPES = frozenset(
     {

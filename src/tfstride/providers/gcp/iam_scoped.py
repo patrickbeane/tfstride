@@ -5,8 +5,11 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.gcp.custom_roles import build_gcp_custom_role_index, custom_role_permissions
-from tfstride.analysis.gcp.iam_access import (
+from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.models import Finding
+from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
+from tfstride.providers.gcp.custom_roles import build_gcp_custom_role_index, custom_role_permissions
+from tfstride.providers.gcp.iam_access import (
     assess_gcp_broad_iam_member,
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
@@ -14,23 +17,20 @@ from tfstride.analysis.gcp.iam_access import (
     iam_resource_binding_members,
     org_folder_scope_description,
 )
-from tfstride.analysis.gcp.iam_role_risk import (
+from tfstride.providers.gcp.iam_role_risk import (
     privileged_org_folder_role_risk,
     privileged_project_role_risk,
 )
-from tfstride.analysis.gcp.indexes import gcp_org_policy_guardrail_index
-from tfstride.analysis.gcp.org_policy_evidence import organization_guardrail_evidence
-from tfstride.analysis.gcp.org_policy_guardrails import (
+from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
+from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_ALLOWED_MEMBER_DOMAINS,
 )
-from tfstride.analysis.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.analysis.gcp.resource_types import (
+from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_types import (
     GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
-    PUBLIC_GCP_IAM_MEMBERS,
 )
-from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding
 
 
 class GcpScopedIamDetectors:

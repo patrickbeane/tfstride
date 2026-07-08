@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.gcp.resource_types import GCP_GKE_RESOURCE_TYPES
 from tfstride.analysis.resource_facts import (
     AnalysisComputeFacts,
     analysis_facts,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.resource_types import GCP_GKE_RESOURCE_TYPES
 from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
 
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
