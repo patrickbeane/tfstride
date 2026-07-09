@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **4 findings** across **11 normalized resources**.
+This run identified **4 trust boundaries** and **5 findings** across **11 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `2`
+- Medium severity findings: `3`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **4 trust boundaries** and **4 findings** across **11 normal
 - Provider resources considered: `11`
 - Normalized resources: `11`
 - Unsupported resources: `0`
-- Registered rules: `173`
-- Enabled rules: `173`
+- Registered rules: `175`
+- Enabled rules: `175`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-public-workload-sensitive-data-access`: `2`
+  - `gcp-subnetwork-flow-logs-not-configured`: `1`
   - `gcp-cloud-run-public-invoker`: `1`
   - `gcp-cloud-functions-public-invoker`: `1`
 
@@ -120,6 +121,17 @@ This run identified **4 trust boundaries** and **4 findings** across **11 normal
   - public invoker bindings: source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers
   - public access reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
   - public exposure reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
+
+#### GCP subnetwork Flow Logs are not configured
+
+- STRIDE category: Repudiation
+- Affected resources: `google_compute_subnetwork.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: google_compute_subnetwork.app does not configure VPC Flow Logs in this Terraform plan. Without subnetwork flow telemetry, network investigation, lateral-movement review, and egress analysis can lack packet-flow evidence for workloads attached to this subnet.
+- Recommended mitigation: Enable VPC Flow Logs on subnetworks that host workloads, keep the flow log configuration in Terraform, and export or retain those logs according to investigation and monitoring requirements.
+- Evidence:
+  - subnetwork flow log posture: address=google_compute_subnetwork.app; type=google_compute_subnetwork; name=app; identifier=tfstride-app; flow_log_state=not_configured; network=google_compute_network.main.id; project=tfstride-demo
 
 ### Low
 

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **0 trust boundaries** and **5 findings** across **8 normalized resources**.
+This run identified **0 trust boundaries** and **6 findings** across **8 normalized resources**.
 
 - High severity findings: `3`
-- Medium severity findings: `2`
+- Medium severity findings: `3`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **0 trust boundaries** and **5 findings** across **8 normali
 - Provider resources considered: `8`
 - Normalized resources: `8`
 - Unsupported resources: `0`
-- Registered rules: `173`
-- Enabled rules: `173`
+- Registered rules: `175`
+- Enabled rules: `175`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-sensitive-resource-iam-external-access`: `2`
+  - `gcp-subnetwork-flow-logs-not-configured`: `1`
   - `gcp-project-iam-privileged-role`: `1`
   - `gcp-inherited-iam-sensitive-resource-access`: `1`
   - `gcp-inherited-iam-blast-radius`: `1`
@@ -80,6 +81,17 @@ No trust boundaries were discovered.
   - trust scope: service account belongs to project `partner-project`, outside resource project `tfstride-demo`
 
 ### Medium
+
+#### GCP subnetwork Flow Logs are not configured
+
+- STRIDE category: Repudiation
+- Affected resources: `google_compute_subnetwork.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: google_compute_subnetwork.app does not configure VPC Flow Logs in this Terraform plan. Without subnetwork flow telemetry, network investigation, lateral-movement review, and egress analysis can lack packet-flow evidence for workloads attached to this subnet.
+- Recommended mitigation: Enable VPC Flow Logs on subnetworks that host workloads, keep the flow log configuration in Terraform, and export or retain those logs according to investigation and monitoring requirements.
+- Evidence:
+  - subnetwork flow log posture: address=google_compute_subnetwork.app; type=google_compute_subnetwork; name=app; identifier=tfstride-app; flow_log_state=not_configured; network=google_compute_network.main.id; project=tfstride-demo
 
 #### Sensitive GCP resource IAM binding allows broad or external access
 

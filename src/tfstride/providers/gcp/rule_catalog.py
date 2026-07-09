@@ -426,6 +426,28 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-subnetwork-flow-logs-not-configured",
+        title="GCP subnetwork Flow Logs are not configured",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable VPC Flow Logs on subnetworks that host workloads, keep the flow log configuration in "
+            "Terraform, and export or retain those logs according to investigation and monitoring requirements."
+        ),
+        tags=("gcp", "network", "subnetwork", "flow-logs", "network-telemetry"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-subnetwork-flow-log-capture-incomplete",
+        title="GCP subnetwork Flow Log capture is incomplete",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure subnetwork VPC Flow Logs to capture the telemetry needed for investigations, avoid "
+            "filters that exclude relevant traffic, and preserve metadata where workload attribution is required."
+        ),
+        tags=("gcp", "network", "subnetwork", "flow-logs", "network-telemetry"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-gke-network-policy-disabled",
         title="GKE network policy is not enabled",
         category=StrideCategory.TAMPERING,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **22 findings** across **23 normalized resources**.
+This run identified **4 trust boundaries** and **23 findings** across **23 normalized resources**.
 
 - High severity findings: `6`
-- Medium severity findings: `16`
+- Medium severity findings: `17`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **4 trust boundaries** and **22 findings** across **23 norma
 - Provider resources considered: `23`
 - Normalized resources: `23`
 - Unsupported resources: `0`
-- Registered rules: `173`
-- Enabled rules: `173`
+- Registered rules: `175`
+- Enabled rules: `175`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -43,6 +43,7 @@ This run identified **4 trust boundaries** and **22 findings** across **23 norma
   - `gcp-secret-manager-lifecycle-posture-incomplete`: `1`
   - `gcp-public-compute-broad-ingress`: `1`
   - `gcp-compute-os-login-disabled`: `1`
+  - `gcp-subnetwork-flow-logs-not-configured`: `1`
   - `gcp-service-account-key-hygiene`: `1`
   - `gcp-service-account-key-effective-access`: `1`
   - `gcp-inherited-iam-blast-radius`: `1`
@@ -233,6 +234,17 @@ This run identified **4 trust boundaries** and **22 findings** across **23 norma
   - key risk: Terraform manages a user-created service-account key; validity window is 365 days and exceeds 180-day threshold; no Terraform keepers rotation trigger observed
   - validity window: valid_after=2026-01-01T00:00:00Z; valid_before=2027-01-01T00:00:00Z; validity_days=365
   - rotation control: no Terraform keepers rotation trigger observed
+
+#### GCP subnetwork Flow Logs are not configured
+
+- STRIDE category: Repudiation
+- Affected resources: `google_compute_subnetwork.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: google_compute_subnetwork.app does not configure VPC Flow Logs in this Terraform plan. Without subnetwork flow telemetry, network investigation, lateral-movement review, and egress analysis can lack packet-flow evidence for workloads attached to this subnet.
+- Recommended mitigation: Enable VPC Flow Logs on subnetworks that host workloads, keep the flow log configuration in Terraform, and export or retain those logs according to investigation and monitoring requirements.
+- Evidence:
+  - subnetwork flow log posture: address=google_compute_subnetwork.app; type=google_compute_subnetwork; name=app; identifier=tfstride-app; flow_log_state=not_configured; network=google_compute_network.main.id; project=tfstride-demo
 
 #### GCS bucket does not enforce Public Access Prevention
 

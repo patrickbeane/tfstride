@@ -8,6 +8,7 @@ from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.gcp.audit_rules import GcpAuditRuleDetectors
 from tfstride.providers.gcp.detectors import GcpRuleDetectors
 from tfstride.providers.gcp.iam_assignment_rules import GcpIamAssignmentRuleDetectors
+from tfstride.providers.gcp.network_telemetry_rules import GcpNetworkTelemetryRuleDetectors
 from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors
 
@@ -49,6 +50,8 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-logging-exclusion-drops-audit-security-logs",
         "gcp-logging-sink-audit-export-incomplete",
         "gcp-central-audit-sink-not-modeled",
+        "gcp-subnetwork-flow-logs-not-configured",
+        "gcp-subnetwork-flow-log-capture-incomplete",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
         "gcp-gke-legacy-abac-enabled-or-unknown",
@@ -84,6 +87,7 @@ def build_gcp_rule_contribution(
 ) -> RuleContribution:
     gcp_detectors = GcpRuleDetectors(finding_factory)
     audit_detectors = GcpAuditRuleDetectors(finding_factory)
+    network_telemetry_detectors = GcpNetworkTelemetryRuleDetectors(finding_factory)
     iam_assignment_detectors = GcpIamAssignmentRuleDetectors(finding_factory)
     private_connectivity_detectors = GcpPrivateConnectivityRuleDetectors(finding_factory)
     path_chain_detectors = GcpPathChainRuleDetectors(finding_factory)
@@ -146,6 +150,12 @@ def build_gcp_rule_contribution(
         ),
         "gcp-logging-sink-audit-export-incomplete": (audit_detectors.detect_logging_sink_audit_export_incomplete),
         "gcp-central-audit-sink-not-modeled": audit_detectors.detect_central_audit_sink_not_modeled,
+        "gcp-subnetwork-flow-logs-not-configured": (
+            network_telemetry_detectors.detect_subnetwork_flow_logs_not_configured
+        ),
+        "gcp-subnetwork-flow-log-capture-incomplete": (
+            network_telemetry_detectors.detect_subnetwork_flow_log_capture_incomplete
+        ),
         "gcp-gke-network-policy-disabled": gcp_detectors.detect_gke_network_policy_disabled,
         "gcp-gke-secrets-encryption-not-configured": gcp_detectors.detect_gke_secrets_encryption_not_configured,
         "gcp-gke-legacy-abac-enabled-or-unknown": gcp_detectors.detect_gke_legacy_abac_enabled_or_unknown,

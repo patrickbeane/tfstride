@@ -102,12 +102,12 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "mixed": (FIXTURE_PATH, 13, {"high": 4, "medium": 9}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 23, {"high": 7, "medium": 16}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
-            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
-            "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
-            "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 5, {"high": 3, "medium": 2}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 22, {"high": 6, "medium": 16}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 41, {"high": 14, "medium": 25, "low": 2}),
+            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
+            "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 1, {"medium": 1}),
+            "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
+            "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 6, {"high": 3, "medium": 3}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 23, {"high": 6, "medium": 17}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 42, {"high": 14, "medium": 26, "low": 2}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
@@ -160,16 +160,21 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-baseline": {
                 "Cloud SQL point-in-time recovery is disabled": 1,
                 "GCP project IAM binding grants a high-privilege role": 1,
+                "GCP subnetwork Flow Logs are not configured": 1,
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
             },
-            "gcp-lb-compute-sql": {},
+            "gcp-lb-compute-sql": {
+                "GCP subnetwork Flow Logs are not configured": 1,
+            },
             "gcp-serverless": {
                 "Cloud Functions function is publicly invokable": 1,
                 "Cloud Run service is publicly invokable": 1,
+                "GCP subnetwork Flow Logs are not configured": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 2,
             },
             "gcp-cross-project-iam": {
                 "GCP project IAM binding grants a high-privilege role": 1,
+                "GCP subnetwork Flow Logs are not configured": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Inherited GCP IAM grant reaches sensitive resources": 1,
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
@@ -183,6 +188,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Cloud SQL public client access does not require SSL": 1,
                 "GCP compute instance disables OS Login": 1,
                 "GCP service account user-managed key lacks rotation hygiene": 1,
+                "GCP subnetwork Flow Logs are not configured": 1,
                 "GCP service account key can exercise sensitive or privileged access": 1,
                 "GCS bucket does not enforce Public Access Prevention": 1,
                 "GCS bucket is publicly accessible": 1,
@@ -228,6 +234,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "GKE secrets encryption is not configured": 1,
                 "GKE legacy ABAC is enabled or unknown": 1,
                 "GKE Shielded Nodes is not enabled": 1,
+                "GCP subnetwork Flow Logs are not configured": 1,
                 "Internet-exposed GCP compute instance permits broad ingress": 1,
                 "Internet-exposed GCP workload can access sensitive data services": 3,
                 "Inherited GCP IAM grant reaches sensitive resources": 1,
@@ -474,7 +481,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 23)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
-        self.assertEqual(len(result.findings), 22)
+        self.assertEqual(len(result.findings), 23)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)

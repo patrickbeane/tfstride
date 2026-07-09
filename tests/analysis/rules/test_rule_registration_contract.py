@@ -192,6 +192,8 @@ EXPECTED_GCP_RULE_GROUP_IDS = (
         "gcp-logging-exclusion-drops-audit-security-logs",
         "gcp-logging-sink-audit-export-incomplete",
         "gcp-central-audit-sink-not-modeled",
+        "gcp-subnetwork-flow-logs-not-configured",
+        "gcp-subnetwork-flow-log-capture-incomplete",
         "gcp-gke-network-policy-disabled",
         "gcp-gke-secrets-encryption-not-configured",
         "gcp-gke-legacy-abac-enabled-or-unknown",
@@ -325,10 +327,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (150, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (152, 2, 2, 14, 3, 2)
         )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (38, 2, 2, 3, 2, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (44, 0, 0, 11, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (46, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (68, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
