@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tfstride.analysis.boundaries import detect_trust_boundaries
+from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
 from tfstride.providers.azure.normalizer import AzureNormalizer
@@ -221,7 +222,14 @@ class AzureResourceDecoratorTests(unittest.TestCase):
         boundaries = detect_trust_boundaries(inventory)
         self.assertEqual(len(boundaries), 1)
         self.assertEqual(boundaries[0].target, virtual_machine.address)
-        self.assertEqual(StrideRuleEngine().evaluate(inventory, boundaries), [])
+        self.assertEqual(
+            StrideRuleEngine().evaluate(
+                inventory,
+                boundaries,
+                rule_policy=RulePolicy(enabled_rule_ids=frozenset({"azure-public-compute-broad-ingress"})),
+            ),
+            [],
+        )
 
     def test_unresolved_storage_account_references_are_recorded(self) -> None:
         inventory = AzureNormalizer().normalize([_container()])

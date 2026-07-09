@@ -18,6 +18,7 @@ from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.load_balancer_rules import AzureLoadBalancerRuleDetectors
 from tfstride.providers.azure.managed_identity_rules import AzureManagedIdentityRuleDetectors
 from tfstride.providers.azure.mssql_rules import AzureMssqlRuleDetectors
+from tfstride.providers.azure.network_telemetry_rules import AzureNetworkTelemetryRuleDetectors
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
 from tfstride.providers.azure.private_endpoint_rules import AzurePrivateEndpointPostureRuleDetectors
 from tfstride.providers.azure.rbac_rules import AzureCustomRoleRuleDetectors
@@ -28,6 +29,10 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-public-compute-broad-ingress",
         "azure-load-balancer-public-frontend",
         "azure-application-gateway-public-listener",
+        "azure-nsg-flow-logs-not-configured",
+        "azure-nsg-flow-log-disabled",
+        "azure-nsg-flow-log-destination-missing",
+        "azure-nsg-flow-log-retention-insufficient",
         "azure-storage-container-public-access",
         "azure-storage-account-nested-public-access-enabled",
         "azure-storage-account-shared-key-enabled",
@@ -108,6 +113,7 @@ def build_azure_rule_contribution(
 ) -> RuleContribution:
     compute_detectors = AzureComputeRuleDetectors(finding_factory)
     load_balancer_detectors = AzureLoadBalancerRuleDetectors(finding_factory)
+    network_telemetry_detectors = AzureNetworkTelemetryRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
@@ -124,6 +130,12 @@ def build_azure_rule_contribution(
         "azure-load-balancer-public-frontend": (load_balancer_detectors.detect_public_load_balancer_frontend),
         "azure-application-gateway-public-listener": (
             load_balancer_detectors.detect_public_application_gateway_listener
+        ),
+        "azure-nsg-flow-logs-not-configured": network_telemetry_detectors.detect_nsg_flow_logs_not_configured,
+        "azure-nsg-flow-log-disabled": network_telemetry_detectors.detect_flow_log_disabled,
+        "azure-nsg-flow-log-destination-missing": (network_telemetry_detectors.detect_flow_log_destination_missing),
+        "azure-nsg-flow-log-retention-insufficient": (
+            network_telemetry_detectors.detect_flow_log_retention_insufficient
         ),
         "azure-storage-container-public-access": storage_detectors.detect_public_container_access,
         "azure-storage-account-nested-public-access-enabled": (storage_detectors.detect_nested_public_access_enabled),

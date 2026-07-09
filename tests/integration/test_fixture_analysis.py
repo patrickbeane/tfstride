@@ -109,11 +109,11 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-inventory": (GCP_FIXTURE_PATH, 23, {"high": 6, "medium": 17}),
             "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 42, {"high": 14, "medium": 26, "low": 2}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
-            "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 1, {"medium": 1}),
-            "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "azure-inventory": (AZURE_FIXTURE_PATH, 22, {"high": 3, "medium": 14, "low": 5}),
-            "azure-nightmare": (AZURE_NIGHTMARE_FIXTURE_PATH, 33, {"high": 7, "medium": 21, "low": 5}),
-            "azure-nsg-precedence": (AZURE_NSG_PRECEDENCE_FIXTURE_PATH, 0, {}),
+            "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 3, {"medium": 3}),
+            "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
+            "azure-inventory": (AZURE_FIXTURE_PATH, 24, {"high": 3, "medium": 16, "low": 5}),
+            "azure-nightmare": (AZURE_NIGHTMARE_FIXTURE_PATH, 36, {"high": 7, "medium": 24, "low": 5}),
+            "azure-nsg-precedence": (AZURE_NSG_PRECEDENCE_FIXTURE_PATH, 1, {"medium": 1}),
             "azure-storage": (AZURE_STORAGE_FIXTURE_PATH, 7, {"high": 2, "medium": 5}),
         }
 
@@ -247,11 +247,13 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "azure-safe": {},
             "azure-compute": {
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
+                "Azure Network Security Group lacks flow-log coverage": 2,
             },
             "azure-identity": {
                 "Azure managed identity has broad RBAC authority": 1,
                 "Internet-exposed Azure workload can access sensitive resources": 1,
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
+                "Azure Network Security Group lacks flow-log coverage": 1,
                 "Azure resource lacks diagnostic settings": 1,
             },
             "azure-inventory": {
@@ -274,6 +276,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Azure Storage account lacks resolved private endpoint coverage": 1,
                 "Azure Storage container is publicly accessible": 1,
                 "Internet-exposed Azure virtual machine permits broad ingress": 1,
+                "Azure Network Security Group lacks flow-log coverage": 2,
                 "Azure resource lacks diagnostic settings": 3,
             },
             "azure-nightmare": {
@@ -298,9 +301,12 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Azure managed identity has broad RBAC authority": 1,
                 "Internet-exposed Azure workload can access sensitive resources": 1,
                 "Internet-exposed Azure virtual machine permits broad ingress": 2,
+                "Azure Network Security Group lacks flow-log coverage": 3,
                 "Azure resource lacks diagnostic settings": 4,
             },
-            "azure-nsg-precedence": {},
+            "azure-nsg-precedence": {
+                "Azure Network Security Group lacks flow-log coverage": 1,
+            },
             "azure-storage": {
                 "Azure Storage account permits Shared Key authorization": 1,
                 "Azure Storage account permits nested public blob access": 1,

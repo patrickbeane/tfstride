@@ -25,6 +25,8 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
                 "azure-key-vault-public-network-access",
                 "azure-key-vault-missing-private-endpoint",
                 "azure-key-vault-purge-protection-disabled",
+                "azure-nsg-flow-logs-not-configured",
+                "azure-nsg-flow-logs-not-configured",
                 "azure-storage-account-minimum-tls-below-1-2",
                 "azure-storage-account-public-network-unrestricted",
                 "azure-storage-account-missing-private-endpoint",
@@ -42,7 +44,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 14, "high": 3, "low": 5}),
+            Counter({"medium": 16, "high": 3, "low": 5}),
         )
         self.assertEqual(
             [boundary.identifier for boundary in result.trust_boundaries],
@@ -88,6 +90,7 @@ class AzureFixtureAnalysisIntegrationTests(unittest.TestCase):
         self.assertIn("Azure Key Vault allows unrestricted public network access", first)
         self.assertIn("AKS control plane is public without narrow authorized IP ranges", first)
         self.assertIn("AKS workload identity is not fully enabled", first)
+        self.assertIn("Azure Network Security Group lacks flow-log coverage", first)
 
 
 if __name__ == "__main__":

@@ -130,6 +130,10 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "azure-public-compute-broad-ingress",
     "azure-load-balancer-public-frontend",
     "azure-application-gateway-public-listener",
+    "azure-nsg-flow-logs-not-configured",
+    "azure-nsg-flow-log-disabled",
+    "azure-nsg-flow-log-destination-missing",
+    "azure-nsg-flow-log-retention-insufficient",
     "azure-storage-container-public-access",
     "azure-storage-account-nested-public-access-enabled",
     "azure-storage-account-shared-key-enabled",
@@ -241,7 +245,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 175)
+        self.assertEqual(len(metadata), 179)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -252,7 +256,7 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 49)
         self.assertEqual(len(gcp_metadata_ids), 58)
-        self.assertEqual(len(azure_metadata_ids), 68)
+        self.assertEqual(len(azure_metadata_ids), 72)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
         self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))

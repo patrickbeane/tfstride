@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 175,
+      "registered_rule_count": 179,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -149,6 +149,10 @@
         "azure-public-compute-broad-ingress",
         "azure-load-balancer-public-frontend",
         "azure-application-gateway-public-listener",
+        "azure-nsg-flow-logs-not-configured",
+        "azure-nsg-flow-log-disabled",
+        "azure-nsg-flow-log-destination-missing",
+        "azure-nsg-flow-log-retention-insufficient",
         "azure-storage-container-public-access",
         "azure-storage-account-nested-public-access-enabled",
         "azure-storage-account-shared-key-enabled",
@@ -328,6 +332,10 @@
         "azure-public-compute-broad-ingress": 0,
         "azure-load-balancer-public-frontend": 0,
         "azure-application-gateway-public-listener": 0,
+        "azure-nsg-flow-logs-not-configured": 0,
+        "azure-nsg-flow-log-disabled": 0,
+        "azure-nsg-flow-log-destination-missing": 0,
+        "azure-nsg-flow-log-retention-insufficient": 0,
         "azure-storage-container-public-access": 0,
         "azure-storage-account-nested-public-access-enabled": 0,
         "azure-storage-account-shared-key-enabled": 0,

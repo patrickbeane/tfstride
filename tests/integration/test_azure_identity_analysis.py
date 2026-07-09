@@ -21,13 +21,14 @@ class AzureIdentityAnalysisIntegrationTests(unittest.TestCase):
             [
                 "azure-managed-identity-broad-rbac",
                 "azure-public-workload-sensitive-resource-access",
+                "azure-nsg-flow-logs-not-configured",
                 "azure-diagnostic-settings-missing",
                 "azure-public-compute-broad-ingress",
             ],
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"high": 2, "medium": 2}),
+            Counter({"high": 2, "medium": 3}),
         )
 
     def test_identity_fixture_keeps_private_storage_quiet_while_modeling_sensitive_scope(self) -> None:

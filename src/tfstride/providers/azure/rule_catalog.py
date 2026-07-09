@@ -38,6 +38,50 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-nsg-flow-logs-not-configured",
+        title="Azure Network Security Group lacks flow-log coverage",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure an `azurerm_network_watcher_flow_log` for the NSG, route logs to durable storage, and keep "
+            "retention long enough for incident response and network investigation workflows."
+        ),
+        tags=("azure", "network", "nsg", "flow-logs", "monitoring"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-nsg-flow-log-disabled",
+        title="Azure Network Watcher flow log is disabled or unknown",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Set the Network Watcher flow log `enabled` value to `true` and keep Terraform plan values "
+            "deterministic so NSG flow telemetry collection can be reviewed before deployment."
+        ),
+        tags=("azure", "network", "nsg", "flow-logs", "monitoring"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-nsg-flow-log-destination-missing",
+        title="Azure Network Watcher flow log has no deterministic storage destination",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure a `storage_account_id` destination for Network Watcher flow logs and retain the storage "
+            "account with access controls appropriate for security telemetry."
+        ),
+        tags=("azure", "network", "nsg", "flow-logs", "logging-destination"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-nsg-flow-log-retention-insufficient",
+        title="Azure Network Watcher flow-log retention is insufficient",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable Network Watcher flow-log retention and configure a retention period that meets incident "
+            "response, threat hunting, and compliance review requirements."
+        ),
+        tags=("azure", "network", "nsg", "flow-logs", "retention"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-storage-container-public-access",
         title="Azure Storage container is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,

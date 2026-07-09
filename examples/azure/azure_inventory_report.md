@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **3 trust boundaries** and **22 findings** across **15 normalized resources**.
+This run identified **3 trust boundaries** and **24 findings** across **15 normalized resources**.
 
 - High severity findings: `3`
-- Medium severity findings: `14`
+- Medium severity findings: `16`
 - Low severity findings: `5`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **3 trust boundaries** and **22 findings** across **15 norma
 - Provider resources considered: `15`
 - Normalized resources: `15`
 - Unsupported resources: `0`
-- Registered rules: `175`
-- Enabled rules: `175`
+- Registered rules: `179`
+- Enabled rules: `179`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `azure-public-compute-broad-ingress`: `1`
+  - `azure-nsg-flow-logs-not-configured`: `2`
   - `azure-storage-container-public-access`: `1`
   - `azure-storage-account-nested-public-access-enabled`: `1`
   - `azure-storage-account-shared-key-enabled`: `1`
@@ -180,6 +181,30 @@ This run identified **3 trust boundaries** and **22 findings** across **15 norma
 - Recommended mitigation: Enable purge protection and retain soft-deleted vault objects long enough to recover from accidental or malicious deletion.
 - Evidence:
   - recovery posture: purge_protection_enabled is false
+
+#### Azure Network Security Group lacks flow-log coverage
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_network_security_group.web_subnet`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_network_security_group.web_subnet does not have a resolved azurerm_network_watcher_flow_log targeting the NSG in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless NSG flow logs are configured elsewhere.
+- Recommended mitigation: Configure an `azurerm_network_watcher_flow_log` for the NSG, route logs to durable storage, and keep retention long enough for incident response and network investigation workflows.
+- Evidence:
+  - target network security group: address=azurerm_network_security_group.web_subnet; resource_type=azurerm_network_security_group; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/networkSecurityGroups/web-subnet; name=web-subnet
+  - flow log coverage: target_nsg_identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/tfstride/providers/microsoft.network/networksecuritygroups/web-subnet; target_nsg_identifier=azurerm_network_security_group.web_subnet; target_nsg_identifier=azurerm_network_security_group.web_subnet.id; target_nsg_identifier=web-subnet; resolved_nsg_flow_log_count=0; azurerm_network_watcher_flow_log resources are not modeled
+
+#### Azure Network Security Group lacks flow-log coverage
+
+- STRIDE category: Repudiation
+- Affected resources: `azurerm_network_security_group.web_nic`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +2, blast_radius +1, final_score 3 => medium
+- Rationale: azurerm_network_security_group.web_nic does not have a resolved azurerm_network_watcher_flow_log targeting the NSG in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless NSG flow logs are configured elsewhere.
+- Recommended mitigation: Configure an `azurerm_network_watcher_flow_log` for the NSG, route logs to durable storage, and keep retention long enough for incident response and network investigation workflows.
+- Evidence:
+  - target network security group: address=azurerm_network_security_group.web_nic; resource_type=azurerm_network_security_group; identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tfstride/providers/Microsoft.Network/networkSecurityGroups/web-nic; name=web-nic
+  - flow log coverage: target_nsg_identifier=/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/tfstride/providers/microsoft.network/networksecuritygroups/web-nic; target_nsg_identifier=azurerm_network_security_group.web_nic; target_nsg_identifier=azurerm_network_security_group.web_nic.id; target_nsg_identifier=web-nic; resolved_nsg_flow_log_count=0; azurerm_network_watcher_flow_log resources are not modeled
 
 #### Azure Storage account allows TLS below 1.2
 

@@ -84,7 +84,10 @@ class AzureComputeExposureNormalizationTests(unittest.TestCase):
         self.assertFalse(virtual_machine.public_exposure)
         self.assertFalse(virtual_machine.direct_internet_reachable)
         self.assertEqual(azure_facts(virtual_machine).public_compute_exposure_paths, [])
-        self.assertEqual(result.findings, [])
+        self.assertNotIn(
+            "azure-public-compute-broad-ingress",
+            {finding.rule_id for finding in result.findings},
+        )
 
     def _fixture_payload(self) -> dict:
         return copy.deepcopy(json.loads(FIXTURE_PATH.read_text(encoding="utf-8")))

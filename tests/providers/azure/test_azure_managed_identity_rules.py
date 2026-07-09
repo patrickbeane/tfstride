@@ -547,7 +547,8 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
     def test_public_compute_without_identity_does_not_create_duplicate_sensitive_findings(self) -> None:
         _, _, findings = _evaluate(
             _public_vm_without_identity(port="22"),
-            *_all_azure_rule_ids(),
+            "azure-public-compute-broad-ingress",
+            "azure-public-workload-sensitive-resource-access",
         )
 
         self.assertEqual([finding.rule_id for finding in findings], ["azure-public-compute-broad-ingress"])

@@ -13,8 +13,11 @@ class AzureComputeRuleTests(unittest.TestCase):
     def test_public_compute_finding_contains_readable_relationship_evidence(self) -> None:
         result = TfStride().analyze_plan(FIXTURE_PATH)
 
-        self.assertEqual(len(result.findings), 1)
-        finding = result.findings[0]
+        compute_findings = [
+            finding for finding in result.findings if finding.rule_id == "azure-public-compute-broad-ingress"
+        ]
+        self.assertEqual(len(compute_findings), 1)
+        finding = compute_findings[0]
         evidence = {item.key: item.values for item in finding.evidence}
 
         self.assertEqual(finding.rule_id, "azure-public-compute-broad-ingress")

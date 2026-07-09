@@ -20,7 +20,7 @@ class AzureNsgPrecedenceAnalysisIntegrationTests(unittest.TestCase):
         assert network_security_group is not None
 
         self.assertEqual(result.inventory.provider, "azure")
-        self.assertEqual(result.findings, [])
+        self.assertEqual([finding.rule_id for finding in result.findings], ["azure-nsg-flow-logs-not-configured"])
         self.assertEqual(result.trust_boundaries, [])
         self.assertFalse(virtual_machine.public_exposure)
         self.assertEqual(azure_facts(virtual_machine).public_compute_exposure_paths, [])
@@ -48,8 +48,9 @@ class AzureNsgPrecedenceAnalysisIntegrationTests(unittest.TestCase):
         second = render_markdown(engine.analyze_plan(AZURE_NSG_PRECEDENCE_FIXTURE_PATH))
 
         self.assertEqual(first, second)
-        self.assertIn("This run identified **0 trust boundaries** and **0 findings**", first)
+        self.assertIn("This run identified **0 trust boundaries** and **1 findings**", first)
         self.assertIn("No trust boundaries were discovered.", first)
+        self.assertIn("Azure Network Security Group lacks flow-log coverage", first)
 
 
 if __name__ == "__main__":

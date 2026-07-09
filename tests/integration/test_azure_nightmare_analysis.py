@@ -15,7 +15,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.inventory.provider, "azure")
         self.assertEqual(len(result.inventory.resources), 27)
-        self.assertEqual(len(result.findings), 33)
+        self.assertEqual(len(result.findings), 36)
         self.assertEqual(
             Counter(finding.rule_id for finding in result.findings),
             Counter(
@@ -28,6 +28,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
                     "azure-storage-account-public-network-unrestricted": 2,
                     "azure-storage-account-missing-private-endpoint": 2,
                     "azure-public-compute-broad-ingress": 2,
+                    "azure-nsg-flow-logs-not-configured": 3,
                     "azure-aks-api-server-public-unrestricted": 1,
                     "azure-aks-local-accounts-not-disabled": 1,
                     "azure-aks-rbac-posture-weak": 1,
@@ -47,7 +48,7 @@ class AzureNightmareAnalysisIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             Counter(finding.severity.value for finding in result.findings),
-            Counter({"medium": 21, "high": 7, "low": 5}),
+            Counter({"medium": 24, "high": 7, "low": 5}),
         )
 
     def test_nightmare_fixture_stresses_distinct_ssh_and_rdp_nsg_paths(self) -> None:
