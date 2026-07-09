@@ -1,8 +1,46 @@
 # tfSTRIDE & Policy Gate
 
-`tfstride` converts Terraform plan JSON into reviewable cloud threat models, trust boundaries, STRIDE-oriented findings, and observed protective controls before deployment.
+`tfstride` turns Terraform plan JSON into evidence-backed cloud threat models - trust boundaries, STRIDE findings, and observed controls - before `terraform apply`. It reasons over **relationships and trust paths across resources**, not just per-resource configuration.
 
-It is built for local review and CI gating: no LLMs in the core path, no runtime cloud access, and no full graph engine. The goal is to make risky infrastructure relationships easier to see before `terraform apply`.
+**Zero runtime dependencies for the base CLI/core engine** (`dependencies = []`). The default install has no transitive packages; dashboard and development extras are intentionally separate. That keeps the supply-chain surface small for a tool run against production-account plan files.
+
+> **Use an IaC scanner** such as Checkov, Trivy, or Snyk IaC to ask: *which resource-level controls are missing?*
+> **Use `tfstride`** to ask: *what architecture risk - and which trust paths - does this plan introduce?*
+
+An IaC scanner may flag the load balancer, the subnet, and the database as separate findings. `tfstride` connects them into the path that matters:
+
+```markdown
+#### Sensitive data tier is transitively reachable from an internet-exposed path
+
+- STRIDE category: Information Disclosure
+- Affected resources: `aws_lb.web`, `aws_instance.app`, `aws_db_instance.app`
+- Rationale: `aws_db_instance.app` is not directly public, but internet traffic can reach
+  `aws_lb.web`, move through `aws_instance.app`, and cross into the private data tier -
+  a quieter transitive exposure path than a directly public data store.
+- Evidence:
+  - internet reaches `aws_lb.web`
+  - `aws_lb.web` reaches `aws_instance.app`
+  - `aws_instance.app` reaches `aws_db_instance.app`
+```
+
+`--fail-on` turns a finding like the one above into a CI gate:
+
+```text
+Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
+```
+
+Generated example output - see [`examples/aws/aws_alb_ec2_rds_report.md`](examples/aws/aws_alb_ec2_rds_report.md).
+
+Where `tfstride` fits beside IaC scanners:
+
+| A reviewer's question | Better fit |
+| --- | --- |
+| Does this change create a path from the internet to a private data tier? | `tfstride` |
+| Does a workload inherit privileges that expand blast radius if compromised? | `tfstride` |
+| Is cross-account, cross-project, or federated trust narrowed by supported conditions? | `tfstride` |
+| Broad policy catalogs and compliance checks across all resources? | Checkov / Trivy / Snyk IaC |
+
+Full comparison - different jobs, transitive exposure, workload blast radius, scope & limits - in [`docs/when-to-use-tfstride.md`](docs/when-to-use-tfstride.md).
 
 ## What It Does
 
@@ -22,7 +60,6 @@ Core capabilities:
 * Suppressions and baselines for incremental adoption
 * Repo-level TOML configuration
 * Optional FastAPI dashboard
-* Zero runtime dependencies for the core CLI engine
 
 ## Quickstart
 
@@ -80,25 +117,6 @@ List registered rules:
 ```bash
 tfstride --list-rules
 tfstride --list-rules --json
-```
-
-## Example Finding
-
-```markdown
-#### Database is reachable from overly permissive sources
-
-- STRIDE category: Information Disclosure
-- Trust boundary: `workload-to-data-store:aws_instance.app->aws_db_instance.app`
-- Severity reasoning: internet_exposure +2, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 6 => high
-- Evidence:
-  - security group rules: aws_security_group.db ingress tcp 5432 from 0.0.0.0/0
-  - network path: database trusts security groups attached to internet-exposed workloads
-```
-
-Expected policy-gate failure:
-
-```text
-Policy gate failed: 3 finding(s) meet or exceed `high` (3 high).
 ```
 
 ## Provider Support
