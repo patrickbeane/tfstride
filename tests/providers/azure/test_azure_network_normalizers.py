@@ -10,6 +10,7 @@ from tfstride.providers.azure.network_normalizers import (
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
     normalize_network_security_rule,
+    normalize_network_watcher_flow_log,
     normalize_private_dns_zone,
     normalize_private_dns_zone_virtual_network_link,
     normalize_public_ip,
@@ -143,6 +144,168 @@ class AzureNetworkNormalizerTests(unittest.TestCase):
         self.assertEqual(azure_facts(rule).network_security_group_reference, "azurerm_network_security_group.web.name")
         self.assertEqual(azure_facts(subnet_association).subnet_reference, "azurerm_subnet.app.id")
         self.assertEqual(azure_facts(nic_association).network_interface_reference, "azurerm_network_interface.web.id")
+
+    def test_network_watcher_flow_log_normalizes_enabled_telemetry_posture(self) -> None:
+        flow_log = normalize_network_watcher_flow_log(
+            _resource(
+                AzureResourceType.NETWORK_WATCHER_FLOW_LOG,
+                {
+                    "id": "/subscriptions/example/networkWatchers/watcher/flowLogs/app-nsg",
+                    "name": "app-nsg",
+                    "location": "eastus",
+                    "network_watcher_name": "watcher",
+                    "resource_group_name": "rg-network",
+                    "network_security_group_id": "azurerm_network_security_group.app.id",
+                    "storage_account_id": "azurerm_storage_account.flow_logs.id",
+                    "enabled": True,
+                    "version": 2,
+                    "retention_policy": [{"enabled": True, "days": 30}],
+                    "traffic_analytics": [
+                        {
+                            "enabled": True,
+                            "workspace_id": "workspace-guid",
+                            "workspace_region": "eastus",
+                            "workspace_resource_id": "azurerm_log_analytics_workspace.security.id",
+                            "interval_in_minutes": 10,
+                        }
+                    ],
+                },
+                name="app",
+            )
+        )
+        facts = azure_facts(flow_log)
+
+        self.assertEqual(flow_log.category, ResourceCategory.NETWORK)
+        self.assertEqual(flow_log.identifier, "/subscriptions/example/networkWatchers/watcher/flowLogs/app-nsg")
+        self.assertEqual(flow_log.security_group_ids, ("azurerm_network_security_group.app.id",))
+        self.assertEqual(facts.network_flow_log_id, "/subscriptions/example/networkWatchers/watcher/flowLogs/app-nsg")
+        self.assertEqual(facts.network_flow_log_name, "app-nsg")
+        self.assertEqual(facts.network_flow_log_state, "enabled")
+        self.assertEqual(facts.network_flow_log_target_resource_id, "azurerm_network_security_group.app.id")
+        self.assertEqual(
+            facts.network_flow_log_network_security_group_id,
+            "azurerm_network_security_group.app.id",
+        )
+        self.assertEqual(facts.network_flow_log_storage_account_id, "azurerm_storage_account.flow_logs.id")
+        self.assertEqual(facts.network_flow_log_network_watcher_name, "watcher")
+        self.assertEqual(facts.network_flow_log_resource_group_name, "rg-network")
+        self.assertEqual(facts.network_flow_log_version, 2)
+        self.assertEqual(facts.network_flow_log_retention_state, "enabled")
+        self.assertEqual(facts.network_flow_log_retention_days, 30)
+        self.assertEqual(facts.network_flow_log_retention_policy, {"enabled": True, "days": 30})
+        self.assertEqual(facts.network_flow_log_traffic_analytics_state, "enabled")
+        self.assertEqual(facts.network_flow_log_traffic_analytics_workspace_id, "workspace-guid")
+        self.assertEqual(facts.network_flow_log_traffic_analytics_workspace_region, "eastus")
+        self.assertEqual(
+            facts.network_flow_log_traffic_analytics_workspace_resource_id,
+            "azurerm_log_analytics_workspace.security.id",
+        )
+        self.assertEqual(facts.network_flow_log_traffic_analytics_interval_minutes, 10)
+        self.assertEqual(
+            facts.network_flow_log_traffic_analytics,
+            {
+                "enabled": True,
+                "workspace_id": "workspace-guid",
+                "workspace_region": "eastus",
+                "workspace_resource_id": "azurerm_log_analytics_workspace.security.id",
+                "interval_in_minutes": 10,
+            },
+        )
+        self.assertEqual(facts.network_telemetry_posture_uncertainties, [])
+
+    def test_network_watcher_flow_log_preserves_disabled_and_missing_blocks(self) -> None:
+        flow_log = normalize_network_watcher_flow_log(
+            _resource(
+                AzureResourceType.NETWORK_WATCHER_FLOW_LOG,
+                {
+                    "name": "disabled",
+                    "target_resource_id": "/subscriptions/example/networkSecurityGroups/app",
+                    "enabled": False,
+                },
+                name="disabled",
+            )
+        )
+        facts = azure_facts(flow_log)
+
+        self.assertEqual(flow_log.identifier, "disabled")
+        self.assertEqual(flow_log.security_group_ids, ("/subscriptions/example/networkSecurityGroups/app",))
+        self.assertEqual(facts.network_flow_log_state, "disabled")
+        self.assertEqual(facts.network_flow_log_target_resource_id, "/subscriptions/example/networkSecurityGroups/app")
+        self.assertEqual(facts.network_flow_log_network_security_group_id, None)
+        self.assertEqual(facts.network_flow_log_retention_state, "not_configured")
+        self.assertEqual(facts.network_flow_log_traffic_analytics_state, "not_configured")
+        self.assertEqual(facts.network_telemetry_posture_uncertainties, [])
+
+    def test_network_watcher_flow_log_preserves_unknown_values_as_uncertainty(self) -> None:
+        flow_log = normalize_network_watcher_flow_log(
+            _resource(
+                AzureResourceType.NETWORK_WATCHER_FLOW_LOG,
+                {
+                    "name": "pending",
+                    "retention_policy": [{}],
+                    "traffic_analytics": [{}],
+                },
+                name="pending",
+                unknown_values={
+                    "id": True,
+                    "enabled": True,
+                    "network_security_group_id": True,
+                    "storage_account_id": True,
+                    "version": True,
+                    "retention_policy": [{"enabled": True, "days": True}],
+                    "traffic_analytics": [
+                        {
+                            "enabled": True,
+                            "workspace_id": True,
+                            "workspace_region": True,
+                            "workspace_resource_id": True,
+                            "interval_in_minutes": True,
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(flow_log)
+
+        self.assertEqual(flow_log.identifier, "pending")
+        self.assertEqual(flow_log.security_group_ids, ())
+        self.assertEqual(facts.network_flow_log_state, "unknown")
+        self.assertIsNone(facts.network_flow_log_target_resource_id)
+        self.assertEqual(facts.network_flow_log_retention_state, "unknown")
+        self.assertEqual(
+            facts.network_flow_log_retention_policy,
+            {"unknown_fields": ["enabled", "days"]},
+        )
+        self.assertEqual(facts.network_flow_log_traffic_analytics_state, "unknown")
+        self.assertEqual(
+            facts.network_flow_log_traffic_analytics,
+            {
+                "unknown_fields": [
+                    "enabled",
+                    "workspace_id",
+                    "workspace_region",
+                    "workspace_resource_id",
+                    "interval_in_minutes",
+                ]
+            },
+        )
+        self.assertEqual(
+            facts.network_telemetry_posture_uncertainties,
+            [
+                "id is unknown after planning",
+                "network_security_group_id is unknown after planning",
+                "enabled is unknown after planning",
+                "storage_account_id is unknown after planning",
+                "version is unknown after planning",
+                "retention_policy.enabled is unknown after planning",
+                "retention_policy.days is unknown after planning",
+                "traffic_analytics.enabled is unknown after planning",
+                "traffic_analytics.workspace_id is unknown after planning",
+                "traffic_analytics.workspace_region is unknown after planning",
+                "traffic_analytics.workspace_resource_id is unknown after planning",
+                "traffic_analytics.interval_in_minutes is unknown after planning",
+            ],
+        )
 
     def test_network_interface_and_public_ip_normalize_public_ip_relationship(self) -> None:
         network_interface = normalize_network_interface(

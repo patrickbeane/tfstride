@@ -63,6 +63,7 @@ class AzureProviderTests(unittest.TestCase):
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.ROLE_DEFINITION))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.NETWORK_WATCHER_FLOW_LOG))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.LOAD_BALANCER))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.APPLICATION_GATEWAY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.PRIVATE_ENDPOINT))

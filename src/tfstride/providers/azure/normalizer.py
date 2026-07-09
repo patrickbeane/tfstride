@@ -56,6 +56,7 @@ from tfstride.providers.azure.network_normalizers import (
     normalize_network_interface_security_group_association,
     normalize_network_security_group,
     normalize_network_security_rule,
+    normalize_network_watcher_flow_log,
     normalize_private_dns_zone,
     normalize_private_dns_zone_virtual_network_link,
     normalize_private_endpoint,
@@ -91,6 +92,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.SUBNET: normalize_subnet,
     AzureResourceType.NETWORK_SECURITY_GROUP: normalize_network_security_group,
     AzureResourceType.NETWORK_SECURITY_RULE: normalize_network_security_rule,
+    AzureResourceType.NETWORK_WATCHER_FLOW_LOG: normalize_network_watcher_flow_log,
     AzureResourceType.SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION: normalize_subnet_network_security_group_association,
     AzureResourceType.NETWORK_INTERFACE: normalize_network_interface,
     AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION: (

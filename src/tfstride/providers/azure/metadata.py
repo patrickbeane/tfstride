@@ -106,6 +106,27 @@ class AzureResourceMetadata:
     NETWORK_RULE_SOURCE_ADDRESS = OptionalStringMetadataField("network_rule_source_address")
     PUBLIC_NETWORK_FALLBACK_STATE = OptionalStringMetadataField("public_network_fallback_state")
     LOCATION = OptionalStringMetadataField("location")
+    NETWORK_FLOW_LOG_ID = OptionalStringMetadataField("network_flow_log_id")
+    NETWORK_FLOW_LOG_NAME = OptionalStringMetadataField("network_flow_log_name")
+    NETWORK_FLOW_LOG_STATE = OptionalStringMetadataField("network_flow_log_state")
+    NETWORK_FLOW_LOG_TARGET_RESOURCE_ID = OptionalStringMetadataField("network_flow_log_target_resource_id")
+    NETWORK_FLOW_LOG_NETWORK_SECURITY_GROUP_ID = OptionalStringMetadataField(
+        "network_flow_log_network_security_group_id"
+    )
+    NETWORK_FLOW_LOG_STORAGE_ACCOUNT_ID = OptionalStringMetadataField("network_flow_log_storage_account_id")
+    NETWORK_FLOW_LOG_NETWORK_WATCHER_NAME = OptionalStringMetadataField("network_flow_log_network_watcher_name")
+    NETWORK_FLOW_LOG_RESOURCE_GROUP_NAME = OptionalStringMetadataField("network_flow_log_resource_group_name")
+    NETWORK_FLOW_LOG_RETENTION_STATE = OptionalStringMetadataField("network_flow_log_retention_state")
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_STATE = OptionalStringMetadataField("network_flow_log_traffic_analytics_state")
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_ID = OptionalStringMetadataField(
+        "network_flow_log_traffic_analytics_workspace_id"
+    )
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_REGION = OptionalStringMetadataField(
+        "network_flow_log_traffic_analytics_workspace_region"
+    )
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_RESOURCE_ID = OptionalStringMetadataField(
+        "network_flow_log_traffic_analytics_workspace_resource_id"
+    )
     LOAD_BALANCER_ID = OptionalStringMetadataField("load_balancer_id")
     LOAD_BALANCER_SKU = OptionalStringMetadataField("load_balancer_sku")
     LOAD_BALANCER_EXPOSURE_STATE = OptionalStringMetadataField("load_balancer_exposure_state")
@@ -186,6 +207,12 @@ class AzureResourceMetadata:
     STORAGE_BLOB_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_blob_delete_retention_days")
     STORAGE_CONTAINER_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_container_delete_retention_days")
     STORAGE_BLOB_RESTORE_POLICY_DAYS = OptionalIntMetadataField("storage_blob_restore_policy_days")
+    NETWORK_FLOW_LOG_VERSION = OptionalIntMetadataField("network_flow_log_version")
+    NETWORK_FLOW_LOG_RETENTION_DAYS = OptionalIntMetadataField("network_flow_log_retention_days")
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_INTERVAL_MINUTES = OptionalIntMetadataField(
+        "network_flow_log_traffic_analytics_interval_minutes"
+    )
+    NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES = StringListMetadataField("network_telemetry_posture_uncertainties")
     APP_SERVICE_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_posture_uncertainties")
     APP_SERVICE_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_access_restrictions")
     APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
@@ -262,6 +289,8 @@ class AzureResourceMetadata:
     APPLICATION_GATEWAY_HTTP_LISTENERS = DictListMetadataField("application_gateway_http_listeners")
     APPLICATION_GATEWAY_ROUTING_RULES = DictListMetadataField("application_gateway_routing_rules")
     NETWORK_SECURITY_RULES = DictListMetadataField("network_security_rules")
+    NETWORK_FLOW_LOG_RETENTION_POLICY = DictMetadataField("network_flow_log_retention_policy")
+    NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS = DictMetadataField("network_flow_log_traffic_analytics")
     PUBLIC_COMPUTE_EXPOSURE_PATHS = DictListMetadataField("public_compute_exposure_paths")
     KEY_VAULT_ACCESS_POLICIES = DictListMetadataField("key_vault_access_policies")
     KEY_VAULT_ROLE_ASSIGNMENTS = DictListMetadataField("key_vault_role_assignments")

@@ -21,6 +21,7 @@ class AzureResourceType:
     SUBNET = "azurerm_subnet"
     NETWORK_SECURITY_GROUP = "azurerm_network_security_group"
     NETWORK_SECURITY_RULE = "azurerm_network_security_rule"
+    NETWORK_WATCHER_FLOW_LOG = "azurerm_network_watcher_flow_log"
     SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION = "azurerm_subnet_network_security_group_association"
     NETWORK_INTERFACE = "azurerm_network_interface"
     NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION = "azurerm_network_interface_security_group_association"
@@ -84,6 +85,7 @@ AZURE_NETWORK_RESOURCE_TYPES = frozenset(
         AzureResourceType.SUBNET,
         AzureResourceType.NETWORK_SECURITY_GROUP,
         AzureResourceType.NETWORK_SECURITY_RULE,
+        AzureResourceType.NETWORK_WATCHER_FLOW_LOG,
         AzureResourceType.SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION,
         AzureResourceType.NETWORK_INTERFACE,
         AzureResourceType.NETWORK_INTERFACE_SECURITY_GROUP_ASSOCIATION,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -40,6 +41,82 @@ class AzureNetworkFacts:
     @property
     def network_security_rules(self) -> list[dict]:
         return self.get(AzureResourceMetadata.NETWORK_SECURITY_RULES)
+
+    @property
+    def network_flow_log_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_ID)
+
+    @property
+    def network_flow_log_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_NAME)
+
+    @property
+    def network_flow_log_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_STATE)
+
+    @property
+    def network_flow_log_target_resource_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TARGET_RESOURCE_ID)
+
+    @property
+    def network_flow_log_network_security_group_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_NETWORK_SECURITY_GROUP_ID)
+
+    @property
+    def network_flow_log_storage_account_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_STORAGE_ACCOUNT_ID)
+
+    @property
+    def network_flow_log_network_watcher_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_NETWORK_WATCHER_NAME)
+
+    @property
+    def network_flow_log_resource_group_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_RESOURCE_GROUP_NAME)
+
+    @property
+    def network_flow_log_version(self) -> int | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_VERSION)
+
+    @property
+    def network_flow_log_retention_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_STATE)
+
+    @property
+    def network_flow_log_retention_days(self) -> int | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_DAYS)
+
+    @property
+    def network_flow_log_retention_policy(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_POLICY)
+
+    @property
+    def network_flow_log_traffic_analytics_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_STATE)
+
+    @property
+    def network_flow_log_traffic_analytics_workspace_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_ID)
+
+    @property
+    def network_flow_log_traffic_analytics_workspace_region(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_REGION)
+
+    @property
+    def network_flow_log_traffic_analytics_workspace_resource_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_RESOURCE_ID)
+
+    @property
+    def network_flow_log_traffic_analytics_interval_minutes(self) -> int | None:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_INTERVAL_MINUTES)
+
+    @property
+    def network_flow_log_traffic_analytics(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS)
+
+    @property
+    def network_telemetry_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES)
 
     @property
     def resolved_subnet_addresses(self) -> list[str]:

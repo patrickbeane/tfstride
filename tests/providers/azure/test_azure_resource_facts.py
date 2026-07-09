@@ -57,6 +57,37 @@ class AzureResourceFactsTests(unittest.TestCase):
                 AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED: True,
                 AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: "enabled",
                 AzureResourceMetadata.NETWORK_DEFAULT_ACTION: "Deny",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_ID: "flow-log-app",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_NAME: "app-nsg",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_STATE: "enabled",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TARGET_RESOURCE_ID: "azurerm_network_security_group.app.id",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_NETWORK_SECURITY_GROUP_ID: (
+                    "azurerm_network_security_group.app.id"
+                ),
+                AzureResourceMetadata.NETWORK_FLOW_LOG_STORAGE_ACCOUNT_ID: "azurerm_storage_account.flow_logs.id",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_NETWORK_WATCHER_NAME: "watcher",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_RESOURCE_GROUP_NAME: "rg-network",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_VERSION: 2,
+                AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_STATE: "enabled",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_DAYS: 30,
+                AzureResourceMetadata.NETWORK_FLOW_LOG_RETENTION_POLICY: {"enabled": True, "days": 30},
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_STATE: "enabled",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_ID: "workspace-guid",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_REGION: "eastus",
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_WORKSPACE_RESOURCE_ID: (
+                    "azurerm_log_analytics_workspace.security.id"
+                ),
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS_INTERVAL_MINUTES: 10,
+                AzureResourceMetadata.NETWORK_FLOW_LOG_TRAFFIC_ANALYTICS: {
+                    "enabled": True,
+                    "workspace_id": "workspace-guid",
+                    "workspace_region": "eastus",
+                    "workspace_resource_id": "azurerm_log_analytics_workspace.security.id",
+                    "interval_in_minutes": 10,
+                },
+                AzureResourceMetadata.NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES: [
+                    "traffic_analytics.workspace_id is unknown after planning"
+                ],
             }
         )
 
@@ -96,6 +127,40 @@ class AzureResourceFactsTests(unittest.TestCase):
         self.assertTrue(facts.public_network_access_enabled)
         self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Deny")
+        self.assertEqual(facts.network_flow_log_id, "flow-log-app")
+        self.assertEqual(facts.network_flow_log_name, "app-nsg")
+        self.assertEqual(facts.network_flow_log_state, "enabled")
+        self.assertEqual(facts.network_flow_log_target_resource_id, "azurerm_network_security_group.app.id")
+        self.assertEqual(facts.network_flow_log_network_security_group_id, "azurerm_network_security_group.app.id")
+        self.assertEqual(facts.network_flow_log_storage_account_id, "azurerm_storage_account.flow_logs.id")
+        self.assertEqual(facts.network_flow_log_network_watcher_name, "watcher")
+        self.assertEqual(facts.network_flow_log_resource_group_name, "rg-network")
+        self.assertEqual(facts.network_flow_log_version, 2)
+        self.assertEqual(facts.network_flow_log_retention_state, "enabled")
+        self.assertEqual(facts.network_flow_log_retention_days, 30)
+        self.assertEqual(facts.network_flow_log_retention_policy, {"enabled": True, "days": 30})
+        self.assertEqual(facts.network_flow_log_traffic_analytics_state, "enabled")
+        self.assertEqual(facts.network_flow_log_traffic_analytics_workspace_id, "workspace-guid")
+        self.assertEqual(facts.network_flow_log_traffic_analytics_workspace_region, "eastus")
+        self.assertEqual(
+            facts.network_flow_log_traffic_analytics_workspace_resource_id,
+            "azurerm_log_analytics_workspace.security.id",
+        )
+        self.assertEqual(facts.network_flow_log_traffic_analytics_interval_minutes, 10)
+        self.assertEqual(
+            facts.network_flow_log_traffic_analytics,
+            {
+                "enabled": True,
+                "workspace_id": "workspace-guid",
+                "workspace_region": "eastus",
+                "workspace_resource_id": "azurerm_log_analytics_workspace.security.id",
+                "interval_in_minutes": 10,
+            },
+        )
+        self.assertEqual(
+            facts.network_telemetry_posture_uncertainties,
+            ["traffic_analytics.workspace_id is unknown after planning"],
+        )
 
     def test_fact_domains_share_provider_owned_facade(self) -> None:
         domains = azure_fact_domains(_resource())
