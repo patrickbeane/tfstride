@@ -354,6 +354,14 @@ class GcpProviderTests(unittest.TestCase):
                 "SCC_ENABLE_ASSET_DISCOVERY",
                 "SCC_ASSET_DISCOVERY_STATE",
                 "SCC_ASSET_DISCOVERY_INCLUSION_MODE",
+                "SUBNETWORK_FLOW_LOG_STATE",
+                "SUBNETWORK_FLOW_LOG_CONFIG",
+                "SUBNETWORK_FLOW_LOG_AGGREGATION_INTERVAL",
+                "SUBNETWORK_FLOW_LOG_SAMPLING",
+                "SUBNETWORK_FLOW_LOG_METADATA",
+                "SUBNETWORK_FLOW_LOG_METADATA_FIELDS",
+                "SUBNETWORK_FLOW_LOG_FILTER_EXPR",
+                "NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES",
                 "SCC_ASSET_DISCOVERY_PROJECT_IDS",
                 "SCC_ASSET_DISCOVERY_FOLDER_IDS",
                 "SCC_ASSET_DISCOVERY_CONFIG",
@@ -404,6 +412,14 @@ class GcpProviderTests(unittest.TestCase):
         self.assertEqual(facts.private_connectivity_reserved_ranges, [])
         self.assertIsNone(facts.private_connectivity_peering)
         self.assertIsNone(facts.private_connectivity_target_service)
+        self.assertIsNone(facts.subnetwork_flow_log_state)
+        self.assertEqual(facts.subnetwork_flow_log_config, {})
+        self.assertIsNone(facts.subnetwork_flow_log_aggregation_interval)
+        self.assertIsNone(facts.subnetwork_flow_log_sampling)
+        self.assertIsNone(facts.subnetwork_flow_log_metadata)
+        self.assertEqual(facts.subnetwork_flow_log_metadata_fields, [])
+        self.assertIsNone(facts.subnetwork_flow_log_filter_expr)
+        self.assertEqual(facts.network_telemetry_posture_uncertainties, [])
         self.assertEqual(facts.private_connectivity_nat_subnets, [])
         self.assertEqual(facts.private_connectivity_subnetworks, [])
         self.assertEqual(facts.private_connectivity_domain_names, [])

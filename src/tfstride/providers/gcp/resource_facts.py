@@ -351,6 +351,38 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.optional_bool(GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS)
 
     @property
+    def subnetwork_flow_log_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_STATE)
+
+    @property
+    def subnetwork_flow_log_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_CONFIG)
+
+    @property
+    def subnetwork_flow_log_aggregation_interval(self) -> str | None:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_AGGREGATION_INTERVAL)
+
+    @property
+    def subnetwork_flow_log_sampling(self) -> str | None:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_SAMPLING)
+
+    @property
+    def subnetwork_flow_log_metadata(self) -> str | None:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_METADATA)
+
+    @property
+    def subnetwork_flow_log_metadata_fields(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_METADATA_FIELDS)
+
+    @property
+    def subnetwork_flow_log_filter_expr(self) -> str | None:
+        return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_FILTER_EXPR)
+
+    @property
+    def network_telemetry_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES)
+
+    @property
     def psc_connection_id(self) -> str | None:
         return self.get(GcpResourceMetadata.PSC_CONNECTION_ID)
 

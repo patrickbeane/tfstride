@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.coercion import attribute_unknown
+from tfstride.providers.coercion import (
+    attribute_unknown,
+    first_mapping,
+    known_block_string,
+    known_block_strings,
+    unknown_block_at,
+)
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -31,6 +40,7 @@ def normalize_compute_network(resource: TerraformResource) -> NormalizedResource
 
 def normalize_compute_subnetwork(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
+    flow_log_metadata = _subnetwork_flow_log_metadata(resource.values, resource.unknown_values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -54,8 +64,102 @@ def normalize_compute_subnetwork(resource: TerraformResource) -> NormalizedResou
             "purpose": values.get(GcpAttr.PURPOSE),
             "stack_type": values.get(GcpAttr.STACK_TYPE),
             "secondary_ip_ranges": values.get(GcpAttr.SECONDARY_IP_RANGE),
+            **flow_log_metadata,
         },
     )
+
+
+def _subnetwork_flow_log_metadata(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+) -> dict[Any, Any]:
+    uncertainties: list[str] = []
+    unknown_log_config = unknown_values.get(GcpAttr.LOG_CONFIG.key) if isinstance(unknown_values, Mapping) else None
+    if unknown_log_config is True:
+        uncertainties.append("log_config is unknown after planning")
+        return _subnetwork_flow_log_metadata_fields(
+            state="unknown",
+            config={},
+            uncertainties=uncertainties,
+        )
+
+    log_config = first_mapping(values.get(GcpAttr.LOG_CONFIG.key), expand_tuples=True)
+    if log_config is None:
+        if unknown_log_config:
+            uncertainties.append("log_config is unknown after planning")
+            state = "unknown"
+        else:
+            state = "not_configured"
+        return _subnetwork_flow_log_metadata_fields(
+            state=state,
+            config={},
+            uncertainties=uncertainties,
+        )
+
+    unknown_block = unknown_block_at(unknown_log_config, 0)
+    return _subnetwork_flow_log_metadata_fields(
+        state="enabled",
+        config=dict(log_config),
+        aggregation_interval=known_block_string(
+            log_config,
+            unknown_block,
+            "aggregation_interval",
+            uncertainties,
+            path="log_config",
+        ),
+        sampling=known_block_string(
+            log_config,
+            unknown_block,
+            "flow_sampling",
+            uncertainties,
+            path="log_config",
+        ),
+        metadata=known_block_string(
+            log_config,
+            unknown_block,
+            "metadata",
+            uncertainties,
+            path="log_config",
+        ),
+        metadata_fields=known_block_strings(
+            log_config,
+            unknown_block,
+            "metadata_fields",
+            uncertainties,
+            path="log_config",
+        ),
+        filter_expr=known_block_string(
+            log_config,
+            unknown_block,
+            "filter_expr",
+            uncertainties,
+            path="log_config",
+        ),
+        uncertainties=uncertainties,
+    )
+
+
+def _subnetwork_flow_log_metadata_fields(
+    *,
+    state: str,
+    config: dict[str, Any],
+    uncertainties: list[str],
+    aggregation_interval: str | None = None,
+    sampling: str | None = None,
+    metadata: str | None = None,
+    metadata_fields: list[str] | None = None,
+    filter_expr: str | None = None,
+) -> dict[Any, Any]:
+    return {
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_STATE: state,
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_CONFIG: config,
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_AGGREGATION_INTERVAL: aggregation_interval,
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_SAMPLING: sampling,
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_METADATA: metadata,
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_METADATA_FIELDS: metadata_fields or [],
+        GcpResourceMetadata.SUBNETWORK_FLOW_LOG_FILTER_EXPR: filter_expr,
+        GcpResourceMetadata.NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES: uncertainties,
+    }
 
 
 def normalize_compute_route(resource: TerraformResource) -> NormalizedResource:

@@ -53,11 +53,109 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
 
     def test_compute_subnetwork_normalizer_preserves_region_and_network(self) -> None:
         normalized = normalize_compute_subnetwork(self.resources["google_compute_subnetwork.app"])
+        facts = gcp_facts(normalized)
 
         self.assertEqual(normalized.category, ResourceCategory.NETWORK)
         self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.REGION), "us-central1")
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CIDR_RANGE), "10.10.1.0/24")
+        self.assertEqual(facts.subnetwork_flow_log_state, "not_configured")
+        self.assertEqual(facts.subnetwork_flow_log_config, {})
+        self.assertEqual(facts.network_telemetry_posture_uncertainties, [])
+
+    def test_compute_subnetwork_normalizes_flow_log_posture(self) -> None:
+        normalized = normalize_compute_subnetwork(
+            _terraform_resource(
+                "google_compute_subnetwork.app",
+                "google_compute_subnetwork",
+                {
+                    "name": "app",
+                    "network": "google_compute_network.main.id",
+                    "region": "us-central1",
+                    "ip_cidr_range": "10.10.1.0/24",
+                    "log_config": [
+                        {
+                            "aggregation_interval": "INTERVAL_5_SEC",
+                            "flow_sampling": 0.7,
+                            "metadata": "INCLUDE_ALL_METADATA",
+                            "metadata_fields": ["src_instance", "dest_instance"],
+                            "filter_expr": "true",
+                        }
+                    ],
+                },
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.subnetwork_flow_log_state, "enabled")
+        self.assertEqual(
+            facts.subnetwork_flow_log_config,
+            {
+                "aggregation_interval": "INTERVAL_5_SEC",
+                "flow_sampling": 0.7,
+                "metadata": "INCLUDE_ALL_METADATA",
+                "metadata_fields": ["src_instance", "dest_instance"],
+                "filter_expr": "true",
+            },
+        )
+        self.assertEqual(facts.subnetwork_flow_log_aggregation_interval, "INTERVAL_5_SEC")
+        self.assertEqual(facts.subnetwork_flow_log_sampling, "0.7")
+        self.assertEqual(facts.subnetwork_flow_log_metadata, "INCLUDE_ALL_METADATA")
+        self.assertEqual(facts.subnetwork_flow_log_metadata_fields, ["src_instance", "dest_instance"])
+        self.assertEqual(facts.subnetwork_flow_log_filter_expr, "true")
+        self.assertEqual(facts.network_telemetry_posture_uncertainties, [])
+
+    def test_compute_subnetwork_preserves_unknown_flow_log_block(self) -> None:
+        normalized = normalize_compute_subnetwork(
+            _terraform_resource(
+                "google_compute_subnetwork.app",
+                "google_compute_subnetwork",
+                {
+                    "name": "app",
+                    "network": "google_compute_network.main.id",
+                    "region": "us-central1",
+                    "ip_cidr_range": "10.10.1.0/24",
+                },
+                unknown_values={"log_config": True},
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.subnetwork_flow_log_state, "unknown")
+        self.assertEqual(facts.subnetwork_flow_log_config, {})
+        self.assertEqual(
+            facts.network_telemetry_posture_uncertainties,
+            ["log_config is unknown after planning"],
+        )
+
+    def test_compute_subnetwork_preserves_unknown_flow_log_fields(self) -> None:
+        normalized = normalize_compute_subnetwork(
+            _terraform_resource(
+                "google_compute_subnetwork.app",
+                "google_compute_subnetwork",
+                {
+                    "name": "app",
+                    "network": "google_compute_network.main.id",
+                    "region": "us-central1",
+                    "ip_cidr_range": "10.10.1.0/24",
+                    "log_config": [{"aggregation_interval": "INTERVAL_30_SEC"}],
+                },
+                unknown_values={"log_config": [{"flow_sampling": True, "metadata_fields": True}]},
+            )
+        )
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.subnetwork_flow_log_state, "enabled")
+        self.assertEqual(facts.subnetwork_flow_log_aggregation_interval, "INTERVAL_30_SEC")
+        self.assertIsNone(facts.subnetwork_flow_log_sampling)
+        self.assertEqual(facts.subnetwork_flow_log_metadata_fields, [])
+        self.assertEqual(
+            facts.network_telemetry_posture_uncertainties,
+            [
+                "log_config.flow_sampling is unknown after planning",
+                "log_config.metadata_fields is unknown after planning",
+            ],
+        )
 
     def test_compute_route_normalizer_preserves_default_route_context(self) -> None:
         normalized = normalize_compute_route(
