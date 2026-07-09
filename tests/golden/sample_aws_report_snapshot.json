@@ -8,19 +8,19 @@
     "normalized_resources": 23,
     "unsupported_resources": 1,
     "trust_boundaries": 9,
-    "active_findings": 12,
-    "total_findings": 12,
+    "active_findings": 13,
+    "total_findings": 13,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "severity_counts": {
       "high": 4,
-      "medium": 8,
+      "medium": 9,
       "low": 0
     }
   },
   "filtering": {
-    "total_findings": 12,
-    "active_findings": 12,
+    "total_findings": 13,
+    "active_findings": 13,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "suppressions_path": null,
@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 170,
+      "registered_rule_count": 173,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -69,6 +69,9 @@
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
         "aws-vpc-endpoint-policy-broad-access",
+        "aws-vpc-flow-logs-not-configured",
+        "aws-vpc-flow-log-traffic-type-incomplete",
+        "aws-vpc-flow-log-destination-missing",
         "aws-eks-api-endpoint-public-unrestricted",
         "aws-eks-private-endpoint-not-enabled",
         "aws-eks-secrets-encryption-not-configured",
@@ -243,6 +246,9 @@
         "aws-workload-kms-vpc-endpoint-missing": 1,
         "aws-workload-s3-vpc-endpoint-missing": 1,
         "aws-vpc-endpoint-policy-broad-access": 0,
+        "aws-vpc-flow-logs-not-configured": 1,
+        "aws-vpc-flow-log-traffic-type-incomplete": 0,
+        "aws-vpc-flow-log-destination-missing": 0,
         "aws-eks-api-endpoint-public-unrestricted": 0,
         "aws-eks-private-endpoint-not-enabled": 0,
         "aws-eks-secrets-encryption-not-configured": 0,
@@ -664,6 +670,16 @@
         "aws_iam_role.workload"
       ],
       "trust_boundary_id": "cross-account-or-role-access:arn:aws:iam::999988887777:root->aws_iam_role.workload"
+    },
+    {
+      "rule_id": "aws-vpc-flow-logs-not-configured",
+      "title": "VPC Flow Logs are not configured for a modeled VPC",
+      "category": "Repudiation",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_vpc.main"
+      ],
+      "trust_boundary_id": null
     },
     {
       "rule_id": "aws-workload-kms-vpc-endpoint-missing",

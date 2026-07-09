@@ -211,11 +211,14 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
         boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
         title_counts = Counter(finding.title for finding in result.findings)
 
-        self.assertEqual(len(result.findings), 1)
+        self.assertEqual(len(result.findings), 2)
         self.assertEqual(len(result.inventory.resources), 19)
         self.assertEqual(
             dict(title_counts),
-            {"Sensitive data tier is transitively reachable from an internet-exposed path": 1},
+            {
+                "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
+                "VPC Flow Logs are not configured for a modeled VPC": 1,
+            },
         )
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)
         self.assertEqual(boundary_types[BoundaryType.PUBLIC_TO_PRIVATE], 2)
@@ -278,8 +281,8 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
         title_counts = Counter(finding.title for finding in result.findings)
 
         self.assertEqual(len(result.inventory.resources), 13)
-        self.assertEqual(len(result.findings), 5)
-        self.assertEqual(dict(severity_counts), {"medium": 5})
+        self.assertEqual(len(result.findings), 6)
+        self.assertEqual(dict(severity_counts), {"medium": 6})
         self.assertEqual(
             dict(title_counts),
             {
@@ -288,6 +291,7 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Role trust relationship expands blast radius": 1,
                 "Workload role carries sensitive permissions": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
+                "VPC Flow Logs are not configured for a modeled VPC": 1,
             },
         )
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 0)

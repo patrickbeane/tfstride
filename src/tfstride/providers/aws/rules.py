@@ -13,6 +13,7 @@ from tfstride.providers.aws.kms_rules import AwsKmsRuleDetectors
 from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
 from tfstride.providers.aws.load_balancer_rules import AwsLoadBalancerRuleDetectors
 from tfstride.providers.aws.network_data_rules import AwsNetworkDataRuleDetectors
+from tfstride.providers.aws.network_telemetry_rules import AwsNetworkTelemetryRuleDetectors
 from tfstride.providers.aws.path_chain_rules import AwsPathChainRuleDetectors
 from tfstride.providers.aws.policy_trust_rules import AwsPolicyTrustRuleDetectors
 from tfstride.providers.aws.posture_rules import AwsPostureRuleDetectors
@@ -52,6 +53,9 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-workload-kms-vpc-endpoint-missing",
         "aws-workload-s3-vpc-endpoint-missing",
         "aws-vpc-endpoint-policy-broad-access",
+        "aws-vpc-flow-logs-not-configured",
+        "aws-vpc-flow-log-traffic-type-incomplete",
+        "aws-vpc-flow-log-destination-missing",
         "aws-eks-api-endpoint-public-unrestricted",
         "aws-eks-private-endpoint-not-enabled",
         "aws-eks-secrets-encryption-not-configured",
@@ -90,6 +94,7 @@ def build_aws_rule_contribution(
     audit_detectors = AwsAccountAuditRuleDetectors(finding_factory)
     posture_detectors = AwsPostureRuleDetectors(finding_factory)
     network_data_detectors = AwsNetworkDataRuleDetectors(finding_factory)
+    network_telemetry_detectors = AwsNetworkTelemetryRuleDetectors(finding_factory)
     path_chain_detectors = AwsPathChainRuleDetectors(finding_factory)
     iam_detectors = AwsIamRuleDetectors(finding_factory)
     iam_assignment_detectors = AwsIamAssignmentRuleDetectors(finding_factory)
@@ -140,6 +145,11 @@ def build_aws_rule_contribution(
         "aws-workload-kms-vpc-endpoint-missing": sensitive_endpoint_detectors.detect_missing_kms_endpoint,
         "aws-workload-s3-vpc-endpoint-missing": sensitive_endpoint_detectors.detect_missing_s3_endpoint,
         "aws-vpc-endpoint-policy-broad-access": sensitive_endpoint_detectors.detect_broad_vpc_endpoint_policy,
+        "aws-vpc-flow-logs-not-configured": network_telemetry_detectors.detect_vpc_flow_logs_not_configured,
+        "aws-vpc-flow-log-traffic-type-incomplete": (
+            network_telemetry_detectors.detect_flow_log_traffic_type_incomplete
+        ),
+        "aws-vpc-flow-log-destination-missing": network_telemetry_detectors.detect_flow_log_destination_missing,
         "aws-eks-api-endpoint-public-unrestricted": eks_detectors.detect_public_api_endpoint_unrestricted,
         "aws-eks-private-endpoint-not-enabled": eks_detectors.detect_private_endpoint_not_enabled,
         "aws-eks-secrets-encryption-not-configured": eks_detectors.detect_secrets_encryption_not_configured,

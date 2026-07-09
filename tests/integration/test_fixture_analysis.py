@@ -98,9 +98,9 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
             "safe": (SAFE_FIXTURE_PATH, 0, {}),
-            "baseline": (BASELINE_FIXTURE_PATH, 3, {"medium": 3}),
-            "mixed": (FIXTURE_PATH, 12, {"high": 4, "medium": 8}),
-            "nightmare": (NIGHTMARE_FIXTURE_PATH, 22, {"high": 7, "medium": 15}),
+            "baseline": (BASELINE_FIXTURE_PATH, 4, {"medium": 4}),
+            "mixed": (FIXTURE_PATH, 13, {"high": 4, "medium": 9}),
+            "nightmare": (NIGHTMARE_FIXTURE_PATH, 23, {"high": 7, "medium": 16}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
             "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 3, {"high": 2, "medium": 1}),
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 0, {}),
@@ -123,6 +123,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "IAM policy grants wildcard privileges": 1,
                 "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
+                "VPC Flow Logs are not configured for a modeled VPC": 1,
             },
             "mixed": {
                 "Cross-account or broad role trust lacks narrowing conditions": 1,
@@ -136,6 +137,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Role trust relationship expands blast radius": 1,
                 "Workload uses KMS without a VPC endpoint": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
+                "VPC Flow Logs are not configured for a modeled VPC": 1,
             },
             "nightmare": {
                 "Cross-account or broad role trust lacks narrowing conditions": 2,
@@ -152,6 +154,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Object storage is publicly accessible": 2,
                 "Workload uses KMS without a VPC endpoint": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
+                "VPC Flow Logs are not configured for a modeled VPC": 1,
             },
             "gcp-safe": {},
             "gcp-baseline": {

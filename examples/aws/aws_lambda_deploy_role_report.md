@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **5 findings** across **13 normalized resources**.
+This run identified **4 trust boundaries** and **6 findings** across **13 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `5`
+- Medium severity findings: `6`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **4 trust boundaries** and **5 findings** across **13 normal
 - Provider resources considered: `13`
 - Normalized resources: `13`
 - Unsupported resources: `0`
-- Registered rules: `170`
-- Enabled rules: `170`
+- Registered rules: `173`
+- Enabled rules: `173`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
+  - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-role-trust-expansion`: `1`
@@ -110,6 +111,18 @@ No findings in this severity band.
 - Evidence:
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
   - trust path: trust principal belongs to foreign account 777788889999
+
+#### VPC Flow Logs are not configured for a modeled VPC
+
+- STRIDE category: Repudiation
+- Affected resources: `aws_vpc.main`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 3 => medium
+- Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
+- Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
+- Evidence:
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-lambda-001; cidr_block=10.30.0.0/16
+  - flow log coverage: target_vpc_id=vpc-lambda-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload role carries sensitive permissions
 

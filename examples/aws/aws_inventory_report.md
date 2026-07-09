@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **12 findings** across **23 normalized resources**.
+This run identified **9 trust boundaries** and **13 findings** across **23 normalized resources**.
 
 - High severity findings: `4`
-- Medium severity findings: `8`
+- Medium severity findings: `9`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **12 findings** across **23 norma
 - Provider resources considered: `24`
 - Normalized resources: `23`
 - Unsupported resources: `1`
-- Registered rules: `170`
-- Enabled rules: `170`
+- Registered rules: `173`
+- Enabled rules: `173`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -32,6 +32,7 @@ This run identified **9 trust boundaries** and **12 findings** across **23 norma
   - `aws-s3-public-access`: `1`
   - `aws-workload-kms-vpc-endpoint-missing`: `1`
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
+  - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
@@ -240,6 +241,18 @@ This run identified **9 trust boundaries** and **12 findings** across **23 norma
 - Evidence:
   - trust principals: arn:aws:iam::999988887777:root
   - trust path: trust principal belongs to foreign account 999988887777
+
+#### VPC Flow Logs are not configured for a modeled VPC
+
+- STRIDE category: Repudiation
+- Affected resources: `aws_vpc.main`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 3 => medium
+- Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
+- Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
+- Evidence:
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-001; cidr_block=10.0.0.0/16
+  - flow log coverage: target_vpc_id=vpc-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload uses KMS without a VPC endpoint
 

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **7 trust boundaries** and **3 findings** across **26 normalized resources**.
+This run identified **7 trust boundaries** and **4 findings** across **26 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `3`
+- Medium severity findings: `4`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **7 trust boundaries** and **3 findings** across **26 normal
 - Provider resources considered: `26`
 - Normalized resources: `26`
 - Unsupported resources: `0`
-- Registered rules: `170`
-- Enabled rules: `170`
+- Registered rules: `173`
+- Enabled rules: `173`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
+  - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-iam-wildcard-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `1`
 
@@ -115,6 +116,18 @@ No findings in this severity band.
   - subnet posture: aws_lb.web sits in public subnet aws_subnet.public_edge with an internet route; aws_instance.app sits in private subnet aws_subnet.private_app with NAT-backed egress
   - data tier posture: aws_db_instance.app is not directly public; database has no direct internet ingress path
   - boundary rationale: Application or function workloads cross into a higher-sensitivity data plane when database ingress security groups explicitly trust the workload security group.
+
+#### VPC Flow Logs are not configured for a modeled VPC
+
+- STRIDE category: Repudiation
+- Affected resources: `aws_vpc.main`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 3 => medium
+- Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
+- Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
+- Evidence:
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-safe-001; cidr_block=10.10.0.0/16
+  - flow log coverage: target_vpc_id=vpc-safe-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload uses S3 without a VPC endpoint
 

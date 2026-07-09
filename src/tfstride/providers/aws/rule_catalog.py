@@ -339,6 +339,39 @@ AWS_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-vpc-flow-logs-not-configured",
+        title="VPC Flow Logs are not configured for a modeled VPC",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose "
+            "destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable."
+        ),
+        tags=("aws", "vpc", "flow-logs", "network-telemetry", "logging"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-vpc-flow-log-traffic-type-incomplete",
+        title="VPC Flow Log does not capture all traffic",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Set VPC Flow Log `traffic_type` to `ALL` where investigation and segmentation review require both "
+            "accepted and rejected traffic records, and keep the field deterministic in Terraform plans."
+        ),
+        tags=("aws", "vpc", "flow-logs", "network-telemetry", "traffic-coverage"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-vpc-flow-log-destination-missing",
+        title="VPC Flow Log destination is missing or unknown",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure VPC Flow Logs with a deterministic CloudWatch Logs, S3, or Firehose destination and ensure "
+            "the delivery role or destination policy permits log delivery."
+        ),
+        tags=("aws", "vpc", "flow-logs", "network-telemetry", "log-destination"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-eks-api-endpoint-public-unrestricted",
         title="EKS Kubernetes API endpoint is public without narrow CIDR restrictions",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

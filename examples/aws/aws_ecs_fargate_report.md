@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **6 trust boundaries** and **9 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **10 findings** across **21 normalized resources**.
 
 - High severity findings: `1`
-- Medium severity findings: `8`
+- Medium severity findings: `9`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **6 trust boundaries** and **9 findings** across **21 normal
 - Provider resources considered: `21`
 - Normalized resources: `21`
 - Unsupported resources: `0`
-- Registered rules: `170`
-- Enabled rules: `170`
+- Registered rules: `173`
+- Enabled rules: `173`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -28,6 +28,7 @@ This run identified **6 trust boundaries** and **9 findings** across **21 normal
   - `aws-secretsmanager-customer-managed-kms-key-missing`: `1`
   - `aws-secretsmanager-rotation-not-configured-or-too-long`: `1`
   - `aws-workload-secretsmanager-vpc-endpoint-missing`: `1`
+  - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-iam-wildcard-permissions`: `2`
   - `aws-iam-privileged-role-assignment`: `1`
   - `aws-workload-role-sensitive-permissions`: `1`
@@ -176,6 +177,18 @@ This run identified **6 trust boundaries** and **9 findings** across **21 normal
   - subnet posture: aws_lb.web sits in public subnet aws_subnet.public_a with an internet route; aws_lb.web sits in public subnet aws_subnet.public_b with an internet route; aws_ecs_service.app sits in private subnet aws_subnet.private_app
   - data tier posture: aws_secretsmanager_secret.app is not directly public
   - boundary rationale: Application or function workloads cross into a higher-sensitivity secret plane when their attached role allows Secrets Manager retrieval actions such as secretsmanager:GetSecretValue.
+
+#### VPC Flow Logs are not configured for a modeled VPC
+
+- STRIDE category: Repudiation
+- Affected resources: `aws_vpc.main`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +2, final_score 3 => medium
+- Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
+- Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
+- Evidence:
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-ecs-001; cidr_block=10.60.0.0/16
+  - flow log coverage: target_vpc_id=vpc-ecs-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload role carries sensitive permissions
 

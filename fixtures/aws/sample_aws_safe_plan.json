@@ -181,6 +181,22 @@
           }
         },
         {
+          "address": "aws_flow_log.vpc",
+          "mode": "managed",
+          "type": "aws_flow_log",
+          "name": "vpc",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "id": "fl-safe-vpc",
+            "vpc_id": "vpc-safe-001",
+            "traffic_type": "ALL",
+            "log_destination_type": "cloud-watch-logs",
+            "log_group_name": "/aws/vpc-flow-logs/safe-main",
+            "iam_role_arn": "arn:aws:iam::111122223333:role/vpc-flow-logs",
+            "max_aggregation_interval": 60
+          }
+        },
+        {
           "address": "aws_security_group.lb",
           "mode": "managed",
           "type": "aws_security_group",
