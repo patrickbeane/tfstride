@@ -69,6 +69,7 @@ class AwsResourceMetadata:
     VPC_ENDPOINT_SECURITY_GROUP_IDS = StringListMetadataField("vpc_endpoint_security_group_ids")
     VPC_ENDPOINT_DNS_NAMES = StringListMetadataField("vpc_endpoint_dns_names")
     VPC_ENDPOINT_POSTURE_UNCERTAINTIES = StringListMetadataField("vpc_endpoint_posture_uncertainties")
+    FLOW_LOG_POSTURE_UNCERTAINTIES = StringListMetadataField("flow_log_posture_uncertainties")
     LAMBDA_FUNCTION_URL_CORS_ALLOW_HEADERS = StringListMetadataField("lambda_function_url_cors_allow_headers")
     LAMBDA_FUNCTION_URL_CORS_ALLOW_METHODS = StringListMetadataField("lambda_function_url_cors_allow_methods")
     LAMBDA_FUNCTION_URL_CORS_ALLOW_ORIGINS = StringListMetadataField("lambda_function_url_cors_allow_origins")
@@ -148,6 +149,14 @@ class AwsResourceMetadata:
     VPC_ENDPOINT_TYPE = OptionalStringMetadataField("vpc_endpoint_type")
     VPC_ENDPOINT_VPC_ID = OptionalStringMetadataField("vpc_endpoint_vpc_id")
     VPC_ENDPOINT_PRIVATE_DNS_ENABLED_STATE = OptionalStringMetadataField("vpc_endpoint_private_dns_enabled_state")
+    FLOW_LOG_ID = OptionalStringMetadataField("flow_log_id")
+    FLOW_LOG_TARGET_TYPE = OptionalStringMetadataField("flow_log_target_type")
+    FLOW_LOG_TARGET_ID = OptionalStringMetadataField("flow_log_target_id")
+    FLOW_LOG_TRAFFIC_TYPE = OptionalStringMetadataField("flow_log_traffic_type")
+    FLOW_LOG_DESTINATION_TYPE = OptionalStringMetadataField("flow_log_destination_type")
+    FLOW_LOG_DESTINATION = OptionalStringMetadataField("flow_log_destination")
+    FLOW_LOG_LOG_GROUP_NAME = OptionalStringMetadataField("flow_log_log_group_name")
+    FLOW_LOG_IAM_ROLE_ARN = OptionalStringMetadataField("flow_log_iam_role_arn")
     LAMBDA_FUNCTION_URL = OptionalStringMetadataField("lambda_function_url")
     LAMBDA_FUNCTION_URL_AUTHORIZATION_TYPE = OptionalStringMetadataField("lambda_function_url_authorization_type")
     LAMBDA_FUNCTION_URL_QUALIFIER = OptionalStringMetadataField("lambda_function_url_qualifier")
@@ -196,6 +205,7 @@ class AwsResourceMetadata:
 
     RDS_BACKUP_RETENTION_PERIOD = OptionalIntMetadataField("rds_backup_retention_period")
     KMS_DELETION_WINDOW_IN_DAYS = OptionalIntMetadataField("kms_deletion_window_in_days")
+    FLOW_LOG_MAX_AGGREGATION_INTERVAL = OptionalIntMetadataField("flow_log_max_aggregation_interval")
     SECRETS_MANAGER_RECOVERY_WINDOW_IN_DAYS = OptionalIntMetadataField("secrets_manager_recovery_window_in_days")
     SECRETS_MANAGER_ROTATION_AUTOMATICALLY_AFTER_DAYS = OptionalIntMetadataField(
         "secrets_manager_rotation_automatically_after_days"
@@ -209,6 +219,7 @@ class AwsResourceMetadata:
     EKS_VPC_CONFIG = DictMetadataField("eks_vpc_config")
     EKS_ACCESS_CONFIG = DictMetadataField("eks_access_config")
     VPC_ENDPOINT_POLICY_DOCUMENT = DictMetadataField("vpc_endpoint_policy_document")
+    FLOW_LOG_DESTINATION_OPTIONS = DictMetadataField("flow_log_destination_options")
     GUARDDUTY_DATASOURCES = DictMetadataField("guardduty_datasources")
     CONFIG_RECORDER_RECORDING_GROUP = DictMetadataField("config_recorder_recording_group")
     CONFIG_RECORDER_RECORDING_STRATEGY = DictMetadataField("config_recorder_recording_strategy")

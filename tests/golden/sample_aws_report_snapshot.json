@@ -406,6 +406,7 @@
         "aws_ecs_task_definition",
         "aws_eks_addon",
         "aws_eks_cluster",
+        "aws_flow_log",
         "aws_guardduty_detector",
         "aws_iam_instance_profile",
         "aws_iam_policy",

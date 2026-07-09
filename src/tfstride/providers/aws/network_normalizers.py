@@ -138,6 +138,54 @@ def normalize_nat_gateway(resource: TerraformResource) -> NormalizedResource:
     )
 
 
+def normalize_flow_log(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    flow_log_id = known_string(values, unknown_values, "id", uncertainties)
+    target_type, target_id = _flow_log_target(values, unknown_values, uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.NETWORK,
+        identifier=flow_log_id or target_id or resource.address,
+        vpc_id=target_id if target_type == "vpc" else None,
+        metadata={
+            AwsResourceMetadata.NAME: resource.name,
+            AwsResourceMetadata.FLOW_LOG_ID: flow_log_id,
+            AwsResourceMetadata.FLOW_LOG_TARGET_TYPE: target_type,
+            AwsResourceMetadata.FLOW_LOG_TARGET_ID: target_id,
+            AwsResourceMetadata.FLOW_LOG_TRAFFIC_TYPE: known_string(
+                values, unknown_values, "traffic_type", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_DESTINATION_TYPE: known_string(
+                values, unknown_values, "log_destination_type", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_DESTINATION: known_string(
+                values, unknown_values, "log_destination", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_LOG_GROUP_NAME: known_string(
+                values, unknown_values, "log_group_name", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_IAM_ROLE_ARN: known_string(
+                values, unknown_values, "iam_role_arn", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_MAX_AGGREGATION_INTERVAL: _known_int(
+                values, unknown_values, "max_aggregation_interval", uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_DESTINATION_OPTIONS: _flow_log_destination_options(
+                values, unknown_values, uncertainties
+            ),
+            AwsResourceMetadata.FLOW_LOG_POSTURE_UNCERTAINTIES: uncertainties,
+            "tags": values.get("tags", {}),
+        },
+    )
+
+
 def normalize_vpc_endpoint(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     unknown_values = resource.unknown_values
@@ -286,6 +334,64 @@ def _bool_state(value: bool | None) -> str:
     if value is False:
         return "disabled"
     return "unknown"
+
+
+_FLOW_LOG_TARGET_FIELDS = (
+    ("vpc", "vpc_id"),
+    ("subnet", "subnet_id"),
+    ("network_interface", "eni_id"),
+    ("transit_gateway", "transit_gateway_id"),
+    ("transit_gateway_attachment", "transit_gateway_attachment_id"),
+)
+
+
+def _flow_log_target(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str | None, str | None]:
+    targets: list[tuple[str, str]] = []
+    for target_type, key in _FLOW_LOG_TARGET_FIELDS:
+        target_id = known_string(values, unknown_values, key, uncertainties)
+        if target_id:
+            targets.append((target_type, target_id))
+
+    if len(targets) > 1:
+        configured_fields = ", ".join(key for _, key in _FLOW_LOG_TARGET_FIELDS if values.get(key))
+        uncertainties.append(f"multiple Flow Log target fields are configured: {configured_fields}")
+    return targets[0] if targets else (None, None)
+
+
+def _flow_log_destination_options(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    if attribute_unknown(unknown_values, "destination_options"):
+        uncertainties.append("destination_options is unknown after planning")
+        return {}
+    for option in as_list(values.get("destination_options")):
+        if isinstance(option, Mapping):
+            return dict(option)
+    return {}
+
+
+def _known_int(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+) -> int | None:
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    value = values.get(key)
+    if value is None or value == "":
+        return None
+    parsed = as_optional_int(value)
+    if parsed is None:
+        uncertainties.append(f"{key} has an unrecognized value shape")
+    return parsed
 
 
 def _vpc_endpoint_policy_document(

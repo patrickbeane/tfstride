@@ -4,7 +4,11 @@ import unittest
 from typing import Any
 
 from tfstride.models import ResourceCategory, TerraformResource
-from tfstride.providers.aws.network_normalizers import normalize_load_balancer_listener, normalize_vpc_endpoint
+from tfstride.providers.aws.network_normalizers import (
+    normalize_flow_log,
+    normalize_load_balancer_listener,
+    normalize_vpc_endpoint,
+)
 from tfstride.providers.aws.resource_facts import aws_facts
 
 
@@ -34,6 +38,22 @@ def _vpc_endpoint_resource(
         mode="managed",
         resource_type="aws_vpc_endpoint",
         name="service",
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _flow_log_resource(
+    values: dict[str, Any],
+    *,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="aws_flow_log.vpc",
+        mode="managed",
+        resource_type="aws_flow_log",
+        name="vpc",
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
         unknown_values=unknown_values or {},
@@ -118,6 +138,126 @@ class AwsNetworkNormalizerTests(unittest.TestCase):
                 "protocol is unknown after planning",
                 "certificate_arn is unknown after planning",
                 "ssl_policy is unknown after planning",
+            ],
+        )
+
+    def test_flow_log_normalizes_cloudwatch_vpc_telemetry_posture(self) -> None:
+        normalized = normalize_flow_log(
+            _flow_log_resource(
+                {
+                    "id": "fl-123",
+                    "vpc_id": "vpc-app",
+                    "traffic_type": "ALL",
+                    "log_destination_type": "cloud-watch-logs",
+                    "log_group_name": "/aws/vpc-flow-logs/app",
+                    "iam_role_arn": "arn:aws:iam::111122223333:role/vpc-flow-logs",
+                    "max_aggregation_interval": 60,
+                    "destination_options": [
+                        {
+                            "file_format": "plain-text",
+                            "hive_compatible_partitions": False,
+                            "per_hour_partition": False,
+                        }
+                    ],
+                    "tags": {"Environment": "prod"},
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.NETWORK)
+        self.assertEqual(normalized.identifier, "fl-123")
+        self.assertEqual(normalized.vpc_id, "vpc-app")
+        self.assertEqual(normalized.metadata["tags"], {"Environment": "prod"})
+        self.assertEqual(facts.name, "vpc")
+        self.assertEqual(facts.flow_log_id, "fl-123")
+        self.assertEqual(facts.flow_log_target_type, "vpc")
+        self.assertEqual(facts.flow_log_target_id, "vpc-app")
+        self.assertEqual(facts.flow_log_traffic_type, "ALL")
+        self.assertEqual(facts.flow_log_destination_type, "cloud-watch-logs")
+        self.assertIsNone(facts.flow_log_destination)
+        self.assertEqual(facts.flow_log_log_group_name, "/aws/vpc-flow-logs/app")
+        self.assertEqual(facts.flow_log_iam_role_arn, "arn:aws:iam::111122223333:role/vpc-flow-logs")
+        self.assertEqual(facts.flow_log_max_aggregation_interval, 60)
+        self.assertEqual(
+            facts.flow_log_destination_options,
+            {
+                "file_format": "plain-text",
+                "hive_compatible_partitions": False,
+                "per_hour_partition": False,
+            },
+        )
+        self.assertEqual(facts.flow_log_posture_uncertainties, [])
+
+    def test_flow_log_normalizes_s3_subnet_telemetry_posture(self) -> None:
+        normalized = normalize_flow_log(
+            _flow_log_resource(
+                {
+                    "id": "fl-subnet",
+                    "subnet_id": "subnet-private",
+                    "traffic_type": "REJECT",
+                    "log_destination_type": "s3",
+                    "log_destination": "arn:aws:s3:::central-flow-logs/prefix/",
+                    "max_aggregation_interval": "600",
+                    "destination_options": [{"file_format": "parquet", "per_hour_partition": True}],
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertIsNone(normalized.vpc_id)
+        self.assertEqual(facts.flow_log_id, "fl-subnet")
+        self.assertEqual(facts.flow_log_target_type, "subnet")
+        self.assertEqual(facts.flow_log_target_id, "subnet-private")
+        self.assertEqual(facts.flow_log_traffic_type, "REJECT")
+        self.assertEqual(facts.flow_log_destination_type, "s3")
+        self.assertEqual(facts.flow_log_destination, "arn:aws:s3:::central-flow-logs/prefix/")
+        self.assertIsNone(facts.flow_log_log_group_name)
+        self.assertIsNone(facts.flow_log_iam_role_arn)
+        self.assertEqual(facts.flow_log_max_aggregation_interval, 600)
+        self.assertEqual(
+            facts.flow_log_destination_options,
+            {"file_format": "parquet", "per_hour_partition": True},
+        )
+        self.assertEqual(facts.flow_log_posture_uncertainties, [])
+
+    def test_flow_log_preserves_unknown_values_as_uncertainty(self) -> None:
+        normalized = normalize_flow_log(
+            _flow_log_resource(
+                {},
+                unknown_values={
+                    "id": True,
+                    "vpc_id": True,
+                    "traffic_type": True,
+                    "log_destination_type": True,
+                    "log_destination": True,
+                    "log_group_name": True,
+                    "iam_role_arn": True,
+                    "max_aggregation_interval": True,
+                    "destination_options": True,
+                },
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "aws_flow_log.vpc")
+        self.assertIsNone(normalized.vpc_id)
+        self.assertIsNone(facts.flow_log_id)
+        self.assertIsNone(facts.flow_log_target_type)
+        self.assertIsNone(facts.flow_log_target_id)
+        self.assertEqual(facts.flow_log_destination_options, {})
+        self.assertEqual(
+            facts.flow_log_posture_uncertainties,
+            [
+                "id is unknown after planning",
+                "vpc_id is unknown after planning",
+                "traffic_type is unknown after planning",
+                "log_destination_type is unknown after planning",
+                "log_destination is unknown after planning",
+                "log_group_name is unknown after planning",
+                "iam_role_arn is unknown after planning",
+                "max_aggregation_interval is unknown after planning",
+                "destination_options is unknown after planning",
             ],
         )
 

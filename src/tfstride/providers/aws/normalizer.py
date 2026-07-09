@@ -43,6 +43,7 @@ from tfstride.providers.aws.iam_normalizers import (
     normalize_iam_role_policy_attachment,
 )
 from tfstride.providers.aws.network_normalizers import (
+    normalize_flow_log,
     normalize_internet_gateway,
     normalize_load_balancer,
     normalize_load_balancer_listener,
@@ -73,6 +74,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_ecs_task_definition": normalize_ecs_task_definition,
     "aws_eks_addon": normalize_eks_addon,
     "aws_eks_cluster": normalize_eks_cluster,
+    "aws_flow_log": normalize_flow_log,
     "aws_iam_instance_profile": normalize_iam_instance_profile,
     "aws_iam_policy": normalize_iam_policy,
     "aws_iam_role": normalize_iam_role,

@@ -508,6 +508,50 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.VPC_ENDPOINT_POSTURE_UNCERTAINTIES)
 
     @property
+    def flow_log_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_ID)
+
+    @property
+    def flow_log_target_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_TARGET_TYPE)
+
+    @property
+    def flow_log_target_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_TARGET_ID)
+
+    @property
+    def flow_log_traffic_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_TRAFFIC_TYPE)
+
+    @property
+    def flow_log_destination_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_DESTINATION_TYPE)
+
+    @property
+    def flow_log_destination(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_DESTINATION)
+
+    @property
+    def flow_log_log_group_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_LOG_GROUP_NAME)
+
+    @property
+    def flow_log_iam_role_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_IAM_ROLE_ARN)
+
+    @property
+    def flow_log_max_aggregation_interval(self) -> int | None:
+        return self.get(AwsResourceMetadata.FLOW_LOG_MAX_AGGREGATION_INTERVAL)
+
+    @property
+    def flow_log_destination_options(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.FLOW_LOG_DESTINATION_OPTIONS)
+
+    @property
+    def flow_log_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.FLOW_LOG_POSTURE_UNCERTAINTIES)
+
+    @property
     def block_public_acls(self) -> bool:
         return self.get(AwsResourceMetadata.BLOCK_PUBLIC_ACLS)
 

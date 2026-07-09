@@ -199,6 +199,17 @@ class AwsResourceFactsTests(unittest.TestCase):
                 ],
                 "vpc_endpoint_dns_names": ["vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com"],
                 "vpc_endpoint_posture_uncertainties": ["private_dns_enabled is unknown after planning"],
+                "flow_log_id": "fl-123",
+                "flow_log_target_type": "vpc",
+                "flow_log_target_id": "vpc-123",
+                "flow_log_traffic_type": "ALL",
+                "flow_log_destination_type": "cloud-watch-logs",
+                "flow_log_destination": "arn:aws:logs:us-east-1:111122223333:log-group:/aws/vpc-flow-logs",
+                "flow_log_log_group_name": "/aws/vpc-flow-logs",
+                "flow_log_iam_role_arn": "arn:aws:iam::111122223333:role/vpc-flow-logs",
+                "flow_log_max_aggregation_interval": 60,
+                "flow_log_destination_options": {"file_format": "plain-text"},
+                "flow_log_posture_uncertainties": ["traffic_type is unknown after planning"],
                 "eks_posture_uncertainties": ["vpc_config.endpoint_public_access is unknown after planning"],
             }
         )
@@ -402,6 +413,20 @@ class AwsResourceFactsTests(unittest.TestCase):
             ["vpce-secrets-abc.secretsmanager.us-east-1.vpce.amazonaws.com"],
         )
         self.assertEqual(facts.vpc_endpoint_posture_uncertainties, ["private_dns_enabled is unknown after planning"])
+        self.assertEqual(facts.flow_log_id, "fl-123")
+        self.assertEqual(facts.flow_log_target_type, "vpc")
+        self.assertEqual(facts.flow_log_target_id, "vpc-123")
+        self.assertEqual(facts.flow_log_traffic_type, "ALL")
+        self.assertEqual(facts.flow_log_destination_type, "cloud-watch-logs")
+        self.assertEqual(
+            facts.flow_log_destination,
+            "arn:aws:logs:us-east-1:111122223333:log-group:/aws/vpc-flow-logs",
+        )
+        self.assertEqual(facts.flow_log_log_group_name, "/aws/vpc-flow-logs")
+        self.assertEqual(facts.flow_log_iam_role_arn, "arn:aws:iam::111122223333:role/vpc-flow-logs")
+        self.assertEqual(facts.flow_log_max_aggregation_interval, 60)
+        self.assertEqual(facts.flow_log_destination_options, {"file_format": "plain-text"})
+        self.assertEqual(facts.flow_log_posture_uncertainties, ["traffic_type is unknown after planning"])
         self.assertEqual(
             facts.eks_posture_uncertainties,
             ["vpc_config.endpoint_public_access is unknown after planning"],
@@ -602,6 +627,17 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.vpc_endpoint_dns_entries, [])
         self.assertEqual(facts.vpc_endpoint_dns_names, [])
         self.assertEqual(facts.vpc_endpoint_posture_uncertainties, [])
+        self.assertIsNone(facts.flow_log_id)
+        self.assertIsNone(facts.flow_log_target_type)
+        self.assertIsNone(facts.flow_log_target_id)
+        self.assertIsNone(facts.flow_log_traffic_type)
+        self.assertIsNone(facts.flow_log_destination_type)
+        self.assertIsNone(facts.flow_log_destination)
+        self.assertIsNone(facts.flow_log_log_group_name)
+        self.assertIsNone(facts.flow_log_iam_role_arn)
+        self.assertIsNone(facts.flow_log_max_aggregation_interval)
+        self.assertEqual(facts.flow_log_destination_options, {})
+        self.assertEqual(facts.flow_log_posture_uncertainties, [])
         self.assertIsNone(facts.rds_publicly_accessible_state)
         self.assertIsNone(facts.rds_publicly_accessible)
         self.assertIsNone(facts.rds_backup_retention_period)

@@ -144,6 +144,17 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "VPC_ENDPOINT_DNS_ENTRIES": "vpc_endpoint_dns_entries",
             "VPC_ENDPOINT_DNS_NAMES": "vpc_endpoint_dns_names",
             "VPC_ENDPOINT_POSTURE_UNCERTAINTIES": "vpc_endpoint_posture_uncertainties",
+            "FLOW_LOG_ID": "flow_log_id",
+            "FLOW_LOG_TARGET_TYPE": "flow_log_target_type",
+            "FLOW_LOG_TARGET_ID": "flow_log_target_id",
+            "FLOW_LOG_TRAFFIC_TYPE": "flow_log_traffic_type",
+            "FLOW_LOG_DESTINATION_TYPE": "flow_log_destination_type",
+            "FLOW_LOG_DESTINATION": "flow_log_destination",
+            "FLOW_LOG_LOG_GROUP_NAME": "flow_log_log_group_name",
+            "FLOW_LOG_IAM_ROLE_ARN": "flow_log_iam_role_arn",
+            "FLOW_LOG_MAX_AGGREGATION_INTERVAL": "flow_log_max_aggregation_interval",
+            "FLOW_LOG_DESTINATION_OPTIONS": "flow_log_destination_options",
+            "FLOW_LOG_POSTURE_UNCERTAINTIES": "flow_log_posture_uncertainties",
         }
 
         for field_name, key in expected_keys.items():
