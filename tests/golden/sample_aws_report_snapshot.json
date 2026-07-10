@@ -459,7 +459,9 @@
         "aws_sqs_queue",
         "aws_subnet",
         "aws_vpc",
-        "aws_vpc_endpoint"
+        "aws_vpc_endpoint",
+        "aws_wafv2_web_acl",
+        "aws_wafv2_web_acl_association"
       ],
       "total_input_resources": 24,
       "provider_resource_count": 24,

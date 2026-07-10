@@ -268,6 +268,50 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES)
 
     @property
+    def web_acl_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_ID)
+
+    @property
+    def web_acl_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_NAME)
+
+    @property
+    def web_acl_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_ARN)
+
+    @property
+    def web_acl_scope(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_SCOPE)
+
+    @property
+    def web_acl_default_action(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_DEFAULT_ACTION)
+
+    @property
+    def web_acl_default_action_evidence(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.WEB_ACL_DEFAULT_ACTION_EVIDENCE)
+
+    @property
+    def web_acl_rules(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.WEB_ACL_RULES)
+
+    @property
+    def web_acl_rule_names(self) -> list[str]:
+        return self.get(AwsResourceMetadata.WEB_ACL_RULE_NAMES)
+
+    @property
+    def web_acl_association_resource_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_ASSOCIATION_RESOURCE_ARN)
+
+    @property
+    def web_acl_association_web_acl_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.WEB_ACL_ASSOCIATION_WEB_ACL_ARN)
+
+    @property
+    def edge_protection_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES)
+
+    @property
     def audit_detection_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES)
 

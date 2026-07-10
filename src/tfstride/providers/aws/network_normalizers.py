@@ -7,7 +7,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupR
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
-from tfstride.providers.coercion import attribute_unknown, known_bool, known_string, known_string_list
+from tfstride.providers.coercion import attribute_unknown, first_mapping, known_bool, known_string, known_string_list
 from tfstride.providers.json_documents import load_json_document
 
 AWS_PROVIDER = "aws"
@@ -326,6 +326,99 @@ def normalize_load_balancer_target_group(resource: TerraformResource) -> Normali
             "target_type": values.get("target_type"),
         },
     )
+
+
+def normalize_wafv2_web_acl(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    web_acl_id = known_string(values, unknown_values, "id", uncertainties)
+    name = known_string(values, unknown_values, "name", uncertainties) or resource.name
+    arn = known_string(values, unknown_values, "arn", uncertainties)
+    scope = known_string(values, unknown_values, "scope", uncertainties)
+    default_action, default_action_evidence = _web_acl_default_action(values, unknown_values, uncertainties)
+    rules = _web_acl_rules(values, unknown_values, uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=arn or web_acl_id or name or resource.address,
+        arn=arn,
+        metadata={
+            AwsResourceMetadata.WEB_ACL_ID: web_acl_id,
+            AwsResourceMetadata.WEB_ACL_NAME: name,
+            AwsResourceMetadata.WEB_ACL_ARN: arn,
+            AwsResourceMetadata.WEB_ACL_SCOPE: scope,
+            AwsResourceMetadata.WEB_ACL_DEFAULT_ACTION: default_action,
+            AwsResourceMetadata.WEB_ACL_DEFAULT_ACTION_EVIDENCE: default_action_evidence,
+            AwsResourceMetadata.WEB_ACL_RULES: rules,
+            AwsResourceMetadata.WEB_ACL_RULE_NAMES: compact(rule.get("name") for rule in rules),
+            AwsResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES: uncertainties,
+            "tags": values.get("tags", {}),
+        },
+    )
+
+
+def normalize_wafv2_web_acl_association(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    resource_arn = known_string(values, unknown_values, "resource_arn", uncertainties)
+    web_acl_arn = known_string(values, unknown_values, "web_acl_arn", uncertainties)
+    association_id = known_string(values, unknown_values, "id", uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=association_id or resource_arn or resource.address,
+        metadata={
+            AwsResourceMetadata.WEB_ACL_ASSOCIATION_RESOURCE_ARN: resource_arn,
+            AwsResourceMetadata.WEB_ACL_ASSOCIATION_WEB_ACL_ARN: web_acl_arn,
+            AwsResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def _web_acl_default_action(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str | None, dict[str, Any]]:
+    if attribute_unknown(unknown_values, "default_action"):
+        uncertainties.append("default_action is unknown after planning")
+        return "unknown", {}
+    action = first_mapping(values.get("default_action"), expand_tuples=True, scan_all=True)
+    if action is None:
+        return None, {}
+    evidence = dict(action)
+    if action.get("allow") not in (None, [], {}):
+        return "allow", evidence
+    if action.get("block") not in (None, [], {}):
+        return "block", evidence
+    return "unknown", evidence
+
+
+def _web_acl_rules(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    if attribute_unknown(unknown_values, "rule"):
+        uncertainties.append("rule is unknown after planning")
+        return []
+    rules: list[dict[str, Any]] = []
+    for rule in as_list(values.get("rule")):
+        if isinstance(rule, Mapping):
+            rules.append(dict(rule))
+    return rules
 
 
 def _bool_state(value: bool | None) -> str:

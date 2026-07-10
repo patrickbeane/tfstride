@@ -8,6 +8,8 @@ from tfstride.providers.aws.network_normalizers import (
     normalize_flow_log,
     normalize_load_balancer_listener,
     normalize_vpc_endpoint,
+    normalize_wafv2_web_acl,
+    normalize_wafv2_web_acl_association,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -54,6 +56,38 @@ def _flow_log_resource(
         mode="managed",
         resource_type="aws_flow_log",
         name="vpc",
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _wafv2_web_acl_resource(
+    values: dict[str, Any],
+    *,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="aws_wafv2_web_acl.edge",
+        mode="managed",
+        resource_type="aws_wafv2_web_acl",
+        name="edge",
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _wafv2_web_acl_association_resource(
+    values: dict[str, Any],
+    *,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="aws_wafv2_web_acl_association.alb",
+        mode="managed",
+        resource_type="aws_wafv2_web_acl_association",
+        name="alb",
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
         unknown_values=unknown_values or {},
@@ -258,6 +292,89 @@ class AwsNetworkNormalizerTests(unittest.TestCase):
                 "iam_role_arn is unknown after planning",
                 "max_aggregation_interval is unknown after planning",
                 "destination_options is unknown after planning",
+            ],
+        )
+
+    def test_wafv2_web_acl_normalizes_edge_protection_posture(self) -> None:
+        web_acl_arn = "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc"
+        normalized = normalize_wafv2_web_acl(
+            _wafv2_web_acl_resource(
+                {
+                    "id": "app/abc",
+                    "name": "app-edge",
+                    "arn": web_acl_arn,
+                    "scope": "REGIONAL",
+                    "default_action": [{"allow": [{}]}],
+                    "rule": [
+                        {
+                            "name": "aws-managed-common",
+                            "priority": 1,
+                            "override_action": [{"none": [{}]}],
+                        }
+                    ],
+                    "tags": {"Environment": "prod"},
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.EDGE)
+        self.assertEqual(normalized.identifier, web_acl_arn)
+        self.assertEqual(normalized.arn, web_acl_arn)
+        self.assertEqual(normalized.metadata["tags"], {"Environment": "prod"})
+        self.assertEqual(facts.web_acl_id, "app/abc")
+        self.assertEqual(facts.web_acl_name, "app-edge")
+        self.assertEqual(facts.web_acl_arn, web_acl_arn)
+        self.assertEqual(facts.web_acl_scope, "REGIONAL")
+        self.assertEqual(facts.web_acl_default_action, "allow")
+        self.assertEqual(facts.web_acl_default_action_evidence, {"allow": [{}]})
+        self.assertEqual(facts.web_acl_rule_names, ["aws-managed-common"])
+        self.assertEqual(facts.web_acl_rules[0]["name"], "aws-managed-common")
+        self.assertEqual(facts.edge_protection_posture_uncertainties, [])
+
+    def test_wafv2_web_acl_association_normalizes_target_and_web_acl_arns(self) -> None:
+        load_balancer_arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/abc"
+        web_acl_arn = "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc"
+
+        normalized = normalize_wafv2_web_acl_association(
+            _wafv2_web_acl_association_resource(
+                {
+                    "id": f"{web_acl_arn},{load_balancer_arn}",
+                    "resource_arn": load_balancer_arn,
+                    "web_acl_arn": web_acl_arn,
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.EDGE)
+        self.assertEqual(normalized.identifier, f"{web_acl_arn},{load_balancer_arn}")
+        self.assertEqual(facts.web_acl_association_resource_arn, load_balancer_arn)
+        self.assertEqual(facts.web_acl_association_web_acl_arn, web_acl_arn)
+        self.assertEqual(facts.edge_protection_posture_uncertainties, [])
+
+    def test_wafv2_web_acl_association_preserves_unknown_targets_as_uncertainty(self) -> None:
+        normalized = normalize_wafv2_web_acl_association(
+            _wafv2_web_acl_association_resource(
+                {},
+                unknown_values={
+                    "id": True,
+                    "resource_arn": True,
+                    "web_acl_arn": True,
+                },
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "aws_wafv2_web_acl_association.alb")
+        self.assertIsNone(facts.web_acl_association_resource_arn)
+        self.assertIsNone(facts.web_acl_association_web_acl_arn)
+        self.assertEqual(
+            facts.edge_protection_posture_uncertainties,
+            [
+                "resource_arn is unknown after planning",
+                "web_acl_arn is unknown after planning",
+                "id is unknown after planning",
             ],
         )
 

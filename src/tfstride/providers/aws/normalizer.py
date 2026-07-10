@@ -57,6 +57,8 @@ from tfstride.providers.aws.network_normalizers import (
     normalize_subnet,
     normalize_vpc,
     normalize_vpc_endpoint,
+    normalize_wafv2_web_acl,
+    normalize_wafv2_web_acl_association,
 )
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.base import ProviderNormalizer
@@ -110,6 +112,8 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_subnet": normalize_subnet,
     "aws_vpc": normalize_vpc,
     "aws_vpc_endpoint": normalize_vpc_endpoint,
+    "aws_wafv2_web_acl": normalize_wafv2_web_acl,
+    "aws_wafv2_web_acl_association": normalize_wafv2_web_acl_association,
 }
 SUPPORTED_AWS_TYPES = set(_AWS_RESOURCE_NORMALIZERS)
 

@@ -130,6 +130,19 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "load_balancer_listener_certificate_arn": ("arn:aws:acm:us-east-1:111122223333:certificate/listener"),
                 "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
                 "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
+                "web_acl_id": "app/abc",
+                "web_acl_name": "app-edge",
+                "web_acl_arn": "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc",
+                "web_acl_scope": "REGIONAL",
+                "web_acl_default_action": "allow",
+                "web_acl_default_action_evidence": {"allow": [{}]},
+                "web_acl_rules": [{"name": "aws-managed-common", "priority": 1}],
+                "web_acl_rule_names": ["aws-managed-common"],
+                "web_acl_association_resource_arn": (
+                    "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/abc"
+                ),
+                "web_acl_association_web_acl_arn": ("arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc"),
+                "edge_protection_posture_uncertainties": ["web_acl_arn is unknown after planning"],
                 "audit_detection_posture_uncertainties": ["enable_logging is unknown after planning"],
                 "privileged_access_grants": [
                     {
@@ -336,6 +349,23 @@ class AwsResourceFactsTests(unittest.TestCase):
             facts.load_balancer_listener_tls_uncertainties,
             ["ssl_policy is unknown after planning"],
         )
+        self.assertEqual(facts.web_acl_id, "app/abc")
+        self.assertEqual(facts.web_acl_name, "app-edge")
+        self.assertEqual(facts.web_acl_arn, "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc")
+        self.assertEqual(facts.web_acl_scope, "REGIONAL")
+        self.assertEqual(facts.web_acl_default_action, "allow")
+        self.assertEqual(facts.web_acl_default_action_evidence, {"allow": [{}]})
+        self.assertEqual(facts.web_acl_rules, [{"name": "aws-managed-common", "priority": 1}])
+        self.assertEqual(facts.web_acl_rule_names, ["aws-managed-common"])
+        self.assertEqual(
+            facts.web_acl_association_resource_arn,
+            "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/abc",
+        )
+        self.assertEqual(
+            facts.web_acl_association_web_acl_arn,
+            "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc",
+        )
+        self.assertEqual(facts.edge_protection_posture_uncertainties, ["web_acl_arn is unknown after planning"])
         self.assertEqual(facts.audit_detection_posture_uncertainties, ["enable_logging is unknown after planning"])
         self.assertEqual(len(facts.privileged_access_grants), 1)
         self.assertEqual(facts.privileged_access_grants[0].privilege_categories[0].value, "full-admin")
@@ -575,6 +605,17 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.load_balancer_listener_certificate_arn)
         self.assertIsNone(facts.load_balancer_listener_ssl_policy)
         self.assertEqual(facts.load_balancer_listener_tls_uncertainties, [])
+        self.assertIsNone(facts.web_acl_id)
+        self.assertIsNone(facts.web_acl_name)
+        self.assertIsNone(facts.web_acl_arn)
+        self.assertIsNone(facts.web_acl_scope)
+        self.assertIsNone(facts.web_acl_default_action)
+        self.assertEqual(facts.web_acl_default_action_evidence, {})
+        self.assertEqual(facts.web_acl_rules, [])
+        self.assertEqual(facts.web_acl_rule_names, [])
+        self.assertIsNone(facts.web_acl_association_resource_arn)
+        self.assertIsNone(facts.web_acl_association_web_acl_arn)
+        self.assertEqual(facts.edge_protection_posture_uncertainties, [])
         self.assertEqual(facts.audit_detection_posture_uncertainties, [])
         self.assertIsNone(facts.cloudtrail_s3_bucket_name)
         self.assertIsNone(facts.cloudtrail_s3_key_prefix)
