@@ -35,7 +35,11 @@ from tfstride.providers.gcp.plugin import gcp_provider_plugin
 from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
-from tfstride.providers.gcp.resource_types import GCP_NORMALIZED_RESOURCE_TYPES, GcpResourceType
+from tfstride.providers.gcp.resource_types import (
+    GCP_EDGE_PROTECTION_RESOURCE_TYPES,
+    GCP_NORMALIZED_RESOURCE_TYPES,
+    GcpResourceType,
+)
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.resource_metadata import InventoryMetadata, MetadataField
 
@@ -133,6 +137,16 @@ class GcpProviderTests(unittest.TestCase):
             GCP_IAM_GRANT_RESOURCE_TYPES | GCP_CUSTOM_ROLE_RESOURCE_TYPES,
         )
         self.assertEqual(SUPPORTED_GCP_TYPES, GCP_NORMALIZED_RESOURCE_TYPES)
+        self.assertEqual(
+            GCP_EDGE_PROTECTION_RESOURCE_TYPES,
+            frozenset(
+                {
+                    GcpResourceType.COMPUTE_SECURITY_POLICY,
+                    GcpResourceType.COMPUTE_REGION_SECURITY_POLICY,
+                }
+            ),
+        )
+        self.assertLessEqual(GCP_EDGE_PROTECTION_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(GCP_SERVERLESS_WORKLOAD_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(GCP_IAM_GRANT_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)
         self.assertLessEqual(GCP_IAM_POLICY_RESOURCE_TYPES, SUPPORTED_GCP_TYPES)

@@ -110,10 +110,19 @@ class GcpResourceMetadata:
     LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME = OptionalStringMetadataField(
         "load_balancer_backend_service_load_balancing_scheme"
     )
+    LOAD_BALANCER_BACKEND_SERVICE_SECURITY_POLICY = OptionalStringMetadataField(
+        "load_balancer_backend_service_security_policy"
+    )
+    LOAD_BALANCER_BACKEND_SERVICE_EDGE_SECURITY_POLICY = OptionalStringMetadataField(
+        "load_balancer_backend_service_edge_security_policy"
+    )
     LOAD_BALANCER_NETWORK_ENDPOINT_TYPE = OptionalStringMetadataField("load_balancer_network_endpoint_type")
     SSL_POLICY_NAME = OptionalStringMetadataField("ssl_policy_name")
     SSL_POLICY_MIN_TLS_VERSION = OptionalStringMetadataField("ssl_policy_min_tls_version")
     SSL_POLICY_PROFILE = OptionalStringMetadataField("ssl_policy_profile")
+    SECURITY_POLICY_NAME = OptionalStringMetadataField("security_policy_name")
+    SECURITY_POLICY_TYPE = OptionalStringMetadataField("security_policy_type")
+    SECURITY_POLICY_DEFAULT_ACTION = OptionalStringMetadataField("security_policy_default_action")
     MANAGED_SSL_CERTIFICATE_NAME = OptionalStringMetadataField("managed_ssl_certificate_name")
     MANAGED_SSL_CERTIFICATE_STATUS = OptionalStringMetadataField("managed_ssl_certificate_status")
     GKE_ENDPOINT = OptionalStringMetadataField("gke_endpoint")
@@ -221,6 +230,7 @@ class GcpResourceMetadata:
     LOAD_BALANCER_SSL_CERTIFICATES = StringListMetadataField("load_balancer_ssl_certificates")
     SSL_POLICY_CUSTOM_FEATURES = StringListMetadataField("ssl_policy_custom_features")
     SSL_POLICY_ENABLED_FEATURES = StringListMetadataField("ssl_policy_enabled_features")
+    SECURITY_POLICY_RULE_ACTIONS = StringListMetadataField("security_policy_rule_actions")
     MANAGED_SSL_CERTIFICATE_DOMAINS = StringListMetadataField("managed_ssl_certificate_domains")
     INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField("internet_facing_load_balancer_addresses")
     GKE_NODE_OAUTH_SCOPES = StringListMetadataField("gke_node_oauth_scopes")
@@ -229,6 +239,7 @@ class GcpResourceMetadata:
     AUDIT_SECURITY_POSTURE_UNCERTAINTIES = StringListMetadataField("audit_security_posture_uncertainties")
     SUBNETWORK_FLOW_LOG_METADATA_FIELDS = StringListMetadataField("subnetwork_flow_log_metadata_fields")
     NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES = StringListMetadataField("network_telemetry_posture_uncertainties")
+    EDGE_PROTECTION_POSTURE_UNCERTAINTIES = StringListMetadataField("edge_protection_posture_uncertainties")
     SCC_ASSET_DISCOVERY_PROJECT_IDS = StringListMetadataField("scc_asset_discovery_project_ids")
     SCC_ASSET_DISCOVERY_FOLDER_IDS = StringListMetadataField("scc_asset_discovery_folder_ids")
     ORG_POLICY_ALLOWED_VALUES = StringListMetadataField("org_policy_allowed_values")
@@ -246,6 +257,7 @@ class GcpResourceMetadata:
     LOAD_BALANCER_NETWORK_ENDPOINTS = DictListMetadataField("load_balancer_network_endpoints")
     LOAD_BALANCER_FRONTENDS = DictListMetadataField("load_balancer_frontends")
     LOAD_BALANCER_REACHABLE_BACKENDS = DictListMetadataField("load_balancer_reachable_backends")
+    SECURITY_POLICY_RULES = DictListMetadataField("security_policy_rules")
     ORG_POLICY_RULES = DictListMetadataField("org_policy_rules")
     GKE_MASTER_AUTHORIZED_NETWORKS = DictListMetadataField("gke_master_authorized_networks")
     GKE_LOGGING_CONFIG = DictMetadataField("gke_logging_config")

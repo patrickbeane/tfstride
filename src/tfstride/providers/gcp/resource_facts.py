@@ -764,6 +764,18 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
 
     @property
+    def load_balancer_backend_service_security_policy(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_SECURITY_POLICY)
+
+    @property
+    def load_balancer_backend_service_edge_security_policy(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_EDGE_SECURITY_POLICY)
+
+    @property
+    def edge_protection_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES)
+
+    @property
     def forwarding_rule_target(self) -> str | None:
         return self.get(GcpResourceMetadata.FORWARDING_RULE_TARGET)
 
@@ -806,6 +818,26 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
     @property
     def ssl_policy_enabled_features(self) -> list[str]:
         return self.get(GcpResourceMetadata.SSL_POLICY_ENABLED_FEATURES)
+
+    @property
+    def security_policy_name(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECURITY_POLICY_NAME)
+
+    @property
+    def security_policy_type(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECURITY_POLICY_TYPE)
+
+    @property
+    def security_policy_default_action(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECURITY_POLICY_DEFAULT_ACTION)
+
+    @property
+    def security_policy_rules(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.SECURITY_POLICY_RULES)
+
+    @property
+    def security_policy_rule_actions(self) -> list[str]:
+        return self.get(GcpResourceMetadata.SECURITY_POLICY_RULE_ACTIONS)
 
     @property
     def managed_ssl_certificate_domains(self) -> list[str]:

@@ -22,9 +22,11 @@ from tfstride.providers.gcp.network_normalizers import (
     normalize_compute_network,
     normalize_compute_network_endpoint_group,
     normalize_compute_region_network_endpoint_group,
+    normalize_compute_region_security_policy,
     normalize_compute_route,
     normalize_compute_router,
     normalize_compute_router_nat,
+    normalize_compute_security_policy,
     normalize_compute_service_attachment,
     normalize_compute_ssl_policy,
     normalize_compute_subnetwork,
@@ -636,6 +638,141 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
             gcp_facts(managed_certificate).managed_ssl_certificate_domains,
             ["app.example.com", "api.example.com"],
         )
+
+    def test_load_balancer_edge_protection_normalizers_preserve_cloud_armor_facts(self) -> None:
+        backend_service = normalize_compute_backend_service(
+            _terraform_resource(
+                "google_compute_backend_service.web",
+                "google_compute_backend_service",
+                {
+                    "name": "web-backend",
+                    "protocol": "HTTP",
+                    "load_balancing_scheme": "EXTERNAL_MANAGED",
+                    "security_policy": "google_compute_security_policy.edge.id",
+                    "edge_security_policy": "google_compute_security_policy.edge.self_link",
+                    "backend": [{"group": "google_compute_region_network_endpoint_group.run.id"}],
+                },
+            )
+        )
+        security_policy = normalize_compute_security_policy(
+            _terraform_resource(
+                "google_compute_security_policy.edge",
+                "google_compute_security_policy",
+                {
+                    "name": "edge-policy",
+                    "self_link": "https://www.googleapis.com/compute/v1/projects/demo/global/securityPolicies/edge-policy",
+                    "project": "demo",
+                    "type": "CLOUD_ARMOR",
+                    "rule": [
+                        {
+                            "priority": 1000,
+                            "action": "deny(403)",
+                            "preview": True,
+                            "match": [
+                                {"versioned_expr": "SRC_IPS_V1", "config": [{"src_ip_ranges": ["203.0.113.0/24"]}]}
+                            ],
+                        },
+                        {"priority": 2147483647, "action": "allow", "match": [{"versioned_expr": "SRC_IPS_V1"}]},
+                    ],
+                },
+            )
+        )
+
+        backend_facts = gcp_facts(backend_service)
+        policy_facts = gcp_facts(security_policy)
+
+        self.assertEqual(backend_service.category, ResourceCategory.EDGE)
+        self.assertEqual(
+            backend_facts.load_balancer_backend_service_security_policy,
+            "google_compute_security_policy.edge.id",
+        )
+        self.assertEqual(
+            backend_facts.load_balancer_backend_service_edge_security_policy,
+            "google_compute_security_policy.edge.self_link",
+        )
+        self.assertEqual(backend_facts.edge_protection_posture_uncertainties, [])
+        self.assertEqual(security_policy.category, ResourceCategory.EDGE)
+        self.assertEqual(
+            security_policy.identifier,
+            "https://www.googleapis.com/compute/v1/projects/demo/global/securityPolicies/edge-policy",
+        )
+        self.assertEqual(policy_facts.security_policy_name, "edge-policy")
+        self.assertEqual(policy_facts.security_policy_type, "CLOUD_ARMOR")
+        self.assertEqual(policy_facts.security_policy_default_action, "allow")
+        self.assertEqual(policy_facts.security_policy_rule_actions, ["deny(403)", "allow"])
+        self.assertEqual(policy_facts.security_policy_rules[0]["preview"], True)
+        self.assertEqual(policy_facts.edge_protection_posture_uncertainties, [])
+
+    def test_regional_security_policy_preserves_default_action_attribute(self) -> None:
+        security_policy = normalize_compute_region_security_policy(
+            _terraform_resource(
+                "google_compute_region_security_policy.edge",
+                "google_compute_region_security_policy",
+                {
+                    "name": "regional-edge-policy",
+                    "region": "us-central1",
+                    "type": "CLOUD_ARMOR",
+                    "default_action": "deny(403)",
+                    "rule": [{"priority": 1000, "action": "allow"}],
+                },
+            )
+        )
+
+        facts = gcp_facts(security_policy)
+
+        self.assertEqual(facts.security_policy_name, "regional-edge-policy")
+        self.assertEqual(facts.security_policy_default_action, "deny(403)")
+        self.assertEqual(facts.security_policy_rule_actions, ["allow"])
+
+    def test_edge_protection_normalizers_preserve_unknown_values_as_uncertainty(self) -> None:
+        backend_service = normalize_compute_backend_service(
+            _terraform_resource(
+                "google_compute_backend_service.web",
+                "google_compute_backend_service",
+                {"name": "web-backend", "load_balancing_scheme": "EXTERNAL_MANAGED"},
+                unknown_values={"security_policy": True, "edge_security_policy": True},
+            )
+        )
+        security_policy = normalize_compute_security_policy(
+            _terraform_resource(
+                "google_compute_security_policy.edge",
+                "google_compute_security_policy",
+                {"name": "edge-policy"},
+                unknown_values={"rule": True, "default_action": True},
+            )
+        )
+
+        self.assertIsNone(gcp_facts(backend_service).load_balancer_backend_service_security_policy)
+        self.assertEqual(
+            gcp_facts(backend_service).edge_protection_posture_uncertainties,
+            ["security_policy is unknown after planning", "edge_security_policy is unknown after planning"],
+        )
+        self.assertEqual(gcp_facts(security_policy).security_policy_rules, [])
+        self.assertEqual(
+            gcp_facts(security_policy).edge_protection_posture_uncertainties,
+            ["default_action is unknown after planning", "rule is unknown after planning"],
+        )
+
+    def test_gcp_normalizer_supports_edge_protection_resource_types(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_compute_security_policy.edge",
+                    "google_compute_security_policy",
+                    {"name": "edge-policy", "rule": [{"priority": 2147483647, "action": "allow"}]},
+                ),
+                _terraform_resource(
+                    "google_compute_region_security_policy.edge",
+                    "google_compute_region_security_policy",
+                    {"name": "regional-edge-policy", "region": "us-central1"},
+                ),
+            ]
+        )
+
+        resources_by_address = {resource.address: resource for resource in inventory.resources}
+        self.assertEqual(inventory.unsupported_resources, [])
+        self.assertIn("google_compute_security_policy.edge", resources_by_address)
+        self.assertIn("google_compute_region_security_policy.edge", resources_by_address)
 
     def test_gcp_normalizer_supports_tls_posture_resource_types(self) -> None:
         inventory = GcpNormalizer().normalize(

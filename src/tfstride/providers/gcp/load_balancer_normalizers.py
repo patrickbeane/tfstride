@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.coercion import known_string
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.network_normalizer_utils import _dict_list, _string_from_raw
+from tfstride.providers.gcp.network_normalizer_utils import _dict_list, _known_dict_list, _string_from_raw
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
@@ -34,6 +35,14 @@ def normalize_compute_target_http_proxy(resource: TerraformResource) -> Normaliz
 
 def normalize_compute_target_https_proxy(resource: TerraformResource) -> NormalizedResource:
     return _normalize_target_proxy(resource)
+
+
+def normalize_compute_security_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_security_policy(resource)
+
+
+def normalize_compute_region_security_policy(resource: TerraformResource) -> NormalizedResource:
+    return _normalize_security_policy(resource)
 
 
 def normalize_compute_ssl_policy(resource: TerraformResource) -> NormalizedResource:
@@ -167,6 +176,13 @@ def _normalize_target_proxy(resource: TerraformResource) -> NormalizedResource:
 
 def _normalize_backend_service(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
+    edge_protection_uncertainties: list[str] = []
+    security_policy = known_string(
+        resource.values, resource.unknown_values, GcpAttr.SECURITY_POLICY.key, edge_protection_uncertainties
+    )
+    edge_security_policy = known_string(
+        resource.values, resource.unknown_values, GcpAttr.EDGE_SECURITY_POLICY.key, edge_protection_uncertainties
+    )
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -182,6 +198,40 @@ def _normalize_backend_service(resource: TerraformResource) -> NormalizedResourc
                     GcpAttr.LOAD_BALANCING_SCHEME
                 ),
                 GcpResourceMetadata.LOAD_BALANCER_BACKENDS: _dict_list(values.get(GcpAttr.BACKEND)),
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_SECURITY_POLICY: security_policy,
+                GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_EDGE_SECURITY_POLICY: edge_security_policy,
+                GcpResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES: edge_protection_uncertainties,
+            },
+        ),
+    )
+
+
+def _normalize_security_policy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    name = known_string(values, unknown_values, GcpAttr.NAME.key, uncertainties) or resource.name
+    self_link = known_string(values, unknown_values, GcpAttr.SELF_LINK.key, uncertainties)
+    policy_type = known_string(values, unknown_values, GcpAttr.TYPE.key, uncertainties)
+    default_action = known_string(values, unknown_values, GcpAttr.DEFAULT_ACTION.key, uncertainties)
+    rules = _known_dict_list(values, unknown_values, GcpAttr.RULE.key, uncertainties)
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=first_non_empty(self_link, name, resource.address),
+        metadata=_load_balancer_metadata(
+            GcpValues(values),
+            {
+                GcpResourceMetadata.SECURITY_POLICY_NAME: name,
+                GcpResourceMetadata.SECURITY_POLICY_TYPE: policy_type,
+                GcpResourceMetadata.SECURITY_POLICY_DEFAULT_ACTION: default_action
+                or _security_policy_default_rule_action(rules),
+                GcpResourceMetadata.SECURITY_POLICY_RULES: rules,
+                GcpResourceMetadata.SECURITY_POLICY_RULE_ACTIONS: _security_policy_rule_actions(rules),
+                GcpResourceMetadata.EDGE_PROTECTION_POSTURE_UNCERTAINTIES: uncertainties,
             },
         ),
     )
@@ -300,3 +350,33 @@ def _normalize_forwarding_rule(resource: TerraformResource) -> NormalizedResourc
 def _forwarding_rule_is_public(values: GcpValues) -> bool:
     scheme = str(values.get(GcpAttr.LOAD_BALANCING_SCHEME) or "EXTERNAL").strip().upper()
     return scheme in {"EXTERNAL", "EXTERNAL_MANAGED"}
+
+
+def _security_policy_rule_actions(rules: list[dict[str, Any]]) -> list[str]:
+    actions: list[str] = []
+    for rule in rules:
+        action = rule.get("action")
+        if action in (None, ""):
+            continue
+        text = str(action).strip()
+        if text and text not in actions:
+            actions.append(text)
+    return actions
+
+
+def _security_policy_default_rule_action(rules: list[dict[str, Any]]) -> str | None:
+    for rule in rules:
+        if _security_policy_rule_priority(rule) == 2147483647:
+            action = rule.get("action")
+            return str(action).strip() if action not in (None, "") else None
+    return None
+
+
+def _security_policy_rule_priority(rule: dict[str, Any]) -> int | None:
+    value = rule.get("priority")
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

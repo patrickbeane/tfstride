@@ -45,10 +45,12 @@ class GcpResourceType:
     COMPUTE_NETWORK_ENDPOINT_GROUP = "google_compute_network_endpoint_group"
     COMPUTE_REGION_BACKEND_SERVICE = "google_compute_region_backend_service"
     COMPUTE_REGION_NETWORK_ENDPOINT_GROUP = "google_compute_region_network_endpoint_group"
+    COMPUTE_REGION_SECURITY_POLICY = "google_compute_region_security_policy"
     COMPUTE_REGION_TARGET_HTTP_PROXY = "google_compute_region_target_http_proxy"
     COMPUTE_REGION_TARGET_HTTPS_PROXY = "google_compute_region_target_https_proxy"
     COMPUTE_REGION_URL_MAP = "google_compute_region_url_map"
     COMPUTE_SERVICE_ATTACHMENT = "google_compute_service_attachment"
+    COMPUTE_SECURITY_POLICY = "google_compute_security_policy"
     COMPUTE_ROUTE = "google_compute_route"
     COMPUTE_ROUTER = "google_compute_router"
     COMPUTE_ROUTER_NAT = "google_compute_router_nat"
@@ -287,6 +289,12 @@ GCP_LOAD_BALANCER_NEG_TYPES = frozenset(
         GcpResourceType.COMPUTE_REGION_NETWORK_ENDPOINT_GROUP,
     }
 )
+GCP_EDGE_PROTECTION_RESOURCE_TYPES = frozenset(
+    {
+        GcpResourceType.COMPUTE_SECURITY_POLICY,
+        GcpResourceType.COMPUTE_REGION_SECURITY_POLICY,
+    }
+)
 GCP_LOAD_BALANCER_TARGET_PROXY_TYPES = frozenset(
     {
         GcpResourceType.COMPUTE_TARGET_HTTP_PROXY,
@@ -359,10 +367,12 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_NETWORK_ENDPOINT_GROUP,
         GcpResourceType.COMPUTE_REGION_BACKEND_SERVICE,
         GcpResourceType.COMPUTE_REGION_NETWORK_ENDPOINT_GROUP,
+        GcpResourceType.COMPUTE_REGION_SECURITY_POLICY,
         GcpResourceType.COMPUTE_REGION_TARGET_HTTP_PROXY,
         GcpResourceType.COMPUTE_REGION_TARGET_HTTPS_PROXY,
         GcpResourceType.COMPUTE_REGION_URL_MAP,
         GcpResourceType.COMPUTE_SERVICE_ATTACHMENT,
+        GcpResourceType.COMPUTE_SECURITY_POLICY,
         GcpResourceType.COMPUTE_ROUTE,
         GcpResourceType.COMPUTE_ROUTER,
         GcpResourceType.COMPUTE_ROUTER_NAT,
