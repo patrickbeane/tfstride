@@ -27,6 +27,7 @@ from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
 
 _GCP_HTTP_LB_RULE = "gcp-load-balancer-http-public-proxy"
 _GCP_SSL_POLICY_RULE = "gcp-load-balancer-ssl-policy-missing-or-weak"
+_GCP_EDGE_PROTECTION_RULE = "gcp-public-load-balancer-cloud-armor-missing"
 
 
 def _gcp_resource(address: str, resource_type: str, values: dict[str, object]) -> TerraformResource:
@@ -83,6 +84,42 @@ def _ssl_policy(*, min_tls_version: str = "TLS_1_2") -> TerraformResource:
         "google_compute_ssl_policy.modern",
         "google_compute_ssl_policy",
         {"name": "modern-tls", "min_tls_version": min_tls_version, "profile": "MODERN"},
+    )
+
+
+def _url_map(*, default_service: str = "google_compute_backend_service.web.id") -> TerraformResource:
+    return _gcp_resource(
+        "google_compute_url_map.web",
+        "google_compute_url_map",
+        {"name": "web-url-map", "default_service": default_service},
+    )
+
+
+def _backend_service(
+    *,
+    security_policy: str | None = None,
+    edge_security_policy: str | None = None,
+    unknown_values: dict[str, object] | None = None,
+    resource_type: str = "google_compute_backend_service",
+) -> TerraformResource:
+    address = f"{resource_type}.web"
+    values: dict[str, object] = {
+        "name": "web-backend",
+        "protocol": "HTTP",
+        "load_balancing_scheme": "EXTERNAL_MANAGED",
+    }
+    if security_policy is not None:
+        values["security_policy"] = security_policy
+    if edge_security_policy is not None:
+        values["edge_security_policy"] = edge_security_policy
+    return TerraformResource(
+        address=address,
+        mode="managed",
+        resource_type=resource_type,
+        name="web",
+        provider_name="registry.terraform.io/hashicorp/google",
+        values=values,
+        unknown_values=unknown_values or {},
     )
 
 
@@ -287,6 +324,100 @@ class GcpComputeRuleTests(unittest.TestCase):
             _findings(
                 [_public_forwarding_rule(), _target_https_proxy(ssl_policy="google_compute_ssl_policy.missing.id")],
                 _GCP_SSL_POLICY_RULE,
+            ),
+            [],
+        )
+
+    def test_public_backend_service_without_cloud_armor_policy_is_detected(self) -> None:
+        findings = _findings(
+            [_public_forwarding_rule(), _target_https_proxy(), _url_map(), _backend_service()],
+            _GCP_EDGE_PROTECTION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_GCP_EDGE_PROTECTION_RULE])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["google_compute_backend_service.web", "google_compute_global_forwarding_rule.web"],
+        )
+        self.assertEqual(
+            finding.trust_boundary_id,
+            "internet-to-service:internet->google_compute_global_forwarding_rule.web",
+        )
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(evidence["frontend_load_balancers"], ["google_compute_global_forwarding_rule.web"])
+        self.assertIn("protocol=HTTP", evidence["target_backend_service"])
+        self.assertIn(
+            "fronted_by_internet_facing_load_balancer=true",
+            evidence["target_backend_service"],
+        )
+        self.assertEqual(
+            evidence["edge_protection_policy"],
+            [
+                "edge_protection_state=missing",
+                "security_policy is unset",
+                "edge_security_policy is unset",
+            ],
+        )
+        self.assertIn(
+            "path=google_compute_global_forwarding_rule.web -> google_compute_target_https_proxy.web -> "
+            "google_compute_url_map.web -> google_compute_backend_service.web",
+            evidence["load_balancer_paths"][0],
+        )
+
+    def test_public_backend_service_with_cloud_armor_policy_is_quiet(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _public_forwarding_rule(),
+                    _target_https_proxy(),
+                    _url_map(),
+                    _backend_service(security_policy="google_compute_security_policy.edge.id"),
+                ],
+                _GCP_EDGE_PROTECTION_RULE,
+            ),
+            [],
+        )
+
+    def test_public_backend_service_with_edge_security_policy_is_quiet(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _public_forwarding_rule(),
+                    _target_https_proxy(),
+                    _url_map(),
+                    _backend_service(edge_security_policy="google_compute_security_policy.edge.self_link"),
+                ],
+                _GCP_EDGE_PROTECTION_RULE,
+            ),
+            [],
+        )
+
+    def test_unknown_cloud_armor_policy_reference_does_not_create_missing_policy_finding(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _public_forwarding_rule(),
+                    _target_https_proxy(),
+                    _url_map(),
+                    _backend_service(unknown_values={"security_policy": True}),
+                ],
+                _GCP_EDGE_PROTECTION_RULE,
+            ),
+            [],
+        )
+
+    def test_internal_backend_service_without_cloud_armor_policy_is_quiet(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _public_forwarding_rule(scheme="INTERNAL_MANAGED"),
+                    _target_https_proxy(),
+                    _url_map(),
+                    _backend_service(),
+                ],
+                _GCP_EDGE_PROTECTION_RULE,
             ),
             [],
         )

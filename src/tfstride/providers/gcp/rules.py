@@ -39,6 +39,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
         "gcp-load-balancer-ssl-policy-missing-or-weak",
+        "gcp-public-load-balancer-cloud-armor-missing",
         "gcp-compute-os-login-disabled",
         "gcp-gke-public-control-plane",
         "gcp-gke-broad-authorized-networks",
@@ -136,6 +137,9 @@ def build_gcp_rule_contribution(
         "gcp-load-balancer-http-public-proxy": gcp_detectors.detect_public_load_balancer_http_frontend,
         "gcp-load-balancer-ssl-policy-missing-or-weak": (
             gcp_detectors.detect_public_load_balancer_ssl_policy_missing_or_weak
+        ),
+        "gcp-public-load-balancer-cloud-armor-missing": (
+            gcp_detectors.detect_public_load_balancer_edge_protection_missing
         ),
         "gcp-compute-os-login-disabled": gcp_detectors.detect_compute_os_login_disabled,
         "gcp-gke-public-control-plane": gcp_detectors.detect_gke_public_control_plane,

@@ -23,6 +23,7 @@ from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_VM_EXTERNAL_IP_ACCESS,
 )
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
@@ -247,6 +248,67 @@ class GcpComputeExposureRuleDetectors:
             )
         return findings
 
+    def detect_public_load_balancer_edge_protection_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for backend_service in context.inventory.by_type(
+            "google_compute_backend_service",
+            "google_compute_region_backend_service",
+        ):
+            backend_facts = analysis_facts(backend_service).compute
+            if not backend_facts.fronted_by_internet_facing_load_balancer:
+                continue
+            policy_state = _backend_service_edge_protection_state(backend_service)
+            if policy_state in {"configured", "unknown"}:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            boundary = _load_balancer_frontend_boundary(context, backend_facts.load_balancer_frontends)
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses(
+                        [backend_service.address, *backend_facts.internet_facing_load_balancer_addresses]
+                    ),
+                    trust_boundary_id=boundary.identifier if boundary else None,
+                    rationale=(
+                        f"{backend_service.display_name} is reached by a public GCP load balancer path, but the "
+                        "Terraform plan does not show a deterministic Cloud Armor security_policy or "
+                        "edge_security_policy attached to the backend service. Public edge traffic can reach "
+                        "the backend without a modeled edge protection policy."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_backend_service", _backend_service_edge_evidence(backend_service)),
+                        evidence_item(
+                            "frontend_load_balancers",
+                            backend_facts.internet_facing_load_balancer_addresses,
+                        ),
+                        evidence_item(
+                            "load_balancer_paths",
+                            _load_balancer_path_evidence(backend_facts.load_balancer_frontends),
+                        ),
+                        evidence_item(
+                            "edge_protection_policy",
+                            _backend_service_edge_protection_evidence(backend_service, policy_state),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_compute_os_login_disabled(
         self,
         context: RuleEvaluationContext,
@@ -434,6 +496,44 @@ def _ssl_policy_rationale(
         "GCP SSL policy. tfSTRIDE cannot prove the public frontend enforces a modern minimum TLS version from "
         "the available plan data."
     )
+
+
+def _backend_service_edge_protection_state(backend_service: NormalizedResource) -> str:
+    facts = gcp_facts(backend_service)
+    if facts.load_balancer_backend_service_security_policy or facts.load_balancer_backend_service_edge_security_policy:
+        return "configured"
+    if facts.edge_protection_posture_uncertainties:
+        return "unknown"
+    return "missing"
+
+
+def _backend_service_edge_evidence(backend_service: NormalizedResource) -> list[str]:
+    facts = gcp_facts(backend_service)
+    values = [f"address={backend_service.address}", f"type={backend_service.resource_type}"]
+    if facts.load_balancer_backend_service_protocol:
+        values.append(f"protocol={facts.load_balancer_backend_service_protocol}")
+    if facts.load_balancer_backend_service_load_balancing_scheme:
+        values.append(f"scheme={facts.load_balancer_backend_service_load_balancing_scheme}")
+    values.append("fronted_by_internet_facing_load_balancer=true")
+    return values
+
+
+def _backend_service_edge_protection_evidence(
+    backend_service: NormalizedResource,
+    policy_state: str,
+) -> list[str]:
+    facts = gcp_facts(backend_service)
+    values = [f"edge_protection_state={policy_state}"]
+    if facts.load_balancer_backend_service_security_policy:
+        values.append(f"security_policy={facts.load_balancer_backend_service_security_policy}")
+    else:
+        values.append("security_policy is unset")
+    if facts.load_balancer_backend_service_edge_security_policy:
+        values.append(f"edge_security_policy={facts.load_balancer_backend_service_edge_security_policy}")
+    else:
+        values.append("edge_security_policy is unset")
+    values.extend(facts.edge_protection_posture_uncertainties)
+    return values
 
 
 def _load_balancer_frontend_boundary(

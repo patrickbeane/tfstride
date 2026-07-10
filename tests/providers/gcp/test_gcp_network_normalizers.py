@@ -682,6 +682,8 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
         policy_facts = gcp_facts(security_policy)
 
         self.assertEqual(backend_service.category, ResourceCategory.EDGE)
+        self.assertEqual(backend_facts.load_balancer_backend_service_protocol, "HTTP")
+        self.assertEqual(backend_facts.load_balancer_backend_service_load_balancing_scheme, "EXTERNAL_MANAGED")
         self.assertEqual(
             backend_facts.load_balancer_backend_service_security_policy,
             "google_compute_security_policy.edge.id",

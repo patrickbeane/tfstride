@@ -304,6 +304,17 @@ GCP_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-public-load-balancer-cloud-armor-missing",
+        title="Public GCP load balancer backend lacks Cloud Armor policy",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Attach a Cloud Armor security policy or edge security policy to public GCP backend services and keep "
+            "the policy reference deterministic in Terraform so public edge protection is reviewable."
+        ),
+        tags=("gcp", "load-balancer", "cloud-armor", "waf", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-compute-os-login-disabled",
         title="GCP compute instance disables OS Login",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

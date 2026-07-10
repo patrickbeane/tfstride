@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 180,
+      "registered_rule_count": 181,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -115,6 +115,7 @@
         "gcp-public-load-balanced-workload",
         "gcp-load-balancer-http-public-proxy",
         "gcp-load-balancer-ssl-policy-missing-or-weak",
+        "gcp-public-load-balancer-cloud-armor-missing",
         "gcp-compute-os-login-disabled",
         "gcp-gke-public-control-plane",
         "gcp-gke-broad-authorized-networks",
@@ -299,6 +300,7 @@
         "gcp-public-load-balanced-workload": 0,
         "gcp-load-balancer-http-public-proxy": 0,
         "gcp-load-balancer-ssl-policy-missing-or-weak": 0,
+        "gcp-public-load-balancer-cloud-armor-missing": 0,
         "gcp-compute-os-login-disabled": 0,
         "gcp-gke-public-control-plane": 0,
         "gcp-gke-broad-authorized-networks": 0,

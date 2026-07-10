@@ -764,6 +764,14 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.LOAD_BALANCER_REACHABLE_BACKENDS)
 
     @property
+    def load_balancer_backend_service_protocol(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_PROTOCOL)
+
+    @property
+    def load_balancer_backend_service_load_balancing_scheme(self) -> str | None:
+        return self.get(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_LOAD_BALANCING_SCHEME)
+
+    @property
     def load_balancer_backend_service_security_policy(self) -> str | None:
         return self.get(GcpResourceMetadata.LOAD_BALANCER_BACKEND_SERVICE_SECURITY_POLICY)
 
