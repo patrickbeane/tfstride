@@ -5,9 +5,10 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 
 
-class AzureNetworkFacts:
+class AzureNetworkFacts(AzureBaseFacts):
     __slots__ = ()
 
     @property

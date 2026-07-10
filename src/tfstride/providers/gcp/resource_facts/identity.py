@@ -7,10 +7,11 @@ from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts.base import GcpBaseFacts
 from tfstride.providers.gcp.resource_utils import service_account_member
 
 
-class GcpIdentityFacts:
+class GcpIdentityFacts(GcpBaseFacts):
     __slots__ = ()
 
     @property

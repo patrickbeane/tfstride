@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts.base import GcpBaseFacts
 
 
-class GcpNetworkFacts:
+class GcpNetworkFacts(GcpBaseFacts):
     __slots__ = ()
 
     @property

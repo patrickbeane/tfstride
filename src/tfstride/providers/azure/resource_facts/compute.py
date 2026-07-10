@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 
 
-class AzureComputeFacts:
+class AzureComputeFacts(AzureBaseFacts):
     __slots__ = ()
 
     @property

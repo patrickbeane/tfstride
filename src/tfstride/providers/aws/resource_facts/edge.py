@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.providers.aws.metadata import AwsResourceMetadata
-from tfstride.providers.aws.resource_facts.base import _bool_from_state
+from tfstride.providers.aws.resource_facts.base import AwsBaseFacts, _bool_from_state
 
 
-class AwsEdgeFacts:
+class AwsEdgeFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property

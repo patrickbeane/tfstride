@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts.base import GcpBaseFacts
 
 
-class GcpComputeFacts:
+class GcpComputeFacts(GcpBaseFacts):
     __slots__ = ()
 
     @property

@@ -6,9 +6,10 @@ from typing import Any
 from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.providers.aws.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.aws.resource_facts.base import AwsBaseFacts
 
 
-class AwsIdentityFacts:
+class AwsIdentityFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property

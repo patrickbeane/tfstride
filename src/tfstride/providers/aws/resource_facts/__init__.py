@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts.audit import AwsAuditFacts
-from tfstride.providers.aws.resource_facts.base import AwsBaseFacts
 from tfstride.providers.aws.resource_facts.compute import AwsComputeFacts
 from tfstride.providers.aws.resource_facts.data import AwsDataFacts
 from tfstride.providers.aws.resource_facts.edge import AwsEdgeFacts
@@ -21,7 +20,6 @@ class AwsResourceFacts(
     AwsEdgeFacts,
     AwsDataFacts,
     AwsAuditFacts,
-    AwsBaseFacts,
 ):
     __slots__ = ()
 

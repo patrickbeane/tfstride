@@ -4,9 +4,10 @@ from collections.abc import Sequence
 from typing import Any
 
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.aws.resource_facts.base import AwsBaseFacts
 
 
-class AwsIamFacts:
+class AwsIamFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property

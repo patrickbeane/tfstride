@@ -5,9 +5,10 @@ from collections.abc import Sequence
 from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.providers.azure.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 
 
-class AzureIdentityFacts:
+class AzureIdentityFacts(AzureBaseFacts):
     __slots__ = ()
 
     @property

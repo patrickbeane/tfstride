@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 
 
-class AzurePostgresqlFacts:
+class AzurePostgresqlFacts(AzureBaseFacts):
     __slots__ = ()
 
     @property

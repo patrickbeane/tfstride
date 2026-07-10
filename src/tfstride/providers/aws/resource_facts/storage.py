@@ -4,13 +4,13 @@ from collections.abc import Sequence
 from typing import Any
 
 from tfstride.providers.aws.metadata import AwsResourceMetadata
-from tfstride.providers.aws.resource_facts.base import _bool_from_state
+from tfstride.providers.aws.resource_facts.base import AwsBaseFacts, _bool_from_state
 
 _S3_BUCKET_KEY_ENABLED = "enabled"
 _S3_BUCKET_KEY_DISABLED = "disabled"
 
 
-class AwsStorageFacts:
+class AwsStorageFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property

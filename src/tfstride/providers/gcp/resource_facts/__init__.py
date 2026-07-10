@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.resource_facts.audit import GcpAuditFacts
-from tfstride.providers.gcp.resource_facts.base import GcpBaseFacts
 from tfstride.providers.gcp.resource_facts.cloud_sql import GcpCloudSqlFacts
 from tfstride.providers.gcp.resource_facts.compute import GcpComputeFacts
 from tfstride.providers.gcp.resource_facts.edge import GcpEdgeFacts
@@ -27,7 +26,6 @@ class GcpResourceFacts(
     GcpGkeFacts,
     GcpAuditFacts,
     GcpEdgeFacts,
-    GcpBaseFacts,
 ):
     __slots__ = ()
 

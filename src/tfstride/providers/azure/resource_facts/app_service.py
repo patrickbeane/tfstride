@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.providers.azure.metadata import AzureResourceMetadata
+from tfstride.providers.azure.resource_facts.base import AzureBaseFacts
 
 
-class AzureAppServiceFacts:
+class AzureAppServiceFacts(AzureBaseFacts):
     __slots__ = ()
 
     @property
