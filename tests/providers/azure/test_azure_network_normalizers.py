@@ -479,6 +479,129 @@ class AzureNetworkNormalizerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(facts.application_gateway_routing_rules[0]["priority"], "100")
+        self.assertEqual(facts.application_gateway_edge_protection_state, "not_configured")
+        self.assertEqual(facts.application_gateway_waf_enabled_state, "not_configured")
+        self.assertEqual(facts.application_gateway_waf_configurations, [])
+
+    def test_application_gateway_normalizes_waf_policy_and_configuration(self) -> None:
+        gateway = normalize_application_gateway(
+            _resource(
+                AzureResourceType.APPLICATION_GATEWAY,
+                {
+                    "id": "/subscriptions/example/applicationGateways/web",
+                    "name": "web",
+                    "sku": [{"name": "WAF_v2", "tier": "WAF_v2"}],
+                    "firewall_policy_id": "/subscriptions/example/providers/Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies/web",
+                    "waf_configuration": [
+                        {
+                            "enabled": True,
+                            "firewall_mode": "Prevention",
+                            "rule_set_type": "OWASP",
+                            "rule_set_version": "3.2",
+                            "disabled_rule_group": [
+                                {
+                                    "rule_group_name": "REQUEST-920-PROTOCOL-ENFORCEMENT",
+                                    "rules": [920300],
+                                }
+                            ],
+                            "exclusion": [
+                                {
+                                    "match_variable": "RequestHeaderNames",
+                                    "selector": "x-test",
+                                    "selector_match_operator": "Equals",
+                                }
+                            ],
+                        }
+                    ],
+                },
+                name="web",
+            )
+        )
+        facts = azure_facts(gateway)
+
+        self.assertEqual(facts.application_gateway_edge_protection_state, "configured")
+        self.assertEqual(
+            facts.application_gateway_firewall_policy_id,
+            "/subscriptions/example/providers/Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies/web",
+        )
+        self.assertEqual(facts.application_gateway_waf_enabled_state, "enabled")
+        self.assertEqual(facts.application_gateway_waf_mode, "Prevention")
+        self.assertEqual(facts.application_gateway_waf_rule_set_type, "OWASP")
+        self.assertEqual(facts.application_gateway_waf_rule_set_version, "3.2")
+        self.assertEqual(
+            facts.application_gateway_waf_configurations,
+            [
+                {
+                    "enabled": True,
+                    "enabled_state": "enabled",
+                    "firewall_mode": "Prevention",
+                    "rule_set_type": "OWASP",
+                    "rule_set_version": "3.2",
+                    "disabled_rule_group": [{"rule_group_name": "REQUEST-920-PROTOCOL-ENFORCEMENT", "rules": [920300]}],
+                    "exclusion": [
+                        {
+                            "match_variable": "RequestHeaderNames",
+                            "selector": "x-test",
+                            "selector_match_operator": "Equals",
+                        }
+                    ],
+                }
+            ],
+        )
+
+    def test_application_gateway_normalizes_disabled_waf_configuration(self) -> None:
+        gateway = normalize_application_gateway(
+            _resource(
+                AzureResourceType.APPLICATION_GATEWAY,
+                {
+                    "name": "web",
+                    "waf_configuration": [
+                        {
+                            "enabled": False,
+                            "firewall_mode": "Detection",
+                            "rule_set_type": "OWASP",
+                            "rule_set_version": "3.1",
+                        }
+                    ],
+                },
+                name="web",
+            )
+        )
+        facts = azure_facts(gateway)
+
+        self.assertEqual(facts.application_gateway_edge_protection_state, "disabled")
+        self.assertEqual(facts.application_gateway_waf_enabled_state, "disabled")
+        self.assertEqual(facts.application_gateway_waf_mode, "Detection")
+        self.assertEqual(facts.application_gateway_edge_protection_uncertainties, [])
+
+    def test_application_gateway_preserves_unknown_edge_protection_values(self) -> None:
+        gateway = normalize_application_gateway(
+            _resource(
+                AzureResourceType.APPLICATION_GATEWAY,
+                {"name": "pending"},
+                name="pending",
+                unknown_values={"firewall_policy_id": True, "waf_configuration": True},
+            )
+        )
+        facts = azure_facts(gateway)
+
+        self.assertEqual(facts.application_gateway_edge_protection_state, "unknown")
+        self.assertEqual(facts.application_gateway_waf_enabled_state, "unknown")
+        self.assertEqual(facts.application_gateway_waf_configurations, [])
+        self.assertEqual(
+            facts.application_gateway_edge_protection_uncertainties,
+            [
+                "firewall_policy_id is unknown after planning",
+                "waf_configuration is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            facts.application_gateway_posture_uncertainties,
+            [
+                "firewall_policy_id is unknown after planning",
+                "waf_configuration is unknown after planning",
+            ],
+        )
 
     def test_application_gateway_normalizes_private_frontend_exposure(self) -> None:
         gateway = normalize_application_gateway(

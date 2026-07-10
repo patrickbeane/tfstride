@@ -187,6 +187,30 @@ class AzureNetworkFacts:
         return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_EXPOSURE_STATE)
 
     @property
+    def application_gateway_edge_protection_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_EDGE_PROTECTION_STATE)
+
+    @property
+    def application_gateway_firewall_policy_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_FIREWALL_POLICY_ID)
+
+    @property
+    def application_gateway_waf_enabled_state(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_WAF_ENABLED_STATE)
+
+    @property
+    def application_gateway_waf_mode(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_WAF_MODE)
+
+    @property
+    def application_gateway_waf_rule_set_type(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_WAF_RULE_SET_TYPE)
+
+    @property
+    def application_gateway_waf_rule_set_version(self) -> str | None:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_WAF_RULE_SET_VERSION)
+
+    @property
     def application_gateway_public_ip_references(self) -> list[str]:
         return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_PUBLIC_IP_REFERENCES)
 
@@ -211,8 +235,16 @@ class AzureNetworkFacts:
         return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_ROUTING_RULES)
 
     @property
+    def application_gateway_waf_configurations(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_WAF_CONFIGURATIONS)
+
+    @property
     def application_gateway_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_POSTURE_UNCERTAINTIES)
+
+    @property
+    def application_gateway_edge_protection_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APPLICATION_GATEWAY_EDGE_PROTECTION_UNCERTAINTIES)
 
     @property
     def private_dns_zone_id(self) -> str | None:
