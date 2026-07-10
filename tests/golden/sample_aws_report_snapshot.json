@@ -8,19 +8,19 @@
     "normalized_resources": 23,
     "unsupported_resources": 1,
     "trust_boundaries": 9,
-    "active_findings": 13,
-    "total_findings": 13,
+    "active_findings": 14,
+    "total_findings": 14,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "severity_counts": {
       "high": 4,
-      "medium": 9,
+      "medium": 10,
       "low": 0
     }
   },
   "filtering": {
-    "total_findings": 13,
-    "active_findings": 13,
+    "total_findings": 14,
+    "active_findings": 14,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "suppressions_path": null,
@@ -37,13 +37,14 @@
       }
     },
     "rules": {
-      "registered_rule_count": 179,
+      "registered_rule_count": 180,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
         "aws-load-balancer-http-public-listener",
         "aws-load-balancer-listener-tls-certificate-missing",
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
+        "aws-public-alb-waf-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -227,6 +228,7 @@
         "aws-load-balancer-http-public-listener": 0,
         "aws-load-balancer-listener-tls-certificate-missing": 0,
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown": 0,
+        "aws-public-alb-waf-missing": 1,
         "aws-cloudtrail-multi-region-disabled": 0,
         "aws-cloudtrail-log-file-validation-disabled": 0,
         "aws-cloudtrail-management-events-disabled": 0,
@@ -674,6 +676,16 @@
         "aws_s3_bucket.assets"
       ],
       "trust_boundary_id": "internet-to-service:internet->aws_s3_bucket.assets"
+    },
+    {
+      "rule_id": "aws-public-alb-waf-missing",
+      "title": "Public Application Load Balancer is not associated with a WAF Web ACL",
+      "category": "Tampering",
+      "severity": "medium",
+      "affected_resources": [
+        "aws_lb.web"
+      ],
+      "trust_boundary_id": null
     },
     {
       "rule_id": "aws-role-trust-expansion",

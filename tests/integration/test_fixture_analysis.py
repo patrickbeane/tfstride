@@ -98,9 +98,9 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
     def test_fixture_scenarios_have_expected_finding_profiles(self) -> None:
         scenarios = {
             "safe": (SAFE_FIXTURE_PATH, 0, {}),
-            "baseline": (BASELINE_FIXTURE_PATH, 4, {"medium": 4}),
-            "mixed": (FIXTURE_PATH, 13, {"high": 4, "medium": 9}),
-            "nightmare": (NIGHTMARE_FIXTURE_PATH, 23, {"high": 7, "medium": 16}),
+            "baseline": (BASELINE_FIXTURE_PATH, 5, {"medium": 5}),
+            "mixed": (FIXTURE_PATH, 14, {"high": 4, "medium": 10}),
+            "nightmare": (NIGHTMARE_FIXTURE_PATH, 24, {"high": 7, "medium": 17}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
             "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 1, {"medium": 1}),
@@ -124,6 +124,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
                 "VPC Flow Logs are not configured for a modeled VPC": 1,
+                "Public Application Load Balancer is not associated with a WAF Web ACL": 1,
             },
             "mixed": {
                 "Cross-account or broad role trust lacks narrowing conditions": 1,
@@ -138,6 +139,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Workload uses KMS without a VPC endpoint": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
                 "VPC Flow Logs are not configured for a modeled VPC": 1,
+                "Public Application Load Balancer is not associated with a WAF Web ACL": 1,
             },
             "nightmare": {
                 "Cross-account or broad role trust lacks narrowing conditions": 2,
@@ -155,6 +157,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Workload uses KMS without a VPC endpoint": 1,
                 "Workload uses S3 without a VPC endpoint": 1,
                 "VPC Flow Logs are not configured for a modeled VPC": 1,
+                "Public Application Load Balancer is not associated with a WAF Web ACL": 1,
             },
             "gcp-safe": {},
             "gcp-baseline": {

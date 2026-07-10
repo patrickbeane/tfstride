@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **2 findings** across **19 normalized resources**.
+This run identified **4 trust boundaries** and **3 findings** across **19 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `2`
+- Medium severity findings: `3`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **4 trust boundaries** and **2 findings** across **19 normal
 - Provider resources considered: `19`
 - Normalized resources: `19`
 - Unsupported resources: `0`
-- Registered rules: `179`
-- Enabled rules: `179`
+- Registered rules: `180`
+- Enabled rules: `180`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `aws-public-alb-waf-missing`: `1`
   - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-private-data-transitive-exposure`: `1`
 
@@ -65,6 +66,18 @@ This run identified **4 trust boundaries** and **2 findings** across **19 normal
 No findings in this severity band.
 
 ### Medium
+
+#### Public Application Load Balancer is not associated with a WAF Web ACL
+
+- STRIDE category: Tampering
+- Affected resources: `aws_lb.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lb.web is an internet-facing Application Load Balancer, but the Terraform plan does not show a deterministic AWS WAFv2 Web ACL association targeting it. Public edge traffic can reach the ALB without a modeled WAF or edge protection policy.
+- Recommended mitigation: Associate an AWS WAFv2 Web ACL with internet-facing Application Load Balancers and keep the association modeled in Terraform so public edge protection is reviewable before deployment.
+- Evidence:
+  - target load balancer: address=aws_lb.web; type=aws_lb; arn=arn:aws:elasticloadbalancing:us-east-1:333344445555:loadbalancer/app/web-prod/123456; load_balancer_type=application; public_exposure=true; load balancer is internet-facing and attached security groups allow internet ingress
+  - waf association coverage: target_resource_arn=arn:aws:elasticloadbalancing:us-east-1:333344445555:loadbalancer/app/web-prod/123456; resolved_web_acl_association_count=0; modeled_web_acl_association_count=0
 
 #### Sensitive data tier is transitively reachable from an internet-exposed path
 

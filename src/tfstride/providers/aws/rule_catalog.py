@@ -61,6 +61,17 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-public-alb-waf-missing",
+        title="Public Application Load Balancer is not associated with a WAF Web ACL",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Associate an AWS WAFv2 Web ACL with internet-facing Application Load Balancers and keep the "
+            "association modeled in Terraform so public edge protection is reviewable before deployment."
+        ),
+        tags=("aws", "load-balancer", "alb", "waf", "wafv2", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-cloudtrail-multi-region-disabled",
         title="CloudTrail is not configured for multi-region auditing",
         category=StrideCategory.REPUDIATION,

@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **13 findings** across **23 normalized resources**.
+This run identified **9 trust boundaries** and **14 findings** across **23 normalized resources**.
 
 - High severity findings: `4`
-- Medium severity findings: `9`
+- Medium severity findings: `10`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **13 findings** across **23 norma
 - Provider resources considered: `24`
 - Normalized resources: `23`
 - Unsupported resources: `1`
-- Registered rules: `179`
-- Enabled rules: `179`
+- Registered rules: `180`
+- Enabled rules: `180`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -28,6 +28,7 @@ This run identified **9 trust boundaries** and **13 findings** across **23 norma
   - `aws_cloudwatch_log_group`: `1`
 - Findings by rule:
   - `aws-public-compute-broad-ingress`: `1`
+  - `aws-public-alb-waf-missing`: `1`
   - `aws-database-permissive-ingress`: `1`
   - `aws-s3-public-access`: `1`
   - `aws-workload-kms-vpc-endpoint-missing`: `1`
@@ -229,6 +230,18 @@ This run identified **9 trust boundaries** and **13 findings** across **23 norma
 - Recommended mitigation: Remove public ACL or bucket policy access, enable an S3 public access block, and serve content through a controlled CDN or origin access pattern when public distribution is required.
 - Evidence:
   - public exposure reasons: bucket ACL `public-read` grants public access; bucket policy allows anonymous access
+
+#### Public Application Load Balancer is not associated with a WAF Web ACL
+
+- STRIDE category: Tampering
+- Affected resources: `aws_lb.web`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +0, lateral_movement +1, blast_radius +1, final_score 4 => medium
+- Rationale: aws_lb.web is an internet-facing Application Load Balancer, but the Terraform plan does not show a deterministic AWS WAFv2 Web ACL association targeting it. Public edge traffic can reach the ALB without a modeled WAF or edge protection policy.
+- Recommended mitigation: Associate an AWS WAFv2 Web ACL with internet-facing Application Load Balancers and keep the association modeled in Terraform so public edge protection is reviewable before deployment.
+- Evidence:
+  - target load balancer: address=aws_lb.web; type=aws_lb; arn=arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/123456; load_balancer_type=application; public_exposure=true; load balancer is internet-facing and attached security groups allow internet ingress
+  - waf association coverage: target_resource_arn=arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/123456; resolved_web_acl_association_count=0; modeled_web_acl_association_count=0
 
 #### Role trust relationship expands blast radius
 

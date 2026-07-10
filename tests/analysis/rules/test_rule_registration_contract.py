@@ -19,6 +19,7 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-load-balancer-http-public-listener",
         "aws-load-balancer-listener-tls-certificate-missing",
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
+        "aws-public-alb-waf-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -331,9 +332,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (156, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (157, 2, 2, 14, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (38, 2, 2, 3, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (39, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (46, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (72, 0, 0, 0, 0, 0))
 
