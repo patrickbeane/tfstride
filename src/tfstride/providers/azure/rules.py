@@ -29,6 +29,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-public-compute-broad-ingress",
         "azure-load-balancer-public-frontend",
         "azure-application-gateway-public-listener",
+        "azure-public-application-gateway-waf-missing",
         "azure-nsg-flow-logs-not-configured",
         "azure-nsg-flow-log-disabled",
         "azure-nsg-flow-log-destination-missing",
@@ -130,6 +131,9 @@ def build_azure_rule_contribution(
         "azure-load-balancer-public-frontend": (load_balancer_detectors.detect_public_load_balancer_frontend),
         "azure-application-gateway-public-listener": (
             load_balancer_detectors.detect_public_application_gateway_listener
+        ),
+        "azure-public-application-gateway-waf-missing": (
+            load_balancer_detectors.detect_public_application_gateway_waf_missing
         ),
         "azure-nsg-flow-logs-not-configured": network_telemetry_detectors.detect_nsg_flow_logs_not_configured,
         "azure-nsg-flow-log-disabled": network_telemetry_detectors.detect_flow_log_disabled,

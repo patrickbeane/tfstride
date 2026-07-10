@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 181,
+      "registered_rule_count": 182,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -151,6 +151,7 @@
         "azure-public-compute-broad-ingress",
         "azure-load-balancer-public-frontend",
         "azure-application-gateway-public-listener",
+        "azure-public-application-gateway-waf-missing",
         "azure-nsg-flow-logs-not-configured",
         "azure-nsg-flow-log-disabled",
         "azure-nsg-flow-log-destination-missing",
@@ -336,6 +337,7 @@
         "azure-public-compute-broad-ingress": 0,
         "azure-load-balancer-public-frontend": 0,
         "azure-application-gateway-public-listener": 0,
+        "azure-public-application-gateway-waf-missing": 0,
         "azure-nsg-flow-logs-not-configured": 0,
         "azure-nsg-flow-log-disabled": 0,
         "azure-nsg-flow-log-destination-missing": 0,

@@ -38,6 +38,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-public-application-gateway-waf-missing",
+        title="Public Azure Application Gateway listener lacks modeled WAF protection",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Attach an Application Gateway WAF policy or enable Application Gateway WAF configuration for public "
+            "listeners, keep the policy reference deterministic in Terraform, and review WAF mode and exclusions "
+            "separately for policy depth."
+        ),
+        tags=("azure", "network", "application-gateway", "waf", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-nsg-flow-logs-not-configured",
         title="Azure Network Security Group lacks flow-log coverage",
         category=StrideCategory.REPUDIATION,

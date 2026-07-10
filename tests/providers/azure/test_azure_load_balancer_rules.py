@@ -12,6 +12,7 @@ from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 _LOAD_BALANCER_RULE_IDS = (
     "azure-load-balancer-public-frontend",
     "azure-application-gateway-public-listener",
+    "azure-public-application-gateway-waf-missing",
 )
 
 
@@ -56,6 +57,9 @@ def _application_gateway(
     frontend: dict[str, object] | None = None,
     listeners: list[dict[str, object]] | None = None,
     routing_rules: list[dict[str, object]] | None = None,
+    firewall_policy_id: str | None = None,
+    waf_configuration: list[dict[str, object]] | None = None,
+    unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
         "id": f"/subscriptions/example/resourceGroups/app/providers/Microsoft.Network/applicationGateways/{name}",
@@ -69,7 +73,11 @@ def _application_gateway(
         values["http_listener"] = listeners
     if routing_rules is not None:
         values["request_routing_rule"] = routing_rules
-    return _resource(AzureResourceType.APPLICATION_GATEWAY, name, values)
+    if firewall_policy_id is not None:
+        values["firewall_policy_id"] = firewall_policy_id
+    if waf_configuration is not None:
+        values["waf_configuration"] = waf_configuration
+    return _resource(AzureResourceType.APPLICATION_GATEWAY, name, values, unknown_values=unknown_values)
 
 
 def _evaluate(resources: list[TerraformResource], *rule_ids: str):
@@ -262,6 +270,180 @@ class AzureLoadBalancerRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+    def test_public_application_gateway_without_waf_emits_edge_protection_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _application_gateway(
+                    frontend={
+                        "name": "public",
+                        "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                    },
+                    listeners=[
+                        {
+                            "name": "https",
+                            "frontend_ip_configuration_name": "public",
+                            "frontend_port_name": "https",
+                            "protocol": "Https",
+                            "host_names": ["app.example.com"],
+                        }
+                    ],
+                    routing_rules=[
+                        {
+                            "name": "default",
+                            "rule_type": "Basic",
+                            "http_listener_name": "https",
+                            "backend_address_pool_name": "app",
+                            "backend_http_settings_name": "https",
+                            "priority": 100,
+                        }
+                    ],
+                )
+            ],
+            "azure-public-application-gateway-waf-missing",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-public-application-gateway-waf-missing"])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(finding.affected_resources, ["azurerm_application_gateway.web"])
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["edge_protection_policy"],
+            [
+                "edge_protection_state=not_configured",
+                "firewall_policy_id is unset",
+                "waf_enabled_state=not_configured",
+            ],
+        )
+        self.assertEqual(
+            evidence["public_listeners"],
+            ["listener https uses frontend=public protocol=Https host_names=app.example.com"],
+        )
+        self.assertIn("without a modeled WAF policy", finding.rationale)
+
+    def test_public_application_gateway_with_firewall_policy_is_quiet(self) -> None:
+        self.assertEqual(
+            _evaluate(
+                [
+                    _application_gateway(
+                        frontend={
+                            "name": "public",
+                            "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                        },
+                        listeners=[
+                            {
+                                "name": "https",
+                                "frontend_ip_configuration_name": "public",
+                                "protocol": "Https",
+                            }
+                        ],
+                        firewall_policy_id=(
+                            "/subscriptions/example/providers/Microsoft.Network/"
+                            "ApplicationGatewayWebApplicationFirewallPolicies/web"
+                        ),
+                    )
+                ],
+                "azure-public-application-gateway-waf-missing",
+            ),
+            [],
+        )
+
+    def test_public_application_gateway_with_enabled_waf_configuration_is_quiet(self) -> None:
+        self.assertEqual(
+            _evaluate(
+                [
+                    _application_gateway(
+                        frontend={
+                            "name": "public",
+                            "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                        },
+                        listeners=[
+                            {
+                                "name": "https",
+                                "frontend_ip_configuration_name": "public",
+                                "protocol": "Https",
+                            }
+                        ],
+                        waf_configuration=[
+                            {
+                                "enabled": True,
+                                "firewall_mode": "Prevention",
+                                "rule_set_type": "OWASP",
+                                "rule_set_version": "3.2",
+                            }
+                        ],
+                    )
+                ],
+                "azure-public-application-gateway-waf-missing",
+            ),
+            [],
+        )
+
+    def test_public_application_gateway_with_disabled_waf_configuration_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _application_gateway(
+                    frontend={
+                        "name": "public",
+                        "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                    },
+                    listeners=[
+                        {
+                            "name": "https",
+                            "frontend_ip_configuration_name": "public",
+                            "protocol": "Https",
+                        }
+                    ],
+                    waf_configuration=[
+                        {
+                            "enabled": False,
+                            "firewall_mode": "Detection",
+                            "rule_set_type": "OWASP",
+                            "rule_set_version": "3.1",
+                        }
+                    ],
+                )
+            ],
+            "azure-public-application-gateway-waf-missing",
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], ["azure-public-application-gateway-waf-missing"])
+        self.assertEqual(
+            _evidence_by_key(findings[0])["edge_protection_policy"],
+            [
+                "edge_protection_state=disabled",
+                "firewall_policy_id is unset",
+                "waf_enabled_state=disabled",
+                "waf_mode=Detection",
+                "waf_rule_set=OWASP/3.1",
+                "waf_configuration enabled_state=disabled mode=Detection rule_set=OWASP/3.1",
+            ],
+        )
+
+    def test_unknown_application_gateway_edge_protection_stays_quiet(self) -> None:
+        self.assertEqual(
+            _evaluate(
+                [
+                    _application_gateway(
+                        frontend={
+                            "name": "public",
+                            "public_ip_address_id": "azurerm_public_ip.gateway.id",
+                        },
+                        listeners=[
+                            {
+                                "name": "https",
+                                "frontend_ip_configuration_name": "public",
+                                "protocol": "Https",
+                            }
+                        ],
+                        unknown_values={"firewall_policy_id": True, "waf_configuration": True},
+                    )
+                ],
+                "azure-public-application-gateway-waf-missing",
+            ),
+            [],
+        )
 
     def test_load_balancer_rule_ids_are_registered_with_azure_rule_group(self) -> None:
         registered = tuple(rule_id for group in AZURE_RULE_GROUP_IDS for rule_id in group)

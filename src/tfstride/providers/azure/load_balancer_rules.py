@@ -102,6 +102,110 @@ class AzureLoadBalancerRuleDetectors:
             )
         return findings
 
+    def detect_public_application_gateway_waf_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for gateway in context.inventory.by_type(AzureResourceType.APPLICATION_GATEWAY):
+            facts = azure_facts(gateway)
+            public_listener_records = _public_application_gateway_listeners(facts)
+            if facts.application_gateway_exposure_state != _EXPOSURE_PUBLIC or not public_listener_records:
+                continue
+            edge_protection_state = _application_gateway_edge_protection_state(facts)
+            if edge_protection_state in {"configured", "unknown"}:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[gateway.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{gateway.display_name} has an Application Gateway listener attached to a public "
+                        "frontend, but the Terraform plan does not show a deterministic firewall policy or enabled "
+                        "WAF configuration. Public edge traffic can reach the listener without a modeled WAF policy."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(gateway)),
+                        evidence_item("frontend_exposure", _application_gateway_frontend_evidence(facts)),
+                        evidence_item("public_listeners", _listener_evidence(public_listener_records)),
+                        evidence_item("routing_rules", _routing_rule_evidence(facts, public_listener_records)),
+                        evidence_item(
+                            "edge_protection_policy",
+                            _application_gateway_edge_protection_evidence(facts, edge_protection_state),
+                        ),
+                        evidence_item("posture_uncertainty", facts.application_gateway_posture_uncertainties),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+
+def _application_gateway_edge_protection_state(facts: AzureResourceFacts) -> str:
+    return facts.application_gateway_edge_protection_state or "not_configured"
+
+
+def _application_gateway_edge_protection_evidence(
+    facts: AzureResourceFacts,
+    edge_protection_state: str,
+) -> list[str]:
+    evidence = [f"edge_protection_state={edge_protection_state}"]
+    if facts.application_gateway_firewall_policy_id:
+        evidence.append(f"firewall_policy_id={facts.application_gateway_firewall_policy_id}")
+    else:
+        evidence.append("firewall_policy_id is unset")
+    waf_enabled_state = facts.application_gateway_waf_enabled_state or "not_configured"
+    evidence.append(f"waf_enabled_state={waf_enabled_state}")
+    if facts.application_gateway_waf_mode:
+        evidence.append(f"waf_mode={facts.application_gateway_waf_mode}")
+    rule_set = _application_gateway_waf_rule_set(facts)
+    if rule_set:
+        evidence.append(f"waf_rule_set={rule_set}")
+    evidence.extend(_waf_configuration_evidence(facts.application_gateway_waf_configurations))
+    return evidence
+
+
+def _application_gateway_waf_rule_set(facts: AzureResourceFacts) -> str | None:
+    rule_set_type = facts.application_gateway_waf_rule_set_type
+    rule_set_version = facts.application_gateway_waf_rule_set_version
+    if rule_set_type and rule_set_version:
+        return f"{rule_set_type}/{rule_set_version}"
+    return rule_set_type or rule_set_version
+
+
+def _waf_configuration_evidence(records: list[dict]) -> list[str]:
+    evidence: list[str] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        values = []
+        enabled_state = record.get("enabled_state")
+        if enabled_state:
+            values.append(f"enabled_state={enabled_state}")
+        firewall_mode = record.get("firewall_mode")
+        if firewall_mode:
+            values.append(f"mode={firewall_mode}")
+        rule_set_type = record.get("rule_set_type") or "unknown"
+        rule_set_version = record.get("rule_set_version") or "unknown"
+        if record.get("rule_set_type") or record.get("rule_set_version"):
+            values.append(f"rule_set={rule_set_type}/{rule_set_version}")
+        if values:
+            evidence.append("waf_configuration " + " ".join(values))
+    return evidence
+
 
 def _target_resource_evidence(resource: NormalizedResource) -> list[str]:
     return [f"address={resource.address}", f"resource_type={resource.resource_type}"]

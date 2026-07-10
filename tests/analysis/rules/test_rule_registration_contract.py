@@ -82,6 +82,7 @@ EXPECTED_AZURE_RULE_GROUP_IDS = (
         "azure-public-compute-broad-ingress",
         "azure-load-balancer-public-frontend",
         "azure-application-gateway-public-listener",
+        "azure-public-application-gateway-waf-missing",
         "azure-nsg-flow-logs-not-configured",
         "azure-nsg-flow-log-disabled",
         "azure-nsg-flow-log-destination-missing",
@@ -333,11 +334,11 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (158, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (159, 2, 2, 14, 3, 2)
         )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (39, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (47, 0, 0, 11, 1, 0))
-        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (72, 0, 0, 0, 0, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (73, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:
         rule_ids = _flatten(EXPECTED_DEFAULT_RULE_GROUP_IDS)
