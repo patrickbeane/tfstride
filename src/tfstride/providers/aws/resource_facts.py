@@ -1133,6 +1133,26 @@ class AwsResourceFacts:
         return _bool_from_state(self.rds_multi_az_state)
 
     @property
+    def rds_performance_insights_enabled_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_PERFORMANCE_INSIGHTS_ENABLED_STATE)
+
+    @property
+    def rds_performance_insights_enabled(self) -> bool | None:
+        return _bool_from_state(self.rds_performance_insights_enabled_state)
+
+    @property
+    def rds_enabled_cloudwatch_logs_exports(self) -> list[str]:
+        return self.get(AwsResourceMetadata.RDS_ENABLED_CLOUDWATCH_LOGS_EXPORTS)
+
+    @property
+    def rds_iam_database_authentication_enabled_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.RDS_IAM_DATABASE_AUTHENTICATION_ENABLED_STATE)
+
+    @property
+    def rds_iam_database_authentication_enabled(self) -> bool | None:
+        return _bool_from_state(self.rds_iam_database_authentication_enabled_state)
+
+    @property
     def rds_kms_key_id(self) -> str | None:
         return self.get(AwsResourceMetadata.RDS_KMS_KEY_ID)
 

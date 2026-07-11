@@ -47,6 +47,9 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "backup_retention_period": 14,
                 "deletion_protection": True,
                 "multi_az": False,
+                "performance_insights_enabled": True,
+                "enabled_cloudwatch_logs_exports": ["postgresql", "upgrade"],
+                "iam_database_authentication_enabled": True,
                 "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/rds",
                 "storage_encrypted": True,
                 "vpc_security_group_ids": ["sg-db"],
@@ -70,6 +73,11 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertTrue(facts.rds_deletion_protection)
         self.assertEqual(facts.rds_multi_az_state, "disabled")
         self.assertFalse(facts.rds_multi_az)
+        self.assertEqual(facts.rds_performance_insights_enabled_state, "enabled")
+        self.assertTrue(facts.rds_performance_insights_enabled)
+        self.assertEqual(facts.rds_enabled_cloudwatch_logs_exports, ["postgresql", "upgrade"])
+        self.assertEqual(facts.rds_iam_database_authentication_enabled_state, "enabled")
+        self.assertTrue(facts.rds_iam_database_authentication_enabled)
         self.assertEqual(facts.rds_kms_key_id, "arn:aws:kms:us-east-1:111122223333:key/rds")
         self.assertEqual(facts.rds_posture_uncertainties, [])
 
@@ -83,6 +91,11 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertIsNone(facts.rds_deletion_protection)
         self.assertEqual(facts.rds_multi_az_state, "unknown")
         self.assertIsNone(facts.rds_multi_az)
+        self.assertEqual(facts.rds_performance_insights_enabled_state, "unknown")
+        self.assertIsNone(facts.rds_performance_insights_enabled)
+        self.assertEqual(facts.rds_enabled_cloudwatch_logs_exports, [])
+        self.assertEqual(facts.rds_iam_database_authentication_enabled_state, "unknown")
+        self.assertIsNone(facts.rds_iam_database_authentication_enabled)
         self.assertIsNone(facts.rds_kms_key_id)
         self.assertEqual(facts.rds_posture_uncertainties, [])
 
@@ -96,6 +109,9 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "deletion_protection": True,
                 "multi_az": True,
                 "kms_key_id": True,
+                "performance_insights_enabled": True,
+                "enabled_cloudwatch_logs_exports": True,
+                "iam_database_authentication_enabled": True,
             },
         )
 
@@ -106,6 +122,11 @@ class AwsDataNormalizerTests(unittest.TestCase):
         self.assertEqual(facts.rds_deletion_protection_state, "unknown")
         self.assertEqual(facts.rds_multi_az_state, "unknown")
         self.assertIsNone(facts.rds_kms_key_id)
+        self.assertEqual(facts.rds_performance_insights_enabled_state, "unknown")
+        self.assertIsNone(facts.rds_performance_insights_enabled)
+        self.assertEqual(facts.rds_enabled_cloudwatch_logs_exports, [])
+        self.assertEqual(facts.rds_iam_database_authentication_enabled_state, "unknown")
+        self.assertIsNone(facts.rds_iam_database_authentication_enabled)
         self.assertEqual(
             facts.rds_posture_uncertainties,
             [
@@ -114,6 +135,9 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "multi_az is unknown after planning",
                 "backup_retention_period is unknown after planning",
                 "kms_key_id is unknown after planning",
+                "performance_insights_enabled is unknown after planning",
+                "enabled_cloudwatch_logs_exports is unknown after planning",
+                "iam_database_authentication_enabled is unknown after planning",
             ],
         )
 

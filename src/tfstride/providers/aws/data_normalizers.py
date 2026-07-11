@@ -19,6 +19,7 @@ from tfstride.providers.coercion import (
     known_block_string,
     known_bool,
     known_string,
+    known_string_list,
 )
 from tfstride.providers.json_documents import load_json_document
 from tfstride.resource_helpers import policy_allows_public_access
@@ -115,6 +116,21 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
                 unknown_values,
                 "kms_key_id",
                 uncertainties,
+            ),
+            AwsResourceMetadata.RDS_PERFORMANCE_INSIGHTS_ENABLED_STATE: _rds_bool_state(
+                known_bool(values, unknown_values, "performance_insights_enabled", uncertainties, allow_string=False)
+            ),
+            AwsResourceMetadata.RDS_ENABLED_CLOUDWATCH_LOGS_EXPORTS: known_string_list(
+                values, unknown_values, "enabled_cloudwatch_logs_exports", uncertainties
+            ),
+            AwsResourceMetadata.RDS_IAM_DATABASE_AUTHENTICATION_ENABLED_STATE: _rds_bool_state(
+                known_bool(
+                    values,
+                    unknown_values,
+                    "iam_database_authentication_enabled",
+                    uncertainties,
+                    allow_string=False,
+                )
             ),
             AwsResourceMetadata.RDS_POSTURE_UNCERTAINTIES: uncertainties,
             "db_subnet_group_name": values.get("db_subnet_group_name"),

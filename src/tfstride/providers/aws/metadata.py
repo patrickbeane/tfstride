@@ -56,6 +56,7 @@ class AwsResourceMetadata:
     UNRESOLVED_BUCKET_REFERENCES = StringListMetadataField("unresolved_bucket_references")
     S3_POSTURE_UNCERTAINTIES = StringListMetadataField("s3_posture_uncertainties")
     RDS_POSTURE_UNCERTAINTIES = StringListMetadataField("rds_posture_uncertainties")
+    RDS_ENABLED_CLOUDWATCH_LOGS_EXPORTS = StringListMetadataField("rds_enabled_cloudwatch_logs_exports")
     KMS_POSTURE_UNCERTAINTIES = StringListMetadataField("kms_posture_uncertainties")
     EKS_PUBLIC_ACCESS_CIDRS = StringListMetadataField("eks_public_access_cidrs")
     EKS_SUBNET_IDS = StringListMetadataField("eks_subnet_ids")
@@ -260,6 +261,10 @@ class AwsResourceMetadata:
     RDS_DELETION_PROTECTION_STATE = OptionalStringMetadataField("rds_deletion_protection_state")
     RDS_MULTI_AZ_STATE = OptionalStringMetadataField("rds_multi_az_state")
     RDS_KMS_KEY_ID = OptionalStringMetadataField("rds_kms_key_id")
+    RDS_PERFORMANCE_INSIGHTS_ENABLED_STATE = OptionalStringMetadataField("rds_performance_insights_enabled_state")
+    RDS_IAM_DATABASE_AUTHENTICATION_ENABLED_STATE = OptionalStringMetadataField(
+        "rds_iam_database_authentication_enabled_state"
+    )
     KMS_KEY_USAGE = OptionalStringMetadataField("kms_key_usage")
     KMS_KEY_SPEC = OptionalStringMetadataField("kms_key_spec")
     KMS_CUSTOMER_MASTER_KEY_SPEC = OptionalStringMetadataField("kms_customer_master_key_spec")
