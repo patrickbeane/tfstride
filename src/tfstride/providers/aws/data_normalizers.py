@@ -286,6 +286,86 @@ def normalize_s3_bucket_server_side_encryption_configuration(resource: Terraform
     )
 
 
+def normalize_s3_bucket_object_lock_configuration(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    enabled_value = known_string(values, unknown_values, "object_lock_enabled", uncertainties)
+    enabled_state = _s3_object_lock_enabled_state(enabled_value, uncertainties)
+    rule = first_mapping(values.get("rule"), scan_all=True)
+    unknown_rule = first_mapping(unknown_values.get("rule"), scan_all=True)
+    default_retention = first_mapping(rule.get("default_retention"), scan_all=True) if rule else None
+    unknown_default_retention = (
+        first_mapping(unknown_rule.get("default_retention"), scan_all=True) if unknown_rule else None
+    )
+    mode = known_block_string(
+        default_retention,
+        unknown_default_retention,
+        "mode",
+        uncertainties,
+        path="rule.default_retention",
+    )
+    days = known_block_int(
+        default_retention,
+        unknown_default_retention,
+        "days",
+        uncertainties,
+        path="rule.default_retention",
+    )
+    years = known_block_int(
+        default_retention,
+        unknown_default_retention,
+        "years",
+        uncertainties,
+        path="rule.default_retention",
+    )
+    if rule is None and unknown_values.get("rule") is True:
+        uncertainties.append("rule is unknown after planning")
+    if default_retention is None and unknown_rule and unknown_rule.get("default_retention") is True:
+        uncertainties.append("rule.default_retention is unknown after planning")
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("bucket") or resource.address,
+        metadata={
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.S3_OBJECT_LOCK_ENABLED_STATE: enabled_state,
+            AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_MODE: mode,
+            AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_DAYS: days,
+            AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_YEARS: years,
+            AwsResourceMetadata.S3_OBJECT_LOCK_CONFIGURATION: _s3_object_lock_configuration(enabled_value, rule),
+            AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def normalize_s3_bucket_lifecycle_configuration(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    rules = _s3_lifecycle_rules(values.get("rule"), unknown_values.get("rule"), uncertainties)
+    rule_count = None if unknown_values.get("rule") is True else len(rules)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("bucket") or resource.address,
+        metadata={
+            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.S3_LIFECYCLE_RULES: rules,
+            AwsResourceMetadata.S3_LIFECYCLE_RULE_COUNT: rule_count,
+            AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
 def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     unknown_values = resource.unknown_values
@@ -497,6 +577,61 @@ def _kms_rotation_state(
     if len(uncertainties) > previous_uncertainty_count:
         return _KMS_STATE_UNKNOWN
     return _KMS_STATE_DISABLED
+
+
+def _s3_object_lock_enabled_state(value: str | None, uncertainties: list[str]) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized == _KMS_STATE_ENABLED:
+        return _KMS_STATE_ENABLED
+    if normalized == _KMS_STATE_DISABLED:
+        return _KMS_STATE_DISABLED
+    uncertainties.append("object_lock_enabled has an unrecognized value")
+    return None
+
+
+def _s3_object_lock_configuration(enabled_value: str | None, rule: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    configuration: dict[str, Any] = {}
+    if enabled_value is not None:
+        configuration["object_lock_enabled"] = enabled_value
+    if rule is not None:
+        configuration["rule"] = [dict(rule)]
+    return configuration or None
+
+
+def _s3_lifecycle_rules(
+    rule_value: Any,
+    unknown_rule_value: Any,
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    if unknown_rule_value is True:
+        uncertainties.append("rule is unknown after planning")
+        return []
+
+    rule_blocks = as_list(rule_value)
+    unknown_blocks = as_list(unknown_rule_value)
+    rules: list[dict[str, Any]] = []
+    for index, rule in enumerate(rule_blocks):
+        if not isinstance(rule, Mapping):
+            uncertainties.append(f"rule[{index}] has an unrecognized value shape")
+            continue
+        unknown_block = unknown_blocks[index] if index < len(unknown_blocks) else None
+        if unknown_block is True:
+            uncertainties.append(f"rule[{index}] is unknown after planning")
+            continue
+        evidence = dict(rule)
+        unknown_fields = _unknown_field_names(unknown_block)
+        if unknown_fields:
+            evidence["unknown_fields"] = unknown_fields
+        rules.append(evidence)
+    return rules
+
+
+def _unknown_field_names(unknown_block: Any) -> list[str]:
+    if not isinstance(unknown_block, Mapping):
+        return []
+    return sorted(str(key) for key, value in unknown_block.items() if value is True)
 
 
 def _secrets_manager_rotation_rules(rotation_rules: Mapping[str, Any] | None) -> dict[str, Any] | None:

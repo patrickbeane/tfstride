@@ -149,6 +149,8 @@ AWS support currently includes:
 * `aws_lb_target_group`
 * `aws_db_instance`
 * `aws_s3_bucket`
+* `aws_s3_bucket_lifecycle_configuration`
+* `aws_s3_bucket_object_lock_configuration`
 * `aws_s3_bucket_policy`
 * `aws_s3_bucket_public_access_block`
 * `aws_s3_bucket_versioning`

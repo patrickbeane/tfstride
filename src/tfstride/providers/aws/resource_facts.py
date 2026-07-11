@@ -869,6 +869,46 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION)
 
     @property
+    def s3_object_lock_enabled_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_ENABLED_STATE)
+
+    @property
+    def s3_object_lock_enabled(self) -> bool | None:
+        return _bool_from_state(self.s3_object_lock_enabled_state)
+
+    @property
+    def s3_object_lock_default_retention_mode(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_MODE)
+
+    @property
+    def s3_object_lock_default_retention_days(self) -> int | None:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_DAYS)
+
+    @property
+    def s3_object_lock_default_retention_years(self) -> int | None:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_YEARS)
+
+    @property
+    def s3_object_lock_source_address(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_SOURCE_ADDRESS)
+
+    @property
+    def s3_object_lock_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.S3_OBJECT_LOCK_CONFIGURATION)
+
+    @property
+    def s3_lifecycle_rules(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.S3_LIFECYCLE_RULES)
+
+    @property
+    def s3_lifecycle_rule_count(self) -> int | None:
+        return self.get(AwsResourceMetadata.S3_LIFECYCLE_RULE_COUNT)
+
+    @property
+    def s3_lifecycle_source_address(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_LIFECYCLE_SOURCE_ADDRESS)
+
+    @property
     def s3_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES)
 
@@ -1142,6 +1182,34 @@ class AwsResourceFacts:
         self.set(AwsResourceMetadata.S3_BUCKET_KEY_ENABLED_STATE, bucket_key_enabled_state)
         self.set(AwsResourceMetadata.S3_SERVER_SIDE_ENCRYPTION_CONFIGURATION, configuration)
         self.set(AwsResourceMetadata.S3_ENCRYPTION_SOURCE_ADDRESS, source_address)
+
+    def set_s3_object_lock_posture(
+        self,
+        *,
+        enabled_state: str | None,
+        default_retention_mode: str | None,
+        default_retention_days: int | None,
+        default_retention_years: int | None,
+        configuration: dict[str, Any] | None,
+        source_address: str | None,
+    ) -> None:
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_ENABLED_STATE, enabled_state)
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_MODE, default_retention_mode)
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_DAYS, default_retention_days)
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_DEFAULT_RETENTION_YEARS, default_retention_years)
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_CONFIGURATION, configuration)
+        self.set(AwsResourceMetadata.S3_OBJECT_LOCK_SOURCE_ADDRESS, source_address)
+
+    def set_s3_lifecycle_posture(
+        self,
+        *,
+        rules: list[dict[str, Any]],
+        rule_count: int | None,
+        source_address: str | None,
+    ) -> None:
+        self.set(AwsResourceMetadata.S3_LIFECYCLE_RULES, rules)
+        self.set(AwsResourceMetadata.S3_LIFECYCLE_RULE_COUNT, rule_count)
+        self.set(AwsResourceMetadata.S3_LIFECYCLE_SOURCE_ADDRESS, source_address)
 
     def extend_s3_posture_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(AwsResourceMetadata.S3_POSTURE_UNCERTAINTIES, values)

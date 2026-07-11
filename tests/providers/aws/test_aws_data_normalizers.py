@@ -7,6 +7,8 @@ from tfstride.models import TerraformResource
 from tfstride.providers.aws.data_normalizers import (
     normalize_db_instance,
     normalize_kms_key,
+    normalize_s3_bucket_lifecycle_configuration,
+    normalize_s3_bucket_object_lock_configuration,
     normalize_s3_bucket_server_side_encryption_configuration,
     normalize_s3_bucket_versioning,
     normalize_secretsmanager_secret,
@@ -507,6 +509,124 @@ class AwsDataNormalizerTests(unittest.TestCase):
                 "rule.bucket_key_enabled is unknown after planning",
             ],
         )
+
+    def test_s3_object_lock_normalizes_default_retention(self) -> None:
+        resource = _terraform_resource(
+            "aws_s3_bucket_object_lock_configuration",
+            {
+                "id": "logs",
+                "bucket": "logs",
+                "object_lock_enabled": "Enabled",
+                "rule": [{"default_retention": [{"mode": "GOVERNANCE", "days": 30}]}],
+            },
+        )
+
+        normalized = normalize_s3_bucket_object_lock_configuration(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "logs")
+        self.assertEqual(facts.bucket_name, "logs")
+        self.assertEqual(facts.s3_object_lock_enabled_state, "enabled")
+        self.assertTrue(facts.s3_object_lock_enabled)
+        self.assertEqual(facts.s3_object_lock_default_retention_mode, "GOVERNANCE")
+        self.assertEqual(facts.s3_object_lock_default_retention_days, 30)
+        self.assertIsNone(facts.s3_object_lock_default_retention_years)
+        self.assertEqual(
+            facts.s3_object_lock_configuration,
+            {
+                "object_lock_enabled": "Enabled",
+                "rule": [{"default_retention": [{"mode": "GOVERNANCE", "days": 30}]}],
+            },
+        )
+        self.assertEqual(facts.s3_posture_uncertainties, [])
+
+    def test_s3_object_lock_preserves_unknown_fields(self) -> None:
+        resource = _terraform_resource(
+            "aws_s3_bucket_object_lock_configuration",
+            {"bucket": "logs", "rule": [{"default_retention": [{}]}]},
+            unknown_values={
+                "object_lock_enabled": True,
+                "rule": [{"default_retention": [{"mode": True, "days": True, "years": True}]}],
+            },
+        )
+
+        facts = aws_facts(normalize_s3_bucket_object_lock_configuration(resource))
+
+        self.assertIsNone(facts.s3_object_lock_enabled_state)
+        self.assertIsNone(facts.s3_object_lock_enabled)
+        self.assertIsNone(facts.s3_object_lock_default_retention_mode)
+        self.assertIsNone(facts.s3_object_lock_default_retention_days)
+        self.assertIsNone(facts.s3_object_lock_default_retention_years)
+        self.assertEqual(facts.s3_object_lock_configuration, {"rule": [{"default_retention": [{}]}]})
+        self.assertEqual(
+            facts.s3_posture_uncertainties,
+            [
+                "object_lock_enabled is unknown after planning",
+                "rule.default_retention.mode is unknown after planning",
+                "rule.default_retention.days is unknown after planning",
+                "rule.default_retention.years is unknown after planning",
+            ],
+        )
+
+    def test_s3_lifecycle_normalizes_recovery_related_rules(self) -> None:
+        resource = _terraform_resource(
+            "aws_s3_bucket_lifecycle_configuration",
+            {
+                "id": "logs",
+                "bucket": "logs",
+                "rule": [
+                    {
+                        "id": "retain-noncurrent",
+                        "status": "Enabled",
+                        "expiration": [{"days": 365}],
+                        "noncurrent_version_expiration": [{"noncurrent_days": 90}],
+                        "abort_incomplete_multipart_upload": [{"days_after_initiation": 7}],
+                    }
+                ],
+            },
+        )
+
+        normalized = normalize_s3_bucket_lifecycle_configuration(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "logs")
+        self.assertEqual(facts.bucket_name, "logs")
+        self.assertEqual(facts.s3_lifecycle_rule_count, 1)
+        self.assertEqual(
+            facts.s3_lifecycle_rules,
+            [
+                {
+                    "id": "retain-noncurrent",
+                    "status": "Enabled",
+                    "expiration": [{"days": 365}],
+                    "noncurrent_version_expiration": [{"noncurrent_days": 90}],
+                    "abort_incomplete_multipart_upload": [{"days_after_initiation": 7}],
+                }
+            ],
+        )
+        self.assertEqual(facts.s3_posture_uncertainties, [])
+
+    def test_s3_lifecycle_preserves_unresolved_rule_fields(self) -> None:
+        resource = _terraform_resource(
+            "aws_s3_bucket_lifecycle_configuration",
+            {"bucket": "logs", "rule": [{"id": "retain-noncurrent", "status": "Enabled"}]},
+            unknown_values={"rule": [{"expiration": True, "noncurrent_version_expiration": True}]},
+        )
+
+        facts = aws_facts(normalize_s3_bucket_lifecycle_configuration(resource))
+
+        self.assertEqual(facts.s3_lifecycle_rule_count, 1)
+        self.assertEqual(
+            facts.s3_lifecycle_rules,
+            [
+                {
+                    "id": "retain-noncurrent",
+                    "status": "Enabled",
+                    "unknown_fields": ["expiration", "noncurrent_version_expiration"],
+                }
+            ],
+        )
+        self.assertEqual(facts.s3_posture_uncertainties, [])
 
 
 if __name__ == "__main__":

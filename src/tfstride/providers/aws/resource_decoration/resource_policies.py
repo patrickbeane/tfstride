@@ -125,6 +125,10 @@ class ApplyS3PostureResourcesStage:
                 self._apply_versioning_resource(posture_resource, context)
             elif posture_resource.resource_type == "aws_s3_bucket_server_side_encryption_configuration":
                 self._apply_encryption_resource(posture_resource, context)
+            elif posture_resource.resource_type == "aws_s3_bucket_object_lock_configuration":
+                self._apply_object_lock_resource(posture_resource, context)
+            elif posture_resource.resource_type == "aws_s3_bucket_lifecycle_configuration":
+                self._apply_lifecycle_resource(posture_resource, context)
 
     def _apply_versioning_resource(
         self,
@@ -160,6 +164,47 @@ class ApplyS3PostureResourcesStage:
             kms_master_key_id=posture_facts.s3_kms_master_key_id,
             bucket_key_enabled_state=posture_facts.s3_bucket_key_enabled_state,
             configuration=posture_facts.s3_server_side_encryption_configuration,
+            source_address=posture_resource.address,
+        )
+        aws_facts(bucket).extend_s3_posture_uncertainties(
+            _source_uncertainties(posture_resource, posture_facts.s3_posture_uncertainties)
+        )
+
+    def _apply_object_lock_resource(
+        self,
+        posture_resource: NormalizedResource,
+        context: AwsDecorationContext,
+    ) -> None:
+        posture_facts = aws_facts(posture_resource)
+        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        if bucket is None:
+            posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
+            return
+        aws_facts(bucket).set_s3_object_lock_posture(
+            enabled_state=posture_facts.s3_object_lock_enabled_state,
+            default_retention_mode=posture_facts.s3_object_lock_default_retention_mode,
+            default_retention_days=posture_facts.s3_object_lock_default_retention_days,
+            default_retention_years=posture_facts.s3_object_lock_default_retention_years,
+            configuration=posture_facts.s3_object_lock_configuration,
+            source_address=posture_resource.address,
+        )
+        aws_facts(bucket).extend_s3_posture_uncertainties(
+            _source_uncertainties(posture_resource, posture_facts.s3_posture_uncertainties)
+        )
+
+    def _apply_lifecycle_resource(
+        self,
+        posture_resource: NormalizedResource,
+        context: AwsDecorationContext,
+    ) -> None:
+        posture_facts = aws_facts(posture_resource)
+        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        if bucket is None:
+            posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
+            return
+        aws_facts(bucket).set_s3_lifecycle_posture(
+            rules=posture_facts.s3_lifecycle_rules,
+            rule_count=posture_facts.s3_lifecycle_rule_count,
             source_address=posture_resource.address,
         )
         aws_facts(bucket).extend_s3_posture_uncertainties(

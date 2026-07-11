@@ -802,6 +802,73 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             ],
         )
 
+    def test_s3_posture_stage_applies_object_lock_and_lifecycle_to_bucket(self) -> None:
+        bucket = _resource(
+            "aws_s3_bucket.logs",
+            "aws_s3_bucket",
+            ResourceCategory.DATA,
+            identifier="logs",
+            arn="arn:aws:s3:::logs",
+            metadata={"bucket": "logs"},
+        )
+        object_lock = _resource(
+            "aws_s3_bucket_object_lock_configuration.logs",
+            "aws_s3_bucket_object_lock_configuration",
+            ResourceCategory.DATA,
+            metadata={
+                "bucket": "logs",
+                "s3_object_lock_enabled_state": "enabled",
+                "s3_object_lock_default_retention_mode": "GOVERNANCE",
+                "s3_object_lock_default_retention_days": 30,
+                "s3_object_lock_configuration": {
+                    "object_lock_enabled": "Enabled",
+                    "rule": [{"default_retention": [{"mode": "GOVERNANCE", "days": 30}]}],
+                },
+            },
+        )
+        lifecycle = _resource(
+            "aws_s3_bucket_lifecycle_configuration.logs",
+            "aws_s3_bucket_lifecycle_configuration",
+            ResourceCategory.DATA,
+            metadata={
+                "bucket": "logs",
+                "s3_lifecycle_rules": [{"id": "retain-noncurrent", "status": "Enabled"}],
+                "s3_lifecycle_rule_count": 1,
+                "s3_posture_uncertainties": ["rule[0].expiration is unknown after planning"],
+            },
+        )
+        resources = [bucket, object_lock, lifecycle]
+
+        ApplyS3PostureResourcesStage().apply(resources, _context(resources))
+
+        bucket_facts = aws_facts(bucket)
+        self.assertEqual(bucket_facts.s3_object_lock_enabled_state, "enabled")
+        self.assertTrue(bucket_facts.s3_object_lock_enabled)
+        self.assertEqual(bucket_facts.s3_object_lock_default_retention_mode, "GOVERNANCE")
+        self.assertEqual(bucket_facts.s3_object_lock_default_retention_days, 30)
+        self.assertIsNone(bucket_facts.s3_object_lock_default_retention_years)
+        self.assertEqual(
+            bucket_facts.s3_object_lock_source_address,
+            "aws_s3_bucket_object_lock_configuration.logs",
+        )
+        self.assertEqual(
+            bucket_facts.s3_object_lock_configuration,
+            {
+                "object_lock_enabled": "Enabled",
+                "rule": [{"default_retention": [{"mode": "GOVERNANCE", "days": 30}]}],
+            },
+        )
+        self.assertEqual(bucket_facts.s3_lifecycle_rule_count, 1)
+        self.assertEqual(bucket_facts.s3_lifecycle_rules, [{"id": "retain-noncurrent", "status": "Enabled"}])
+        self.assertEqual(
+            bucket_facts.s3_lifecycle_source_address,
+            "aws_s3_bucket_lifecycle_configuration.logs",
+        )
+        self.assertEqual(
+            bucket_facts.s3_posture_uncertainties,
+            ["aws_s3_bucket_lifecycle_configuration.logs: rule[0].expiration is unknown after planning"],
+        )
+
     def test_s3_posture_stage_records_unresolved_bucket_references(self) -> None:
         versioning = _resource(
             "aws_s3_bucket_versioning.logs",
