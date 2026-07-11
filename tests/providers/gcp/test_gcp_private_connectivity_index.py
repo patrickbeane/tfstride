@@ -95,7 +95,7 @@ class GcpPrivateConnectivityIndexTests(unittest.TestCase):
         self.assertTrue(coverage.has_private_service_access)
         self.assertTrue(coverage.has_cloud_sql_private_service_access)
         self.assertTrue(coverage.has_cloud_sql_private_connectivity)
-        self.assertTrue(index.has_private_service_access_for_network("projects/demo/global/networks/main"))
+        self.assertTrue(index.coverage_for_network("projects/demo/global/networks/main").has_private_service_access)
         self.assertEqual(
             coverage.private_service_access_connection_addresses,
             ("google_service_networking_connection.private_services",),
@@ -124,7 +124,7 @@ class GcpPrivateConnectivityIndexTests(unittest.TestCase):
         self.assertEqual(unresolved.address, "google_service_networking_connection.private_services")
         self.assertIsNone(unresolved.network)
         self.assertIn("network is unknown after planning", unresolved.uncertainties)
-        self.assertFalse(index.has_private_service_access_for_network("google_compute_network.main.id"))
+        self.assertFalse(index.coverage_for_network("google_compute_network.main.id").has_private_service_access)
 
     def test_non_vpc_peering_global_address_is_ignored(self) -> None:
         inventory = _inventory(

@@ -117,10 +117,9 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
         coverage = index.coverage_for(storage)
 
         self.assertTrue(coverage.has_private_endpoint)
-        self.assertTrue(index.has_private_endpoint(storage))
         self.assertEqual(tuple(index.connections_by_target_key), (_STORAGE_ID.lower(),))
-        self.assertEqual(index.private_endpoint_addresses_for(storage), ("azurerm_private_endpoint.logs_blob",))
-        self.assertEqual(index.subresource_names_for(storage), ("blob",))
+        self.assertEqual(coverage.private_endpoint_addresses, ("azurerm_private_endpoint.logs_blob",))
+        self.assertEqual(coverage.subresource_names, ("blob",))
         self.assertEqual(coverage.connections[0].target_resource_id, _STORAGE_ID)
         self.assertEqual(coverage.connections[0].subresource_names, ("blob",))
         self.assertEqual(coverage.connections[0].private_dns_zone_group_state, "not_configured")
@@ -207,7 +206,7 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
 
         index = build_azure_private_endpoint_index(inventory)
 
-        self.assertFalse(index.has_private_endpoint(storage))
+        self.assertFalse(index.coverage_for(storage).has_private_endpoint)
         self.assertEqual(len(index.unresolved_targets), 1)
         self.assertEqual(index.unresolved_targets[0].private_endpoint_address, "azurerm_private_endpoint.external")
         self.assertEqual(
@@ -226,7 +225,7 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
 
         index = build_azure_private_endpoint_index(inventory)
 
-        self.assertFalse(index.has_private_endpoint(storage))
+        self.assertFalse(index.coverage_for(storage).has_private_endpoint)
         self.assertEqual(len(index.unresolved_targets), 1)
         self.assertEqual(index.unresolved_targets[0].target_resource_id, "shared")
 

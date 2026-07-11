@@ -140,16 +140,13 @@ class AzureDiagnosticSettingIndexTests(unittest.TestCase):
         coverage = index.coverage_for(storage)
 
         self.assertTrue(coverage.has_diagnostic_settings)
-        self.assertTrue(index.has_diagnostic_settings(storage))
         self.assertEqual(tuple(index.settings_by_target_key), (_STORAGE_ID.lower(),))
-        self.assertEqual(
-            index.diagnostic_setting_addresses_for(storage), ("azurerm_monitor_diagnostic_setting.storage_audit",)
-        )
-        self.assertEqual(index.enabled_log_categories_for(storage), ("StorageRead", "StorageWrite"))
+        self.assertEqual(coverage.diagnostic_setting_addresses, ("azurerm_monitor_diagnostic_setting.storage_audit",))
+        self.assertEqual(coverage.enabled_log_categories, ("StorageRead", "StorageWrite"))
         self.assertEqual(coverage.enabled_log_category_groups, ("audit",))
-        self.assertEqual(index.metric_categories_for(storage), ("Transaction",))
+        self.assertEqual(coverage.metric_categories, ("Transaction",))
         self.assertEqual(
-            index.destinations_for(storage),
+            coverage.destinations,
             (
                 "log_analytics_workspace_id=/subscriptions/sub-0001/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/sec",
                 "storage_account_id=/subscriptions/sub-0001/resourceGroups/obs/providers/Microsoft.Storage/storageAccounts/audit",
@@ -224,7 +221,7 @@ class AzureDiagnosticSettingIndexTests(unittest.TestCase):
 
         index = build_azure_diagnostic_setting_index(inventory)
 
-        self.assertFalse(index.has_diagnostic_settings(storage))
+        self.assertFalse(index.coverage_for(storage).has_diagnostic_settings)
         self.assertEqual(len(index.unresolved_targets), 2)
         self.assertEqual(
             [target.diagnostic_setting_address for target in index.unresolved_targets],
@@ -247,7 +244,7 @@ class AzureDiagnosticSettingIndexTests(unittest.TestCase):
 
         index = build_azure_diagnostic_setting_index(inventory)
 
-        self.assertFalse(index.has_diagnostic_settings(storage))
+        self.assertFalse(index.coverage_for(storage).has_diagnostic_settings)
         self.assertEqual(len(index.unresolved_targets), 1)
         self.assertEqual(
             index.unresolved_targets[0].diagnostic_setting_address, "azurerm_monitor_diagnostic_setting.pending"

@@ -163,9 +163,6 @@ class GcpPrivateConnectivityIndex:
         facts = gcp_facts(resource)
         return self.coverage_for_network(facts.private_network or resource.vpc_id)
 
-    def has_private_service_access_for_network(self, network: str | None) -> bool:
-        return self.coverage_for_network(network).has_private_service_access
-
     def has_cloud_sql_private_connectivity(self, resource: NormalizedResource) -> bool:
         return self.coverage_for_cloud_sql(resource).has_cloud_sql_private_connectivity
 

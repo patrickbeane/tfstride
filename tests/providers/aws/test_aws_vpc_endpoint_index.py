@@ -49,8 +49,7 @@ class AwsVpcEndpointIndexTests(unittest.TestCase):
         coverage = index.coverage_for("vpc-app", "s3", endpoint_type="gateway")
 
         self.assertTrue(index.has_s3_endpoint("vpc-app"))
-        self.assertTrue(index.has_s3_gateway_endpoint("vpc-app"))
-        self.assertFalse(index.has_s3_interface_endpoint("vpc-app"))
+        self.assertFalse(index.coverage_for("vpc-app", "s3", endpoint_type="interface").has_endpoint)
         self.assertFalse(index.has_s3_endpoint("vpc-other"))
         self.assertTrue(coverage.has_endpoint)
         self.assertEqual(coverage.endpoint_addresses, ("aws_vpc_endpoint.s3_gateway",))
@@ -90,8 +89,7 @@ class AwsVpcEndpointIndexTests(unittest.TestCase):
         coverage = index.coverage_for("vpc-app", "s3", endpoint_type="interface")
 
         self.assertTrue(index.has_s3_endpoint("vpc-app"))
-        self.assertFalse(index.has_s3_gateway_endpoint("vpc-app"))
-        self.assertTrue(index.has_s3_interface_endpoint("vpc-app"))
+        self.assertFalse(index.coverage_for("vpc-app", "s3", endpoint_type="gateway").has_endpoint)
         self.assertEqual(coverage.subnet_ids, ("subnet-a", "subnet-b"))
         self.assertEqual(coverage.security_group_ids, ("sg-endpoint",))
         self.assertEqual(coverage.dns_names, ("vpce-s3-abc.s3.us-east-1.vpce.amazonaws.com",))

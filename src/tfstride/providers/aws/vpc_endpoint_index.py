@@ -11,7 +11,6 @@ from tfstride.providers.aws.resource_facts import aws_facts
 _S3 = "s3"
 _SECRETS_MANAGER = "secretsmanager"
 _KMS = "kms"
-_GATEWAY = "gateway"
 _INTERFACE = "interface"
 
 
@@ -106,12 +105,6 @@ class AwsVpcEndpointIndex:
 
     def has_s3_endpoint(self, vpc_id: str | None) -> bool:
         return self.coverage_for(vpc_id, _S3).has_endpoint
-
-    def has_s3_gateway_endpoint(self, vpc_id: str | None) -> bool:
-        return self.coverage_for(vpc_id, _S3, endpoint_type=_GATEWAY).has_endpoint
-
-    def has_s3_interface_endpoint(self, vpc_id: str | None) -> bool:
-        return self.coverage_for(vpc_id, _S3, endpoint_type=_INTERFACE).has_endpoint
 
     def has_secrets_manager_interface_endpoint(self, vpc_id: str | None) -> bool:
         return self.coverage_for(vpc_id, _SECRETS_MANAGER, endpoint_type=_INTERFACE).has_endpoint

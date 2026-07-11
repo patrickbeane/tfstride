@@ -106,21 +106,6 @@ class AzureDiagnosticSettingIndex:
                 settings.append(setting)
         return AzureDiagnosticSettingCoverage(tuple(settings))
 
-    def has_diagnostic_settings(self, resource: NormalizedResource) -> bool:
-        return self.coverage_for(resource).has_diagnostic_settings
-
-    def diagnostic_setting_addresses_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).diagnostic_setting_addresses
-
-    def enabled_log_categories_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).enabled_log_categories
-
-    def metric_categories_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).metric_categories
-
-    def destinations_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).destinations
-
 
 def build_azure_diagnostic_setting_index(
     source: ResourceInventory | Iterable[NormalizedResource],

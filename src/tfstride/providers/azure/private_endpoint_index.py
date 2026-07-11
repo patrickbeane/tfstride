@@ -96,15 +96,6 @@ class AzurePrivateEndpointIndex:
                 connections.append(connection)
         return AzurePrivateEndpointCoverage(tuple(connections))
 
-    def has_private_endpoint(self, resource: NormalizedResource) -> bool:
-        return self.coverage_for(resource).has_private_endpoint
-
-    def private_endpoint_addresses_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).private_endpoint_addresses
-
-    def subresource_names_for(self, resource: NormalizedResource) -> tuple[str, ...]:
-        return self.coverage_for(resource).subresource_names
-
 
 def build_azure_private_endpoint_index(
     source: ResourceInventory | Iterable[NormalizedResource],
