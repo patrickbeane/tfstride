@@ -74,15 +74,7 @@ def _build_reference_coverage(resources: list[NormalizedResource]) -> ReferenceC
     unresolved_count = 0
 
     for resource in sorted(resources, key=lambda item: item.address):
-        references = {
-            key: values
-            for key, values in (
-                (key, _coerce_reference_values(value))
-                for key, value in sorted(resource.metadata.items())
-                if key.startswith(UNRESOLVED_REFERENCE_PREFIX)
-            )
-            if values
-        }
+        references = _unresolved_reference_metadata(resource)
         if not references:
             continue
 
@@ -98,6 +90,17 @@ def _build_reference_coverage(resources: list[NormalizedResource]) -> ReferenceC
         unresolved_reference_count=unresolved_count,
         unresolved_references=unresolved_references,
     )
+
+
+def _unresolved_reference_metadata(resource: NormalizedResource) -> dict[str, list[str]]:
+    references: dict[str, list[str]] = {}
+    for key in sorted(resource._metadata):
+        if not key.startswith(UNRESOLVED_REFERENCE_PREFIX):
+            continue
+        values = _coerce_reference_values(resource._metadata[key])
+        if values:
+            references[key] = values
+    return references
 
 
 def _coerce_reference_values(value: Any) -> list[str]:

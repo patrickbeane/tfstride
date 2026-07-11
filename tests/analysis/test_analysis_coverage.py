@@ -8,6 +8,11 @@ from tfstride.models import NormalizedResource, ResourceCategory, ResourceInvent
 from tfstride.resource_metadata import InventoryMetadata
 
 
+class _RaisesOnDeepcopy:
+    def __deepcopy__(self, _memo: object) -> object:
+        raise AssertionError("coverage should not snapshot unrelated metadata")
+
+
 class AnalysisCoverageTests(unittest.TestCase):
     def test_build_analysis_coverage_summarizes_resources_rules_and_unresolved_references(self) -> None:
         resource = NormalizedResource(
@@ -59,6 +64,26 @@ class AnalysisCoverageTests(unittest.TestCase):
                 "unresolved_instance_profiles": ["missing-profile"],
                 "unresolved_role_references": ["missing-role"],
             },
+        )
+
+    def test_reference_coverage_does_not_snapshot_unrelated_metadata(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={"unresolved_role_references": ["missing-role"]},
+        )
+        resource._metadata["expensive_metadata"] = _RaisesOnDeepcopy()
+        inventory = ResourceInventory(provider="aws", resources=[resource])
+
+        coverage = build_analysis_coverage(inventory)
+
+        self.assertEqual(coverage.references.unresolved_reference_count, 1)
+        self.assertEqual(
+            coverage.references.unresolved_references[0].references,
+            {"unresolved_role_references": ["missing-role"]},
         )
 
 
