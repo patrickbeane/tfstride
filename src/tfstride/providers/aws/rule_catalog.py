@@ -105,6 +105,29 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-api-gateway-cors-permissive",
+        title="Public API Gateway HTTP API reflects all origins via CORS",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Scope API Gateway v2 CORS `allow_origins` to reviewed origins for public HTTP APIs, "
+            "avoid wildcard origins, and never pair `allow_credentials` with a wildcard origin list."
+        ),
+        tags=("aws", "api-gateway", "serverless", "cors", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-public-api-gateway-waf-missing",
+        title="Public API Gateway endpoint lacks modeled WAF protection",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Attach an AWS WAFv2 Web ACL to public API Gateway endpoints with an "
+            "`aws_wafv2_web_acl_association` targeting the API stage, and keep the association modeled in "
+            "Terraform so public edge protection is reviewable before deployment."
+        ),
+        tags=("aws", "api-gateway", "serverless", "waf", "wafv2", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-cloudtrail-multi-region-disabled",
         title="CloudTrail is not configured for multi-region auditing",
         category=StrideCategory.REPUDIATION,

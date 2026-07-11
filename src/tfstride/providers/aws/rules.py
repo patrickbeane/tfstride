@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
+from tfstride.providers.aws.api_gateway_rules import AwsApiGatewayRuleDetectors
 from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
@@ -35,6 +36,8 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-cloudfront-viewer-http-allowed",
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown",
         "aws-public-cloudfront-waf-missing",
+        "aws-api-gateway-cors-permissive",
+        "aws-public-api-gateway-waf-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -114,6 +117,7 @@ def build_aws_rule_contribution(
     load_balancer_detectors = AwsLoadBalancerRuleDetectors(finding_factory)
     edge_protection_detectors = AwsEdgeProtectionRuleDetectors(finding_factory)
     cloudfront_detectors = AwsCloudFrontRuleDetectors(finding_factory)
+    api_gateway_detectors = AwsApiGatewayRuleDetectors(finding_factory)
     sensitive_endpoint_detectors = AwsSensitiveEndpointRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
@@ -129,6 +133,8 @@ def build_aws_rule_contribution(
             cloudfront_detectors.detect_viewer_tls_policy_weak_or_unknown
         ),
         "aws-public-cloudfront-waf-missing": cloudfront_detectors.detect_web_acl_missing,
+        "aws-api-gateway-cors-permissive": api_gateway_detectors.detect_cors_permissive,
+        "aws-public-api-gateway-waf-missing": api_gateway_detectors.detect_waf_missing,
         "aws-cloudtrail-multi-region-disabled": audit_detectors.detect_cloudtrail_multi_region_disabled,
         "aws-cloudtrail-log-file-validation-disabled": audit_detectors.detect_cloudtrail_log_file_validation_disabled,
         "aws-cloudtrail-management-events-disabled": (audit_detectors.detect_cloudtrail_management_events_disabled),
