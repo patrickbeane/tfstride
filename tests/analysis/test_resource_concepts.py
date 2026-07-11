@@ -23,20 +23,14 @@ from tfstride.analysis.resource_concepts import (
     WORKLOAD_RESOURCE_TYPES,
     has_provider_managed_egress_without_vpc,
     is_control_plane_sensitive_data_store,
-    is_data_store_resource,
     is_database_resource,
-    is_iam_policy_resource,
     is_identity_role_resource,
     is_key_management_resource,
     is_network_security_group_resource,
-    is_object_storage_public_access_control_resource,
     is_object_storage_resource,
-    is_public_compute_resource,
     is_public_edge_resource,
     is_secret_store_resource,
-    is_security_group_backed_workload_resource,
     is_subnet_resource,
-    is_workload_resource,
 )
 from tfstride.models import NormalizedResource, ResourceCategory
 
@@ -313,37 +307,6 @@ class ResourceConceptTests(unittest.TestCase):
         )
 
     def test_resource_concept_predicates_classify_known_resources(self) -> None:
-        self.assertTrue(is_workload_resource(_resource("aws_instance")))
-        self.assertTrue(is_workload_resource(_resource("aws_lambda_function")))
-        self.assertTrue(is_workload_resource(_resource("aws_ecs_service")))
-        self.assertTrue(is_workload_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
-        self.assertTrue(is_workload_resource(_resource("google_cloudfunctions_function", provider="gcp")))
-        self.assertTrue(is_workload_resource(_resource("google_compute_instance", provider="gcp")))
-        self.assertTrue(is_workload_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
-        self.assertTrue(is_workload_resource(_resource("azurerm_linux_web_app", provider="azure")))
-        self.assertTrue(is_workload_resource(_resource("azurerm_linux_function_app", provider="azure")))
-        self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_instance")))
-        self.assertTrue(is_security_group_backed_workload_resource(_resource("aws_ecs_service")))
-        self.assertTrue(
-            is_security_group_backed_workload_resource(_resource("azurerm_linux_virtual_machine", provider="azure"))
-        )
-        self.assertTrue(is_public_compute_resource(_resource("aws_instance")))
-        self.assertTrue(is_public_compute_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
-        self.assertTrue(is_public_compute_resource(_resource("google_cloudfunctions_function", provider="gcp")))
-        self.assertTrue(is_public_compute_resource(_resource("google_compute_instance", provider="gcp")))
-        self.assertTrue(is_public_compute_resource(_resource("azurerm_linux_virtual_machine", provider="azure")))
-        self.assertTrue(is_data_store_resource(_resource("aws_db_instance")))
-        self.assertTrue(is_data_store_resource(_resource("aws_s3_bucket")))
-        self.assertTrue(is_data_store_resource(_resource("aws_secretsmanager_secret")))
-        self.assertTrue(is_data_store_resource(_resource("google_bigquery_dataset", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_bigquery_table", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_pubsub_topic", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_pubsub_subscription", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_secret_manager_secret", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_sql_database_instance", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("google_storage_bucket", provider="gcp")))
-        self.assertTrue(is_data_store_resource(_resource("azurerm_storage_account", provider="azure")))
-        self.assertTrue(is_data_store_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
         self.assertTrue(is_public_edge_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloud_run_v2_service", provider="gcp")))
@@ -360,26 +323,6 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(is_identity_role_resource(_resource("aws_iam_role")))
         self.assertTrue(is_identity_role_resource(_resource("google_service_account", provider="gcp")))
         self.assertTrue(is_identity_role_resource(_resource("azurerm_user_assigned_identity", provider="azure")))
-        self.assertTrue(is_iam_policy_resource(_resource("aws_iam_policy")))
-        self.assertTrue(is_iam_policy_resource(_resource("aws_iam_role")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_bigquery_dataset_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_bigquery_table_iam_binding", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_pubsub_topic_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_pubsub_subscription_iam_binding", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_cloud_run_v2_service_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_cloudfunctions_function_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_kms_crypto_key_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_kms_key_ring_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_folder_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_organization_iam_binding", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_organization_iam_custom_role", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_binding", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_custom_role", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_project_iam_policy", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_secret_manager_secret_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_service_account_iam_member", provider="gcp")))
-        self.assertTrue(is_iam_policy_resource(_resource("google_storage_bucket_iam_member", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("aws_security_group")))
         self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall", provider="gcp")))
         self.assertTrue(is_network_security_group_resource(_resource("google_compute_firewall_policy", provider="gcp")))
@@ -405,9 +348,6 @@ class ResourceConceptTests(unittest.TestCase):
         self.assertTrue(
             is_control_plane_sensitive_data_store(_resource("google_secret_manager_secret", provider="gcp"))
         )
-        self.assertTrue(
-            is_object_storage_public_access_control_resource(_resource("aws_s3_bucket_public_access_block"))
-        )
         self.assertTrue(is_key_management_resource(_resource("aws_kms_key")))
         self.assertTrue(is_key_management_resource(_resource("google_kms_crypto_key", provider="gcp")))
         self.assertTrue(is_key_management_resource(_resource("azurerm_key_vault_key", provider="azure")))
@@ -423,21 +363,14 @@ class ResourceConceptTests(unittest.TestCase):
     def test_resource_concept_predicates_reject_unrelated_resources(self) -> None:
         subnet = _resource("aws_subnet")
 
-        self.assertFalse(is_workload_resource(subnet))
-        self.assertFalse(is_workload_resource(_resource("google_compute_instance")))
-        self.assertFalse(is_security_group_backed_workload_resource(_resource("aws_lambda_function")))
-        self.assertFalse(is_public_compute_resource(_resource("aws_ecs_service")))
-        self.assertFalse(is_data_store_resource(subnet))
         self.assertFalse(is_public_edge_resource(subnet))
         self.assertFalse(is_identity_role_resource(subnet))
-        self.assertFalse(is_iam_policy_resource(subnet))
         self.assertFalse(is_network_security_group_resource(subnet))
         self.assertFalse(is_subnet_resource(_resource("aws_instance")))
         self.assertFalse(is_database_resource(subnet))
         self.assertFalse(is_object_storage_resource(subnet))
         self.assertFalse(is_secret_store_resource(subnet))
         self.assertFalse(is_control_plane_sensitive_data_store(_resource("aws_s3_bucket")))
-        self.assertFalse(is_object_storage_public_access_control_resource(subnet))
         self.assertFalse(is_key_management_resource(subnet))
         self.assertFalse(
             has_provider_managed_egress_without_vpc(_resource("aws_lambda_function", metadata={"vpc_enabled": True}))

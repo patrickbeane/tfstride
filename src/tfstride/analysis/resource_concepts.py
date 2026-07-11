@@ -40,32 +40,12 @@ PROVIDER_MANAGED_EGRESS_WITHOUT_VPC_RESOURCE_TYPES = _DEFAULT_RESOURCE_CAPABILIT
 )
 
 
-def is_workload_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.WORKLOAD)
-
-
-def is_security_group_backed_workload_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD)
-
-
-def is_public_compute_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.PUBLIC_COMPUTE)
-
-
-def is_data_store_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.DATA_STORE)
-
-
 def is_public_edge_resource(resource: NormalizedResource) -> bool:
     return _has_capability(resource, ResourceCapability.PUBLIC_EDGE)
 
 
 def is_identity_role_resource(resource: NormalizedResource) -> bool:
     return _has_capability(resource, ResourceCapability.IDENTITY_ROLE)
-
-
-def is_iam_policy_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.IAM_POLICY)
 
 
 def is_network_security_group_resource(resource: NormalizedResource) -> bool:
@@ -90,10 +70,6 @@ def is_secret_store_resource(resource: NormalizedResource) -> bool:
 
 def is_control_plane_sensitive_data_store(resource: NormalizedResource) -> bool:
     return _has_capability(resource, ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE)
-
-
-def is_object_storage_public_access_control_resource(resource: NormalizedResource) -> bool:
-    return _has_capability(resource, ResourceCapability.OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL)
 
 
 def is_key_management_resource(resource: NormalizedResource) -> bool:
