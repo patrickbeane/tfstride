@@ -428,6 +428,8 @@
     "metadata": {
       "primary_account_id": "111122223333",
       "supported_resource_types": [
+        "aws_api_gateway_rest_api",
+        "aws_apigatewayv2_api",
         "aws_cloudfront_distribution",
         "aws_cloudtrail",
         "aws_config_configuration_recorder",

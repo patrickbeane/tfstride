@@ -5,6 +5,10 @@ from collections.abc import Callable
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
+from tfstride.providers.aws.api_gateway_normalizers import (
+    normalize_api_gateway_rest_api,
+    normalize_apigatewayv2_api,
+)
 from tfstride.providers.aws.audit_normalizers import (
     normalize_cloudtrail,
     normalize_config_configuration_recorder,
@@ -69,6 +73,8 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    "aws_api_gateway_rest_api": normalize_api_gateway_rest_api,
+    "aws_apigatewayv2_api": normalize_apigatewayv2_api,
     "aws_cloudfront_distribution": normalize_cloudfront_distribution,
     "aws_cloudtrail": normalize_cloudtrail,
     "aws_config_configuration_recorder": normalize_config_configuration_recorder,

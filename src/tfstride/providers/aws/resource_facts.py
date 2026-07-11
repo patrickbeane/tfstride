@@ -252,6 +252,62 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES)
 
     @property
+    def api_gateway_api_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_API_ID)
+
+    @property
+    def api_gateway_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_NAME)
+
+    @property
+    def api_gateway_description(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_DESCRIPTION)
+
+    @property
+    def api_gateway_protocol_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_PROTOCOL_TYPE)
+
+    @property
+    def api_gateway_api_endpoint(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_API_ENDPOINT)
+
+    @property
+    def api_gateway_execution_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_EXECUTION_ARN)
+
+    @property
+    def api_gateway_endpoint_types(self) -> list[str]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ENDPOINT_TYPES)
+
+    @property
+    def api_gateway_vpc_endpoint_ids(self) -> list[str]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_VPC_ENDPOINT_IDS)
+
+    @property
+    def api_gateway_endpoint_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ENDPOINT_CONFIGURATION)
+
+    @property
+    def api_gateway_execute_api_endpoint_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_EXECUTE_API_ENDPOINT_STATE)
+
+    @property
+    def api_gateway_public_endpoint_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_PUBLIC_ENDPOINT_STATE)
+
+    @property
+    def api_gateway_route_selection_expression(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ROUTE_SELECTION_EXPRESSION)
+
+    @property
+    def api_gateway_cors_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_CORS_CONFIGURATION)
+
+    @property
+    def api_gateway_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_POSTURE_UNCERTAINTIES)
+
+    @property
     def load_balancer_listener_protocol(self) -> str | None:
         return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL)
 

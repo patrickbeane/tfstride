@@ -133,6 +133,8 @@ class ResourceConceptTests(unittest.TestCase):
                 {
                     "aws_instance",
                     "aws_cloudfront_distribution",
+                    "aws_api_gateway_rest_api",
+                    "aws_apigatewayv2_api",
                     "aws_lb",
                     "aws_db_instance",
                     "aws_s3_bucket",
