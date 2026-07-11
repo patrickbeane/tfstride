@@ -373,6 +373,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
         posture_rule_ids = {
             "aws-public-compute-broad-ingress",
             "aws-rds-storage-encryption-disabled",
+            "aws-rds-cloudwatch-log-exports-missing",
             "aws-s3-public-access",
         }
 

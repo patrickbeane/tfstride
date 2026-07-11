@@ -211,7 +211,7 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
         boundary_types = Counter(boundary.boundary_type for boundary in result.trust_boundaries)
         title_counts = Counter(finding.title for finding in result.findings)
 
-        self.assertEqual(len(result.findings), 3)
+        self.assertEqual(len(result.findings), 4)
         self.assertEqual(len(result.inventory.resources), 19)
         self.assertEqual(
             dict(title_counts),
@@ -219,6 +219,7 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Sensitive data tier is transitively reachable from an internet-exposed path": 1,
                 "VPC Flow Logs are not configured for a modeled VPC": 1,
                 "Public Application Load Balancer is not associated with a WAF Web ACL": 1,
+                "RDS database does not export engine CloudWatch logs": 1,
             },
         )
         self.assertEqual(boundary_types[BoundaryType.INTERNET_TO_SERVICE], 1)

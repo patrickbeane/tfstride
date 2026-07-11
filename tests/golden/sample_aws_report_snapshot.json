@@ -8,19 +8,19 @@
     "normalized_resources": 23,
     "unsupported_resources": 1,
     "trust_boundaries": 9,
-    "active_findings": 14,
-    "total_findings": 14,
+    "active_findings": 15,
+    "total_findings": 15,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "severity_counts": {
       "high": 4,
       "medium": 10,
-      "low": 0
+      "low": 1
     }
   },
   "filtering": {
-    "total_findings": 14,
-    "active_findings": 14,
+    "total_findings": 15,
+    "active_findings": 15,
     "suppressed_findings": 0,
     "baselined_findings": 0,
     "suppressions_path": null,
@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 193,
+      "registered_rule_count": 197,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -67,6 +67,10 @@
         "aws-rds-backup-retention-insufficient",
         "aws-rds-deletion-protection-disabled",
         "aws-rds-customer-managed-kms-key-missing",
+        "aws-rds-multi-az-disabled",
+        "aws-rds-performance-insights-disabled",
+        "aws-rds-cloudwatch-log-exports-missing",
+        "aws-rds-iam-auth-disabled",
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
@@ -264,6 +268,10 @@
         "aws-rds-backup-retention-insufficient": 0,
         "aws-rds-deletion-protection-disabled": 0,
         "aws-rds-customer-managed-kms-key-missing": 0,
+        "aws-rds-multi-az-disabled": 0,
+        "aws-rds-performance-insights-disabled": 0,
+        "aws-rds-cloudwatch-log-exports-missing": 1,
+        "aws-rds-iam-auth-disabled": 0,
         "aws-s3-public-access": 1,
         "aws-s3-customer-managed-encryption-missing": 0,
         "aws-s3-versioning-disabled": 0,
@@ -761,6 +769,16 @@
       "affected_resources": [
         "aws_lambda_function.processor",
         "aws_iam_role.workload"
+      ],
+      "trust_boundary_id": null
+    },
+    {
+      "rule_id": "aws-rds-cloudwatch-log-exports-missing",
+      "title": "RDS database does not export engine CloudWatch logs",
+      "category": "Repudiation",
+      "severity": "low",
+      "affected_resources": [
+        "aws_db_instance.app"
       ],
       "trust_boundary_id": null
     }

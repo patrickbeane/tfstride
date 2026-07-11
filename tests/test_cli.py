@@ -211,9 +211,9 @@ class CliTests(unittest.TestCase):
 
             payload = json.loads(json_output_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["tool"]["name"], "tfstride")
-            self.assertEqual(payload["summary"]["active_findings"], 14)
-            self.assertEqual(payload["summary"]["total_findings"], 14)
-            self.assertEqual(len(payload["findings"]), 14)
+            self.assertEqual(payload["summary"]["active_findings"], 15)
+            self.assertEqual(payload["summary"]["total_findings"], 15)
+            self.assertEqual(len(payload["findings"]), 15)
             self.assertEqual(payload["findings"][0]["fingerprint"].split(":")[0], "sha256")
 
     def test_cli_provider_option_can_select_gcp_inventory(self) -> None:
@@ -336,7 +336,7 @@ class CliTests(unittest.TestCase):
             self.assertTrue(baseline_path.exists())
 
             baseline_payload = json.loads(baseline_path.read_text(encoding="utf-8"))
-            self.assertEqual(len(baseline_payload["findings"]), 14)
+            self.assertEqual(len(baseline_payload["findings"]), 15)
 
             with redirect_stderr(stderr_buffer):
                 second_exit_code = main(
@@ -401,12 +401,12 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(first_exit_code, 0)
         self.assertEqual(second_exit_code, 0)
-        self.assertEqual(payload["summary"]["total_findings"], 14)
+        self.assertEqual(payload["summary"]["total_findings"], 15)
         self.assertEqual(payload["summary"]["active_findings"], 0)
         self.assertEqual(payload["summary"]["suppressed_findings"], 1)
-        self.assertEqual(payload["summary"]["baselined_findings"], 13)
+        self.assertEqual(payload["summary"]["baselined_findings"], 14)
         self.assertEqual(len(payload["suppressed_findings"]), 1)
-        self.assertEqual(len(payload["baselined_findings"]), 13)
+        self.assertEqual(len(payload["baselined_findings"]), 14)
 
     def test_cli_suppressions_can_filter_findings_before_policy_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -568,7 +568,7 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual("", stderr_buffer.getvalue())
-        self.assertEqual(payload["summary"]["severity_counts"], {"high": 0, "medium": 0, "low": 1})
+        self.assertEqual(payload["summary"]["severity_counts"], {"high": 0, "medium": 0, "low": 2})
         self.assertEqual(payload["findings"][0]["severity"], "low")
         self.assertEqual(payload["findings"][0]["severity_reasoning"]["computed_severity"], "medium")
 

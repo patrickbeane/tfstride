@@ -376,6 +376,7 @@
             "identifier": "safe-customer-db",
             "arn": "arn:aws:rds:us-east-1:222233334444:db:safe-customer-db",
             "engine": "postgres",
+            "enabled_cloudwatch_logs_exports": ["postgresql"],
             "publicly_accessible": false,
             "backup_retention_period": 14,
             "deletion_protection": true,

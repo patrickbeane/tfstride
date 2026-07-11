@@ -84,7 +84,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `193`", report)
+        self.assertIn("- Registered rules: `197`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -357,10 +357,10 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(payload["kind"], REPORT_KIND)
         self.assertEqual(payload["version"], REPORT_FORMAT_VERSION)
         self.assertEqual(payload["tool"]["name"], "tfstride")
-        self.assertEqual(payload["summary"]["active_findings"], 14)
-        self.assertEqual(payload["summary"]["total_findings"], 14)
+        self.assertEqual(payload["summary"]["active_findings"], 15)
+        self.assertEqual(payload["summary"]["total_findings"], 15)
         self.assertEqual(payload["inventory"]["provider"], "aws")
-        self.assertEqual(len(payload["findings"]), 14)
+        self.assertEqual(len(payload["findings"]), 15)
         self.assertTrue(payload["findings"][0]["fingerprint"].startswith("sha256:"))
 
     def test_json_report_uses_metadata_snapshots(self) -> None:
@@ -436,7 +436,7 @@ class JsonReportTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["summary"]["severity_counts"],
-            {"high": 4, "medium": 10, "low": 0},
+            {"high": 4, "medium": 10, "low": 1},
         )
         self.assertEqual(
             list(payload["inventory"]),
@@ -502,7 +502,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 193)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 197)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})
@@ -536,7 +536,7 @@ class JsonReportTests(unittest.TestCase):
             filtered_result = apply_finding_filters(unsuppressed_result, baseline_path=baseline_path)
 
         payload = json.loads(render_json(filtered_result))
-        self.assertEqual(payload["summary"]["total_findings"], 14)
+        self.assertEqual(payload["summary"]["total_findings"], 15)
         self.assertEqual(payload["summary"]["suppressed_findings"], 1)
         self.assertEqual(payload["summary"]["baselined_findings"], 2)
         self.assertEqual(len(payload["suppressed_findings"]), 1)

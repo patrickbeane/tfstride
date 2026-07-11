@@ -7,11 +7,11 @@
 
 ## Summary
 
-This run identified **19 trust boundaries** and **24 findings** across **25 normalized resources**.
+This run identified **19 trust boundaries** and **25 findings** across **25 normalized resources**.
 
 - High severity findings: `7`
 - Medium severity findings: `17`
-- Low severity findings: `0`
+- Low severity findings: `1`
 
 ## Analysis Coverage
 
@@ -19,8 +19,8 @@ This run identified **19 trust boundaries** and **24 findings** across **25 norm
 - Provider resources considered: `25`
 - Normalized resources: `25`
 - Unsupported resources: `0`
-- Registered rules: `193`
-- Enabled rules: `193`
+- Registered rules: `197`
+- Enabled rules: `197`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -31,6 +31,7 @@ This run identified **19 trust boundaries** and **24 findings** across **25 norm
   - `aws-rds-storage-encryption-disabled`: `1`
   - `aws-rds-backup-retention-insufficient`: `1`
   - `aws-rds-deletion-protection-disabled`: `1`
+  - `aws-rds-cloudwatch-log-exports-missing`: `1`
   - `aws-s3-public-access`: `2`
   - `aws-workload-kms-vpc-endpoint-missing`: `1`
   - `aws-workload-s3-vpc-endpoint-missing`: `1`
@@ -493,7 +494,17 @@ This run identified **19 trust boundaries** and **24 findings** across **25 norm
 
 ### Low
 
-No findings in this severity band.
+#### RDS database does not export engine CloudWatch logs
+
+- STRIDE category: Repudiation
+- Affected resources: `aws_db_instance.customer`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +1, lateral_movement +0, blast_radius +1, final_score 2 => low
+- Rationale: aws_db_instance.customer (engine `postgres`) does not export any of the baseline CloudWatch Logs expected for its engine family (postgresql). Without these log exports the database lacks the basic observability posture needed to investigate errors, slow queries, and audit activity from CloudWatch.
+- Recommended mitigation: Enable the CloudWatch Logs exports expected for the RDS engine family (for example `postgresql` for PostgreSQL, `error` and `slowquery` for MySQL/MariaDB) so errors, slow queries, and audit activity are captured for investigation.
+- Evidence:
+  - target resource: address=aws_db_instance.customer; type=aws_db_instance; identifier=db-bad-001; engine=postgres
+  - log export posture: enabled_cloudwatch_logs_exports=[]; expected_log_exports=['postgresql']; engine-family baseline log exports are absent
 
 ## Limitations / Unsupported Resources
 

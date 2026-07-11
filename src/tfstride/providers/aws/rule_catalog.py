@@ -317,6 +317,51 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-rds-multi-az-disabled",
+        title="RDS instance is not deployed across multiple Availability Zones",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable Multi-AZ for RDS instances that require availability, so a standby in a second AZ can "
+            "perform automatic failover during AZ-level outages or maintenance events."
+        ),
+        tags=("aws", "database", "rds", "availability", "high-availability"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-performance-insights-disabled",
+        title="RDS Performance Insights is disabled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable RDS Performance Insights for production databases to expose query-level load, wait "
+            "events, and regression signals that support operational detection and investigation."
+        ),
+        tags=("aws", "database", "rds", "observability", "performance-insights"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-cloudwatch-log-exports-missing",
+        title="RDS database does not export engine CloudWatch logs",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable the CloudWatch Logs exports expected for the RDS engine family (for example `postgresql` "
+            "for PostgreSQL, `error` and `slowquery` for MySQL/MariaDB) so errors, slow queries, and audit "
+            "activity are captured for investigation."
+        ),
+        tags=("aws", "database", "rds", "observability", "logging"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-rds-iam-auth-disabled",
+        title="RDS IAM database authentication is disabled",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Enable RDS IAM database authentication where supported so database access relies on short-lived "
+            "AWS-signed tokens issued via IAM instead of long-lived static database credentials."
+        ),
+        tags=("aws", "database", "rds", "authentication", "iam"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-s3-public-access",
         title="Object storage is publicly accessible",
         category=StrideCategory.INFORMATION_DISCLOSURE,
