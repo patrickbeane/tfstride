@@ -668,6 +668,70 @@ class AwsResourceFacts:
         return self.get(AwsResourceMetadata.CONFIG_RECORDER_RECORDING_STRATEGY)
 
     @property
+    def config_recorder_status_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_RECORDER_STATUS_NAME)
+
+    @property
+    def config_recorder_status_is_enabled_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_RECORDER_IS_ENABLED_STATE)
+
+    @property
+    def config_recorder_status_is_enabled(self) -> bool | None:
+        return _bool_from_state(self.config_recorder_status_is_enabled_state)
+
+    @property
+    def config_delivery_channel_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_NAME)
+
+    @property
+    def config_delivery_channel_s3_bucket_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_S3_BUCKET_NAME)
+
+    @property
+    def config_delivery_channel_s3_key_prefix(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_S3_KEY_PREFIX)
+
+    @property
+    def config_delivery_channel_sns_topic_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_SNS_TOPIC_ARN)
+
+    @property
+    def access_analyzer_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.ACCESS_ANALYZER_NAME)
+
+    @property
+    def access_analyzer_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.ACCESS_ANALYZER_TYPE)
+
+    @property
+    def access_analyzer_status(self) -> str | None:
+        return self.get(AwsResourceMetadata.ACCESS_ANALYZER_STATUS)
+
+    @property
+    def access_analyzer_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.ACCESS_ANALYZER_ARN)
+
+    @property
+    def access_analyzer_configuration(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.ACCESS_ANALYZER_CONFIGURATION)
+
+    @property
+    def macie_account_status(self) -> str | None:
+        return self.get(AwsResourceMetadata.MACIE_ACCOUNT_STATUS)
+
+    @property
+    def macie_account_status_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.MACIE_ACCOUNT_STATUS_STATE)
+
+    @property
+    def macie_account_enabled(self) -> bool | None:
+        return _bool_from_state(self.macie_account_status_state)
+
+    @property
+    def macie_finding_publishing_frequency(self) -> str | None:
+        return self.get(AwsResourceMetadata.MACIE_FINDING_PUBLISHING_FREQUENCY)
+
+    @property
     def route_table_id(self) -> str | None:
         return self.get(AwsResourceMetadata.ROUTE_TABLE_ID)
 

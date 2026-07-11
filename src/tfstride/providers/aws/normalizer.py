@@ -10,9 +10,13 @@ from tfstride.providers.aws.api_gateway_normalizers import (
     normalize_apigatewayv2_api,
 )
 from tfstride.providers.aws.audit_normalizers import (
+    normalize_accessanalyzer_analyzer,
     normalize_cloudtrail,
     normalize_config_configuration_recorder,
+    normalize_config_configuration_recorder_status,
+    normalize_config_delivery_channel,
     normalize_guardduty_detector,
+    normalize_macie2_account,
     normalize_securityhub_account,
 )
 from tfstride.providers.aws.compute_normalizers import (
@@ -75,11 +79,14 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    "aws_accessanalyzer_analyzer": normalize_accessanalyzer_analyzer,
     "aws_api_gateway_rest_api": normalize_api_gateway_rest_api,
     "aws_apigatewayv2_api": normalize_apigatewayv2_api,
     "aws_cloudfront_distribution": normalize_cloudfront_distribution,
     "aws_cloudtrail": normalize_cloudtrail,
     "aws_config_configuration_recorder": normalize_config_configuration_recorder,
+    "aws_config_configuration_recorder_status": normalize_config_configuration_recorder_status,
+    "aws_config_delivery_channel": normalize_config_delivery_channel,
     "aws_db_instance": normalize_db_instance,
     "aws_ecs_cluster": normalize_ecs_cluster,
     "aws_ecs_service": normalize_ecs_service,
@@ -103,6 +110,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_lb_listener": normalize_load_balancer_listener,
     "aws_lb_listener_rule": normalize_load_balancer_listener_rule,
     "aws_lb_target_group": normalize_load_balancer_target_group,
+    "aws_macie2_account": normalize_macie2_account,
     "aws_nat_gateway": normalize_nat_gateway,
     "aws_route_table": normalize_route_table,
     "aws_route_table_association": normalize_route_table_association,

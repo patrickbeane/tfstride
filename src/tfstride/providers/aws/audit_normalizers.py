@@ -251,6 +251,162 @@ def normalize_config_configuration_recorder(resource: TerraformResource) -> Norm
     )
 
 
+def normalize_config_configuration_recorder_status(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    name = known_string(values, unknown_values, "name", uncertainties) or resource.name
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=known_string(values, unknown_values, "id", uncertainties) or name,
+        metadata={
+            AwsResourceMetadata.CONFIG_RECORDER_STATUS_NAME: name,
+            AwsResourceMetadata.CONFIG_RECORDER_IS_ENABLED_STATE: _known_bool_state(
+                values,
+                unknown_values,
+                "is_enabled",
+                uncertainties,
+            ),
+            AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def normalize_config_delivery_channel(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    name = known_string(values, unknown_values, "name", uncertainties) or resource.name
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=known_string(values, unknown_values, "id", uncertainties) or name,
+        metadata={
+            AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_NAME: name,
+            AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_S3_BUCKET_NAME: known_string(
+                values,
+                unknown_values,
+                "s3_bucket_name",
+                uncertainties,
+            ),
+            AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_S3_KEY_PREFIX: known_string(
+                values,
+                unknown_values,
+                "s3_key_prefix",
+                uncertainties,
+            ),
+            AwsResourceMetadata.CONFIG_DELIVERY_CHANNEL_SNS_TOPIC_ARN: known_string(
+                values,
+                unknown_values,
+                "sns_topic_arn",
+                uncertainties,
+            ),
+            AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def normalize_accessanalyzer_analyzer(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    name = known_string(values, unknown_values, "analyzer_name", uncertainties)
+    if name is None and not attribute_unknown(unknown_values, "analyzer_name"):
+        name = known_string(values, unknown_values, "name", uncertainties)
+    resolved_name = name or resource.name
+    arn = known_string(values, unknown_values, "arn", uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=known_string(values, unknown_values, "id", uncertainties) or resolved_name,
+        arn=arn,
+        metadata={
+            AwsResourceMetadata.ACCESS_ANALYZER_NAME: resolved_name,
+            AwsResourceMetadata.ACCESS_ANALYZER_TYPE: known_string(
+                values,
+                unknown_values,
+                "type",
+                uncertainties,
+            ),
+            AwsResourceMetadata.ACCESS_ANALYZER_STATUS: known_string(
+                values,
+                unknown_values,
+                "status",
+                uncertainties,
+            ),
+            AwsResourceMetadata.ACCESS_ANALYZER_ARN: arn,
+            AwsResourceMetadata.ACCESS_ANALYZER_CONFIGURATION: _known_first_record(
+                values,
+                unknown_values,
+                "configuration",
+                uncertainties,
+            ),
+            AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def normalize_macie2_account(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    status, status_state = _macie_status(values, unknown_values, uncertainties)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=(
+            known_string(values, unknown_values, "id", uncertainties)
+            or known_string(values, unknown_values, "account_id", uncertainties)
+            or resource.address
+        ),
+        metadata={
+            AwsResourceMetadata.MACIE_ACCOUNT_STATUS: status,
+            AwsResourceMetadata.MACIE_ACCOUNT_STATUS_STATE: status_state,
+            AwsResourceMetadata.MACIE_FINDING_PUBLISHING_FREQUENCY: known_string(
+                values,
+                unknown_values,
+                "finding_publishing_frequency",
+                uncertainties,
+            ),
+            AwsResourceMetadata.AUDIT_DETECTION_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def _macie_status(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> tuple[str | None, str | None]:
+    if attribute_unknown(unknown_values, "status"):
+        uncertainties.append("status is unknown after planning")
+        return None, _STATE_UNKNOWN
+    raw = values.get("status")
+    if raw is None:
+        return None, None
+    text = str(raw).strip()
+    if not text:
+        return None, None
+    return text, _STATE_ENABLED if text.lower() == _STATE_ENABLED else _STATE_DISABLED
+
+
 def _known_bool_state(
     values: Mapping[str, Any],
     unknown_values: Mapping[str, Any],

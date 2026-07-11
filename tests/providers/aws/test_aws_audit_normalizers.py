@@ -5,9 +5,13 @@ from typing import Any
 
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.aws.audit_normalizers import (
+    normalize_accessanalyzer_analyzer,
     normalize_cloudtrail,
     normalize_config_configuration_recorder,
+    normalize_config_configuration_recorder_status,
+    normalize_config_delivery_channel,
     normalize_guardduty_detector,
+    normalize_macie2_account,
     normalize_securityhub_account,
 )
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
@@ -224,12 +228,192 @@ class AwsAuditDetectionNormalizerTests(unittest.TestCase):
             ],
         )
 
+    def test_governance_services_normalize_account_controls(self) -> None:
+        recorder_status = normalize_config_configuration_recorder_status(
+            _resource(
+                "aws_config_configuration_recorder_status",
+                {"id": "default-status", "name": "default", "is_enabled": True},
+            )
+        )
+        delivery_channel = normalize_config_delivery_channel(
+            _resource(
+                "aws_config_delivery_channel",
+                {
+                    "id": "default-channel",
+                    "name": "default",
+                    "s3_bucket_name": "audit-bucket",
+                    "s3_key_prefix": "config",
+                    "sns_topic_arn": "arn:aws:sns:us-east-1:111122223333:config-topic",
+                },
+            )
+        )
+        analyzer = normalize_accessanalyzer_analyzer(
+            _resource(
+                "aws_accessanalyzer_analyzer",
+                {
+                    "id": "arn:aws:access-analyzer:us-east-1:111122223333:analyzer/org-analyzer",
+                    "analyzer_name": "org-analyzer",
+                    "type": "ORGANIZATION",
+                    "status": "ACTIVE",
+                    "arn": "arn:aws:access-analyzer:us-east-1:111122223333:analyzer/org-analyzer",
+                    "configuration": [{"unused_access": [{"unused_access_age_in_days": 30}]}],
+                },
+            )
+        )
+        macie = normalize_macie2_account(
+            _resource(
+                "aws_macie2_account",
+                {
+                    "id": "111122223333",
+                    "status": "ENABLED",
+                    "finding_publishing_frequency": "FIFTEEN_MINUTES",
+                },
+            )
+        )
+
+        recorder_status_facts = aws_facts(recorder_status)
+        self.assertEqual(recorder_status.category, ResourceCategory.IAM)
+        self.assertEqual(recorder_status.identifier, "default-status")
+        self.assertEqual(recorder_status_facts.config_recorder_status_name, "default")
+        self.assertEqual(recorder_status_facts.config_recorder_status_is_enabled_state, "enabled")
+        self.assertTrue(recorder_status_facts.config_recorder_status_is_enabled)
+        self.assertEqual(recorder_status_facts.audit_detection_posture_uncertainties, [])
+
+        delivery_channel_facts = aws_facts(delivery_channel)
+        self.assertEqual(delivery_channel_facts.config_delivery_channel_name, "default")
+        self.assertEqual(delivery_channel_facts.config_delivery_channel_s3_bucket_name, "audit-bucket")
+        self.assertEqual(delivery_channel_facts.config_delivery_channel_s3_key_prefix, "config")
+        self.assertEqual(
+            delivery_channel_facts.config_delivery_channel_sns_topic_arn,
+            "arn:aws:sns:us-east-1:111122223333:config-topic",
+        )
+        self.assertEqual(delivery_channel_facts.audit_detection_posture_uncertainties, [])
+
+        analyzer_facts = aws_facts(analyzer)
+        self.assertEqual(analyzer.identifier, "arn:aws:access-analyzer:us-east-1:111122223333:analyzer/org-analyzer")
+        self.assertEqual(analyzer_facts.access_analyzer_name, "org-analyzer")
+        self.assertEqual(analyzer_facts.access_analyzer_type, "ORGANIZATION")
+        self.assertEqual(analyzer_facts.access_analyzer_status, "ACTIVE")
+        self.assertEqual(
+            analyzer_facts.access_analyzer_arn,
+            "arn:aws:access-analyzer:us-east-1:111122223333:analyzer/org-analyzer",
+        )
+        self.assertEqual(
+            analyzer_facts.access_analyzer_configuration,
+            {"unused_access": [{"unused_access_age_in_days": 30}]},
+        )
+        self.assertEqual(analyzer_facts.audit_detection_posture_uncertainties, [])
+
+        macie_facts = aws_facts(macie)
+        self.assertEqual(macie.identifier, "111122223333")
+        self.assertEqual(macie_facts.macie_account_status, "ENABLED")
+        self.assertEqual(macie_facts.macie_account_status_state, "enabled")
+        self.assertTrue(macie_facts.macie_account_enabled)
+        self.assertEqual(macie_facts.macie_finding_publishing_frequency, "FIFTEEN_MINUTES")
+        self.assertEqual(macie_facts.audit_detection_posture_uncertainties, [])
+
+        analyzer_name_fallback = normalize_accessanalyzer_analyzer(
+            _resource(
+                "aws_accessanalyzer_analyzer",
+                {"id": "fallback-id", "name": "fallback"},
+                name="legacy",
+            )
+        )
+        self.assertEqual(aws_facts(analyzer_name_fallback).access_analyzer_name, "fallback")
+
+        paused_macie = normalize_macie2_account(
+            _resource("aws_macie2_account", {"id": "111122223333", "status": "PAUSED"})
+        )
+        paused_facts = aws_facts(paused_macie)
+        self.assertEqual(paused_facts.macie_account_status, "PAUSED")
+        self.assertEqual(paused_facts.macie_account_status_state, "disabled")
+        self.assertFalse(paused_facts.macie_account_enabled)
+
+    def test_unknown_governance_values_are_explicit(self) -> None:
+        recorder_status = normalize_config_configuration_recorder_status(
+            _resource(
+                "aws_config_configuration_recorder_status",
+                {"name": "default"},
+                unknown_values={"is_enabled": True},
+            )
+        )
+        delivery_channel = normalize_config_delivery_channel(
+            _resource(
+                "aws_config_delivery_channel",
+                {"name": "default"},
+                unknown_values={"s3_bucket_name": True, "sns_topic_arn": True},
+            )
+        )
+        analyzer = normalize_accessanalyzer_analyzer(
+            _resource(
+                "aws_accessanalyzer_analyzer",
+                {"analyzer_name": "org", "type": "ACCOUNT"},
+                unknown_values={"status": True, "arn": True, "configuration": True},
+            )
+        )
+        macie = normalize_macie2_account(
+            _resource(
+                "aws_macie2_account",
+                {"id": "111122223333"},
+                unknown_values={"status": True, "finding_publishing_frequency": True},
+            )
+        )
+
+        recorder_status_facts = aws_facts(recorder_status)
+        self.assertEqual(recorder_status_facts.config_recorder_status_is_enabled_state, "unknown")
+        self.assertIsNone(recorder_status_facts.config_recorder_status_is_enabled)
+        self.assertEqual(
+            recorder_status_facts.audit_detection_posture_uncertainties,
+            ["is_enabled is unknown after planning"],
+        )
+
+        delivery_channel_facts = aws_facts(delivery_channel)
+        self.assertIsNone(delivery_channel_facts.config_delivery_channel_s3_bucket_name)
+        self.assertIsNone(delivery_channel_facts.config_delivery_channel_sns_topic_arn)
+        self.assertEqual(
+            delivery_channel_facts.audit_detection_posture_uncertainties,
+            [
+                "s3_bucket_name is unknown after planning",
+                "sns_topic_arn is unknown after planning",
+            ],
+        )
+
+        analyzer_facts = aws_facts(analyzer)
+        self.assertIsNone(analyzer_facts.access_analyzer_status)
+        self.assertIsNone(analyzer_facts.access_analyzer_arn)
+        self.assertEqual(analyzer_facts.access_analyzer_configuration, {})
+        self.assertEqual(
+            analyzer_facts.audit_detection_posture_uncertainties,
+            [
+                "arn is unknown after planning",
+                "status is unknown after planning",
+                "configuration is unknown after planning",
+            ],
+        )
+
+        macie_facts = aws_facts(macie)
+        self.assertIsNone(macie_facts.macie_account_status)
+        self.assertEqual(macie_facts.macie_account_status_state, "unknown")
+        self.assertIsNone(macie_facts.macie_account_enabled)
+        self.assertIsNone(macie_facts.macie_finding_publishing_frequency)
+        self.assertEqual(
+            macie_facts.audit_detection_posture_uncertainties,
+            [
+                "status is unknown after planning",
+                "finding_publishing_frequency is unknown after planning",
+            ],
+        )
+
     def test_audit_detection_resource_types_are_supported_without_findings(self) -> None:
         for resource_type in (
             "aws_cloudtrail",
             "aws_guardduty_detector",
             "aws_securityhub_account",
             "aws_config_configuration_recorder",
+            "aws_config_configuration_recorder_status",
+            "aws_config_delivery_channel",
+            "aws_accessanalyzer_analyzer",
+            "aws_macie2_account",
         ):
             with self.subTest(resource_type=resource_type):
                 self.assertIn(resource_type, SUPPORTED_AWS_TYPES)
@@ -240,11 +424,15 @@ class AwsAuditDetectionNormalizerTests(unittest.TestCase):
                 _resource("aws_guardduty_detector", {"enable": True}),
                 _resource("aws_securityhub_account", {"enable_default_standards": True}),
                 _resource("aws_config_configuration_recorder", {"name": "default"}),
+                _resource("aws_config_configuration_recorder_status", {"name": "default", "is_enabled": True}),
+                _resource("aws_config_delivery_channel", {"name": "default", "s3_bucket_name": "audit-bucket"}),
+                _resource("aws_accessanalyzer_analyzer", {"analyzer_name": "org", "type": "ACCOUNT"}),
+                _resource("aws_macie2_account", {"id": "111122223333", "status": "ENABLED"}),
             ]
         )
 
         self.assertEqual(inventory.unsupported_resources, [])
-        self.assertEqual(len(inventory.resources), 4)
+        self.assertEqual(len(inventory.resources), 8)
 
 
 if __name__ == "__main__":

@@ -180,6 +180,10 @@ AWS support currently includes:
 * `aws_guardduty_detector`
 * `aws_securityhub_account`
 * `aws_config_configuration_recorder`
+* `aws_config_configuration_recorder_status`
+* `aws_config_delivery_channel`
+* `aws_accessanalyzer_analyzer`
+* `aws_macie2_account`
 
 AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, ALB listener HTTP/TLS certificate/SSL-policy posture, public ALB WAF association posture, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, VPC Flow Logs coverage, traffic-type, and destination posture, S3 public-access/encryption/versioning posture, RDS public endpoint, backup retention, deletion protection, and customer-managed KMS posture, Secrets Manager customer-managed key, recovery-window, and rotation posture, KMS key rotation and deletion-window posture, workload use of S3, KMS, or Secrets Manager without modeled VPC endpoint coverage, broad VPC endpoint policies, CloudTrail multi-region, log-validation, event-selector, data-event, and Insights posture, GuardDuty, Security Hub, and AWS Config baseline posture, IAM wildcard permissions, privileged role-assignment posture, workload-role sensitive permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
 
