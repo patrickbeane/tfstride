@@ -6,6 +6,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDetector, build_rule_contribution
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
+from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.iam_assignment_rules import AwsIamAssignmentRuleDetectors
@@ -31,6 +32,9 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-load-balancer-listener-tls-certificate-missing",
         "aws-load-balancer-listener-ssl-policy-weak-or-unknown",
         "aws-public-alb-waf-missing",
+        "aws-cloudfront-viewer-http-allowed",
+        "aws-cloudfront-viewer-tls-policy-weak-or-unknown",
+        "aws-public-cloudfront-waf-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -109,6 +113,7 @@ def build_aws_rule_contribution(
     lambda_detectors = AwsLambdaRuleDetectors(finding_factory)
     load_balancer_detectors = AwsLoadBalancerRuleDetectors(finding_factory)
     edge_protection_detectors = AwsEdgeProtectionRuleDetectors(finding_factory)
+    cloudfront_detectors = AwsCloudFrontRuleDetectors(finding_factory)
     sensitive_endpoint_detectors = AwsSensitiveEndpointRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "aws-public-compute-broad-ingress": posture_detectors.detect_public_compute_exposure,
@@ -119,6 +124,11 @@ def build_aws_rule_contribution(
             load_balancer_detectors.detect_ssl_policy_weak_or_unknown
         ),
         "aws-public-alb-waf-missing": edge_protection_detectors.detect_public_alb_waf_missing,
+        "aws-cloudfront-viewer-http-allowed": cloudfront_detectors.detect_viewer_http_allowed,
+        "aws-cloudfront-viewer-tls-policy-weak-or-unknown": (
+            cloudfront_detectors.detect_viewer_tls_policy_weak_or_unknown
+        ),
+        "aws-public-cloudfront-waf-missing": cloudfront_detectors.detect_web_acl_missing,
         "aws-cloudtrail-multi-region-disabled": audit_detectors.detect_cloudtrail_multi_region_disabled,
         "aws-cloudtrail-log-file-validation-disabled": audit_detectors.detect_cloudtrail_log_file_validation_disabled,
         "aws-cloudtrail-management-events-disabled": (audit_detectors.detect_cloudtrail_management_events_disabled),

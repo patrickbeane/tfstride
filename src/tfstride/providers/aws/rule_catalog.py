@@ -72,6 +72,39 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-cloudfront-viewer-http-allowed",
+        title="CloudFront distribution allows viewer HTTP",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set CloudFront cache behavior viewer_protocol_policy to redirect-to-https or https-only for public "
+            "distributions, and keep exceptions explicit and reviewed."
+        ),
+        tags=("aws", "cloudfront", "cdn", "tls", "http", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-cloudfront-viewer-tls-policy-weak-or-unknown",
+        title="CloudFront distribution has weak or unknown viewer TLS policy",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure CloudFront viewer certificates with a minimum protocol version of TLS 1.2 or newer, and keep "
+            "the minimum_protocol_version deterministic in Terraform for public distributions."
+        ),
+        tags=("aws", "cloudfront", "cdn", "tls", "certificate", "public-edge"),
+        severity_factors=("internet_exposure", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-public-cloudfront-waf-missing",
+        title="Public CloudFront distribution lacks modeled WAF protection",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Attach an AWS WAFv2 Web ACL to public CloudFront distributions with web_acl_id and keep the association "
+            "modeled in Terraform so public edge protection is reviewable before deployment."
+        ),
+        tags=("aws", "cloudfront", "cdn", "waf", "wafv2", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-cloudtrail-multi-region-disabled",
         title="CloudTrail is not configured for multi-region auditing",
         category=StrideCategory.REPUDIATION,
