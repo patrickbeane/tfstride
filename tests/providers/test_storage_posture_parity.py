@@ -12,6 +12,12 @@ from tests.providers.aws.test_aws_storage_rules import (
     _findings as _aws_findings,
 )
 from tests.providers.aws.test_aws_storage_rules import (
+    _lifecycle as _aws_lifecycle,
+)
+from tests.providers.aws.test_aws_storage_rules import (
+    _object_lock as _aws_object_lock,
+)
+from tests.providers.aws.test_aws_storage_rules import (
     _versioning as _aws_versioning,
 )
 from tests.providers.azure.test_azure_storage_rules import (
@@ -44,6 +50,8 @@ AWS_STORAGE_RULE_IDS = frozenset(
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-s3-object-lock-retention-missing",
+        "aws-s3-lifecycle-noncurrent-retention-insufficient",
     }
 )
 GCP_STORAGE_RULE_IDS = frozenset(
@@ -112,6 +120,8 @@ class StoragePostureParityTests(unittest.TestCase):
                 _aws_bucket(acl="public-read"),
                 _aws_encryption(algorithm="AES256"),
                 _aws_versioning("Suspended"),
+                _aws_object_lock(include_default_retention=False),
+                _aws_lifecycle(noncurrent_days=1),
             ],
             set(AWS_STORAGE_RULE_IDS),
         )
@@ -155,6 +165,8 @@ class StoragePostureParityTests(unittest.TestCase):
                     kms_master_key_id="arn:aws:kms:us-east-1:111122223333:key/storage",
                 ),
                 _aws_versioning("Enabled"),
+                _aws_object_lock(days=30, mode="GOVERNANCE"),
+                _aws_lifecycle(noncurrent_days=30),
             ],
             set(AWS_STORAGE_RULE_IDS),
         )

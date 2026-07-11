@@ -40,6 +40,8 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-s3-object-lock-retention-missing",
+        "aws-s3-lifecycle-noncurrent-retention-insufficient",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
@@ -339,9 +341,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (164, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (166, 2, 2, 14, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (44, 2, 2, 3, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (46, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (47, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (73, 0, 0, 0, 0, 0))
 

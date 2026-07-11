@@ -10,6 +10,8 @@ from tfstride.providers.aws.normalizer import AwsNormalizer
 
 _S3_ENCRYPTION_RULE = "aws-s3-customer-managed-encryption-missing"
 _S3_VERSIONING_RULE = "aws-s3-versioning-disabled"
+_S3_OBJECT_LOCK_RULE = "aws-s3-object-lock-retention-missing"
+_S3_LIFECYCLE_RULE = "aws-s3-lifecycle-noncurrent-retention-insufficient"
 
 
 def _resource(
@@ -77,6 +79,65 @@ def _encryption(
             "bucket": "logs",
             "rule": [{"apply_server_side_encryption_by_default": [encryption_default]}],
         },
+        unknown_values=unknown_values,
+    )
+
+
+def _object_lock(
+    *,
+    enabled: str = "Enabled",
+    mode: str | None = "GOVERNANCE",
+    days: int | None = 30,
+    years: int | None = None,
+    include_default_retention: bool = True,
+    unknown: bool = False,
+) -> TerraformResource:
+    values: dict[str, Any] = {"bucket": "logs", "object_lock_enabled": enabled}
+    if include_default_retention:
+        retention: dict[str, Any] = {}
+        if mode is not None:
+            retention["mode"] = mode
+        if days is not None:
+            retention["days"] = days
+        if years is not None:
+            retention["years"] = years
+        values["rule"] = [{"default_retention": [retention]}]
+    else:
+        values["rule"] = [{}]
+    unknown_values = (
+        {
+            "object_lock_enabled": True,
+            "rule": [{"default_retention": [{"mode": True, "days": True, "years": True}]}],
+        }
+        if unknown
+        else None
+    )
+    return _resource(
+        "aws_s3_bucket_object_lock_configuration.logs",
+        "aws_s3_bucket_object_lock_configuration",
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _lifecycle(
+    *,
+    noncurrent_days: int | None = 30,
+    include_noncurrent_expiration: bool = True,
+    unknown_noncurrent_expiration: bool = False,
+    status: str = "Enabled",
+) -> TerraformResource:
+    rule: dict[str, Any] = {"id": "retain-noncurrent", "status": status}
+    if include_noncurrent_expiration:
+        expiration: dict[str, Any] = {}
+        if noncurrent_days is not None:
+            expiration["noncurrent_days"] = noncurrent_days
+        rule["noncurrent_version_expiration"] = [expiration]
+    unknown_values = {"rule": [{"noncurrent_version_expiration": True}]} if unknown_noncurrent_expiration else None
+    return _resource(
+        "aws_s3_bucket_lifecycle_configuration.logs",
+        "aws_s3_bucket_lifecycle_configuration",
+        {"bucket": "logs", "rule": [rule]},
         unknown_values=unknown_values,
     )
 
@@ -195,8 +256,109 @@ class AwsStorageRuleTests(unittest.TestCase):
             ["aws_s3_bucket_versioning.logs: versioning_configuration.status is unknown after planning"],
         )
 
+    def test_s3_object_lock_missing_default_retention_and_short_lifecycle_are_detected(self) -> None:
+        findings = _findings(
+            [
+                _bucket(),
+                _object_lock(include_default_retention=False),
+                _lifecycle(noncurrent_days=3),
+            ],
+            {_S3_OBJECT_LOCK_RULE, _S3_LIFECYCLE_RULE},
+        )
+
+        findings_by_rule = {finding.rule_id: finding for finding in findings}
+
+        self.assertEqual(set(findings_by_rule), {_S3_OBJECT_LOCK_RULE, _S3_LIFECYCLE_RULE})
+        object_lock_finding = findings_by_rule[_S3_OBJECT_LOCK_RULE]
+        self.assertEqual(object_lock_finding.severity.value, "medium")
+        object_lock_evidence = {item.key: item.values for item in object_lock_finding.evidence}
+        self.assertEqual(
+            object_lock_evidence["object_lock_posture"],
+            [
+                "s3_object_lock_state=default_retention_missing",
+                "minimum_retention_days=7",
+                "object_lock_enabled_state=enabled",
+                "default_retention.mode is unset",
+                "source=aws_s3_bucket_object_lock_configuration.logs",
+            ],
+        )
+
+        lifecycle_finding = findings_by_rule[_S3_LIFECYCLE_RULE]
+        self.assertEqual(lifecycle_finding.severity.value, "medium")
+        lifecycle_evidence = {item.key: item.values for item in lifecycle_finding.evidence}
+        self.assertEqual(
+            lifecycle_evidence["lifecycle_recovery_posture"],
+            [
+                "s3_lifecycle_noncurrent_version_retention_state=short_retention",
+                "minimum_retention_days=7",
+                "source=aws_s3_bucket_lifecycle_configuration.logs",
+                "rule.id=retain-noncurrent",
+                "rule.status=Enabled",
+                "noncurrent_version_expiration.noncurrent_days=3",
+            ],
+        )
+
+    def test_s3_object_lock_and_lifecycle_recovery_are_quiet_when_configured(self) -> None:
+        findings = _findings(
+            [
+                _bucket(),
+                _object_lock(days=30),
+                _lifecycle(noncurrent_days=30),
+            ],
+            {_S3_OBJECT_LOCK_RULE, _S3_LIFECYCLE_RULE},
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_s3_object_lock_unknown_retention_is_reported_as_uncertain(self) -> None:
+        findings = _findings(
+            [_bucket(), _object_lock(mode=None, days=None, unknown=True)],
+            {_S3_OBJECT_LOCK_RULE},
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_S3_OBJECT_LOCK_RULE])
+        self.assertEqual(findings[0].severity.value, "low")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertIn("s3_object_lock_state=unknown", evidence["object_lock_posture"])
+        self.assertEqual(
+            evidence["posture_uncertainty"],
+            [
+                "aws_s3_bucket_object_lock_configuration.logs: object_lock_enabled is unknown after planning",
+                "aws_s3_bucket_object_lock_configuration.logs: rule.default_retention.mode is unknown after planning",
+                "aws_s3_bucket_object_lock_configuration.logs: rule.default_retention.days is unknown after planning",
+                "aws_s3_bucket_object_lock_configuration.logs: rule.default_retention.years is unknown after planning",
+            ],
+        )
+
+    def test_s3_lifecycle_unknown_noncurrent_expiration_is_reported_as_uncertain(self) -> None:
+        findings = _findings(
+            [
+                _bucket(),
+                _lifecycle(include_noncurrent_expiration=False, unknown_noncurrent_expiration=True),
+            ],
+            {_S3_LIFECYCLE_RULE},
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_S3_LIFECYCLE_RULE])
+        self.assertEqual(findings[0].severity.value, "low")
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["lifecycle_recovery_posture"],
+            [
+                "s3_lifecycle_noncurrent_version_retention_state=unknown",
+                "minimum_retention_days=7",
+                "source=aws_s3_bucket_lifecycle_configuration.logs",
+                "rule.id=retain-noncurrent",
+                "rule.status=Enabled",
+                "unknown_fields=noncurrent_version_expiration",
+            ],
+        )
+
     def test_absent_s3_posture_resources_are_not_overstated_as_findings(self) -> None:
-        findings = _findings([_bucket()], {_S3_ENCRYPTION_RULE, _S3_VERSIONING_RULE})
+        findings = _findings(
+            [_bucket()],
+            {_S3_ENCRYPTION_RULE, _S3_VERSIONING_RULE, _S3_OBJECT_LOCK_RULE, _S3_LIFECYCLE_RULE},
+        )
 
         self.assertEqual(findings, [])
 

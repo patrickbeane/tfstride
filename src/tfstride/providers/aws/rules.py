@@ -53,6 +53,8 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-public-access",
         "aws-s3-customer-managed-encryption-missing",
         "aws-s3-versioning-disabled",
+        "aws-s3-object-lock-retention-missing",
+        "aws-s3-lifecycle-noncurrent-retention-insufficient",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
@@ -150,6 +152,10 @@ def build_aws_rule_contribution(
         "aws-s3-public-access": posture_detectors.detect_public_object_storage,
         "aws-s3-customer-managed-encryption-missing": (s3_posture_detectors.detect_customer_managed_encryption_missing),
         "aws-s3-versioning-disabled": s3_posture_detectors.detect_versioning_disabled_or_unknown,
+        "aws-s3-object-lock-retention-missing": (s3_posture_detectors.detect_object_lock_retention_missing_or_short),
+        "aws-s3-lifecycle-noncurrent-retention-insufficient": (
+            s3_posture_detectors.detect_lifecycle_noncurrent_retention_insufficient
+        ),
         "aws-secretsmanager-customer-managed-kms-key-missing": (
             secrets_manager_detectors.detect_customer_managed_kms_key_missing
         ),

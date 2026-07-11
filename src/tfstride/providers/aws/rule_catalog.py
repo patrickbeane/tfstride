@@ -304,6 +304,30 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-s3-object-lock-retention-missing",
+        title="S3 Object Lock default retention is missing or too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Enable S3 Object Lock with default retention for buckets that require immutable recovery "
+            "protection, choose Governance or Compliance mode intentionally, and align retention duration "
+            "with recovery and compliance objectives."
+        ),
+        tags=("aws", "s3", "storage", "immutability", "object-lock", "retention"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-s3-lifecycle-noncurrent-retention-insufficient",
+        title="S3 lifecycle expires noncurrent versions too quickly",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Keep noncurrent object versions for a recovery window that matches operational detection and "
+            "restore objectives. Avoid lifecycle expiration periods that remove recoverable versions before "
+            "operators can respond to accidental or malicious destructive changes."
+        ),
+        tags=("aws", "s3", "storage", "recovery", "lifecycle", "retention"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-secretsmanager-customer-managed-kms-key-missing",
         title="Secrets Manager secret does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,
