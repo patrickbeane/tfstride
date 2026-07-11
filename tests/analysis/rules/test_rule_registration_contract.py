@@ -32,6 +32,10 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-cloudtrail-insight-selectors-missing",
         "aws-guardduty-detector-disabled-or-missing",
         "aws-securityhub-account-missing",
+        "aws-config-recorder-disabled-or-missing",
+        "aws-config-delivery-channel-missing",
+        "aws-access-analyzer-not-configured",
+        "aws-macie-not-enabled-for-sensitive-storage",
         "aws-rds-storage-encryption-disabled",
         "aws-rds-public-endpoint-enabled",
         "aws-rds-backup-retention-insufficient",
@@ -341,9 +345,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (166, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (170, 2, 2, 14, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (46, 2, 2, 3, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (50, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (47, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (73, 0, 0, 0, 0, 0))
 

@@ -3,9 +3,13 @@ from __future__ import annotations
 import unittest
 
 from tests.providers.aws.test_aws_audit_rules import _AUDIT_RULE_IDS as AWS_ACCOUNT_AUDIT_RULE_IDS
+from tests.providers.aws.test_aws_audit_rules import _access_analyzer as _aws_access_analyzer
 from tests.providers.aws.test_aws_audit_rules import _cloudtrail as _aws_cloudtrail
 from tests.providers.aws.test_aws_audit_rules import _config_recorder as _aws_config_recorder
+from tests.providers.aws.test_aws_audit_rules import _config_recorder_status as _aws_config_recorder_status
+from tests.providers.aws.test_aws_audit_rules import _delivery_channel as _aws_delivery_channel
 from tests.providers.aws.test_aws_audit_rules import _guardduty as _aws_guardduty
+from tests.providers.aws.test_aws_audit_rules import _s3_bucket as _aws_s3_bucket
 from tests.providers.aws.test_aws_audit_rules import _securityhub as _aws_securityhub
 from tests.providers.gcp.normalizer_support import _terraform_resource as _gcp_resource
 from tfstride.analysis.rule_registry import RulePolicy
@@ -82,6 +86,14 @@ AWS_ACCOUNT_AUDIT_RULE_CONCEPTS = {
     ),
     "threat_detection": frozenset({"aws-guardduty-detector-disabled-or-missing"}),
     "security_posture_management": frozenset({"aws-securityhub-account-missing"}),
+    "configuration_recording": frozenset(
+        {
+            "aws-config-recorder-disabled-or-missing",
+            "aws-config-delivery-channel-missing",
+        }
+    ),
+    "access_analysis": frozenset({"aws-access-analyzer-not-configured"}),
+    "data_classification": frozenset({"aws-macie-not-enabled-for-sensitive-storage"}),
 }
 AUDIT_DESTINATION_RULE_IDS_BY_PROVIDER = {
     "gcp": frozenset({"gcp-logging-sink-audit-export-incomplete"}),
@@ -224,6 +236,8 @@ def _unsafe_aws_account_audit_resources() -> list[TerraformResource]:
         ),
         _aws_guardduty(enabled=False),
         _aws_config_recorder(),
+        _aws_config_recorder_status(enabled=False),
+        _aws_s3_bucket(),
     ]
 
 
@@ -507,7 +521,15 @@ class AuditDetectionPostureParityTests(unittest.TestCase):
 
     def test_safe_account_audit_and_detection_posture_stays_quiet(self) -> None:
         aws_findings = _evaluate_aws(
-            [_aws_cloudtrail(), _aws_guardduty(), _aws_securityhub(), _aws_config_recorder()],
+            [
+                _aws_cloudtrail(),
+                _aws_guardduty(),
+                _aws_securityhub(),
+                _aws_config_recorder(),
+                _aws_config_recorder_status(),
+                _aws_delivery_channel(),
+                _aws_access_analyzer(),
+            ],
             AWS_ACCOUNT_AUDIT_RULE_IDS,
         )
         gcp_findings = _evaluate_gcp(

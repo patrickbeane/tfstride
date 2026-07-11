@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 189,
+      "registered_rule_count": 193,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -57,6 +57,10 @@
         "aws-cloudtrail-insight-selectors-missing",
         "aws-guardduty-detector-disabled-or-missing",
         "aws-securityhub-account-missing",
+        "aws-config-recorder-disabled-or-missing",
+        "aws-config-delivery-channel-missing",
+        "aws-access-analyzer-not-configured",
+        "aws-macie-not-enabled-for-sensitive-storage",
         "aws-database-permissive-ingress",
         "aws-rds-storage-encryption-disabled",
         "aws-rds-public-endpoint-enabled",
@@ -250,6 +254,10 @@
         "aws-cloudtrail-insight-selectors-missing": 0,
         "aws-guardduty-detector-disabled-or-missing": 0,
         "aws-securityhub-account-missing": 0,
+        "aws-config-recorder-disabled-or-missing": 0,
+        "aws-config-delivery-channel-missing": 0,
+        "aws-access-analyzer-not-configured": 0,
+        "aws-macie-not-enabled-for-sensitive-storage": 0,
         "aws-database-permissive-ingress": 1,
         "aws-rds-storage-encryption-disabled": 0,
         "aws-rds-public-endpoint-enabled": 0,

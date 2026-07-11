@@ -205,6 +205,52 @@ AWS_RULE_METADATA = (
         severity_factors=("lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-config-recorder-disabled-or-missing",
+        title="AWS Config recorder is disabled or not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable the AWS Config recorder and keep `aws_config_configuration_recorder` "
+            "(with `aws_config_configuration_recorder_status`) or an equivalent account-baseline module "
+            "represented in Terraform so resource configuration changes are reviewable before deployment."
+        ),
+        tags=("aws", "config", "audit", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-config-delivery-channel-missing",
+        title="AWS Config delivery channel is not modeled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure an `aws_config_delivery_channel` pointing to a durable S3 bucket and optionally an SNS "
+            "topic, or represent the equivalent account-baseline module in Terraform so configuration history is "
+            "exported and reviewable before deployment."
+        ),
+        tags=("aws", "config", "audit", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-access-analyzer-not-configured",
+        title="IAM Access Analyzer is not configured",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Create an `aws_accessanalyzer_analyzer` (account or organization scope) for the account baseline so "
+            "external and unused access to IAM resources is detected and reviewable before deployment."
+        ),
+        tags=("aws", "access-analyzer", "audit", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-macie-not-enabled-for-sensitive-storage",
+        title="Amazon Macie is not enabled for sensitive S3 storage",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable Amazon Macie with an `aws_macie2_account` resource for the account baseline so sensitive "
+            "data in the modeled Amazon S3 storage is discovered and classified before deployment."
+        ),
+        tags=("aws", "macie", "data-classification", "account-posture"),
+        severity_factors=("lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-database-permissive-ingress",
         title="Database is reachable from overly permissive sources",
         category=StrideCategory.INFORMATION_DISCLOSURE,

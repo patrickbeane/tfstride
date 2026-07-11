@@ -17,6 +17,11 @@ _AWS_CLOUDTRAIL = "aws_cloudtrail"
 _AWS_GUARDDUTY_DETECTOR = "aws_guardduty_detector"
 _AWS_SECURITYHUB_ACCOUNT = "aws_securityhub_account"
 _AWS_CONFIG_CONFIGURATION_RECORDER = "aws_config_configuration_recorder"
+_AWS_CONFIG_CONFIGURATION_RECORDER_STATUS = "aws_config_configuration_recorder_status"
+_AWS_CONFIG_DELIVERY_CHANNEL = "aws_config_delivery_channel"
+_AWS_ACCESSANALYZER_ANALYZER = "aws_accessanalyzer_analyzer"
+_AWS_MACIE2_ACCOUNT = "aws_macie2_account"
+_AWS_S3_BUCKET = "aws_s3_bucket"
 _AWS_ACCOUNT_AUDIT_RESOURCE_TYPES = (
     _AWS_CLOUDTRAIL,
     _AWS_GUARDDUTY_DETECTOR,
@@ -295,6 +300,225 @@ class AwsAccountAuditRuleDetectors:
             )
         ]
 
+    def detect_config_recorder_disabled_or_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        recorders = list(context.inventory.by_type(_AWS_CONFIG_CONFIGURATION_RECORDER))
+        recorder_statuses = list(context.inventory.by_type(_AWS_CONFIG_CONFIGURATION_RECORDER_STATUS))
+        findings: list[Finding] = []
+        for status in recorder_statuses:
+            facts = aws_facts(status)
+            if facts.config_recorder_status_is_enabled is not False:
+                continue
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[status.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{status.display_name} reports the AWS Config recorder is disabled. Configuration "
+                        "changes for the modeled account resources may not be captured by AWS Config until "
+                        "recording is enabled."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _account_resource_evidence(status, facts)),
+                        evidence_item("config_recorder_posture", _config_recorder_status_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        if recorders:
+            if not recorder_statuses:
+                severity_reasoning = _audit_detection_severity()
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=_resource_addresses(recorders),
+                        trust_boundary_id=None,
+                        rationale=(
+                            "The Terraform plan models aws_config_configuration_recorder, but no "
+                            "aws_config_configuration_recorder_status resource is present. tfSTRIDE cannot "
+                            "confirm the recorder is enabled and actively recording resource configurations "
+                            "from this plan."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item(
+                                "missing_control",
+                                ["aws_config_configuration_recorder_status is not modeled"],
+                            ),
+                            evidence_item("target_recorders", _modeled_control_evidence(recorders)),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+            return findings
+
+        modeled_controls = _modeled_account_audit_resources(context.inventory.resources)
+        if not modeled_controls:
+            return findings
+
+        severity_reasoning = _audit_detection_severity()
+        findings.append(
+            self._finding_factory.build(
+                rule_id=rule_id,
+                severity=severity_reasoning.severity,
+                affected_resources=_resource_addresses(modeled_controls),
+                trust_boundary_id=None,
+                rationale=(
+                    "The Terraform plan models AWS account audit or detection controls, but no "
+                    "aws_config_configuration_recorder resource is present. tfSTRIDE cannot confirm AWS Config is "
+                    "recording resource configurations for the modeled account from this plan."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("missing_control", ["aws_config_configuration_recorder is not modeled"]),
+                    evidence_item("modeled_account_controls", _modeled_control_evidence(modeled_controls)),
+                ),
+                severity_reasoning=severity_reasoning,
+            )
+        )
+        return findings
+
+    def detect_config_delivery_channel_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+        if context.inventory.by_type(_AWS_CONFIG_DELIVERY_CHANNEL):
+            return []
+
+        modeled_controls = _modeled_account_audit_resources(context.inventory.resources)
+        if not modeled_controls:
+            return []
+
+        severity_reasoning = _audit_detection_severity()
+        return [
+            self._finding_factory.build(
+                rule_id=rule_id,
+                severity=severity_reasoning.severity,
+                affected_resources=_resource_addresses(modeled_controls),
+                trust_boundary_id=None,
+                rationale=(
+                    "The Terraform plan models AWS account audit or detection controls, but no "
+                    "aws_config_delivery_channel resource is present. tfSTRIDE cannot confirm AWS Config "
+                    "configuration history is exported to a durable destination from this plan."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("missing_control", ["aws_config_delivery_channel is not modeled"]),
+                    evidence_item("modeled_account_controls", _modeled_control_evidence(modeled_controls)),
+                ),
+                severity_reasoning=severity_reasoning,
+            )
+        ]
+
+    def detect_access_analyzer_not_configured(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+        if context.inventory.by_type(_AWS_ACCESSANALYZER_ANALYZER):
+            return []
+
+        modeled_controls = _modeled_account_audit_resources(context.inventory.resources)
+        if not modeled_controls:
+            return []
+
+        severity_reasoning = _audit_detection_severity()
+        return [
+            self._finding_factory.build(
+                rule_id=rule_id,
+                severity=severity_reasoning.severity,
+                affected_resources=_resource_addresses(modeled_controls),
+                trust_boundary_id=None,
+                rationale=(
+                    "The Terraform plan models AWS account audit or detection controls, but no "
+                    "aws_accessanalyzer_analyzer resource is present. tfSTRIDE cannot confirm IAM Access "
+                    "Analyzer is reviewing external or unused access for the modeled account from this plan."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("missing_control", ["aws_accessanalyzer_analyzer is not modeled"]),
+                    evidence_item("modeled_account_controls", _modeled_control_evidence(modeled_controls)),
+                ),
+                severity_reasoning=severity_reasoning,
+            )
+        ]
+
+    def detect_macie_not_enabled_for_sensitive_storage(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        sensitive_storage = list(context.inventory.by_type(_AWS_S3_BUCKET))
+        if not sensitive_storage:
+            return []
+
+        macie_accounts = list(context.inventory.by_type(_AWS_MACIE2_ACCOUNT))
+        findings: list[Finding] = []
+        for macie in macie_accounts:
+            facts = aws_facts(macie)
+            if facts.macie_account_enabled is not False:
+                continue
+            severity_reasoning = _audit_detection_severity()
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[macie.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{macie.display_name} has Amazon Macie disabled. Sensitive objects in the modeled "
+                        "Amazon S3 storage may not be discovered or classified until Macie is enabled."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _account_resource_evidence(macie, facts)),
+                        evidence_item("macie_posture", _macie_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        if macie_accounts:
+            return findings
+
+        modeled_controls = _modeled_account_audit_resources(context.inventory.resources)
+        if not modeled_controls:
+            return findings
+
+        severity_reasoning = _audit_detection_severity()
+        findings.append(
+            self._finding_factory.build(
+                rule_id=rule_id,
+                severity=severity_reasoning.severity,
+                affected_resources=_resource_addresses(modeled_controls),
+                trust_boundary_id=None,
+                rationale=(
+                    "The Terraform plan models sensitive Amazon S3 storage and AWS account audit or detection "
+                    "controls, but no aws_macie2_account resource is present. tfSTRIDE cannot confirm Amazon Macie "
+                    "is enabled to discover and classify sensitive data in the modeled S3 storage from this plan."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("missing_control", ["aws_macie2_account is not modeled"]),
+                    evidence_item("sensitive_storage", _macie_sensitive_storage_evidence(sensitive_storage)),
+                    evidence_item("modeled_account_controls", _modeled_control_evidence(modeled_controls)),
+                ),
+                severity_reasoning=severity_reasoning,
+            )
+        )
+        return findings
+
 
 def _audit_detection_severity():
     return build_severity_reasoning(
@@ -458,3 +682,31 @@ def _guardduty_evidence(facts: AwsResourceFacts) -> list[str]:
 
 def _modeled_control_evidence(resources: Iterable[NormalizedResource]) -> list[str]:
     return [f"{resource.resource_type}:{resource.address}" for resource in resources]
+
+
+def _config_recorder_status_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [f"recorder_status_is_enabled_state={facts.config_recorder_status_is_enabled_state or 'unknown'}"]
+    if facts.config_recorder_status_is_enabled is False:
+        values.append("recorder is disabled")
+    elif facts.config_recorder_status_is_enabled is True:
+        values.append("recorder is enabled")
+    else:
+        values.append("recorder enablement is unknown")
+    return values
+
+
+def _macie_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [f"account_status_state={facts.macie_account_status_state or 'unknown'}"]
+    if facts.macie_account_enabled is False:
+        values.append("macie is disabled")
+    elif facts.macie_account_enabled is True:
+        values.append("macie is enabled")
+    else:
+        values.append("macie enablement is unknown")
+    if facts.macie_finding_publishing_frequency:
+        values.append(f"finding_publishing_frequency={facts.macie_finding_publishing_frequency}")
+    return values
+
+
+def _macie_sensitive_storage_evidence(resources: Iterable[NormalizedResource]) -> list[str]:
+    return sorted({f"{resource.resource_type}:{resource.address}" for resource in resources})

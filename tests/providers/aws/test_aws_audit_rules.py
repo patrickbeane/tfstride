@@ -15,6 +15,10 @@ _CLOUDTRAIL_DATA_EVENTS_RULE = "aws-cloudtrail-data-events-not-modeled"
 _CLOUDTRAIL_INSIGHT_SELECTORS_RULE = "aws-cloudtrail-insight-selectors-missing"
 _GUARDDUTY_RULE = "aws-guardduty-detector-disabled-or-missing"
 _SECURITYHUB_RULE = "aws-securityhub-account-missing"
+_CONFIG_RECORDER_RULE = "aws-config-recorder-disabled-or-missing"
+_CONFIG_DELIVERY_CHANNEL_RULE = "aws-config-delivery-channel-missing"
+_ACCESS_ANALYZER_RULE = "aws-access-analyzer-not-configured"
+_MACIE_RULE = "aws-macie-not-enabled-for-sensitive-storage"
 _AUDIT_RULE_IDS = (
     _CLOUDTRAIL_MULTI_REGION_RULE,
     _CLOUDTRAIL_LOG_VALIDATION_RULE,
@@ -23,6 +27,10 @@ _AUDIT_RULE_IDS = (
     _CLOUDTRAIL_INSIGHT_SELECTORS_RULE,
     _GUARDDUTY_RULE,
     _SECURITYHUB_RULE,
+    _CONFIG_RECORDER_RULE,
+    _CONFIG_DELIVERY_CHANNEL_RULE,
+    _ACCESS_ANALYZER_RULE,
+    _MACIE_RULE,
 )
 _MISSING = object()
 _SAFE_EVENT_SELECTORS = [
@@ -123,6 +131,56 @@ def _config_recorder(*, name: str = "default") -> TerraformResource:
 
 def _s3_bucket(*, name: str = "logs") -> TerraformResource:
     return _resource("aws_s3_bucket", {"id": name, "bucket": name}, name=name)
+
+
+def _config_recorder_status(
+    *,
+    name: str = "default",
+    enabled: object = True,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {"id": f"{name}-status", "name": name}
+    if enabled is not _MISSING:
+        values["is_enabled"] = enabled
+    return _resource(
+        "aws_config_configuration_recorder_status",
+        values,
+        name=name,
+        unknown_values=unknown_values,
+    )
+
+
+def _delivery_channel(*, name: str = "default") -> TerraformResource:
+    return _resource(
+        "aws_config_delivery_channel",
+        {"id": f"{name}-channel", "name": name, "s3_bucket_name": "audit-bucket"},
+        name=name,
+    )
+
+
+def _access_analyzer(*, name: str = "org", analyzer_type: str = "ORGANIZATION") -> TerraformResource:
+    return _resource(
+        "aws_accessanalyzer_analyzer",
+        {
+            "id": f"arn:aws:access-analyzer:us-east-1:111122223333:analyzer/{name}",
+            "analyzer_name": name,
+            "type": analyzer_type,
+            "status": "ACTIVE",
+        },
+        name=name,
+    )
+
+
+def _macie(
+    *,
+    name: str = "main",
+    status: object = "ENABLED",
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {"id": "111122223333", "finding_publishing_frequency": "FIFTEEN_MINUTES"}
+    if status is not _MISSING:
+        values["status"] = status
+    return _resource("aws_macie2_account", values, name=name, unknown_values=unknown_values)
 
 
 def _findings(resources: list[TerraformResource], *rule_ids: str):
@@ -260,9 +318,107 @@ class AwsAccountAuditRuleTests(unittest.TestCase):
         securityhub_evidence = _evidence_by_key(findings_by_rule[_SECURITYHUB_RULE])
         self.assertEqual(securityhub_evidence["missing_control"], ["aws_securityhub_account is not modeled"])
 
+    def test_config_recorder_disabled_status_is_detected(self) -> None:
+        findings = _findings(
+            [_config_recorder(), _config_recorder_status(enabled=False)],
+            _CONFIG_RECORDER_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_CONFIG_RECORDER_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["config_recorder_posture"],
+            ["recorder_status_is_enabled_state=disabled", "recorder is disabled"],
+        )
+
+    def test_config_recorder_missing_is_detected_when_audit_controls_are_modeled(self) -> None:
+        findings = _findings([_cloudtrail(), _securityhub()], _CONFIG_RECORDER_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_CONFIG_RECORDER_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(evidence["missing_control"], ["aws_config_configuration_recorder is not modeled"])
+        self.assertEqual(
+            evidence["modeled_account_controls"],
+            [
+                "aws_cloudtrail:aws_cloudtrail.audit",
+                "aws_securityhub_account:aws_securityhub_account.main",
+            ],
+        )
+
+    def test_config_recorder_status_missing_is_detected_when_recorder_is_modeled(self) -> None:
+        findings = _findings([_config_recorder()], _CONFIG_RECORDER_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_CONFIG_RECORDER_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(evidence["missing_control"], ["aws_config_configuration_recorder_status is not modeled"])
+        self.assertEqual(
+            evidence["target_recorders"],
+            ["aws_config_configuration_recorder:aws_config_configuration_recorder.default"],
+        )
+
+    def test_config_delivery_channel_and_access_analyzer_missing_are_detected(self) -> None:
+        findings = _findings(
+            [_cloudtrail(), _config_recorder()],
+            _CONFIG_DELIVERY_CHANNEL_RULE,
+            _ACCESS_ANALYZER_RULE,
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            [_CONFIG_DELIVERY_CHANNEL_RULE, _ACCESS_ANALYZER_RULE],
+        )
+        findings_by_rule = {finding.rule_id: finding for finding in findings}
+        delivery_evidence = _evidence_by_key(findings_by_rule[_CONFIG_DELIVERY_CHANNEL_RULE])
+        self.assertEqual(delivery_evidence["missing_control"], ["aws_config_delivery_channel is not modeled"])
+        self.assertEqual(
+            delivery_evidence["modeled_account_controls"],
+            [
+                "aws_cloudtrail:aws_cloudtrail.audit",
+                "aws_config_configuration_recorder:aws_config_configuration_recorder.default",
+            ],
+        )
+        analyzer_evidence = _evidence_by_key(findings_by_rule[_ACCESS_ANALYZER_RULE])
+        self.assertEqual(analyzer_evidence["missing_control"], ["aws_accessanalyzer_analyzer is not modeled"])
+
+    def test_macie_disabled_is_detected_for_sensitive_storage(self) -> None:
+        findings = _findings([_s3_bucket(), _macie(status="PAUSED")], _MACIE_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_MACIE_RULE])
+        self.assertEqual(findings[0].severity.value, "medium")
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(
+            evidence["macie_posture"],
+            ["account_status_state=disabled", "macie is disabled", "finding_publishing_frequency=FIFTEEN_MINUTES"],
+        )
+
+    def test_macie_missing_is_detected_for_sensitive_storage_when_controls_are_modeled(self) -> None:
+        findings = _findings([_s3_bucket(), _cloudtrail()], _MACIE_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_MACIE_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertEqual(evidence["missing_control"], ["aws_macie2_account is not modeled"])
+        self.assertEqual(evidence["sensitive_storage"], ["aws_s3_bucket:aws_s3_bucket.logs"])
+
+    def test_macie_is_not_inferred_without_sensitive_storage(self) -> None:
+        findings = _findings([_cloudtrail(), _config_recorder()], _MACIE_RULE)
+
+        self.assertEqual(findings, [])
+
     def test_complete_account_audit_detection_posture_is_quiet(self) -> None:
         findings = _findings(
-            [_cloudtrail(), _guardduty(), _securityhub(), _config_recorder()],
+            [
+                _cloudtrail(),
+                _guardduty(),
+                _securityhub(),
+                _config_recorder(),
+                _config_recorder_status(),
+                _delivery_channel(),
+                _access_analyzer(),
+                _s3_bucket(),
+                _macie(),
+            ],
             *_AUDIT_RULE_IDS,
         )
 
@@ -285,6 +441,12 @@ class AwsAccountAuditRuleTests(unittest.TestCase):
                 ),
                 _guardduty(enabled=False, unknown_values={"enable": True}),
                 _securityhub(),
+                _config_recorder(),
+                _config_recorder_status(enabled=False, unknown_values={"is_enabled": True}),
+                _delivery_channel(),
+                _access_analyzer(),
+                _macie(status="PAUSED", unknown_values={"status": True}),
+                _s3_bucket(),
             ],
             *_AUDIT_RULE_IDS,
         )
@@ -292,7 +454,15 @@ class AwsAccountAuditRuleTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_missing_detection_services_are_not_inferred_without_account_audit_resources(self) -> None:
-        findings = _findings([_s3_bucket()], _GUARDDUTY_RULE, _SECURITYHUB_RULE)
+        findings = _findings(
+            [_s3_bucket()],
+            _GUARDDUTY_RULE,
+            _SECURITYHUB_RULE,
+            _CONFIG_RECORDER_RULE,
+            _CONFIG_DELIVERY_CHANNEL_RULE,
+            _ACCESS_ANALYZER_RULE,
+            _MACIE_RULE,
+        )
 
         self.assertEqual(findings, [])
 
