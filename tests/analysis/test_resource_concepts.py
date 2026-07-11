@@ -132,6 +132,7 @@ class ResourceConceptTests(unittest.TestCase):
             frozenset(
                 {
                     "aws_instance",
+                    "aws_cloudfront_distribution",
                     "aws_lb",
                     "aws_db_instance",
                     "aws_s3_bucket",
@@ -307,6 +308,7 @@ class ResourceConceptTests(unittest.TestCase):
         )
 
     def test_resource_concept_predicates_classify_known_resources(self) -> None:
+        self.assertTrue(is_public_edge_resource(_resource("aws_cloudfront_distribution")))
         self.assertTrue(is_public_edge_resource(_resource("aws_lb")))
         self.assertTrue(is_public_edge_resource(_resource("azurerm_key_vault", provider="azure")))
         self.assertTrue(is_public_edge_resource(_resource("google_cloud_run_v2_service", provider="gcp")))

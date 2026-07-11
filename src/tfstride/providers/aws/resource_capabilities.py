@@ -31,6 +31,7 @@ AWS_RESOURCE_CAPABILITIES = MappingProxyType(
             {
                 "aws_instance",
                 "aws_lb",
+                "aws_cloudfront_distribution",
                 "aws_db_instance",
                 "aws_s3_bucket",
             }

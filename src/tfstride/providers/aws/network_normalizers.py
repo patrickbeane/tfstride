@@ -7,7 +7,17 @@ from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupR
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
-from tfstride.providers.coercion import attribute_unknown, first_mapping, known_bool, known_string, known_string_list
+from tfstride.providers.coercion import (
+    attribute_unknown,
+    first_mapping,
+    known_block_bool,
+    known_block_string,
+    known_block_strings,
+    known_bool,
+    known_string,
+    known_string_list,
+    unknown_block_at,
+)
 from tfstride.providers.json_documents import load_json_document
 
 AWS_PROVIDER = "aws"
@@ -236,6 +246,90 @@ def normalize_vpc_endpoint(resource: TerraformResource) -> NormalizedResource:
     )
 
 
+def normalize_cloudfront_distribution(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    distribution_id = known_string(values, unknown_values, "id", uncertainties)
+    arn = known_string(values, unknown_values, "arn", uncertainties)
+    domain_name = known_string(values, unknown_values, "domain_name", uncertainties)
+    enabled = known_bool(values, unknown_values, "enabled", uncertainties, allow_string=False)
+    ipv6_enabled = known_bool(values, unknown_values, "is_ipv6_enabled", uncertainties, allow_string=False)
+    aliases = known_string_list(values, unknown_values, "aliases", uncertainties)
+    default_cache_behavior = _cloudfront_default_cache_behavior(values, unknown_values, uncertainties)
+    ordered_cache_behaviors = _cloudfront_ordered_cache_behaviors(values, unknown_values, uncertainties)
+    origins = _cloudfront_origins(values, unknown_values, uncertainties)
+    viewer_certificate = _cloudfront_viewer_certificate(values, unknown_values, uncertainties)
+    logging_config, logging_state = _cloudfront_logging_config(values, unknown_values, uncertainties)
+
+    is_enabled = enabled is True
+    normalized = NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=distribution_id or arn or domain_name or resource.address,
+        arn=arn,
+        public_access_configured=is_enabled,
+        public_exposure=is_enabled,
+        metadata={
+            AwsResourceMetadata.NAME: known_string(values, unknown_values, "comment", uncertainties) or resource.name,
+            AwsResourceMetadata.CLOUDFRONT_DISTRIBUTION_ID: distribution_id,
+            AwsResourceMetadata.CLOUDFRONT_DISTRIBUTION_ARN: arn,
+            AwsResourceMetadata.CLOUDFRONT_DOMAIN_NAME: domain_name,
+            AwsResourceMetadata.CLOUDFRONT_ENABLED_STATE: _bool_state(enabled),
+            AwsResourceMetadata.CLOUDFRONT_IPV6_ENABLED_STATE: _bool_state(ipv6_enabled),
+            AwsResourceMetadata.CLOUDFRONT_HTTP_VERSION: known_string(
+                values, unknown_values, "http_version", uncertainties
+            ),
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_ROOT_OBJECT: known_string(
+                values, unknown_values, "default_root_object", uncertainties
+            ),
+            AwsResourceMetadata.CLOUDFRONT_ALIASES: aliases,
+            AwsResourceMetadata.CLOUDFRONT_WEB_ACL_ID: known_string(
+                values, unknown_values, "web_acl_id", uncertainties
+            ),
+            AwsResourceMetadata.CLOUDFRONT_ORIGINS: origins,
+            AwsResourceMetadata.CLOUDFRONT_ORIGIN_IDS: compact(origin.get("origin_id") for origin in origins),
+            AwsResourceMetadata.CLOUDFRONT_ORIGIN_DOMAIN_NAMES: compact(
+                origin.get("domain_name") for origin in origins
+            ),
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_CACHE_BEHAVIOR: default_cache_behavior,
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_VIEWER_PROTOCOL_POLICY: default_cache_behavior.get(
+                "viewer_protocol_policy"
+            ),
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_ALLOWED_METHODS: default_cache_behavior.get("allowed_methods", []),
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_CACHED_METHODS: default_cache_behavior.get("cached_methods", []),
+            AwsResourceMetadata.CLOUDFRONT_ORDERED_CACHE_BEHAVIORS: ordered_cache_behaviors,
+            AwsResourceMetadata.CLOUDFRONT_ORDERED_VIEWER_PROTOCOL_POLICIES: compact(
+                behavior.get("viewer_protocol_policy") for behavior in ordered_cache_behaviors
+            ),
+            AwsResourceMetadata.CLOUDFRONT_VIEWER_CERTIFICATE: viewer_certificate,
+            AwsResourceMetadata.CLOUDFRONT_VIEWER_CERTIFICATE_SOURCE: viewer_certificate.get("certificate_source"),
+            AwsResourceMetadata.CLOUDFRONT_DEFAULT_CERTIFICATE_STATE: viewer_certificate.get(
+                "cloudfront_default_certificate_state"
+            ),
+            AwsResourceMetadata.CLOUDFRONT_MINIMUM_PROTOCOL_VERSION: viewer_certificate.get("minimum_protocol_version"),
+            AwsResourceMetadata.CLOUDFRONT_SSL_SUPPORT_METHOD: viewer_certificate.get("ssl_support_method"),
+            AwsResourceMetadata.CLOUDFRONT_ACM_CERTIFICATE_ARN: viewer_certificate.get("acm_certificate_arn"),
+            AwsResourceMetadata.CLOUDFRONT_IAM_CERTIFICATE_ID: viewer_certificate.get("iam_certificate_id"),
+            AwsResourceMetadata.CLOUDFRONT_LOGGING_STATE: logging_state,
+            AwsResourceMetadata.CLOUDFRONT_LOGGING_CONFIG: logging_config,
+            AwsResourceMetadata.CLOUDFRONT_LOGGING_BUCKET: logging_config.get("bucket_name"),
+            AwsResourceMetadata.CLOUDFRONT_LOGGING_PREFIX: logging_config.get("prefix"),
+            AwsResourceMetadata.CLOUDFRONT_POSTURE_UNCERTAINTIES: uncertainties,
+            "tags": values.get("tags", {}),
+        },
+    )
+    reasons = ["CloudFront distribution is enabled"] if is_enabled else []
+    mutations = aws_mutations(normalized)
+    mutations.set_public_access_reasons(reasons)
+    mutations.set_public_exposure_reasons(reasons)
+    return normalized
+
+
 def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     internet_facing = not bool(values.get("internal", False))
@@ -419,6 +513,275 @@ def _web_acl_rules(
         if isinstance(rule, Mapping):
             rules.append(dict(rule))
     return rules
+
+
+def _cloudfront_default_cache_behavior(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    behavior, unknown_block = _first_cloudfront_block(values, unknown_values, "default_cache_behavior", uncertainties)
+    if behavior is None:
+        return {}
+    return _compact_record(
+        {
+            "target_origin_id": known_block_string(
+                behavior, unknown_block, "target_origin_id", uncertainties, path="default_cache_behavior"
+            ),
+            "viewer_protocol_policy": known_block_string(
+                behavior, unknown_block, "viewer_protocol_policy", uncertainties, path="default_cache_behavior"
+            ),
+            "cache_policy_id": known_block_string(
+                behavior, unknown_block, "cache_policy_id", uncertainties, path="default_cache_behavior"
+            ),
+            "origin_request_policy_id": known_block_string(
+                behavior, unknown_block, "origin_request_policy_id", uncertainties, path="default_cache_behavior"
+            ),
+            "response_headers_policy_id": known_block_string(
+                behavior, unknown_block, "response_headers_policy_id", uncertainties, path="default_cache_behavior"
+            ),
+            "allowed_methods": known_block_strings(
+                behavior, unknown_block, "allowed_methods", uncertainties, path="default_cache_behavior"
+            ),
+            "cached_methods": known_block_strings(
+                behavior, unknown_block, "cached_methods", uncertainties, path="default_cache_behavior"
+            ),
+        }
+    )
+
+
+def _cloudfront_ordered_cache_behaviors(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    unknown_collection = _unknown_value(unknown_values, "ordered_cache_behavior")
+    if unknown_collection is True:
+        uncertainties.append("ordered_cache_behavior is unknown after planning")
+        return []
+    behaviors: list[dict[str, Any]] = []
+    for index, behavior in enumerate(as_list(values.get("ordered_cache_behavior"))):
+        if not isinstance(behavior, Mapping):
+            uncertainties.append("ordered_cache_behavior has an unrecognized value shape")
+            continue
+        unknown_block = unknown_block_at(unknown_collection, index)
+        record = _compact_record(
+            {
+                "path_pattern": known_block_string(
+                    behavior, unknown_block, "path_pattern", uncertainties, path="ordered_cache_behavior"
+                ),
+                "target_origin_id": known_block_string(
+                    behavior, unknown_block, "target_origin_id", uncertainties, path="ordered_cache_behavior"
+                ),
+                "viewer_protocol_policy": known_block_string(
+                    behavior, unknown_block, "viewer_protocol_policy", uncertainties, path="ordered_cache_behavior"
+                ),
+                "cache_policy_id": known_block_string(
+                    behavior, unknown_block, "cache_policy_id", uncertainties, path="ordered_cache_behavior"
+                ),
+                "allowed_methods": known_block_strings(
+                    behavior, unknown_block, "allowed_methods", uncertainties, path="ordered_cache_behavior"
+                ),
+                "cached_methods": known_block_strings(
+                    behavior, unknown_block, "cached_methods", uncertainties, path="ordered_cache_behavior"
+                ),
+            }
+        )
+        if record:
+            behaviors.append(record)
+    return behaviors
+
+
+def _cloudfront_origins(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> list[dict[str, Any]]:
+    unknown_collection = _unknown_value(unknown_values, "origin")
+    if unknown_collection is True:
+        uncertainties.append("origin is unknown after planning")
+        return []
+    origins: list[dict[str, Any]] = []
+    for index, origin in enumerate(as_list(values.get("origin"))):
+        if not isinstance(origin, Mapping):
+            uncertainties.append("origin has an unrecognized value shape")
+            continue
+        unknown_block = unknown_block_at(unknown_collection, index)
+        record = _compact_record(
+            {
+                "origin_id": known_block_string(origin, unknown_block, "origin_id", uncertainties, path="origin"),
+                "domain_name": known_block_string(origin, unknown_block, "domain_name", uncertainties, path="origin"),
+                "origin_path": known_block_string(origin, unknown_block, "origin_path", uncertainties, path="origin"),
+            }
+        )
+        custom_origin_config = first_mapping(origin.get("custom_origin_config"), expand_tuples=True)
+        if custom_origin_config is not None:
+            record["custom_origin_config"] = dict(custom_origin_config)
+        s3_origin_config = first_mapping(origin.get("s3_origin_config"), expand_tuples=True)
+        if s3_origin_config is not None:
+            record["s3_origin_config"] = dict(s3_origin_config)
+        if record:
+            origins.append(record)
+    return origins
+
+
+def _cloudfront_viewer_certificate(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    certificate, unknown_block = _first_cloudfront_block(values, unknown_values, "viewer_certificate", uncertainties)
+    if certificate is None:
+        return {}
+    unknown_fields: list[str] = []
+    default_certificate = known_block_bool(
+        certificate,
+        unknown_block,
+        "cloudfront_default_certificate",
+        uncertainties,
+        path="viewer_certificate",
+        unknown_fields=unknown_fields,
+    )
+    acm_certificate_arn = known_block_string(
+        certificate,
+        unknown_block,
+        "acm_certificate_arn",
+        uncertainties,
+        path="viewer_certificate",
+        unknown_fields=unknown_fields,
+    )
+    iam_certificate_id = known_block_string(
+        certificate,
+        unknown_block,
+        "iam_certificate_id",
+        uncertainties,
+        path="viewer_certificate",
+        unknown_fields=unknown_fields,
+    )
+    minimum_protocol_version = known_block_string(
+        certificate,
+        unknown_block,
+        "minimum_protocol_version",
+        uncertainties,
+        path="viewer_certificate",
+        unknown_fields=unknown_fields,
+    )
+    ssl_support_method = known_block_string(
+        certificate,
+        unknown_block,
+        "ssl_support_method",
+        uncertainties,
+        path="viewer_certificate",
+        unknown_fields=unknown_fields,
+    )
+    default_certificate_state = _bool_state(default_certificate)
+    return _compact_record(
+        {
+            "certificate_source": _cloudfront_certificate_source(
+                default_certificate, acm_certificate_arn, iam_certificate_id, unknown_fields
+            ),
+            "cloudfront_default_certificate_state": default_certificate_state,
+            "acm_certificate_arn": acm_certificate_arn,
+            "iam_certificate_id": iam_certificate_id,
+            "minimum_protocol_version": minimum_protocol_version,
+            "ssl_support_method": ssl_support_method,
+        }
+    )
+
+
+def _cloudfront_logging_config(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[dict[str, Any], str]:
+    logging_config, unknown_block = _first_cloudfront_block(values, unknown_values, "logging_config", uncertainties)
+    if unknown_block is True:
+        return {}, "unknown"
+    if logging_config is None:
+        return {}, "not_configured"
+    unknown_fields: list[str] = []
+    bucket = known_block_string(
+        logging_config,
+        unknown_block,
+        "bucket",
+        uncertainties,
+        path="logging_config",
+        unknown_fields=unknown_fields,
+    )
+    prefix = known_block_string(
+        logging_config,
+        unknown_block,
+        "prefix",
+        uncertainties,
+        path="logging_config",
+        unknown_fields=unknown_fields,
+    )
+    include_cookies = known_block_bool(
+        logging_config,
+        unknown_block,
+        "include_cookies",
+        uncertainties,
+        path="logging_config",
+        unknown_fields=unknown_fields,
+    )
+    state = "configured" if bucket else "unknown" if "bucket" in unknown_fields else "not_configured"
+    return (
+        _compact_record(
+            {
+                "bucket_name": bucket,
+                "prefix": prefix,
+                "include_cookies": include_cookies,
+            }
+        ),
+        state,
+    )
+
+
+def _cloudfront_certificate_source(
+    default_certificate: bool | None,
+    acm_certificate_arn: str | None,
+    iam_certificate_id: str | None,
+    unknown_fields: list[str],
+) -> str | None:
+    if default_certificate is True:
+        return "cloudfront_default"
+    if acm_certificate_arn:
+        return "acm"
+    if iam_certificate_id:
+        return "iam"
+    if unknown_fields:
+        return "unknown"
+    return None
+
+
+def _first_cloudfront_block(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+) -> tuple[Mapping[str, Any] | None, Any]:
+    unknown_value = _unknown_value(unknown_values, key)
+    if unknown_value is True:
+        uncertainties.append(f"{key} is unknown after planning")
+        return None, unknown_value
+    raw = values.get(key)
+    unknown_block = unknown_block_at(unknown_value, 0)
+    if raw in (None, [], {}):
+        if unknown_block not in (None, False, [], {}):
+            return {}, unknown_block
+        return None, unknown_block
+    block = first_mapping(raw, expand_tuples=True)
+    if block is None:
+        uncertainties.append(f"{key} has an unrecognized value shape")
+    return block, unknown_block_at(unknown_value, 0)
+
+
+def _unknown_value(unknown_values: Mapping[str, Any] | None, key: str) -> Any:
+    return unknown_values.get(key) if isinstance(unknown_values, Mapping) else None
+
+
+def _compact_record(values: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in values.items() if value not in (None, "", [], {})}
 
 
 def _bool_state(value: bool | None) -> str:

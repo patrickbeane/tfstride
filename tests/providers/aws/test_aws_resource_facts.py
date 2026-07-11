@@ -130,6 +130,55 @@ class AwsResourceFactsTests(unittest.TestCase):
                 "load_balancer_listener_certificate_arn": ("arn:aws:acm:us-east-1:111122223333:certificate/listener"),
                 "load_balancer_listener_ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
                 "load_balancer_listener_tls_uncertainties": ["ssl_policy is unknown after planning"],
+                "cloudfront_distribution_id": "E123",
+                "cloudfront_distribution_arn": "arn:aws:cloudfront::111122223333:distribution/E123",
+                "cloudfront_domain_name": "d111111abcdef8.cloudfront.net",
+                "cloudfront_enabled_state": "enabled",
+                "cloudfront_ipv6_enabled_state": "disabled",
+                "cloudfront_http_version": "http2and3",
+                "cloudfront_default_root_object": "index.html",
+                "cloudfront_aliases": ["www.example.com"],
+                "cloudfront_web_acl_id": "arn:aws:wafv2:us-east-1:111122223333:global/webacl/cdn/abc",
+                "cloudfront_default_cache_behavior": {
+                    "target_origin_id": "app",
+                    "viewer_protocol_policy": "redirect-to-https",
+                    "cache_policy_id": "managed-cache",
+                    "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+                    "cached_methods": ["GET", "HEAD"],
+                },
+                "cloudfront_default_viewer_protocol_policy": "redirect-to-https",
+                "cloudfront_default_allowed_methods": ["GET", "HEAD", "OPTIONS"],
+                "cloudfront_default_cached_methods": ["GET", "HEAD"],
+                "cloudfront_ordered_cache_behaviors": [
+                    {"path_pattern": "/api/*", "viewer_protocol_policy": "https-only"}
+                ],
+                "cloudfront_ordered_viewer_protocol_policies": ["https-only"],
+                "cloudfront_origins": [{"origin_id": "app", "domain_name": "app.example.com"}],
+                "cloudfront_origin_ids": ["app"],
+                "cloudfront_origin_domain_names": ["app.example.com"],
+                "cloudfront_viewer_certificate": {
+                    "certificate_source": "acm",
+                    "cloudfront_default_certificate_state": "disabled",
+                    "acm_certificate_arn": "arn:aws:acm:us-east-1:111122223333:certificate/cdn",
+                    "minimum_protocol_version": "TLSv1.2_2021",
+                    "ssl_support_method": "sni-only",
+                },
+                "cloudfront_viewer_certificate_source": "acm",
+                "cloudfront_default_certificate_state": "disabled",
+                "cloudfront_minimum_protocol_version": "TLSv1.2_2021",
+                "cloudfront_ssl_support_method": "sni-only",
+                "cloudfront_acm_certificate_arn": "arn:aws:acm:us-east-1:111122223333:certificate/cdn",
+                "cloudfront_logging_state": "configured",
+                "cloudfront_logging_config": {
+                    "bucket_name": "logs.s3.amazonaws.com",
+                    "prefix": "cloudfront/",
+                    "include_cookies": False,
+                },
+                "cloudfront_logging_bucket": "logs.s3.amazonaws.com",
+                "cloudfront_logging_prefix": "cloudfront/",
+                "cloudfront_posture_uncertainties": [
+                    "viewer_certificate.minimum_protocol_version is unknown after planning"
+                ],
                 "web_acl_id": "app/abc",
                 "web_acl_name": "app-edge",
                 "web_acl_arn": "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/app/abc",
@@ -348,6 +397,66 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(
             facts.load_balancer_listener_tls_uncertainties,
             ["ssl_policy is unknown after planning"],
+        )
+        self.assertEqual(facts.cloudfront_distribution_id, "E123")
+        self.assertEqual(facts.cloudfront_distribution_arn, "arn:aws:cloudfront::111122223333:distribution/E123")
+        self.assertEqual(facts.cloudfront_domain_name, "d111111abcdef8.cloudfront.net")
+        self.assertEqual(facts.cloudfront_enabled_state, "enabled")
+        self.assertTrue(facts.cloudfront_enabled)
+        self.assertEqual(facts.cloudfront_ipv6_enabled_state, "disabled")
+        self.assertFalse(facts.cloudfront_ipv6_enabled)
+        self.assertEqual(facts.cloudfront_http_version, "http2and3")
+        self.assertEqual(facts.cloudfront_default_root_object, "index.html")
+        self.assertEqual(facts.cloudfront_aliases, ["www.example.com"])
+        self.assertEqual(facts.cloudfront_web_acl_id, "arn:aws:wafv2:us-east-1:111122223333:global/webacl/cdn/abc")
+        self.assertEqual(
+            facts.cloudfront_default_cache_behavior,
+            {
+                "target_origin_id": "app",
+                "viewer_protocol_policy": "redirect-to-https",
+                "cache_policy_id": "managed-cache",
+                "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+                "cached_methods": ["GET", "HEAD"],
+            },
+        )
+        self.assertEqual(facts.cloudfront_default_viewer_protocol_policy, "redirect-to-https")
+        self.assertEqual(facts.cloudfront_default_allowed_methods, ["GET", "HEAD", "OPTIONS"])
+        self.assertEqual(facts.cloudfront_default_cached_methods, ["GET", "HEAD"])
+        self.assertEqual(
+            facts.cloudfront_ordered_cache_behaviors,
+            [{"path_pattern": "/api/*", "viewer_protocol_policy": "https-only"}],
+        )
+        self.assertEqual(facts.cloudfront_ordered_viewer_protocol_policies, ["https-only"])
+        self.assertEqual(facts.cloudfront_origins, [{"origin_id": "app", "domain_name": "app.example.com"}])
+        self.assertEqual(facts.cloudfront_origin_ids, ["app"])
+        self.assertEqual(facts.cloudfront_origin_domain_names, ["app.example.com"])
+        self.assertEqual(
+            facts.cloudfront_viewer_certificate,
+            {
+                "certificate_source": "acm",
+                "cloudfront_default_certificate_state": "disabled",
+                "acm_certificate_arn": "arn:aws:acm:us-east-1:111122223333:certificate/cdn",
+                "minimum_protocol_version": "TLSv1.2_2021",
+                "ssl_support_method": "sni-only",
+            },
+        )
+        self.assertEqual(facts.cloudfront_viewer_certificate_source, "acm")
+        self.assertEqual(facts.cloudfront_default_certificate_state, "disabled")
+        self.assertFalse(facts.cloudfront_default_certificate)
+        self.assertEqual(facts.cloudfront_minimum_protocol_version, "TLSv1.2_2021")
+        self.assertEqual(facts.cloudfront_ssl_support_method, "sni-only")
+        self.assertEqual(facts.cloudfront_acm_certificate_arn, "arn:aws:acm:us-east-1:111122223333:certificate/cdn")
+        self.assertIsNone(facts.cloudfront_iam_certificate_id)
+        self.assertEqual(facts.cloudfront_logging_state, "configured")
+        self.assertEqual(
+            facts.cloudfront_logging_config,
+            {"bucket_name": "logs.s3.amazonaws.com", "prefix": "cloudfront/", "include_cookies": False},
+        )
+        self.assertEqual(facts.cloudfront_logging_bucket, "logs.s3.amazonaws.com")
+        self.assertEqual(facts.cloudfront_logging_prefix, "cloudfront/")
+        self.assertEqual(
+            facts.cloudfront_posture_uncertainties,
+            ["viewer_certificate.minimum_protocol_version is unknown after planning"],
         )
         self.assertEqual(facts.web_acl_id, "app/abc")
         self.assertEqual(facts.web_acl_name, "app-edge")
@@ -605,6 +714,39 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertIsNone(facts.load_balancer_listener_certificate_arn)
         self.assertIsNone(facts.load_balancer_listener_ssl_policy)
         self.assertEqual(facts.load_balancer_listener_tls_uncertainties, [])
+        self.assertIsNone(facts.cloudfront_distribution_id)
+        self.assertIsNone(facts.cloudfront_distribution_arn)
+        self.assertIsNone(facts.cloudfront_domain_name)
+        self.assertIsNone(facts.cloudfront_enabled_state)
+        self.assertIsNone(facts.cloudfront_enabled)
+        self.assertIsNone(facts.cloudfront_ipv6_enabled_state)
+        self.assertIsNone(facts.cloudfront_ipv6_enabled)
+        self.assertIsNone(facts.cloudfront_http_version)
+        self.assertIsNone(facts.cloudfront_default_root_object)
+        self.assertEqual(facts.cloudfront_aliases, [])
+        self.assertIsNone(facts.cloudfront_web_acl_id)
+        self.assertEqual(facts.cloudfront_default_cache_behavior, {})
+        self.assertIsNone(facts.cloudfront_default_viewer_protocol_policy)
+        self.assertEqual(facts.cloudfront_default_allowed_methods, [])
+        self.assertEqual(facts.cloudfront_default_cached_methods, [])
+        self.assertEqual(facts.cloudfront_ordered_cache_behaviors, [])
+        self.assertEqual(facts.cloudfront_ordered_viewer_protocol_policies, [])
+        self.assertEqual(facts.cloudfront_origins, [])
+        self.assertEqual(facts.cloudfront_origin_ids, [])
+        self.assertEqual(facts.cloudfront_origin_domain_names, [])
+        self.assertEqual(facts.cloudfront_viewer_certificate, {})
+        self.assertIsNone(facts.cloudfront_viewer_certificate_source)
+        self.assertIsNone(facts.cloudfront_default_certificate_state)
+        self.assertIsNone(facts.cloudfront_default_certificate)
+        self.assertIsNone(facts.cloudfront_minimum_protocol_version)
+        self.assertIsNone(facts.cloudfront_ssl_support_method)
+        self.assertIsNone(facts.cloudfront_acm_certificate_arn)
+        self.assertIsNone(facts.cloudfront_iam_certificate_id)
+        self.assertIsNone(facts.cloudfront_logging_state)
+        self.assertEqual(facts.cloudfront_logging_config, {})
+        self.assertIsNone(facts.cloudfront_logging_bucket)
+        self.assertIsNone(facts.cloudfront_logging_prefix)
+        self.assertEqual(facts.cloudfront_posture_uncertainties, [])
         self.assertIsNone(facts.web_acl_id)
         self.assertIsNone(facts.web_acl_name)
         self.assertIsNone(facts.web_acl_arn)

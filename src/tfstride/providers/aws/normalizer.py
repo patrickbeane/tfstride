@@ -43,6 +43,7 @@ from tfstride.providers.aws.iam_normalizers import (
     normalize_iam_role_policy_attachment,
 )
 from tfstride.providers.aws.network_normalizers import (
+    normalize_cloudfront_distribution,
     normalize_flow_log,
     normalize_internet_gateway,
     normalize_load_balancer,
@@ -68,6 +69,7 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    "aws_cloudfront_distribution": normalize_cloudfront_distribution,
     "aws_cloudtrail": normalize_cloudtrail,
     "aws_config_configuration_recorder": normalize_config_configuration_recorder,
     "aws_db_instance": normalize_db_instance,

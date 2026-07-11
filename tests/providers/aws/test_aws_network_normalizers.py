@@ -5,6 +5,7 @@ from typing import Any
 
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.aws.network_normalizers import (
+    normalize_cloudfront_distribution,
     normalize_flow_log,
     normalize_load_balancer_listener,
     normalize_vpc_endpoint,
@@ -56,6 +57,22 @@ def _flow_log_resource(
         mode="managed",
         resource_type="aws_flow_log",
         name="vpc",
+        provider_name="registry.terraform.io/hashicorp/aws",
+        values=values,
+        unknown_values=unknown_values or {},
+    )
+
+
+def _cloudfront_distribution_resource(
+    values: dict[str, Any],
+    *,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    return TerraformResource(
+        address="aws_cloudfront_distribution.cdn",
+        mode="managed",
+        resource_type="aws_cloudfront_distribution",
+        name="cdn",
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
         unknown_values=unknown_values or {},
@@ -172,6 +189,192 @@ class AwsNetworkNormalizerTests(unittest.TestCase):
                 "protocol is unknown after planning",
                 "certificate_arn is unknown after planning",
                 "ssl_policy is unknown after planning",
+            ],
+        )
+
+    def test_cloudfront_distribution_normalizes_edge_posture(self) -> None:
+        distribution_arn = "arn:aws:cloudfront::111122223333:distribution/E123"
+        certificate_arn = "arn:aws:acm:us-east-1:111122223333:certificate/cdn"
+        web_acl_arn = "arn:aws:wafv2:us-east-1:111122223333:global/webacl/cdn/abc"
+
+        normalized = normalize_cloudfront_distribution(
+            _cloudfront_distribution_resource(
+                {
+                    "id": "E123",
+                    "arn": distribution_arn,
+                    "comment": "production CDN",
+                    "domain_name": "d111111abcdef8.cloudfront.net",
+                    "enabled": True,
+                    "is_ipv6_enabled": True,
+                    "http_version": "http2and3",
+                    "default_root_object": "index.html",
+                    "aliases": ["www.example.com"],
+                    "web_acl_id": web_acl_arn,
+                    "origin": [
+                        {
+                            "origin_id": "app",
+                            "domain_name": "app.example.com",
+                            "origin_path": "/prod",
+                            "custom_origin_config": [{"origin_protocol_policy": "https-only"}],
+                        }
+                    ],
+                    "default_cache_behavior": [
+                        {
+                            "target_origin_id": "app",
+                            "viewer_protocol_policy": "redirect-to-https",
+                            "cache_policy_id": "managed-cache",
+                            "origin_request_policy_id": "origin-policy",
+                            "response_headers_policy_id": "headers-policy",
+                            "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+                            "cached_methods": ["GET", "HEAD"],
+                        }
+                    ],
+                    "ordered_cache_behavior": [
+                        {
+                            "path_pattern": "/api/*",
+                            "target_origin_id": "api",
+                            "viewer_protocol_policy": "https-only",
+                            "allowed_methods": ["GET", "HEAD"],
+                            "cached_methods": ["GET", "HEAD"],
+                        }
+                    ],
+                    "viewer_certificate": [
+                        {
+                            "cloudfront_default_certificate": False,
+                            "acm_certificate_arn": certificate_arn,
+                            "minimum_protocol_version": "TLSv1.2_2021",
+                            "ssl_support_method": "sni-only",
+                        }
+                    ],
+                    "logging_config": [
+                        {
+                            "bucket": "logs.s3.amazonaws.com",
+                            "prefix": "cloudfront/",
+                            "include_cookies": False,
+                        }
+                    ],
+                    "tags": {"Environment": "prod"},
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.category, ResourceCategory.EDGE)
+        self.assertEqual(normalized.identifier, "E123")
+        self.assertEqual(normalized.arn, distribution_arn)
+        self.assertTrue(normalized.public_access_configured)
+        self.assertTrue(normalized.public_exposure)
+        self.assertEqual(normalized.public_access_reasons, ["CloudFront distribution is enabled"])
+        self.assertEqual(normalized.public_exposure_reasons, ["CloudFront distribution is enabled"])
+        self.assertEqual(normalized.metadata["tags"], {"Environment": "prod"})
+        self.assertEqual(facts.name, "production CDN")
+        self.assertEqual(facts.cloudfront_distribution_id, "E123")
+        self.assertEqual(facts.cloudfront_distribution_arn, distribution_arn)
+        self.assertEqual(facts.cloudfront_domain_name, "d111111abcdef8.cloudfront.net")
+        self.assertEqual(facts.cloudfront_enabled_state, "enabled")
+        self.assertTrue(facts.cloudfront_enabled)
+        self.assertEqual(facts.cloudfront_ipv6_enabled_state, "enabled")
+        self.assertTrue(facts.cloudfront_ipv6_enabled)
+        self.assertEqual(facts.cloudfront_http_version, "http2and3")
+        self.assertEqual(facts.cloudfront_default_root_object, "index.html")
+        self.assertEqual(facts.cloudfront_aliases, ["www.example.com"])
+        self.assertEqual(facts.cloudfront_web_acl_id, web_acl_arn)
+        self.assertEqual(facts.cloudfront_origin_ids, ["app"])
+        self.assertEqual(facts.cloudfront_origin_domain_names, ["app.example.com"])
+        self.assertEqual(facts.cloudfront_origins[0]["custom_origin_config"], {"origin_protocol_policy": "https-only"})
+        self.assertEqual(facts.cloudfront_default_viewer_protocol_policy, "redirect-to-https")
+        self.assertEqual(facts.cloudfront_default_allowed_methods, ["GET", "HEAD", "OPTIONS"])
+        self.assertEqual(facts.cloudfront_default_cached_methods, ["GET", "HEAD"])
+        self.assertEqual(facts.cloudfront_ordered_viewer_protocol_policies, ["https-only"])
+        self.assertEqual(facts.cloudfront_viewer_certificate_source, "acm")
+        self.assertEqual(facts.cloudfront_default_certificate_state, "disabled")
+        self.assertFalse(facts.cloudfront_default_certificate)
+        self.assertEqual(facts.cloudfront_minimum_protocol_version, "TLSv1.2_2021")
+        self.assertEqual(facts.cloudfront_ssl_support_method, "sni-only")
+        self.assertEqual(facts.cloudfront_acm_certificate_arn, certificate_arn)
+        self.assertEqual(facts.cloudfront_logging_state, "configured")
+        self.assertEqual(facts.cloudfront_logging_bucket, "logs.s3.amazonaws.com")
+        self.assertEqual(facts.cloudfront_logging_prefix, "cloudfront/")
+        self.assertEqual(
+            facts.cloudfront_logging_config,
+            {"bucket_name": "logs.s3.amazonaws.com", "prefix": "cloudfront/", "include_cookies": False},
+        )
+        self.assertEqual(facts.cloudfront_posture_uncertainties, [])
+
+    def test_cloudfront_distribution_disabled_is_not_marked_public(self) -> None:
+        normalized = normalize_cloudfront_distribution(
+            _cloudfront_distribution_resource(
+                {
+                    "id": "Edisabled",
+                    "domain_name": "d222222abcdef8.cloudfront.net",
+                    "enabled": False,
+                }
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertFalse(normalized.public_access_configured)
+        self.assertFalse(normalized.public_exposure)
+        self.assertEqual(normalized.public_access_reasons, [])
+        self.assertEqual(normalized.public_exposure_reasons, [])
+        self.assertEqual(facts.cloudfront_enabled_state, "disabled")
+        self.assertFalse(facts.cloudfront_enabled)
+        self.assertEqual(facts.cloudfront_logging_state, "not_configured")
+        self.assertEqual(facts.cloudfront_posture_uncertainties, [])
+
+    def test_cloudfront_distribution_preserves_unknown_edge_values(self) -> None:
+        normalized = normalize_cloudfront_distribution(
+            _cloudfront_distribution_resource(
+                {},
+                unknown_values={
+                    "id": True,
+                    "domain_name": True,
+                    "enabled": True,
+                    "is_ipv6_enabled": True,
+                    "aliases": True,
+                    "web_acl_id": True,
+                    "origin": True,
+                    "default_cache_behavior": [{"viewer_protocol_policy": True}],
+                    "viewer_certificate": [
+                        {
+                            "cloudfront_default_certificate": True,
+                            "minimum_protocol_version": True,
+                        }
+                    ],
+                    "logging_config": [{"bucket": True}],
+                },
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.identifier, "aws_cloudfront_distribution.cdn")
+        self.assertFalse(normalized.public_access_configured)
+        self.assertFalse(normalized.public_exposure)
+        self.assertEqual(facts.cloudfront_enabled_state, "unknown")
+        self.assertIsNone(facts.cloudfront_enabled)
+        self.assertEqual(facts.cloudfront_ipv6_enabled_state, "unknown")
+        self.assertIsNone(facts.cloudfront_ipv6_enabled)
+        self.assertEqual(facts.cloudfront_aliases, [])
+        self.assertEqual(facts.cloudfront_origin_ids, [])
+        self.assertIsNone(facts.cloudfront_default_viewer_protocol_policy)
+        self.assertEqual(facts.cloudfront_viewer_certificate_source, "unknown")
+        self.assertEqual(facts.cloudfront_default_certificate_state, "unknown")
+        self.assertIsNone(facts.cloudfront_default_certificate)
+        self.assertEqual(facts.cloudfront_logging_state, "unknown")
+        self.assertEqual(
+            facts.cloudfront_posture_uncertainties,
+            [
+                "id is unknown after planning",
+                "domain_name is unknown after planning",
+                "enabled is unknown after planning",
+                "is_ipv6_enabled is unknown after planning",
+                "aliases is unknown after planning",
+                "default_cache_behavior.viewer_protocol_policy is unknown after planning",
+                "origin is unknown after planning",
+                "viewer_certificate.cloudfront_default_certificate is unknown after planning",
+                "viewer_certificate.minimum_protocol_version is unknown after planning",
+                "logging_config.bucket is unknown after planning",
+                "web_acl_id is unknown after planning",
             ],
         )
 
