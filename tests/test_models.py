@@ -417,6 +417,162 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
             ["aws_security_group.web ingress tcp 443 from 0.0.0.0/0"],
         )
 
+    def test_unresolved_reference_keys_returns_coerced_references_without_exposing_metadata(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_instance_profiles": ["missing-profile"],
+                "unresolved_role_references": ["missing-role", "another-missing"],
+                "other_metadata": "should-not-appear",
+            },
+        )
+
+        references = resource.unresolved_reference_keys()
+
+        self.assertEqual(
+            references,
+            {
+                "unresolved_instance_profiles": ["missing-profile"],
+                "unresolved_role_references": ["missing-role", "another-missing"],
+            },
+        )
+        self.assertNotIn("other_metadata", references)
+
+    def test_unresolved_reference_keys_returns_empty_when_no_references(self) -> None:
+        resource = _resource(address="aws_instance.web", resource_type="aws_instance")
+
+        self.assertEqual(resource.unresolved_reference_keys(), {})
+
+    def test_unresolved_reference_keys_filters_none_and_empty_values(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_refs": ["valid", None, "", "also-valid"],
+            },
+        )
+
+        references = resource.unresolved_reference_keys()
+
+        self.assertEqual(references, {"unresolved_refs": ["valid", "also-valid"]})
+
+    def test_unresolved_reference_keys_coerces_non_string_values(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_ids": [123, True, "str-val"],
+            },
+        )
+
+        references = resource.unresolved_reference_keys()
+
+        self.assertEqual(references, {"unresolved_ids": ["123", "True", "str-val"]})
+
+    def test_unresolved_reference_keys_handles_single_non_list_value(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_single": "just-a-string",
+            },
+        )
+
+        references = resource.unresolved_reference_keys()
+
+        self.assertEqual(references, {"unresolved_single": ["just-a-string"]})
+
+    def test_unresolved_reference_keys_returns_sorted_keys(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_z": ["z-ref"],
+                "unresolved_a": ["a-ref"],
+                "unresolved_m": ["m-ref"],
+            },
+        )
+
+        references = resource.unresolved_reference_keys()
+
+        self.assertEqual(list(references.keys()), ["unresolved_a", "unresolved_m", "unresolved_z"])
+
+    def test_unresolved_reference_keys_json_encodes_structured_values(self) -> None:
+        resource = NormalizedResource(
+            address="aws_instance.app",
+            provider="aws",
+            resource_type="aws_instance",
+            name="app",
+            category=ResourceCategory.COMPUTE,
+            metadata={
+                "unresolved_complex": [{"b": 2, "a": 1}],
+            },
+        )
+
+        self.assertEqual(
+            resource.unresolved_reference_keys(),
+            {"unresolved_complex": ['{"a":1,"b":2}']},
+        )
+
+
+class ResourceInventoryValidationTests(unittest.TestCase):
+    def test_primary_account_id_setter_routes_through_ownership_validator(self) -> None:
+        from unittest.mock import patch
+
+        inventory = ResourceInventory(provider="aws", resources=[])
+
+        with patch(
+            "tfstride.providers.metadata_ownership.validate_normalized_resource_metadata_write"
+        ) as mock_validate:
+            inventory.primary_account_id = "111122223333"
+
+            mock_validate.assert_called_once()
+            call_kwargs = mock_validate.call_args.kwargs
+            self.assertEqual(call_kwargs["resource_provider"], "aws")
+
+        self.assertEqual(inventory.primary_account_id, "111122223333")
+
+    def test_primary_account_id_setter_none_removes_key_through_validator(self) -> None:
+        from unittest.mock import patch
+
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=[],
+            metadata={"primary_account_id": "111122223333"},
+        )
+
+        with patch(
+            "tfstride.providers.metadata_ownership.validate_normalized_resource_metadata_write"
+        ) as mock_validate:
+            inventory.primary_account_id = None
+
+            mock_validate.assert_called_once()
+
+        self.assertIsNone(inventory.primary_account_id)
+
+    def test_primary_account_id_setter_accepts_owned_inventory_metadata(self) -> None:
+        inventory = ResourceInventory(provider="aws", resources=[])
+
+        inventory.primary_account_id = "111122223333"
+
+        self.assertEqual(inventory.primary_account_id, "111122223333")
+
 
 if __name__ == "__main__":
     unittest.main()

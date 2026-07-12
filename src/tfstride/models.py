@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import InitVar, dataclass, field
@@ -16,6 +17,23 @@ from tfstride.resource_metadata import (
 
 _MetadataValue = TypeVar("_MetadataValue")
 _MetadataKey = str | MetadataField[Any]
+UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
+
+
+def _coerce_reference_values(value: Any) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [_reference_value_to_string(item) for item in value if item not in (None, "")]
+    return [_reference_value_to_string(value)]
+
+
+def _reference_value_to_string(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, int | float | bool):
+        return str(value)
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _normalized_metadata(metadata: Mapping[_MetadataKey, Any] | None) -> dict[str, Any]:
@@ -191,6 +209,18 @@ class NormalizedResource:
 
     def has_metadata_value(self, field: MetadataField[Any]) -> bool:
         return self._metadata.get(field.key) is not None
+
+    def unresolved_reference_keys(self) -> dict[str, list[str]]:
+        """Return unresolved reference metadata without exposing internal state."""
+        references: dict[str, list[str]] = {}
+        for key in sorted(self._metadata):
+            if not key.startswith(UNRESOLVED_REFERENCE_PREFIX):
+                continue
+            raw = self._metadata[key]
+            values = _coerce_reference_values(raw)
+            if values:
+                references[key] = values
+        return references
 
     def set_metadata_field(self, field: MetadataField[_MetadataValue], value: _MetadataValue) -> None:
         self._validate_metadata_field_write(field)
@@ -375,12 +405,18 @@ class ResourceInventory:
         self._resources_by_identifier = resources_by_identifier
         self._resource_positions = resource_positions
 
+    def _validate_metadata_field_write(self, field: MetadataField[Any]) -> None:
+        from tfstride.providers.metadata_ownership import validate_normalized_resource_metadata_write
+
+        validate_normalized_resource_metadata_write(resource_provider=self.provider, field=field)
+
     @property
     def primary_account_id(self) -> str | None:
         return InventoryMetadata.PRIMARY_ACCOUNT_ID.get(self._metadata)
 
     @primary_account_id.setter
     def primary_account_id(self, value: str | None) -> None:
+        self._validate_metadata_field_write(InventoryMetadata.PRIMARY_ACCOUNT_ID)
         InventoryMetadata.PRIMARY_ACCOUNT_ID.set(self._metadata, value)
 
     def metadata_snapshot(self) -> dict[str, Any]:

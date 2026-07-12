@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from tfstride.analysis.rule_registry import RulePolicy, RuleRegistry, default_rule_registry
 from tfstride.models import (
     AnalysisCoverage,
@@ -14,8 +11,6 @@ from tfstride.models import (
     UnresolvedReference,
 )
 from tfstride.resource_metadata import InventoryMetadata
-
-UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
 
 
 def build_analysis_coverage(
@@ -93,27 +88,4 @@ def _build_reference_coverage(resources: list[NormalizedResource]) -> ReferenceC
 
 
 def _unresolved_reference_metadata(resource: NormalizedResource) -> dict[str, list[str]]:
-    references: dict[str, list[str]] = {}
-    for key in sorted(resource._metadata):
-        if not key.startswith(UNRESOLVED_REFERENCE_PREFIX):
-            continue
-        values = _coerce_reference_values(resource._metadata[key])
-        if values:
-            references[key] = values
-    return references
-
-
-def _coerce_reference_values(value: Any) -> list[str]:
-    if value is None or value == "":
-        return []
-    if isinstance(value, list):
-        return [_reference_value_to_string(item) for item in value if item not in (None, "")]
-    return [_reference_value_to_string(value)]
-
-
-def _reference_value_to_string(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, int | float | bool):
-        return str(value)
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return resource.unresolved_reference_keys()
