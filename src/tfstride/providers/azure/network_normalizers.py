@@ -7,6 +7,7 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.resource_utils import (
     as_list,
+    bool_state,
     compact_strings,
     first_mapping,
     first_non_empty,
@@ -151,7 +152,7 @@ def normalize_network_watcher_flow_log(resource: TerraformResource) -> Normalize
             AzureResourceMetadata.LOCATION: location,
             AzureResourceMetadata.NETWORK_FLOW_LOG_ID: flow_log_id,
             AzureResourceMetadata.NETWORK_FLOW_LOG_NAME: name,
-            AzureResourceMetadata.NETWORK_FLOW_LOG_STATE: _optional_bool_state(enabled),
+            AzureResourceMetadata.NETWORK_FLOW_LOG_STATE: bool_state(enabled),
             AzureResourceMetadata.NETWORK_FLOW_LOG_TARGET_RESOURCE_ID: target_id,
             AzureResourceMetadata.NETWORK_FLOW_LOG_NETWORK_SECURITY_GROUP_ID: network_security_group_id,
             AzureResourceMetadata.NETWORK_FLOW_LOG_STORAGE_ACCOUNT_ID: storage_account_id,
@@ -428,7 +429,7 @@ def normalize_private_dns_zone_virtual_network_link(resource: TerraformResource)
         AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK_ID: link_id,
         AzureResourceMetadata.PRIVATE_DNS_ZONE_REFERENCE: zone_reference,
         AzureResourceMetadata.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_REFERENCE: virtual_network_reference,
-        AzureResourceMetadata.PRIVATE_DNS_ZONE_REGISTRATION_STATE: _optional_bool_state(registration_enabled),
+        AzureResourceMetadata.PRIVATE_DNS_ZONE_REGISTRATION_STATE: bool_state(registration_enabled),
     }
     if uncertainties:
         metadata[AzureResourceMetadata.PRIVATE_DNS_ZONE_UNCERTAINTIES] = uncertainties
@@ -719,7 +720,7 @@ def _application_gateway_waf_configurations(
         )
         if enabled is not None:
             record["enabled"] = enabled
-            record["enabled_state"] = _optional_bool_state(enabled)
+            record["enabled_state"] = bool_state(enabled)
         for field in ("firewall_mode", "rule_set_type", "rule_set_version"):
             value = known_block_string(
                 item,
@@ -1062,7 +1063,7 @@ def _flow_log_retention_policy(
         record["days"] = days
     if unknown_fields:
         record["unknown_fields"] = unknown_fields
-    return record, _optional_bool_state(enabled), days
+    return record, bool_state(enabled), days
 
 
 def _flow_log_traffic_analytics(
@@ -1116,7 +1117,7 @@ def _flow_log_traffic_analytics(
         record["interval_in_minutes"] = interval
     if unknown_fields:
         record["unknown_fields"] = unknown_fields
-    return record, _optional_bool_state(enabled)
+    return record, bool_state(enabled)
 
 
 def _network_resource(
@@ -1170,11 +1171,3 @@ def _known_int(
     except (TypeError, ValueError):
         uncertainties.append(f"{key} has an unrecognized value shape")
         return None
-
-
-def _optional_bool_state(value: bool | None) -> str:
-    if value is True:
-        return _STATE_ENABLED
-    if value is False:
-        return _STATE_DISABLED
-    return _STATE_UNKNOWN

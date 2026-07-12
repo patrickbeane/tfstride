@@ -324,6 +324,14 @@ def dedupe_strings(values: Iterable[str | None]) -> list[str]:
     return deduped
 
 
+def bool_state(value: bool | None) -> str:
+    if value is True:
+        return "enabled"
+    if value is False:
+        return "disabled"
+    return "unknown"
+
+
 def tls_version_below_1_2(value: str | None) -> bool:
     if value is None:
         return False

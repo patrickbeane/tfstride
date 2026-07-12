@@ -9,6 +9,7 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
     attribute_unknown,
+    bool_state,
     dedupe,
     first_mapping,
     known_block_bool,
@@ -238,7 +239,7 @@ def normalize_vpc_endpoint(resource: TerraformResource) -> NormalizedResource:
             AwsResourceMetadata.VPC_ENDPOINT_ROUTE_TABLE_IDS: route_table_ids,
             AwsResourceMetadata.VPC_ENDPOINT_SUBNET_IDS: subnet_ids,
             AwsResourceMetadata.VPC_ENDPOINT_SECURITY_GROUP_IDS: security_group_ids,
-            AwsResourceMetadata.VPC_ENDPOINT_PRIVATE_DNS_ENABLED_STATE: _bool_state(private_dns_enabled),
+            AwsResourceMetadata.VPC_ENDPOINT_PRIVATE_DNS_ENABLED_STATE: bool_state(private_dns_enabled),
             AwsResourceMetadata.VPC_ENDPOINT_POLICY_DOCUMENT: policy_document,
             AwsResourceMetadata.VPC_ENDPOINT_DNS_ENTRIES: dns_entries,
             AwsResourceMetadata.VPC_ENDPOINT_DNS_NAMES: compact(entry.get("dns_name") for entry in dns_entries),
@@ -280,8 +281,8 @@ def normalize_cloudfront_distribution(resource: TerraformResource) -> Normalized
             AwsResourceMetadata.CLOUDFRONT_DISTRIBUTION_ID: distribution_id,
             AwsResourceMetadata.CLOUDFRONT_DISTRIBUTION_ARN: arn,
             AwsResourceMetadata.CLOUDFRONT_DOMAIN_NAME: domain_name,
-            AwsResourceMetadata.CLOUDFRONT_ENABLED_STATE: _bool_state(enabled),
-            AwsResourceMetadata.CLOUDFRONT_IPV6_ENABLED_STATE: _bool_state(ipv6_enabled),
+            AwsResourceMetadata.CLOUDFRONT_ENABLED_STATE: bool_state(enabled),
+            AwsResourceMetadata.CLOUDFRONT_IPV6_ENABLED_STATE: bool_state(ipv6_enabled),
             AwsResourceMetadata.CLOUDFRONT_HTTP_VERSION: known_string(
                 values, unknown_values, "http_version", uncertainties
             ),
@@ -675,7 +676,7 @@ def _cloudfront_viewer_certificate(
         path="viewer_certificate",
         unknown_fields=unknown_fields,
     )
-    default_certificate_state = _bool_state(default_certificate)
+    default_certificate_state = bool_state(default_certificate)
     return _compact_record(
         {
             "certificate_source": _cloudfront_certificate_source(
@@ -783,14 +784,6 @@ def _unknown_value(unknown_values: Mapping[str, Any] | None, key: str) -> Any:
 
 def _compact_record(values: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value not in (None, "", [], {})}
-
-
-def _bool_state(value: bool | None) -> str:
-    if value is True:
-        return "enabled"
-    if value is False:
-        return "disabled"
-    return "unknown"
 
 
 _FLOW_LOG_TARGET_FIELDS = (

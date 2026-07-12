@@ -17,8 +17,8 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.aws.vpc_endpoint_index import AwsVpcEndpointIndex, build_aws_vpc_endpoint_index
+from tfstride.providers.coercion import dedupe_strings
 
 
 @dataclass(frozen=True, slots=True)

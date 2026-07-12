@@ -6,8 +6,8 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import AssignmentScopeKind, PrivilegeCategory, PrivilegeConfidence, PrivilegedAccessGrant
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.coercion import dedupe_strings
 
 _HIGH_IMPACT_CATEGORIES = frozenset(
     {

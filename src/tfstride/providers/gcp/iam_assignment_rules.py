@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_factory import FindingFactory
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrincipalType, PrivilegeCategory, PrivilegeConfidence, PrivilegedAccessGrant
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_FOLDER_IAM_RESOURCE_TYPES,

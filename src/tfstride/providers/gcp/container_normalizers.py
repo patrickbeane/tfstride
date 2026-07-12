@@ -13,7 +13,7 @@ from tfstride.providers.coercion import (
     known_string,
 )
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
-from tfstride.providers.gcp.coercion import as_bool, compact, first_item
+from tfstride.providers.gcp.coercion import as_bool, bool_state, compact, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -202,9 +202,9 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
                 dict(database_encryption) if database_encryption is not None else None
             ),
             GcpResourceMetadata.GKE_LEGACY_ABAC_ENABLED: legacy_abac_enabled,
-            GcpResourceMetadata.GKE_LEGACY_ABAC_STATE: _bool_state(legacy_abac_enabled),
+            GcpResourceMetadata.GKE_LEGACY_ABAC_STATE: bool_state(legacy_abac_enabled),
             GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_ENABLED: client_certificate_auth_enabled,
-            GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_STATE: _bool_state(client_certificate_auth_enabled),
+            GcpResourceMetadata.GKE_CLIENT_CERTIFICATE_AUTH_STATE: bool_state(client_certificate_auth_enabled),
             GcpResourceMetadata.GKE_BASIC_AUTH_USERNAME: basic_auth_username,
             GcpResourceMetadata.GKE_BASIC_AUTH_PASSWORD_CONFIGURED: basic_auth_password_configured,
             GcpResourceMetadata.GKE_BASIC_AUTH_STATE: _basic_auth_state(
@@ -226,7 +226,7 @@ def normalize_container_cluster(resource: TerraformResource) -> NormalizedResour
                 dict(release_channel_config) if release_channel_config is not None else None
             ),
             GcpResourceMetadata.GKE_SHIELDED_NODES_ENABLED: shielded_nodes_enabled,
-            GcpResourceMetadata.GKE_SHIELDED_NODES_STATE: _bool_state(shielded_nodes_enabled),
+            GcpResourceMetadata.GKE_SHIELDED_NODES_STATE: bool_state(shielded_nodes_enabled),
             GcpResourceMetadata.GKE_SHIELDED_NODES_CONFIG: dict(shielded_nodes) if shielded_nodes is not None else None,
             GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_EVALUATION_MODE: binary_authorization_evaluation_mode,
             GcpResourceMetadata.GKE_BINARY_AUTHORIZATION_STATE: _binary_authorization_state(
@@ -324,12 +324,6 @@ def _secrets_encryption_state(
     if normalized in {"ENCRYPTED", "DECRYPTED"}:
         return _STATE_DISABLED
     return _STATE_UNKNOWN
-
-
-def _bool_state(value: bool | None) -> str:
-    if value is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if value else _STATE_DISABLED
 
 
 def _basic_auth_state(

@@ -7,9 +7,9 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
+from tfstride.providers.coercion import dedupe_strings
 
 _AZURE_DIAGNOSTIC_SETTING = AzureResourceType.MONITOR_DIAGNOSTIC_SETTING
 _TARGET_ID_FACT_NAMES = (

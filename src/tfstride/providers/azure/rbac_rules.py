@@ -7,7 +7,6 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.rbac_breadth import (
     COMPUTE_MANAGEMENT,
     KEY_VAULT_DATA_PLANE,
@@ -20,6 +19,7 @@ from tfstride.providers.azure.rbac_breadth import (
 )
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.coercion import dedupe_strings
 
 _MANAGEMENT_WILDCARD_SIGNALS = frozenset(
     {

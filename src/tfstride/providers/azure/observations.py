@@ -3,7 +3,6 @@ from __future__ import annotations
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
     AZURE_COMPUTE_RESOURCE_TYPES,
@@ -11,6 +10,7 @@ from tfstride.providers.azure.resource_types import (
     AZURE_SQL_RESOURCE_TYPES,
     AzureResourceType,
 )
+from tfstride.providers.coercion import dedupe_strings
 
 _STORAGE_POSTURE_RESOURCE_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,

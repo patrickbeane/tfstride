@@ -10,12 +10,12 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
-from tfstride.providers.coercion import dedupe
 from tfstride.providers.aws.policy_conditions import (
     policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
 )
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import dedupe
 
 _AWS_LAMBDA_FUNCTION = "aws_lambda_function"
 _AWS_LAMBDA_FUNCTION_URL = "aws_lambda_function_url"

@@ -6,9 +6,9 @@ from types import MappingProxyType
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
+from tfstride.providers.coercion import dedupe_strings
 
 _SUPPORTED_PRIVATE_ENDPOINT_TARGET_TYPES = frozenset(
     {

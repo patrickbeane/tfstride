@@ -8,6 +8,7 @@ from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.coercion import as_list as as_list
 from tfstride.providers.coercion import attribute_unknown as attribute_unknown
 from tfstride.providers.coercion import block_attribute_unknown as block_attribute_unknown
+from tfstride.providers.coercion import bool_state as bool_state
 from tfstride.providers.coercion import compact_strings as compact_strings
 from tfstride.providers.coercion import first_block_attribute_unknown as first_block_attribute_unknown
 from tfstride.providers.coercion import first_mapping as first_mapping

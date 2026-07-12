@@ -13,7 +13,6 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrivilegedAccessGrant
 from tfstride.models import BoundaryType, Finding
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
@@ -21,6 +20,7 @@ from tfstride.providers.azure.resource_types import (
     AzureResourceType,
 )
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
+from tfstride.providers.coercion import dedupe_strings
 
 _AZURE_WORKLOAD_RESOURCE_TYPES = tuple(sorted(AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES))
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.coercion import dedupe
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex
 from tfstride.providers.aws.resource_mutations import aws_mutations
+from tfstride.providers.coercion import dedupe
 
 
 class ResolveEcsServiceRelationshipsStage:

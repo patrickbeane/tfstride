@@ -12,7 +12,6 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
-from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.private_endpoint_index import (
     AzurePrivateEndpointConnection,
     build_azure_private_endpoint_index,
@@ -25,6 +24,7 @@ from tfstride.providers.azure.public_network import (
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
+from tfstride.providers.coercion import dedupe_strings
 
 _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
