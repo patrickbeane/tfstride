@@ -227,6 +227,10 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
             router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS),
             [{"name": "google_compute_subnetwork.app.id", "source_ip_ranges_to_nat": ["ALL_IP_RANGES"]}],
         )
+        self.assertEqual(
+            gcp_facts(router_nat).nat_source_subnetwork_ip_ranges_to_nat,
+            "LIST_OF_SUBNETWORKS",
+        )
 
     def test_private_service_access_address_normalizer_preserves_reserved_range_context(self) -> None:
         normalized = normalize_compute_global_address(

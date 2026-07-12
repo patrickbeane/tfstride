@@ -182,6 +182,7 @@ class NormalizedResource:
     public_exposure: bool = False
     data_sensitivity: str = "standard"
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _metadata_read_view: Mapping[str, Any] = field(init=False, repr=False)
     _decoration_state_frozen: bool = field(default=False, init=False, repr=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
 
@@ -192,6 +193,7 @@ class NormalizedResource:
         self.network_rules = tuple(self.network_rules)
         self.policy_statements = tuple(self.policy_statements)
         self._metadata = _normalized_metadata(metadata)
+        self._metadata_read_view = MappingProxyType(self._metadata)
 
     @property
     def display_name(self) -> str:
@@ -263,8 +265,8 @@ class NormalizedResource:
         if self._decoration_state_frozen:
             raise RuntimeError("NormalizedResource decoration state is frozen.")
 
-    def _metadata_view(self) -> Mapping[str, Any]:
-        return MappingProxyType(deepcopy(self._metadata))
+    def _metadata_readview(self) -> Mapping[str, Any]:
+        return self._metadata_read_view
 
     @property
     def direct_internet_reachable(self) -> bool:
@@ -365,7 +367,7 @@ class NormalizedResource:
 
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
 NormalizedResource.metadata = property(
-    NormalizedResource._metadata_view,
+    NormalizedResource._metadata_readview,
     doc="Read-only metadata view. Use typed properties or metadata field helpers to mutate.",
 )
 
@@ -376,6 +378,7 @@ class ResourceInventory:
     resources: Sequence[NormalizedResource]
     unsupported_resources: list[str] = field(default_factory=list)
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _metadata_read_view: Mapping[str, Any] = field(init=False, repr=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
@@ -384,6 +387,7 @@ class ResourceInventory:
 
     def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self._metadata = _normalized_metadata(metadata)
+        self._metadata_read_view = MappingProxyType(self._metadata)
         resources = tuple(self.resources)
         self.resources = resources
         resources_by_type: dict[str, list[NormalizedResource]] = {}
@@ -423,8 +427,8 @@ class ResourceInventory:
         """Return a detached metadata copy for serialization boundaries."""
         return deepcopy(self._metadata)
 
-    def _metadata_view(self) -> Mapping[str, Any]:
-        return MappingProxyType(deepcopy(self._metadata))
+    def _metadata_readview(self) -> Mapping[str, Any]:
+        return self._metadata_read_view
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:
@@ -448,7 +452,7 @@ class ResourceInventory:
 
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
 ResourceInventory.metadata = property(
-    ResourceInventory._metadata_view,
+    ResourceInventory._metadata_readview,
     doc="Read-only metadata view. Use typed properties or metadata_snapshot() for serialization.",
 )
 

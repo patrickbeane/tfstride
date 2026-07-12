@@ -10,6 +10,22 @@ class AwsEdgeFacts:
     __slots__ = ()
 
     @property
+    def load_balancer_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_TYPE)
+
+    @property
+    def load_balancer_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_ARN)
+
+    @property
+    def load_balancer_target_group_arns(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS)
+
+    @property
+    def listener_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.LISTENER_ARN)
+
+    @property
     def load_balancer_listener_protocol(self) -> str | None:
         return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL)
 

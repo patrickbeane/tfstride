@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import (
     GcpDecorationContext,
     GcpResourceIndex,
@@ -185,7 +186,7 @@ def _nat_applies_to_subnetwork(
     subnetwork: NormalizedResource,
     index: GcpResourceIndex,
 ) -> bool:
-    source_mode = str(router_nat.metadata.get("source_subnetwork_ip_ranges_to_nat") or "").upper()
+    source_mode = str(gcp_facts(router_nat).nat_source_subnetwork_ip_ranges_to_nat or "").upper()
     if source_mode.startswith("ALL_SUBNETWORKS"):
         return any(
             _same_network_reference(network_reference, subnetwork.vpc_id, index)

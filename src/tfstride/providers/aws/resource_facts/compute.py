@@ -10,6 +10,10 @@ class AwsComputeFacts:
     __slots__ = ()
 
     @property
+    def ecs_load_balancers(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_LOAD_BALANCERS)
+
+    @property
     def cluster_reference(self) -> str | None:
         return self.get(AwsResourceMetadata.CLUSTER_REFERENCE)
 

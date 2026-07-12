@@ -230,7 +230,9 @@ def normalize_compute_router_nat(resource: TerraformResource) -> NormalizedResou
             GcpResourceMetadata.ROUTER_REFERENCE: router_reference,
             GcpResourceMetadata.NAT_SUBNETWORKS: values.get(GcpAttr.SUBNETWORK_BLOCKS),
             "nat_ip_allocate_option": values.get(GcpAttr.NAT_IP_ALLOCATE_OPTION),
-            "source_subnetwork_ip_ranges_to_nat": values.get(GcpAttr.SOURCE_SUBNETWORK_IP_RANGES_TO_NAT),
+            GcpResourceMetadata.NAT_SOURCE_SUBNETWORK_IP_RANGES_TO_NAT: values.get(
+                GcpAttr.SOURCE_SUBNETWORK_IP_RANGES_TO_NAT
+            ),
             "min_ports_per_vm": values.get(GcpAttr.MIN_PORTS_PER_VM),
             "enable_endpoint_independent_mapping": values.get(GcpAttr.ENABLE_ENDPOINT_INDEPENDENT_MAPPING),
             "log_config": first_item(values.get(GcpAttr.LOG_CONFIG)) or {},

@@ -388,6 +388,15 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertTrue((SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
         self.assertTrue((SOURCE_ROOT / "providers" / "azure" / "boundaries.py").exists())
 
+    def test_analysis_and_provider_code_do_not_read_raw_metadata(self) -> None:
+        raw_metadata_reads: set[str] = set()
+        for root in (SOURCE_ROOT / "analysis", SOURCE_ROOT / "providers"):
+            for path in root.rglob("*.py"):
+                if ".metadata.get(" in path.read_text(encoding="utf-8"):
+                    raw_metadata_reads.add(path.relative_to(SOURCE_ROOT).as_posix())
+
+        self.assertEqual(raw_metadata_reads, set())
+
     def test_provider_fact_consumers_do_not_depend_on_shared_fact_facades(self) -> None:
         offenders: set[str] = set()
         for provider in ("aws", "gcp", "azure"):

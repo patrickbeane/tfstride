@@ -160,7 +160,7 @@ class AwsResourceIndexBuilder:
                         f"{resource.address}.name",
                         resource.arn,
                         resource.name,
-                        str(resource.metadata.get("name") or "") or None,
+                        aws_facts(resource).name,
                     ),
                 )
             elif resource_type == "aws_iam_role":

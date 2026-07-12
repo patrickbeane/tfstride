@@ -84,7 +84,7 @@ def _internet_facing_load_balancer_addresses_by_target_group(
         load_balancer = _listener_load_balancer(listener, index)
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
-        for target_group_reference in _metadata_string_list(listener, "target_group_arns"):
+        for target_group_reference in aws_facts(listener).load_balancer_target_group_arns:
             _append_load_balancer_target_group_references(
                 load_balancers_by_target_group,
                 index,
@@ -95,12 +95,12 @@ def _internet_facing_load_balancer_addresses_by_target_group(
     for listener_rule in index.load_balancer_listener_rules:
         listener = _resource_by_reference(
             index.load_balancer_listeners,
-            _metadata_string(listener_rule, "listener_arn"),
+            aws_facts(listener_rule).listener_arn,
         )
         load_balancer = _listener_load_balancer(listener, index)
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
-        for target_group_reference in _metadata_string_list(listener_rule, "target_group_arns"):
+        for target_group_reference in aws_facts(listener_rule).load_balancer_target_group_arns:
             _append_load_balancer_target_group_references(
                 load_balancers_by_target_group,
                 index,
@@ -208,7 +208,7 @@ def _listener_load_balancer(
         return None
     return _resource_by_reference(
         index.load_balancers,
-        _metadata_string(listener, "load_balancer_arn"),
+        aws_facts(listener).load_balancer_arn,
     )
 
 
@@ -218,7 +218,7 @@ def _is_internet_facing_load_balancer(resource: NormalizedResource | None) -> bo
 
 def _ecs_target_group_references(service: NormalizedResource) -> list[str]:
     references: list[str] = []
-    for load_balancer in _metadata_dict_list(service, "load_balancers"):
+    for load_balancer in aws_facts(service).ecs_load_balancers:
         target_group_arn = load_balancer.get("target_group_arn")
         if target_group_arn:
             references.append(str(target_group_arn))
@@ -227,7 +227,7 @@ def _ecs_target_group_references(service: NormalizedResource) -> list[str]:
 
 def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
     references: list[str] = []
-    for load_balancer in _metadata_dict_list(service, "load_balancers"):
+    for load_balancer in aws_facts(service).ecs_load_balancers:
         elb_name = load_balancer.get("elb_name")
         if elb_name:
             references.append(str(elb_name))
@@ -252,34 +252,11 @@ def _resource_reference_values(resource: NormalizedResource) -> list[str]:
                 resource.address,
                 resource.arn,
                 resource.name,
-                _metadata_string(resource, "name"),
+                aws_facts(resource).name,
             )
             if value
         ]
     )
-
-
-def _metadata_string(resource: NormalizedResource, key: str) -> str | None:
-    value = resource.metadata.get(key)
-    if value in (None, "", []):
-        return None
-    return str(value)
-
-
-def _metadata_string_list(resource: NormalizedResource, key: str) -> list[str]:
-    value = resource.metadata.get(key)
-    if value in (None, "", []):
-        return []
-    if isinstance(value, list):
-        return dedupe(str(item) for item in value if item not in (None, "", []))
-    return [str(value)]
-
-
-def _metadata_dict_list(resource: NormalizedResource, key: str) -> list[dict]:
-    value = resource.metadata.get(key)
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, dict)]
 
 
 def _unique_resources(resources) -> tuple[NormalizedResource, ...]:

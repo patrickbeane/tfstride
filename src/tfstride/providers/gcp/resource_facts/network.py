@@ -61,6 +61,10 @@ class GcpNetworkFacts:
         return self.optional_bool(GcpResourceMetadata.PRIVATE_IP_GOOGLE_ACCESS)
 
     @property
+    def nat_source_subnetwork_ip_ranges_to_nat(self) -> str | None:
+        return self.get(GcpResourceMetadata.NAT_SOURCE_SUBNETWORK_IP_RANGES_TO_NAT)
+
+    @property
     def subnetwork_flow_log_state(self) -> str | None:
         return self.get(GcpResourceMetadata.SUBNETWORK_FLOW_LOG_STATE)
 

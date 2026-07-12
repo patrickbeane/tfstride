@@ -170,7 +170,7 @@ def _public_load_balancers_by_listener(
     index = AwsResourceIndexBuilder().build(context.inventory.resources)
     public_load_balancers_by_listener: list[tuple[NormalizedResource, NormalizedResource]] = []
     for listener in context.inventory.by_type(_AWS_LOAD_BALANCER_LISTENER):
-        load_balancer = index.load_balancers.get(str(listener.metadata.get("load_balancer_arn") or ""))
+        load_balancer = index.load_balancers.get(aws_facts(listener).load_balancer_arn or "")
         if _is_public_load_balancer(load_balancer):
             public_load_balancers_by_listener.append((listener, load_balancer))
     return public_load_balancers_by_listener

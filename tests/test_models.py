@@ -33,6 +33,11 @@ def _resource(
     )
 
 
+class _RaisesOnDeepcopy:
+    def __deepcopy__(self, _memo: object) -> object:
+        raise AssertionError("runtime metadata reads should not deep copy")
+
+
 class SeverityTests(unittest.TestCase):
     def test_rank_orders_severities_for_threshold_comparison(self) -> None:
         self.assertLess(Severity.LOW.rank, Severity.MEDIUM.rank)
@@ -148,6 +153,13 @@ class ResourceInventoryTests(unittest.TestCase):
             inventory.metadata,
             {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
         )
+
+    def test_metadata_view_does_not_deepcopy_runtime_values(self) -> None:
+        inventory = ResourceInventory(provider="aws", resources=[])
+        value = _RaisesOnDeepcopy()
+        inventory._metadata["opaque"] = value
+
+        self.assertIs(inventory.metadata["opaque"], value)
 
     def test_metadata_view_is_read_only_and_detached(self) -> None:
         source_metadata = {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}}
@@ -314,6 +326,13 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertFalse(resource.has_metadata_value(ResourceMetadata.STORAGE_ENCRYPTED))
         self.assertTrue(resource.has_metadata_value(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertFalse(resource.has_metadata_value(ResourceMetadata.VPC_ENABLED))
+
+    def test_metadata_view_does_not_deepcopy_runtime_values(self) -> None:
+        resource = _resource(address="aws_instance.web", resource_type="aws_instance")
+        value = _RaisesOnDeepcopy()
+        resource._metadata["opaque"] = value
+
+        self.assertIs(resource.metadata["opaque"], value)
 
     def test_metadata_view_is_read_only_and_detached(self) -> None:
         source_metadata = {"tags": {"env": "prod"}}

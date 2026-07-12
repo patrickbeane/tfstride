@@ -80,7 +80,7 @@ def _is_public_application_load_balancer(load_balancer: NormalizedResource) -> b
 
 
 def _load_balancer_type(load_balancer: NormalizedResource) -> str | None:
-    value = load_balancer.metadata.get("load_balancer_type")
+    value = aws_facts(load_balancer).load_balancer_type
     return value.strip().lower() if isinstance(value, str) and value.strip() else None
 
 
@@ -111,8 +111,9 @@ def _load_balancer_evidence(load_balancer: NormalizedResource) -> list[str]:
     values = [f"address={load_balancer.address}", f"type={load_balancer.resource_type}"]
     if load_balancer.arn:
         values.append(f"arn={load_balancer.arn}")
-    if load_balancer.metadata.get("load_balancer_type"):
-        values.append(f"load_balancer_type={load_balancer.metadata['load_balancer_type']}")
+    load_balancer_type = aws_facts(load_balancer).load_balancer_type
+    if load_balancer_type:
+        values.append(f"load_balancer_type={load_balancer_type}")
     values.append("public_exposure=true")
     values.extend(load_balancer.public_exposure_reasons)
     return values

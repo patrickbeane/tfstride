@@ -91,6 +91,7 @@ class GcpResourceMetadata:
     ROUTE_NEXT_HOP_ILB = OptionalStringMetadataField("route_next_hop_ilb")
     ROUTE_NEXT_HOP_VPN_TUNNEL = OptionalStringMetadataField("route_next_hop_vpn_tunnel")
     ROUTER_REFERENCE = OptionalStringMetadataField("router_reference")
+    NAT_SOURCE_SUBNETWORK_IP_RANGES_TO_NAT = OptionalStringMetadataField("source_subnetwork_ip_ranges_to_nat")
     FIREWALL_POLICY_REFERENCE = OptionalStringMetadataField("firewall_policy_reference")
     FIREWALL_POLICY_PARENT = OptionalStringMetadataField("firewall_policy_parent")
     FIREWALL_POLICY_ATTACHMENT_TARGET = OptionalStringMetadataField("firewall_policy_attachment_target")

@@ -24,6 +24,14 @@ class AwsResourceFactsTests(unittest.TestCase):
     def test_reads_aws_provider_metadata(self) -> None:
         resource = _resource(
             {
+                "cidr_block": "10.0.0.0/16",
+                "load_balancer_type": "application",
+                "load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web",
+                "target_group_arns": ["arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/web/abc"],
+                "listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/web/abc/def",
+                "load_balancers": [
+                    {"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/web/abc"}
+                ],
                 "cluster": "arn:aws:ecs:us-east-1:111122223333:cluster/app",
                 "task_definition": "app:7",
                 "task_role_arn": "arn:aws:iam::111122223333:role/task",
@@ -376,6 +384,24 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertEqual(
             facts.lambda_function_url_posture_uncertainties,
             ["authorization_type is unknown after planning"],
+        )
+        self.assertEqual(facts.cidr_block, "10.0.0.0/16")
+        self.assertEqual(facts.load_balancer_type, "application")
+        self.assertEqual(
+            facts.load_balancer_arn,
+            "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web",
+        )
+        self.assertEqual(
+            facts.load_balancer_target_group_arns,
+            ["arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/web/abc"],
+        )
+        self.assertEqual(
+            facts.listener_arn,
+            "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/web/abc/def",
+        )
+        self.assertEqual(
+            facts.ecs_load_balancers,
+            [{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/web/abc"}],
         )
         self.assertEqual(facts.load_balancer_listener_protocol, "HTTPS")
         self.assertEqual(

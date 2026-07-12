@@ -209,7 +209,7 @@ def _vpc_target_evidence(vpc: NormalizedResource) -> list[str]:
         values.append(f"identifier={vpc.identifier}")
     if vpc.vpc_id:
         values.append(f"vpc_id={vpc.vpc_id}")
-    cidr_block = vpc.metadata.get("cidr_block")
+    cidr_block = aws_facts(vpc).cidr_block
     if cidr_block:
         values.append(f"cidr_block={cidr_block}")
     return values

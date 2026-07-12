@@ -14,6 +14,10 @@ class AwsNetworkFacts:
         return self.get(AwsResourceMetadata.SECURITY_GROUP_ID)
 
     @property
+    def cidr_block(self) -> str | None:
+        return self.get(AwsResourceMetadata.CIDR_BLOCK)
+
+    @property
     def route_table_id(self) -> str | None:
         return self.get(AwsResourceMetadata.ROUTE_TABLE_ID)
 

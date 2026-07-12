@@ -34,7 +34,7 @@ def normalize_vpc(resource: TerraformResource) -> NormalizedResource:
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=values.get("id"),
-        metadata={"cidr_block": values.get("cidr_block"), "tags": values.get("tags", {})},
+        metadata={AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"), "tags": values.get("tags", {})},
     )
 
 
@@ -49,7 +49,7 @@ def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
         identifier=values.get("id"),
         vpc_id=values.get("vpc_id"),
         metadata={
-            "cidr_block": values.get("cidr_block"),
+            AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"),
             "availability_zone": values.get("availability_zone"),
             "map_public_ip_on_launch": bool(values.get("map_public_ip_on_launch", False)),
             "tags": values.get("tags", {}),
@@ -349,7 +349,7 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         public_access_configured=internet_facing,
         metadata={
             "internal": not internet_facing,
-            "load_balancer_type": values.get("load_balancer_type"),
+            AwsResourceMetadata.LOAD_BALANCER_TYPE: values.get("load_balancer_type"),
         },
     )
     mutations = aws_mutations(normalized)
@@ -374,8 +374,10 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
         identifier=values.get("id") or values.get("arn"),
         arn=values.get("arn"),
         metadata={
-            "load_balancer_arn": values.get("load_balancer_arn"),
-            "target_group_arns": _load_balancer_action_target_group_arns(values.get("default_action")),
+            AwsResourceMetadata.LOAD_BALANCER_ARN: values.get("load_balancer_arn"),
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: _load_balancer_action_target_group_arns(
+                values.get("default_action")
+            ),
             "port": as_optional_int(values.get("port")),
             "protocol": protocol,
             AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL: protocol,
@@ -397,8 +399,10 @@ def normalize_load_balancer_listener_rule(resource: TerraformResource) -> Normal
         identifier=values.get("id") or values.get("arn"),
         arn=values.get("arn"),
         metadata={
-            "listener_arn": values.get("listener_arn"),
-            "target_group_arns": _load_balancer_action_target_group_arns(values.get("action")),
+            AwsResourceMetadata.LISTENER_ARN: values.get("listener_arn"),
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: _load_balancer_action_target_group_arns(
+                values.get("action")
+            ),
             "listener_rule_priority": as_optional_int(values.get("priority")),
         },
     )

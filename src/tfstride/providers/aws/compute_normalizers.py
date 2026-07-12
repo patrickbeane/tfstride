@@ -117,7 +117,7 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
             "launch_type": values.get("launch_type"),
             "platform_version": values.get("platform_version"),
             "assign_public_ip": assign_public_ip,
-            "load_balancers": as_list(values.get("load_balancer")),
+            AwsResourceMetadata.ECS_LOAD_BALANCERS: as_list(values.get("load_balancer")),
         },
     )
     mutations = aws_mutations(normalized)
