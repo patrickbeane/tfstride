@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.azure.network_normalizers import (
     normalize_application_gateway,
@@ -41,6 +42,23 @@ def _resource(
 
 
 class AzureNetworkNormalizerTests(unittest.TestCase):
+    def test_network_normalizers_are_grouped_by_domain(self) -> None:
+        azure_provider_root = SOURCE_ROOT / "providers" / "azure"
+        normalizers_package = azure_provider_root / "network_normalizers"
+        required_modules = {
+            "core",
+            "vnet_nsg",
+            "public_edge",
+            "private_endpoint_dns",
+            "flow_logs",
+        }
+
+        self.assertFalse((azure_provider_root / "network_normalizers.py").exists())
+        self.assertTrue(normalizers_package.is_dir())
+        self.assertTrue(
+            required_modules <= {path.stem for path in normalizers_package.glob("*.py")},
+        )
+
     def test_virtual_network_and_subnet_normalize_graph_references(self) -> None:
         virtual_network = normalize_virtual_network(
             _resource(
