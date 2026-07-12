@@ -10,6 +10,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.aws.policy_conditions import (
     policy_statement_principal_assessments,
     resource_policy_statement_has_effective_narrowing,
@@ -108,7 +109,7 @@ class AwsLambdaRuleDetectors:
                     self._finding_factory.build(
                         rule_id=rule_id,
                         severity=severity_reasoning.severity,
-                        affected_resources=_dedupe_addresses([function.address, *resource_policy_sources]),
+                        affected_resources=dedupe([function.address, *resource_policy_sources]),
                         trust_boundary_id=None,
                         rationale=(
                             f"{function.display_name} has a Lambda resource policy statement that allows "
@@ -197,14 +198,3 @@ def _lambda_permission_evidence(statement: IAMPolicyStatement) -> list[str]:
         "actions=" + ", ".join(sorted(statement.actions)),
         describe_policy_statement(statement),
     ]
-
-
-def _dedupe_addresses(addresses: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for address in addresses:
-        if not address or address in seen:
-            continue
-        seen.add(address)
-        deduped.append(address)
-    return deduped

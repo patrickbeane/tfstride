@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypeVar
 
+from tfstride.providers.coercion import dedupe_strings
+
 
 class PrincipalType(str, Enum):
     """Provider-neutral identity principal categories."""
@@ -83,20 +85,6 @@ def _normalize_provider(provider: str) -> str:
     return normalized
 
 
-def _dedupe_strings(values: Iterable[str | None]) -> tuple[str, ...]:
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for value in values:
-        if value is None:
-            continue
-        normalized = str(value).strip()
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        deduped.append(normalized)
-    return tuple(deduped)
-
-
 def _dedupe_enum_values(values: Iterable[_EnumT | str], enum_type: type[_EnumT]) -> tuple[_EnumT, ...]:
     seen: set[_EnumT] = set()
     deduped: list[_EnumT] = []
@@ -161,9 +149,9 @@ class PrivilegedAccessGrant:
         object.__setattr__(self, "provider", _normalize_provider(self.provider))
         object.__setattr__(self, "privilege_categories", categories)
         object.__setattr__(self, "confidence", PrivilegeConfidence(self.confidence))
-        object.__setattr__(self, "permission_patterns", _dedupe_strings(self.permission_patterns))
-        object.__setattr__(self, "evidence", _dedupe_strings(self.evidence))
-        object.__setattr__(self, "uncertainties", _dedupe_strings(self.uncertainties))
+        object.__setattr__(self, "permission_patterns", tuple(dedupe_strings(self.permission_patterns)))
+        object.__setattr__(self, "evidence", tuple(dedupe_strings(self.evidence)))
+        object.__setattr__(self, "uncertainties", tuple(dedupe_strings(self.uncertainties)))
 
     @property
     def has_uncertainty(self) -> bool:
@@ -186,7 +174,7 @@ class PrivilegedAccessPosture:
         provider = _normalize_provider(self.provider)
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "grants", tuple(self.grants))
-        object.__setattr__(self, "unresolved_assignments", _dedupe_strings(self.unresolved_assignments))
+        object.__setattr__(self, "unresolved_assignments", tuple(dedupe_strings(self.unresolved_assignments)))
         mismatched = tuple(grant.provider for grant in self.grants if grant.provider != provider)
         if mismatched:
             raise ValueError("all privileged access grants must match the posture provider")

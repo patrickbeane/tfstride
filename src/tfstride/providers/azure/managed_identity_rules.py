@@ -13,6 +13,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrivilegedAccessGrant
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
@@ -180,13 +181,13 @@ def _assignment_breadth_signal_set(assignment: Mapping[str, Any]) -> set[str]:
 
 
 def _assignment_breadth_signals(assignments: list[Mapping[str, Any]]) -> list[str]:
-    return _dedupe_strings(
+    return dedupe_strings(
         signal for assignment in assignments for signal in assignment.get("breadth_signals", []) if signal
     )
 
 
 def _assignment_values(assignments: list[Mapping[str, Any]], key: str) -> list[str]:
-    return _dedupe_strings(str(assignment[key]) for assignment in assignments if assignment.get(key))
+    return dedupe_strings(str(assignment[key]) for assignment in assignments if assignment.get(key))
 
 
 def _describe_role_assignments(assignments: list[Mapping[str, Any]]) -> list[str]:
@@ -241,7 +242,7 @@ def _privileged_access_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> li
 
 
 def _privileged_access_categories(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
-    return _dedupe_strings(category.value for grant in grants for category in grant.privilege_categories)
+    return dedupe_strings(category.value for grant in grants for category in grant.privilege_categories)
 
 
 def _public_workloads_by_identity_address(inventory) -> dict[str, list[Any]]:
@@ -312,17 +313,6 @@ def _first_public_workload_boundary(public_workloads: list[Any], context: RuleEv
 
 def _role_name(assignment: Mapping[str, Any]) -> str:
     return str(assignment.get("role_definition_name") or "").strip().lower()
-
-
-def _dedupe_strings(values) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        text = str(value).strip()
-        if text and text not in seen:
-            deduped.append(text)
-            seen.add(text)
-    return deduped
 
 
 _SENSITIVE_RESOURCE_ACCESS_ROLE_NAMES = frozenset(

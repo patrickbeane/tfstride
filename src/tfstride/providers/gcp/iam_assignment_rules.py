@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrincipalType, PrivilegeCategory, PrivilegeConfidence, PrivilegedAccessGrant
@@ -131,7 +130,7 @@ def _assignment_evidence(resource: NormalizedResource, grants: tuple[PrivilegedA
         f"type={resource.resource_type}",
     ]
     values.extend(f"role={grant.role_name}" for grant in grants if grant.role_name)
-    return _dedupe(values)
+    return dedupe_strings(values)
 
 
 def _grant_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
@@ -151,7 +150,7 @@ def _category_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
 
 
 def _permission_pattern_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
-    return _dedupe(pattern for grant in grants for pattern in grant.permission_patterns)
+    return dedupe_strings(pattern for grant in grants for pattern in grant.permission_patterns)
 
 
 def _principal_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
@@ -161,7 +160,7 @@ def _principal_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
         if grant.principal.identifier:
             value = f"{value}; principal={grant.principal.identifier}"
         values.append(value)
-    return _dedupe(values)
+    return dedupe_strings(values)
 
 
 def _scope_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
@@ -172,30 +171,16 @@ def _scope_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
         if scope.value:
             value = f"{value}; scope_value={scope.value}"
         values.append(value)
-    return _dedupe(values)
+    return dedupe_strings(values)
 
 
 def _confidence_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
-    return _dedupe(grant.confidence.value for grant in grants)
+    return dedupe_strings(grant.confidence.value for grant in grants)
 
 
 def _provider_fact_evidence(grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
-    return _dedupe(value for grant in grants for value in grant.evidence)
+    return dedupe_strings(value for grant in grants for value in grant.evidence)
 
 
 def _affected_resources(resource: NormalizedResource, grants: tuple[PrivilegedAccessGrant, ...]) -> list[str]:
-    return _dedupe([resource.address, *(grant.assignment_scope.source_address for grant in grants)])
-
-
-def _dedupe(values: Iterable[str | None]) -> list[str]:
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for value in values:
-        if value is None:
-            continue
-        normalized = str(value).strip()
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        deduped.append(normalized)
-    return deduped
+    return dedupe_strings([resource.address, *(grant.assignment_scope.source_address for grant in grants)])

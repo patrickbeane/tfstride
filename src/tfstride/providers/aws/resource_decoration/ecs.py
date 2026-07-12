@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex
 from tfstride.providers.aws.resource_mutations import aws_mutations
 
@@ -221,7 +222,7 @@ def _ecs_target_group_references(service: NormalizedResource) -> list[str]:
         target_group_arn = load_balancer.get("target_group_arn")
         if target_group_arn:
             references.append(str(target_group_arn))
-    return _dedupe(references)
+    return dedupe(references)
 
 
 def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
@@ -230,7 +231,7 @@ def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
         elb_name = load_balancer.get("elb_name")
         if elb_name:
             references.append(str(elb_name))
-    return _dedupe(references)
+    return dedupe(references)
 
 
 def _resource_by_reference(
@@ -243,7 +244,7 @@ def _resource_by_reference(
 
 
 def _resource_reference_values(resource: NormalizedResource) -> list[str]:
-    return _dedupe(
+    return dedupe(
         [
             value
             for value in (
@@ -270,7 +271,7 @@ def _metadata_string_list(resource: NormalizedResource, key: str) -> list[str]:
     if value in (None, "", []):
         return []
     if isinstance(value, list):
-        return _dedupe(str(item) for item in value if item not in (None, "", []))
+        return dedupe(str(item) for item in value if item not in (None, "", []))
     return [str(value)]
 
 
@@ -295,12 +296,3 @@ def _unique_resources(resources) -> tuple[NormalizedResource, ...]:
 def _append_unique(values: list[str], value: str) -> None:
     if value not in values:
         values.append(value)
-
-
-def _dedupe(values) -> list[str]:
-    deduped: list[str] = []
-    for value in values:
-        if value in deduped:
-            continue
-        deduped.append(value)
-    return deduped

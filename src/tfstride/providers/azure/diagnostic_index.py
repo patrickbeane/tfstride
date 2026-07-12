@@ -7,6 +7,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
 
@@ -66,27 +67,31 @@ class AzureDiagnosticSettingCoverage:
 
     @property
     def diagnostic_setting_addresses(self) -> tuple[str, ...]:
-        return _dedupe(setting.diagnostic_setting_address for setting in self.settings)
+        return tuple(dedupe_strings(setting.diagnostic_setting_address for setting in self.settings))
 
     @property
     def enabled_log_categories(self) -> tuple[str, ...]:
-        return _dedupe(category for setting in self.settings for category in setting.enabled_log_categories)
+        return tuple(
+            dedupe_strings(category for setting in self.settings for category in setting.enabled_log_categories)
+        )
 
     @property
     def enabled_log_category_groups(self) -> tuple[str, ...]:
-        return _dedupe(group for setting in self.settings for group in setting.enabled_log_category_groups)
+        return tuple(
+            dedupe_strings(group for setting in self.settings for group in setting.enabled_log_category_groups)
+        )
 
     @property
     def metric_categories(self) -> tuple[str, ...]:
-        return _dedupe(category for setting in self.settings for category in setting.metric_categories)
+        return tuple(dedupe_strings(category for setting in self.settings for category in setting.metric_categories))
 
     @property
     def destinations(self) -> tuple[str, ...]:
-        return _dedupe(destination for setting in self.settings for destination in setting.destinations)
+        return tuple(dedupe_strings(destination for setting in self.settings for destination in setting.destinations))
 
     @property
     def uncertainties(self) -> tuple[str, ...]:
-        return _dedupe(uncertainty for setting in self.settings for uncertainty in setting.uncertainties)
+        return tuple(dedupe_strings(uncertainty for setting in self.settings for uncertainty in setting.uncertainties))
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,14 +256,3 @@ def _looks_like_terraform_id_reference(value: object) -> bool:
     if text.startswith("${") and text.endswith("}"):
         text = text[2:-1].strip()
     return text.lower().endswith(".id")
-
-
-def _dedupe(values: Iterable[str]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return tuple(deduped)

@@ -7,7 +7,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.coercion import as_list, value_is_unknown
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
-from tfstride.providers.gcp.coercion import as_bool, first_item
+from tfstride.providers.gcp.coercion import as_bool, dedupe, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -541,11 +541,11 @@ def _user_managed_secret_replication_posture(
     if replica_evidence:
         replication["replicas"] = replica_evidence
     if kms_key_names:
-        replication["kms_key_names"] = _dedupe(kms_key_names)
+        replication["kms_key_names"] = dedupe(kms_key_names)
     return (
         "user_managed",
         replication,
-        _dedupe(kms_key_names),
+        dedupe(kms_key_names),
         uncertainties,
         _customer_managed_encryption_state(
             kms_key_names,
@@ -583,7 +583,7 @@ def _secret_manager_cmek_key_names(
         kms_key_name = first_non_empty(block.get(GcpAttr.KMS_KEY_NAME.key))
         if kms_key_name is not None:
             key_names.append(kms_key_name)
-    return _dedupe(key_names)
+    return dedupe(key_names)
 
 
 def _customer_managed_encryption_state(kms_key_names: list[str], uncertainties: list[str]) -> bool | None:
@@ -605,17 +605,6 @@ def _unknown_child(value: Mapping[str, Any] | None, key: str) -> Any:
     if value is None:
         return None
     return value.get(key)
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped
 
 
 def _with_storage_encrypted(resource: NormalizedResource) -> NormalizedResource:

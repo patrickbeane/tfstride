@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.private_endpoint_index import (
     AzurePrivateEndpointConnection,
     build_azure_private_endpoint_index,
@@ -449,7 +450,7 @@ def _endpoint_virtual_network_keys(
             if virtual_network_reference:
                 references.append(virtual_network_reference)
                 evidence.append(f"{endpoint.address}: endpoint_vnet={virtual_network_reference}")
-    return _expanded_reference_keys(references, resource_by_reference), _dedupe_strings(evidence)
+    return _expanded_reference_keys(references, resource_by_reference), dedupe_strings(evidence)
 
 
 def _expanded_reference_keys(
@@ -465,11 +466,11 @@ def _expanded_reference_keys(
         resolved_resource = resource_by_reference.get(reference_key)
         if resolved_resource is not None:
             keys.extend(azure_resource_references(resolved_resource))
-    return _dedupe_strings(keys)
+    return dedupe_strings(keys)
 
 
 def _private_dns_zone_link_evidence(links: Iterable[_PrivateDnsZoneLink]) -> list[str]:
-    return _dedupe_strings(
+    return dedupe_strings(
         f"{link.address}: zone={link.zone_reference or 'unknown'}; "
         f"virtual_network={link.virtual_network_reference or 'unknown'}"
         for link in links
@@ -484,17 +485,6 @@ def _dedupe_links(links: Iterable[_PrivateDnsZoneLink]) -> tuple[_PrivateDnsZone
             continue
         seen.add(link.address)
         deduped.append(link)
-    return tuple(deduped)
-
-
-def _dedupe_strings(values: Iterable[str]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
     return tuple(deduped)
 
 

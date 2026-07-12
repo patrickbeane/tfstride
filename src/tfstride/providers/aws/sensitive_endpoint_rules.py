@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 
@@ -17,6 +17,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.aws.vpc_endpoint_index import AwsVpcEndpointIndex, build_aws_vpc_endpoint_index
 
 
@@ -262,7 +263,7 @@ def _broad_endpoint_policy_posture(
     if not reasons:
         return None
     return _EndpointPolicyPosture(
-        reasons=_dedupe(reasons),
+        reasons=tuple(dedupe_strings(reasons)),
         statements=tuple(statements),
     )
 
@@ -328,8 +329,8 @@ def _service_dependency(role: NormalizedResource, service: _SensitiveEndpointSer
     if not actions:
         return None
     return _ServiceDependency(
-        actions=_dedupe(actions),
-        resources=_dedupe(resources),
+        actions=tuple(dedupe_strings(actions)),
+        resources=tuple(dedupe_strings(resources)),
         statements=tuple(statements),
     )
 
@@ -436,14 +437,3 @@ def _endpoint_coverage_evidence(
     if existing_endpoint_addresses:
         values.append(f"existing_vpc_endpoint_addresses=[{', '.join(existing_endpoint_addresses)}]")
     return values
-
-
-def _dedupe(values: Iterable[str | None]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return tuple(deduped)

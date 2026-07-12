@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import (
     gcp_network_reference_key,
@@ -100,34 +101,40 @@ class GcpPrivateConnectivityCoverage:
 
     @property
     def private_service_access_connection_addresses(self) -> tuple[str, ...]:
-        return _dedupe(connection.address for connection in self.private_service_access_connections)
+        return tuple(dedupe_strings(connection.address for connection in self.private_service_access_connections))
 
     @property
     def reserved_range_addresses(self) -> tuple[str, ...]:
-        return _dedupe(reserved_range.address for reserved_range in self.private_service_access_reserved_ranges)
+        return tuple(
+            dedupe_strings(reserved_range.address for reserved_range in self.private_service_access_reserved_ranges)
+        )
 
     @property
     def reserved_range_names(self) -> tuple[str, ...]:
-        return _dedupe(reserved_range.name for reserved_range in self.private_service_access_reserved_ranges)
+        return tuple(
+            dedupe_strings(reserved_range.name for reserved_range in self.private_service_access_reserved_ranges)
+        )
 
     @property
     def psc_forwarding_rule_addresses(self) -> tuple[str, ...]:
-        return _dedupe(endpoint.address for endpoint in self.psc_forwarding_rule_endpoints)
+        return tuple(dedupe_strings(endpoint.address for endpoint in self.psc_forwarding_rule_endpoints))
 
     @property
     def psc_service_connection_policy_addresses(self) -> tuple[str, ...]:
-        return _dedupe(policy.address for policy in self.psc_service_connection_policies)
+        return tuple(dedupe_strings(policy.address for policy in self.psc_service_connection_policies))
 
     @property
     def uncertainties(self) -> tuple[str, ...]:
-        return _dedupe(
-            uncertainty
-            for record in (
-                *self.private_service_access_connections,
-                *self.private_service_access_reserved_ranges,
-                *self.psc_service_connection_policies,
+        return tuple(
+            dedupe_strings(
+                uncertainty
+                for record in (
+                    *self.private_service_access_connections,
+                    *self.private_service_access_reserved_ranges,
+                    *self.psc_service_connection_policies,
+                )
+                for uncertainty in record.uncertainties
             )
-            for uncertainty in record.uncertainties
         )
 
 
@@ -367,14 +374,3 @@ def _is_cloud_sql_service_class(service_class: str | None) -> bool:
 def _is_private_service_access_range(purpose: str | None, uncertainties: Iterable[str]) -> bool:
     normalized = (purpose or "").strip().lower()
     return normalized == "vpc_peering" or any("purpose is unknown" in uncertainty for uncertainty in uncertainties)
-
-
-def _dedupe(values: Iterable[str | None]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return tuple(deduped)

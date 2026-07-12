@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from tfstride.analysis.finding_helpers import collect_evidence, evidence_item
 from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
     AZURE_COMPUTE_RESOURCE_TYPES,
@@ -76,7 +75,7 @@ def _observe_managed_identity_principals(inventory: ResourceInventory) -> list[O
                     title="Azure managed identity role assignment is connected",
                     observation_id="azure-managed-identity-role-assignment-observed",
                     category="iam",
-                    affected_resources=_dedupe_strings([resource.address, *_record_sources(assignments)]),
+                    affected_resources=dedupe_strings([resource.address, *_record_sources(assignments)]),
                     rationale=(
                         f"{resource.display_name} has Azure role assignments whose `principal_id` matches this "
                         "managed identity. Scope breadth is reported separately from any downstream exposure rule."
@@ -382,19 +381,8 @@ def _record_sources(records: list[dict]) -> list[str]:
 
 
 def _record_values(records: list[dict], key: str) -> list[str]:
-    return _dedupe_strings(str(record[key]) for record in records if record.get(key))
+    return dedupe_strings(str(record[key]) for record in records if record.get(key))
 
 
 def _record_breadth_signals(records: list[dict]) -> list[str]:
-    return _dedupe_strings(str(signal) for record in records for signal in record.get("breadth_signals", []) if signal)
-
-
-def _dedupe_strings(values: Iterable[object]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        text = str(value).strip()
-        if text and text not in seen:
-            deduped.append(text)
-            seen.add(text)
-    return deduped
+    return dedupe_strings(str(signal) for record in records for signal in record.get("breadth_signals", []) if signal)

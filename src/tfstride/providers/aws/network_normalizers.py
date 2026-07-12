@@ -9,6 +9,7 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
     attribute_unknown,
+    dedupe,
     first_mapping,
     known_block_bool,
     known_block_string,
@@ -950,15 +951,4 @@ def _load_balancer_action_target_group_arns(actions: Any) -> list[str]:
                 target_group_arn = target_group.get("arn")
                 if target_group_arn:
                     target_group_arns.append(str(target_group_arn))
-    return _dedupe(target_group_arns)
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return deduped
+    return dedupe(target_group_arns)

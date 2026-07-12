@@ -7,6 +7,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.coercion import dedupe_strings
 
 _S3 = "s3"
 _SECRETS_MANAGER = "secretsmanager"
@@ -43,33 +44,37 @@ class AwsVpcEndpointCoverage:
 
     @property
     def endpoint_addresses(self) -> tuple[str, ...]:
-        return _dedupe(endpoint.endpoint_address for endpoint in self.endpoints)
+        return tuple(dedupe_strings(endpoint.endpoint_address for endpoint in self.endpoints))
 
     @property
     def endpoint_ids(self) -> tuple[str, ...]:
-        return _dedupe(endpoint.endpoint_id for endpoint in self.endpoints)
+        return tuple(dedupe_strings(endpoint.endpoint_id for endpoint in self.endpoints))
 
     @property
     def endpoint_types(self) -> tuple[str, ...]:
-        return _dedupe(endpoint.endpoint_type for endpoint in self.endpoints)
+        return tuple(dedupe_strings(endpoint.endpoint_type for endpoint in self.endpoints))
 
     @property
     def route_table_ids(self) -> tuple[str, ...]:
-        return _dedupe(route_table_id for endpoint in self.endpoints for route_table_id in endpoint.route_table_ids)
+        return tuple(
+            dedupe_strings(route_table_id for endpoint in self.endpoints for route_table_id in endpoint.route_table_ids)
+        )
 
     @property
     def subnet_ids(self) -> tuple[str, ...]:
-        return _dedupe(subnet_id for endpoint in self.endpoints for subnet_id in endpoint.subnet_ids)
+        return tuple(dedupe_strings(subnet_id for endpoint in self.endpoints for subnet_id in endpoint.subnet_ids))
 
     @property
     def security_group_ids(self) -> tuple[str, ...]:
-        return _dedupe(
-            security_group_id for endpoint in self.endpoints for security_group_id in endpoint.security_group_ids
+        return tuple(
+            dedupe_strings(
+                security_group_id for endpoint in self.endpoints for security_group_id in endpoint.security_group_ids
+            )
         )
 
     @property
     def dns_names(self) -> tuple[str, ...]:
-        return _dedupe(dns_name for endpoint in self.endpoints for dns_name in endpoint.dns_names)
+        return tuple(dedupe_strings(dns_name for endpoint in self.endpoints for dns_name in endpoint.dns_names))
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,14 +174,3 @@ def _normalized_endpoint_type(endpoint_type: str | None) -> str | None:
         return None
     normalized = endpoint_type.strip().lower()
     return normalized or None
-
-
-def _dedupe(values: Iterable[str | None]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return tuple(deduped)

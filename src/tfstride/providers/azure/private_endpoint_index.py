@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
 
@@ -50,28 +51,38 @@ class AzurePrivateEndpointCoverage:
 
     @property
     def private_endpoint_addresses(self) -> tuple[str, ...]:
-        return _dedupe(connection.private_endpoint_address for connection in self.connections)
+        return tuple(dedupe_strings(connection.private_endpoint_address for connection in self.connections))
 
     @property
     def subresource_names(self) -> tuple[str, ...]:
-        return _dedupe(
-            subresource_name for connection in self.connections for subresource_name in connection.subresource_names
+        return tuple(
+            dedupe_strings(
+                subresource_name for connection in self.connections for subresource_name in connection.subresource_names
+            )
         )
 
     @property
     def private_dns_zone_group_names(self) -> tuple[str, ...]:
-        return _dedupe(
-            group_name for connection in self.connections for group_name in connection.private_dns_zone_group_names
+        return tuple(
+            dedupe_strings(
+                group_name for connection in self.connections for group_name in connection.private_dns_zone_group_names
+            )
         )
 
     @property
     def private_dns_zone_ids(self) -> tuple[str, ...]:
-        return _dedupe(zone_id for connection in self.connections for zone_id in connection.private_dns_zone_ids)
+        return tuple(
+            dedupe_strings(zone_id for connection in self.connections for zone_id in connection.private_dns_zone_ids)
+        )
 
     @property
     def private_dns_zone_uncertainties(self) -> tuple[str, ...]:
-        return _dedupe(
-            uncertainty for connection in self.connections for uncertainty in connection.private_dns_zone_uncertainties
+        return tuple(
+            dedupe_strings(
+                uncertainty
+                for connection in self.connections
+                for uncertainty in connection.private_dns_zone_uncertainties
+            )
         )
 
 
@@ -215,14 +226,3 @@ def _optional_string(value: object) -> str | None:
 
 def _optional_bool(value: object) -> bool | None:
     return value if isinstance(value, bool) else None
-
-
-def _dedupe(values: Iterable[str]) -> tuple[str, ...]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return tuple(deduped)

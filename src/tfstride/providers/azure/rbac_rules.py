@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
+from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.azure.rbac_breadth import (
     COMPUTE_MANAGEMENT,
     KEY_VAULT_DATA_PLANE,
@@ -353,7 +354,7 @@ def _assigned_custom_role_affected_resources(
     assignment_facts: AzureResourceFacts,
     principal: NormalizedResource | None,
 ) -> list[str]:
-    return _dedupe_strings(
+    return dedupe_strings(
         value
         for value in (
             principal.address if principal is not None else None,
@@ -419,10 +420,6 @@ def _assigned_custom_role_reason_summary(reasons: list[str]) -> str:
 
 def _scope_label(scope_kind: str | None) -> str:
     return scope_kind or "unknown"
-
-
-def _dedupe_strings(values: Iterable[str]) -> list[str]:
-    return list(dict.fromkeys(value for value in values if value))
 
 
 def _custom_role_definitions(resources: Iterable[NormalizedResource]) -> tuple[NormalizedResource, ...]:
