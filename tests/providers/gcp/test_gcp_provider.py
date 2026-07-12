@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.gcp.constants import (
     GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
@@ -394,6 +395,30 @@ class GcpProviderTests(unittest.TestCase):
         self.assertFalse(hasattr(facts, "trust_statements"))
         self.assertFalse(hasattr(facts, "rds_backup_retention_period"))
         self.assertFalse(hasattr(facts, "s3_versioning_enabled"))
+
+    def test_gcp_resource_facts_are_composed_by_domain(self) -> None:
+        gcp_provider_root = SOURCE_ROOT / "providers" / "gcp"
+        facts_package = gcp_provider_root / "resource_facts"
+        required_fact_modules = {
+            "base",
+            "storage",
+            "secret_manager",
+            "kms",
+            "iam",
+            "identity",
+            "network",
+            "cloud_sql",
+            "compute",
+            "gke",
+            "audit",
+            "edge",
+        }
+
+        self.assertFalse((gcp_provider_root / "resource_facts.py").exists())
+        self.assertTrue(facts_package.is_dir())
+        self.assertTrue(
+            required_fact_modules <= {path.stem for path in facts_package.glob("*.py")},
+        )
 
     def test_optional_boolean_facts_preserve_none_and_false(self) -> None:
         resource = NormalizedResource(
