@@ -123,7 +123,7 @@ tfstride --list-rules --json
 
 | Provider | Status          | Coverage Summary                                                                                                                                     |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, ALB listener TLS and WAF posture, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption/observability/HA posture, S3 public/encryption/versioning/immutability/recovery posture, Secrets Manager recovery/encryption/rotation posture, KMS rotation/deletion posture, VPC endpoint/private service posture, VPC Flow Logs telemetry posture, account audit/detection posture, IAM and privileged role-assignment posture, SNS/SQS, VPC routing, security groups, trust boundaries, and control observations. |
+| AWS      | Deepest support | EC2, ECS/Fargate, Lambda and Function URLs, CloudFront and API Gateway public-edge posture, ALB listener TLS and WAF posture, EKS control-plane/add-on posture, RDS endpoint/recovery/encryption/observability/HA posture, S3 public/encryption/versioning/immutability/recovery posture, Secrets Manager recovery/encryption/rotation posture, KMS rotation/deletion posture, VPC endpoint/private service posture, VPC Flow Logs telemetry posture, account audit/detection/governance posture, IAM and privileged role-assignment posture, SNS/SQS, VPC routing, security groups, trust boundaries, and control observations. |
 | GCP      | Active support  | Compute, GKE control-plane/auth/hardening posture, Cloud SQL, GCS public/encryption/versioning/retention posture, load balancer TLS and Cloud Armor posture, subnet Flow Logs telemetry posture, Private Service Access and Private Google Access posture, Secret Manager lifecycle/encryption posture, KMS rotation/destruction posture, audit logging/SCC posture, IAM and privileged assignment posture, Cloud Run, Cloud Functions, Pub/Sub, BigQuery, firewall posture, and workload-to-data paths. |
 | Azure    | Active support  | Azure Storage public/encryption/recovery/private-endpoint posture, Key Vault network/key/secret lifecycle posture, SQL/PostgreSQL recovery and exposure posture, App Service/Function Apps access posture, AKS control-plane/auth/add-on posture, Load Balancer/Application Gateway exposure and WAF posture, NSG Flow Logs telemetry posture, diagnostic settings/Defender posture, managed identity, built-in RBAC, and custom RBAC posture, NSG-aware public ingress, public VM exposure, and workload-to-sensitive-resource paths. |
 
@@ -147,6 +147,10 @@ AWS support currently includes:
 * `aws_lb_listener`
 * `aws_lb_listener_rule`
 * `aws_lb_target_group`
+* `aws_cloudfront_distribution`
+* `aws_api_gateway_rest_api`
+* `aws_apigatewayv2_api`
+* `aws_wafv2_web_acl_association`
 * `aws_db_instance`
 * `aws_s3_bucket`
 * `aws_s3_bucket_lifecycle_configuration`
@@ -185,7 +189,7 @@ AWS support currently includes:
 * `aws_accessanalyzer_analyzer`
 * `aws_macie2_account`
 
-AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, ALB listener HTTP/TLS certificate/SSL-policy posture, public ALB WAF association posture, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, VPC Flow Logs coverage, traffic-type, and destination posture, S3 public-access/encryption/versioning posture, RDS public endpoint, backup retention, deletion protection, and customer-managed KMS posture, Secrets Manager customer-managed key, recovery-window, and rotation posture, KMS key rotation and deletion-window posture, workload use of S3, KMS, or Secrets Manager without modeled VPC endpoint coverage, broad VPC endpoint policies, CloudTrail multi-region, log-validation, event-selector, data-event, and Insights posture, GuardDuty, Security Hub, and AWS Config baseline posture, IAM wildcard permissions, privileged role-assignment posture, workload-role sensitive permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
+AWS rule coverage includes public compute ingress, public Lambda Function URL invocation, CloudFront viewer HTTP/TLS/WAF posture, public API Gateway CORS/WAF posture, ALB listener HTTP/TLS certificate/SSL-policy posture, public ALB WAF association posture, EKS public endpoint/CIDR/private-endpoint posture, EKS secrets encryption, authentication mode, control-plane logging, and VPC CNI network-policy posture, VPC Flow Logs coverage, traffic-type, and destination posture, S3 public-access/encryption/versioning/Object Lock/recovery posture, RDS public endpoint, backup retention, deletion protection, customer-managed KMS, Multi-AZ, Performance Insights, engine-log export, and IAM authentication posture, Secrets Manager customer-managed key, recovery-window, and rotation posture, KMS key rotation and deletion-window posture, workload use of S3, KMS, or Secrets Manager without modeled VPC endpoint coverage, broad VPC endpoint policies, CloudTrail multi-region, log-validation, event-selector, data-event, and Insights posture, GuardDuty, Security Hub, AWS Config, Access Analyzer, and Macie account posture, IAM wildcard permissions, privileged role-assignment posture, workload-role sensitive permissions, resource-policy exposure, tier segmentation, transitive private-data exposure, control-plane-to-sensitive-workload chains, and role-trust narrowing.
 
 </details>
 
