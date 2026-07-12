@@ -11,14 +11,12 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import STATE_CONFIGURED, STATE_NOT_CONFIGURED, STATE_UNKNOWN
 
 _AWS_SECRETS_MANAGER_SECRET = "aws_secretsmanager_secret"
 _MIN_SECRET_RECOVERY_WINDOW_DAYS = 7
 _MAX_SECRET_ROTATION_INTERVAL_DAYS = 90
 _RATE_EXPRESSION = re.compile(r"^rate\(\s*(\d+)\s+([a-z]+)s?\s*\)$", re.IGNORECASE)
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 _STATE_TOO_LONG = "too_long"
 
 
@@ -38,9 +36,9 @@ class AwsSecretsManagerPostureRuleDetectors:
         for secret in context.inventory.by_type(_AWS_SECRETS_MANAGER_SECRET):
             facts = aws_facts(secret)
             state = _secret_customer_managed_kms_state(facts)
-            if state == _STATE_CONFIGURED:
+            if state == STATE_CONFIGURED:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -122,9 +120,9 @@ class AwsSecretsManagerPostureRuleDetectors:
         for secret in context.inventory.by_type(_AWS_SECRETS_MANAGER_SECRET):
             facts = aws_facts(secret)
             state, interval_days = _secret_rotation_state(facts)
-            if state == _STATE_CONFIGURED:
+            if state == STATE_CONFIGURED:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -155,13 +153,13 @@ class AwsSecretsManagerPostureRuleDetectors:
 
 def _secret_rotation_state(facts: AwsResourceFacts) -> tuple[str, int | None]:
     if not facts.secrets_manager_rotation_source_address:
-        return _STATE_NOT_CONFIGURED, None
+        return STATE_NOT_CONFIGURED, None
     interval_days = _rotation_interval_days(facts)
     if interval_days is None:
-        return _STATE_UNKNOWN, None
+        return STATE_UNKNOWN, None
     if interval_days > _MAX_SECRET_ROTATION_INTERVAL_DAYS:
         return _STATE_TOO_LONG, interval_days
-    return _STATE_CONFIGURED, interval_days
+    return STATE_CONFIGURED, interval_days
 
 
 def _rotation_interval_days(facts: AwsResourceFacts) -> int | None:
@@ -186,10 +184,10 @@ def _rotation_interval_days(facts: AwsResourceFacts) -> int | None:
 
 def _secret_customer_managed_kms_state(facts: AwsResourceFacts) -> str:
     if facts.secrets_manager_kms_key_id:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if _secret_uncertainty_evidence(facts, "kms_key_id"):
-        return _STATE_UNKNOWN
-    return _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_NOT_CONFIGURED
 
 
 def _secret_target_evidence(secret) -> list[str]:
@@ -249,7 +247,7 @@ def _secret_uncertainty_evidence(facts: AwsResourceFacts, field_path: str) -> li
 
 
 def _rotation_rationale(display_name: str, state: str, interval_days: int | None) -> str:
-    if state == _STATE_NOT_CONFIGURED:
+    if state == STATE_NOT_CONFIGURED:
         return (
             f"{display_name} does not show a deterministic Secrets Manager rotation resource in the Terraform "
             "plan. Static or manually rotated secrets can remain valid longer after disclosure, service compromise, "

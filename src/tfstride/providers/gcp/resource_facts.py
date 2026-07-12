@@ -6,9 +6,10 @@ from typing import Any, TypeVar
 
 from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.models import NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.resource_utils import dedupe, service_account_member
+from tfstride.providers.gcp.resource_utils import service_account_member
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import NeutralProviderResourceFacts, ProviderResourceFactDomains
 from tfstride.resource_metadata import MetadataField, StringListMetadataField

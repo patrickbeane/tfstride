@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     GCP_ROLE_REFERENCE_SUFFIXES,
     binding_members,
-    dedupe,
     gcp_reference_key,
     service_account_member,
 )

@@ -13,6 +13,7 @@ from tfstride.identity import (
     PrivilegedPrincipal,
 )
 from tfstride.models import IAMPolicyStatement, NormalizedResource
+from tfstride.providers.coercion import append_unique
 
 _AWS_PROVIDER = "aws"
 _FULL_ADMIN_ACTIONS = frozenset({"*", "*:*"})
@@ -153,28 +154,28 @@ def _statement_privilege_categories(statement: IAMPolicyStatement) -> tuple[Priv
         normalized = action.strip()
         lower = normalized.lower()
         if normalized in _FULL_ADMIN_ACTIONS:
-            _append_unique(categories, PrivilegeCategory.FULL_ADMIN)
+            append_unique(categories, PrivilegeCategory.FULL_ADMIN)
             continue
         if _action_matches_any(lower, _IAM_ADMIN_PATTERNS):
-            _append_unique(categories, PrivilegeCategory.IAM_ADMIN)
+            append_unique(categories, PrivilegeCategory.IAM_ADMIN)
         if _action_matches_any(lower, _POLICY_ADMIN_PREFIXES):
-            _append_unique(categories, PrivilegeCategory.POLICY_ADMIN)
+            append_unique(categories, PrivilegeCategory.POLICY_ADMIN)
         if _action_matches_any(lower, _ROLE_ASSIGNMENT_ACTIONS):
-            _append_unique(categories, PrivilegeCategory.ROLE_ASSIGNMENT)
+            append_unique(categories, PrivilegeCategory.ROLE_ASSIGNMENT)
         if _action_matches_any(lower, _PRIVILEGE_ESCALATION_ACTIONS):
-            _append_unique(categories, PrivilegeCategory.PRIVILEGE_ESCALATION)
+            append_unique(categories, PrivilegeCategory.PRIVILEGE_ESCALATION)
         if _action_matches_any(lower, _DATA_ADMIN_PATTERNS):
-            _append_unique(categories, PrivilegeCategory.DATA_ADMIN)
+            append_unique(categories, PrivilegeCategory.DATA_ADMIN)
         if _action_matches_any(lower, _SECRETS_ADMIN_PATTERNS):
-            _append_unique(categories, PrivilegeCategory.SECRETS_ADMIN)
+            append_unique(categories, PrivilegeCategory.SECRETS_ADMIN)
         if _action_matches_any(lower, _KEY_ADMIN_PATTERNS):
-            _append_unique(categories, PrivilegeCategory.KEY_ADMIN)
+            append_unique(categories, PrivilegeCategory.KEY_ADMIN)
         if _action_matches_any(lower, _COMPUTE_ADMIN_PATTERNS):
-            _append_unique(categories, PrivilegeCategory.COMPUTE_ADMIN)
+            append_unique(categories, PrivilegeCategory.COMPUTE_ADMIN)
         if _action_matches_any(lower, _NETWORK_ADMIN_PREFIXES):
-            _append_unique(categories, PrivilegeCategory.NETWORK_ADMIN)
+            append_unique(categories, PrivilegeCategory.NETWORK_ADMIN)
         if _action_matches_prefixes(lower, _AUDIT_ADMIN_PREFIXES):
-            _append_unique(categories, PrivilegeCategory.AUDIT_ADMIN)
+            append_unique(categories, PrivilegeCategory.AUDIT_ADMIN)
     return tuple(categories)
 
 
@@ -201,7 +202,7 @@ def _privileged_action_patterns(actions: Iterable[str]) -> list[str]:
         if not normalized:
             continue
         if normalized in _FULL_ADMIN_ACTIONS or normalized.endswith(":*"):
-            _append_unique(patterns, normalized)
+            append_unique(patterns, normalized)
             continue
         lower = normalized.lower()
         if (
@@ -209,16 +210,16 @@ def _privileged_action_patterns(actions: Iterable[str]) -> list[str]:
             or _action_matches_any(lower, _PRIVILEGE_ESCALATION_ACTIONS)
             or _action_matches_any(lower, _POLICY_ADMIN_PREFIXES)
         ):
-            _append_unique(patterns, normalized)
+            append_unique(patterns, normalized)
     return patterns
 
 
 def _statement_evidence(statement: IAMPolicyStatement) -> list[str]:
     evidence: list[str] = []
     for action in statement.actions:
-        _append_unique(evidence, f"action={action}")
+        append_unique(evidence, f"action={action}")
     for resource in statement.resources:
-        _append_unique(evidence, f"resource={resource}")
+        append_unique(evidence, f"resource={resource}")
     return evidence
 
 
@@ -277,8 +278,3 @@ def _action_matches_any(action: str, patterns: Iterable[str]) -> bool:
 
 def _action_matches_prefixes(action: str, prefixes: Iterable[str]) -> bool:
     return any(action.startswith(prefix.lower()) for prefix in prefixes)
-
-
-def _append_unique(values: list, value: object) -> None:
-    if value not in values:
-        values.append(value)

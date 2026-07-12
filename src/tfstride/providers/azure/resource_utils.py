@@ -6,6 +6,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, SecurityGroupRule
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.coercion import as_list as as_list
+from tfstride.providers.coercion import as_optional_int as as_optional_int
 from tfstride.providers.coercion import attribute_unknown as attribute_unknown
 from tfstride.providers.coercion import block_attribute_unknown as block_attribute_unknown
 from tfstride.providers.coercion import bool_state as bool_state
@@ -101,7 +102,7 @@ def normalize_network_security_rule_record(
     ) or ["*"]
     record = {
         "name": first_non_empty(values.get("name")),
-        "rule_priority": _optional_int(values.get("priority")),
+        "rule_priority": as_optional_int(values.get("priority")),
         "rule_direction": _direction(values.get("direction")),
         "access": str(values.get("access") or "Allow").strip().lower(),
         "protocol": _protocol(values.get("protocol")),
@@ -234,15 +235,8 @@ def _port_ranges(values: Iterable[str]) -> list[tuple[int | None, int | None]]:
             continue
         if "-" in text:
             start, end = text.split("-", 1)
-            parsed.append((_optional_int(start), _optional_int(end)))
+            parsed.append((as_optional_int(start), as_optional_int(end)))
             continue
-        port = _optional_int(text)
+        port = as_optional_int(text)
         parsed.append((port, port))
     return parsed or [(None, None)]
-
-
-def _optional_int(value: Any) -> int | None:
-    try:
-        return int(value) if value not in (None, "") else None
-    except (TypeError, ValueError):
-        return None

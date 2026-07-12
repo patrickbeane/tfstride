@@ -11,6 +11,9 @@ from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
 from tfstride.providers.coercion import (
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_UNKNOWN,
     as_optional_int,
     attribute_unknown,
     first_mapping,
@@ -24,20 +27,13 @@ from tfstride.providers.coercion import (
 from tfstride.providers.json_documents import load_json_document
 from tfstride.resource_helpers import policy_allows_public_access
 
-_RDS_STATE_ENABLED = "enabled"
-_RDS_STATE_DISABLED = "disabled"
-_RDS_STATE_UNKNOWN = "unknown"
-_KMS_STATE_ENABLED = "enabled"
-_KMS_STATE_DISABLED = "disabled"
-_KMS_STATE_UNKNOWN = "unknown"
-
 
 def _rds_bool_state(value: bool | None) -> str:
     if value is True:
-        return _RDS_STATE_ENABLED
+        return STATE_ENABLED
     if value is False:
-        return _RDS_STATE_DISABLED
-    return _RDS_STATE_UNKNOWN
+        return STATE_DISABLED
+    return STATE_UNKNOWN
 
 
 def _known_top_level_int(
@@ -587,22 +583,22 @@ def _kms_rotation_state(
         allow_string=False,
     )
     if rotation_enabled is True:
-        return _KMS_STATE_ENABLED
+        return STATE_ENABLED
     if rotation_enabled is False:
-        return _KMS_STATE_DISABLED
+        return STATE_DISABLED
     if len(uncertainties) > previous_uncertainty_count:
-        return _KMS_STATE_UNKNOWN
-    return _KMS_STATE_DISABLED
+        return STATE_UNKNOWN
+    return STATE_DISABLED
 
 
 def _s3_object_lock_enabled_state(value: str | None, uncertainties: list[str]) -> str | None:
     if value is None:
         return None
     normalized = value.strip().lower()
-    if normalized == _KMS_STATE_ENABLED:
-        return _KMS_STATE_ENABLED
-    if normalized == _KMS_STATE_DISABLED:
-        return _KMS_STATE_DISABLED
+    if normalized == STATE_ENABLED:
+        return STATE_ENABLED
+    if normalized == STATE_DISABLED:
+        return STATE_DISABLED
     uncertainties.append("object_lock_enabled has an unrecognized value")
     return None
 

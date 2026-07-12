@@ -26,6 +26,7 @@ from tfstride.providers.azure.rbac_breadth import (
     UNKNOWN_CUSTOM_WILDCARD,
 )
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.coercion import append_unique
 
 _AZURE_PROVIDER = "azure"
 
@@ -231,14 +232,14 @@ def _privilege_categories(
 ) -> tuple[PrivilegeCategory, ...]:
     categories: list[PrivilegeCategory] = []
     for category in _BUILTIN_ROLE_CATEGORIES.get((role_name or "").strip().lower(), ()):
-        _append_unique(categories, category)
+        append_unique(categories, category)
     for signal in breadth_signals:
         for category in _BREADTH_SIGNAL_CATEGORIES.get(str(signal), ()):
-            _append_unique(categories, category)
+            append_unique(categories, category)
     if role_definition is not None:
         for signal in _get_list(role_definition, AzureResourceMetadata.ROLE_DEFINITION_BREADTH_SIGNALS):
             for category in _BREADTH_SIGNAL_CATEGORIES.get(signal, ()):
-                _append_unique(categories, category)
+                append_unique(categories, category)
     return tuple(categories)
 
 
@@ -356,8 +357,3 @@ def _dedupe(values: Iterable[str | None]) -> list[str]:
         seen.add(normalized)
         deduped.append(normalized)
     return deduped
-
-
-def _append_unique(values: list[PrivilegeCategory], value: PrivilegeCategory) -> None:
-    if value not in values:
-        values.append(value)

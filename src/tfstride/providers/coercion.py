@@ -3,6 +3,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+STATE_ENABLED = "enabled"
+STATE_DISABLED = "disabled"
+STATE_UNKNOWN = "unknown"
+STATE_CONFIGURED = "configured"
+STATE_NOT_CONFIGURED = "not_configured"
+
 
 def compact(values: Iterable[Any]) -> list[str]:
     return [str(value) for value in values if value not in (None, "", [])]
@@ -326,10 +332,30 @@ def dedupe_strings(values: Iterable[str | None]) -> list[str]:
 
 def bool_state(value: bool | None) -> str:
     if value is True:
-        return "enabled"
+        return STATE_ENABLED
     if value is False:
-        return "disabled"
-    return "unknown"
+        return STATE_DISABLED
+    return STATE_UNKNOWN
+
+
+def block_bool_state(
+    block: Mapping[str, Any] | None,
+    unknown_block: Any,
+    key: str,
+    uncertainties: list[str],
+    *,
+    path: str,
+) -> str:
+    value = known_block_bool(block, unknown_block, key, uncertainties, path=path)
+    if value is None:
+        return STATE_UNKNOWN
+    return STATE_ENABLED if value else STATE_DISABLED
+
+
+def block_config_state(block: Mapping[str, Any] | None, unknown_block: Any) -> str:
+    if unknown_block is True and block is None:
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if block else STATE_NOT_CONFIGURED
 
 
 def tls_version_below_1_2(value: str | None) -> bool:
@@ -337,3 +363,8 @@ def tls_version_below_1_2(value: str | None) -> bool:
         return False
     normalized = value.strip().lower().replace(".", "_").replace("-", "_")
     return normalized in {"tls1_0", "tls1_1", "tlsv1", "tlsv1_0", "tlsv1_1", "1_0", "1_1"}
+
+
+def append_unique(values: list[Any], value: Any) -> None:
+    if value not in values:
+        values.append(value)

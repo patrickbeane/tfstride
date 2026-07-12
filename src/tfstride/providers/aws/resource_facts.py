@@ -8,6 +8,7 @@ from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.coercion import STATE_DISABLED, STATE_ENABLED
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
 from tfstride.providers.resource_facts import (
     NeutralProviderComputeFacts,
@@ -26,8 +27,6 @@ _AWS_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 )
 _S3_BUCKET_KEY_ENABLED = "enabled"
 _S3_BUCKET_KEY_DISABLED = "disabled"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1401,9 +1400,9 @@ class AwsResourceFacts:
 
 
 def _bool_from_state(state: str | None) -> bool | None:
-    if state == _STATE_ENABLED:
+    if state == STATE_ENABLED:
         return True
-    if state == _STATE_DISABLED:
+    if state == STATE_DISABLED:
         return False
     return None
 

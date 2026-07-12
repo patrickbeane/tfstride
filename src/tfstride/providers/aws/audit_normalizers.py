@@ -8,16 +8,15 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.coercion import (
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_UNKNOWN,
     as_list,
     attribute_unknown,
     compact_strings,
     first_mapping,
     known_string,
 )
-
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_cloudtrail(resource: TerraformResource) -> NormalizedResource:
@@ -397,14 +396,14 @@ def _macie_status(
 ) -> tuple[str | None, str | None]:
     if attribute_unknown(unknown_values, "status"):
         uncertainties.append("status is unknown after planning")
-        return None, _STATE_UNKNOWN
+        return None, STATE_UNKNOWN
     raw = values.get("status")
     if raw is None:
         return None, None
     text = str(raw).strip()
     if not text:
         return None, None
-    return text, _STATE_ENABLED if text.lower() == _STATE_ENABLED else _STATE_DISABLED
+    return text, STATE_ENABLED if text.lower() == STATE_ENABLED else STATE_DISABLED
 
 
 def _known_bool_state(
@@ -415,12 +414,12 @@ def _known_bool_state(
 ) -> str | None:
     if attribute_unknown(unknown_values, key):
         uncertainties.append(f"{key} is unknown after planning")
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     value = values.get(key)
     if value is None:
         return None
     if isinstance(value, bool):
-        return _STATE_ENABLED if value else _STATE_DISABLED
+        return STATE_ENABLED if value else STATE_DISABLED
     uncertainties.append(f"{key} has an unrecognized value shape")
     return None
 
@@ -435,12 +434,12 @@ def _known_block_bool_state(
 ) -> str | None:
     if attribute_unknown(unknown_values or {}, key):
         uncertainties.append(f"{path}.{key} is unknown after planning")
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     value = values.get(key) if values else None
     if value is None:
         return None
     if isinstance(value, bool):
-        return _STATE_ENABLED if value else _STATE_DISABLED
+        return STATE_ENABLED if value else STATE_DISABLED
     uncertainties.append(f"{path}.{key} has an unrecognized value shape")
     return None
 

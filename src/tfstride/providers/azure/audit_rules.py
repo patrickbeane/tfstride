@@ -16,6 +16,7 @@ from tfstride.providers.azure.diagnostic_index import (
 )
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.coercion import STATE_DISABLED
 
 _DIAGNOSTIC_TARGET_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
@@ -35,7 +36,6 @@ _DATA_PLANE_DIAGNOSTIC_TARGET_TYPES = {
     AzureResourceType.MSSQL_SERVER,
     AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER,
 }
-_STATE_DISABLED = "disabled"
 
 _DIAGNOSTIC_DESTINATION_FIELDS = (
     "log_analytics_workspace_id",
@@ -212,7 +212,7 @@ class AzureAuditRuleDetectors:
         findings: list[Finding] = []
         for setting in context.inventory.by_type(AzureResourceType.SECURITY_CENTER_AUTO_PROVISIONING):
             facts = azure_facts(setting)
-            if facts.security_center_auto_provisioning_state != _STATE_DISABLED:
+            if facts.security_center_auto_provisioning_state != STATE_DISABLED:
                 continue
 
             severity_reasoning = _audit_detection_severity()

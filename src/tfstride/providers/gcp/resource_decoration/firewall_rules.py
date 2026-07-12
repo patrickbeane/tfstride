@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.models import SecurityGroupRule
+from tfstride.providers.coercion import as_optional_int
 
 
 def parse_firewall_port_range(value: object) -> tuple[int | None, int | None]:
@@ -8,17 +9,10 @@ def parse_firewall_port_range(value: object) -> tuple[int | None, int | None]:
     if not text:
         return (None, None)
     if "-" not in text:
-        port = _optional_int(text)
+        port = as_optional_int(text)
         return (port, port)
     start, end = text.split("-", 1)
-    return (_optional_int(start.strip()), _optional_int(end.strip()))
-
-
-def _optional_int(value: str) -> int | None:
-    try:
-        return int(value)
-    except ValueError:
-        return None
+    return (as_optional_int(start.strip()), as_optional_int(end.strip()))
 
 
 def priority_value(value: object, *, default: int = 1000) -> int:

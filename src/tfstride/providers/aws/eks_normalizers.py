@@ -8,11 +8,17 @@ from tfstride.models import NormalizedResource, ResourceCategory, TerraformResou
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
     as_list,
     block_attribute_unknown,
+    block_bool_state,
+    block_config_state,
     compact_strings,
     first_mapping,
-    known_block_bool,
     known_block_string,
     known_block_strings,
     known_bool,
@@ -21,11 +27,6 @@ from tfstride.providers.coercion import (
 )
 from tfstride.providers.kubernetes import block_value, dedupe, first_unknown_block, unknown_block_at_index
 
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 _EKS_ADDON_TARGET_CLASSES = {
     "vpc-cni": "networking",
     "coredns": "dns",
@@ -69,7 +70,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
     encryption_config = _encryption_config(resource, uncertainties)
     encryption_resources = _encryption_resources(encryption_config)
     encryption_key_arn = _first_non_empty(record.get("key_arn") for record in encryption_config)
-    endpoint_public_access_state = _block_bool_state(
+    endpoint_public_access_state = block_bool_state(
         vpc_config,
         vpc_unknown,
         "endpoint_public_access",
@@ -83,7 +84,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
         AwsResourceMetadata.EKS_CLUSTER_ROLE_ARN: role_arn,
         AwsResourceMetadata.EKS_KUBERNETES_VERSION: known_string(values, unknown_values, "version", uncertainties),
         AwsResourceMetadata.EKS_ENDPOINT_PUBLIC_ACCESS_STATE: endpoint_public_access_state,
-        AwsResourceMetadata.EKS_ENDPOINT_PRIVATE_ACCESS_STATE: _block_bool_state(
+        AwsResourceMetadata.EKS_ENDPOINT_PRIVATE_ACCESS_STATE: block_bool_state(
             vpc_config,
             vpc_unknown,
             "endpoint_private_access",
@@ -124,7 +125,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
         ),
         AwsResourceMetadata.EKS_ENCRYPTION_KEY_ARN: encryption_key_arn,
         AwsResourceMetadata.EKS_ENCRYPTION_RESOURCES: encryption_resources,
-        AwsResourceMetadata.EKS_ACCESS_CONFIG_STATE: _block_config_state(access_config, access_unknown),
+        AwsResourceMetadata.EKS_ACCESS_CONFIG_STATE: block_config_state(access_config, access_unknown),
         AwsResourceMetadata.EKS_AUTHENTICATION_MODE: known_block_string(
             access_config,
             access_unknown,
@@ -132,7 +133,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
             uncertainties,
             path="access_config",
         ),
-        AwsResourceMetadata.EKS_BOOTSTRAP_CLUSTER_CREATOR_ADMIN_PERMISSIONS_STATE: _block_bool_state(
+        AwsResourceMetadata.EKS_BOOTSTRAP_CLUSTER_CREATOR_ADMIN_PERMISSIONS_STATE: block_bool_state(
             access_config,
             access_unknown,
             "bootstrap_cluster_creator_admin_permissions",
@@ -155,7 +156,7 @@ def normalize_eks_cluster(resource: TerraformResource) -> NormalizedResource:
         subnet_ids=tuple(subnet_ids),
         security_group_ids=tuple(security_group_ids),
         attached_role_arns=compact_strings([role_arn]),
-        public_access_configured=endpoint_public_access_state == _STATE_ENABLED,
+        public_access_configured=endpoint_public_access_state == STATE_ENABLED,
         metadata=metadata,
     )
 
@@ -203,26 +204,6 @@ def normalize_eks_addon(resource: TerraformResource) -> NormalizedResource:
     )
 
 
-def _block_bool_state(
-    block: Mapping[str, Any] | None,
-    unknown_block: Any,
-    key: str,
-    uncertainties: list[str],
-    *,
-    path: str,
-) -> str:
-    value = known_block_bool(block, unknown_block, key, uncertainties, path=path)
-    if value is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if value else _STATE_DISABLED
-
-
-def _block_config_state(block: Mapping[str, Any] | None, unknown_block: Any) -> str:
-    if unknown_block is True and block is None:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if block else _STATE_NOT_CONFIGURED
-
-
 def _top_level_bool_state(
     values: Mapping[str, Any],
     unknown_values: Mapping[str, Any],
@@ -231,8 +212,8 @@ def _top_level_bool_state(
 ) -> str | None:
     value = known_bool(values, unknown_values, key, uncertainties)
     if value is None:
-        return _STATE_UNKNOWN if block_attribute_unknown(unknown_values, key) else None
-    return _STATE_ENABLED if value else _STATE_DISABLED
+        return STATE_UNKNOWN if block_attribute_unknown(unknown_values, key) else None
+    return STATE_ENABLED if value else STATE_DISABLED
 
 
 def _block_list_config_state(
@@ -242,10 +223,10 @@ def _block_list_config_state(
     key: str,
 ) -> str:
     if block_attribute_unknown(unknown_block, key):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if block is None:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if values else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if values else STATE_NOT_CONFIGURED
 
 
 def _top_level_list_config_state(
@@ -254,25 +235,25 @@ def _top_level_list_config_state(
     list_values: list[str],
 ) -> str:
     if block_attribute_unknown(unknown_values, key):
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if list_values else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if list_values else STATE_NOT_CONFIGURED
 
 
 def _record_config_state(records: list[dict[str, Any]], unknown_block: Any) -> str:
     if unknown_block is True and not records:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if records else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if records else STATE_NOT_CONFIGURED
 
 
 def _secrets_encryption_state(records: list[dict[str, Any]], unknown_block: Any) -> str:
     if unknown_block is True and not records:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     resources_unknown = _encryption_resources_unknown(unknown_block)
     for record in records:
         resources = {str(value).strip().lower() for value in record.get("resources", [])}
         if "secrets" in resources:
-            return _STATE_ENABLED
-    return _STATE_UNKNOWN if resources_unknown else _STATE_DISABLED
+            return STATE_ENABLED
+    return STATE_UNKNOWN if resources_unknown else STATE_DISABLED
 
 
 def _encryption_config(resource: TerraformResource, uncertainties: list[str]) -> list[dict[str, Any]]:

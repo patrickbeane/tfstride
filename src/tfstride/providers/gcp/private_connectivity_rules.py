@@ -15,6 +15,7 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.private_connectivity_index import (
     GcpPrivateConnectivityCoverage,
     GcpPrivateConnectivityIndex,
@@ -23,7 +24,7 @@ from tfstride.providers.gcp.private_connectivity_index import (
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder, gcp_resource_references
 from tfstride.providers.gcp.resource_types import GcpResourceType
-from tfstride.providers.gcp.resource_utils import GCP_NETWORK_REFERENCE_SUFFIXES, dedupe, gcp_reference_key
+from tfstride.providers.gcp.resource_utils import GCP_NETWORK_REFERENCE_SUFFIXES, gcp_reference_key
 
 
 class GcpPrivateConnectivityRuleDetectors:

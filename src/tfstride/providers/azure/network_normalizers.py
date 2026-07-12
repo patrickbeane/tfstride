@@ -21,13 +21,15 @@ from tfstride.providers.azure.resource_utils import (
     unknown_block_at,
     value_is_unknown,
 )
+from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+)
 
 AZURE_PROVIDER = "azure"
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
 
 
 def normalize_virtual_network(resource: TerraformResource) -> NormalizedResource:
@@ -677,16 +679,16 @@ def _application_gateway_edge_protection_state(
     waf_enabled_state: str,
 ) -> str:
     if firewall_policy_id:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if firewall_policy_unknown:
-        return _STATE_UNKNOWN
-    if waf_enabled_state == _STATE_ENABLED:
-        return _STATE_CONFIGURED
-    if waf_enabled_state == _STATE_DISABLED:
-        return _STATE_DISABLED
-    if waf_enabled_state == _STATE_UNKNOWN:
-        return _STATE_UNKNOWN
-    return _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    if waf_enabled_state == STATE_ENABLED:
+        return STATE_CONFIGURED
+    if waf_enabled_state == STATE_DISABLED:
+        return STATE_DISABLED
+    if waf_enabled_state == STATE_UNKNOWN:
+        return STATE_UNKNOWN
+    return STATE_NOT_CONFIGURED
 
 
 def _application_gateway_waf_configurations(
@@ -697,7 +699,7 @@ def _application_gateway_waf_configurations(
     raw_unknown = resource.unknown_values.get("waf_configuration")
     if raw_unknown is True and not values.get("waf_configuration"):
         uncertainties.append("waf_configuration is unknown after planning")
-        return [], _STATE_UNKNOWN
+        return [], STATE_UNKNOWN
 
     records: list[dict[str, Any]] = []
     enabled_unknown = raw_unknown is True
@@ -754,14 +756,14 @@ def _application_gateway_waf_configurations(
 
 def _application_gateway_waf_enabled_state(records: list[dict[str, Any]], unknown: bool) -> str:
     if any(record.get("enabled") is True for record in records):
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if unknown or any("enabled" in record.get("unknown_fields", []) for record in records):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if any(record.get("enabled") is False for record in records):
-        return _STATE_DISABLED
+        return STATE_DISABLED
     if records:
-        return _STATE_UNKNOWN
-    return _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_NOT_CONFIGURED
 
 
 def _nested_block_records(
@@ -967,7 +969,7 @@ def _private_dns_zone_groups(
     raw_unknown = resource.unknown_values.get("private_dns_zone_group")
     if raw_unknown is True and not values.get("private_dns_zone_group"):
         uncertainties.append("private_dns_zone_group is unknown after planning")
-        return [], [], [], _STATE_UNKNOWN, _STATE_UNKNOWN
+        return [], [], [], STATE_UNKNOWN, STATE_UNKNOWN
 
     records: list[dict[str, Any]] = []
     all_zone_ids: list[str] = []
@@ -1009,18 +1011,18 @@ def _private_dns_zone_groups(
 
 def _private_dns_zone_group_state(records: list[dict[str, Any]], unknown: bool) -> str:
     if unknown:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if records:
-        return _STATE_CONFIGURED
-    return _STATE_NOT_CONFIGURED
+        return STATE_CONFIGURED
+    return STATE_NOT_CONFIGURED
 
 
 def _private_dns_zone_ids_state(records: list[dict[str, Any]], zone_ids: list[str], unknown: bool) -> str:
     if unknown or any("private_dns_zone_ids" in record.get("unknown_fields", []) for record in records):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if zone_ids:
-        return _STATE_CONFIGURED
-    return _STATE_NOT_CONFIGURED
+        return STATE_CONFIGURED
+    return STATE_NOT_CONFIGURED
 
 
 def _flow_log_retention_policy(
@@ -1031,13 +1033,13 @@ def _flow_log_retention_policy(
     raw_unknown = resource.unknown_values.get("retention_policy")
     if raw_unknown is True and not values.get("retention_policy"):
         uncertainties.append("retention_policy is unknown after planning")
-        return {}, _STATE_UNKNOWN, None
+        return {}, STATE_UNKNOWN, None
     retention_policy = first_mapping(values.get("retention_policy"), expand_tuples=True)
     if retention_policy is None:
         if raw_unknown:
             uncertainties.append("retention_policy is unknown after planning")
-            return {}, _STATE_UNKNOWN, None
-        return {}, _STATE_NOT_CONFIGURED, None
+            return {}, STATE_UNKNOWN, None
+        return {}, STATE_NOT_CONFIGURED, None
     unknown_block = unknown_block_at(raw_unknown, 0)
     unknown_fields: list[str] = []
     enabled = known_block_bool(
@@ -1074,13 +1076,13 @@ def _flow_log_traffic_analytics(
     raw_unknown = resource.unknown_values.get("traffic_analytics")
     if raw_unknown is True and not values.get("traffic_analytics"):
         uncertainties.append("traffic_analytics is unknown after planning")
-        return {}, _STATE_UNKNOWN
+        return {}, STATE_UNKNOWN
     traffic_analytics = first_mapping(values.get("traffic_analytics"), expand_tuples=True)
     if traffic_analytics is None:
         if raw_unknown:
             uncertainties.append("traffic_analytics is unknown after planning")
-            return {}, _STATE_UNKNOWN
-        return {}, _STATE_NOT_CONFIGURED
+            return {}, STATE_UNKNOWN
+        return {}, STATE_NOT_CONFIGURED
     unknown_block = unknown_block_at(raw_unknown, 0)
     unknown_fields: list[str] = []
     enabled = known_block_bool(

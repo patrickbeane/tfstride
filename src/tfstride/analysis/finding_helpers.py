@@ -58,8 +58,8 @@ def dedupe_addresses(addresses: list[str]) -> list[str]:
     for address in addresses:
         if not address or address in seen:
             continue
-        deduped.append(address)
         seen.add(address)
+        deduped.append(address)
     return deduped
 
 

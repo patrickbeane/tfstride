@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import Any, TypeVar
+from typing import Any
 
 from tfstride.models import TerraformResource
+from tfstride.providers.coercion import first_non_empty
 from tfstride.providers.gcp.coercion import as_list, compact
-
-_T = TypeVar("_T")
 
 GCP_REFERENCE_SUFFIXES = (
     ".id",
@@ -29,16 +28,6 @@ GCP_NETWORK_REFERENCE_SUFFIXES = (
     ".table_id",
     ".self_link",
 )
-
-
-def first_non_empty(*values: Any) -> str | None:
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return None
 
 
 def resource_identifier(resource: TerraformResource) -> str:
@@ -77,17 +66,6 @@ def has_external_access_config(values: dict[str, Any]) -> bool:
         if as_list(interface.get("access_config")) or as_list(interface.get("ipv6_access_config")):
             return True
     return False
-
-
-def dedupe(values: Iterable[_T]) -> list[_T]:
-    deduped: list[_T] = []
-    seen: set[_T] = set()
-    for value in values:
-        if value in seen:
-            continue
-        deduped.append(value)
-        seen.add(value)
-    return deduped
 
 
 def binding_members(binding: Mapping[str, Any]) -> list[str]:

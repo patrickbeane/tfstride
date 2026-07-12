@@ -10,21 +10,24 @@ from tfstride.providers.azure.resource_utils import (
     as_list,
     first_mapping,
     first_non_empty,
-    known_block_bool,
     known_block_string,
     known_block_strings,
     known_bool,
     known_string,
     value_is_unknown,
 )
+from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+    block_bool_state,
+    block_config_state,
+)
 from tfstride.providers.kubernetes import dedupe, first_unknown_block, unknown_block_at_index
 
 AZURE_PROVIDER = "azure"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResource:
@@ -69,7 +72,7 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
         AzureResourceMetadata.AKS_AUTHORIZED_IP_RANGES_STATE: _configured_state(
             authorized_ip_ranges, api_server_unknown, "authorized_ip_ranges"
         ),
-        AzureResourceMetadata.AKS_API_SERVER_VNET_INTEGRATION_STATE: _block_bool_state(
+        AzureResourceMetadata.AKS_API_SERVER_VNET_INTEGRATION_STATE: block_bool_state(
             api_server_profile,
             api_server_unknown,
             "vnet_integration_enabled",
@@ -95,15 +98,15 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
             "role_based_access_control_enabled",
             uncertainties,
         ),
-        AzureResourceMetadata.AKS_AAD_RBAC_STATE: _block_config_state(aad_profile, aad_unknown),
-        AzureResourceMetadata.AKS_AAD_MANAGED_STATE: _block_bool_state(
+        AzureResourceMetadata.AKS_AAD_RBAC_STATE: block_config_state(aad_profile, aad_unknown),
+        AzureResourceMetadata.AKS_AAD_MANAGED_STATE: block_bool_state(
             aad_profile,
             aad_unknown,
             "managed",
             uncertainties,
             path="azure_active_directory_role_based_access_control",
         ),
-        AzureResourceMetadata.AKS_AAD_AZURE_RBAC_STATE: _block_bool_state(
+        AzureResourceMetadata.AKS_AAD_AZURE_RBAC_STATE: block_bool_state(
             aad_profile,
             aad_unknown,
             "azure_rbac_enabled",
@@ -182,7 +185,7 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
             resource.unknown_values.get("kubelet_identity"),
         ),
         AzureResourceMetadata.AKS_KUBELET_IDENTITIES: kubelet_identity,
-        AzureResourceMetadata.AKS_KMS_STATE: _block_config_state(kms_profile, kms_unknown),
+        AzureResourceMetadata.AKS_KMS_STATE: block_config_state(kms_profile, kms_unknown),
         AzureResourceMetadata.AKS_KMS_KEY_VAULT_KEY_ID: known_block_string(
             kms_profile,
             kms_unknown,
@@ -234,7 +237,7 @@ def normalize_kubernetes_cluster(resource: TerraformResource) -> NormalizedResou
         name=resource.name,
         category=ResourceCategory.COMPUTE,
         identifier=cluster_id or first_non_empty(values.get("name"), resource.name, resource.address),
-        public_access_configured=private_cluster_state == _STATE_DISABLED,
+        public_access_configured=private_cluster_state == STATE_DISABLED,
         metadata=metadata,
     )
 
@@ -247,8 +250,8 @@ def _bool_state(
 ) -> str:
     value = known_bool(values, unknown_values, key, uncertainties, allow_string=False)
     if value is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if value else _STATE_DISABLED
+        return STATE_UNKNOWN
+    return STATE_ENABLED if value else STATE_DISABLED
 
 
 def _disabled_state(
@@ -259,54 +262,34 @@ def _disabled_state(
 ) -> str:
     value = known_bool(values, unknown_values, key, uncertainties, allow_string=False)
     if value is None:
-        return _STATE_UNKNOWN
-    return _STATE_DISABLED if value else _STATE_ENABLED
-
-
-def _block_bool_state(
-    block: Mapping[str, Any] | None,
-    unknown_block: Any,
-    key: str,
-    uncertainties: list[str],
-    *,
-    path: str,
-) -> str:
-    value = known_block_bool(block, unknown_block, key, uncertainties, path=path)
-    if value is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if value else _STATE_DISABLED
-
-
-def _block_config_state(block: Mapping[str, Any] | None, unknown_block: Any) -> str:
-    if unknown_block is True and block is None:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if block else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_DISABLED if value else STATE_ENABLED
 
 
 def _block_presence_state(block: Mapping[str, Any] | None, unknown_block: Any) -> str:
     if unknown_block is True and block is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if block else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_ENABLED if block else STATE_NOT_CONFIGURED
 
 
 def _record_state(records: list[dict[str, Any]], unknown_block: Any) -> str:
     if unknown_block is True and not records:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if records else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if records else STATE_NOT_CONFIGURED
 
 
 def _configured_state(values: list[str], unknown_block: Any, key: str) -> str:
     if _block_field_unknown(unknown_block, key):
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if values else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if values else STATE_NOT_CONFIGURED
 
 
 def _string_config_state(block: Mapping[str, Any] | None, unknown_block: Any, key: str) -> str:
     if _block_field_unknown(unknown_block, key):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if block is None:
-        return _STATE_UNKNOWN
-    return _STATE_CONFIGURED if first_non_empty(block.get(key)) else _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_CONFIGURED if first_non_empty(block.get(key)) else STATE_NOT_CONFIGURED
 
 
 def _authorized_ip_ranges(

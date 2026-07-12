@@ -10,15 +10,17 @@ from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+)
 from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
 
 _AWS_EKS_CLUSTER = "aws_eks_cluster"
 _AWS_EKS_ADDON = "aws_eks_addon"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 _REQUIRED_SECURITY_LOG_TYPES = ("api", "audit", "authenticator")
 _WEAK_AUTHENTICATION_MODES = frozenset({"config_map"})
 _VPC_CNI_ADDON_NAME = "vpc-cni"
@@ -38,7 +40,7 @@ class _PublicAccessRestriction:
 
     @property
     def broad_or_missing_or_unknown(self) -> bool:
-        return self.state in {"broad", _STATE_NOT_CONFIGURED, _STATE_UNKNOWN}
+        return self.state in {"broad", STATE_NOT_CONFIGURED, STATE_UNKNOWN}
 
 
 class AwsEksRuleDetectors:
@@ -57,14 +59,14 @@ class AwsEksRuleDetectors:
         for cluster in context.inventory.by_type(_AWS_EKS_CLUSTER):
             facts = aws_facts(cluster)
             restriction = _public_access_restriction(facts)
-            if facts.eks_endpoint_public_access_state not in {_STATE_ENABLED, _STATE_UNKNOWN}:
+            if facts.eks_endpoint_public_access_state not in {STATE_ENABLED, STATE_UNKNOWN}:
                 continue
             if not restriction.broad_or_missing_or_unknown:
                 continue
 
-            explicit_broad = facts.eks_endpoint_public_access_state == _STATE_ENABLED and restriction.state in {
+            explicit_broad = facts.eks_endpoint_public_access_state == STATE_ENABLED and restriction.state in {
                 "broad",
-                _STATE_NOT_CONFIGURED,
+                STATE_NOT_CONFIGURED,
             }
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=explicit_broad,
@@ -110,13 +112,13 @@ class AwsEksRuleDetectors:
         findings: list[Finding] = []
         for cluster in context.inventory.by_type(_AWS_EKS_CLUSTER):
             facts = aws_facts(cluster)
-            if facts.eks_endpoint_private_access_state != _STATE_DISABLED:
+            if facts.eks_endpoint_private_access_state != STATE_DISABLED:
                 continue
             if _public_endpoint_unrestricted(facts):
                 continue
 
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=facts.eks_endpoint_public_access_state == _STATE_ENABLED,
+                internet_exposure=facts.eks_endpoint_public_access_state == STATE_ENABLED,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -154,10 +156,10 @@ class AwsEksRuleDetectors:
         findings: list[Finding] = []
         for cluster in context.inventory.by_type(_AWS_EKS_CLUSTER):
             facts = aws_facts(cluster)
-            if facts.eks_secrets_encryption_state == _STATE_ENABLED:
+            if facts.eks_secrets_encryption_state == STATE_ENABLED:
                 continue
 
-            unknown = facts.eks_secrets_encryption_state == _STATE_UNKNOWN
+            unknown = facts.eks_secrets_encryption_state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -200,12 +202,12 @@ class AwsEksRuleDetectors:
         for cluster in context.inventory.by_type(_AWS_EKS_CLUSTER):
             facts = aws_facts(cluster)
             missing_logs = _missing_security_log_types(facts)
-            if facts.eks_control_plane_logging_state == _STATE_CONFIGURED and not missing_logs:
+            if facts.eks_control_plane_logging_state == STATE_CONFIGURED and not missing_logs:
                 continue
 
-            unknown = facts.eks_control_plane_logging_state == _STATE_UNKNOWN
-            disabled = facts.eks_control_plane_logging_state == _STATE_NOT_CONFIGURED
-            incomplete = facts.eks_control_plane_logging_state == _STATE_CONFIGURED and bool(missing_logs)
+            unknown = facts.eks_control_plane_logging_state == STATE_UNKNOWN
+            disabled = facts.eks_control_plane_logging_state == STATE_NOT_CONFIGURED
+            incomplete = facts.eks_control_plane_logging_state == STATE_CONFIGURED and bool(missing_logs)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -248,7 +250,7 @@ class AwsEksRuleDetectors:
         for cluster in context.inventory.by_type(_AWS_EKS_CLUSTER):
             facts = aws_facts(cluster)
             state = _authentication_mode_state(facts)
-            if state == _STATE_CONFIGURED:
+            if state == STATE_CONFIGURED:
                 continue
 
             weak = state == "legacy_config_map"
@@ -354,13 +356,13 @@ def _public_api_rationale(display_name: str, explicit_broad: bool) -> str:
 
 def _api_endpoint_evidence(facts: AwsResourceFacts, restriction: _PublicAccessRestriction) -> list[str]:
     values = [
-        f"endpoint_public_access_state={facts.eks_endpoint_public_access_state or _STATE_UNKNOWN}",
-        f"endpoint_private_access_state={facts.eks_endpoint_private_access_state or _STATE_UNKNOWN}",
+        f"endpoint_public_access_state={facts.eks_endpoint_public_access_state or STATE_UNKNOWN}",
+        f"endpoint_private_access_state={facts.eks_endpoint_private_access_state or STATE_UNKNOWN}",
     ]
     if facts.eks_public_access_cidrs:
         values.append(f"public_access_cidrs=[{', '.join(facts.eks_public_access_cidrs)}]")
     else:
-        values.append(f"public_access_cidrs_state={facts.eks_public_access_cidrs_state or _STATE_UNKNOWN}")
+        values.append(f"public_access_cidrs_state={facts.eks_public_access_cidrs_state or STATE_UNKNOWN}")
     if restriction.broad_ranges:
         values.append(f"broad_public_access_cidrs=[{', '.join(restriction.broad_ranges)}]")
     if facts.eks_cluster_security_group_id:
@@ -374,8 +376,8 @@ def _api_endpoint_evidence(facts: AwsResourceFacts, restriction: _PublicAccessRe
 
 def _secrets_encryption_evidence(facts: AwsResourceFacts) -> list[str]:
     values = [
-        f"encryption_config_state={facts.eks_encryption_config_state or _STATE_UNKNOWN}",
-        f"secrets_encryption_state={facts.eks_secrets_encryption_state or _STATE_UNKNOWN}",
+        f"encryption_config_state={facts.eks_encryption_config_state or STATE_UNKNOWN}",
+        f"secrets_encryption_state={facts.eks_secrets_encryption_state or STATE_UNKNOWN}",
     ]
     if facts.eks_encryption_resources:
         values.append(f"encrypted_resources=[{', '.join(facts.eks_encryption_resources)}]")
@@ -389,7 +391,7 @@ def _secrets_encryption_evidence(facts: AwsResourceFacts) -> list[str]:
 
 
 def _control_plane_logging_evidence(facts: AwsResourceFacts, missing_logs: tuple[str, ...]) -> list[str]:
-    values = [f"control_plane_logging_state={facts.eks_control_plane_logging_state or _STATE_UNKNOWN}"]
+    values = [f"control_plane_logging_state={facts.eks_control_plane_logging_state or STATE_UNKNOWN}"]
     if facts.eks_enabled_cluster_log_types:
         values.append(f"enabled_cluster_log_types=[{', '.join(facts.eks_enabled_cluster_log_types)}]")
     else:
@@ -403,7 +405,7 @@ def _control_plane_logging_evidence(facts: AwsResourceFacts, missing_logs: tuple
 def _authentication_evidence(facts: AwsResourceFacts, state: str) -> list[str]:
     values = [
         f"authentication_mode_state={state}",
-        f"access_config_state={facts.eks_access_config_state or _STATE_UNKNOWN}",
+        f"access_config_state={facts.eks_access_config_state or STATE_UNKNOWN}",
     ]
     if facts.eks_authentication_mode:
         values.append(f"authentication_mode={facts.eks_authentication_mode}")
@@ -437,7 +439,7 @@ def _vpc_cni_network_policy_evidence(
     disabled_config: _NetworkPolicyConfigValue,
 ) -> list[str]:
     values = [
-        f"addon_name={facts.eks_addon_name or _STATE_UNKNOWN}",
+        f"addon_name={facts.eks_addon_name or STATE_UNKNOWN}",
         f"configuration_path={disabled_config.path}",
         f"configured_value={disabled_config.value}",
     ]
@@ -448,17 +450,17 @@ def _vpc_cni_network_policy_evidence(
 
 def _public_endpoint_unrestricted(facts: AwsResourceFacts) -> bool:
     restriction = _public_access_restriction(facts)
-    return facts.eks_endpoint_public_access_state == _STATE_ENABLED and restriction.state in {
+    return facts.eks_endpoint_public_access_state == STATE_ENABLED and restriction.state in {
         "broad",
-        _STATE_NOT_CONFIGURED,
+        STATE_NOT_CONFIGURED,
     }
 
 
 def _public_access_restriction(facts: AwsResourceFacts) -> _PublicAccessRestriction:
-    if facts.eks_public_access_cidrs_state == _STATE_UNKNOWN:
-        return _PublicAccessRestriction(_STATE_UNKNOWN)
+    if facts.eks_public_access_cidrs_state == STATE_UNKNOWN:
+        return _PublicAccessRestriction(STATE_UNKNOWN)
     if not facts.eks_public_access_cidrs:
-        return _PublicAccessRestriction(_STATE_NOT_CONFIGURED)
+        return _PublicAccessRestriction(STATE_NOT_CONFIGURED)
     broad_ranges = tuple(value for value in facts.eks_public_access_cidrs if is_broad_public_range(value))
     if broad_ranges:
         return _PublicAccessRestriction("broad", broad_ranges)
@@ -472,17 +474,17 @@ def _missing_security_log_types(facts: AwsResourceFacts) -> tuple[str, ...]:
 
 def _authentication_mode_state(facts: AwsResourceFacts) -> str:
     mode = facts.eks_authentication_mode
-    if facts.eks_access_config_state == _STATE_UNKNOWN or uncertainty_evidence(
+    if facts.eks_access_config_state == STATE_UNKNOWN or uncertainty_evidence(
         facts.eks_posture_uncertainties,
         ("access_config.authentication_mode",),
     ):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if not mode:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     normalized = mode.strip().lower()
     if normalized in _WEAK_AUTHENTICATION_MODES:
         return "legacy_config_map"
-    return _STATE_CONFIGURED
+    return STATE_CONFIGURED
 
 
 def _vpc_cni_disabled_network_policy_config(facts: AwsResourceFacts) -> _NetworkPolicyConfigValue | None:

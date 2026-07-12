@@ -8,6 +8,9 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_UNKNOWN,
     first_mapping,
     known_block_bool,
     known_block_int,
@@ -19,9 +22,6 @@ from tfstride.providers.coercion import (
 
 _REST_PUBLIC_ENDPOINT_TYPES = frozenset({"EDGE", "REGIONAL"})
 _PRIVATE_ENDPOINT_TYPE = "PRIVATE"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_api_gateway_rest_api(resource: TerraformResource) -> NormalizedResource:
@@ -76,8 +76,8 @@ def normalize_api_gateway_rest_api(resource: TerraformResource) -> NormalizedRes
         category=ResourceCategory.EDGE,
         identifier=api_id or name or resource.address,
         arn=arn,
-        public_access_configured=public_endpoint_state == _STATE_ENABLED,
-        public_exposure=public_endpoint_state == _STATE_ENABLED,
+        public_access_configured=public_endpoint_state == STATE_ENABLED,
+        public_exposure=public_endpoint_state == STATE_ENABLED,
         metadata={
             AwsResourceMetadata.API_GATEWAY_API_ID: api_id,
             AwsResourceMetadata.API_GATEWAY_NAME: name,
@@ -131,8 +131,8 @@ def normalize_apigatewayv2_api(resource: TerraformResource) -> NormalizedResourc
         category=ResourceCategory.EDGE,
         identifier=api_endpoint or api_id or name or resource.address,
         arn=execution_arn,
-        public_access_configured=public_endpoint_state == _STATE_ENABLED,
-        public_exposure=public_endpoint_state == _STATE_ENABLED,
+        public_access_configured=public_endpoint_state == STATE_ENABLED,
+        public_exposure=public_endpoint_state == STATE_ENABLED,
         metadata={
             AwsResourceMetadata.API_GATEWAY_API_ID: api_id,
             AwsResourceMetadata.API_GATEWAY_NAME: name,
@@ -154,31 +154,31 @@ def normalize_apigatewayv2_api(resource: TerraformResource) -> NormalizedResourc
 
 def _execute_api_endpoint_state(disable_execute_api_endpoint: bool | None) -> str:
     if disable_execute_api_endpoint is True:
-        return _STATE_DISABLED
+        return STATE_DISABLED
     if disable_execute_api_endpoint is False:
-        return _STATE_ENABLED
-    return _STATE_UNKNOWN
+        return STATE_ENABLED
+    return STATE_UNKNOWN
 
 
 def _rest_api_public_endpoint_state(endpoint_types: list[str], execute_api_endpoint_state: str) -> str:
     normalized_types = {endpoint_type.strip().upper() for endpoint_type in endpoint_types if endpoint_type.strip()}
     if normalized_types and normalized_types <= {_PRIVATE_ENDPOINT_TYPE}:
-        return _STATE_DISABLED
-    if execute_api_endpoint_state == _STATE_DISABLED:
-        return _STATE_DISABLED
+        return STATE_DISABLED
+    if execute_api_endpoint_state == STATE_DISABLED:
+        return STATE_DISABLED
     if normalized_types & _REST_PUBLIC_ENDPOINT_TYPES:
-        return _STATE_ENABLED
-    if execute_api_endpoint_state == _STATE_ENABLED:
-        return _STATE_ENABLED
-    return _STATE_UNKNOWN
+        return STATE_ENABLED
+    if execute_api_endpoint_state == STATE_ENABLED:
+        return STATE_ENABLED
+    return STATE_UNKNOWN
 
 
 def _v2_api_public_endpoint_state(api_endpoint: str | None, execute_api_endpoint_state: str) -> str:
-    if execute_api_endpoint_state == _STATE_DISABLED:
-        return _STATE_DISABLED
-    if api_endpoint or execute_api_endpoint_state == _STATE_ENABLED:
-        return _STATE_ENABLED
-    return _STATE_UNKNOWN
+    if execute_api_endpoint_state == STATE_DISABLED:
+        return STATE_DISABLED
+    if api_endpoint or execute_api_endpoint_state == STATE_ENABLED:
+        return STATE_ENABLED
+    return STATE_UNKNOWN
 
 
 def _endpoint_configuration_evidence(
@@ -292,7 +292,7 @@ def _compact_record(values: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _set_public_endpoint_reasons(resource: NormalizedResource, public_endpoint_state: str, reason: str) -> None:
-    reasons = [reason] if public_endpoint_state == _STATE_ENABLED else []
+    reasons = [reason] if public_endpoint_state == STATE_ENABLED else []
     mutations = aws_mutations(resource)
     mutations.set_public_access_reasons(reasons)
     mutations.set_public_exposure_reasons(reasons)

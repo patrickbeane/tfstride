@@ -14,11 +14,9 @@ from tfstride.providers.azure.resource_utils import (
     known_string,
     value_is_unknown,
 )
+from tfstride.providers.coercion import STATE_DISABLED, STATE_ENABLED, STATE_UNKNOWN
 
 AZURE_PROVIDER = "azure"
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_monitor_diagnostic_setting(resource: TerraformResource) -> NormalizedResource:
@@ -283,10 +281,10 @@ def _known_bool_state(
 ) -> str:
     value = known_bool(values, unknown_values, key, uncertainties, allow_string=False)
     if value is True:
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if value is False:
-        return _STATE_DISABLED
-    return _STATE_UNKNOWN
+        return STATE_DISABLED
+    return STATE_UNKNOWN
 
 
 def _known_on_off_state(
@@ -297,17 +295,17 @@ def _known_on_off_state(
 ) -> str:
     if value_is_unknown(unknown_values.get(key)):
         uncertainties.append(f"{key} is unknown after planning")
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     raw = values.get(key)
     if raw is None:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     normalized = str(raw).strip().lower()
     if normalized in {"on", "enabled", "true"}:
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if normalized in {"off", "disabled", "false"}:
-        return _STATE_DISABLED
+        return STATE_DISABLED
     uncertainties.append(f"{key} has an unrecognized value shape")
-    return _STATE_UNKNOWN
+    return STATE_UNKNOWN
 
 
 def _known_records(

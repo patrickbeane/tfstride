@@ -4,7 +4,7 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex
 from tfstride.providers.aws.resource_mutations import aws_mutations
-from tfstride.providers.coercion import dedupe
+from tfstride.providers.coercion import append_unique, dedupe
 
 
 class ResolveEcsServiceRelationshipsStage:
@@ -118,7 +118,7 @@ def _internet_facing_load_balancer_addresses_by_security_group(
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
         for security_group_id in load_balancer.security_group_ids:
-            _append_unique(
+            append_unique(
                 load_balancers_by_security_group.setdefault(security_group_id, []),
                 load_balancer.address,
             )
@@ -135,7 +135,7 @@ def _fronting_load_balancers_for_ecs_service(
     for load_balancer_reference in _ecs_load_balancer_references(service):
         load_balancer = _resource_by_reference(index.load_balancers, load_balancer_reference)
         if _is_internet_facing_load_balancer(load_balancer):
-            _append_unique(fronting_load_balancers, load_balancer.address)
+            append_unique(fronting_load_balancers, load_balancer.address)
 
     for target_group_reference in _ecs_target_group_references(service):
         target_group = _resource_by_reference(
@@ -148,14 +148,14 @@ def _fronting_load_balancers_for_ecs_service(
                 reference,
                 [],
             ):
-                _append_unique(fronting_load_balancers, load_balancer_address)
+                append_unique(fronting_load_balancers, load_balancer_address)
 
     for load_balancer_address in _security_group_fronting_load_balancers(
         service,
         index,
         public_load_balancers_by_security_group,
     ):
-        _append_unique(fronting_load_balancers, load_balancer_address)
+        append_unique(fronting_load_balancers, load_balancer_address)
 
     return fronting_load_balancers
 
@@ -178,7 +178,7 @@ def _security_group_fronting_load_balancers(
                     security_group_id,
                     [],
                 ):
-                    _append_unique(fronting_load_balancers, load_balancer_address)
+                    append_unique(fronting_load_balancers, load_balancer_address)
     return fronting_load_balancers
 
 
@@ -194,7 +194,7 @@ def _append_load_balancer_target_group_references(
     )
     references = _resource_reference_values(target_group) if target_group is not None else [target_group_reference]
     for reference in references:
-        _append_unique(
+        append_unique(
             load_balancers_by_target_group.setdefault(reference, []),
             load_balancer_address,
         )
@@ -291,8 +291,3 @@ def _unique_resources(resources) -> tuple[NormalizedResource, ...]:
         seen.add(resource.address)
         unique.append(resource)
     return tuple(unique)
-
-
-def _append_unique(values: list[str], value: str) -> None:
-    if value not in values:
-        values.append(value)

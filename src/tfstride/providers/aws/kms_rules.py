@@ -9,11 +9,9 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import STATE_DISABLED, STATE_ENABLED, STATE_UNKNOWN
 
 _AWS_KMS_KEY = "aws_kms_key"
-_KMS_STATE_ENABLED = "enabled"
-_KMS_STATE_DISABLED = "disabled"
-_KMS_STATE_UNKNOWN = "unknown"
 _SYMMETRIC_KEY_SPECS = frozenset({"SYMMETRIC_DEFAULT"})
 _KMS_MIN_DELETION_WINDOW_DAYS = 14
 _KMS_DEFAULT_DELETION_WINDOW_DAYS = 30
@@ -36,11 +34,11 @@ class AwsKmsRuleDetectors:
             facts = aws_facts(key)
             if not _kms_rotation_applicable(facts):
                 continue
-            state = facts.kms_enable_key_rotation_state or _KMS_STATE_DISABLED
-            if state == _KMS_STATE_ENABLED:
+            state = facts.kms_enable_key_rotation_state or STATE_DISABLED
+            if state == STATE_ENABLED:
                 continue
 
-            unknown = state == _KMS_STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -185,7 +183,7 @@ def _kms_uncertainty_evidence(facts: AwsResourceFacts, field_path: str) -> list[
 
 
 def _kms_rotation_rationale(display_name: str, state: str) -> str:
-    if state == _KMS_STATE_UNKNOWN:
+    if state == STATE_UNKNOWN:
         return (
             f"{display_name} does not show deterministic AWS KMS key rotation posture in the Terraform plan. "
             "Review the final plan or deployed key to confirm automatic annual rotation is enabled for this "

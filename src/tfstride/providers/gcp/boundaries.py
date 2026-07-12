@@ -19,13 +19,14 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.constants import GCP_PROJECT_IAM_RESOURCE_TYPES
 from tfstride.providers.gcp.custom_roles import (
     GcpCustomRoleIndex,
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,
 )
-from tfstride.providers.gcp.resource_utils import binding_members, dedupe
+from tfstride.providers.gcp.resource_utils import binding_members
 
 
 @dataclass(frozen=True, slots=True)

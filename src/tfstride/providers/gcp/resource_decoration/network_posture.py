@@ -4,6 +4,7 @@ import re
 from collections.abc import Mapping
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_index import (
     GcpDecorationContext,
@@ -18,7 +19,6 @@ from tfstride.providers.gcp.resource_types import (
 )
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
-    dedupe,
     gcp_reference_key,
 )
 

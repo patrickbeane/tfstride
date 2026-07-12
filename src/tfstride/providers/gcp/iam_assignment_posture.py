@@ -15,6 +15,7 @@ from tfstride.identity import (
     PrivilegedPrincipal,
 )
 from tfstride.models import NormalizedResource
+from tfstride.providers.coercion import append_unique, dedupe
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings, resource_iam_target_reference
 from tfstride.providers.gcp.resource_types import (
@@ -24,7 +25,7 @@ from tfstride.providers.gcp.resource_types import (
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
 )
-from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, dedupe, gcp_reference_key
+from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
 _GCP_PROVIDER = "gcp"
 
@@ -305,25 +306,25 @@ def _permission_categories(permissions: tuple[str, ...]) -> tuple[PrivilegeCateg
         if not normalized:
             continue
         if normalized == "*":
-            _append_unique(categories, PrivilegeCategory.FULL_ADMIN)
+            append_unique(categories, PrivilegeCategory.FULL_ADMIN)
         if normalized.endswith(".setIamPolicy") or normalized.startswith("resourcemanager.iam."):
-            _append_unique(categories, PrivilegeCategory.IAM_ADMIN)
-            _append_unique(categories, PrivilegeCategory.POLICY_ADMIN)
+            append_unique(categories, PrivilegeCategory.IAM_ADMIN)
+            append_unique(categories, PrivilegeCategory.POLICY_ADMIN)
         if normalized.startswith("iam.roles."):
-            _append_unique(categories, PrivilegeCategory.IAM_ADMIN)
-            _append_unique(categories, PrivilegeCategory.ROLE_ASSIGNMENT)
+            append_unique(categories, PrivilegeCategory.IAM_ADMIN)
+            append_unique(categories, PrivilegeCategory.ROLE_ASSIGNMENT)
         if normalized.startswith("iam.serviceAccounts."):
-            _append_unique(categories, PrivilegeCategory.PRIVILEGE_ESCALATION)
+            append_unique(categories, PrivilegeCategory.PRIVILEGE_ESCALATION)
         if normalized.startswith(("storage.", "bigquery.", "cloudsql.", "pubsub.")):
-            _append_unique(categories, PrivilegeCategory.DATA_ADMIN)
+            append_unique(categories, PrivilegeCategory.DATA_ADMIN)
         if normalized.startswith("secretmanager."):
-            _append_unique(categories, PrivilegeCategory.SECRETS_ADMIN)
+            append_unique(categories, PrivilegeCategory.SECRETS_ADMIN)
         if normalized.startswith("cloudkms."):
-            _append_unique(categories, PrivilegeCategory.KEY_ADMIN)
+            append_unique(categories, PrivilegeCategory.KEY_ADMIN)
         if normalized.startswith(("compute.", "container.", "run.", "cloudfunctions.", "cloudbuild.")):
-            _append_unique(categories, PrivilegeCategory.COMPUTE_ADMIN)
+            append_unique(categories, PrivilegeCategory.COMPUTE_ADMIN)
         if normalized.startswith(("logging.", "monitoring.", "cloudasset.", "securitycenter.")):
-            _append_unique(categories, PrivilegeCategory.AUDIT_ADMIN)
+            append_unique(categories, PrivilegeCategory.AUDIT_ADMIN)
     return tuple(categories)
 
 
@@ -477,8 +478,3 @@ def _get_list(resource: NormalizedResource, field: object) -> tuple[str, ...]:
 
 def _looks_like_custom_role(role: str) -> bool:
     return "/roles/" in role and not role.startswith("roles/")
-
-
-def _append_unique(values: list[PrivilegeCategory], value: PrivilegeCategory) -> None:
-    if value not in values:
-        values.append(value)

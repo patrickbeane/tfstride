@@ -13,12 +13,12 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import STATE_ENABLED
 
 _AWS_API_GATEWAY_REST_API = "aws_api_gateway_rest_api"
 _AWS_APIGATEWAYV2_API = "aws_apigatewayv2_api"
 _AWS_WAFV2_WEB_ACL_ASSOCIATION = "aws_wafv2_web_acl_association"
 _PUBLIC_API_GATEWAY_TYPES = (_AWS_API_GATEWAY_REST_API, _AWS_APIGATEWAYV2_API)
-_STATE_ENABLED = "enabled"
 _PROTOCOL_TYPE_WEBSOCKET = "websocket"
 _CORS_WILDCARD_ORIGIN = "*"
 
@@ -38,7 +38,7 @@ class AwsApiGatewayRuleDetectors:
         findings: list[Finding] = []
         for api in context.inventory.by_type(_AWS_APIGATEWAYV2_API):
             facts = aws_facts(api)
-            if facts.api_gateway_public_endpoint_state != _STATE_ENABLED:
+            if facts.api_gateway_public_endpoint_state != STATE_ENABLED:
                 continue
             if _normalized_protocol_type(facts) == _PROTOCOL_TYPE_WEBSOCKET:
                 continue
@@ -87,7 +87,7 @@ class AwsApiGatewayRuleDetectors:
         findings: list[Finding] = []
         for api in context.inventory.by_type(*_PUBLIC_API_GATEWAY_TYPES):
             facts = aws_facts(api)
-            if facts.api_gateway_public_endpoint_state != _STATE_ENABLED:
+            if facts.api_gateway_public_endpoint_state != STATE_ENABLED:
                 continue
             api_id = facts.api_gateway_api_id
             if not api_id or api_id in associated_api_ids:

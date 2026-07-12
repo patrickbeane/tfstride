@@ -11,6 +11,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.coercion import STATE_DISABLED
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
@@ -27,7 +28,6 @@ _MODELED_AUDIT_SECURITY_TYPES = (
     GcpResourceType.LOGGING_ORGANIZATION_EXCLUSION,
     GcpResourceType.SCC_ORGANIZATION_SETTINGS,
 )
-_STATE_DISABLED = "disabled"
 _AUDIT_SECURITY_FILTER_SIGNALS = (
     ("cloudaudit.googleapis.com", "matches Cloud Audit Logs"),
     ("google.cloud.audit.auditlog", "matches AuditLog proto payloads"),
@@ -56,7 +56,7 @@ class GcpAuditRuleDetectors:
         findings: list[Finding] = []
         for setting in context.inventory.by_type(GcpResourceType.SCC_ORGANIZATION_SETTINGS):
             facts = gcp_facts(setting)
-            if facts.scc_enable_asset_discovery is not False and facts.scc_asset_discovery_state != _STATE_DISABLED:
+            if facts.scc_enable_asset_discovery is not False and facts.scc_asset_discovery_state != STATE_DISABLED:
                 continue
 
             severity_reasoning = _audit_detection_severity()

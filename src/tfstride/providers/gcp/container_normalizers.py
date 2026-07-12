@@ -5,6 +5,11 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
     block_attribute_unknown,
     known_block_bool,
     known_block_string,
@@ -19,12 +24,6 @@ from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
 from tfstride.providers.kubernetes import block_value, dedupe, first_unknown_block, is_broad_public_range
-
-_STATE_CONFIGURED = "configured"
-_STATE_DISABLED = "disabled"
-_STATE_ENABLED = "enabled"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_container_cluster(resource: TerraformResource) -> NormalizedResource:
@@ -280,15 +279,15 @@ def _control_plane_logging_state(
         logging_unknown,
         GcpAttr.ENABLE_COMPONENTS.key,
     ):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if logging_components:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if logging_service is None:
-        return _STATE_NOT_CONFIGURED
+        return STATE_NOT_CONFIGURED
     normalized = logging_service.strip().lower()
     if normalized in {"none", "logging.googleapis.com/none"}:
-        return _STATE_DISABLED
-    return _STATE_CONFIGURED
+        return STATE_DISABLED
+    return STATE_CONFIGURED
 
 
 def _network_policy_state(
@@ -297,12 +296,12 @@ def _network_policy_state(
     enabled: bool | None,
 ) -> str:
     if block_attribute_unknown(network_policy_unknown, GcpAttr.ENABLED.key):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if network_policy is None:
-        return _STATE_NOT_CONFIGURED
+        return STATE_NOT_CONFIGURED
     if enabled is None:
-        return _STATE_UNKNOWN
-    return _STATE_ENABLED if enabled else _STATE_DISABLED
+        return STATE_UNKNOWN
+    return STATE_ENABLED if enabled else STATE_DISABLED
 
 
 def _secrets_encryption_state(
@@ -312,18 +311,18 @@ def _secrets_encryption_state(
     key_name: str | None,
 ) -> str:
     if database_encryption is None:
-        return _STATE_UNKNOWN if database_encryption_unknown is True else _STATE_DISABLED
+        return STATE_UNKNOWN if database_encryption_unknown is True else STATE_DISABLED
     if block_attribute_unknown(database_encryption_unknown, GcpAttr.STATE.key) or block_attribute_unknown(
         database_encryption_unknown,
         GcpAttr.KEY_NAME.key,
     ):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     normalized = (encryption_state or "").strip().upper()
     if normalized == "ENCRYPTED" and key_name:
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if normalized in {"ENCRYPTED", "DECRYPTED"}:
-        return _STATE_DISABLED
-    return _STATE_UNKNOWN
+        return STATE_DISABLED
+    return STATE_UNKNOWN
 
 
 def _basic_auth_state(
@@ -333,17 +332,17 @@ def _basic_auth_state(
     password_configured: bool | None,
 ) -> str:
     if master_auth is None:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if block_attribute_unknown(master_auth_unknown, GcpAttr.USERNAME.key) or block_attribute_unknown(
         master_auth_unknown,
         GcpAttr.PASSWORD.key,
     ):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if username or password_configured:
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if GcpAttr.USERNAME.key in master_auth or GcpAttr.PASSWORD.key in master_auth:
-        return _STATE_DISABLED
-    return _STATE_UNKNOWN
+        return STATE_DISABLED
+    return STATE_UNKNOWN
 
 
 def _binary_authorization_state(
@@ -352,12 +351,12 @@ def _binary_authorization_state(
     evaluation_mode: str | None,
 ) -> str:
     if binary_authorization is None:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if block_attribute_unknown(binary_authorization_unknown, GcpAttr.EVALUATION_MODE.key):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if evaluation_mode is None:
-        return _STATE_UNKNOWN
-    return _STATE_DISABLED if evaluation_mode.strip().upper() == "DISABLED" else _STATE_ENABLED
+        return STATE_UNKNOWN
+    return STATE_DISABLED if evaluation_mode.strip().upper() == "DISABLED" else STATE_ENABLED
 
 
 def _known_block_secret_configured(

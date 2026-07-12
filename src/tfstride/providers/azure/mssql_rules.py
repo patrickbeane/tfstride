@@ -12,14 +12,14 @@ from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import tls_version_below_1_2
+from tfstride.providers.coercion import STATE_DISABLED
 
 _BROAD_IP_RANGES = frozenset(
     {
         ("0.0.0.0", "255.255.255.255"),
     }
 )
-_STATE_DISABLED = "disabled"
-_ALERT_DISABLED = _STATE_DISABLED
+_ALERT_DISABLED = STATE_DISABLED
 _MIN_SQL_BACKUP_RETENTION_DAYS = 7
 _GEO_REDUNDANT_BACKUP_STORAGE_TYPES = frozenset({"geo", "geozone", "grs", "gzrs"})
 _LOCAL_BACKUP_STORAGE_TYPES = frozenset({"local", "zone", "lrs", "zrs"})
@@ -417,7 +417,7 @@ def _mssql_geo_redundancy_reportable(facts) -> bool:
     storage_type = facts.mssql_backup_storage_redundancy
     if storage_type is not None:
         return _backup_storage_redundancy_state(storage_type) != "geo_redundant"
-    if facts.mssql_geo_backup_state == _STATE_DISABLED:
+    if facts.mssql_geo_backup_state == STATE_DISABLED:
         return True
     return bool(_mssql_geo_uncertainty_evidence(facts))
 

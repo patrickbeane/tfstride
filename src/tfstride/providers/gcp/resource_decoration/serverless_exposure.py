@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.resource_decoration.iam import (
     iam_bindings,
@@ -12,7 +13,6 @@ from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     binding_members,
-    dedupe,
     gcp_reference_key,
 )
 

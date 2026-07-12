@@ -12,16 +12,14 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.coercion import STATE_CONFIGURED, STATE_DISABLED, STATE_UNKNOWN, as_optional_int
 
 _AWS_S3_BUCKET = "aws_s3_bucket"
 _KMS_ENCRYPTION_ALGORITHMS = frozenset({"aws:kms", "aws:kms:dsse"})
-_STATE_CONFIGURED = "configured"
 _STATE_NOT_MODELED = "not_modeled"
-_STATE_UNKNOWN = "unknown"
 _STATE_PROVIDER_MANAGED_SSE_S3 = "provider_managed_sse_s3"
 _STATE_SSE_KMS_WITHOUT_CUSTOMER_KEY = "sse_kms_without_customer_key"
 _STATE_NON_KMS_ALGORITHM = "non_kms_algorithm"
-_STATE_DISABLED = "disabled"
 _STATE_DEFAULT_RETENTION_MISSING = "default_retention_missing"
 _STATE_SHORT_RETENTION = "short_retention"
 _MIN_S3_RECOVERY_RETENTION_DAYS = 7
@@ -43,9 +41,9 @@ class AwsS3PostureRuleDetectors:
         for bucket in context.inventory.by_type(_AWS_S3_BUCKET):
             facts = aws_facts(bucket)
             state = _s3_customer_managed_encryption_state(facts)
-            if state in {_STATE_CONFIGURED, _STATE_NOT_MODELED}:
+            if state in {STATE_CONFIGURED, _STATE_NOT_MODELED}:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -89,9 +87,9 @@ class AwsS3PostureRuleDetectors:
         for bucket in context.inventory.by_type(_AWS_S3_BUCKET):
             facts = aws_facts(bucket)
             state = _s3_versioning_state(facts)
-            if state in {_STATE_CONFIGURED, _STATE_NOT_MODELED}:
+            if state in {STATE_CONFIGURED, _STATE_NOT_MODELED}:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -135,9 +133,9 @@ class AwsS3PostureRuleDetectors:
         for bucket in context.inventory.by_type(_AWS_S3_BUCKET):
             facts = aws_facts(bucket)
             state = _s3_object_lock_retention_state(facts)
-            if state in {_STATE_CONFIGURED, _STATE_NOT_MODELED}:
+            if state in {STATE_CONFIGURED, _STATE_NOT_MODELED}:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -174,9 +172,9 @@ class AwsS3PostureRuleDetectors:
         for bucket in context.inventory.by_type(_AWS_S3_BUCKET):
             facts = aws_facts(bucket)
             state, rule = _s3_lifecycle_noncurrent_retention_state(facts)
-            if state in {_STATE_CONFIGURED, _STATE_NOT_MODELED}:
+            if state in {STATE_CONFIGURED, _STATE_NOT_MODELED}:
                 continue
-            unknown = state == _STATE_UNKNOWN
+            unknown = state == STATE_UNKNOWN
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -204,9 +202,9 @@ class AwsS3PostureRuleDetectors:
 def _s3_customer_managed_encryption_state(facts: AwsResourceFacts) -> str:
     algorithm = facts.s3_encryption_algorithm
     if algorithm in _KMS_ENCRYPTION_ALGORITHMS and facts.s3_kms_master_key_id:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if _s3_encryption_unknown(facts):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if not facts.s3_encryption_source_address and not algorithm:
         return _STATE_NOT_MODELED
     if algorithm in _KMS_ENCRYPTION_ALGORITHMS:
@@ -218,11 +216,11 @@ def _s3_customer_managed_encryption_state(facts: AwsResourceFacts) -> str:
 
 def _s3_versioning_state(facts: AwsResourceFacts) -> str:
     if facts.s3_versioning_enabled is True:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if facts.s3_versioning_enabled is False:
-        return _STATE_DISABLED
+        return STATE_DISABLED
     if facts.s3_versioning_source_address or _s3_uncertainty_evidence(facts, "versioning_configuration"):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     return _STATE_NOT_MODELED
 
 
@@ -230,20 +228,20 @@ def _s3_object_lock_retention_state(facts: AwsResourceFacts) -> str:
     if not facts.s3_object_lock_source_address and not _s3_object_lock_uncertainty_evidence(facts):
         return _STATE_NOT_MODELED
     if _s3_object_lock_unknown(facts):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if facts.s3_object_lock_enabled is False:
-        return _STATE_DISABLED
+        return STATE_DISABLED
     if facts.s3_object_lock_enabled is not True:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if not facts.s3_object_lock_default_retention_mode:
         return _STATE_DEFAULT_RETENTION_MISSING
     if facts.s3_object_lock_default_retention_years is not None:
-        return _STATE_CONFIGURED if facts.s3_object_lock_default_retention_years > 0 else _STATE_SHORT_RETENTION
+        return STATE_CONFIGURED if facts.s3_object_lock_default_retention_years > 0 else _STATE_SHORT_RETENTION
     if facts.s3_object_lock_default_retention_days is None:
         return _STATE_DEFAULT_RETENTION_MISSING
     if facts.s3_object_lock_default_retention_days < _MIN_S3_RECOVERY_RETENTION_DAYS:
         return _STATE_SHORT_RETENTION
-    return _STATE_CONFIGURED
+    return STATE_CONFIGURED
 
 
 def _s3_lifecycle_noncurrent_retention_state(facts: AwsResourceFacts) -> tuple[str, Mapping[str, Any] | None]:
@@ -260,7 +258,7 @@ def _s3_lifecycle_noncurrent_retention_state(facts: AwsResourceFacts) -> tuple[s
             unknown_rule = rule
             continue
         for expiration in _mapping_list(rule.get("noncurrent_version_expiration")):
-            days = _optional_int(expiration.get("noncurrent_days"))
+            days = as_optional_int(expiration.get("noncurrent_days"))
             if days is None:
                 continue
             if days < _MIN_S3_RECOVERY_RETENTION_DAYS:
@@ -268,9 +266,9 @@ def _s3_lifecycle_noncurrent_retention_state(facts: AwsResourceFacts) -> tuple[s
             configured_rule = rule
 
     if unknown_rule is not None:
-        return _STATE_UNKNOWN, unknown_rule
+        return STATE_UNKNOWN, unknown_rule
     if configured_rule is not None:
-        return _STATE_CONFIGURED, configured_rule
+        return STATE_CONFIGURED, configured_rule
     return _STATE_NOT_MODELED, None
 
 
@@ -304,15 +302,6 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
-
-
-def _optional_int(value: Any) -> int | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _s3_target_evidence(bucket) -> list[str]:
@@ -401,14 +390,14 @@ def _s3_lifecycle_noncurrent_days(rule: Mapping[str, Any] | None) -> int | None:
     if rule is None:
         return None
     for expiration in _mapping_list(rule.get("noncurrent_version_expiration")):
-        days = _optional_int(expiration.get("noncurrent_days"))
+        days = as_optional_int(expiration.get("noncurrent_days"))
         if days is not None:
             return days
     return None
 
 
 def _s3_object_lock_rationale(display_name: str, state: str) -> str:
-    if state == _STATE_DISABLED:
+    if state == STATE_DISABLED:
         return (
             f"{display_name} has an S3 Object Lock configuration with object lock disabled. "
             "Buckets that require immutability protection should enable Object Lock and default retention."
@@ -419,7 +408,7 @@ def _s3_object_lock_rationale(display_name: str, state: str) -> str:
             f"{_MIN_S3_RECOVERY_RETENTION_DAYS}-day tfSTRIDE recovery baseline. Short retention can weaken "
             "immutability protection after delayed detection of destructive changes."
         )
-    if state == _STATE_UNKNOWN:
+    if state == STATE_UNKNOWN:
         return (
             f"{display_name} has S3 Object Lock posture that remains unresolved after Terraform planning. "
             "tfSTRIDE cannot confirm whether immutable default retention is enabled."
@@ -431,7 +420,7 @@ def _s3_object_lock_rationale(display_name: str, state: str) -> str:
 
 
 def _s3_lifecycle_rationale(display_name: str, state: str, rule: Mapping[str, Any] | None) -> str:
-    if state == _STATE_UNKNOWN:
+    if state == STATE_UNKNOWN:
         return (
             f"{display_name} has lifecycle noncurrent-version retention that remains unresolved after Terraform "
             "planning. tfSTRIDE cannot confirm whether recoverable object versions meet the recovery baseline."

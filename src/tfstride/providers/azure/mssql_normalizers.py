@@ -16,13 +16,15 @@ from tfstride.providers.azure.resource_utils import (
     known_string,
     unknown_block_at,
 )
+from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+)
 
 AZURE_PROVIDER = "azure"
-_STATE_CONFIGURED = "configured"
-_STATE_DISABLED = "disabled"
-_STATE_ENABLED = "enabled"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 
 
 def normalize_mssql_server(resource: TerraformResource) -> NormalizedResource:
@@ -283,14 +285,14 @@ def _field_posture_state(
     known_value: Any,
 ) -> str:
     if block_attribute_unknown(unknown_block, key):
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if values is None:
-        return _STATE_NOT_CONFIGURED
+        return STATE_NOT_CONFIGURED
     if known_value is not None:
-        return _STATE_CONFIGURED
+        return STATE_CONFIGURED
     if key in values:
-        return _STATE_UNKNOWN
-    return _STATE_NOT_CONFIGURED
+        return STATE_UNKNOWN
+    return STATE_NOT_CONFIGURED
 
 
 def _long_term_retention_state(
@@ -299,17 +301,17 @@ def _long_term_retention_state(
     unknown_fields: list[str],
 ) -> str:
     if unknown_fields:
-        return _STATE_UNKNOWN
+        return STATE_UNKNOWN
     if values is None:
-        return _STATE_NOT_CONFIGURED
+        return STATE_NOT_CONFIGURED
     if any(retention_values):
-        return _STATE_CONFIGURED
-    return _STATE_NOT_CONFIGURED
+        return STATE_CONFIGURED
+    return STATE_NOT_CONFIGURED
 
 
 def _bool_posture_state(value: bool | None) -> str:
     if value is True:
-        return _STATE_ENABLED
+        return STATE_ENABLED
     if value is False:
-        return _STATE_DISABLED
-    return _STATE_UNKNOWN
+        return STATE_DISABLED
+    return STATE_UNKNOWN

@@ -24,16 +24,13 @@ from tfstride.providers.azure.public_network import (
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
-from tfstride.providers.coercion import dedupe_strings
+from tfstride.providers.coercion import STATE_NOT_CONFIGURED, STATE_UNKNOWN, dedupe_strings
 
 _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
     AzureResourceType.KEY_VAULT,
     AzureResourceType.MSSQL_SERVER,
 )
-_STATE_CONFIGURED = "configured"
-_STATE_NOT_CONFIGURED = "not_configured"
-_STATE_UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,13 +295,13 @@ def _private_dns_zone_state_posture(connection: AzurePrivateEndpointConnection) 
     group_state = connection.private_dns_zone_group_state
     zone_ids_state = connection.private_dns_zone_ids_state
 
-    if group_state == _STATE_NOT_CONFIGURED:
+    if group_state == STATE_NOT_CONFIGURED:
         return [f"{address}: no private_dns_zone_group blocks are represented"]
-    if group_state == _STATE_UNKNOWN:
+    if group_state == STATE_UNKNOWN:
         return _private_dns_uncertainty_posture(connection) or [f"{address}: private_dns_zone_group state is unknown"]
-    if zone_ids_state == _STATE_NOT_CONFIGURED:
+    if zone_ids_state == STATE_NOT_CONFIGURED:
         return [f"{address}: private_dns_zone_group does not include private_dns_zone_ids"]
-    if zone_ids_state == _STATE_UNKNOWN:
+    if zone_ids_state == STATE_UNKNOWN:
         return _private_dns_uncertainty_posture(connection) or [f"{address}: private_dns_zone_ids state is unknown"]
 
     # Backward-compatible inference for manually constructed resources that predate the explicit DNS state facts.

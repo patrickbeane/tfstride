@@ -4,7 +4,7 @@ import ipaddress
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from tfstride.providers.coercion import unknown_block_at
+from tfstride.providers.coercion import dedupe_strings, unknown_block_at
 
 _BROAD_PUBLIC_ALIASES = frozenset({"*", "internet", "any"})
 
@@ -31,18 +31,8 @@ def block_value(block: Any, key: str) -> Any:
     return None
 
 
-def dedupe(values: Iterable[Any]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if not text or text in seen:
-            continue
-        deduped.append(text)
-        seen.add(text)
-    return deduped
+# Re-export for downstream consumers.
+dedupe = dedupe_strings
 
 
 def is_broad_public_range(value: object) -> bool:

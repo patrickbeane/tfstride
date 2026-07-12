@@ -8,10 +8,8 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.coercion import STATE_ENABLED, STATE_UNKNOWN
 
-_STATE_ENABLED = "enabled"
-_STATE_DISABLED = "disabled"
-_STATE_UNKNOWN = "unknown"
 _MIN_FLOW_LOG_RETENTION_DAYS = 7
 
 
@@ -80,10 +78,10 @@ class AzureNetworkTelemetryRuleDetectors:
         findings: list[Finding] = []
         for flow_log in context.inventory.by_type(AzureResourceType.NETWORK_WATCHER_FLOW_LOG):
             facts = azure_facts(flow_log)
-            if facts.network_flow_log_state == _STATE_ENABLED:
+            if facts.network_flow_log_state == STATE_ENABLED:
                 continue
 
-            unknown_state = facts.network_flow_log_state in (None, _STATE_UNKNOWN)
+            unknown_state = facts.network_flow_log_state in (None, STATE_UNKNOWN)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -288,8 +286,8 @@ def _destination_evidence(facts: AzureResourceFacts) -> list[str]:
 
 
 def _retention_issue(facts: AzureResourceFacts) -> str | None:
-    state = facts.network_flow_log_retention_state or _STATE_UNKNOWN
-    if state != _STATE_ENABLED:
+    state = facts.network_flow_log_retention_state or STATE_UNKNOWN
+    if state != STATE_ENABLED:
         return f"{state}_retention"
     days = facts.network_flow_log_retention_days
     if days is None:
