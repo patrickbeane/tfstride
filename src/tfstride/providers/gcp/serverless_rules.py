@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import collect_evidence, dedupe_addresses, evidence_item
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
@@ -13,6 +12,7 @@ from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
 from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.providers.gcp.org_policy_guardrails import ORG_POLICY_ALLOWED_MEMBER_DOMAINS
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
@@ -156,7 +156,7 @@ def _public_invoker_bindings(
     invoker_roles: frozenset[str],
 ) -> list[tuple[str, str, str, dict | None]]:
     bindings: list[tuple[str, str, str, dict | None]] = []
-    for binding in analysis_facts(resource).iam.bindings:
+    for binding in gcp_facts(resource).bindings:
         role = str(binding.get("role") or "").strip()
         if role not in invoker_roles:
             continue

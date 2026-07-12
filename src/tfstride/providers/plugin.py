@@ -15,10 +15,6 @@ from tfstride.providers.resource_capabilities import (
     ResourceCapability,
     ResourceCapabilityMap,
 )
-from tfstride.providers.resource_facts import (
-    ProviderResourceFactsFactory,
-    ProviderResourceFactsRegistry,
-)
 
 if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
@@ -50,7 +46,6 @@ class ProviderPlugin:
 
     provider: str
     normalizer_factory: Callable[[], ProviderNormalizer]
-    resource_facts_factory: ProviderResourceFactsFactory
     metadata_namespace: type
     supported_resource_types: frozenset[str]
     resource_capabilities: ResourceCapabilityMap = field(default_factory=dict)
@@ -68,8 +63,6 @@ class ProviderPlugin:
             raise ProviderPluginError("Provider plugins must define a non-empty provider name.")
         if not callable(self.normalizer_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` normalizer factory must be callable.")
-        if not callable(self.resource_facts_factory):
-            raise ProviderPluginError(f"Provider plugin `{provider}` facts factory must be callable.")
         if self.resource_decorator_factory is not None and not callable(self.resource_decorator_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` decorator factory must be callable.")
         if self.rule_metadata_factory is not None and not callable(self.rule_metadata_factory):
@@ -149,9 +142,6 @@ class ProviderPlugin:
             raise ProviderPluginError(str(exc)) from exc
         return self.resource_capabilities.get(normalized_capability, frozenset())
 
-    def facts_registry_entry(self) -> tuple[str, ProviderResourceFactsFactory]:
-        return (self.provider, self.resource_facts_factory)
-
     def capability_registry_entry(self) -> tuple[str, ResourceCapabilityMap]:
         return (self.provider, self.resource_capabilities)
 
@@ -161,12 +151,6 @@ class ProviderPlugin:
 
 def provider_registry_from_plugins(plugins: Iterable[ProviderPlugin]) -> ProviderRegistry:
     return ProviderRegistry(plugin.create_normalizer() for plugin in plugins)
-
-
-def resource_facts_registry_from_plugins(
-    plugins: Iterable[ProviderPlugin],
-) -> ProviderResourceFactsRegistry:
-    return ProviderResourceFactsRegistry(plugin.facts_registry_entry() for plugin in plugins)
 
 
 def resource_capability_registry_from_plugins(

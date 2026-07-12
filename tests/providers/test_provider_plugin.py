@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
-from typing import Any
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDefinition, RuleEvaluationContext
@@ -27,12 +26,10 @@ from tfstride.providers.plugin import (
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
-    resource_facts_registry_from_plugins,
     rule_contribution_from_plugins,
     rule_metadata_from_plugins,
 )
 from tfstride.providers.resource_capabilities import ResourceCapability
-from tfstride.providers.resource_facts import ProviderResourceFactDomains
 
 
 class FakeMetadata:
@@ -70,39 +67,6 @@ class RecordingNormalizer(ProviderNormalizer):
 
 
 @dataclass(frozen=True, slots=True)
-class RecordingFacts:
-    resource: NormalizedResource
-
-    @property
-    def bucket_name(self) -> str | None:
-        return f"{self.resource.provider}-bucket"
-
-    @property
-    def bucket_acl(self) -> str:
-        return "private"
-
-    @property
-    def public_access_block(self) -> dict[str, bool] | None:
-        return None
-
-    @property
-    def policy_document(self) -> dict[str, Any]:
-        return {}
-
-    @property
-    def trust_statements(self) -> list[dict[str, Any]]:
-        return []
-
-    @property
-    def engine(self) -> str | None:
-        return None
-
-    @property
-    def resource_policy_source_addresses(self) -> list[str]:
-        return []
-
-
-@dataclass(frozen=True, slots=True)
 class RecordingAnalysisIndexes:
     provider: str
 
@@ -135,17 +99,6 @@ class RecordingDecorator:
         self.calls.append(resources)
 
 
-def _facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
-    facts = RecordingFacts(resource)
-    return ProviderResourceFactDomains(
-        storage=facts,
-        iam=facts,
-        sql=facts,
-        compute=facts,
-        workload=facts,
-    )
-
-
 def _resource(provider: str = "aws") -> NormalizedResource:
     return NormalizedResource(
         address="example.resource",
@@ -170,7 +123,6 @@ def _plugin(
     return ProviderPlugin(
         provider=provider,
         normalizer_factory=lambda: RecordingNormalizer(normalizer_provider),
-        resource_facts_factory=_facts,
         metadata_namespace=FakeMetadata,
         supported_resource_types=frozenset({" example_resource "}),
         resource_capabilities={
@@ -198,7 +150,6 @@ class ProviderPluginTests(unittest.TestCase):
         )
         self.assertIs(plugin.metadata_namespace, FakeMetadata)
         self.assertEqual(plugin.limitations, ("limitation",))
-        self.assertIs(plugin.facts_registry_entry()[1], _facts)
         self.assertIs(plugin.rule_metadata_factory, _rule_metadata)
         self.assertIs(plugin.rule_contribution_factory, _rule_contribution)
         self.assertIs(plugin.boundary_contributor_factory, RecordingBoundaryContributor)
@@ -281,10 +232,7 @@ class ProviderPluginTests(unittest.TestCase):
 
     def test_plugin_helpers_build_runtime_registries(self) -> None:
         plugin = _plugin()
-        resource = _resource("aws")
-
         provider_registry = provider_registry_from_plugins([plugin])
-        facts_registry = resource_facts_registry_from_plugins([plugin])
         limitation_registry = provider_limitations_from_plugins([plugin])
         boundary_contributors = boundary_contributors_from_plugins([plugin])
         boundary_contributors_by_provider = boundary_contributors_by_provider_from_plugins([plugin])
@@ -297,7 +245,6 @@ class ProviderPluginTests(unittest.TestCase):
         rule_metadata = rule_metadata_from_plugins([plugin])
 
         self.assertEqual(provider_registry.providers(), ("aws",))
-        self.assertEqual(facts_registry.providers(), ("aws",))
         self.assertEqual(limitation_registry, {"aws": ("limitation",)})
         self.assertIsInstance(boundary_contributors[0], RecordingBoundaryContributor)
         self.assertIsInstance(boundary_contributors_by_provider["aws"][0], RecordingBoundaryContributor)
@@ -312,7 +259,6 @@ class ProviderPluginTests(unittest.TestCase):
         self.assertEqual(rule_contribution.rule_groups[0][0].metadata.rule_id, "test-provider-rule")
         self.assertEqual(rule_metadata, (RULE_METADATA,))
         self.assertIsInstance(provider_registry.get("aws"), RecordingNormalizer)
-        self.assertEqual(facts_registry.facts_for(resource).storage.bucket_name, "aws-bucket")
 
     def test_boundary_contributor_helper_can_filter_by_provider(self) -> None:
         aws_plugin = _plugin(provider="aws")
@@ -345,17 +291,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=None,
-                resource_facts_factory=_facts,
-                metadata_namespace=FakeMetadata,
-                supported_resource_types=frozenset(),
-            )
-
-    def test_plugin_rejects_non_callable_facts_factory(self) -> None:
-        with self.assertRaises(ProviderPluginError):
-            ProviderPlugin(
-                provider="aws",
-                normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=None,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
             )
@@ -365,7 +300,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 rule_metadata_factory=object(),
@@ -376,7 +310,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 rule_contribution_factory=object(),
@@ -387,7 +320,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 boundary_contributor_factory=object(),
@@ -398,7 +330,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 observation_factory=object(),
@@ -409,7 +340,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 analysis_index_factory=object(),
@@ -420,7 +350,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=object(),
                 supported_resource_types=frozenset(),
             )
@@ -430,7 +359,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset({" "}),
             )
@@ -440,7 +368,6 @@ class ProviderPluginTests(unittest.TestCase):
             ProviderPlugin(
                 provider="aws",
                 normalizer_factory=lambda: RecordingNormalizer(),
-                resource_facts_factory=_facts,
                 metadata_namespace=FakeMetadata,
                 supported_resource_types=frozenset(),
                 resource_capabilities={ResourceCapability.WORKLOAD: frozenset({" "})},

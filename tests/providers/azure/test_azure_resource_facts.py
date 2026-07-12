@@ -4,7 +4,7 @@ import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.azure.metadata import AzureResourceMetadata
-from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_fact_domains, azure_facts
+from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.metadata_ownership import ProviderMetadataOwnershipError
@@ -162,14 +162,8 @@ class AzureResourceFactsTests(unittest.TestCase):
             ["traffic_analytics.workspace_id is unknown after planning"],
         )
 
-    def test_fact_domains_share_provider_owned_facade(self) -> None:
-        domains = azure_fact_domains(_resource())
-
-        self.assertIsInstance(domains.storage, AzureResourceFacts)
-        self.assertIs(domains.iam, domains.storage)
-        self.assertIs(domains.sql, domains.storage)
-        self.assertIs(domains.compute, domains.storage)
-        self.assertIs(domains.workload, domains.storage)
+    def test_facts_return_provider_owned_facade(self) -> None:
+        self.assertIsInstance(azure_facts(_resource()), AzureResourceFacts)
 
     def test_mutations_update_metadata_and_public_posture(self) -> None:
         resource = _resource()

@@ -11,7 +11,6 @@ from tfstride.providers.gcp.iam_assignment_posture import deserialize_privileged
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_utils import service_account_member
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts, ProviderResourceFactDomains
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -57,8 +56,10 @@ _IAM_TARGET_REFERENCE_FIELDS = (
 
 
 @dataclass(frozen=True, slots=True)
-class GcpResourceFacts(NeutralProviderResourceFacts):
+class GcpResourceFacts:
     """GCP-owned view over provider-specific resource metadata."""
+
+    resource: NormalizedResource
 
     def get(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return self.resource.get_metadata_field(field)
@@ -873,17 +874,6 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
 
 def gcp_facts(resource: NormalizedResource) -> GcpResourceFacts:
     return GcpResourceFacts(resource)
-
-
-def gcp_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
-    facts = gcp_facts(resource)
-    return ProviderResourceFactDomains(
-        storage=facts,
-        iam=facts,
-        sql=facts,
-        compute=facts,
-        workload=facts,
-    )
 
 
 def _service_account_email(value: Any) -> str | None:

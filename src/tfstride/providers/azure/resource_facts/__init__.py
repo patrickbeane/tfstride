@@ -14,7 +14,6 @@ from tfstride.providers.azure.resource_facts.private_endpoint import AzurePrivat
 from tfstride.providers.azure.resource_facts.rbac import AzureRbacFacts
 from tfstride.providers.azure.resource_facts.sql import AzureSqlFacts
 from tfstride.providers.azure.resource_facts.storage import AzureStorageFacts
-from tfstride.providers.resource_facts import ProviderResourceFactDomains
 
 
 class AzureResourceFacts(
@@ -39,9 +38,4 @@ def azure_facts(resource: NormalizedResource) -> AzureResourceFacts:
     return AzureResourceFacts(resource)
 
 
-def azure_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
-    facts = azure_facts(resource)
-    return ProviderResourceFactDomains(storage=facts, iam=facts, sql=facts, compute=facts, workload=facts)
-
-
-__all__ = ["AzureResourceFacts", "azure_fact_domains", "azure_facts"]
+__all__ = ["AzureResourceFacts", "azure_facts"]

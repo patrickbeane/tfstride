@@ -6,18 +6,7 @@ import unittest
 from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
-from tfstride.providers.aws.resource_facts import (
-    AwsIamFacts,
-    AwsResourceFacts,
-    AwsSqlFacts,
-    AwsStorageFacts,
-    aws_fact_domains,
-    aws_facts,
-)
-from tfstride.providers.resource_facts import (
-    NeutralProviderComputeFacts,
-    NeutralProviderWorkloadFacts,
-)
+from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
 
 
 def _resource(metadata: dict[str, object] | None = None) -> NormalizedResource:
@@ -912,44 +901,6 @@ class AwsResourceFactsTests(unittest.TestCase):
         for fact_name in sorted(unsupported_defaults):
             with self.subTest(fact_name=fact_name):
                 self.assertFalse(hasattr(facts, fact_name))
-
-    def test_aws_fact_domains_add_neutral_defaults_at_analysis_boundary(self) -> None:
-        resource = _resource(
-            {
-                AwsResourceMetadata.BUCKET_NAME: "logs",
-                AwsResourceMetadata.BUCKET_ACL: "private",
-                AwsResourceMetadata.POLICY_DOCUMENT: {"Statement": []},
-                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
-                AwsResourceMetadata.ENGINE: "postgres",
-                AwsResourceMetadata.RDS_BACKUP_RETENTION_PERIOD: 7,
-                AwsResourceMetadata.RDS_DELETION_PROTECTION_STATE: "enabled",
-                AwsResourceMetadata.RDS_PUBLICLY_ACCESSIBLE_STATE: "disabled",
-                AwsResourceMetadata.S3_VERSIONING_STATUS: "Enabled",
-            }
-        )
-
-        domains = aws_fact_domains(resource)
-
-        self.assertIsInstance(domains.storage, AwsStorageFacts)
-        self.assertIsInstance(domains.iam, AwsIamFacts)
-        self.assertIsInstance(domains.sql, AwsSqlFacts)
-        self.assertIsInstance(domains.compute, NeutralProviderComputeFacts)
-        self.assertIsInstance(domains.workload, NeutralProviderWorkloadFacts)
-        self.assertEqual(domains.storage.bucket_name, "logs")
-        self.assertEqual(domains.storage.bucket_acl, "private")
-        self.assertTrue(domains.storage.s3_versioning_enabled)
-        self.assertIsNone(domains.storage.uniform_bucket_level_access)
-        self.assertEqual(domains.iam.policy_document, {"Statement": []})
-        self.assertEqual(domains.iam.trust_statements, [{"Effect": "Allow"}])
-        self.assertEqual(domains.iam.reference_values, [])
-        self.assertIsNone(domains.iam.service_account_email)
-        self.assertEqual(domains.sql.engine, "postgres")
-        self.assertTrue(domains.sql.backup_enabled)
-        self.assertTrue(domains.sql.deletion_protection)
-        self.assertFalse(domains.sql.ipv4_enabled)
-        self.assertEqual(domains.sql.authorized_networks, [])
-        self.assertFalse(domains.compute.fronted_by_internet_facing_load_balancer)
-        self.assertEqual(domains.workload.identity_members, [])
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = SOURCE_ROOT / "providers" / "aws"

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.gcp.data_rule_utils import gcp_duration_seconds as _gcp_duration_seconds
-from tfstride.providers.resource_facts.contracts import ProviderStorageFacts
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 
 _KMS_MAX_ROTATION_PERIOD_DAYS = 90
 _KMS_MAX_ROTATION_PERIOD_SECONDS = _KMS_MAX_ROTATION_PERIOD_DAYS * 24 * 60 * 60
@@ -24,7 +23,7 @@ class GcpKmsRuleDetectors:
 
         findings: list[Finding] = []
         for key in context.inventory.by_type("google_kms_crypto_key"):
-            key_facts = analysis_facts(key).storage
+            key_facts = gcp_facts(key)
             if key.data_sensitivity != "sensitive":
                 continue
             rotation_issues = _kms_rotation_issues(key_facts)
@@ -69,7 +68,7 @@ class GcpKmsRuleDetectors:
 
         findings: list[Finding] = []
         for key in context.inventory.by_type("google_kms_crypto_key"):
-            key_facts = analysis_facts(key).storage
+            key_facts = gcp_facts(key)
             if key.data_sensitivity != "sensitive":
                 continue
             destruction_issues = _kms_destroy_scheduled_duration_issues(key_facts)
@@ -108,7 +107,7 @@ class GcpKmsRuleDetectors:
         return findings
 
 
-def _kms_rotation_issues(key_facts: ProviderStorageFacts) -> list[str]:
+def _kms_rotation_issues(key_facts: GcpResourceFacts) -> list[str]:
     if key_facts.kms_posture_uncertainties:
         return []
     if not _kms_rotation_supported_for_purpose(key_facts.kms_purpose):
@@ -126,7 +125,7 @@ def _kms_rotation_issues(key_facts: ProviderStorageFacts) -> list[str]:
     return []
 
 
-def _kms_rotation_evidence(key_facts: ProviderStorageFacts) -> list[str]:
+def _kms_rotation_evidence(key_facts: GcpResourceFacts) -> list[str]:
     rotation_period = key_facts.kms_rotation_period
     rotation_seconds = _gcp_duration_seconds(rotation_period)
     if not rotation_period:
@@ -150,7 +149,7 @@ def _kms_rotation_evidence(key_facts: ProviderStorageFacts) -> list[str]:
     return evidence
 
 
-def _kms_destroy_scheduled_duration_issues(key_facts: ProviderStorageFacts) -> list[str]:
+def _kms_destroy_scheduled_duration_issues(key_facts: GcpResourceFacts) -> list[str]:
     if _kms_destroy_scheduled_duration_uncertainties(key_facts):
         return []
 
@@ -169,7 +168,7 @@ def _kms_destroy_scheduled_duration_issues(key_facts: ProviderStorageFacts) -> l
     return []
 
 
-def _kms_destroy_scheduled_duration_evidence(key_facts: ProviderStorageFacts) -> list[str]:
+def _kms_destroy_scheduled_duration_evidence(key_facts: GcpResourceFacts) -> list[str]:
     destroy_scheduled_duration = key_facts.kms_destroy_scheduled_duration
     destroy_seconds = _gcp_duration_seconds(destroy_scheduled_duration)
     if not destroy_scheduled_duration:
@@ -193,7 +192,7 @@ def _kms_destroy_scheduled_duration_evidence(key_facts: ProviderStorageFacts) ->
     return evidence
 
 
-def _kms_destroy_scheduled_duration_uncertainties(key_facts: ProviderStorageFacts) -> list[str]:
+def _kms_destroy_scheduled_duration_uncertainties(key_facts: GcpResourceFacts) -> list[str]:
     return [
         uncertainty
         for uncertainty in key_facts.kms_posture_uncertainties

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_types import GCP_GKE_RESOURCE_TYPES
 from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
-from tfstride.providers.resource_facts.contracts import ProviderComputeFacts
 
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
     {
@@ -31,7 +30,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if not cluster.public_access_configured:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -76,7 +75,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if not cluster.public_access_configured:
                 continue
             broad_networks = _gke_broad_authorized_networks(cluster)
@@ -124,7 +123,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if cluster_facts.gke_workload_identity_enabled is True:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -172,7 +171,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*GCP_GKE_RESOURCE_TYPES):
-            resource_facts = analysis_facts(resource).compute
+            resource_facts = gcp_facts(resource)
             if resource_facts.gke_legacy_metadata_endpoints_enabled is not True:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -217,7 +216,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*GCP_GKE_RESOURCE_TYPES):
-            resource_facts = analysis_facts(resource).compute
+            resource_facts = gcp_facts(resource)
             risk_descriptions = _gke_node_identity_risks(resource)
             if not risk_descriptions:
                 continue
@@ -259,7 +258,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             logging_issues = _gke_logging_issues(cluster_facts)
             if not logging_issues:
                 continue
@@ -308,7 +307,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if cluster_facts.gke_network_policy_state == "enabled":
                 continue
             explicit_gap = cluster_facts.gke_network_policy_state in {"disabled", "not_configured"}
@@ -352,7 +351,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if cluster_facts.gke_secrets_encryption_state == "enabled":
                 continue
             explicit_gap = cluster_facts.gke_secrets_encryption_state == "disabled"
@@ -396,7 +395,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if cluster_facts.gke_legacy_abac_state == _GKE_POSTURE_DISABLED:
                 continue
             unknown = cluster_facts.gke_legacy_abac_state == _GKE_POSTURE_UNKNOWN
@@ -440,7 +439,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if not _gke_client_certificate_auth_represented(cluster_facts):
                 continue
             if cluster_facts.gke_client_certificate_auth_state == _GKE_POSTURE_DISABLED:
@@ -492,7 +491,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if cluster_facts.gke_shielded_nodes_state == "enabled":
                 continue
             unknown = cluster_facts.gke_shielded_nodes_state == "unknown"
@@ -539,7 +538,7 @@ class GcpGkeRuleDetectors:
 
         findings: list[Finding] = []
         for cluster in context.inventory.by_type("google_container_cluster"):
-            cluster_facts = analysis_facts(cluster).compute
+            cluster_facts = gcp_facts(cluster)
             if not _gke_binary_authorization_represented(cluster_facts):
                 continue
             if cluster_facts.gke_binary_authorization_state == "enabled":
@@ -588,7 +587,7 @@ def _bool_status(value: bool | None) -> str:
 
 
 def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
-    facts = analysis_facts(cluster).compute
+    facts = gcp_facts(cluster)
     if not facts.gke_master_authorized_networks:
         return ["master authorized networks are not configured"]
     descriptions: list[str] = []
@@ -601,7 +600,7 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
     return descriptions
 
 
-def _gke_logging_issues(facts: ProviderComputeFacts) -> list[str]:
+def _gke_logging_issues(facts: GcpResourceFacts) -> list[str]:
     state = facts.gke_control_plane_logging_state
     if state == "unknown":
         return ["control-plane logging state is unknown"]
@@ -614,7 +613,7 @@ def _gke_logging_issues(facts: ProviderComputeFacts) -> list[str]:
     return [f"missing security logging component: {component}" for component in missing_components]
 
 
-def _gke_logging_evidence(facts: ProviderComputeFacts, issues: list[str]) -> list[str]:
+def _gke_logging_evidence(facts: GcpResourceFacts, issues: list[str]) -> list[str]:
     values = [f"control_plane_logging_state={facts.gke_control_plane_logging_state or 'unknown'}"]
     if facts.gke_logging_service:
         values.append(f"logging_service={facts.gke_logging_service}")
@@ -628,7 +627,7 @@ def _gke_logging_evidence(facts: ProviderComputeFacts, issues: list[str]) -> lis
     return values
 
 
-def _gke_network_policy_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_network_policy_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"network_policy_state={facts.gke_network_policy_state or 'unknown'}"]
     if facts.gke_network_policy_provider:
         values.append(f"network_policy_provider={facts.gke_network_policy_provider}")
@@ -637,7 +636,7 @@ def _gke_network_policy_evidence(facts: ProviderComputeFacts) -> list[str]:
     return values
 
 
-def _gke_secrets_encryption_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_secrets_encryption_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"secrets_encryption_state={facts.gke_secrets_encryption_state or 'unknown'}"]
     if facts.gke_database_encryption_state:
         values.append(f"database_encryption_state={facts.gke_database_encryption_state}")
@@ -650,7 +649,7 @@ def _gke_secrets_encryption_evidence(facts: ProviderComputeFacts) -> list[str]:
     return values
 
 
-def _gke_legacy_abac_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_legacy_abac_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"legacy_abac_state={facts.gke_legacy_abac_state or 'unknown'}"]
     if facts.gke_legacy_abac_enabled is None:
         values.append("enable_legacy_abac is not represented in planned values")
@@ -659,7 +658,7 @@ def _gke_legacy_abac_evidence(facts: ProviderComputeFacts) -> list[str]:
     return values
 
 
-def _gke_client_certificate_auth_represented(facts: ProviderComputeFacts) -> bool:
+def _gke_client_certificate_auth_represented(facts: GcpResourceFacts) -> bool:
     return (
         facts.gke_client_certificate_auth_state in {"enabled", "disabled"}
         or bool(facts.gke_client_certificate_config)
@@ -671,7 +670,7 @@ def _gke_client_certificate_auth_represented(facts: ProviderComputeFacts) -> boo
     )
 
 
-def _gke_client_certificate_auth_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_client_certificate_auth_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"client_certificate_auth_state={facts.gke_client_certificate_auth_state or 'unknown'}"]
     if facts.gke_client_certificate_auth_enabled is None:
         values.append(
@@ -685,7 +684,7 @@ def _gke_client_certificate_auth_evidence(facts: ProviderComputeFacts) -> list[s
     return values
 
 
-def _gke_shielded_nodes_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_shielded_nodes_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"shielded_nodes_state={facts.gke_shielded_nodes_state or 'unknown'}"]
     if facts.gke_shielded_nodes_enabled is None:
         values.append("shielded nodes setting is not represented in planned values")
@@ -694,7 +693,7 @@ def _gke_shielded_nodes_evidence(facts: ProviderComputeFacts) -> list[str]:
     return values
 
 
-def _gke_binary_authorization_represented(facts: ProviderComputeFacts) -> bool:
+def _gke_binary_authorization_represented(facts: GcpResourceFacts) -> bool:
     return (
         facts.gke_binary_authorization_state in {"enabled", "disabled"}
         or bool(facts.gke_binary_authorization)
@@ -702,7 +701,7 @@ def _gke_binary_authorization_represented(facts: ProviderComputeFacts) -> bool:
     )
 
 
-def _gke_binary_authorization_evidence(facts: ProviderComputeFacts) -> list[str]:
+def _gke_binary_authorization_evidence(facts: GcpResourceFacts) -> list[str]:
     values = [f"binary_authorization_state={facts.gke_binary_authorization_state or 'unknown'}"]
     if facts.gke_binary_authorization_evaluation_mode:
         values.append(f"evaluation_mode={facts.gke_binary_authorization_evaluation_mode}")
@@ -712,7 +711,7 @@ def _gke_binary_authorization_evidence(facts: ProviderComputeFacts) -> list[str]
 
 
 def _gke_node_identity_risks(resource: NormalizedResource) -> list[str]:
-    facts = analysis_facts(resource).compute
+    facts = gcp_facts(resource)
     risks: list[str] = []
     service_account = str(facts.gke_node_service_account or "").strip()
     if not service_account and not facts.gke_node_oauth_scopes:

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TypeVar
 
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_FOLDER_IAM_RESOURCE_TYPES,
     GCP_IAM_GRANT_RESOURCE_TYPES,
@@ -168,7 +168,7 @@ def _resolve_iam_resource_scopes(
     resource: NormalizedResource,
     reference_index: Mapping[str, tuple[NormalizedResource, ...]],
 ) -> list[tuple[GcpIamScopeKey, NormalizedResource | None]]:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     if resource.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
         project = _normalize_project_id(facts.project)
         if project:
@@ -197,7 +197,7 @@ def _resolve_iam_resource_scopes(
 
 
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
-    return analysis_facts(resource).iam.target_reference
+    return gcp_facts(resource).target_reference
 
 
 def _build_resource_reference_index(
@@ -213,7 +213,7 @@ def _build_resource_reference_index(
 
 
 def _resource_reference_keys(resource: NormalizedResource) -> tuple[str, ...]:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     references: set[str] = {
         resource.address,
         f"{resource.address}.id",
@@ -251,7 +251,7 @@ def _group_resources_by_scope(
 
 
 def _resource_project(resource: NormalizedResource) -> str | None:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     project = _normalize_project_id(facts.project)
     if project:
         return project
@@ -263,7 +263,7 @@ def _resource_project(resource: NormalizedResource) -> str | None:
 
 
 def _resource_folder_id(resource: NormalizedResource) -> str | None:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     folder_id = _normalize_hierarchy_id(facts.folder_id, "folders")
     if folder_id:
         return folder_id
@@ -275,7 +275,7 @@ def _resource_folder_id(resource: NormalizedResource) -> str | None:
 
 
 def _resource_organization_id(resource: NormalizedResource) -> str | None:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     organization_id = _normalize_hierarchy_id(facts.organization_id, "organizations")
     if organization_id:
         return organization_id
@@ -287,7 +287,7 @@ def _resource_organization_id(resource: NormalizedResource) -> str | None:
 
 
 def _scope_candidate_values(resource: NormalizedResource) -> tuple[str, ...]:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     values: list[str] = []
     for value in (resource.identifier, facts.resource_name):
         if value:

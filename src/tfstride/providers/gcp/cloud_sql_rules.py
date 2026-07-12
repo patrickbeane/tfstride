@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
-from tfstride.providers.resource_facts.contracts import ProviderSqlFacts
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 
 
 class GcpCloudSqlRuleDetectors:
@@ -59,7 +58,7 @@ class GcpCloudSqlRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database).sql
+            database_facts = gcp_facts(database)
             if database_facts.backup_enabled:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -106,7 +105,7 @@ class GcpCloudSqlRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database).sql
+            database_facts = gcp_facts(database)
             if not database_facts.ipv4_enabled or database_facts.private_network:
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
@@ -154,7 +153,7 @@ class GcpCloudSqlRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database).sql
+            database_facts = gcp_facts(database)
             if not database_facts.ipv4_enabled or _cloud_sql_ssl_enforced(database_facts):
                 continue
             boundary = context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
@@ -201,7 +200,7 @@ class GcpCloudSqlRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database).sql
+            database_facts = gcp_facts(database)
             if not database_facts.backup_enabled:
                 continue
             if database_facts.point_in_time_recovery_enabled is not False:
@@ -249,7 +248,7 @@ class GcpCloudSqlRuleDetectors:
 
         findings: list[Finding] = []
         for database in context.inventory.by_type("google_sql_database_instance"):
-            database_facts = analysis_facts(database).sql
+            database_facts = gcp_facts(database)
             if database_facts.deletion_protection is not False:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -279,7 +278,7 @@ class GcpCloudSqlRuleDetectors:
         return findings
 
 
-def _cloud_sql_ssl_enforced(sql_facts: ProviderSqlFacts) -> bool:
+def _cloud_sql_ssl_enforced(sql_facts: GcpResourceFacts) -> bool:
     if sql_facts.require_ssl:
         return True
     ssl_mode = str(sql_facts.ssl_mode or "").strip().upper()
@@ -288,7 +287,7 @@ def _cloud_sql_ssl_enforced(sql_facts: ProviderSqlFacts) -> bool:
 
 def _cloud_sql_public_authorized_networks(database: NormalizedResource) -> list[str]:
     descriptions: list[str] = []
-    for network in analysis_facts(database).sql.authorized_networks:
+    for network in gcp_facts(database).authorized_networks:
         value = str(network.get("value") or "").strip()
         if value not in {"0.0.0.0/0", "::/0"}:
             continue

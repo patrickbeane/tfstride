@@ -6,7 +6,6 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import (
     BoundaryType,
@@ -107,7 +106,7 @@ class GcpComputeExposureRuleDetectors:
                             "firewall_rules",
                             [describe_security_group_rule(firewall, rule) for firewall, rule in risky_rules],
                         ),
-                        evidence_item("network_tags", analysis_facts(instance).compute.network_tags),
+                        evidence_item("network_tags", gcp_facts(instance).network_tags),
                         evidence_item("internet_ingress_reasons", instance.internet_ingress_reasons),
                         evidence_item("public_exposure_reasons", instance.public_exposure_reasons),
                         organization_guardrail_evidence(
@@ -131,7 +130,7 @@ class GcpComputeExposureRuleDetectors:
 
         findings: list[Finding] = []
         for resource in context.inventory.by_type(*_GCP_LOAD_BALANCED_EXPOSURE_RESOURCE_TYPES):
-            resource_facts = analysis_facts(resource).compute
+            resource_facts = gcp_facts(resource)
             if not resource_facts.fronted_by_internet_facing_load_balancer:
                 continue
             frontends = resource_facts.load_balancer_frontends
@@ -261,7 +260,7 @@ class GcpComputeExposureRuleDetectors:
             "google_compute_backend_service",
             "google_compute_region_backend_service",
         ):
-            backend_facts = analysis_facts(backend_service).compute
+            backend_facts = gcp_facts(backend_service)
             if not backend_facts.fronted_by_internet_facing_load_balancer:
                 continue
             policy_state = _backend_service_edge_protection_state(backend_service)
@@ -319,7 +318,7 @@ class GcpComputeExposureRuleDetectors:
 
         findings: list[Finding] = []
         for instance in context.inventory.by_type("google_compute_instance"):
-            instance_facts = analysis_facts(instance).compute
+            instance_facts = gcp_facts(instance)
             if instance_facts.os_login_enabled is not False:
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -366,7 +365,7 @@ def _public_forwarding_rule_target_proxies(
     for forwarding_rule in inventory.by_type(*_GCP_FORWARDING_RULE_RESOURCE_TYPES):
         if not forwarding_rule.public_access_configured:
             continue
-        target_reference = analysis_facts(forwarding_rule).compute.forwarding_rule_target
+        target_reference = gcp_facts(forwarding_rule).forwarding_rule_target
         if not target_reference:
             continue
         target_proxy = _resolve_inventory_reference(inventory, target_reference)
@@ -400,7 +399,7 @@ def _forwarding_rule_boundary(
 
 
 def _forwarding_rule_evidence(forwarding_rule: NormalizedResource) -> list[str]:
-    facts = analysis_facts(forwarding_rule).compute
+    facts = gcp_facts(forwarding_rule)
     values = [f"address={forwarding_rule.address}", f"type={forwarding_rule.resource_type}"]
     if facts.forwarding_rule_load_balancing_scheme:
         values.append(f"scheme={facts.forwarding_rule_load_balancing_scheme}")
@@ -416,7 +415,7 @@ def _forwarding_rule_evidence(forwarding_rule: NormalizedResource) -> list[str]:
 
 
 def _target_proxy_evidence(target_proxy: NormalizedResource) -> list[str]:
-    facts = analysis_facts(target_proxy).compute
+    facts = gcp_facts(target_proxy)
     values = [f"address={target_proxy.address}", f"type={target_proxy.resource_type}"]
     if facts.load_balancer_ssl_policy:
         values.append(f"ssl_policy={facts.load_balancer_ssl_policy}")
@@ -433,7 +432,7 @@ def _target_proxy_ssl_policy_state(
     inventory: ResourceInventory,
     target_proxy: NormalizedResource,
 ) -> tuple[str, NormalizedResource | None]:
-    ssl_policy_reference = analysis_facts(target_proxy).compute.load_balancer_ssl_policy
+    ssl_policy_reference = gcp_facts(target_proxy).load_balancer_ssl_policy
     if not ssl_policy_reference:
         return "missing", None
     ssl_policy = _resolve_inventory_reference(inventory, ssl_policy_reference)
@@ -446,7 +445,7 @@ def _target_proxy_ssl_policy_state(
 
 
 def _ssl_policy_min_tls_state(ssl_policy: NormalizedResource) -> str:
-    min_tls_version = analysis_facts(ssl_policy).compute.ssl_policy_min_tls_version
+    min_tls_version = gcp_facts(ssl_policy).ssl_policy_min_tls_version
     if not min_tls_version:
         return "unknown"
     normalized = min_tls_version.strip().lower().replace("-", "_").replace(".", "_")
@@ -460,14 +459,14 @@ def _ssl_policy_evidence(
     ssl_policy: NormalizedResource | None,
     policy_state: str,
 ) -> list[str]:
-    proxy_facts = analysis_facts(target_proxy).compute
+    proxy_facts = gcp_facts(target_proxy)
     values = [f"ssl_policy_state={policy_state}"]
     if proxy_facts.load_balancer_ssl_policy:
         values.append(f"ssl_policy_reference={proxy_facts.load_balancer_ssl_policy}")
     else:
         values.append("ssl_policy is unset")
     if ssl_policy is not None:
-        policy_facts = analysis_facts(ssl_policy).compute
+        policy_facts = gcp_facts(ssl_policy)
         values.append(f"ssl_policy_resource={ssl_policy.address}")
         if policy_facts.ssl_policy_min_tls_version:
             values.append(f"min_tls_version={policy_facts.ssl_policy_min_tls_version}")
@@ -486,7 +485,7 @@ def _ssl_policy_rationale(
     policy_state: str,
 ) -> str:
     if policy_state == "weak" and ssl_policy is not None:
-        min_tls_version = analysis_facts(ssl_policy).compute.ssl_policy_min_tls_version or "an older TLS version"
+        min_tls_version = gcp_facts(ssl_policy).ssl_policy_min_tls_version or "an older TLS version"
         return (
             f"{target_proxy.display_name} uses {ssl_policy.display_name}, whose minimum TLS version is "
             f"`{min_tls_version}`. Public HTTPS load balancers should require TLS 1.2 or newer."
@@ -643,7 +642,7 @@ def _risky_public_firewall_rules(
     instance: NormalizedResource,
     inventory: ResourceInventory,
 ) -> list[tuple[NormalizedResource, SecurityGroupRule]]:
-    firewall_addresses = analysis_facts(instance).compute.internet_ingress_firewalls
+    firewall_addresses = gcp_facts(instance).internet_ingress_firewalls
     risky_rules: list[tuple[NormalizedResource, SecurityGroupRule]] = []
     for firewall_address in firewall_addresses:
         firewall = inventory.get_by_address(firewall_address)

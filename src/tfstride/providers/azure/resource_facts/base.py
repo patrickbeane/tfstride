@@ -4,10 +4,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
+from tfstride.models import NormalizedResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_UNKNOWN
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
-from tfstride.providers.resource_facts import NeutralProviderResourceFacts
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -18,8 +18,10 @@ _AZURE_METADATA_WRITE_VALIDATOR = ProviderMetadataWriteValidator.build(
 
 
 @dataclass(frozen=True, slots=True)
-class AzureBaseFacts(NeutralProviderResourceFacts):
+class AzureBaseFacts:
     """Azure-owned view over normalized metadata and relationship posture."""
+
+    resource: NormalizedResource
 
     def get(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return self.resource.get_metadata_field(field)

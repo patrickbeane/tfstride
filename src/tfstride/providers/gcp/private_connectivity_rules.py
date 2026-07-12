@@ -12,7 +12,6 @@ from tfstride.analysis.resource_concepts import (
     is_object_storage_resource,
     is_secret_store_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.coercion import dedupe
@@ -146,7 +145,7 @@ class GcpPrivateConnectivityRuleDetectors:
                             "workload_subnetwork_posture",
                             _workload_subnetwork_posture_evidence(workload, subnetworks),
                         ),
-                        evidence_item("workload_identity", analysis_facts(workload).workload.identity_members),
+                        evidence_item("workload_identity", gcp_facts(workload).identity_members),
                         evidence_item(
                             "google_api_data_paths",
                             [

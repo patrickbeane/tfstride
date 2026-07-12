@@ -12,7 +12,6 @@ from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
-from tfstride.providers.aws.resource_facts import AwsIamFacts, AwsSqlFacts, AwsStorageFacts
 from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.azure.boundaries import AzureBoundaryContributor
@@ -22,7 +21,6 @@ from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNorm
 from tfstride.providers.azure.observations import observe_azure_posture
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
-from tfstride.providers.azure.resource_facts import AzureResourceFacts
 from tfstride.providers.azure.rule_catalog import AZURE_RULE_METADATA
 from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 from tfstride.providers.catalog import (
@@ -38,7 +36,6 @@ from tfstride.providers.catalog import (
     default_provider_registry,
     default_provider_rule_metadata,
     default_resource_capability_registry,
-    default_resource_facts_registry,
     default_rule_contribution,
 )
 from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
@@ -48,7 +45,6 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import SUPPORTED_GCP_TYPES, GcpNormalizer
 from tfstride.providers.gcp.resource_capabilities import GCP_RESOURCE_CAPABILITIES
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
-from tfstride.providers.gcp.resource_facts import GcpResourceFacts
 from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
 from tfstride.providers.gcp.rules import GCP_RULE_GROUP_IDS
 from tfstride.providers.resource_capabilities import ResourceCapability
@@ -78,8 +74,6 @@ class ProviderCatalogTests(unittest.TestCase):
     def test_cached_plugins_build_fresh_runtime_registries(self) -> None:
         first_provider_registry = default_provider_registry()
         second_provider_registry = default_provider_registry()
-        first_facts_registry = default_resource_facts_registry()
-        second_facts_registry = default_resource_facts_registry()
         first_capability_registry = default_resource_capability_registry()
         second_capability_registry = default_resource_capability_registry()
 
@@ -87,10 +81,6 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsNot(first_provider_registry.get("aws"), second_provider_registry.get("aws"))
         self.assertIsNot(first_provider_registry.get("gcp"), second_provider_registry.get("gcp"))
         self.assertIsNot(first_provider_registry.get("azure"), second_provider_registry.get("azure"))
-        self.assertIsNot(first_facts_registry, second_facts_registry)
-        self.assertIs(first_facts_registry.get("aws"), second_facts_registry.get("aws"))
-        self.assertIs(first_facts_registry.get("gcp"), second_facts_registry.get("gcp"))
-        self.assertIs(first_facts_registry.get("azure"), second_facts_registry.get("azure"))
         self.assertIsNot(first_capability_registry, second_capability_registry)
         self.assertEqual(first_capability_registry.providers(), second_capability_registry.providers())
 
@@ -216,33 +206,6 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(limitations["aws"], AWS_LIMITATIONS)
         self.assertEqual(limitations["gcp"], GCP_LIMITATIONS)
         self.assertEqual(limitations["azure"], AZURE_LIMITATIONS)
-
-    def test_default_resource_facts_registry_registers_builtin_providers(self) -> None:
-        registry = default_resource_facts_registry()
-        aws_resource = TfStride().analyze_plan(FIXTURE_PATH).inventory.resources[0]
-        gcp_resource = NormalizedResource(
-            address="google_storage_bucket.logs",
-            provider="gcp",
-            resource_type="google_storage_bucket",
-            name="logs",
-            category=ResourceCategory.DATA,
-        )
-        azure_resource = NormalizedResource(
-            address="azurerm_storage_account.logs",
-            provider="azure",
-            resource_type="azurerm_storage_account",
-            name="logs",
-            category=ResourceCategory.DATA,
-        )
-
-        aws_facts = registry.facts_for(aws_resource)
-
-        self.assertEqual(registry.providers(), ("aws", "gcp", "azure"))
-        self.assertIsInstance(aws_facts.storage, AwsStorageFacts)
-        self.assertIsInstance(aws_facts.iam, AwsIamFacts)
-        self.assertIsInstance(aws_facts.sql, AwsSqlFacts)
-        self.assertIsInstance(registry.facts_for(gcp_resource).storage, GcpResourceFacts)
-        self.assertIsInstance(registry.facts_for(azure_resource).storage, AzureResourceFacts)
 
     def test_default_resource_capability_registry_registers_builtin_providers(self) -> None:
         registry = default_resource_capability_registry()

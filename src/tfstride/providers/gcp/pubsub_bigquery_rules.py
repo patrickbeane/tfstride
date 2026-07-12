@@ -6,7 +6,6 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.gcp.iam_access import (
@@ -16,6 +15,7 @@ from tfstride.providers.gcp.iam_access import (
     gcp_iam_condition_evidence_values,
     gcp_iam_condition_limited_score,
 )
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 _PUBSUB_RESOURCE_TYPES = frozenset({"google_pubsub_topic", "google_pubsub_subscription"})
 _BIGQUERY_RESOURCE_TYPES = frozenset({"google_bigquery_dataset", "google_bigquery_table"})
@@ -68,7 +68,7 @@ class GcpPubSubBigQueryRuleDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
-                                analysis_facts(resource).iam.resource_policy_source_addresses,
+                                gcp_facts(resource).resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,
@@ -122,7 +122,7 @@ class GcpPubSubBigQueryRuleDetectors:
                             evidence_item("iam_condition", gcp_iam_condition_evidence_values(condition)),
                             evidence_item(
                                 "resource_policy_sources",
-                                analysis_facts(resource).iam.resource_policy_source_addresses,
+                                gcp_facts(resource).resource_policy_source_addresses,
                             ),
                         ),
                         severity_reasoning=severity_reasoning,

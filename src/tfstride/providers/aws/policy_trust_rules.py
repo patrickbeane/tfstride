@@ -14,7 +14,6 @@ from tfstride.analysis.resource_concepts import (
     is_key_management_resource,
     is_object_storage_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.aws.policy_conditions import (
@@ -26,6 +25,7 @@ from tfstride.providers.aws.policy_conditions import (
     trust_statement_has_supported_narrowing_for_principal,
     trust_statement_principal_assessments,
 )
+from tfstride.providers.aws.resource_facts import aws_facts
 
 
 class AwsPolicyTrustRuleDetectors:
@@ -130,7 +130,7 @@ class AwsPolicyTrustRuleDetectors:
                     boundary = context.boundary_index.get(
                         (BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, resource.address)
                     )
-                    resource_policy_sources = analysis_facts(resource).iam.resource_policy_source_addresses
+                    resource_policy_sources = aws_facts(resource).resource_policy_source_addresses
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
@@ -169,7 +169,7 @@ class AwsPolicyTrustRuleDetectors:
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-            for trust_statement in analysis_facts(role).iam.trust_statements:
+            for trust_statement in aws_facts(role).trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue
@@ -220,7 +220,7 @@ class AwsPolicyTrustRuleDetectors:
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-            for trust_statement in analysis_facts(role).iam.trust_statements:
+            for trust_statement in aws_facts(role).trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment):
                         continue

@@ -13,7 +13,6 @@ from tfstride.analysis.resource_concepts import (
     is_control_plane_sensitive_data_store,
     is_database_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import (
@@ -29,6 +28,7 @@ from tfstride.providers.aws.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
     trust_statement_principal_assessments,
 )
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -110,7 +110,7 @@ class AwsPathChainRuleDetectors:
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
-            for trust_statement in analysis_facts(role).iam.trust_statements:
+            for trust_statement in aws_facts(role).trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue

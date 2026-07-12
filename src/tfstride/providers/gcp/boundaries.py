@@ -16,7 +16,6 @@ from tfstride.analysis.resource_concepts import (
     is_object_storage_resource,
     is_secret_store_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
 from tfstride.providers.coercion import dedupe
@@ -26,6 +25,7 @@ from tfstride.providers.gcp.custom_roles import (
     build_gcp_custom_role_index,
     custom_role_allows_data_store_access,
 )
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
 
 
@@ -294,7 +294,7 @@ def _gcp_matching_iam_access_grants(
         return []
 
     grants: list[str] = []
-    for binding in analysis_facts(data_store).iam.bindings:
+    for binding in gcp_facts(data_store).bindings:
         role = str(binding.get("role") or "")
         if not _gcp_role_allows_data_store_access(data_store, role, candidate_index.gcp_custom_roles):
             continue
@@ -302,10 +302,10 @@ def _gcp_matching_iam_access_grants(
             source = str(binding.get("source") or data_store.address)
             grants.append(f"{source} grants {role} to {member}")
 
-    data_store_project = analysis_facts(data_store).iam.project
+    data_store_project = gcp_facts(data_store).project
     for project_iam_resource in candidate_index.project_iam_resources:
-        project_iam_facts = analysis_facts(project_iam_resource)
-        if not data_store_project or project_iam_facts.iam.project != data_store_project:
+        project_iam_facts = gcp_facts(project_iam_resource)
+        if not data_store_project or project_iam_facts.project != data_store_project:
             continue
         for role, member in _project_iam_binding_members(project_iam_resource):
             if member not in workload_members or not _gcp_role_allows_data_store_access(
@@ -317,11 +317,11 @@ def _gcp_matching_iam_access_grants(
 
 
 def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    bindings = analysis_facts(resource).iam.bindings
+    bindings = gcp_facts(resource).bindings
     if not bindings:
-        facts = analysis_facts(resource)
-        role = facts.iam.role
-        member = facts.iam.member
+        facts = gcp_facts(resource)
+        role = facts.role
+        member = facts.member
         if role and member:
             return [(role, member)]
         return []
@@ -335,14 +335,14 @@ def _project_iam_binding_members(resource: NormalizedResource) -> list[tuple[str
 
 
 def _gcp_workload_identity_members(workload: NormalizedResource) -> list[str]:
-    return analysis_facts(workload).workload.identity_members
+    return gcp_facts(workload).identity_members
 
 
 def _gcp_workload_scopes_allow_access(
     workload: NormalizedResource,
     data_store: NormalizedResource,
 ) -> bool:
-    scopes = {scope.lower() for scope in analysis_facts(workload).workload.identity_scopes}
+    scopes = {scope.lower() for scope in gcp_facts(workload).identity_scopes}
     if not scopes:
         return True
     if any(scope.endswith("/cloud-platform") or scope == "cloud-platform" for scope in scopes):

@@ -7,7 +7,6 @@ from tfstride.analysis.finding_helpers import (
     describe_policy_statement,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.policy_conditions import (
@@ -89,7 +88,7 @@ class AwsLambdaRuleDetectors:
         seen: set[tuple[str, str]] = set()
 
         for function in context.inventory.by_type(_AWS_LAMBDA_FUNCTION):
-            resource_policy_sources = analysis_facts(function).iam.resource_policy_source_addresses
+            resource_policy_sources = aws_facts(function).resource_policy_source_addresses
             for statement in function.policy_statements:
                 if not _is_public_invocation_statement(statement, primary_account_id):
                     continue

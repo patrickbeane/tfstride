@@ -10,8 +10,8 @@ from tfstride.analysis.resource_concepts import (
     is_object_storage_resource,
     is_secret_store_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
 GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset({"google_project_iam_custom_role", "google_organization_iam_custom_role"})
@@ -48,7 +48,7 @@ def build_gcp_custom_role_index(resources: Iterable[NormalizedResource]) -> GcpC
     for resource in resources:
         if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
             continue
-        permissions = tuple(sorted(set(analysis_facts(resource).iam.custom_role_permissions)))
+        permissions = tuple(sorted(set(gcp_facts(resource).custom_role_permissions)))
         if not permissions:
             continue
         for reference in _custom_role_references(resource):
@@ -159,7 +159,7 @@ def custom_role_allows_data_store_access(
 
 
 def _custom_role_references(resource: NormalizedResource) -> set[str]:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     references = {
         resource.address,
         f"{resource.address}.id",

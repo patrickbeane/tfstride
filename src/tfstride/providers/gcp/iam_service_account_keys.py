@@ -8,7 +8,6 @@ from tfstride.analysis.finding_helpers import (
     dedupe_addresses,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, ResourceInventory
 from tfstride.providers.gcp.custom_roles import (
@@ -39,6 +38,7 @@ from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_DISABLE_SERVICE_ACCOUNT_KEY_CREATION,
 )
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
@@ -96,10 +96,10 @@ class GcpServiceAccountKeyDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         for key in inventory.by_type("google_service_account_key"):
-            service_account_reference = analysis_facts(key).iam.service_account_reference
+            service_account_reference = gcp_facts(key).service_account_reference
             target = service_account_iam_target(key, inventory)
             validity_days = _service_account_key_validity_days(key)
-            keepers = analysis_facts(key).iam.service_account_key_keepers
+            keepers = gcp_facts(key).service_account_key_keepers
             keepers_configured = isinstance(keepers, dict) and bool(keepers)
 
             risks = ["Terraform manages a user-created service-account key"]
@@ -148,8 +148,8 @@ class GcpServiceAccountKeyDetectors:
                             [
                                 f"source={key.address}",
                                 f"service_account_reference={service_account_reference or ''}",
-                                f"key_algorithm={analysis_facts(key).iam.service_account_key_algorithm or ''}",
-                                f"public_key_type={analysis_facts(key).iam.service_account_public_key_type or ''}",
+                                f"key_algorithm={gcp_facts(key).service_account_key_algorithm or ''}",
+                                f"public_key_type={gcp_facts(key).service_account_public_key_type or ''}",
                             ],
                         ),
                         evidence_item("key_risk", risks),
@@ -197,7 +197,7 @@ class GcpServiceAccountKeyDetectors:
                 lateral_movement=2 if identity_control_plane_access else 1,
                 blast_radius=2,
             )
-            service_account_reference = analysis_facts(key).iam.service_account_reference
+            service_account_reference = gcp_facts(key).service_account_reference
             target_label = (
                 target.address if target is not None else service_account_reference or "unknown service account"
             )
@@ -375,7 +375,7 @@ def _service_account_key_principals(
 ) -> set[str]:
     values: list[object] = []
     if target is not None:
-        target_facts = analysis_facts(target).iam
+        target_facts = gcp_facts(target)
         values.extend(
             [
                 target_facts.service_account_email,
@@ -383,7 +383,7 @@ def _service_account_key_principals(
                 target_facts.resource_name,
             ]
         )
-    key_facts = analysis_facts(key).iam
+    key_facts = gcp_facts(key)
     values.extend(
         [
             key_facts.service_account_reference,
@@ -429,7 +429,7 @@ def _member_matches_service_account_principal(member: str, principals: set[str])
 def _resource_iam_binding_members(resource: NormalizedResource) -> list[tuple[str, str, str]]:
     members: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str, str]] = set()
-    for binding in analysis_facts(resource).iam.bindings:
+    for binding in gcp_facts(resource).bindings:
         role = str(binding.get("role") or "unknown role").strip()
         source = str(binding.get("source") or "").strip()
         for member in binding_members(binding):
@@ -459,8 +459,8 @@ def _keyed_service_account_grant_evidence(grant: _KeyedServiceAccountGrant) -> s
 
 
 def _service_account_key_validity_days(resource: NormalizedResource) -> int | None:
-    valid_after = _parse_rfc3339_timestamp(analysis_facts(resource).iam.service_account_key_valid_after)
-    valid_before = _parse_rfc3339_timestamp(analysis_facts(resource).iam.service_account_key_valid_before)
+    valid_after = _parse_rfc3339_timestamp(gcp_facts(resource).service_account_key_valid_after)
+    valid_before = _parse_rfc3339_timestamp(gcp_facts(resource).service_account_key_valid_before)
     if valid_after is None or valid_before is None or valid_before <= valid_after:
         return None
     return int((valid_before - valid_after).total_seconds() // 86400)
@@ -471,8 +471,8 @@ def _service_account_key_validity_evidence(
     validity_days: int | None,
 ) -> list[str]:
     values = [
-        f"valid_after={analysis_facts(resource).iam.service_account_key_valid_after or ''}",
-        f"valid_before={analysis_facts(resource).iam.service_account_key_valid_before or ''}",
+        f"valid_after={gcp_facts(resource).service_account_key_valid_after or ''}",
+        f"valid_before={gcp_facts(resource).service_account_key_valid_before or ''}",
     ]
     if validity_days is not None:
         values.append(f"validity_days={validity_days}")

@@ -8,7 +8,6 @@ from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNorm
 from tfstride.providers.azure.observations import observe_azure_posture
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
-from tfstride.providers.azure.resource_facts import azure_fact_domains
 from tfstride.providers.plugin import ProviderPlugin
 
 if TYPE_CHECKING:
@@ -40,7 +39,6 @@ def azure_provider_plugin() -> ProviderPlugin:
     return ProviderPlugin(
         provider="azure",
         normalizer_factory=AzureNormalizer,
-        resource_facts_factory=azure_fact_domains,
         metadata_namespace=AzureResourceMetadata,
         supported_resource_types=SUPPORTED_AZURE_TYPES,
         resource_capabilities=AZURE_RESOURCE_CAPABILITIES,

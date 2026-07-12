@@ -13,7 +13,6 @@ from tfstride.providers.plugin import (
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
-    resource_facts_registry_from_plugins,
     rule_contribution_from_plugins,
     rule_metadata_from_plugins,
 )
@@ -28,16 +27,8 @@ from tfstride.providers.resource_capabilities import (
     ProviderResourceCapabilityRegistryError,
     ResourceCapability,
 )
-from tfstride.providers.resource_facts import (
-    NeutralProviderResourceFacts,
-    ProviderResourceFactDomains,
-    ProviderResourceFactsNotRegisteredError,
-    ProviderResourceFactsRegistry,
-    ProviderResourceFactsRegistryError,
-)
 
 __all__ = [
-    "NeutralProviderResourceFacts",
     "ProviderBoundaryContributorFactory",
     "ProviderNotRegisteredError",
     "ProviderPlugin",
@@ -49,11 +40,7 @@ __all__ = [
     "ProviderResourceDecorator",
     "ProviderRuleContributionFactory",
     "ProviderRuleMetadataFactory",
-    "ProviderResourceFactDomains",
     "ProviderSelectionError",
-    "ProviderResourceFactsNotRegisteredError",
-    "ProviderResourceFactsRegistry",
-    "ProviderResourceFactsRegistryError",
     "ResourceCapability",
     "boundary_contributor_factories_by_provider_from_plugins",
     "boundary_contributors_by_provider_from_plugins",
@@ -61,7 +48,6 @@ __all__ = [
     "provider_limitations_from_plugins",
     "provider_registry_from_plugins",
     "resource_capability_registry_from_plugins",
-    "resource_facts_registry_from_plugins",
     "rule_contribution_from_plugins",
     "rule_metadata_from_plugins",
 ]

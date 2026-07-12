@@ -16,7 +16,6 @@ from tfstride.analysis.resource_concepts import (
     is_object_storage_resource,
     is_secret_store_resource,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
 from tfstride.providers.aws.policy_conditions import (
@@ -25,6 +24,7 @@ from tfstride.providers.aws.policy_conditions import (
     policy_statement_principal_assessments,
     trust_statement_principal_assessments,
 )
+from tfstride.providers.aws.resource_facts import aws_facts
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +75,7 @@ class AwsBoundaryContributor:
         primary_account_id = inventory.primary_account_id
         for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
             seen_role_principals: set[tuple[str, str]] = set()
-            for trust_statement in analysis_facts(role).iam.trust_statements:
+            for trust_statement in aws_facts(role).trust_statements:
                 for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
                     principal_key = (assessment.principal_kind, assessment.principal)
                     if principal_key in seen_role_principals:

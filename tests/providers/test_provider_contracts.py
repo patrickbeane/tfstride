@@ -388,6 +388,16 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertTrue((SOURCE_ROOT / "providers" / "gcp" / "boundaries.py").exists())
         self.assertTrue((SOURCE_ROOT / "providers" / "azure" / "boundaries.py").exists())
 
+    def test_provider_fact_consumers_do_not_depend_on_shared_fact_facades(self) -> None:
+        offenders: set[str] = set()
+        for provider in ("aws", "gcp", "azure"):
+            for path in (SOURCE_ROOT / "providers" / provider).rglob("*.py"):
+                if "tfstride.analysis.resource_facts" in path.read_text(encoding="utf-8"):
+                    offenders.add(path.relative_to(SOURCE_ROOT).as_posix())
+
+        self.assertFalse((SOURCE_ROOT / "analysis" / "resource_facts.py").exists())
+        self.assertEqual(offenders, set())
+
     def test_provider_contract_documents_encapsulation_rules(self) -> None:
         guidelines = DEFAULT_PROVIDER_ENCAPSULATION_CONTRACT.guidelines
 

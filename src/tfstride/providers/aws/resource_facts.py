@@ -10,14 +10,6 @@ from tfstride.providers.aws.iam_assignment_posture import deserialize_privileged
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.coercion import STATE_DISABLED, STATE_ENABLED
 from tfstride.providers.metadata_ownership import ProviderMetadataWriteValidator
-from tfstride.providers.resource_facts import (
-    NeutralProviderComputeFacts,
-    NeutralProviderIamFacts,
-    NeutralProviderSqlFacts,
-    NeutralProviderStorageFacts,
-    NeutralProviderWorkloadFacts,
-    ProviderResourceFactDomains,
-)
 from tfstride.resource_metadata import MetadataField, StringListMetadataField
 
 _MetadataValue = TypeVar("_MetadataValue")
@@ -1407,42 +1399,5 @@ def _bool_from_state(state: str | None) -> bool | None:
     return None
 
 
-class AwsStorageFacts(AwsResourceFacts, NeutralProviderStorageFacts):
-    __slots__ = ()
-
-
-class AwsIamFacts(AwsResourceFacts, NeutralProviderIamFacts):
-    __slots__ = ()
-
-
-class AwsSqlFacts(AwsResourceFacts, NeutralProviderSqlFacts):
-    __slots__ = ()
-
-    @property
-    def backup_enabled(self) -> bool | None:
-        period = self.rds_backup_retention_period
-        if period is None:
-            return None
-        return period > 0
-
-    @property
-    def deletion_protection(self) -> bool | None:
-        return self.rds_deletion_protection
-
-    @property
-    def ipv4_enabled(self) -> bool | None:
-        return self.rds_publicly_accessible
-
-
 def aws_facts(resource: NormalizedResource) -> AwsResourceFacts:
     return AwsResourceFacts(resource)
-
-
-def aws_fact_domains(resource: NormalizedResource) -> ProviderResourceFactDomains:
-    return ProviderResourceFactDomains(
-        storage=AwsStorageFacts(resource),
-        iam=AwsIamFacts(resource),
-        sql=AwsSqlFacts(resource),
-        compute=NeutralProviderComputeFacts(),
-        workload=NeutralProviderWorkloadFacts(),
-    )

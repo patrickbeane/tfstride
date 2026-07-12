@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import binding_members
 
 GCP_PUBSUB_DATA_ACCESS_ROLES = frozenset(
@@ -165,7 +165,7 @@ def iam_binding_condition(
 ) -> Mapping[str, Any] | None:
     matched_condition: Mapping[str, Any] | None = None
     matched = False
-    for binding in analysis_facts(resource).iam.bindings:
+    for binding in gcp_facts(resource).bindings:
         binding_role = str(binding.get("role") or "unknown role").strip()
         if binding_role != str(role).strip():
             continue
@@ -242,7 +242,7 @@ def broad_resource_iam_bindings(
 ) -> list[tuple[str, str, str, GcpIamMemberAssessment, Mapping[str, Any] | None]]:
     matches: list[tuple[str, str, str, GcpIamMemberAssessment, Mapping[str, Any] | None]] = []
     seen: set[tuple[str, str, str]] = set()
-    for binding in analysis_facts(resource).iam.bindings:
+    for binding in gcp_facts(resource).bindings:
         role = str(binding.get("role") or "unknown role").strip()
         if role not in allowed_roles:
             continue
@@ -260,9 +260,9 @@ def broad_resource_iam_bindings(
 
 
 def iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str, str]]:
-    bindings = analysis_facts(resource).iam.bindings
+    bindings = gcp_facts(resource).bindings
     if not bindings:
-        facts = analysis_facts(resource).iam
+        facts = gcp_facts(resource)
         role = facts.role
         member = facts.member
         if role and member:
@@ -278,7 +278,7 @@ def iam_resource_binding_members(resource: NormalizedResource) -> list[tuple[str
 
 
 def org_folder_scope_description(resource: NormalizedResource) -> str:
-    facts = analysis_facts(resource).iam
+    facts = gcp_facts(resource)
     if resource.resource_type.startswith("google_organization_iam_"):
         if facts.organization_id:
             return f"organization scope `{facts.organization_id}`"

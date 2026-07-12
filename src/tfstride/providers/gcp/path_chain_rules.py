@@ -6,9 +6,9 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, TrustBoundary
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 
 class GcpPathChainRuleDetectors:
@@ -49,9 +49,9 @@ class GcpPathChainRuleDetectors:
             policy_sources = [
                 source
                 for data_store, _ in data_paths
-                for source in analysis_facts(data_store).iam.resource_policy_source_addresses
+                for source in gcp_facts(data_store).resource_policy_source_addresses
             ]
-            workload_identities = analysis_facts(workload).workload.identity_members
+            workload_identities = gcp_facts(workload).identity_members
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
                 privilege_breadth=2 if len(data_store_addresses) > 1 else 1,
@@ -77,7 +77,7 @@ class GcpPathChainRuleDetectors:
                         evidence_item("workload_identity", workload_identities),
                         evidence_item(
                             "workload_identity_scopes",
-                            analysis_facts(workload).workload.identity_scopes,
+                            gcp_facts(workload).identity_scopes,
                         ),
                         evidence_item(
                             "data_access_path",

@@ -11,10 +11,10 @@ from tfstride.analysis.resource_concepts import (
     OBJECT_STORAGE_RESOURCE_TYPES,
     PUBLIC_COMPUTE_RESOURCE_TYPES,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -121,7 +121,7 @@ class AwsPostureRuleDetectors:
                             "encryption_posture",
                             [
                                 "storage_encrypted is false",
-                                f"engine is {analysis_facts(database).sql.engine or 'unknown'}",
+                                f"engine is {aws_facts(database).engine or 'unknown'}",
                             ],
                         ),
                     ),

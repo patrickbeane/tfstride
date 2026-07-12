@@ -5,7 +5,6 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
@@ -15,7 +14,7 @@ from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
 )
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
-from tfstride.providers.resource_facts.contracts import ProviderStorageFacts
+from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 
 _GCS_MIN_RETENTION_PERIOD_DAYS = 7
 _GCS_MIN_RETENTION_PERIOD_SECONDS = _GCS_MIN_RETENTION_PERIOD_DAYS * 24 * 60 * 60
@@ -79,7 +78,7 @@ class GcpStorageRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket).storage
+            bucket_facts = gcp_facts(bucket)
             if bucket_facts.uniform_bucket_level_access is True:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -126,7 +125,7 @@ class GcpStorageRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket).storage
+            bucket_facts = gcp_facts(bucket)
             if _gcs_public_access_prevention_enforced(bucket_facts.public_access_prevention):
                 continue
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -180,7 +179,7 @@ class GcpStorageRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket).storage
+            bucket_facts = gcp_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
             if bucket_facts.versioning_enabled is True:
@@ -227,7 +226,7 @@ class GcpStorageRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket).storage
+            bucket_facts = gcp_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
             if bucket_facts.customer_managed_encryption:
@@ -277,7 +276,7 @@ class GcpStorageRuleDetectors:
 
         findings: list[Finding] = []
         for bucket in context.inventory.by_type("google_storage_bucket"):
-            bucket_facts = analysis_facts(bucket).storage
+            bucket_facts = gcp_facts(bucket)
             if bucket.data_sensitivity != "sensitive":
                 continue
             retention_issues = _gcs_retention_policy_issues(bucket_facts)
@@ -318,7 +317,7 @@ def _bool_status(value: bool | None) -> str:
     return str(value).lower()
 
 
-def _gcs_retention_policy_issues(bucket_facts: ProviderStorageFacts) -> list[str]:
+def _gcs_retention_policy_issues(bucket_facts: GcpResourceFacts) -> list[str]:
     if bucket_facts.gcs_retention_policy_uncertainties:
         return []
 
@@ -338,7 +337,7 @@ def _gcs_retention_policy_issues(bucket_facts: ProviderStorageFacts) -> list[str
     return issues
 
 
-def _gcs_retention_policy_evidence(bucket_facts: ProviderStorageFacts) -> list[str]:
+def _gcs_retention_policy_evidence(bucket_facts: GcpResourceFacts) -> list[str]:
     retention_period_seconds = bucket_facts.gcs_retention_period_seconds
     if retention_period_seconds is None:
         retention_state = "missing"

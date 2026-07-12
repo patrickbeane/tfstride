@@ -12,7 +12,7 @@ from tfstride.providers.azure.normalizer import SUPPORTED_AZURE_TYPES, AzureNorm
 from tfstride.providers.azure.plugin import azure_provider_plugin
 from tfstride.providers.azure.resource_capabilities import AZURE_RESOURCE_CAPABILITIES
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
-from tfstride.providers.azure.resource_facts import AzureResourceFacts
+from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_SUPPORTED_RESOURCE_TYPES, AzureResourceType
 from tfstride.providers.resource_capabilities import ResourceCapability
 from tfstride.resource_metadata import InventoryMetadata
@@ -116,7 +116,7 @@ class AzureProviderTests(unittest.TestCase):
             frozenset({AzureResourceType.NETWORK_SECURITY_GROUP}),
         )
 
-    def test_plugin_uses_azure_resource_facts(self) -> None:
+    def test_azure_resource_facts_stay_provider_local(self) -> None:
         resource = NormalizedResource(
             address="azurerm_storage_account.logs",
             provider="azure",
@@ -125,13 +125,7 @@ class AzureProviderTests(unittest.TestCase):
             category=ResourceCategory.DATA,
         )
 
-        facts = azure_provider_plugin().resource_facts_factory(resource)
-
-        self.assertIsInstance(facts.storage, AzureResourceFacts)
-        self.assertIs(facts.iam, facts.storage)
-        self.assertIs(facts.sql, facts.storage)
-        self.assertIs(facts.compute, facts.storage)
-        self.assertIs(facts.workload, facts.storage)
+        self.assertIsInstance(azure_facts(resource), AzureResourceFacts)
 
     def test_normalizer_detects_azurerm_source_and_resource_prefix(self) -> None:
         normalizer = AzureNormalizer()
