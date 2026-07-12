@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import AnalysisSqlFacts, analysis_facts
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.resource_facts.contracts import ProviderSqlFacts
 
 
 class GcpCloudSqlRuleDetectors:
@@ -278,7 +279,7 @@ class GcpCloudSqlRuleDetectors:
         return findings
 
 
-def _cloud_sql_ssl_enforced(sql_facts: AnalysisSqlFacts) -> bool:
+def _cloud_sql_ssl_enforced(sql_facts: ProviderSqlFacts) -> bool:
     if sql_facts.require_ssl:
         return True
     ssl_mode = str(sql_facts.ssl_mode or "").strip().upper()

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import AnalysisStorageFacts, analysis_facts
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.gcp.data_rule_utils import gcp_duration_seconds as _gcp_duration_seconds
+from tfstride.providers.resource_facts.contracts import ProviderStorageFacts
 
 _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS = 7
 _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_SECONDS = _SECRET_MANAGER_MIN_VERSION_DESTROY_TTL_DAYS * 24 * 60 * 60
@@ -107,7 +108,7 @@ class GcpSecretManagerRuleDetectors:
         return findings
 
 
-def _secret_manager_lifecycle_issues(secret_facts: AnalysisStorageFacts) -> list[str]:
+def _secret_manager_lifecycle_issues(secret_facts: ProviderStorageFacts) -> list[str]:
     if _secret_manager_lifecycle_uncertainties(secret_facts):
         return []
 
@@ -132,7 +133,7 @@ def _secret_manager_lifecycle_issues(secret_facts: AnalysisStorageFacts) -> list
     return issues
 
 
-def _secret_manager_lifecycle_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+def _secret_manager_lifecycle_evidence(secret_facts: ProviderStorageFacts) -> list[str]:
     evidence = [
         f"ttl={secret_facts.secret_manager_ttl or 'unset'}",
         f"expire_time={secret_facts.secret_manager_expire_time or 'unset'}",
@@ -146,7 +147,7 @@ def _secret_manager_lifecycle_evidence(secret_facts: AnalysisStorageFacts) -> li
     return evidence
 
 
-def _secret_manager_lifecycle_uncertainties(secret_facts: AnalysisStorageFacts) -> list[str]:
+def _secret_manager_lifecycle_uncertainties(secret_facts: ProviderStorageFacts) -> list[str]:
     return [
         uncertainty
         for uncertainty in secret_facts.secret_manager_posture_uncertainties
@@ -161,7 +162,7 @@ def _secret_manager_target_evidence(secret: NormalizedResource) -> list[str]:
     return evidence
 
 
-def _secret_manager_encryption_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+def _secret_manager_encryption_evidence(secret_facts: ProviderStorageFacts) -> list[str]:
     evidence = [
         "customer_managed_encryption is false",
         f"secret_manager_replication_mode={secret_facts.secret_manager_replication_mode or 'unknown'}",
@@ -174,7 +175,7 @@ def _secret_manager_encryption_evidence(secret_facts: AnalysisStorageFacts) -> l
     return evidence
 
 
-def _secret_manager_replication_evidence(secret_facts: AnalysisStorageFacts) -> list[str]:
+def _secret_manager_replication_evidence(secret_facts: ProviderStorageFacts) -> list[str]:
     replication = secret_facts.secret_manager_replication
     evidence = [
         f"replication.mode={replication.get('mode') or secret_facts.secret_manager_replication_mode or 'unknown'}"

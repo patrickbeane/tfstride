@@ -116,8 +116,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "project",
                 "resource_name",
                 "reference_values",
-                "iam_target_reference",
-                "iam_bindings",
+                "target_reference",
+                "bindings",
                 "custom_role_id",
                 "custom_role_permissions",
                 "organization_id",
@@ -125,8 +125,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "service_account_email",
                 "service_account_member",
                 "service_account_reference",
-                "iam_role",
-                "iam_member",
+                "role",
+                "member",
                 "org_policy_constraint",
                 "org_policy_rules",
                 "org_policy_allowed_values",
@@ -213,8 +213,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
                 "gke_posture_uncertainties",
             },
             "workload": {
-                "workload_identity_members",
-                "workload_identity_scopes",
+                "identity_members",
+                "identity_scopes",
             },
         }
         protocols = {
@@ -253,7 +253,7 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertEqual(facts.policy_document, {})
         self.assertIsNone(facts.engine)
         self.assertFalse(facts.fronted_by_internet_facing_load_balancer)
-        self.assertEqual(facts.workload_identity_members, [])
+        self.assertEqual(facts.identity_members, [])
 
     def test_registers_and_returns_factories_by_provider_name(self) -> None:
         def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:
@@ -330,8 +330,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsNone(facts.iam.project)
         self.assertIsNone(facts.iam.resource_name)
         self.assertEqual(facts.iam.reference_values, [])
-        self.assertIsNone(facts.iam.iam_target_reference)
-        self.assertEqual(facts.iam.iam_bindings, [])
+        self.assertIsNone(facts.iam.target_reference)
+        self.assertEqual(facts.iam.bindings, [])
         self.assertIsNone(facts.iam.custom_role_id)
         self.assertEqual(facts.iam.custom_role_permissions, [])
         self.assertIsNone(facts.iam.organization_id)
@@ -339,8 +339,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertIsNone(facts.iam.service_account_email)
         self.assertIsNone(facts.iam.service_account_member)
         self.assertIsNone(facts.iam.service_account_reference)
-        self.assertIsNone(facts.iam.iam_role)
-        self.assertIsNone(facts.iam.iam_member)
+        self.assertIsNone(facts.iam.role)
+        self.assertIsNone(facts.iam.member)
         self.assertIsNone(facts.sql.engine)
         self.assertEqual(facts.sql.authorized_networks, [])
         self.assertIsNone(facts.sql.backup_enabled)
@@ -357,8 +357,8 @@ class ProviderResourceFactsRegistryTests(unittest.TestCase):
         self.assertEqual(facts.compute.internet_facing_load_balancer_addresses, [])
         self.assertEqual(facts.compute.load_balancer_frontends, [])
         self.assertEqual(facts.compute.load_balancer_reachable_backends, [])
-        self.assertEqual(facts.workload.workload_identity_members, [])
-        self.assertEqual(facts.workload.workload_identity_scopes, [])
+        self.assertEqual(facts.workload.identity_members, [])
+        self.assertEqual(facts.workload.identity_scopes, [])
 
     def test_rejects_duplicate_provider_registration(self) -> None:
         def factory(resource: NormalizedResource) -> ProviderResourceFactDomains:

@@ -135,11 +135,11 @@ class NeutralProviderIamFacts:
         return []
 
     @property
-    def iam_target_reference(self) -> str | None:
+    def target_reference(self) -> str | None:
         return None
 
     @property
-    def iam_bindings(self) -> list[dict[str, Any]]:
+    def bindings(self) -> list[dict[str, Any]]:
         return []
 
     @property
@@ -171,11 +171,11 @@ class NeutralProviderIamFacts:
         return None
 
     @property
-    def iam_role(self) -> str | None:
+    def role(self) -> str | None:
         return None
 
     @property
-    def iam_member(self) -> str | None:
+    def member(self) -> str | None:
         return None
 
     @property
@@ -517,11 +517,11 @@ class NeutralProviderWorkloadFacts:
     __slots__ = ()
 
     @property
-    def workload_identity_members(self) -> list[str]:
+    def identity_members(self) -> list[str]:
         return []
 
     @property
-    def workload_identity_scopes(self) -> list[str]:
+    def identity_scopes(self) -> list[str]:
         return []
 
 

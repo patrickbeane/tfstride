@@ -196,7 +196,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return dedupe(values)
 
     @property
-    def iam_target_reference(self) -> str | None:
+    def target_reference(self) -> str | None:
         for field in _IAM_TARGET_REFERENCE_FIELDS:
             value = self.get(field)
             if value:
@@ -204,7 +204,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return None
 
     @property
-    def iam_bindings(self) -> list[dict[str, Any]]:
+    def bindings(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.IAM_BINDINGS)
 
     @property
@@ -716,7 +716,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_REFERENCE)
 
     @property
-    def workload_identity_members(self) -> list[str]:
+    def identity_members(self) -> list[str]:
         members: list[str] = []
         for account in self.get(GcpResourceMetadata.SERVICE_ACCOUNTS):
             email = _service_account_email(account)
@@ -728,7 +728,7 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return dedupe(members)
 
     @property
-    def workload_identity_scopes(self) -> list[str]:
+    def identity_scopes(self) -> list[str]:
         scopes: list[str] = []
         for account in self.get(GcpResourceMetadata.SERVICE_ACCOUNTS):
             if not isinstance(account, dict):
@@ -857,11 +857,11 @@ class GcpResourceFacts(NeutralProviderResourceFacts):
         return self.get(GcpResourceMetadata.MANAGED_SSL_CERTIFICATE_STATUS)
 
     @property
-    def iam_role(self) -> str | None:
+    def role(self) -> str | None:
         return self.get(GcpResourceMetadata.IAM_ROLE)
 
     @property
-    def iam_member(self) -> str | None:
+    def member(self) -> str | None:
         return self.get(GcpResourceMetadata.IAM_MEMBER)
 
     def set_privileged_access_grants(self, values: Sequence[dict[str, Any]]) -> None:

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
-from tfstride.analysis.resource_facts import (
-    AnalysisComputeFacts,
-    analysis_facts,
-)
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.gcp.resource_types import GCP_GKE_RESOURCE_TYPES
 from tfstride.providers.kubernetes import is_broad_public_range, uncertainty_evidence
+from tfstride.providers.resource_facts.contracts import ProviderComputeFacts
 
 _GKE_BROAD_OAUTH_SCOPES = frozenset(
     {
@@ -603,7 +601,7 @@ def _gke_broad_authorized_networks(cluster: NormalizedResource) -> list[str]:
     return descriptions
 
 
-def _gke_logging_issues(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_logging_issues(facts: ProviderComputeFacts) -> list[str]:
     state = facts.gke_control_plane_logging_state
     if state == "unknown":
         return ["control-plane logging state is unknown"]
@@ -616,7 +614,7 @@ def _gke_logging_issues(facts: AnalysisComputeFacts) -> list[str]:
     return [f"missing security logging component: {component}" for component in missing_components]
 
 
-def _gke_logging_evidence(facts: AnalysisComputeFacts, issues: list[str]) -> list[str]:
+def _gke_logging_evidence(facts: ProviderComputeFacts, issues: list[str]) -> list[str]:
     values = [f"control_plane_logging_state={facts.gke_control_plane_logging_state or 'unknown'}"]
     if facts.gke_logging_service:
         values.append(f"logging_service={facts.gke_logging_service}")
@@ -630,7 +628,7 @@ def _gke_logging_evidence(facts: AnalysisComputeFacts, issues: list[str]) -> lis
     return values
 
 
-def _gke_network_policy_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_network_policy_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"network_policy_state={facts.gke_network_policy_state or 'unknown'}"]
     if facts.gke_network_policy_provider:
         values.append(f"network_policy_provider={facts.gke_network_policy_provider}")
@@ -639,7 +637,7 @@ def _gke_network_policy_evidence(facts: AnalysisComputeFacts) -> list[str]:
     return values
 
 
-def _gke_secrets_encryption_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_secrets_encryption_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"secrets_encryption_state={facts.gke_secrets_encryption_state or 'unknown'}"]
     if facts.gke_database_encryption_state:
         values.append(f"database_encryption_state={facts.gke_database_encryption_state}")
@@ -652,7 +650,7 @@ def _gke_secrets_encryption_evidence(facts: AnalysisComputeFacts) -> list[str]:
     return values
 
 
-def _gke_legacy_abac_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_legacy_abac_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"legacy_abac_state={facts.gke_legacy_abac_state or 'unknown'}"]
     if facts.gke_legacy_abac_enabled is None:
         values.append("enable_legacy_abac is not represented in planned values")
@@ -661,7 +659,7 @@ def _gke_legacy_abac_evidence(facts: AnalysisComputeFacts) -> list[str]:
     return values
 
 
-def _gke_client_certificate_auth_represented(facts: AnalysisComputeFacts) -> bool:
+def _gke_client_certificate_auth_represented(facts: ProviderComputeFacts) -> bool:
     return (
         facts.gke_client_certificate_auth_state in {"enabled", "disabled"}
         or bool(facts.gke_client_certificate_config)
@@ -673,7 +671,7 @@ def _gke_client_certificate_auth_represented(facts: AnalysisComputeFacts) -> boo
     )
 
 
-def _gke_client_certificate_auth_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_client_certificate_auth_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"client_certificate_auth_state={facts.gke_client_certificate_auth_state or 'unknown'}"]
     if facts.gke_client_certificate_auth_enabled is None:
         values.append(
@@ -687,7 +685,7 @@ def _gke_client_certificate_auth_evidence(facts: AnalysisComputeFacts) -> list[s
     return values
 
 
-def _gke_shielded_nodes_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_shielded_nodes_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"shielded_nodes_state={facts.gke_shielded_nodes_state or 'unknown'}"]
     if facts.gke_shielded_nodes_enabled is None:
         values.append("shielded nodes setting is not represented in planned values")
@@ -696,7 +694,7 @@ def _gke_shielded_nodes_evidence(facts: AnalysisComputeFacts) -> list[str]:
     return values
 
 
-def _gke_binary_authorization_represented(facts: AnalysisComputeFacts) -> bool:
+def _gke_binary_authorization_represented(facts: ProviderComputeFacts) -> bool:
     return (
         facts.gke_binary_authorization_state in {"enabled", "disabled"}
         or bool(facts.gke_binary_authorization)
@@ -704,7 +702,7 @@ def _gke_binary_authorization_represented(facts: AnalysisComputeFacts) -> bool:
     )
 
 
-def _gke_binary_authorization_evidence(facts: AnalysisComputeFacts) -> list[str]:
+def _gke_binary_authorization_evidence(facts: ProviderComputeFacts) -> list[str]:
     values = [f"binary_authorization_state={facts.gke_binary_authorization_state or 'unknown'}"]
     if facts.gke_binary_authorization_evaluation_mode:
         values.append(f"evaluation_mode={facts.gke_binary_authorization_evaluation_mode}")

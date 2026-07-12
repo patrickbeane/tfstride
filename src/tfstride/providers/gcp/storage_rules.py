@@ -5,7 +5,7 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.resource_facts import AnalysisStorageFacts, analysis_facts
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
 from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
@@ -15,6 +15,7 @@ from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_STORAGE_PUBLIC_ACCESS_PREVENTION,
 )
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
+from tfstride.providers.resource_facts.contracts import ProviderStorageFacts
 
 _GCS_MIN_RETENTION_PERIOD_DAYS = 7
 _GCS_MIN_RETENTION_PERIOD_SECONDS = _GCS_MIN_RETENTION_PERIOD_DAYS * 24 * 60 * 60
@@ -317,7 +318,7 @@ def _bool_status(value: bool | None) -> str:
     return str(value).lower()
 
 
-def _gcs_retention_policy_issues(bucket_facts: AnalysisStorageFacts) -> list[str]:
+def _gcs_retention_policy_issues(bucket_facts: ProviderStorageFacts) -> list[str]:
     if bucket_facts.gcs_retention_policy_uncertainties:
         return []
 
@@ -337,7 +338,7 @@ def _gcs_retention_policy_issues(bucket_facts: AnalysisStorageFacts) -> list[str
     return issues
 
 
-def _gcs_retention_policy_evidence(bucket_facts: AnalysisStorageFacts) -> list[str]:
+def _gcs_retention_policy_evidence(bucket_facts: ProviderStorageFacts) -> list[str]:
     retention_period_seconds = bucket_facts.gcs_retention_period_seconds
     if retention_period_seconds is None:
         retention_state = "missing"

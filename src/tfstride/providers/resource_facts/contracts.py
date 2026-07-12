@@ -131,11 +131,11 @@ class ProviderIamFacts(Protocol):
         raise NotImplementedError
 
     @property
-    def iam_target_reference(self) -> str | None:
+    def target_reference(self) -> str | None:
         raise NotImplementedError
 
     @property
-    def iam_bindings(self) -> list[dict[str, Any]]:
+    def bindings(self) -> list[dict[str, Any]]:
         raise NotImplementedError
 
     @property
@@ -167,11 +167,11 @@ class ProviderIamFacts(Protocol):
         raise NotImplementedError
 
     @property
-    def iam_role(self) -> str | None:
+    def role(self) -> str | None:
         raise NotImplementedError
 
     @property
-    def iam_member(self) -> str | None:
+    def member(self) -> str | None:
         raise NotImplementedError
 
     @property
@@ -507,11 +507,11 @@ class ProviderWorkloadFacts(Protocol):
     """Workload identity facts from provider adapters."""
 
     @property
-    def workload_identity_members(self) -> list[str]:
+    def identity_members(self) -> list[str]:
         raise NotImplementedError
 
     @property
-    def workload_identity_scopes(self) -> list[str]:
+    def identity_scopes(self) -> list[str]:
         raise NotImplementedError
 
 

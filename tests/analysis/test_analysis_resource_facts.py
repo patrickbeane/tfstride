@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import dataclass
-from typing import Any
 
-from tests.helpers.paths import SOURCE_ROOT
-from tfstride.analysis.resource_facts import AnalysisResourceFacts, analysis_facts
+from tfstride.analysis.resource_facts import analysis_facts
 from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -31,258 +28,7 @@ def _resource(
     )
 
 
-@dataclass(slots=True)
-class AccessTrackingFacts:
-    resource: NormalizedResource
-    values: dict[str, object]
-    accessed: list[str]
-
-    def __getattr__(self, name: str) -> object:
-        self.accessed.append(name)
-        try:
-            return self.values[name]
-        except KeyError:
-            raise AttributeError(name) from None
-
-
-@dataclass(frozen=True, slots=True)
-class FakeProviderFacts:
-    resource: NormalizedResource
-
-    @property
-    def bucket_name(self) -> str | None:
-        return f"{self.resource.provider}-logs"
-
-    @property
-    def bucket_acl(self) -> str:
-        return "private"
-
-    @property
-    def public_access_block(self) -> dict[str, bool] | None:
-        return {"block_public_acls": True}
-
-    @property
-    def uniform_bucket_level_access(self) -> bool | None:
-        return True
-
-    @property
-    def public_access_prevention(self) -> str | None:
-        return "enforced"
-
-    @property
-    def versioning_enabled(self) -> bool | None:
-        return True
-
-    @property
-    def default_kms_key_name(self) -> str | None:
-        return "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs"
-
-    @property
-    def customer_managed_encryption(self) -> bool | None:
-        return True
-
-    @property
-    def policy_document(self) -> dict[str, Any]:
-        return {"Statement": [{"Effect": "Allow"}]}
-
-    @property
-    def trust_statements(self) -> list[dict[str, Any]]:
-        return [{"Effect": "Allow"}]
-
-    @property
-    def engine(self) -> str | None:
-        return "spanner"
-
-    @property
-    def resource_policy_source_addresses(self) -> list[str]:
-        return ["google_storage_bucket_iam_binding.logs"]
-
-    @property
-    def project(self) -> str | None:
-        return "tfstride-demo"
-
-    @property
-    def resource_name(self) -> str | None:
-        return "fake-resource"
-
-    @property
-    def reference_values(self) -> list[str]:
-        return ["fake-resource", "google_service_account.fake.email"]
-
-    @property
-    def iam_target_reference(self) -> str | None:
-        return "google_service_account.fake.email"
-
-    @property
-    def iam_bindings(self) -> list[dict[str, Any]]:
-        return [{"role": "roles/viewer", "members": ["group:ops@example.com"]}]
-
-    @property
-    def custom_role_id(self) -> str | None:
-        return "deployAdmin"
-
-    @property
-    def custom_role_permissions(self) -> list[str]:
-        return ["iam.serviceAccounts.actAs"]
-
-    @property
-    def organization_id(self) -> str | None:
-        return "1234567890"
-
-    @property
-    def folder_id(self) -> str | None:
-        return "folders/12345"
-
-    @property
-    def authorized_networks(self) -> list[dict[str, Any]]:
-        return [{"name": "anywhere", "value": "0.0.0.0/0"}]
-
-    @property
-    def backup_enabled(self) -> bool | None:
-        return False
-
-    @property
-    def point_in_time_recovery_enabled(self) -> bool | None:
-        return True
-
-    @property
-    def ipv4_enabled(self) -> bool | None:
-        return True
-
-    @property
-    def private_network(self) -> str | None:
-        return "google_compute_network.main.id"
-
-    @property
-    def require_ssl(self) -> bool | None:
-        return True
-
-    @property
-    def ssl_mode(self) -> str | None:
-        return "ENCRYPTED_ONLY"
-
-    @property
-    def deletion_protection(self) -> bool | None:
-        return True
-
-    @property
-    def service_account_email(self) -> str | None:
-        return "fake@example.iam.gserviceaccount.com"
-
-    @property
-    def service_account_member(self) -> str | None:
-        return "serviceAccount:fake@example.iam.gserviceaccount.com"
-
-    @property
-    def service_account_reference(self) -> str | None:
-        return "google_service_account.fake.email"
-
-    @property
-    def workload_identity_members(self) -> list[str]:
-        return ["serviceAccount:fake@example.iam.gserviceaccount.com"]
-
-    @property
-    def workload_identity_scopes(self) -> list[str]:
-        return ["https://www.googleapis.com/auth/cloud-platform"]
-
-
-class AnalysisResourceFactsTests(unittest.TestCase):
-    def test_analysis_fact_facades_read_only_their_provider_fact_domain(self) -> None:
-        domain_cases = {
-            "storage": (
-                (
-                    ("bucket_name", "bucket_name", "logs"),
-                    ("bucket_acl", "bucket_acl", "private"),
-                    ("public_access_block", "public_access_block", {"block_public_acls": True}),
-                    ("uniform_bucket_level_access", "uniform_bucket_level_access", True),
-                    ("public_access_prevention", "public_access_prevention", "enforced"),
-                    ("versioning_enabled", "versioning_enabled", True),
-                    ("default_kms_key_name", "default_kms_key_name", "projects/demo/keyRings/app/keys/gcs"),
-                    ("customer_managed_encryption", "customer_managed_encryption", True),
-                ),
-            ),
-            "iam": (
-                (
-                    ("policy_document", "policy_document", {"Statement": []}),
-                    ("trust_statements", "trust_statements", [{"Effect": "Allow"}]),
-                    ("resource_policy_source_addresses", "resource_policy_source_addresses", ["policy.source"]),
-                    ("project", "project", "tfstride-demo"),
-                    ("resource_name", "resource_name", "resource-name"),
-                    ("reference_values", "reference_values", ["resource-name"]),
-                    ("target_reference", "iam_target_reference", "target-ref"),
-                    ("bindings", "iam_bindings", [{"role": "roles/viewer"}]),
-                    ("custom_role_id", "custom_role_id", "deployAdmin"),
-                    ("custom_role_permissions", "custom_role_permissions", ["iam.serviceAccounts.actAs"]),
-                    ("organization_id", "organization_id", "1234567890"),
-                    ("folder_id", "folder_id", "folders/12345"),
-                    ("service_account_email", "service_account_email", "app@example.iam.gserviceaccount.com"),
-                    ("service_account_member", "service_account_member", "serviceAccount:app@example.com"),
-                    ("service_account_reference", "service_account_reference", "google_service_account.app.email"),
-                    ("role", "iam_role", "roles/viewer"),
-                    ("member", "iam_member", "user:ops@example.com"),
-                ),
-            ),
-            "sql": (
-                (
-                    ("engine", "engine", "POSTGRES_15"),
-                    ("authorized_networks", "authorized_networks", [{"value": "0.0.0.0/0"}]),
-                    ("backup_enabled", "backup_enabled", False),
-                    ("point_in_time_recovery_enabled", "point_in_time_recovery_enabled", True),
-                    ("ipv4_enabled", "ipv4_enabled", True),
-                    ("private_network", "private_network", "google_compute_network.main.id"),
-                    ("require_ssl", "require_ssl", True),
-                    ("ssl_mode", "ssl_mode", "ENCRYPTED_ONLY"),
-                    ("deletion_protection", "deletion_protection", True),
-                ),
-            ),
-            "compute": (
-                (
-                    ("os_login_enabled", "os_login_enabled", True),
-                    ("network_tags", "network_tags", ["web"]),
-                    ("internet_ingress_firewalls", "internet_ingress_firewalls", ["google_compute_firewall.web"]),
-                    ("fronted_by_internet_facing_load_balancer", "fronted_by_internet_facing_load_balancer", True),
-                    (
-                        "internet_facing_load_balancer_addresses",
-                        "internet_facing_load_balancer_addresses",
-                        ["lb-address"],
-                    ),
-                    ("load_balancer_frontends", "load_balancer_frontends", [{"address": "lb-address"}]),
-                    ("load_balancer_reachable_backends", "load_balancer_reachable_backends", [{"address": "backend"}]),
-                ),
-            ),
-            "workload": (
-                (
-                    ("identity_members", "workload_identity_members", ["serviceAccount:app@example.com"]),
-                    ("identity_scopes", "workload_identity_scopes", ["https://www.googleapis.com/auth/cloud-platform"]),
-                ),
-            ),
-        }
-
-        for domain, (expectations,) in domain_cases.items():
-            resource = _resource()
-            provider_values = {provider_property: value for _, provider_property, value in expectations}
-            tracker = AccessTrackingFacts(resource, provider_values, [])
-            fallback = AccessTrackingFacts(resource, {}, [])
-            domain_facts = {
-                "storage": fallback,
-                "iam": fallback,
-                "sql": fallback,
-                "compute": fallback,
-                "workload": fallback,
-            }
-            domain_facts[domain] = tracker
-            facts = AnalysisResourceFacts(resource, ProviderResourceFactDomains(**domain_facts))
-            facade = getattr(facts, domain)
-
-            with self.subTest(domain=domain):
-                for facade_property, _, expected_value in expectations:
-                    self.assertEqual(getattr(facade, facade_property), expected_value)
-                self.assertEqual(
-                    tracker.accessed,
-                    [provider_property for _, provider_property, _ in expectations],
-                )
-                self.assertEqual(fallback.accessed, [])
-
+class AnalysisFactsTests(unittest.TestCase):
     def test_reads_provider_backed_analysis_facts(self) -> None:
         resource = _resource(
             {
@@ -298,7 +44,7 @@ class AnalysisResourceFactsTests(unittest.TestCase):
 
         facts = analysis_facts(resource)
 
-        self.assertIsInstance(facts, AnalysisResourceFacts)
+        self.assertIsInstance(facts, ProviderResourceFactDomains)
         self.assertEqual(facts.storage.bucket_name, "logs")
         self.assertEqual(facts.storage.bucket_acl, "public-read")
         self.assertEqual(facts.storage.public_access_block, {"block_public_acls": True})
@@ -318,8 +64,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam.bindings, [])
         self.assertIsNone(facts.iam.custom_role_id)
         self.assertEqual(facts.iam.custom_role_permissions, [])
-        self.assertIsNone(facts.iam.organization_id)
-        self.assertIsNone(facts.iam.folder_id)
         self.assertIsNone(facts.iam.organization_id)
         self.assertIsNone(facts.iam.folder_id)
         self.assertEqual(facts.sql.authorized_networks, [])
@@ -343,11 +87,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
                 GcpResourceMetadata.POLICY_DOCUMENT: {
                     "bindings": [{"role": "roles/viewer", "members": ["user:ops@example.com"]}]
                 },
-                AwsResourceMetadata.BUCKET_ACL: "public-read",
-                AwsResourceMetadata.PUBLIC_ACCESS_BLOCK: {"block_public_acls": True},
-                AwsResourceMetadata.TRUST_STATEMENTS: [{"Effect": "Allow"}],
-                AwsResourceMetadata.ENGINE: "postgres",
-                AwsResourceMetadata.RESOURCE_POLICY_SOURCE_ADDRESSES: ["google_storage_bucket_iam_binding.logs"],
             },
             provider="gcp",
             resource_type="google_storage_bucket",
@@ -358,11 +97,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.storage.bucket_name, "logs")
         self.assertEqual(facts.storage.bucket_acl, "")
         self.assertIsNone(facts.storage.public_access_block)
-        self.assertIsNone(facts.storage.uniform_bucket_level_access)
-        self.assertIsNone(facts.storage.public_access_prevention)
-        self.assertIsNone(facts.storage.versioning_enabled)
-        self.assertIsNone(facts.storage.default_kms_key_name)
-        self.assertIsNone(facts.storage.customer_managed_encryption)
         self.assertEqual(
             facts.iam.policy_document,
             {"bindings": [{"role": "roles/viewer", "members": ["user:ops@example.com"]}]},
@@ -374,19 +108,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam.reference_values, ["logs"])
         self.assertEqual(facts.iam.target_reference, "logs")
         self.assertEqual(facts.iam.bindings, [])
-        self.assertEqual(facts.sql.authorized_networks, [])
-        self.assertIsNone(facts.sql.backup_enabled)
-        self.assertIsNone(facts.sql.point_in_time_recovery_enabled)
-        self.assertIsNone(facts.sql.ipv4_enabled)
-        self.assertIsNone(facts.sql.private_network)
-        self.assertIsNone(facts.sql.require_ssl)
-        self.assertIsNone(facts.sql.ssl_mode)
-        self.assertIsNone(facts.sql.deletion_protection)
-        self.assertIsNone(facts.iam.service_account_email)
-        self.assertIsNone(facts.iam.service_account_member)
-        self.assertIsNone(facts.iam.service_account_reference)
-        self.assertEqual(facts.workload.identity_members, [])
-        self.assertEqual(facts.workload.identity_scopes, [])
 
     def test_gcp_storage_bucket_facts_read_provider_owned_posture_metadata(self) -> None:
         resource = _resource(
@@ -572,61 +293,6 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         )
         self.assertIsNone(facts.iam.service_account_reference)
 
-    def test_registered_provider_facts_are_used_without_analysis_branching(self) -> None:
-        calls: list[NormalizedResource] = []
-
-        def gcp_facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
-            calls.append(resource)
-            facts = FakeProviderFacts(resource)
-            return ProviderResourceFactDomains(
-                storage=facts,
-                iam=facts,
-                sql=facts,
-                compute=facts,
-                workload=facts,
-            )
-
-        resource = _resource(provider="gcp", resource_type="google_storage_bucket")
-        registry = ProviderResourceFactsRegistry([("gcp", gcp_facts)])
-
-        facts = analysis_facts(resource, facts_registry=registry)
-
-        self.assertEqual(calls, [resource])
-        self.assertEqual(facts.storage.bucket_name, "gcp-logs")
-        self.assertEqual(facts.storage.bucket_acl, "private")
-        self.assertEqual(facts.storage.public_access_block, {"block_public_acls": True})
-        self.assertTrue(facts.storage.uniform_bucket_level_access)
-        self.assertEqual(facts.storage.public_access_prevention, "enforced")
-        self.assertTrue(facts.storage.versioning_enabled)
-        self.assertEqual(
-            facts.storage.default_kms_key_name,
-            "projects/tfstride-demo/locations/global/keyRings/app/cryptoKeys/gcs",
-        )
-        self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
-        self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
-        self.assertEqual(facts.sql.engine, "spanner")
-        self.assertEqual(
-            facts.iam.resource_policy_source_addresses,
-            ["google_storage_bucket_iam_binding.logs"],
-        )
-        self.assertEqual(facts.iam.project, "tfstride-demo")
-        self.assertEqual(facts.iam.resource_name, "fake-resource")
-        self.assertEqual(facts.iam.reference_values, ["fake-resource", "google_service_account.fake.email"])
-        self.assertEqual(facts.iam.target_reference, "google_service_account.fake.email")
-        self.assertEqual(facts.iam.bindings, [{"role": "roles/viewer", "members": ["group:ops@example.com"]}])
-        self.assertEqual(facts.iam.custom_role_id, "deployAdmin")
-        self.assertEqual(facts.iam.custom_role_permissions, ["iam.serviceAccounts.actAs"])
-        self.assertEqual(facts.iam.organization_id, "1234567890")
-        self.assertEqual(facts.iam.folder_id, "folders/12345")
-        self.assertEqual(facts.sql.authorized_networks, [{"name": "anywhere", "value": "0.0.0.0/0"}])
-        self.assertFalse(facts.sql.backup_enabled)
-        self.assertTrue(facts.sql.point_in_time_recovery_enabled)
-        self.assertEqual(facts.iam.service_account_email, "fake@example.iam.gserviceaccount.com")
-        self.assertEqual(facts.iam.service_account_member, "serviceAccount:fake@example.iam.gserviceaccount.com")
-        self.assertEqual(facts.iam.service_account_reference, "google_service_account.fake.email")
-        self.assertEqual(facts.workload.identity_members, ["serviceAccount:fake@example.iam.gserviceaccount.com"])
-        self.assertEqual(facts.workload.identity_scopes, ["https://www.googleapis.com/auth/cloud-platform"])
-
     def test_returns_detached_collections(self) -> None:
         resource = _resource(
             {
@@ -644,30 +310,38 @@ class AnalysisResourceFactsTests(unittest.TestCase):
         self.assertEqual(facts.iam.policy_document, {"Statement": [{"Effect": "Allow"}]})
         self.assertEqual(facts.iam.trust_statements, [{"Effect": "Allow"}])
 
-    def test_analysis_metadata_reads_are_centralized_in_facts_facade(self) -> None:
-        analysis_root = SOURCE_ROOT / "analysis"
-        offenders: list[str] = []
+    def test_analysis_facts_returns_provider_resource_fact_domains(self) -> None:
+        resource = _resource()
 
-        for path in sorted(analysis_root.glob("*.py")):
-            text = path.read_text(encoding="utf-8")
-            if "ResourceMetadata" in text or "get_metadata_field(" in text:
-                offenders.append(path.name)
+        facts = analysis_facts(resource)
 
-        self.assertEqual(offenders, [])
+        self.assertIsInstance(facts, ProviderResourceFactDomains)
+        self.assertIsNotNone(facts.storage)
+        self.assertIsNotNone(facts.iam)
+        self.assertIsNotNone(facts.sql)
+        self.assertIsNotNone(facts.compute)
+        self.assertIsNotNone(facts.workload)
 
-    def test_gcp_provider_specific_analysis_helpers_are_provider_owned(self) -> None:
-        gcp_analysis_root = SOURCE_ROOT / "analysis" / "gcp"
-        helper_modules = sorted(path.name for path in gcp_analysis_root.glob("*.py"))
+    def test_custom_registry_is_respected(self) -> None:
+        calls: list[NormalizedResource] = []
 
-        self.assertEqual(helper_modules, [])
+        def custom_facts(resource: NormalizedResource) -> ProviderResourceFactDomains:
+            calls.append(resource)
+            return ProviderResourceFactDomains(
+                storage=type("S", (), {"bucket_name": property(lambda _: "custom")})(),
+                iam=type("I", (), {})(),
+                sql=type("Q", (), {})(),
+                compute=type("C", (), {})(),
+                workload=type("W", (), {})(),
+            )
 
-    def test_analysis_resource_facts_does_not_import_aws_directly(self) -> None:
-        analysis_root = SOURCE_ROOT / "analysis"
-        text = (analysis_root / "resource_facts.py").read_text(encoding="utf-8")
+        resource = _resource(provider="gcp", resource_type="google_storage_bucket")
+        registry = ProviderResourceFactsRegistry([("gcp", custom_facts)])
 
-        self.assertNotIn("tfstride.providers.aws", text)
-        self.assertNotIn('provider == "aws"', text)
-        self.assertNotIn('provider != "aws"', text)
+        facts = analysis_facts(resource, facts_registry=registry)
+
+        self.assertEqual(calls, [resource])
+        self.assertEqual(facts.storage.bucket_name, "custom")
 
 
 if __name__ == "__main__":

@@ -869,8 +869,8 @@ class AwsResourceFactsTests(unittest.TestCase):
             "customer_managed_encryption",
             "project",
             "reference_values",
-            "iam_target_reference",
-            "iam_bindings",
+            "target_reference",
+            "bindings",
             "custom_role_id",
             "custom_role_permissions",
             "organization_id",
@@ -878,8 +878,8 @@ class AwsResourceFactsTests(unittest.TestCase):
             "service_account_email",
             "service_account_member",
             "service_account_reference",
-            "iam_role",
-            "iam_member",
+            "role",
+            "member",
             "authorized_networks",
             "backup_enabled",
             "point_in_time_recovery_enabled",
@@ -905,8 +905,8 @@ class AwsResourceFactsTests(unittest.TestCase):
             "gke_node_oauth_scopes",
             "gke_node_metadata_mode",
             "gke_legacy_metadata_endpoints_enabled",
-            "workload_identity_members",
-            "workload_identity_scopes",
+            "identity_members",
+            "identity_scopes",
         }
 
         for fact_name in sorted(unsupported_defaults):
@@ -949,7 +949,7 @@ class AwsResourceFactsTests(unittest.TestCase):
         self.assertFalse(domains.sql.ipv4_enabled)
         self.assertEqual(domains.sql.authorized_networks, [])
         self.assertFalse(domains.compute.fronted_by_internet_facing_load_balancer)
-        self.assertEqual(domains.workload.workload_identity_members, [])
+        self.assertEqual(domains.workload.identity_members, [])
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = SOURCE_ROOT / "providers" / "aws"
