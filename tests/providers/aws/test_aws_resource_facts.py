@@ -904,25 +904,41 @@ class AwsResourceFactsTests(unittest.TestCase):
 
     def test_aws_provider_metadata_access_is_centralized_in_namespace_and_facts(self) -> None:
         aws_provider_root = SOURCE_ROOT / "providers" / "aws"
+        facts_package = aws_provider_root / "resource_facts"
+        required_fact_modules = {
+            "base",
+            "storage",
+            "iam",
+            "identity",
+            "network",
+            "compute",
+            "edge",
+            "data",
+            "audit",
+        }
         resource_metadata_reference = re.compile(r"\bResourceMetadata\b")
         offenders: list[str] = []
 
-        for path in sorted(aws_provider_root.glob("*.py")):
+        self.assertFalse((aws_provider_root / "resource_facts.py").exists())
+        self.assertTrue(facts_package.is_dir())
+        self.assertTrue(
+            required_fact_modules <= {path.stem for path in facts_package.glob("*.py")},
+        )
+
+        for path in sorted(aws_provider_root.rglob("*.py")):
             text = path.read_text(encoding="utf-8")
             if path.name == "metadata.py":
                 if "get_metadata_field(" in text or "set_metadata_field(" in text:
-                    offenders.append(path.name)
+                    offenders.append(path.relative_to(aws_provider_root).as_posix())
                 continue
-            if path.name == "resource_facts.py":
-                if resource_metadata_reference.search(text):
-                    offenders.append(path.name)
+            if facts_package in path.parents:
                 continue
             if (
                 resource_metadata_reference.search(text)
                 or "get_metadata_field(" in text
                 or "set_metadata_field(" in text
             ):
-                offenders.append(path.name)
+                offenders.append(path.relative_to(aws_provider_root).as_posix())
 
         self.assertEqual(offenders, [])
 
