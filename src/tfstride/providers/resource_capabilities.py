@@ -86,15 +86,6 @@ class ProviderResourceCapabilityRegistry:
     ) -> bool:
         return resource.resource_type in self.resource_types_for_provider(resource.provider, capability)
 
-    def capabilities_for(self, resource: NormalizedResource) -> frozenset[ResourceCapability]:
-        provider_name = normalize_provider_name(resource.provider)
-        provider_capabilities = self._capabilities.get(provider_name, {})
-        return frozenset(
-            capability
-            for capability, resource_types in provider_capabilities.items()
-            if resource.resource_type in resource_types
-        )
-
 
 def _normalize_capability_map(
     provider_name: str,

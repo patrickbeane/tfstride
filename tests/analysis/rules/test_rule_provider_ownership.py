@@ -5,6 +5,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
+from tests.helpers import engine_configured_rule_ids
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT, TESTS_ROOT
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import default_rule_registry
@@ -128,7 +129,7 @@ class ProviderRuleOwnershipTests(unittest.TestCase):
 
         duplicate_rule_ids = sorted(rule_id for rule_id, count in Counter(contributed_rule_ids).items() if count > 1)
         self.assertEqual(duplicate_rule_ids, [])
-        self.assertEqual(set(contributed_rule_ids), StrideRuleEngine().configured_rule_ids())
+        self.assertEqual(set(contributed_rule_ids), engine_configured_rule_ids(StrideRuleEngine()))
 
     def test_provider_rule_metadata_ids_match_contributed_rule_ids(self) -> None:
         registry = default_rule_registry()

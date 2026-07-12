@@ -315,51 +315,26 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.WORKLOAD))
         self.assertTrue(registry.has_capability(gcp_resource, ResourceCapability.PUBLIC_COMPUTE))
         self.assertTrue(registry.has_capability(gcp_bucket, ResourceCapability.OBJECT_STORAGE))
-        self.assertEqual(
-            registry.capabilities_for(azure_resource),
-            frozenset(
-                {
-                    ResourceCapability.DATA_STORE,
-                    ResourceCapability.PUBLIC_EDGE,
-                    ResourceCapability.OBJECT_STORAGE,
-                }
-            ),
+        self.assertTrue(registry.has_capability(azure_resource, ResourceCapability.DATA_STORE))
+        self.assertTrue(registry.has_capability(azure_resource, ResourceCapability.PUBLIC_EDGE))
+        self.assertTrue(registry.has_capability(azure_resource, ResourceCapability.OBJECT_STORAGE))
+        self.assertTrue(registry.has_capability(azure_virtual_machine, ResourceCapability.WORKLOAD))
+        self.assertTrue(
+            registry.has_capability(azure_virtual_machine, ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD)
         )
-        self.assertEqual(
-            registry.capabilities_for(azure_virtual_machine),
-            frozenset(
-                {
-                    ResourceCapability.WORKLOAD,
-                    ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD,
-                    ResourceCapability.PUBLIC_COMPUTE,
-                    ResourceCapability.PUBLIC_EDGE,
-                }
-            ),
-        )
-        self.assertEqual(
-            registry.capabilities_for(azure_key_vault),
-            frozenset(
-                {
-                    ResourceCapability.DATA_STORE,
-                    ResourceCapability.PUBLIC_EDGE,
-                    ResourceCapability.SECRET_STORE,
-                    ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE,
-                    ResourceCapability.KEY_MANAGEMENT,
-                    ResourceCapability.SENSITIVE_RESOURCE_POLICY,
-                }
-            ),
-        )
-        self.assertEqual(
-            registry.capabilities_for(azure_managed_identity),
-            frozenset({ResourceCapability.IDENTITY_ROLE}),
-        )
-        self.assertEqual(
-            registry.capabilities_for(azure_web_app),
-            frozenset({ResourceCapability.WORKLOAD, ResourceCapability.PUBLIC_EDGE}),
-        )
-        self.assertEqual(
-            registry.capabilities_for(azure_network_security_group),
-            frozenset({ResourceCapability.NETWORK_SECURITY_GROUP}),
+        self.assertTrue(registry.has_capability(azure_virtual_machine, ResourceCapability.PUBLIC_COMPUTE))
+        self.assertTrue(registry.has_capability(azure_virtual_machine, ResourceCapability.PUBLIC_EDGE))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.DATA_STORE))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.PUBLIC_EDGE))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.SECRET_STORE))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.CONTROL_PLANE_SENSITIVE_DATA_STORE))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.KEY_MANAGEMENT))
+        self.assertTrue(registry.has_capability(azure_key_vault, ResourceCapability.SENSITIVE_RESOURCE_POLICY))
+        self.assertTrue(registry.has_capability(azure_managed_identity, ResourceCapability.IDENTITY_ROLE))
+        self.assertTrue(registry.has_capability(azure_web_app, ResourceCapability.WORKLOAD))
+        self.assertTrue(registry.has_capability(azure_web_app, ResourceCapability.PUBLIC_EDGE))
+        self.assertTrue(
+            registry.has_capability(azure_network_security_group, ResourceCapability.NETWORK_SECURITY_GROUP)
         )
 
     def test_app_uses_catalog_default_provider(self) -> None:

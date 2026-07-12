@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import unittest
 
+from tests.helpers import engine_configured_rule_ids
 from tfstride.analysis import stride_rules
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_definitions import RuleContribution
@@ -367,7 +368,7 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
 
     def test_default_configured_rule_ids_match_default_registry(self) -> None:
         self.assertEqual(
-            StrideRuleEngine().configured_rule_ids(),
+            engine_configured_rule_ids(StrideRuleEngine()),
             default_rule_registry().known_rule_ids(),
         )
 

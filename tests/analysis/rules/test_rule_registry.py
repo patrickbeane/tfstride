@@ -4,6 +4,7 @@ import subprocess
 import sys
 import unittest
 
+from tests.helpers import engine_configured_rule_ids
 from tfstride.analysis import rule_registry as rule_registry_module
 from tfstride.analysis.rule_registry import (
     RuleMetadata,
@@ -284,7 +285,7 @@ class RuleRegistryTests(unittest.TestCase):
         )
 
     def test_default_registry_rule_ids_match_configured_rules(self) -> None:
-        self.assertEqual(default_rule_registry().known_rule_ids(), StrideRuleEngine().configured_rule_ids())
+        self.assertEqual(default_rule_registry().known_rule_ids(), engine_configured_rule_ids(StrideRuleEngine()))
 
     def test_provider_rule_ids_have_default_metadata(self) -> None:
         registry = default_rule_registry()

@@ -30,9 +30,6 @@ class StrideRuleEngine:
             rule_registry if rule_registry is not None else build_rule_registry_from_contribution(rule_contribution)
         )
 
-    def configured_rule_ids(self) -> set[str]:
-        return {rule.metadata.rule_id for rule_group in self._rule_groups() for rule in rule_group}
-
     def evaluate(
         self,
         inventory: ResourceInventory,

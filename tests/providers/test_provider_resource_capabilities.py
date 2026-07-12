@@ -59,10 +59,7 @@ class ProviderResourceCapabilityRegistryTests(unittest.TestCase):
         self.assertFalse(
             registry.has_capability(_resource("aws_instance", provider="gcp"), ResourceCapability.WORKLOAD)
         )
-        self.assertEqual(
-            registry.capabilities_for(_resource("aws_db_instance")),
-            frozenset({ResourceCapability.DATABASE}),
-        )
+        self.assertTrue(registry.has_capability(_resource("aws_db_instance"), ResourceCapability.DATABASE))
 
     def test_accepts_capability_values_as_strings(self) -> None:
         registry = ProviderResourceCapabilityRegistry([("aws", {"workload": frozenset({"aws_instance"})})])

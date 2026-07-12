@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.helpers import engine_configured_rule_ids
 from tfstride.analysis.rule_definitions import RuleDefinition
 from tfstride.analysis.rule_registry import RuleMetadata, RulePolicy, RuleRegistry, default_rule_registry
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -36,7 +37,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
 
     def test_rule_registry_matches_configured_executable_rules(self) -> None:
         self.assertEqual(
-            StrideRuleEngine().configured_rule_ids(),
+            engine_configured_rule_ids(StrideRuleEngine()),
             default_rule_registry().known_rule_ids(),
         )
 
