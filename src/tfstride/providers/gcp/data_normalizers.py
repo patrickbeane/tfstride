@@ -5,13 +5,23 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.coercion import as_list, value_is_unknown
+from tfstride.providers.coercion import (
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+    as_list,
+    known_block_bool,
+    known_block_string,
+    value_is_unknown,
+)
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_bool, dedupe, first_item
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
+from tfstride.providers.kubernetes import block_value, first_unknown_block
 
 
 def normalize_storage_bucket(resource: TerraformResource) -> NormalizedResource:
@@ -304,6 +314,38 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
     backup_configuration_values = _first_block(settings, GcpAttr.BACKUP_CONFIGURATION)
     ip_configuration = GcpValues(ip_configuration_values)
     backup_configuration = GcpValues(backup_configuration_values)
+    settings_unknown = first_unknown_block(resource.unknown_values.get(GcpAttr.SETTINGS.key))
+    insights_config_values = _first_block(settings, GcpAttr.INSIGHTS_CONFIG)
+    insights_config_unknown = first_unknown_block(block_value(settings_unknown, GcpAttr.INSIGHTS_CONFIG.key))
+    cloud_sql_posture_uncertainties: list[str] = []
+    availability_type = known_block_string(
+        settings_values,
+        settings_unknown,
+        GcpAttr.AVAILABILITY_TYPE.key,
+        cloud_sql_posture_uncertainties,
+        path=GcpAttr.SETTINGS.key,
+    )
+    connector_enforcement = known_block_string(
+        settings_values,
+        settings_unknown,
+        GcpAttr.CONNECTOR_ENFORCEMENT.key,
+        cloud_sql_posture_uncertainties,
+        path=GcpAttr.SETTINGS.key,
+    )
+    cloud_sql_deletion_protection_enabled = known_block_bool(
+        settings_values,
+        settings_unknown,
+        GcpAttr.DELETION_PROTECTION_ENABLED.key,
+        cloud_sql_posture_uncertainties,
+        path=GcpAttr.SETTINGS.key,
+    )
+    query_insights_enabled = known_block_bool(
+        insights_config_values,
+        insights_config_unknown,
+        GcpAttr.QUERY_INSIGHTS_ENABLED.key,
+        cloud_sql_posture_uncertainties,
+        path=f"{GcpAttr.SETTINGS.key}.{GcpAttr.INSIGHTS_CONFIG.key}",
+    )
     authorized_networks = _authorized_networks(ip_configuration)
     public_authorized_networks = [
         network for network in authorized_networks if _authorized_network_allows_internet(network)
@@ -337,6 +379,20 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
             GcpResourceMetadata.DATABASE_VERSION: values.get(GcpAttr.DATABASE_VERSION),
             GcpResourceMetadata.CLOUD_SQL_PRIVATE_NETWORK: private_network,
             GcpResourceMetadata.CLOUD_SQL_SSL_MODE: ip_configuration.get(GcpAttr.SSL_MODE),
+            GcpResourceMetadata.CLOUD_SQL_AVAILABILITY_TYPE: availability_type,
+            GcpResourceMetadata.CLOUD_SQL_CONNECTOR_ENFORCEMENT: connector_enforcement,
+            GcpResourceMetadata.CLOUD_SQL_QUERY_INSIGHTS_ENABLED: query_insights_enabled,
+            GcpResourceMetadata.CLOUD_SQL_QUERY_INSIGHTS_STATE: _query_insights_state(
+                insights_config_values,
+                insights_config_unknown,
+                query_insights_enabled,
+            ),
+            GcpResourceMetadata.CLOUD_SQL_INSIGHTS_CONFIG: insights_config_values,
+            GcpResourceMetadata.CLOUD_SQL_DELETION_PROTECTION_ENABLED: cloud_sql_deletion_protection_enabled,
+            GcpResourceMetadata.CLOUD_SQL_DELETION_PROTECTION_STATE: _cloud_sql_deletion_protection_state(
+                cloud_sql_deletion_protection_enabled
+            ),
+            GcpResourceMetadata.CLOUD_SQL_POSTURE_UNCERTAINTIES: cloud_sql_posture_uncertainties,
             GcpResourceMetadata.CLOUD_SQL_IPV4_ENABLED: ipv4_enabled,
             GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED: backup_enabled,
             GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED: pitr_enabled,
@@ -346,7 +402,6 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
             GcpResourceMetadata.CLOUD_SQL_IP_CONFIGURATION: ip_configuration_values,
             GcpResourceMetadata.DELETION_PROTECTION: as_bool(values.get(GcpAttr.DELETION_PROTECTION)),
             GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-            "availability_type": settings.get(GcpAttr.AVAILABILITY_TYPE),
             "tier": settings.get(GcpAttr.TIER),
             "disk_type": settings.get(GcpAttr.DISK_TYPE),
             "disk_size": settings.raw(GcpAttr.DISK_SIZE),
@@ -363,6 +418,24 @@ def normalize_sql_database_instance(resource: TerraformResource) -> NormalizedRe
     mutations.set_publicly_accessible(ipv4_enabled)
     mutations.set_storage_encrypted(True)
     return normalized
+
+
+def _query_insights_state(
+    insights_config: Mapping[str, Any],
+    unknown_insights_config: Any,
+    query_insights_enabled: bool | None,
+) -> str:
+    if unknown_insights_config is True:
+        return STATE_UNKNOWN
+    if query_insights_enabled is None:
+        return STATE_UNKNOWN if insights_config or unknown_insights_config else STATE_NOT_CONFIGURED
+    return STATE_ENABLED if query_insights_enabled else STATE_DISABLED
+
+
+def _cloud_sql_deletion_protection_state(enabled: bool | None) -> str:
+    if enabled is None:
+        return STATE_UNKNOWN
+    return STATE_ENABLED if enabled else STATE_DISABLED
 
 
 def _first_block(values: GcpValues, attribute: GcpAttribute[Any]) -> dict[str, Any]:

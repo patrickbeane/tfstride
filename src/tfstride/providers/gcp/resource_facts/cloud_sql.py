@@ -44,3 +44,35 @@ class GcpCloudSqlFacts(GcpBaseFacts):
     @property
     def deletion_protection(self) -> bool | None:
         return self.optional_bool(GcpResourceMetadata.DELETION_PROTECTION)
+
+    @property
+    def availability_type(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_AVAILABILITY_TYPE)
+
+    @property
+    def connector_enforcement(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_CONNECTOR_ENFORCEMENT)
+
+    @property
+    def query_insights_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_QUERY_INSIGHTS_ENABLED)
+
+    @property
+    def query_insights_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_QUERY_INSIGHTS_STATE)
+
+    @property
+    def insights_config(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_INSIGHTS_CONFIG)
+
+    @property
+    def cloud_sql_deletion_protection_enabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.CLOUD_SQL_DELETION_PROTECTION_ENABLED)
+
+    @property
+    def cloud_sql_deletion_protection_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_DELETION_PROTECTION_STATE)
+
+    @property
+    def cloud_sql_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.CLOUD_SQL_POSTURE_UNCERTAINTIES)

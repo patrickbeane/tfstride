@@ -482,6 +482,7 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
         self.assertTrue(normalized.public_exposure)
         self.assertTrue(normalized.direct_internet_reachable)
         self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.DATABASE_VERSION), "POSTGRES_15")
+        self.assertEqual(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_AVAILABILITY_TYPE), "ZONAL")
         self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_BACKUP_ENABLED))
         self.assertFalse(normalized.get_metadata_field(GcpResourceMetadata.CLOUD_SQL_POINT_IN_TIME_RECOVERY_ENABLED))
         self.assertEqual(
@@ -586,6 +587,137 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
             "google_bigquery_dataset.analytics.dataset_id",
         )
         self.assertTrue(table.metadata_snapshot()["deletion_protection"])
+
+    def test_sql_database_instance_normalizer_preserves_resilience_and_observability_posture(self) -> None:
+        normalized = normalize_sql_database_instance(
+            _terraform_resource(
+                "google_sql_database_instance.regional",
+                "google_sql_database_instance",
+                {
+                    "name": "regional-db",
+                    "deletion_protection": False,
+                    "settings": [
+                        {
+                            "availability_type": "REGIONAL",
+                            "connector_enforcement": "REQUIRED",
+                            "deletion_protection_enabled": True,
+                            "insights_config": [
+                                {
+                                    "query_insights_enabled": True,
+                                    "query_string_length": 2_048,
+                                    "record_application_tags": True,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.availability_type, "REGIONAL")
+        self.assertEqual(facts.connector_enforcement, "REQUIRED")
+        self.assertTrue(facts.query_insights_enabled)
+        self.assertEqual(facts.query_insights_state, "enabled")
+        self.assertEqual(
+            facts.insights_config,
+            {
+                "query_insights_enabled": True,
+                "query_string_length": 2_048,
+                "record_application_tags": True,
+            },
+        )
+        self.assertTrue(facts.cloud_sql_deletion_protection_enabled)
+        self.assertEqual(facts.cloud_sql_deletion_protection_state, "enabled")
+        self.assertFalse(facts.deletion_protection)
+        self.assertEqual(facts.cloud_sql_posture_uncertainties, [])
+
+    def test_sql_database_instance_normalizer_preserves_explicit_disabled_resilience_posture(self) -> None:
+        normalized = normalize_sql_database_instance(
+            _terraform_resource(
+                "google_sql_database_instance.zonal",
+                "google_sql_database_instance",
+                {
+                    "name": "zonal-db",
+                    "settings": [
+                        {
+                            "availability_type": "ZONAL",
+                            "connector_enforcement": "NOT_REQUIRED",
+                            "deletion_protection_enabled": False,
+                            "insights_config": [{"query_insights_enabled": False}],
+                        }
+                    ],
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertEqual(facts.availability_type, "ZONAL")
+        self.assertEqual(facts.connector_enforcement, "NOT_REQUIRED")
+        self.assertFalse(facts.query_insights_enabled)
+        self.assertEqual(facts.query_insights_state, "disabled")
+        self.assertFalse(facts.cloud_sql_deletion_protection_enabled)
+        self.assertEqual(facts.cloud_sql_deletion_protection_state, "disabled")
+        self.assertEqual(facts.cloud_sql_posture_uncertainties, [])
+
+    def test_sql_database_instance_normalizer_keeps_missing_resilience_posture_unknown(self) -> None:
+        normalized = normalize_sql_database_instance(
+            _terraform_resource(
+                "google_sql_database_instance.minimal",
+                "google_sql_database_instance",
+                {"name": "minimal-db", "settings": [{}]},
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.availability_type)
+        self.assertIsNone(facts.connector_enforcement)
+        self.assertIsNone(facts.query_insights_enabled)
+        self.assertEqual(facts.query_insights_state, "not_configured")
+        self.assertEqual(facts.insights_config, {})
+        self.assertIsNone(facts.cloud_sql_deletion_protection_enabled)
+        self.assertEqual(facts.cloud_sql_deletion_protection_state, "unknown")
+        self.assertEqual(facts.cloud_sql_posture_uncertainties, [])
+
+    def test_sql_database_instance_normalizer_preserves_unknown_resilience_posture(self) -> None:
+        normalized = normalize_sql_database_instance(
+            _terraform_resource(
+                "google_sql_database_instance.unknown",
+                "google_sql_database_instance",
+                {"name": "unknown-db", "settings": [{"insights_config": [{}]}]},
+                unknown_values={
+                    "settings": [
+                        {
+                            "availability_type": True,
+                            "connector_enforcement": True,
+                            "deletion_protection_enabled": True,
+                            "insights_config": [{"query_insights_enabled": True}],
+                        }
+                    ]
+                },
+            )
+        )
+
+        facts = gcp_facts(normalized)
+
+        self.assertIsNone(facts.availability_type)
+        self.assertIsNone(facts.connector_enforcement)
+        self.assertIsNone(facts.query_insights_enabled)
+        self.assertEqual(facts.query_insights_state, "unknown")
+        self.assertIsNone(facts.cloud_sql_deletion_protection_enabled)
+        self.assertEqual(facts.cloud_sql_deletion_protection_state, "unknown")
+        self.assertEqual(
+            facts.cloud_sql_posture_uncertainties,
+            [
+                "settings.availability_type is unknown after planning",
+                "settings.connector_enforcement is unknown after planning",
+                "settings.deletion_protection_enabled is unknown after planning",
+                "settings.insights_config.query_insights_enabled is unknown after planning",
+            ],
+        )
 
     def test_sql_database_instance_normalizer_handles_private_backed_up_instance(self) -> None:
         normalized = normalize_sql_database_instance(
