@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.resource_decoration.api_gateway import ResolveApiGatewayRelationshipsStage
 from tfstride.providers.aws.resource_decoration.ecs import (
     MarkEcsLoadBalancerExposureStage,
     ResolveEcsServiceRelationshipsStage,
@@ -46,6 +47,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         NormalizeIamAssignmentPostureStage(),
         ResolveInstanceProfileRolesStage(),
         ResolveEcsServiceRelationshipsStage(),
+        ResolveApiGatewayRelationshipsStage(),
         MergeResourcePolicyResourcesStage(),
         ApplyS3PublicAccessBlocksStage(),
         ApplyS3PostureResourcesStage(),

@@ -5,8 +5,13 @@ from typing import Any
 
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.aws.api_gateway_normalizers import (
+    normalize_api_gateway_authorizer,
+    normalize_api_gateway_method,
     normalize_api_gateway_rest_api,
+    normalize_api_gateway_stage,
     normalize_apigatewayv2_api,
+    normalize_apigatewayv2_route,
+    normalize_apigatewayv2_stage,
 )
 from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_facts import aws_facts
@@ -219,6 +224,149 @@ class AwsApiGatewayNormalizerTests(unittest.TestCase):
             ],
         )
 
+    def test_rest_api_children_normalize_authorization_and_access_log_facts(self) -> None:
+        method = normalize_api_gateway_method(
+            _terraform_resource(
+                "aws_api_gateway_method",
+                {
+                    "rest_api_id": "rest-123",
+                    "resource_id": "orders-resource",
+                    "http_method": "POST",
+                    "authorization": "COGNITO_USER_POOLS",
+                    "authorizer_id": "authorizer-123",
+                    "authorization_scopes": ["orders.write"],
+                },
+            )
+        )
+        stage = normalize_api_gateway_stage(
+            _terraform_resource(
+                "aws_api_gateway_stage",
+                {
+                    "rest_api_id": "rest-123",
+                    "stage_name": "prod",
+                    "access_log_settings": [
+                        {
+                            "destination_arn": "arn:aws:logs:us-east-1:111122223333:log-group:api-access",
+                            "format": '{"requestId":"$context.requestId"}',
+                        }
+                    ],
+                },
+            )
+        )
+        authorizer = normalize_api_gateway_authorizer(
+            _terraform_resource(
+                "aws_api_gateway_authorizer",
+                {
+                    "rest_api_id": "rest-123",
+                    "id": "authorizer-123",
+                    "name": "orders-users",
+                    "type": "COGNITO_USER_POOLS",
+                    "identity_source": "method.request.header.Authorization",
+                    "provider_arns": ["arn:aws:cognito-idp:us-east-1:111122223333:userpool/us-east-1_pool"],
+                    "authorizer_result_ttl_in_seconds": 300,
+                },
+            )
+        )
+
+        method_facts = aws_facts(method)
+        stage_facts = aws_facts(stage)
+        authorizer_facts = aws_facts(authorizer)
+
+        self.assertEqual(method.category, ResourceCategory.EDGE)
+        self.assertEqual(method.identifier, "rest-123:orders-resource:POST")
+        self.assertEqual(method_facts.api_gateway_api_id, "rest-123")
+        self.assertEqual(method_facts.api_gateway_method_resource_id, "orders-resource")
+        self.assertEqual(method_facts.api_gateway_method_http_method, "POST")
+        self.assertEqual(method_facts.api_gateway_authorization_type, "COGNITO_USER_POOLS")
+        self.assertEqual(method_facts.api_gateway_authorizer_id, "authorizer-123")
+        self.assertEqual(method_facts.api_gateway_authorization_scopes, ["orders.write"])
+        self.assertEqual(stage_facts.api_gateway_stage_name, "prod")
+        self.assertEqual(
+            stage_facts.api_gateway_access_log_destination_arn,
+            "arn:aws:logs:us-east-1:111122223333:log-group:api-access",
+        )
+        self.assertEqual(stage_facts.api_gateway_access_log_format, '{"requestId":"$context.requestId"}')
+        self.assertEqual(authorizer_facts.api_gateway_authorizer_id, "authorizer-123")
+        self.assertEqual(authorizer_facts.api_gateway_authorizer_name, "orders-users")
+        self.assertEqual(authorizer_facts.api_gateway_authorizer_type, "COGNITO_USER_POOLS")
+        self.assertEqual(authorizer_facts.api_gateway_identity_source, "method.request.header.Authorization")
+        self.assertEqual(
+            authorizer_facts.api_gateway_authorizer_provider_arns,
+            ["arn:aws:cognito-idp:us-east-1:111122223333:userpool/us-east-1_pool"],
+        )
+        self.assertEqual(authorizer_facts.api_gateway_authorizer_result_ttl, 300)
+
+    def test_v2_routes_and_stages_normalize_authorization_and_access_log_facts(self) -> None:
+        route = normalize_apigatewayv2_route(
+            _terraform_resource(
+                "aws_apigatewayv2_route",
+                {
+                    "api_id": "v2-123",
+                    "route_key": "GET /orders",
+                    "authorization_type": "JWT",
+                    "authorizer_id": "v2-authorizer",
+                    "authorization_scopes": ["orders.read"],
+                },
+            )
+        )
+        stage = normalize_apigatewayv2_stage(
+            _terraform_resource(
+                "aws_apigatewayv2_stage",
+                {
+                    "api_id": "v2-123",
+                    "name": "$default",
+                    "access_log_settings": [
+                        {
+                            "destination_arn": "arn:aws:logs:us-east-1:111122223333:log-group:http-api-access",
+                            "format": "$context.requestId",
+                        }
+                    ],
+                },
+            )
+        )
+
+        route_facts = aws_facts(route)
+        stage_facts = aws_facts(stage)
+
+        self.assertEqual(route.identifier, "v2-123:GET /orders")
+        self.assertEqual(route_facts.api_gateway_api_id, "v2-123")
+        self.assertEqual(route_facts.api_gateway_route_key, "GET /orders")
+        self.assertEqual(route_facts.api_gateway_authorization_type, "JWT")
+        self.assertEqual(route_facts.api_gateway_authorizer_id, "v2-authorizer")
+        self.assertEqual(route_facts.api_gateway_authorization_scopes, ["orders.read"])
+        self.assertEqual(stage_facts.api_gateway_stage_name, "$default")
+        self.assertEqual(
+            stage_facts.api_gateway_access_log_destination_arn,
+            "arn:aws:logs:us-east-1:111122223333:log-group:http-api-access",
+        )
+        self.assertEqual(stage_facts.api_gateway_access_log_format, "$context.requestId")
+
+    def test_api_gateway_child_unknown_values_are_preserved_as_uncertainty(self) -> None:
+        normalized = normalize_api_gateway_stage(
+            _terraform_resource(
+                "aws_api_gateway_stage",
+                {"stage_name": "prod", "access_log_settings": [{}]},
+                unknown_values={
+                    "rest_api_id": True,
+                    "access_log_settings": [{"destination_arn": True, "format": True}],
+                },
+            )
+        )
+        facts = aws_facts(normalized)
+
+        self.assertIsNone(facts.api_gateway_api_id)
+        self.assertEqual(facts.api_gateway_stage_name, "prod")
+        self.assertIsNone(facts.api_gateway_access_log_destination_arn)
+        self.assertIsNone(facts.api_gateway_access_log_format)
+        self.assertEqual(
+            facts.api_gateway_posture_uncertainties,
+            [
+                "rest_api_id is unknown after planning",
+                "access_log_settings.destination_arn is unknown after planning",
+                "access_log_settings.format is unknown after planning",
+            ],
+        )
+
     def test_api_gateway_resources_are_registered_as_supported_aws_resources(self) -> None:
         inventory = AwsNormalizer().normalize(
             [
@@ -240,7 +388,12 @@ class AwsApiGatewayNormalizerTests(unittest.TestCase):
         )
 
         self.assertIn("aws_api_gateway_rest_api", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_api_gateway_method", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_api_gateway_stage", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_api_gateway_authorizer", SUPPORTED_AWS_TYPES)
         self.assertIn("aws_apigatewayv2_api", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_apigatewayv2_route", SUPPORTED_AWS_TYPES)
+        self.assertIn("aws_apigatewayv2_stage", SUPPORTED_AWS_TYPES)
         self.assertEqual(inventory.unsupported_resources, [])
         self.assertEqual(
             [resource.resource_type for resource in inventory.resources],

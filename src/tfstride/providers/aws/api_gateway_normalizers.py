@@ -11,12 +11,16 @@ from tfstride.providers.coercion import (
     STATE_DISABLED,
     STATE_ENABLED,
     STATE_UNKNOWN,
+    as_optional_int,
+    attribute_unknown,
     first_mapping,
     known_block_bool,
     known_block_int,
+    known_block_string,
     known_block_strings,
     known_bool,
     known_string,
+    known_string_list,
     unknown_block_at,
 )
 
@@ -296,3 +300,229 @@ def _set_public_endpoint_reasons(resource: NormalizedResource, public_endpoint_s
     mutations = aws_mutations(resource)
     mutations.set_public_access_reasons(reasons)
     mutations.set_public_exposure_reasons(reasons)
+
+
+def normalize_api_gateway_method(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    api_id = known_string(values, unknown_values, "rest_api_id", uncertainties)
+    resource_id = known_string(values, unknown_values, "resource_id", uncertainties)
+    http_method = known_string(values, unknown_values, "http_method", uncertainties)
+    authorization_type = known_string(values, unknown_values, "authorization", uncertainties)
+    authorizer_id = known_string(values, unknown_values, "authorizer_id", uncertainties)
+    authorization_scopes = known_string_list(values, unknown_values, "authorization_scopes", uncertainties)
+
+    return _api_gateway_child_resource(
+        resource,
+        api_id=api_id,
+        identifier=_api_gateway_child_identifier(
+            api_id,
+            resource_id,
+            http_method,
+            fallback=resource.address,
+        ),
+        metadata={
+            AwsResourceMetadata.API_GATEWAY_METHOD_RESOURCE_ID: resource_id,
+            AwsResourceMetadata.API_GATEWAY_METHOD_HTTP_METHOD: http_method,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_TYPE: authorization_type,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_ID: authorizer_id,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_SCOPES: authorization_scopes,
+        },
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_api_gateway_stage(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    api_id = known_string(values, unknown_values, "rest_api_id", uncertainties)
+    stage_name = known_string(values, unknown_values, "stage_name", uncertainties)
+    destination_arn, log_format = _api_gateway_access_log_settings(values, unknown_values, uncertainties)
+
+    return _api_gateway_child_resource(
+        resource,
+        api_id=api_id,
+        identifier=_api_gateway_child_identifier(api_id, stage_name, fallback=resource.address),
+        metadata={
+            AwsResourceMetadata.API_GATEWAY_STAGE_NAME: stage_name,
+            AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_DESTINATION_ARN: destination_arn,
+            AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_FORMAT: log_format,
+        },
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_api_gateway_authorizer(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    api_id = known_string(values, unknown_values, "rest_api_id", uncertainties)
+    authorizer_id = known_string(values, unknown_values, "id", uncertainties)
+    name = known_string(values, unknown_values, "name", uncertainties) or resource.name
+    authorizer_type = known_string(values, unknown_values, "type", uncertainties)
+    authorizer_uri = known_string(values, unknown_values, "authorizer_uri", uncertainties)
+    authorizer_credentials = known_string(values, unknown_values, "authorizer_credentials", uncertainties)
+    identity_source = known_string(values, unknown_values, "identity_source", uncertainties)
+    identity_validation_expression = known_string(
+        values,
+        unknown_values,
+        "identity_validation_expression",
+        uncertainties,
+    )
+    provider_arns = known_string_list(values, unknown_values, "provider_arns", uncertainties)
+    result_ttl = _known_api_gateway_int(
+        values,
+        unknown_values,
+        "authorizer_result_ttl_in_seconds",
+        uncertainties,
+    )
+
+    return _api_gateway_child_resource(
+        resource,
+        api_id=api_id,
+        identifier=_api_gateway_child_identifier(api_id, authorizer_id or name, fallback=resource.address),
+        metadata={
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_ID: authorizer_id,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_NAME: name,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_TYPE: authorizer_type,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_URI: authorizer_uri,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_CREDENTIALS: authorizer_credentials,
+            AwsResourceMetadata.API_GATEWAY_IDENTITY_SOURCE: identity_source,
+            AwsResourceMetadata.API_GATEWAY_IDENTITY_VALIDATION_EXPRESSION: identity_validation_expression,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_PROVIDER_ARNS: provider_arns,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_RESULT_TTL: result_ttl,
+        },
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_apigatewayv2_route(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    api_id = known_string(values, unknown_values, "api_id", uncertainties)
+    route_key = known_string(values, unknown_values, "route_key", uncertainties)
+    authorization_type = known_string(values, unknown_values, "authorization_type", uncertainties)
+    authorizer_id = known_string(values, unknown_values, "authorizer_id", uncertainties)
+    authorization_scopes = known_string_list(values, unknown_values, "authorization_scopes", uncertainties)
+
+    return _api_gateway_child_resource(
+        resource,
+        api_id=api_id,
+        identifier=_api_gateway_child_identifier(api_id, route_key, fallback=resource.address),
+        metadata={
+            AwsResourceMetadata.API_GATEWAY_ROUTE_KEY: route_key,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_TYPE: authorization_type,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZER_ID: authorizer_id,
+            AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_SCOPES: authorization_scopes,
+        },
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_apigatewayv2_stage(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+
+    api_id = known_string(values, unknown_values, "api_id", uncertainties)
+    stage_name = known_string(values, unknown_values, "name", uncertainties)
+    destination_arn, log_format = _api_gateway_access_log_settings(values, unknown_values, uncertainties)
+
+    return _api_gateway_child_resource(
+        resource,
+        api_id=api_id,
+        identifier=_api_gateway_child_identifier(api_id, stage_name, fallback=resource.address),
+        metadata={
+            AwsResourceMetadata.API_GATEWAY_STAGE_NAME: stage_name,
+            AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_DESTINATION_ARN: destination_arn,
+            AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_FORMAT: log_format,
+        },
+        uncertainties=uncertainties,
+    )
+
+
+def _api_gateway_child_resource(
+    resource: TerraformResource,
+    *,
+    api_id: str | None,
+    identifier: str,
+    metadata: dict[object, Any],
+    uncertainties: list[str],
+) -> NormalizedResource:
+    child_metadata: dict[object, Any] = {
+        AwsResourceMetadata.API_GATEWAY_API_ID: api_id,
+        AwsResourceMetadata.API_GATEWAY_POSTURE_UNCERTAINTIES: uncertainties,
+        "tags": resource.values.get("tags", {}),
+    }
+    child_metadata.update(metadata)
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.EDGE,
+        identifier=identifier,
+        metadata=child_metadata,
+    )
+
+
+def _api_gateway_child_identifier(
+    api_id: str | None,
+    *components: str | None,
+    fallback: str,
+) -> str:
+    known_components = [component for component in components if component]
+    if api_id and known_components:
+        return ":".join((api_id, *known_components))
+    return api_id or next(iter(known_components), fallback)
+
+
+def _api_gateway_access_log_settings(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str | None, str | None]:
+    settings, unknown_block = _first_api_gateway_block(values, unknown_values, "access_log_settings", uncertainties)
+    if settings is None:
+        return None, None
+    destination_arn = known_block_string(
+        settings,
+        unknown_block,
+        "destination_arn",
+        uncertainties,
+        path="access_log_settings",
+    )
+    log_format = known_block_string(
+        settings,
+        unknown_block,
+        "format",
+        uncertainties,
+        path="access_log_settings",
+    )
+    return destination_arn, log_format
+
+
+def _known_api_gateway_int(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    key: str,
+    uncertainties: list[str],
+) -> int | None:
+    if attribute_unknown(unknown_values, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    value = values.get(key)
+    if value is None:
+        return None
+    parsed = as_optional_int(value)
+    if parsed is None or isinstance(value, bool):
+        uncertainties.append(f"{key} has an unrecognized value shape")
+        return None
+    return parsed

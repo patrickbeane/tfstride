@@ -27,6 +27,8 @@ class AwsResourceIndex:
     role_index: dict[str, NormalizedResource]
     instance_profile_index: dict[str, NormalizedResource]
     policy_index: dict[str, NormalizedResource]
+    api_gateway_rest_apis: dict[str, NormalizedResource]
+    apigatewayv2_apis: dict[str, NormalizedResource]
     vpcs_with_igw: set[str]
     vpcs_with_public_routes: set[str]
     nat_gateway_ids: set[str]
@@ -55,6 +57,8 @@ class AwsResourceIndexBuilder:
         role_index: dict[str, NormalizedResource] = {}
         instance_profile_index: dict[str, NormalizedResource] = {}
         policy_index: dict[str, NormalizedResource] = {}
+        api_gateway_rest_apis: dict[str, NormalizedResource] = {}
+        apigatewayv2_apis: dict[str, NormalizedResource] = {}
         vpcs_with_igw: set[str] = set()
         vpcs_with_public_routes: set[str] = set()
         nat_gateway_ids: set[str] = set()
@@ -181,6 +185,10 @@ class AwsResourceIndexBuilder:
                     resource,
                     (resource.identifier, resource.address, resource.arn),
                 )
+            elif resource_type == "aws_api_gateway_rest_api" and facts.api_gateway_api_id:
+                api_gateway_rest_apis[facts.api_gateway_api_id] = resource
+            elif resource_type == "aws_apigatewayv2_api" and facts.api_gateway_api_id:
+                apigatewayv2_apis[facts.api_gateway_api_id] = resource
             elif resource_type == "aws_internet_gateway":
                 if resource.vpc_id:
                     vpcs_with_igw.add(resource.vpc_id)
@@ -204,6 +212,8 @@ class AwsResourceIndexBuilder:
             role_index=role_index,
             instance_profile_index=instance_profile_index,
             policy_index=policy_index,
+            api_gateway_rest_apis=api_gateway_rest_apis,
+            apigatewayv2_apis=apigatewayv2_apis,
             vpcs_with_igw=vpcs_with_igw,
             vpcs_with_public_routes=vpcs_with_public_routes,
             nat_gateway_ids=nat_gateway_ids,

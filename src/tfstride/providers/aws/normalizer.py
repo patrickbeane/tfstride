@@ -6,8 +6,13 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.aws.api_gateway_normalizers import (
+    normalize_api_gateway_authorizer,
+    normalize_api_gateway_method,
     normalize_api_gateway_rest_api,
+    normalize_api_gateway_stage,
     normalize_apigatewayv2_api,
+    normalize_apigatewayv2_route,
+    normalize_apigatewayv2_stage,
 )
 from tfstride.providers.aws.audit_normalizers import (
     normalize_accessanalyzer_analyzer,
@@ -81,7 +86,12 @@ ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_accessanalyzer_analyzer": normalize_accessanalyzer_analyzer,
     "aws_api_gateway_rest_api": normalize_api_gateway_rest_api,
+    "aws_api_gateway_method": normalize_api_gateway_method,
+    "aws_api_gateway_stage": normalize_api_gateway_stage,
+    "aws_api_gateway_authorizer": normalize_api_gateway_authorizer,
     "aws_apigatewayv2_api": normalize_apigatewayv2_api,
+    "aws_apigatewayv2_route": normalize_apigatewayv2_route,
+    "aws_apigatewayv2_stage": normalize_apigatewayv2_stage,
     "aws_cloudfront_distribution": normalize_cloudfront_distribution,
     "aws_cloudtrail": normalize_cloudtrail,
     "aws_config_configuration_recorder": normalize_config_configuration_recorder,

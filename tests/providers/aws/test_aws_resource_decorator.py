@@ -163,6 +163,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "normalize_iam_assignment_posture",
                 "resolve_instance_profile_roles",
                 "resolve_ecs_service_relationships",
+                "resolve_api_gateway_relationships",
                 "merge_resource_policy_resources",
                 "apply_s3_public_access_blocks",
                 "apply_s3_posture_resources",

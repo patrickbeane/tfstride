@@ -4,6 +4,7 @@ from typing import Any
 
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts.base import AwsBaseFacts, _bool_from_state
+from tfstride.resource_metadata import DictListMetadataField
 
 
 class AwsComputeFacts(AwsBaseFacts):
@@ -154,12 +155,131 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.API_GATEWAY_ROUTE_SELECTION_EXPRESSION)
 
     @property
+    def api_gateway_route_key(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ROUTE_KEY)
+
+    @property
     def api_gateway_cors_configuration(self) -> dict[str, Any]:
         return self.get(AwsResourceMetadata.API_GATEWAY_CORS_CONFIGURATION)
 
     @property
+    def api_gateway_parent_api_address(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_PARENT_API_ADDRESS)
+
+    @property
+    def api_gateway_method_resource_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_METHOD_RESOURCE_ID)
+
+    @property
+    def api_gateway_method_http_method(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_METHOD_HTTP_METHOD)
+
+    @property
+    def api_gateway_authorization_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_TYPE)
+
+    @property
+    def api_gateway_authorizer_id(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_ID)
+
+    @property
+    def api_gateway_authorization_scopes(self) -> list[str]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZATION_SCOPES)
+
+    @property
+    def api_gateway_stage_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_STAGE_NAME)
+
+    @property
+    def api_gateway_access_log_destination_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_DESTINATION_ARN)
+
+    @property
+    def api_gateway_access_log_format(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ACCESS_LOG_FORMAT)
+
+    @property
+    def api_gateway_authorizer_name(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_NAME)
+
+    @property
+    def api_gateway_authorizer_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_TYPE)
+
+    @property
+    def api_gateway_authorizer_uri(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_URI)
+
+    @property
+    def api_gateway_authorizer_credentials(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_CREDENTIALS)
+
+    @property
+    def api_gateway_identity_source(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_IDENTITY_SOURCE)
+
+    @property
+    def api_gateway_identity_validation_expression(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_IDENTITY_VALIDATION_EXPRESSION)
+
+    @property
+    def api_gateway_authorizer_provider_arns(self) -> list[str]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_PROVIDER_ARNS)
+
+    @property
+    def api_gateway_authorizer_result_ttl(self) -> int | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZER_RESULT_TTL)
+
+    @property
+    def api_gateway_methods(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_METHODS)
+
+    @property
+    def api_gateway_stages(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_STAGES)
+
+    @property
+    def api_gateway_authorizers(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_AUTHORIZERS)
+
+    @property
+    def api_gateway_routes(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.API_GATEWAY_ROUTES)
+
+    @property
+    def unresolved_api_gateway_api_ids(self) -> list[str]:
+        return self.get(AwsResourceMetadata.UNRESOLVED_API_GATEWAY_API_IDS)
+
+    @property
     def api_gateway_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.API_GATEWAY_POSTURE_UNCERTAINTIES)
+
+    def set_api_gateway_parent_api_address(self, address: str) -> None:
+        self.set(AwsResourceMetadata.API_GATEWAY_PARENT_API_ADDRESS, address)
+
+    def add_unresolved_api_gateway_api_id(self, api_id: str | None) -> None:
+        self.append(AwsResourceMetadata.UNRESOLVED_API_GATEWAY_API_IDS, api_id)
+
+    def extend_api_gateway_posture_uncertainties(self, uncertainties: list[str]) -> None:
+        self.extend(AwsResourceMetadata.API_GATEWAY_POSTURE_UNCERTAINTIES, uncertainties)
+
+    def add_api_gateway_method(self, method: dict[str, Any]) -> None:
+        self._append_api_gateway_record(AwsResourceMetadata.API_GATEWAY_METHODS, method)
+
+    def add_api_gateway_stage(self, stage: dict[str, Any]) -> None:
+        self._append_api_gateway_record(AwsResourceMetadata.API_GATEWAY_STAGES, stage)
+
+    def add_api_gateway_authorizer(self, authorizer: dict[str, Any]) -> None:
+        self._append_api_gateway_record(AwsResourceMetadata.API_GATEWAY_AUTHORIZERS, authorizer)
+
+    def add_api_gateway_route(self, route: dict[str, Any]) -> None:
+        self._append_api_gateway_record(AwsResourceMetadata.API_GATEWAY_ROUTES, route)
+
+    def _append_api_gateway_record(self, field: DictListMetadataField, record: dict[str, Any]) -> None:
+        existing = self.get(field)
+        if record not in existing:
+            existing.append(record)
+            self.set(field, existing)
 
     @property
     def eks_cluster_arn(self) -> str | None:

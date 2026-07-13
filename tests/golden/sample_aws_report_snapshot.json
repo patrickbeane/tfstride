@@ -459,8 +459,13 @@
       "primary_account_id": "111122223333",
       "supported_resource_types": [
         "aws_accessanalyzer_analyzer",
+        "aws_api_gateway_authorizer",
+        "aws_api_gateway_method",
         "aws_api_gateway_rest_api",
+        "aws_api_gateway_stage",
         "aws_apigatewayv2_api",
+        "aws_apigatewayv2_route",
+        "aws_apigatewayv2_stage",
         "aws_cloudfront_distribution",
         "aws_cloudtrail",
         "aws_config_configuration_recorder",

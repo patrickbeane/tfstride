@@ -78,6 +78,9 @@ class AwsResourceMetadata:
     LAMBDA_FUNCTION_URL_POSTURE_UNCERTAINTIES = StringListMetadataField("lambda_function_url_posture_uncertainties")
     API_GATEWAY_ENDPOINT_TYPES = StringListMetadataField("api_gateway_endpoint_types")
     API_GATEWAY_VPC_ENDPOINT_IDS = StringListMetadataField("api_gateway_vpc_endpoint_ids")
+    API_GATEWAY_AUTHORIZATION_SCOPES = StringListMetadataField("api_gateway_authorization_scopes")
+    API_GATEWAY_AUTHORIZER_PROVIDER_ARNS = StringListMetadataField("api_gateway_authorizer_provider_arns")
+    UNRESOLVED_API_GATEWAY_API_IDS = StringListMetadataField("unresolved_api_gateway_api_ids")
     API_GATEWAY_POSTURE_UNCERTAINTIES = StringListMetadataField("api_gateway_posture_uncertainties")
     LOAD_BALANCER_LISTENER_TLS_UNCERTAINTIES = StringListMetadataField("load_balancer_listener_tls_uncertainties")
     CLOUDFRONT_ALIASES = StringListMetadataField("cloudfront_aliases")
@@ -195,6 +198,23 @@ class AwsResourceMetadata:
     API_GATEWAY_EXECUTE_API_ENDPOINT_STATE = OptionalStringMetadataField("api_gateway_execute_api_endpoint_state")
     API_GATEWAY_PUBLIC_ENDPOINT_STATE = OptionalStringMetadataField("api_gateway_public_endpoint_state")
     API_GATEWAY_ROUTE_SELECTION_EXPRESSION = OptionalStringMetadataField("api_gateway_route_selection_expression")
+    API_GATEWAY_ROUTE_KEY = OptionalStringMetadataField("api_gateway_route_key")
+    API_GATEWAY_PARENT_API_ADDRESS = OptionalStringMetadataField("api_gateway_parent_api_address")
+    API_GATEWAY_METHOD_RESOURCE_ID = OptionalStringMetadataField("api_gateway_method_resource_id")
+    API_GATEWAY_METHOD_HTTP_METHOD = OptionalStringMetadataField("api_gateway_method_http_method")
+    API_GATEWAY_AUTHORIZATION_TYPE = OptionalStringMetadataField("api_gateway_authorization_type")
+    API_GATEWAY_AUTHORIZER_ID = OptionalStringMetadataField("api_gateway_authorizer_id")
+    API_GATEWAY_STAGE_NAME = OptionalStringMetadataField("api_gateway_stage_name")
+    API_GATEWAY_ACCESS_LOG_DESTINATION_ARN = OptionalStringMetadataField("api_gateway_access_log_destination_arn")
+    API_GATEWAY_ACCESS_LOG_FORMAT = OptionalStringMetadataField("api_gateway_access_log_format")
+    API_GATEWAY_AUTHORIZER_NAME = OptionalStringMetadataField("api_gateway_authorizer_name")
+    API_GATEWAY_AUTHORIZER_TYPE = OptionalStringMetadataField("api_gateway_authorizer_type")
+    API_GATEWAY_AUTHORIZER_URI = OptionalStringMetadataField("api_gateway_authorizer_uri")
+    API_GATEWAY_AUTHORIZER_CREDENTIALS = OptionalStringMetadataField("api_gateway_authorizer_credentials")
+    API_GATEWAY_IDENTITY_SOURCE = OptionalStringMetadataField("api_gateway_identity_source")
+    API_GATEWAY_IDENTITY_VALIDATION_EXPRESSION = OptionalStringMetadataField(
+        "api_gateway_identity_validation_expression"
+    )
     LOAD_BALANCER_LISTENER_PROTOCOL = OptionalStringMetadataField("load_balancer_listener_protocol")
     LOAD_BALANCER_LISTENER_CERTIFICATE_ARN = OptionalStringMetadataField("load_balancer_listener_certificate_arn")
     LOAD_BALANCER_LISTENER_SSL_POLICY = OptionalStringMetadataField("load_balancer_listener_ssl_policy")
@@ -287,6 +307,7 @@ class AwsResourceMetadata:
         "secrets_manager_rotation_automatically_after_days"
     )
     LAMBDA_FUNCTION_URL_CORS_MAX_AGE = OptionalIntMetadataField("lambda_function_url_cors_max_age")
+    API_GATEWAY_AUTHORIZER_RESULT_TTL = OptionalIntMetadataField("api_gateway_authorizer_result_ttl")
     TASK_DEFINITION_REVISION = OptionalIntMetadataField("revision")
 
     POLICY_DOCUMENT = DictMetadataField("policy_document")
@@ -322,6 +343,10 @@ class AwsResourceMetadata:
     GUARDDUTY_FEATURES = DictListMetadataField("guardduty_features")
     SECRETS_MANAGER_ROTATION_RULES = DictMetadataField("secrets_manager_rotation_rules")
     SECRETS_MANAGER_REPLICATION = DictListMetadataField("secrets_manager_replication")
+    API_GATEWAY_METHODS = DictListMetadataField("api_gateway_methods")
+    API_GATEWAY_STAGES = DictListMetadataField("api_gateway_stages")
+    API_GATEWAY_AUTHORIZERS = DictListMetadataField("api_gateway_authorizers")
+    API_GATEWAY_ROUTES = DictListMetadataField("api_gateway_routes")
     PUBLIC_ACCESS_BLOCK = BoolDictMetadataField("public_access_block")
 
     PUBLIC_ACCESS_CONFIGURED = ResourceMetadata.PUBLIC_ACCESS_CONFIGURED
