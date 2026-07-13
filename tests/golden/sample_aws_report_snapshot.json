@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 204,
+      "registered_rule_count": 205,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -47,6 +47,7 @@
         "aws-public-alb-waf-missing",
         "aws-cloudfront-viewer-http-allowed",
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown",
+        "aws-cloudfront-access-logging-not-configured",
         "aws-public-cloudfront-waf-missing",
         "aws-api-gateway-cors-permissive",
         "aws-public-api-gateway-waf-missing",
@@ -255,6 +256,7 @@
         "aws-public-alb-waf-missing": 1,
         "aws-cloudfront-viewer-http-allowed": 0,
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown": 0,
+        "aws-cloudfront-access-logging-not-configured": 0,
         "aws-public-cloudfront-waf-missing": 0,
         "aws-api-gateway-cors-permissive": 0,
         "aws-public-api-gateway-waf-missing": 0,

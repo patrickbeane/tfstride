@@ -23,6 +23,7 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-public-alb-waf-missing",
         "aws-cloudfront-viewer-http-allowed",
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown",
+        "aws-cloudfront-access-logging-not-configured",
         "aws-public-cloudfront-waf-missing",
         "aws-api-gateway-cors-permissive",
         "aws-public-api-gateway-waf-missing",
@@ -357,9 +358,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (181, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (182, 2, 2, 14, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (56, 2, 2, 3, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (57, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (50, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (75, 0, 0, 0, 0, 0))
 

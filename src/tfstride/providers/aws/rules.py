@@ -35,6 +35,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-public-alb-waf-missing",
         "aws-cloudfront-viewer-http-allowed",
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown",
+        "aws-cloudfront-access-logging-not-configured",
         "aws-public-cloudfront-waf-missing",
         "aws-api-gateway-cors-permissive",
         "aws-public-api-gateway-waf-missing",
@@ -144,6 +145,7 @@ def build_aws_rule_contribution(
         "aws-cloudfront-viewer-tls-policy-weak-or-unknown": (
             cloudfront_detectors.detect_viewer_tls_policy_weak_or_unknown
         ),
+        "aws-cloudfront-access-logging-not-configured": (cloudfront_detectors.detect_access_logging_not_configured),
         "aws-public-cloudfront-waf-missing": cloudfront_detectors.detect_web_acl_missing,
         "aws-api-gateway-cors-permissive": api_gateway_detectors.detect_cors_permissive,
         "aws-public-api-gateway-waf-missing": api_gateway_detectors.detect_waf_missing,

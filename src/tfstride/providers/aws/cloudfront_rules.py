@@ -114,6 +114,47 @@ class AwsCloudFrontRuleDetectors:
             )
         return findings
 
+    def detect_access_logging_not_configured(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for distribution in _enabled_cloudfront_distributions(context):
+            facts = aws_facts(distribution)
+            if facts.cloudfront_logging_state != "not_configured":
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=0,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=dedupe_addresses([distribution.address]),
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{distribution.display_name} is an enabled public CloudFront distribution, but the "
+                        "Terraform plan does not configure a standard access-log destination through "
+                        "logging_config. Requests may lack durable CloudFront access records unless separate "
+                        "real-time logging or external telemetry is configured outside this resource."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_distribution", _distribution_evidence(distribution, facts)),
+                        evidence_item("access_logging", _access_logging_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_web_acl_missing(
         self,
         context: RuleEvaluationContext,
@@ -241,6 +282,17 @@ def _viewer_tls_evidence(facts: AwsResourceFacts, tls_state: str) -> list[str]:
     if facts.cloudfront_aliases:
         evidence.append("aliases=" + ",".join(facts.cloudfront_aliases))
     return evidence
+
+
+def _access_logging_evidence(facts: AwsResourceFacts) -> list[str]:
+    values = [f"cloudfront_logging_state={facts.cloudfront_logging_state or 'unknown'}"]
+    if facts.cloudfront_logging_bucket:
+        values.append(f"bucket={facts.cloudfront_logging_bucket}")
+    else:
+        values.append("logging_config.bucket is not configured")
+    if facts.cloudfront_logging_prefix:
+        values.append(f"prefix={facts.cloudfront_logging_prefix}")
+    return values
 
 
 def _edge_protection_evidence(facts: AwsResourceFacts, edge_protection_state: str) -> list[str]:

@@ -94,6 +94,18 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-cloudfront-access-logging-not-configured",
+        title="Public CloudFront distribution does not configure access logging",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure CloudFront `logging_config.bucket` for public distributions, use a dedicated retained "
+            "S3 destination with appropriate access controls, and set a reviewed prefix where it improves "
+            "log organization."
+        ),
+        tags=("aws", "cloudfront", "cdn", "logging", "access-logs", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-public-cloudfront-waf-missing",
         title="Public CloudFront distribution lacks modeled WAF protection",
         category=StrideCategory.TAMPERING,
