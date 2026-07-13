@@ -19,6 +19,12 @@ from tfstride.providers.azure.resource_utils import (
     unknown_block_at,
     value_is_unknown,
 )
+from tfstride.providers.coercion import (
+    STATE_DISABLED,
+    STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
+)
 
 AZURE_PROVIDER = "azure"
 
@@ -101,6 +107,9 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
         "scm_ip_restriction",
         uncertainties,
     )
+    auth_uncertainties: list[str] = []
+    auth_settings = _legacy_auth_settings(resource, values, auth_uncertainties)
+    auth_settings_v2 = _auth_settings_v2(resource, values, auth_uncertainties)
 
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
@@ -111,6 +120,8 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
         AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: public_network_fallback_state(
             public_network_access_enabled
         ),
+        AzureResourceMetadata.APP_SERVICE_AUTH_SETTINGS: auth_settings,
+        AzureResourceMetadata.APP_SERVICE_AUTH_SETTINGS_V2: auth_settings_v2,
     }
     if vnet_integration_subnet_id is not None:
         metadata[AzureResourceMetadata.APP_SERVICE_VNET_INTEGRATION_SUBNET_ID] = vnet_integration_subnet_id
@@ -134,6 +145,8 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
         metadata[AzureResourceMetadata.APP_SERVICE_SCM_ACCESS_RESTRICTIONS] = scm_access_restrictions
     if uncertainties:
         metadata[AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES] = uncertainties
+    if auth_uncertainties:
+        metadata[AzureResourceMetadata.APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES] = auth_uncertainties
     metadata.update(managed_identity_metadata(resource))
 
     return NormalizedResource(
@@ -146,6 +159,195 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
         public_access_configured=public_network_access_enabled is True,
         metadata=metadata,
     )
+
+
+def _legacy_auth_settings(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    settings, unknown_settings = _auth_settings_block(resource, values, "auth_settings", uncertainties)
+    if settings is None:
+        state = STATE_UNKNOWN if unknown_settings is True else STATE_NOT_CONFIGURED
+        return {"enabled_state": state, "token_store_state": state}
+    return _auth_settings_record(
+        settings,
+        unknown_settings,
+        enabled_key="enabled",
+        unauthenticated_action_key="unauthenticated_client_action",
+        token_store_parent=settings,
+        token_store_unknown=unknown_settings,
+        path="auth_settings",
+        uncertainties=uncertainties,
+    )
+
+
+def _auth_settings_v2(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    settings, unknown_settings = _auth_settings_block(resource, values, "auth_settings_v2", uncertainties)
+    if settings is None:
+        return {
+            "auth_enabled_state": STATE_UNKNOWN if unknown_settings is True else STATE_NOT_CONFIGURED,
+            "require_authentication_state": STATE_UNKNOWN if unknown_settings is True else STATE_NOT_CONFIGURED,
+            "token_store_state": STATE_UNKNOWN if unknown_settings is True else STATE_NOT_CONFIGURED,
+        }
+
+    login, unknown_login = _auth_nested_block(
+        settings,
+        unknown_settings,
+        "login",
+        path="auth_settings_v2.login",
+        uncertainties=uncertainties,
+    )
+    record = _auth_settings_record(
+        settings,
+        unknown_settings,
+        enabled_key="auth_enabled",
+        unauthenticated_action_key="unauthenticated_action",
+        token_store_parent=login,
+        token_store_unknown=unknown_login,
+        path="auth_settings_v2",
+        uncertainties=uncertainties,
+    )
+    record["auth_enabled_state"] = record.pop("enabled_state")
+    record["require_authentication_state"] = _auth_bool_state(
+        settings,
+        unknown_settings,
+        "require_authentication",
+        path="auth_settings_v2",
+        uncertainties=uncertainties,
+    )
+    return record
+
+
+def _auth_settings_block(
+    resource: TerraformResource,
+    values: Mapping[str, Any],
+    key: str,
+    uncertainties: list[str],
+) -> tuple[Mapping[str, Any] | None, Any]:
+    raw_unknown = resource.unknown_values.get(key)
+    if raw_unknown is True:
+        uncertainties.append(f"{key} is unknown after planning")
+        return None, True
+    raw = values.get(key)
+    unknown_block = unknown_block_at(raw_unknown, 0)
+    if raw in (None, [], {}):
+        if unknown_block not in (None, False, [], {}):
+            return {}, unknown_block
+        return None, unknown_block
+    block = first_mapping(raw)
+    if block is None:
+        uncertainties.append(f"{key} has an unrecognized value shape")
+    return block, unknown_block
+
+
+def _auth_nested_block(
+    parent: Mapping[str, Any],
+    unknown_parent: Any,
+    key: str,
+    *,
+    path: str,
+    uncertainties: list[str],
+) -> tuple[Mapping[str, Any] | None, Any]:
+    if unknown_parent is True:
+        return None, True
+    unknown_block = unknown_block_at(unknown_parent.get(key) if isinstance(unknown_parent, Mapping) else None, 0)
+    raw = parent.get(key)
+    if raw in (None, [], {}):
+        if unknown_block not in (None, False, [], {}):
+            return {}, unknown_block
+        return None, unknown_block
+    block = first_mapping(raw)
+    if block is None:
+        uncertainties.append(f"{path} has an unrecognized value shape")
+    return block, unknown_block
+
+
+def _auth_settings_record(
+    settings: Mapping[str, Any],
+    unknown_settings: Any,
+    *,
+    enabled_key: str,
+    unauthenticated_action_key: str,
+    token_store_parent: Mapping[str, Any] | None,
+    token_store_unknown: Any,
+    path: str,
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "enabled_state": _auth_bool_state(
+            settings,
+            unknown_settings,
+            enabled_key,
+            path=path,
+            uncertainties=uncertainties,
+        ),
+        "token_store_state": _auth_bool_state(
+            token_store_parent,
+            token_store_unknown,
+            "token_store_enabled",
+            path=f"{path}.login" if token_store_parent is not settings else path,
+            uncertainties=uncertainties,
+        ),
+    }
+    unauthenticated_action = _auth_string(
+        settings,
+        unknown_settings,
+        unauthenticated_action_key,
+        path=path,
+        uncertainties=uncertainties,
+    )
+    default_provider = _auth_string(
+        settings,
+        unknown_settings,
+        "default_provider",
+        path=path,
+        uncertainties=uncertainties,
+    )
+    if unauthenticated_action is not None:
+        record["unauthenticated_action"] = unauthenticated_action
+    if default_provider is not None:
+        record["default_provider"] = default_provider
+    return record
+
+
+def _auth_bool_state(
+    values: Mapping[str, Any] | None,
+    unknown_values: Any,
+    key: str,
+    *,
+    path: str,
+    uncertainties: list[str],
+) -> str:
+    if unknown_values is True:
+        return STATE_UNKNOWN
+    if isinstance(unknown_values, Mapping) and value_is_unknown(unknown_values.get(key)):
+        uncertainties.append(f"{path}.{key} is unknown after planning")
+        return STATE_UNKNOWN
+    if values is None or key not in values or values[key] is None:
+        return STATE_UNKNOWN
+    value = values[key]
+    if isinstance(value, bool):
+        return STATE_ENABLED if value else STATE_DISABLED
+    uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+    return STATE_UNKNOWN
+
+
+def _auth_string(
+    values: Mapping[str, Any],
+    unknown_values: Any,
+    key: str,
+    *,
+    path: str,
+    uncertainties: list[str],
+) -> str | None:
+    if unknown_values is True:
+        return None
+    return known_block_string(values, unknown_values, key, uncertainties, path=path)
 
 
 def _known_service_plan_reference(

@@ -364,6 +364,164 @@ class AzureAppServiceNormalizerTests(unittest.TestCase):
             ],
         )
 
+    def test_legacy_auth_settings_preserve_authentication_posture(self) -> None:
+        web_app = normalize_linux_web_app(
+            _resource(
+                AzureResourceType.LINUX_WEB_APP,
+                {
+                    "name": "api",
+                    "auth_settings": [
+                        {
+                            "enabled": True,
+                            "unauthenticated_client_action": "RedirectToLoginPage",
+                            "default_provider": "AzureActiveDirectory",
+                            "token_store_enabled": True,
+                        }
+                    ],
+                },
+                name="api",
+            )
+        )
+        facts = azure_facts(web_app)
+
+        self.assertEqual(
+            facts.app_service_auth_settings,
+            {
+                "enabled_state": "enabled",
+                "token_store_state": "enabled",
+                "unauthenticated_action": "RedirectToLoginPage",
+                "default_provider": "AzureActiveDirectory",
+            },
+        )
+        self.assertEqual(facts.app_service_legacy_auth_enabled_state, "enabled")
+        self.assertEqual(facts.app_service_legacy_unauthenticated_action, "RedirectToLoginPage")
+        self.assertEqual(facts.app_service_legacy_default_provider, "AzureActiveDirectory")
+        self.assertEqual(facts.app_service_legacy_token_store_state, "enabled")
+        self.assertEqual(facts.app_service_auth_posture_uncertainties, [])
+
+    def test_auth_settings_v2_preserve_authentication_posture(self) -> None:
+        function_app = normalize_linux_function_app(
+            _resource(
+                AzureResourceType.LINUX_FUNCTION_APP,
+                {
+                    "name": "worker",
+                    "auth_settings_v2": [
+                        {
+                            "auth_enabled": True,
+                            "require_authentication": True,
+                            "unauthenticated_action": "Return401",
+                            "default_provider": "azureactivedirectory",
+                            "login": [{"token_store_enabled": True}],
+                        }
+                    ],
+                },
+                name="worker",
+            )
+        )
+        facts = azure_facts(function_app)
+
+        self.assertEqual(
+            facts.app_service_auth_settings_v2,
+            {
+                "auth_enabled_state": "enabled",
+                "token_store_state": "enabled",
+                "unauthenticated_action": "Return401",
+                "default_provider": "azureactivedirectory",
+                "require_authentication_state": "enabled",
+            },
+        )
+        self.assertEqual(facts.app_service_auth_v2_enabled_state, "enabled")
+        self.assertEqual(facts.app_service_auth_v2_require_authentication_state, "enabled")
+        self.assertEqual(facts.app_service_auth_v2_unauthenticated_action, "Return401")
+        self.assertEqual(facts.app_service_auth_v2_default_provider, "azureactivedirectory")
+        self.assertEqual(facts.app_service_auth_v2_token_store_state, "enabled")
+        self.assertEqual(facts.app_service_auth_posture_uncertainties, [])
+
+    def test_absent_authentication_configuration_is_not_configured(self) -> None:
+        web_app = normalize_windows_web_app(
+            _resource(AzureResourceType.WINDOWS_WEB_APP, {"name": "admin"}, name="admin")
+        )
+        facts = azure_facts(web_app)
+
+        self.assertEqual(facts.app_service_legacy_auth_enabled_state, "not_configured")
+        self.assertEqual(facts.app_service_legacy_token_store_state, "not_configured")
+        self.assertEqual(facts.app_service_auth_v2_enabled_state, "not_configured")
+        self.assertEqual(facts.app_service_auth_v2_require_authentication_state, "not_configured")
+        self.assertEqual(facts.app_service_auth_v2_token_store_state, "not_configured")
+        self.assertEqual(facts.app_service_auth_posture_uncertainties, [])
+
+    def test_unknown_authentication_values_remain_explicit(self) -> None:
+        web_app = normalize_linux_web_app(
+            _resource(
+                AzureResourceType.LINUX_WEB_APP,
+                {
+                    "name": "pending",
+                    "auth_settings": [
+                        {
+                            "enabled": None,
+                            "unauthenticated_client_action": None,
+                            "default_provider": None,
+                            "token_store_enabled": None,
+                        }
+                    ],
+                    "auth_settings_v2": [
+                        {
+                            "auth_enabled": None,
+                            "require_authentication": None,
+                            "unauthenticated_action": None,
+                            "default_provider": None,
+                            "login": [{"token_store_enabled": None}],
+                        }
+                    ],
+                },
+                name="pending",
+                unknown_values={
+                    "auth_settings": [
+                        {
+                            "enabled": True,
+                            "unauthenticated_client_action": True,
+                            "default_provider": True,
+                            "token_store_enabled": True,
+                        }
+                    ],
+                    "auth_settings_v2": [
+                        {
+                            "auth_enabled": True,
+                            "require_authentication": True,
+                            "unauthenticated_action": True,
+                            "default_provider": True,
+                            "login": [{"token_store_enabled": True}],
+                        }
+                    ],
+                },
+            )
+        )
+        facts = azure_facts(web_app)
+
+        self.assertEqual(facts.app_service_legacy_auth_enabled_state, "unknown")
+        self.assertEqual(facts.app_service_legacy_token_store_state, "unknown")
+        self.assertIsNone(facts.app_service_legacy_unauthenticated_action)
+        self.assertIsNone(facts.app_service_legacy_default_provider)
+        self.assertEqual(facts.app_service_auth_v2_enabled_state, "unknown")
+        self.assertEqual(facts.app_service_auth_v2_require_authentication_state, "unknown")
+        self.assertEqual(facts.app_service_auth_v2_token_store_state, "unknown")
+        self.assertIsNone(facts.app_service_auth_v2_unauthenticated_action)
+        self.assertIsNone(facts.app_service_auth_v2_default_provider)
+        self.assertEqual(
+            facts.app_service_auth_posture_uncertainties,
+            [
+                "auth_settings.enabled is unknown after planning",
+                "auth_settings.token_store_enabled is unknown after planning",
+                "auth_settings.unauthenticated_client_action is unknown after planning",
+                "auth_settings.default_provider is unknown after planning",
+                "auth_settings_v2.auth_enabled is unknown after planning",
+                "auth_settings_v2.login.token_store_enabled is unknown after planning",
+                "auth_settings_v2.unauthenticated_action is unknown after planning",
+                "auth_settings_v2.default_provider is unknown after planning",
+                "auth_settings_v2.require_authentication is unknown after planning",
+            ],
+        )
+
     def test_azure_normalizer_supports_app_service_and_function_resource_types(self) -> None:
         inventory = AzureNormalizer().normalize(
             [

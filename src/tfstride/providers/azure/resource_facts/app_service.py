@@ -46,5 +46,61 @@ class AzureAppServiceFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.FTPS_STATE)
 
     @property
+    def app_service_auth_settings(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_AUTH_SETTINGS)
+
+    @property
+    def app_service_auth_settings_v2(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_AUTH_SETTINGS_V2)
+
+    @property
+    def app_service_legacy_auth_enabled_state(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings, "enabled_state")
+
+    @property
+    def app_service_legacy_unauthenticated_action(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings, "unauthenticated_action")
+
+    @property
+    def app_service_legacy_default_provider(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings, "default_provider")
+
+    @property
+    def app_service_legacy_token_store_state(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings, "token_store_state")
+
+    @property
+    def app_service_auth_v2_enabled_state(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings_v2, "auth_enabled_state")
+
+    @property
+    def app_service_auth_v2_require_authentication_state(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings_v2, "require_authentication_state")
+
+    @property
+    def app_service_auth_v2_unauthenticated_action(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings_v2, "unauthenticated_action")
+
+    @property
+    def app_service_auth_v2_default_provider(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings_v2, "default_provider")
+
+    @property
+    def app_service_auth_v2_token_store_state(self) -> str | None:
+        return _auth_string(self.app_service_auth_settings_v2, "token_store_state")
+
+    @property
+    def app_service_auth_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES)
+
+    @property
     def app_service_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES)
+
+
+def _auth_string(values: dict[str, Any], key: str) -> str | None:
+    value = values.get(key)
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
