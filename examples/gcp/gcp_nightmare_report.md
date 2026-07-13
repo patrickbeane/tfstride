@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **9 trust boundaries** and **42 findings** across **31 normalized resources**.
+This run identified **9 trust boundaries** and **43 findings** across **31 normalized resources**.
 
 - High severity findings: `14`
-- Medium severity findings: `26`
+- Medium severity findings: `27`
 - Low severity findings: `2`
 
 ## Analysis Coverage
@@ -19,8 +19,8 @@ This run identified **9 trust boundaries** and **42 findings** across **31 norma
 - Provider resources considered: `31`
 - Normalized resources: `31`
 - Unsupported resources: `0`
-- Registered rules: `197`
-- Enabled rules: `197`
+- Registered rules: `200`
+- Enabled rules: `200`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
@@ -34,6 +34,7 @@ This run identified **9 trust boundaries** and **42 findings** across **31 norma
   - `gcp-cloud-sql-public-ip-without-private-network`: `1`
   - `gcp-cloud-sql-ssl-not-required`: `1`
   - `gcp-cloud-sql-deletion-protection-disabled`: `1`
+  - `gcp-cloud-sql-zonal-availability`: `1`
   - `gcp-gcs-public-access`: `1`
   - `gcp-gcs-public-access-prevention-not-enforced`: `1`
   - `gcp-gcs-versioning-disabled`: `1`
@@ -371,6 +372,17 @@ This run identified **9 trust boundaries** and **42 findings** across **31 norma
 - Recommended mitigation: Enable Cloud SQL deletion protection for persistent environments and require explicit review before disabling it during planned database retirement.
 - Evidence:
   - lifecycle posture: deletion_protection is false
+
+#### Cloud SQL instance uses zonal availability
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app uses zonal Cloud SQL availability. A zonal failure or maintenance disruption can leave the database unavailable longer than a regional high-availability deployment.
+- Recommended mitigation: Use `REGIONAL` availability for production Cloud SQL instances that require higher availability, then validate application failover behavior and recovery objectives.
+- Evidence:
+  - availability posture: availability_type=ZONAL; engine=POSTGRES_15
 
 #### Cloud SQL public IPv4 is enabled without private network access
 

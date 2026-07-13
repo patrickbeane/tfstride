@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **2 trust boundaries** and **1 findings** across **11 normalized resources**.
+This run identified **2 trust boundaries** and **2 findings** across **11 normalized resources**.
 
 - High severity findings: `0`
-- Medium severity findings: `1`
+- Medium severity findings: `2`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,12 +19,13 @@ This run identified **2 trust boundaries** and **1 findings** across **11 normal
 - Provider resources considered: `11`
 - Normalized resources: `11`
 - Unsupported resources: `0`
-- Registered rules: `197`
-- Enabled rules: `197`
+- Registered rules: `200`
+- Enabled rules: `200`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
+  - `gcp-cloud-sql-zonal-availability`: `1`
   - `gcp-subnetwork-flow-logs-not-configured`: `1`
 
 ## Discovered Trust Boundaries
@@ -50,6 +51,17 @@ This run identified **2 trust boundaries** and **1 findings** across **11 normal
 No findings in this severity band.
 
 ### Medium
+
+#### Cloud SQL instance uses zonal availability
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app uses zonal Cloud SQL availability. A zonal failure or maintenance disruption can leave the database unavailable longer than a regional high-availability deployment.
+- Recommended mitigation: Use `REGIONAL` availability for production Cloud SQL instances that require higher availability, then validate application failover behavior and recovery objectives.
+- Evidence:
+  - availability posture: availability_type=ZONAL; engine=POSTGRES_15
 
 #### GCP subnetwork Flow Logs are not configured
 

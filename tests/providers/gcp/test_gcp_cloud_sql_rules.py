@@ -217,6 +217,125 @@ class GcpCloudSqlRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_cloud_sql_zonal_availability_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(ipv4_enabled=False, availability_type="ZONAL")])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-zonal-availability"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-zonal-availability")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(evidence["availability_posture"], ["availability_type=ZONAL", "engine=POSTGRES_15"])
+
+    def test_cloud_sql_regional_availability_is_not_flagged(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(ipv4_enabled=False, availability_type="REGIONAL")])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-zonal-availability"})),
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_cloud_sql_query_insights_disabled_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize([_cloud_sql_instance(ipv4_enabled=False, query_insights_enabled=False)])
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-query-insights-disabled"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-query-insights-disabled")
+        self.assertEqual(finding.severity.value, "low")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["query_insights_posture"],
+            ["query_insights_enabled=false", "query_insights_state=disabled"],
+        )
+
+    def test_cloud_sql_enabled_or_unknown_query_insights_are_not_flagged(self) -> None:
+        resources = (
+            _cloud_sql_instance(ipv4_enabled=False, query_insights_enabled=True),
+            _cloud_sql_instance(
+                ipv4_enabled=False,
+                unknown_settings={"insights_config": [{"query_insights_enabled": True}]},
+            ),
+        )
+
+        for resource in resources:
+            with self.subTest(resource=resource.unknown_values):
+                inventory = GcpNormalizer().normalize([resource])
+                findings = StrideRuleEngine().evaluate(
+                    inventory,
+                    [],
+                    rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-query-insights-disabled"})),
+                )
+
+                self.assertEqual(findings, [])
+
+    def test_cloud_sql_connector_enforcement_not_required_is_detected(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_sql_instance(
+                    ipv4_enabled=False,
+                    private_network="google_compute_network.main.id",
+                    connector_enforcement="NOT_REQUIRED",
+                )
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-sql-connector-enforcement-not-required"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.rule_id, "gcp-cloud-sql-connector-enforcement-not-required")
+        self.assertEqual(finding.severity.value, "medium")
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["connector_enforcement_posture"],
+            [
+                "connector_enforcement=NOT_REQUIRED",
+                "ipv4_enabled=false",
+                "private_network=google_compute_network.main.id",
+            ],
+        )
+
+    def test_cloud_sql_required_or_unknown_connector_enforcement_is_not_flagged(self) -> None:
+        resources = (
+            _cloud_sql_instance(ipv4_enabled=False, connector_enforcement="REQUIRED"),
+            _cloud_sql_instance(
+                ipv4_enabled=False,
+                unknown_settings={"connector_enforcement": True},
+            ),
+        )
+
+        for resource in resources:
+            with self.subTest(resource=resource.unknown_values):
+                inventory = GcpNormalizer().normalize([resource])
+                findings = StrideRuleEngine().evaluate(
+                    inventory,
+                    [],
+                    rule_policy=RulePolicy(
+                        enabled_rule_ids=frozenset({"gcp-cloud-sql-connector-enforcement-not-required"})
+                    ),
+                )
+
+                self.assertEqual(findings, [])
+
     def test_cloud_sql_deletion_protection_disabled_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(
             [

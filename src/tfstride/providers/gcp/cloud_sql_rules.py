@@ -238,6 +238,146 @@ class GcpCloudSqlRuleDetectors:
             )
         return findings
 
+    def detect_cloud_sql_zonal_availability(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for database in context.inventory.by_type("google_sql_database_instance"):
+            database_facts = gcp_facts(database)
+            if (database_facts.availability_type or "").strip().upper() != "ZONAL":
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=0,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{database.display_name} uses zonal Cloud SQL availability. A zonal failure or "
+                        "maintenance disruption can leave the database unavailable longer than a regional "
+                        "high-availability deployment."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "availability_posture",
+                            [
+                                "availability_type=ZONAL",
+                                f"engine={database_facts.engine or 'unknown'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloud_sql_query_insights_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for database in context.inventory.by_type("google_sql_database_instance"):
+            database_facts = gcp_facts(database)
+            if database_facts.query_insights_enabled is not False:
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=1,
+                lateral_movement=1,
+                blast_radius=0,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{database.display_name} explicitly disables Cloud SQL Query Insights. Database-native "
+                        "query behavior and investigation context will have less observability during performance "
+                        "or security incident review."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "query_insights_posture",
+                            [
+                                "query_insights_enabled=false",
+                                f"query_insights_state={database_facts.query_insights_state or 'unknown'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_cloud_sql_connector_enforcement_not_required(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "gcp":
+            return []
+
+        findings: list[Finding] = []
+        for database in context.inventory.by_type("google_sql_database_instance"):
+            database_facts = gcp_facts(database)
+            if (database_facts.connector_enforcement or "").strip().upper() != "NOT_REQUIRED":
+                continue
+
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=False,
+                privilege_breadth=0,
+                data_sensitivity=2,
+                lateral_movement=1,
+                blast_radius=0,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[database.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{database.display_name} does not require Cloud SQL connectors for client access. "
+                        "Direct connections remain possible, so client network and authentication controls rely "
+                        "on surrounding configuration instead of connector-only access paths. This does not by "
+                        "itself establish that the database is publicly reachable."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "connector_enforcement_posture",
+                            [
+                                "connector_enforcement=NOT_REQUIRED",
+                                f"ipv4_enabled={_bool_state(database_facts.ipv4_enabled)}",
+                                f"private_network={database_facts.private_network or 'unset'}",
+                            ],
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
     def detect_cloud_sql_deletion_protection_disabled(
         self,
         context: RuleEvaluationContext,
@@ -276,6 +416,12 @@ class GcpCloudSqlRuleDetectors:
                 )
             )
         return findings
+
+
+def _bool_state(value: bool | None) -> str:
+    if value is None:
+        return "unknown"
+    return str(value).lower()
 
 
 def _cloud_sql_ssl_enforced(sql_facts: GcpResourceFacts) -> bool:

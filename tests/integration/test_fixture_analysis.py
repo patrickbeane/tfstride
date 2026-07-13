@@ -102,12 +102,12 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "mixed": (FIXTURE_PATH, 15, {"high": 4, "medium": 10, "low": 1}),
             "nightmare": (NIGHTMARE_FIXTURE_PATH, 25, {"high": 7, "medium": 17, "low": 1}),
             "gcp-safe": (GCP_SAFE_FIXTURE_PATH, 0, {}),
-            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 4, {"high": 2, "medium": 2}),
-            "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 1, {"medium": 1}),
+            "gcp-baseline": (GCP_BASELINE_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
+            "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 2, {"medium": 2}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 6, {"high": 3, "medium": 3}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 23, {"high": 6, "medium": 17}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 42, {"high": 14, "medium": 26, "low": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 24, {"high": 6, "medium": 18}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 43, {"high": 14, "medium": 27, "low": 2}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 3, {"medium": 3}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
@@ -165,11 +165,13 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-safe": {},
             "gcp-baseline": {
                 "Cloud SQL point-in-time recovery is disabled": 1,
+                "Cloud SQL instance uses zonal availability": 1,
                 "GCP project IAM binding grants a high-privilege role": 1,
                 "GCP subnetwork Flow Logs are not configured": 1,
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
             },
             "gcp-lb-compute-sql": {
+                "Cloud SQL instance uses zonal availability": 1,
                 "GCP subnetwork Flow Logs are not configured": 1,
             },
             "gcp-serverless": {
@@ -189,6 +191,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "BigQuery IAM binding allows public or broad data access": 1,
                 "Cloud SQL automated backups are disabled": 1,
                 "Cloud SQL deletion protection is disabled": 1,
+                "Cloud SQL instance uses zonal availability": 1,
                 "Cloud SQL instance accepts public authorized network access": 1,
                 "Cloud SQL public IPv4 is enabled without private network access": 1,
                 "Cloud SQL public client access does not require SSL": 1,
@@ -215,6 +218,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Cloud Run service is publicly invokable": 1,
                 "Cloud SQL automated backups are disabled": 1,
                 "Cloud SQL deletion protection is disabled": 1,
+                "Cloud SQL instance uses zonal availability": 1,
                 "Cloud SQL instance accepts public authorized network access": 1,
                 "Cloud SQL public IPv4 is enabled without private network access": 1,
                 "Cloud SQL public client access does not require SSL": 1,
@@ -493,7 +497,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 23)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
-        self.assertEqual(len(result.findings), 23)
+        self.assertEqual(len(result.findings), 24)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)

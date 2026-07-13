@@ -66,6 +66,10 @@ def _cloud_sql_instance(
     require_ssl: bool = True,
     ssl_mode: str | None = None,
     deletion_protection: bool = True,
+    availability_type: str | None = None,
+    query_insights_enabled: bool | None = None,
+    connector_enforcement: str | None = None,
+    unknown_settings: dict[str, object] | None = None,
 ) -> TerraformResource:
     ip_configuration: dict[str, object] = {
         "ipv4_enabled": ipv4_enabled,
@@ -76,6 +80,23 @@ def _cloud_sql_instance(
         ip_configuration["private_network"] = private_network
     if ssl_mode is not None:
         ip_configuration["ssl_mode"] = ssl_mode
+
+    settings: dict[str, object] = {
+        "backup_configuration": [
+            {
+                "enabled": backup_enabled,
+                "point_in_time_recovery_enabled": pitr_enabled,
+            }
+        ],
+        "ip_configuration": [ip_configuration],
+    }
+    if availability_type is not None:
+        settings["availability_type"] = availability_type
+    if connector_enforcement is not None:
+        settings["connector_enforcement"] = connector_enforcement
+    if query_insights_enabled is not None:
+        settings["insights_config"] = [{"query_insights_enabled": query_insights_enabled}]
+
     return TerraformResource(
         address="google_sql_database_instance.app",
         mode="managed",
@@ -85,19 +106,10 @@ def _cloud_sql_instance(
         values={
             "name": "tfstride-app-db",
             "database_version": "POSTGRES_15",
-            "settings": [
-                {
-                    "backup_configuration": [
-                        {
-                            "enabled": backup_enabled,
-                            "point_in_time_recovery_enabled": pitr_enabled,
-                        }
-                    ],
-                    "ip_configuration": [ip_configuration],
-                }
-            ],
+            "settings": [settings],
             "deletion_protection": deletion_protection,
         },
+        unknown_values={"settings": [unknown_settings]} if unknown_settings is not None else {},
     )
 
 

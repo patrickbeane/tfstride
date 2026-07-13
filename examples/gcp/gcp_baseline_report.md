@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **1 trust boundaries** and **4 findings** across **9 normalized resources**.
+This run identified **1 trust boundaries** and **5 findings** across **9 normalized resources**.
 
 - High severity findings: `2`
-- Medium severity findings: `2`
+- Medium severity findings: `3`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,13 +19,14 @@ This run identified **1 trust boundaries** and **4 findings** across **9 normali
 - Provider resources considered: `9`
 - Normalized resources: `9`
 - Unsupported resources: `0`
-- Registered rules: `197`
-- Enabled rules: `197`
+- Registered rules: `200`
+- Enabled rules: `200`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-cloud-sql-point-in-time-recovery-disabled`: `1`
+  - `gcp-cloud-sql-zonal-availability`: `1`
   - `gcp-subnetwork-flow-logs-not-configured`: `1`
   - `gcp-project-iam-privileged-role`: `1`
   - `gcp-inherited-iam-blast-radius`: `1`
@@ -73,6 +74,17 @@ This run identified **1 trust boundaries** and **4 findings** across **9 normali
   - custom role permissions: iam.serviceAccounts.actAs
 
 ### Medium
+
+#### Cloud SQL instance uses zonal availability
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_sql_database_instance.app`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_sql_database_instance.app uses zonal Cloud SQL availability. A zonal failure or maintenance disruption can leave the database unavailable longer than a regional high-availability deployment.
+- Recommended mitigation: Use `REGIONAL` availability for production Cloud SQL instances that require higher availability, then validate application failover behavior and recovery objectives.
+- Evidence:
+  - availability posture: availability_type=ZONAL; engine=POSTGRES_15
 
 #### Cloud SQL point-in-time recovery is disabled
 

@@ -122,6 +122,39 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-sql-zonal-availability",
+        title="Cloud SQL instance uses zonal availability",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Use `REGIONAL` availability for production Cloud SQL instances that require higher availability, "
+            "then validate application failover behavior and recovery objectives."
+        ),
+        tags=("gcp", "cloud-sql", "database", "availability", "resilience"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-query-insights-disabled",
+        title="Cloud SQL Query Insights is disabled",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Enable Cloud SQL Query Insights for production databases and retain query telemetry according to "
+            "the organization's privacy, performance, and incident-response requirements."
+        ),
+        tags=("gcp", "cloud-sql", "database", "observability", "query-insights"),
+        severity_factors=("data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-sql-connector-enforcement-not-required",
+        title="Cloud SQL does not require connector-based client access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set Cloud SQL `connector_enforcement` to `REQUIRED` where workloads should use Cloud SQL connectors "
+            "or the Auth Proxy, and combine it with private networking and narrowly scoped database identities."
+        ),
+        tags=("gcp", "cloud-sql", "database", "connectivity", "connectors"),
+        severity_factors=("data_sensitivity", "lateral_movement"),
+    ),
+    RuleMetadata(
         rule_id="gcp-cloud-sql-private-connectivity-not-modeled",
         title="Cloud SQL private network lacks modeled private service access",
         category=StrideCategory.INFORMATION_DISCLOSURE,
