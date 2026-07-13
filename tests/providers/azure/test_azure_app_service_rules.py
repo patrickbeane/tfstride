@@ -11,6 +11,8 @@ from tfstride.providers.azure.rules import AZURE_RULE_GROUP_IDS
 
 _APP_RULE_IDS = (
     "azure-app-service-public-network-access-not-disabled",
+    "azure-app-service-platform-authentication-disabled",
+    "azure-app-service-anonymous-platform-access-allowed",
     "azure-app-service-minimum-tls-below-1-2",
     "azure-app-service-minimum-tls-unknown",
     "azure-app-service-managed-identity-missing",
@@ -48,6 +50,8 @@ def _app(
     tls_version: object = "1.2",
     identity: object = _MISSING,
     vnet_subnet: object = _MISSING,
+    auth_settings: object = _MISSING,
+    auth_settings_v2: object = _MISSING,
     site_config_overrides: dict[str, object] | None = None,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
@@ -70,6 +74,10 @@ def _app(
         values["identity"] = identity
     if vnet_subnet is not _MISSING:
         values["virtual_network_subnet_id"] = vnet_subnet
+    if auth_settings is not _MISSING:
+        values["auth_settings"] = auth_settings
+    if auth_settings_v2 is not _MISSING:
+        values["auth_settings_v2"] = auth_settings_v2
     return _resource(resource_type, name, values, unknown_values=unknown_values)
 
 
@@ -152,6 +160,121 @@ class AzureAppServicePublicNetworkRuleTests(unittest.TestCase):
         findings = _evaluate(
             [_app(public_network=False)],
             "azure-app-service-public-network-access-not-disabled",
+        )
+
+        self.assertEqual(findings, [])
+
+
+class AzureAppServiceAuthenticationRuleTests(unittest.TestCase):
+    def test_public_app_with_legacy_platform_authentication_disabled_emits_one_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    public_network=True,
+                    auth_settings=[
+                        {
+                            "enabled": False,
+                            "unauthenticated_client_action": "AllowAnonymous",
+                            "default_provider": "AzureActiveDirectory",
+                            "token_store_enabled": False,
+                        }
+                    ],
+                )
+            ],
+            "azure-app-service-platform-authentication-disabled",
+            "azure-app-service-anonymous-platform-access-allowed",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-platform-authentication-disabled"],
+        )
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertIn("application may still enforce its own authentication outside Terraform", finding.rationale)
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["platform_authentication"],
+            [
+                "configuration_source=auth_settings",
+                "platform_authentication_state=disabled",
+                "unauthenticated_action=AllowAnonymous",
+                "default_provider=AzureActiveDirectory",
+                "application-level authentication is not represented in Terraform",
+            ],
+        )
+
+    def test_public_app_with_v2_anonymous_platform_access_emits_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    resource_type=AzureResourceType.LINUX_FUNCTION_APP,
+                    public_network=True,
+                    auth_settings_v2=[
+                        {
+                            "auth_enabled": True,
+                            "require_authentication": True,
+                            "unauthenticated_action": "AllowAnonymous",
+                            "default_provider": "azureactivedirectory",
+                            "login": [{"token_store_enabled": True}],
+                        }
+                    ],
+                )
+            ],
+            "azure-app-service-anonymous-platform-access-allowed",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-anonymous-platform-access-allowed"],
+        )
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertIn("application may still enforce its own authentication outside Terraform", finding.rationale)
+        evidence = _evidence_by_key(finding)
+        self.assertEqual(
+            evidence["platform_authentication"],
+            [
+                "configuration_source=auth_settings_v2",
+                "platform_authentication_state=enabled",
+                "require_authentication_state=enabled",
+                "unauthenticated_action=AllowAnonymous",
+                "default_provider=azureactivedirectory",
+                "application-level authentication is not represented in Terraform",
+            ],
+        )
+
+    def test_private_or_unconfigured_platform_authentication_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _app(
+                    name="private",
+                    public_network=False,
+                    auth_settings_v2=[
+                        {
+                            "auth_enabled": False,
+                            "require_authentication": False,
+                            "unauthenticated_action": "AllowAnonymous",
+                            "login": [{"token_store_enabled": False}],
+                        }
+                    ],
+                ),
+                _app(name="unconfigured", public_network=True),
+                _app(
+                    name="protected",
+                    public_network=True,
+                    auth_settings_v2=[
+                        {
+                            "auth_enabled": True,
+                            "require_authentication": True,
+                            "unauthenticated_action": "Return401",
+                            "login": [{"token_store_enabled": True}],
+                        }
+                    ],
+                ),
+            ],
+            "azure-app-service-platform-authentication-disabled",
+            "azure-app-service-anonymous-platform-access-allowed",
         )
 
         self.assertEqual(findings, [])

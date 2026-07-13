@@ -415,6 +415,30 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-platform-authentication-disabled",
+        title="Public Azure App Service has platform authentication disabled",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Enable App Service authentication through `auth_settings` or `auth_settings_v2` for public apps, "
+            "configure a reviewed identity provider and unauthenticated-request action, and document any "
+            "application-level authentication controls that are intentionally enforced outside Terraform."
+        ),
+        tags=("azure", "app-service", "function-app", "authentication", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-anonymous-platform-access-allowed",
+        title="Public Azure App Service permits anonymous platform access",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Set the App Service unauthenticated-request action to require a reviewed identity provider or "
+            "return an authentication failure, unless anonymous access is an explicit product requirement; "
+            "document any application-level authentication enforced outside Terraform."
+        ),
+        tags=("azure", "app-service", "function-app", "authentication", "anonymous-access", "public-access"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-app-service-minimum-tls-below-1-2",
         title="Azure App Service allows TLS below 1.2",
         category=StrideCategory.INFORMATION_DISCLOSURE,

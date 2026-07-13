@@ -63,6 +63,8 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
+        "azure-app-service-platform-authentication-disabled",
+        "azure-app-service-anonymous-platform-access-allowed",
         "azure-app-service-minimum-tls-below-1-2",
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
@@ -183,6 +185,12 @@ def build_azure_rule_contribution(
         ),
         "azure-app-service-public-network-access-not-disabled": (
             app_service_detectors.detect_public_network_access_not_disabled
+        ),
+        "azure-app-service-platform-authentication-disabled": (
+            app_service_detectors.detect_platform_authentication_disabled
+        ),
+        "azure-app-service-anonymous-platform-access-allowed": (
+            app_service_detectors.detect_anonymous_platform_access_allowed
         ),
         "azure-app-service-minimum-tls-below-1-2": app_service_detectors.detect_minimum_tls_below_1_2,
         "azure-app-service-minimum-tls-unknown": app_service_detectors.detect_minimum_tls_unknown,

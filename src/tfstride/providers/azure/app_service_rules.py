@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import NamedTuple
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
@@ -10,7 +11,16 @@ from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_DISA
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES
 from tfstride.providers.azure.resource_utils import tls_version_below_1_2
+from tfstride.providers.coercion import STATE_DISABLED, STATE_ENABLED, STATE_NOT_CONFIGURED
 from tfstride.providers.kubernetes import is_broad_public_range
+
+
+class _PlatformAuthentication(NamedTuple):
+    source: str
+    enabled_state: str | None
+    unauthenticated_action: str | None
+    default_provider: str | None
+    require_authentication_state: str | None
 
 
 class AzureAppServiceRuleDetectors:
@@ -53,6 +63,104 @@ class AzureAppServiceRuleDetectors:
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
                         evidence_item("posture_uncertainty", _public_network_uncertainty_evidence(facts)),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_platform_authentication_disabled(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            authentication = _effective_platform_authentication(facts)
+            if facts.public_network_access_enabled is not True:
+                continue
+            if authentication is None or authentication.enabled_state != STATE_DISABLED:
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} has public network access enabled and its {authentication.source} "
+                        "configuration explicitly disables Azure platform authentication. The application may "
+                        "still enforce its own authentication outside Terraform, but tfSTRIDE cannot verify "
+                        "that control from this plan."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                        evidence_item(
+                            "platform_authentication",
+                            _platform_authentication_evidence(authentication),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+    def detect_anonymous_platform_access_allowed(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
+
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            authentication = _effective_platform_authentication(facts)
+            if facts.public_network_access_enabled is not True:
+                continue
+            if authentication is None or authentication.enabled_state != STATE_ENABLED:
+                continue
+            if not _allows_anonymous_platform_access(authentication.unauthenticated_action):
+                continue
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=1,
+                data_sensitivity=0,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=[app.address],
+                    trust_boundary_id=None,
+                    rationale=(
+                        f"{app.display_name} has public network access enabled and its {authentication.source} "
+                        "configuration explicitly allows anonymous requests. The application may still enforce "
+                        "its own authentication outside Terraform, but tfSTRIDE cannot verify that control "
+                        "from this plan."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item("target_resource", _target_resource_evidence(app)),
+                        evidence_item("network_posture", _public_network_evidence(facts)),
+                        evidence_item(
+                            "platform_authentication",
+                            _platform_authentication_evidence(authentication),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -389,6 +497,45 @@ def _public_network_evidence(facts: AzureResourceFacts) -> list[str]:
         values.append("public_network_access_enabled is false")
     else:
         values.append("public_network_access_enabled is unknown")
+    return values
+
+
+def _effective_platform_authentication(facts: AzureResourceFacts) -> _PlatformAuthentication | None:
+    if facts.app_service_auth_v2_enabled_state != STATE_NOT_CONFIGURED:
+        return _PlatformAuthentication(
+            source="auth_settings_v2",
+            enabled_state=facts.app_service_auth_v2_enabled_state,
+            unauthenticated_action=facts.app_service_auth_v2_unauthenticated_action,
+            default_provider=facts.app_service_auth_v2_default_provider,
+            require_authentication_state=facts.app_service_auth_v2_require_authentication_state,
+        )
+    if facts.app_service_legacy_auth_enabled_state != STATE_NOT_CONFIGURED:
+        return _PlatformAuthentication(
+            source="auth_settings",
+            enabled_state=facts.app_service_legacy_auth_enabled_state,
+            unauthenticated_action=facts.app_service_legacy_unauthenticated_action,
+            default_provider=facts.app_service_legacy_default_provider,
+            require_authentication_state=None,
+        )
+    return None
+
+
+def _allows_anonymous_platform_access(unauthenticated_action: str | None) -> bool:
+    return bool(unauthenticated_action and unauthenticated_action.strip().lower() == "allowanonymous")
+
+
+def _platform_authentication_evidence(authentication: _PlatformAuthentication) -> list[str]:
+    values = [
+        f"configuration_source={authentication.source}",
+        f"platform_authentication_state={authentication.enabled_state or 'unknown'}",
+    ]
+    if authentication.require_authentication_state is not None:
+        values.append(f"require_authentication_state={authentication.require_authentication_state}")
+    if authentication.unauthenticated_action:
+        values.append(f"unauthenticated_action={authentication.unauthenticated_action}")
+    if authentication.default_provider:
+        values.append(f"default_provider={authentication.default_provider}")
+    values.append("application-level authentication is not represented in Terraform")
     return values
 
 

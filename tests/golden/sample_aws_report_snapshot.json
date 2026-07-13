@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 202,
+      "registered_rule_count": 204,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -205,6 +205,8 @@
         "azure-managed-identity-broad-rbac",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
+        "azure-app-service-platform-authentication-disabled",
+        "azure-app-service-anonymous-platform-access-allowed",
         "azure-app-service-minimum-tls-below-1-2",
         "azure-app-service-minimum-tls-unknown",
         "azure-app-service-managed-identity-missing",
@@ -411,6 +413,8 @@
         "azure-managed-identity-broad-rbac": 0,
         "azure-public-workload-sensitive-resource-access": 0,
         "azure-app-service-public-network-access-not-disabled": 0,
+        "azure-app-service-platform-authentication-disabled": 0,
+        "azure-app-service-anonymous-platform-access-allowed": 0,
         "azure-app-service-minimum-tls-below-1-2": 0,
         "azure-app-service-minimum-tls-unknown": 0,
         "azure-app-service-managed-identity-missing": 0,
