@@ -7,10 +7,14 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.observations import observe_aws_controls
+from tfstride.providers.aws.resource_facts import aws_facts
 
 _CORS_RULE = "aws-api-gateway-cors-permissive"
 _WAF_RULE = "aws-public-api-gateway-waf-missing"
-_ALL_RULE_IDS = (_CORS_RULE, _WAF_RULE)
+_AUTHORIZATION_RULE = "aws-api-gateway-public-route-authorization-none"
+_STAGE_LOGGING_RULE = "aws-api-gateway-stage-access-logs-missing"
+_ALL_RULE_IDS = (_CORS_RULE, _WAF_RULE, _AUTHORIZATION_RULE, _STAGE_LOGGING_RULE)
 _REST_EXECUTION_ARN = "arn:aws:execute-api:us-east-1:111122223333:rest123"
 _V2_EXECUTION_ARN = "arn:aws:execute-api:us-east-1:111122223333:v2abc"
 _V2_ENDPOINT = "https://v2abc.execute-api.us-east-1.amazonaws.com"
@@ -45,6 +49,8 @@ def _rest_api(
     endpoint_types: tuple[str, ...] | object = ("REGIONAL",),
     vpc_endpoint_ids: tuple[str, ...] | object = (),
     disable_execute_api_endpoint: bool = False,
+    body: str | object = _MISSING,
+    unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     values: dict[str, Any] = {
         "id": api_id,
@@ -59,7 +65,14 @@ def _rest_api(
                 "vpc_endpoint_ids": list(vpc_endpoint_ids),  # type: ignore[arg-type]
             }
         ]
-    return _resource("aws_api_gateway_rest_api.orders", "aws_api_gateway_rest_api", values)
+    if body is not _MISSING:
+        values["body"] = body
+    return _resource(
+        "aws_api_gateway_rest_api.orders",
+        "aws_api_gateway_rest_api",
+        values,
+        unknown_values=unknown_values,
+    )
 
 
 def _v2_api(
@@ -91,6 +104,87 @@ def _v2_api(
     )
 
 
+def _rest_method(
+    *,
+    authorization: str | object = "NONE",
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {
+        "rest_api_id": "rest123",
+        "resource_id": "orders-resource",
+        "http_method": "POST",
+    }
+    if authorization is not _MISSING:
+        values["authorization"] = authorization
+    return _resource(
+        "aws_api_gateway_method.orders",
+        "aws_api_gateway_method",
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _rest_stage(
+    *,
+    access_log_settings: dict[str, Any] | object = _MISSING,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {
+        "rest_api_id": "rest123",
+        "stage_name": "prod",
+    }
+    if access_log_settings is not _MISSING:
+        values["access_log_settings"] = [access_log_settings]
+    return _resource(
+        "aws_api_gateway_stage.prod",
+        "aws_api_gateway_stage",
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _v2_route(
+    *,
+    authorization_type: str | object = "NONE",
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {
+        "api_id": "v2abc",
+        "route_key": "GET /orders",
+    }
+    if authorization_type is not _MISSING:
+        values["authorization_type"] = authorization_type
+    return _resource(
+        "aws_apigatewayv2_route.orders",
+        "aws_apigatewayv2_route",
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _v2_stage(
+    *,
+    access_log_settings: dict[str, Any] | object = _MISSING,
+    unknown_values: dict[str, Any] | None = None,
+) -> TerraformResource:
+    values: dict[str, Any] = {
+        "api_id": "v2abc",
+        "name": "$default",
+    }
+    if access_log_settings is not _MISSING:
+        values["access_log_settings"] = [access_log_settings]
+    return _resource(
+        "aws_apigatewayv2_stage.default",
+        "aws_apigatewayv2_stage",
+        values,
+        unknown_values=unknown_values,
+    )
+
+
+def _observations(resources: list[TerraformResource]):
+    return observe_aws_controls(AwsNormalizer().normalize(resources))
+
+
 def _wafv2_web_acl_association(
     *,
     resource_arn: object = _V2_STAGE_ARN,
@@ -117,6 +211,167 @@ def _evidence_by_key(finding):
 
 
 class AwsApiGatewayRuleTests(unittest.TestCase):
+    def test_public_rest_method_with_explicit_none_authorization_is_detected(self) -> None:
+        findings = _findings([_rest_api(), _rest_method()], _AUTHORIZATION_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_AUTHORIZATION_RULE])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "high")
+        self.assertEqual(
+            finding.affected_resources,
+            ["aws_api_gateway_rest_api.orders", "aws_api_gateway_method.orders"],
+        )
+        evidence = _evidence_by_key(finding)
+        self.assertIn("authorization_type=NONE", evidence["unauthenticated_method_or_route"])
+        self.assertIn("http_method=POST", evidence["unauthenticated_method_or_route"])
+        self.assertIn("public_endpoint_state=enabled", evidence["target_endpoint"])
+
+    def test_explicit_method_authorization_is_used_when_openapi_body_is_unresolved(self) -> None:
+        findings = _findings(
+            [
+                _rest_api(body=None, unknown_values={"body": True}),
+                _rest_method(),
+            ],
+            _AUTHORIZATION_RULE,
+        )
+
+        self.assertEqual([finding.rule_id for finding in findings], [_AUTHORIZATION_RULE])
+
+    def test_public_v2_route_with_explicit_none_authorization_is_detected(self) -> None:
+        findings = _findings([_v2_api(), _v2_route()], _AUTHORIZATION_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_AUTHORIZATION_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn("resource_kind=v2 route", evidence["unauthenticated_method_or_route"])
+        self.assertIn("route_key=GET /orders", evidence["unauthenticated_method_or_route"])
+
+    def test_authenticated_or_private_api_methods_and_routes_are_quiet(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _rest_api(),
+                    _rest_method(authorization="AWS_IAM"),
+                    _v2_api(),
+                    _v2_route(authorization_type="JWT"),
+                ],
+                _AUTHORIZATION_RULE,
+            ),
+            [],
+        )
+        self.assertEqual(
+            _findings(
+                [
+                    _rest_api(endpoint_types=("PRIVATE",), vpc_endpoint_ids=("vpce-1",)),
+                    _rest_method(),
+                ],
+                _AUTHORIZATION_RULE,
+            ),
+            [],
+        )
+
+    def test_unknown_authorization_emits_an_uncertainty_observation_not_a_finding(self) -> None:
+        resources = [
+            _rest_api(),
+            _rest_method(authorization=_MISSING, unknown_values={"authorization": True}),
+        ]
+
+        self.assertEqual(_findings(resources, _AUTHORIZATION_RULE), [])
+        observations = _observations(resources)
+        matches = [
+            observation
+            for observation in observations
+            if observation.observation_id == "aws-api-gateway-public-authorization-unknown"
+        ]
+
+        self.assertEqual(len(matches), 1)
+        observation = matches[0]
+        self.assertEqual(
+            observation.affected_resources,
+            ["aws_api_gateway_rest_api.orders", "aws_api_gateway_method.orders"],
+        )
+        evidence = {item.key: item.values for item in observation.evidence}
+        self.assertEqual(
+            evidence["unknown_authorization_posture"],
+            ["aws_api_gateway_method.orders: authorization is unknown after planning"],
+        )
+
+    def test_rest_api_with_only_unresolved_openapi_body_is_not_treated_as_unauthenticated(self) -> None:
+        resources = [_rest_api(body=None, unknown_values={"body": True})]
+        inventory = AwsNormalizer().normalize(resources)
+
+        self.assertEqual(aws_facts(inventory.resources[0]).api_gateway_openapi_body_state, "unknown")
+        self.assertEqual(_findings(resources, _AUTHORIZATION_RULE), [])
+        self.assertFalse(
+            any(
+                observation.observation_id == "aws-api-gateway-public-authorization-unknown"
+                for observation in _observations(resources)
+            )
+        )
+
+    def test_public_rest_stage_without_access_log_destination_is_detected(self) -> None:
+        findings = _findings([_rest_api(), _rest_stage()], _STAGE_LOGGING_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_STAGE_LOGGING_RULE])
+        finding = findings[0]
+        self.assertEqual(finding.severity.value, "medium")
+        self.assertEqual(
+            finding.affected_resources,
+            ["aws_api_gateway_rest_api.orders", "aws_api_gateway_stage.prod"],
+        )
+        evidence = _evidence_by_key(finding)
+        self.assertIn("stage_name=prod", evidence["stage_telemetry"])
+        self.assertIn("access_log_destination_arn is not configured", evidence["stage_telemetry"])
+
+    def test_public_v2_stage_without_access_log_destination_is_detected(self) -> None:
+        findings = _findings([_v2_api(), _v2_stage()], _STAGE_LOGGING_RULE)
+
+        self.assertEqual([finding.rule_id for finding in findings], [_STAGE_LOGGING_RULE])
+        evidence = _evidence_by_key(findings[0])
+        self.assertIn("resource_type=aws_apigatewayv2_stage", evidence["stage_telemetry"])
+        self.assertIn("stage_name=$default", evidence["stage_telemetry"])
+
+    def test_private_api_stage_without_access_logs_is_quiet(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _rest_api(endpoint_types=("PRIVATE",), vpc_endpoint_ids=("vpce-1",)),
+                    _rest_stage(),
+                ],
+                _STAGE_LOGGING_RULE,
+            ),
+            [],
+        )
+
+    def test_resolved_or_unknown_stage_log_destination_is_not_reported_as_missing(self) -> None:
+        self.assertEqual(
+            _findings(
+                [
+                    _v2_api(),
+                    _v2_stage(
+                        access_log_settings={
+                            "destination_arn": "arn:aws:logs:us-east-1:111122223333:log-group:api-access",
+                            "format": "$context.requestId",
+                        }
+                    ),
+                ],
+                _STAGE_LOGGING_RULE,
+            ),
+            [],
+        )
+        self.assertEqual(
+            _findings(
+                [
+                    _v2_api(),
+                    _v2_stage(
+                        access_log_settings={},
+                        unknown_values={"access_log_settings": [{"destination_arn": True}]},
+                    ),
+                ],
+                _STAGE_LOGGING_RULE,
+            ),
+            [],
+        )
+
     def test_public_http_api_with_wildcard_cors_is_detected(self) -> None:
         findings = _findings(
             [

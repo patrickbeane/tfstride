@@ -38,6 +38,8 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-public-cloudfront-waf-missing",
         "aws-api-gateway-cors-permissive",
         "aws-public-api-gateway-waf-missing",
+        "aws-api-gateway-public-route-authorization-none",
+        "aws-api-gateway-stage-access-logs-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -145,6 +147,10 @@ def build_aws_rule_contribution(
         "aws-public-cloudfront-waf-missing": cloudfront_detectors.detect_web_acl_missing,
         "aws-api-gateway-cors-permissive": api_gateway_detectors.detect_cors_permissive,
         "aws-public-api-gateway-waf-missing": api_gateway_detectors.detect_waf_missing,
+        "aws-api-gateway-public-route-authorization-none": (
+            api_gateway_detectors.detect_public_route_authorization_none
+        ),
+        "aws-api-gateway-stage-access-logs-missing": api_gateway_detectors.detect_stage_access_logs_missing,
         "aws-cloudtrail-multi-region-disabled": audit_detectors.detect_cloudtrail_multi_region_disabled,
         "aws-cloudtrail-log-file-validation-disabled": audit_detectors.detect_cloudtrail_log_file_validation_disabled,
         "aws-cloudtrail-management-events-disabled": (audit_detectors.detect_cloudtrail_management_events_disabled),

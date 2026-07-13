@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 200,
+      "registered_rule_count": 202,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -50,6 +50,8 @@
         "aws-public-cloudfront-waf-missing",
         "aws-api-gateway-cors-permissive",
         "aws-public-api-gateway-waf-missing",
+        "aws-api-gateway-public-route-authorization-none",
+        "aws-api-gateway-stage-access-logs-missing",
         "aws-cloudtrail-multi-region-disabled",
         "aws-cloudtrail-log-file-validation-disabled",
         "aws-cloudtrail-management-events-disabled",
@@ -254,6 +256,8 @@
         "aws-public-cloudfront-waf-missing": 0,
         "aws-api-gateway-cors-permissive": 0,
         "aws-public-api-gateway-waf-missing": 0,
+        "aws-api-gateway-public-route-authorization-none": 0,
+        "aws-api-gateway-stage-access-logs-missing": 0,
         "aws-cloudtrail-multi-region-disabled": 0,
         "aws-cloudtrail-log-file-validation-disabled": 0,
         "aws-cloudtrail-management-events-disabled": 0,

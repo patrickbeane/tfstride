@@ -128,6 +128,28 @@ AWS_RULE_METADATA = (
         severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-api-gateway-public-route-authorization-none",
+        title="Public API Gateway method or route permits unauthenticated requests",
+        category=StrideCategory.SPOOFING,
+        recommended_mitigation=(
+            "Configure an API Gateway authorizer, IAM authorization, or another reviewed authentication "
+            "mechanism for public methods and routes unless anonymous access is an explicit product requirement."
+        ),
+        tags=("aws", "api-gateway", "serverless", "authentication", "public-edge"),
+        severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-api-gateway-stage-access-logs-missing",
+        title="Public API Gateway stage lacks an access log destination",
+        category=StrideCategory.REPUDIATION,
+        recommended_mitigation=(
+            "Configure `access_log_settings.destination_arn` for public API Gateway stages and deliver "
+            "request logs to a retained, access-controlled CloudWatch Logs group or supported destination."
+        ),
+        tags=("aws", "api-gateway", "serverless", "logging", "public-edge"),
+        severity_factors=("internet_exposure", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-cloudtrail-multi-region-disabled",
         title="CloudTrail is not configured for multi-region auditing",
         category=StrideCategory.REPUDIATION,

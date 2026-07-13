@@ -116,6 +116,7 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "API_GATEWAY_PUBLIC_ENDPOINT_STATE": "api_gateway_public_endpoint_state",
             "API_GATEWAY_ROUTE_SELECTION_EXPRESSION": "api_gateway_route_selection_expression",
             "API_GATEWAY_ROUTE_KEY": "api_gateway_route_key",
+            "API_GATEWAY_OPENAPI_BODY_STATE": "api_gateway_openapi_body_state",
             "API_GATEWAY_ENDPOINT_TYPES": "api_gateway_endpoint_types",
             "API_GATEWAY_VPC_ENDPOINT_IDS": "api_gateway_vpc_endpoint_ids",
             "API_GATEWAY_AUTHORIZATION_SCOPES": "api_gateway_authorization_scopes",

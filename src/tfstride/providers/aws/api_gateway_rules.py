@@ -123,6 +123,168 @@ class AwsApiGatewayRuleDetectors:
             )
         return findings
 
+    def detect_public_route_authorization_none(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for api in context.inventory.by_type(*_PUBLIC_API_GATEWAY_TYPES):
+            facts = aws_facts(api)
+            if facts.api_gateway_public_endpoint_state != STATE_ENABLED:
+                continue
+            if _rest_api_has_unresolved_openapi_body_only(api, facts):
+                continue
+            for resource_kind, route in _api_authorization_records(facts):
+                if _normalized_authorization_type(route) != _AUTHORIZATION_NONE:
+                    continue
+                route_address = _record_string(route, "address")
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=True,
+                    privilege_breadth=2,
+                    data_sensitivity=0,
+                    lateral_movement=1,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=dedupe_addresses([api.address, route_address or ""]),
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{api.display_name} is publicly reachable and its modeled {resource_kind} uses "
+                            "authorization type NONE. Requests to that method or route do not require an "
+                            "API Gateway authorizer or IAM authorization."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_endpoint", _endpoint_evidence(api, facts)),
+                            evidence_item(
+                                "unauthenticated_method_or_route", _authorization_evidence(resource_kind, route)
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+    def detect_stage_access_logs_missing(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for api in context.inventory.by_type(*_PUBLIC_API_GATEWAY_TYPES):
+            facts = aws_facts(api)
+            if facts.api_gateway_public_endpoint_state != STATE_ENABLED:
+                continue
+            for stage in facts.api_gateway_stages:
+                if _record_string(stage, "access_log_destination_arn"):
+                    continue
+                if _stage_access_log_destination_is_unknown(stage, facts):
+                    continue
+                stage_address = _record_string(stage, "address")
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=True,
+                    privilege_breadth=0,
+                    data_sensitivity=0,
+                    lateral_movement=1,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=dedupe_addresses([api.address, stage_address or ""]),
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{api.display_name} is publicly reachable, but its modeled API Gateway stage does "
+                            "not configure a resolved access-log destination. Requests may not have durable "
+                            "stage-level request telemetry."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_endpoint", _endpoint_evidence(api, facts)),
+                            evidence_item("stage_telemetry", _stage_telemetry_evidence(stage)),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+
+_AUTHORIZATION_NONE = "none"
+_ACCESS_LOG_UNKNOWN_SUFFIX = "access_log_settings"
+
+
+def _rest_api_has_unresolved_openapi_body_only(api: NormalizedResource, facts: AwsResourceFacts) -> bool:
+    return (
+        api.resource_type == _AWS_API_GATEWAY_REST_API
+        and facts.api_gateway_openapi_body_state == "unknown"
+        and not facts.api_gateway_methods
+    )
+
+
+def _api_authorization_records(facts: AwsResourceFacts) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    methods = (("REST method", method) for method in facts.api_gateway_methods)
+    routes = (("v2 route", route) for route in facts.api_gateway_routes)
+    return tuple((*methods, *routes))
+
+
+def _normalized_authorization_type(record: Mapping[str, Any]) -> str | None:
+    value = _record_string(record, "authorization_type")
+    return value.lower() if value else None
+
+
+def _record_string(record: Mapping[str, Any], key: str) -> str | None:
+    value = record.get(key)
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _authorization_evidence(resource_kind: str, route: Mapping[str, Any]) -> list[str]:
+    values = [f"resource_kind={resource_kind}", "authorization_type=NONE"]
+    if address := _record_string(route, "address"):
+        values.append(f"address={address}")
+    if resource_id := _record_string(route, "resource_id"):
+        values.append(f"resource_id={resource_id}")
+    if http_method := _record_string(route, "http_method"):
+        values.append(f"http_method={http_method}")
+    if route_key := _record_string(route, "route_key"):
+        values.append(f"route_key={route_key}")
+    return values
+
+
+def _stage_access_log_destination_is_unknown(stage: Mapping[str, Any], facts: AwsResourceFacts) -> bool:
+    stage_address = _record_string(stage, "address")
+    if not stage_address:
+        return True
+    prefix = f"{stage_address}: "
+    return any(
+        uncertainty.startswith(prefix + _ACCESS_LOG_UNKNOWN_SUFFIX)
+        for uncertainty in facts.api_gateway_posture_uncertainties
+    )
+
+
+def _stage_telemetry_evidence(stage: Mapping[str, Any]) -> list[str]:
+    values = ["access_log_destination_arn is not configured"]
+    if address := _record_string(stage, "address"):
+        values.append(f"address={address}")
+    if resource_type := _record_string(stage, "resource_type"):
+        values.append(f"resource_type={resource_type}")
+    if stage_name := _record_string(stage, "stage_name"):
+        values.append(f"stage_name={stage_name}")
+    if log_format := _record_string(stage, "access_log_format"):
+        values.append(f"access_log_format={log_format}")
+    return values
+
 
 def _normalized_protocol_type(facts: AwsResourceFacts) -> str | None:
     value = facts.api_gateway_protocol_type

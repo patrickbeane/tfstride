@@ -199,6 +199,7 @@ class AwsResourceMetadata:
     API_GATEWAY_PUBLIC_ENDPOINT_STATE = OptionalStringMetadataField("api_gateway_public_endpoint_state")
     API_GATEWAY_ROUTE_SELECTION_EXPRESSION = OptionalStringMetadataField("api_gateway_route_selection_expression")
     API_GATEWAY_ROUTE_KEY = OptionalStringMetadataField("api_gateway_route_key")
+    API_GATEWAY_OPENAPI_BODY_STATE = OptionalStringMetadataField("api_gateway_openapi_body_state")
     API_GATEWAY_PARENT_API_ADDRESS = OptionalStringMetadataField("api_gateway_parent_api_address")
     API_GATEWAY_METHOD_RESOURCE_ID = OptionalStringMetadataField("api_gateway_method_resource_id")
     API_GATEWAY_METHOD_HTTP_METHOD = OptionalStringMetadataField("api_gateway_method_http_method")

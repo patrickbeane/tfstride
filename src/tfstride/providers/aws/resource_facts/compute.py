@@ -159,6 +159,10 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.API_GATEWAY_ROUTE_KEY)
 
     @property
+    def api_gateway_openapi_body_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.API_GATEWAY_OPENAPI_BODY_STATE)
+
+    @property
     def api_gateway_cors_configuration(self) -> dict[str, Any]:
         return self.get(AwsResourceMetadata.API_GATEWAY_CORS_CONFIGURATION)
 

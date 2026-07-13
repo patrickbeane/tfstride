@@ -14,6 +14,7 @@ from tfstride.providers.aws.policy_conditions import (
     trust_statement_principal_assessments,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.coercion import STATE_ENABLED
 from tfstride.resource_helpers import policy_allows_public_access
 
 
@@ -22,6 +23,7 @@ def observe_aws_controls(inventory: ResourceInventory) -> list[Observation]:
     observations.extend(_observe_bucket_public_access_blocks(inventory))
     observations.extend(_observe_narrowed_trust(inventory))
     observations.extend(_observe_private_encrypted_databases(inventory))
+    observations.extend(_observe_api_gateway_authorization_uncertainties(inventory))
     observations.sort(
         key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id)
     )
@@ -153,3 +155,61 @@ def _observe_private_encrypted_databases(inventory: ResourceInventory) -> list[O
             )
         )
     return observations
+
+
+_API_GATEWAY_PUBLIC_TYPES = (
+    "aws_api_gateway_rest_api",
+    "aws_apigatewayv2_api",
+)
+_AUTHORIZATION_UNKNOWN_SUFFIXES = (
+    "authorization is unknown after planning",
+    "authorization_type is unknown after planning",
+)
+
+
+def _observe_api_gateway_authorization_uncertainties(inventory: ResourceInventory) -> list[Observation]:
+    if inventory.provider != "aws":
+        return []
+
+    observations: list[Observation] = []
+    for api in inventory.by_type(*_API_GATEWAY_PUBLIC_TYPES):
+        facts = aws_facts(api)
+        if facts.api_gateway_public_endpoint_state != STATE_ENABLED:
+            continue
+        uncertainties = [
+            uncertainty
+            for uncertainty in facts.api_gateway_posture_uncertainties
+            if uncertainty.endswith(_AUTHORIZATION_UNKNOWN_SUFFIXES)
+        ]
+        if not uncertainties:
+            continue
+        affected_resources = [api.address, *_uncertainty_source_addresses(uncertainties)]
+        observations.append(
+            Observation(
+                title="Public API Gateway authorization contains unresolved plan values",
+                observation_id="aws-api-gateway-public-authorization-unknown",
+                category="analysis-uncertainty",
+                affected_resources=list(dict.fromkeys(affected_resources)),
+                rationale=(
+                    f"{api.display_name} has public methods or routes whose API Gateway authorization value is "
+                    "computed. tfSTRIDE does not infer unauthenticated access from unresolved plan values."
+                ),
+                evidence=collect_evidence(
+                    evidence_item("unknown_authorization_posture", uncertainties),
+                    evidence_item(
+                        "analysis_effect",
+                        ["unauthenticated access findings are emitted only for explicit authorization type NONE"],
+                    ),
+                ),
+            )
+        )
+    return observations
+
+
+def _uncertainty_source_addresses(uncertainties: list[str]) -> list[str]:
+    addresses: list[str] = []
+    for uncertainty in uncertainties:
+        address, separator, _ = uncertainty.partition(": ")
+        if separator and address:
+            addresses.append(address)
+    return list(dict.fromkeys(addresses))

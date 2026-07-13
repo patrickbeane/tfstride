@@ -8,8 +8,10 @@ from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
     STATE_DISABLED,
     STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
     STATE_UNKNOWN,
     as_optional_int,
     attribute_unknown,
@@ -69,6 +71,7 @@ def normalize_api_gateway_rest_api(resource: TerraformResource) -> NormalizedRes
             uncertainties,
             path="endpoint_configuration",
         )
+    openapi_body_state = _openapi_body_state(values, unknown_values, uncertainties)
     execute_api_endpoint_state = _execute_api_endpoint_state(disable_execute_api_endpoint)
     public_endpoint_state = _rest_api_public_endpoint_state(endpoint_types, execute_api_endpoint_state)
 
@@ -96,6 +99,7 @@ def normalize_api_gateway_rest_api(resource: TerraformResource) -> NormalizedRes
             ),
             AwsResourceMetadata.API_GATEWAY_EXECUTE_API_ENDPOINT_STATE: execute_api_endpoint_state,
             AwsResourceMetadata.API_GATEWAY_PUBLIC_ENDPOINT_STATE: public_endpoint_state,
+            AwsResourceMetadata.API_GATEWAY_OPENAPI_BODY_STATE: openapi_body_state,
             AwsResourceMetadata.API_GATEWAY_POSTURE_UNCERTAINTIES: uncertainties,
             "tags": values.get("tags", {}),
         },
@@ -154,6 +158,23 @@ def normalize_apigatewayv2_api(resource: TerraformResource) -> NormalizedResourc
     )
     _set_public_endpoint_reasons(normalized, public_endpoint_state, "API Gateway v2 execute-api endpoint is public")
     return normalized
+
+
+def _openapi_body_state(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> str:
+    if attribute_unknown(unknown_values, "body"):
+        uncertainties.append("body is unknown after planning")
+        return STATE_UNKNOWN
+    body = values.get("body")
+    if body in (None, ""):
+        return STATE_NOT_CONFIGURED
+    if isinstance(body, str):
+        return STATE_CONFIGURED
+    uncertainties.append("body has an unrecognized value shape")
+    return STATE_UNKNOWN
 
 
 def _execute_api_endpoint_state(disable_execute_api_endpoint: bool | None) -> str:
