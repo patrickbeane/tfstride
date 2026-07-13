@@ -24,12 +24,36 @@ dashboard = [
 ]
 dev = [
   "pytest>=8,<10",
+  "basedpyright==1.39.9",
   "ruff>=0.5,<1",
   "vulture>=2.16,<3",
 ]
 
 [project.scripts]
 tfstride = "tfstride.cli:main"
+
+[tool.basedpyright]
+include = [
+  "src/tfstride/providers/base.py",
+  "src/tfstride/providers/plugin.py",
+  "src/tfstride/providers/contracts.py",
+  "src/tfstride/providers/metadata_ownership.py",
+  "src/tfstride/resource_metadata.py",
+  "src/tfstride/analysis/indexes.py",
+  "src/tfstride/analysis/boundaries/types.py",
+  "src/tfstride/analysis/rule_definitions.py",
+  "src/tfstride/providers/aws/plugin.py",
+  "src/tfstride/providers/gcp/plugin.py",
+  "src/tfstride/providers/azure/plugin.py",
+]
+extraPaths = ["src"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+failOnWarnings = true
+reportMissingTypeArgument = "error"
+reportUnknownMemberType = "error"
+reportIncompatibleMethodOverride = "error"
+reportIncompatibleVariableOverride = "error"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
