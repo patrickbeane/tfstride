@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from tfstride.models import NormalizedResource, Observation, ResourceInventory
 from tfstride.providers.base import ProviderNormalizer
@@ -36,8 +36,7 @@ class ProviderPluginError(ValueError):
 class ProviderResourceDecorator(Protocol):
     """Provider-owned post-normalization resource decoration hook."""
 
-    def decorate(self, resources: list[NormalizedResource]) -> None:
-        raise NotImplementedError
+    def decorate(self, resources: list[NormalizedResource]) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +45,7 @@ class ProviderPlugin:
 
     provider: str
     normalizer_factory: Callable[[], ProviderNormalizer]
-    metadata_namespace: type
+    metadata_namespace: type[Any]
     supported_resource_types: frozenset[str]
     resource_capabilities: ResourceCapabilityMap = field(default_factory=dict)
     limitations: tuple[str, ...] = ()
@@ -214,11 +213,12 @@ def observation_factories_by_provider_from_plugins(
 def analysis_index_factories_by_provider_from_plugins(
     plugins: Iterable[ProviderPlugin],
 ) -> dict[str, AnalysisIndexExtensionFactory]:
-    return {
-        plugin.provider: plugin.analysis_index_factory
-        for plugin in plugins
-        if plugin.analysis_index_factory is not None
-    }
+    factories_by_provider: dict[str, AnalysisIndexExtensionFactory] = {}
+    for plugin in plugins:
+        factory = plugin.analysis_index_factory
+        if factory is not None:
+            factories_by_provider[plugin.provider] = factory
+    return factories_by_provider
 
 
 def rule_metadata_from_plugins(plugins: Iterable[ProviderPlugin]) -> tuple[RuleMetadata, ...]:
@@ -250,7 +250,7 @@ def rule_contribution_from_plugins(
 
 def _normalize_resource_capabilities(
     provider: str,
-    capabilities: Mapping[ResourceCapability | str, frozenset[str]],
+    capabilities: ResourceCapabilityMap,
 ) -> dict[ResourceCapability, frozenset[str]]:
     try:
         registry = ProviderResourceCapabilityRegistry([(provider, capabilities)])

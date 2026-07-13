@@ -48,7 +48,7 @@ class NormalizedResourceMetadataWriteValidator:
                 )
             field_owners[id(field)] = _SHARED_METADATA_OWNER
 
-        provider_namespaces = {
+        provider_namespaces: dict[str, type[Any]] = {
             "aws": AwsResourceMetadata,
             "gcp": GcpResourceMetadata,
             "azure": AzureResourceMetadata,
@@ -113,7 +113,7 @@ class ProviderMetadataWriteValidator:
         cls,
         *,
         provider: str,
-        namespace: type,
+        namespace: type[Any],
         contract: ResourceMetadataOwnershipContract = DEFAULT_RESOURCE_METADATA_OWNERSHIP_CONTRACT,
     ) -> ProviderMetadataWriteValidator:
         provider_key = normalize_provider_name(provider)
@@ -144,5 +144,5 @@ class ProviderMetadataWriteValidator:
         )
 
 
-def _metadata_fields_by_name(namespace: type) -> dict[str, MetadataField[Any]]:
+def _metadata_fields_by_name(namespace: type[Any]) -> dict[str, MetadataField[Any]]:
     return {name: value for name, value in vars(namespace).items() if isinstance(value, MetadataField)}
