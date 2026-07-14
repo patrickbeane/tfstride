@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 
-from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import ResourceCategory, TerraformResource
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -167,12 +166,11 @@ class AzureServiceBusNormalizerTests(unittest.TestCase):
             ],
         )
 
-    def test_namespace_is_a_data_store_without_new_findings(self) -> None:
+    def test_namespace_is_a_data_store(self) -> None:
         inventory = AzureNormalizer().normalize([_namespace(values={"public_network_access_enabled": True})])
         namespace = inventory.resources[0]
 
         self.assertTrue(default_resource_capability_registry().has_capability(namespace, ResourceCapability.DATA_STORE))
-        self.assertEqual(StrideRuleEngine().evaluate(inventory, []), [])
 
     def test_companion_resources_do_not_resolve_bare_namespace_names(self) -> None:
         namespace = _namespace()

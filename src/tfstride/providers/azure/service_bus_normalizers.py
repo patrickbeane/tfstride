@@ -69,6 +69,7 @@ def normalize_servicebus_namespace(resource: TerraformResource) -> NormalizedRes
         AzureResourceMetadata.SERVICE_BUS_LOCAL_AUTH_STATE: bool_state(local_auth_enabled),
         AzureResourceMetadata.NETWORK_DEFAULT_ACTION: network_default_action,
         AzureResourceMetadata.SERVICE_BUS_NETWORK_RULE_SOURCE_ADDRESS: network_rule_source_address,
+        AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: network_rule_source_address,
         AzureResourceMetadata.SERVICE_BUS_CUSTOMER_MANAGED_KEY_STATE: cmk_state,
         AzureResourceMetadata.SERVICE_BUS_KEY_VAULT_KEY_ID: key_vault_key_id,
         AzureResourceMetadata.SERVICE_BUS_CUSTOMER_MANAGED_KEY_SOURCE_ADDRESS: cmk_source_address,
@@ -120,6 +121,7 @@ def normalize_servicebus_namespace_network_rule_set(resource: TerraformResource)
         AzureResourceMetadata.SERVICE_BUS_NAMESPACE_REFERENCE: namespace_reference,
         AzureResourceMetadata.NETWORK_DEFAULT_ACTION: default_action,
         AzureResourceMetadata.SERVICE_BUS_NETWORK_RULE_SOURCE_ADDRESS: resource.address,
+        AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS: resource.address,
         AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: public_network_fallback_state(
             public_network_access_enabled
         ),

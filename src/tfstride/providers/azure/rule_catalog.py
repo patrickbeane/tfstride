@@ -225,6 +225,72 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-service-bus-public-network-access-not-disabled",
+        title="Azure Service Bus namespace does not disable public network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public network access for Service Bus where possible. If public connectivity is required, "
+            "use an effective default-deny network rule with narrow reviewed exceptions and do not treat it as "
+            "equivalent to private-only access."
+        ),
+        tags=("azure", "service-bus", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-service-bus-minimum-tls-below-1-2",
+        title="Azure Service Bus namespace allows TLS below 1.2",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set `minimum_tls_version` to `1.2` and remove Service Bus clients that require deprecated TLS versions."
+        ),
+        tags=("azure", "service-bus", "tls"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-service-bus-minimum-tls-unknown",
+        title="Azure Service Bus namespace minimum TLS posture is unknown",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Set `minimum_tls_version` explicitly to `1.2` or newer so Terraform plan analysis can verify "
+            "Service Bus transport protection."
+        ),
+        tags=("azure", "service-bus", "tls", "configuration-uncertainty"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-service-bus-local-auth-enabled",
+        title="Azure Service Bus namespace permits local or SAS authorization",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable local authorization where application compatibility permits it, use Microsoft Entra ID with "
+            "least-privilege roles, and rotate or retire existing shared access policies and connection strings."
+        ),
+        tags=("azure", "service-bus", "identity", "sas", "local-auth"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-service-bus-customer-managed-key-missing",
+        title="Azure Service Bus namespace lacks customer-managed key control",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "For Premium namespaces that require customer key ownership, configure a customer-managed Key Vault "
+            "key and retain deterministic Terraform references for key review and rotation governance."
+        ),
+        tags=("azure", "service-bus", "encryption", "cmk", "key-management"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-service-bus-missing-private-endpoint",
+        title="Azure Service Bus namespace lacks resolved private endpoint coverage",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "For Premium namespaces, add a Private Endpoint for the namespace, configure Private DNS, verify "
+            "clients use the private path, and explicitly disable public network access where possible."
+        ),
+        tags=("azure", "service-bus", "private-endpoint", "public-fallback"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-key-vault-public-network-access",
         title="Azure Key Vault allows unrestricted public network access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

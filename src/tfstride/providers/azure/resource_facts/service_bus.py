@@ -32,6 +32,11 @@ class AzureServiceBusFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.SERVICE_BUS_TIER)
 
     @property
+    def service_bus_is_premium_tier(self) -> bool:
+        tier = self.service_bus_tier or self.service_bus_sku
+        return bool(tier and tier.strip().lower() == "premium")
+
+    @property
     def service_bus_local_auth_state(self) -> str | None:
         return self.get(AzureResourceMetadata.SERVICE_BUS_LOCAL_AUTH_STATE)
 
@@ -79,6 +84,7 @@ class AzureServiceBusFacts(AzureBaseFacts):
     ) -> None:
         self.set(AzureResourceMetadata.NETWORK_DEFAULT_ACTION, default_action)
         self.set(AzureResourceMetadata.SERVICE_BUS_NETWORK_RULE_SOURCE_ADDRESS, source_address)
+        self.set(AzureResourceMetadata.NETWORK_RULE_SOURCE_ADDRESS, source_address)
         if public_network_access_enabled is not None:
             self.set(AzureResourceMetadata.PUBLIC_NETWORK_ACCESS_ENABLED, public_network_access_enabled)
             self.set(

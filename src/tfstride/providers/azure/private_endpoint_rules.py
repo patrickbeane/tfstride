@@ -30,6 +30,7 @@ _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.STORAGE_ACCOUNT,
     AzureResourceType.KEY_VAULT,
     AzureResourceType.MSSQL_SERVER,
+    AzureResourceType.SERVICE_BUS_NAMESPACE,
 )
 
 
@@ -90,6 +91,22 @@ class AzurePrivateEndpointPostureRuleDetectors:
                 f"{resource.display_name} does not have a resolved private endpoint and may expose database "
                 "access through public Azure SQL endpoints when public network fallback is enabled or unknown."
             ),
+        )
+
+    def detect_service_bus_namespace_missing_private_endpoint(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_missing_private_endpoint(
+            context,
+            rule_id,
+            resource_type=AzureResourceType.SERVICE_BUS_NAMESPACE,
+            rationale=lambda resource: (
+                f"{resource.display_name} does not have a resolved private endpoint and may remain reachable "
+                "through public Azure Service Bus endpoints when public network fallback is enabled or unknown."
+            ),
+            eligible=lambda _resource, facts: facts.service_bus_is_premium_tier,
         )
 
     def detect_private_endpoint_public_fallback(
@@ -227,6 +244,7 @@ class AzurePrivateEndpointPostureRuleDetectors:
         *,
         resource_type: str,
         rationale: Callable[[NormalizedResource], str],
+        eligible: Callable[[NormalizedResource, AzureResourceFacts], bool] | None = None,
     ) -> list[Finding]:
         if context.inventory.provider != "azure":
             return []
@@ -235,6 +253,8 @@ class AzurePrivateEndpointPostureRuleDetectors:
         findings: list[Finding] = []
         for resource in context.inventory.by_type(resource_type):
             facts = azure_facts(resource)
+            if eligible is not None and not eligible(resource, facts):
+                continue
             if facts.public_network_fallback_state == PUBLIC_NETWORK_FALLBACK_DISABLED:
                 continue
             coverage = index.coverage_for(resource)
@@ -571,6 +591,8 @@ def _posture_uncertainties(
         return facts.key_vault_network_uncertainties
     if resource.resource_type == AzureResourceType.MSSQL_SERVER:
         return facts.mssql_posture_uncertainties
+    if resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
+        return facts.service_bus_posture_uncertainties
     return []
 
 

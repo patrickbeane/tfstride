@@ -22,6 +22,7 @@ from tfstride.providers.azure.network_telemetry_rules import AzureNetworkTelemet
 from tfstride.providers.azure.postgresql_rules import AzurePostgresqlRuleDetectors
 from tfstride.providers.azure.private_endpoint_rules import AzurePrivateEndpointPostureRuleDetectors
 from tfstride.providers.azure.rbac_rules import AzureCustomRoleRuleDetectors
+from tfstride.providers.azure.service_bus_rules import AzureServiceBusRuleDetectors
 from tfstride.providers.azure.storage_rules import AzureStorageRuleDetectors
 
 AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
@@ -46,6 +47,12 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-storage-account-container-soft-delete-insufficient",
         "azure-storage-account-point-in-time-restore-missing",
         "azure-storage-account-missing-private-endpoint",
+        "azure-service-bus-public-network-access-not-disabled",
+        "azure-service-bus-minimum-tls-below-1-2",
+        "azure-service-bus-minimum-tls-unknown",
+        "azure-service-bus-local-auth-enabled",
+        "azure-service-bus-customer-managed-key-missing",
+        "azure-service-bus-missing-private-endpoint",
         "azure-key-vault-public-network-access",
         "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
@@ -121,6 +128,7 @@ def build_azure_rule_contribution(
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
+    service_bus_detectors = AzureServiceBusRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     custom_role_detectors = AzureCustomRoleRuleDetectors(finding_factory)
     iam_assignment_detectors = AzureIamAssignmentRuleDetectors(finding_factory)
@@ -160,6 +168,16 @@ def build_azure_rule_contribution(
         "azure-storage-account-point-in-time-restore-missing": (storage_detectors.detect_point_in_time_restore_missing),
         "azure-storage-account-missing-private-endpoint": (
             private_endpoint_detectors.detect_storage_account_missing_private_endpoint
+        ),
+        "azure-service-bus-public-network-access-not-disabled": (
+            service_bus_detectors.detect_public_network_access_not_disabled
+        ),
+        "azure-service-bus-minimum-tls-below-1-2": (service_bus_detectors.detect_minimum_tls_below_1_2),
+        "azure-service-bus-minimum-tls-unknown": service_bus_detectors.detect_minimum_tls_unknown,
+        "azure-service-bus-local-auth-enabled": service_bus_detectors.detect_local_auth_enabled,
+        "azure-service-bus-customer-managed-key-missing": (service_bus_detectors.detect_customer_managed_key_missing),
+        "azure-service-bus-missing-private-endpoint": (
+            private_endpoint_detectors.detect_service_bus_namespace_missing_private_endpoint
         ),
         "azure-key-vault-public-network-access": key_vault_detectors.detect_public_network_access,
         "azure-key-vault-missing-private-endpoint": (
