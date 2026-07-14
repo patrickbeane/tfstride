@@ -74,6 +74,21 @@ class GcpResourceMetadata:
     SECRET_MANAGER_VERSION_DESTROY_TTL = OptionalStringMetadataField("secret_manager_version_destroy_ttl")
     PUBSUB_TOPIC_REFERENCE = OptionalStringMetadataField("pubsub_topic_reference")
     PUBSUB_SUBSCRIPTION_REFERENCE = OptionalStringMetadataField("pubsub_subscription_reference")
+    PUBSUB_TOPIC_KMS_KEY_NAME = OptionalStringMetadataField("pubsub_topic_kms_key_name")
+    PUBSUB_TOPIC_CMEK_STATE = OptionalStringMetadataField("pubsub_topic_cmek_state")
+    PUBSUB_TOPIC_MESSAGE_RETENTION_DURATION = OptionalStringMetadataField("pubsub_topic_message_retention_duration")
+    PUBSUB_TOPIC_MESSAGE_RETENTION_STATE = OptionalStringMetadataField("pubsub_topic_message_retention_state")
+    PUBSUB_SUBSCRIPTION_DEAD_LETTER_POLICY_STATE = OptionalStringMetadataField(
+        "pubsub_subscription_dead_letter_policy_state"
+    )
+    PUBSUB_SUBSCRIPTION_DEAD_LETTER_TOPIC = OptionalStringMetadataField("pubsub_subscription_dead_letter_topic")
+    PUBSUB_SUBSCRIPTION_FILTER = OptionalStringMetadataField("pubsub_subscription_filter")
+    PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_DURATION = OptionalStringMetadataField(
+        "pubsub_subscription_message_retention_duration"
+    )
+    PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_STATE = OptionalStringMetadataField(
+        "pubsub_subscription_message_retention_state"
+    )
     BIGQUERY_DATASET_ID = OptionalStringMetadataField("bigquery_dataset_id")
     BIGQUERY_DATASET_REFERENCE = OptionalStringMetadataField("bigquery_dataset_reference")
     BIGQUERY_TABLE_ID = OptionalStringMetadataField("bigquery_table_id")
@@ -87,6 +102,14 @@ class GcpResourceMetadata:
     PUBLIC_ACCESS_PREVENTION = OptionalStringMetadataField("public_access_prevention")
     GCS_DEFAULT_KMS_KEY_NAME = OptionalStringMetadataField("gcs_default_kms_key_name")
     GCS_RETENTION_PERIOD_SECONDS = OptionalIntMetadataField("gcs_retention_period_seconds")
+    PUBSUB_TOPIC_MESSAGE_RETENTION_SECONDS = OptionalIntMetadataField("pubsub_topic_message_retention_seconds")
+    PUBSUB_SUBSCRIPTION_ACK_DEADLINE_SECONDS = OptionalIntMetadataField("pubsub_subscription_ack_deadline_seconds")
+    PUBSUB_SUBSCRIPTION_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS = OptionalIntMetadataField(
+        "pubsub_subscription_dead_letter_max_delivery_attempts"
+    )
+    PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_SECONDS = OptionalIntMetadataField(
+        "pubsub_subscription_message_retention_seconds"
+    )
     PRIVATE_CONNECTIVITY_PREFIX_LENGTH = OptionalIntMetadataField("private_connectivity_prefix_length")
     ROUTE_DEST_RANGE = OptionalStringMetadataField("route_dest_range")
     ROUTE_NEXT_HOP_GATEWAY = OptionalStringMetadataField("route_next_hop_gateway")
@@ -177,6 +200,7 @@ class GcpResourceMetadata:
     PRIVATE_IP_GOOGLE_ACCESS = BoolMetadataField("private_ip_google_access")
     UNIFORM_BUCKET_LEVEL_ACCESS = BoolMetadataField("uniform_bucket_level_access")
     GCS_VERSIONING_ENABLED = BoolMetadataField("gcs_versioning_enabled")
+    PUBSUB_SUBSCRIPTION_RETAIN_ACKED_MESSAGES = BoolMetadataField("pubsub_subscription_retain_acked_messages")
     GCS_RETENTION_POLICY_LOCKED = BoolMetadataField("gcs_retention_policy_locked")
     SERVICE_ACCOUNT_DISABLED = BoolMetadataField("service_account_disabled")
     OS_LOGIN_ENABLED = BoolMetadataField("os_login_enabled")
@@ -214,6 +238,7 @@ class GcpResourceMetadata:
     CUSTOM_ROLE_PERMISSIONS = StringListMetadataField("custom_role_permissions")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("gcp_resource_policy_source_addresses")
     GCS_RETENTION_POLICY_UNCERTAINTIES = StringListMetadataField("gcs_retention_policy_uncertainties")
+    PUBSUB_POSTURE_UNCERTAINTIES = StringListMetadataField("pubsub_posture_uncertainties")
     SECRET_MANAGER_KMS_KEY_NAMES = StringListMetadataField("secret_manager_kms_key_names")
     SECRET_MANAGER_POSTURE_UNCERTAINTIES = StringListMetadataField("secret_manager_posture_uncertainties")
     KMS_POSTURE_UNCERTAINTIES = StringListMetadataField("kms_posture_uncertainties")
@@ -278,6 +303,12 @@ class GcpResourceMetadata:
     GKE_BINARY_AUTHORIZATION = DictMetadataField("gke_binary_authorization")
     SCC_ASSET_DISCOVERY_CONFIG = DictMetadataField("scc_asset_discovery_config")
     SUBNETWORK_FLOW_LOG_CONFIG = DictMetadataField("subnetwork_flow_log_config")
+    PUBSUB_TOPIC_MESSAGE_STORAGE_POLICY = DictListMetadataField("pubsub_topic_message_storage_policy")
+    PUBSUB_TOPIC_SCHEMA_SETTINGS = DictListMetadataField("pubsub_topic_schema_settings")
+    PUBSUB_SUBSCRIPTION_DEAD_LETTER_POLICY = DictListMetadataField("pubsub_subscription_dead_letter_policy")
+    PUBSUB_SUBSCRIPTION_EXPIRATION_POLICY = DictListMetadataField("pubsub_subscription_expiration_policy")
+    PUBSUB_SUBSCRIPTION_PUSH_CONFIG = DictListMetadataField("pubsub_subscription_push_config")
+    PUBSUB_SUBSCRIPTION_RETRY_POLICY = DictListMetadataField("pubsub_subscription_retry_policy")
     CLOUD_SQL_AUTHORIZED_NETWORKS = DictListMetadataField("cloud_sql_authorized_networks")
     CLOUD_SQL_BACKUP_CONFIGURATION = DictMetadataField("cloud_sql_backup_configuration")
     CLOUD_SQL_IP_CONFIGURATION = DictMetadataField("cloud_sql_ip_configuration")

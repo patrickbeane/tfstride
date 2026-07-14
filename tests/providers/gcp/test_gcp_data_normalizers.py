@@ -543,7 +543,7 @@ class GcpDataNormalizerTests(GcpNormalizerTestCase):
             normalized.get_metadata_field(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE),
             "google_pubsub_topic.events.id",
         )
-        self.assertTrue(normalized.metadata_snapshot()["retain_acked_messages"])
+        self.assertTrue(normalized.get_metadata_field(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_RETAIN_ACKED_MESSAGES))
 
     def test_bigquery_dataset_and_table_normalizers_preserve_data_context(self) -> None:
         dataset = normalize_bigquery_dataset(

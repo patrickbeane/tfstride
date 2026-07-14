@@ -9,6 +9,7 @@ from tfstride.providers.gcp.resource_facts.gke import GcpGkeFacts
 from tfstride.providers.gcp.resource_facts.iam import GcpIamFacts
 from tfstride.providers.gcp.resource_facts.identity import GcpIdentityFacts
 from tfstride.providers.gcp.resource_facts.kms import GcpKmsFacts
+from tfstride.providers.gcp.resource_facts.messaging import GcpMessagingFacts
 from tfstride.providers.gcp.resource_facts.network import GcpNetworkFacts
 from tfstride.providers.gcp.resource_facts.secret_manager import GcpSecretManagerFacts
 from tfstride.providers.gcp.resource_facts.storage import GcpStorageFacts
@@ -16,6 +17,7 @@ from tfstride.providers.gcp.resource_facts.storage import GcpStorageFacts
 
 class GcpResourceFacts(
     GcpStorageFacts,
+    GcpMessagingFacts,
     GcpSecretManagerFacts,
     GcpKmsFacts,
     GcpIamFacts,

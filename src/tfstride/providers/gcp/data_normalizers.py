@@ -6,17 +6,20 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
     STATE_DISABLED,
     STATE_ENABLED,
     STATE_NOT_CONFIGURED,
     STATE_UNKNOWN,
     as_list,
+    as_optional_int,
     known_block_bool,
     known_block_string,
     value_is_unknown,
 )
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_bool, dedupe, first_item
+from tfstride.providers.gcp.data_rule_utils import gcp_duration_seconds
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -128,7 +131,28 @@ def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
     name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
     identifier = first_non_empty(values.get(GcpAttr.ID), name, resource.address)
-    kms_key_name = first_non_empty(values.get(GcpAttr.KMS_KEY_NAME))
+    uncertainties: list[str] = []
+    kms_key_name, cmek_state = _pubsub_cmek_posture(resource, uncertainties)
+    message_retention_duration, message_retention_seconds, message_retention_state = _pubsub_message_retention_posture(
+        resource,
+        uncertainties,
+    )
+    metadata: dict[object, object] = {
+        GcpResourceMetadata.NAME: name,
+        GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
+        GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE: identifier,
+        GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
+        GcpResourceMetadata.PUBSUB_TOPIC_KMS_KEY_NAME: kms_key_name,
+        GcpResourceMetadata.PUBSUB_TOPIC_CMEK_STATE: cmek_state,
+        GcpResourceMetadata.PUBSUB_TOPIC_MESSAGE_RETENTION_DURATION: message_retention_duration,
+        GcpResourceMetadata.PUBSUB_TOPIC_MESSAGE_RETENTION_SECONDS: message_retention_seconds,
+        GcpResourceMetadata.PUBSUB_TOPIC_MESSAGE_RETENTION_STATE: message_retention_state,
+        GcpResourceMetadata.PUBSUB_TOPIC_MESSAGE_STORAGE_POLICY: values.get(GcpAttr.MESSAGE_STORAGE_POLICY),
+        GcpResourceMetadata.PUBSUB_TOPIC_SCHEMA_SETTINGS: values.get(GcpAttr.SCHEMA_SETTINGS),
+        GcpResourceMetadata.PUBSUB_POSTURE_UNCERTAINTIES: uncertainties,
+    }
+    if cmek_state != STATE_UNKNOWN:
+        metadata[GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION] = cmek_state == STATE_CONFIGURED
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -138,17 +162,7 @@ def normalize_pubsub_topic(resource: TerraformResource) -> NormalizedResource:
             category=ResourceCategory.DATA,
             identifier=identifier,
             data_sensitivity="sensitive",
-            metadata={
-                GcpResourceMetadata.NAME: name,
-                GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
-                GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE: identifier,
-                GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-                "kms_key_name": kms_key_name,
-                "message_retention_duration": values.get(GcpAttr.MESSAGE_RETENTION_DURATION),
-                "message_storage_policy": values.get(GcpAttr.MESSAGE_STORAGE_POLICY),
-                "schema_settings": values.get(GcpAttr.SCHEMA_SETTINGS),
-                GcpResourceMetadata.CUSTOMER_MANAGED_ENCRYPTION: bool(kms_key_name),
-            },
+            metadata=metadata,
         )
     )
 
@@ -158,6 +172,17 @@ def normalize_pubsub_subscription(resource: TerraformResource) -> NormalizedReso
     name = first_non_empty(values.get(GcpAttr.NAME), resource.name)
     identifier = first_non_empty(values.get(GcpAttr.ID), name, resource.address)
     topic_reference = first_non_empty(values.get(GcpAttr.TOPIC))
+    uncertainties: list[str] = []
+    message_retention_duration, message_retention_seconds, message_retention_state = _pubsub_message_retention_posture(
+        resource,
+        uncertainties,
+    )
+    (
+        dead_letter_policy,
+        dead_letter_policy_state,
+        dead_letter_topic,
+        dead_letter_max_delivery_attempts,
+    ) = _pubsub_dead_letter_posture(resource, uncertainties)
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -173,17 +198,115 @@ def normalize_pubsub_subscription(resource: TerraformResource) -> NormalizedReso
                 GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE: identifier,
                 GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE: topic_reference,
                 GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
-                "ack_deadline_seconds": values.raw(GcpAttr.ACK_DEADLINE_SECONDS),
-                "dead_letter_policy": values.get(GcpAttr.DEAD_LETTER_POLICY),
-                "expiration_policy": values.get(GcpAttr.EXPIRATION_POLICY),
-                "filter": values.get(GcpAttr.FILTER),
-                "message_retention_duration": values.get(GcpAttr.MESSAGE_RETENTION_DURATION),
-                "push_config": values.get(GcpAttr.PUSH_CONFIG),
-                "retain_acked_messages": as_bool(values.get(GcpAttr.RETAIN_ACKED_MESSAGES)),
-                "retry_policy": values.get(GcpAttr.RETRY_POLICY),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_ACK_DEADLINE_SECONDS: as_optional_int(
+                    values.raw(GcpAttr.ACK_DEADLINE_SECONDS)
+                ),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_DEAD_LETTER_POLICY: dead_letter_policy,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_DEAD_LETTER_POLICY_STATE: dead_letter_policy_state,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_DEAD_LETTER_TOPIC: dead_letter_topic,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS: (
+                    dead_letter_max_delivery_attempts
+                ),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_EXPIRATION_POLICY: values.get(GcpAttr.EXPIRATION_POLICY),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_FILTER: values.get(GcpAttr.FILTER),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_DURATION: message_retention_duration,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_SECONDS: message_retention_seconds,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_MESSAGE_RETENTION_STATE: message_retention_state,
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_PUSH_CONFIG: values.get(GcpAttr.PUSH_CONFIG),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_RETAIN_ACKED_MESSAGES: as_bool(
+                    values.get(GcpAttr.RETAIN_ACKED_MESSAGES)
+                ),
+                GcpResourceMetadata.PUBSUB_SUBSCRIPTION_RETRY_POLICY: values.get(GcpAttr.RETRY_POLICY),
+                GcpResourceMetadata.PUBSUB_POSTURE_UNCERTAINTIES: uncertainties,
             },
         )
     )
+
+
+def _pubsub_cmek_posture(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> tuple[str | None, str]:
+    if value_is_unknown(resource.unknown_values.get(GcpAttr.KMS_KEY_NAME.key)):
+        uncertainties.append("kms_key_name is unknown after planning")
+        return None, STATE_UNKNOWN
+
+    raw_key_name = resource.values.get(GcpAttr.KMS_KEY_NAME.key)
+    if raw_key_name is None:
+        return None, STATE_NOT_CONFIGURED
+    if not isinstance(raw_key_name, str):
+        uncertainties.append("kms_key_name has an unrecognized value shape")
+        return None, STATE_UNKNOWN
+
+    key_name = raw_key_name.strip()
+    if not key_name:
+        return None, STATE_NOT_CONFIGURED
+    return key_name, STATE_CONFIGURED
+
+
+def _pubsub_message_retention_posture(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> tuple[str | None, int | None, str]:
+    if value_is_unknown(resource.unknown_values.get(GcpAttr.MESSAGE_RETENTION_DURATION.key)):
+        uncertainties.append("message_retention_duration is unknown after planning")
+        return None, None, STATE_UNKNOWN
+
+    raw_duration = resource.values.get(GcpAttr.MESSAGE_RETENTION_DURATION.key)
+    if raw_duration is None:
+        return None, None, STATE_NOT_CONFIGURED
+    if not isinstance(raw_duration, str):
+        uncertainties.append("message_retention_duration has an unrecognized value shape")
+        return None, None, STATE_UNKNOWN
+
+    duration = raw_duration.strip()
+    if not duration:
+        return None, None, STATE_NOT_CONFIGURED
+    seconds = gcp_duration_seconds(duration)
+    if seconds is None:
+        uncertainties.append("message_retention_duration has an unrecognized duration")
+        return duration, None, STATE_UNKNOWN
+    return duration, seconds, STATE_CONFIGURED
+
+
+def _pubsub_dead_letter_posture(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> tuple[list[dict[str, Any]], str, str | None, int | None]:
+    values = GcpValues(resource.values)
+    policy = values.get(GcpAttr.DEAD_LETTER_POLICY)
+    unknown_policy = resource.unknown_values.get(GcpAttr.DEAD_LETTER_POLICY.key)
+    if unknown_policy is True:
+        uncertainties.append("dead_letter_policy is unknown after planning")
+        return policy, STATE_UNKNOWN, None, None
+    if not policy:
+        return [], STATE_NOT_CONFIGURED, None, None
+
+    first_policy = first_item(policy)
+    if first_policy is None:
+        uncertainties.append("dead_letter_policy has an unrecognized value shape")
+        return policy, STATE_UNKNOWN, None, None
+
+    unknown_block = first_unknown_block(unknown_policy)
+    topic_unknown = value_is_unknown(block_value(unknown_block, "dead_letter_topic"))
+    attempts_unknown = value_is_unknown(block_value(unknown_block, "max_delivery_attempts"))
+    if topic_unknown:
+        uncertainties.append("dead_letter_policy.dead_letter_topic is unknown after planning")
+    if attempts_unknown:
+        uncertainties.append("dead_letter_policy.max_delivery_attempts is unknown after planning")
+
+    raw_topic = first_policy.get("dead_letter_topic")
+    dead_letter_topic = raw_topic.strip() if isinstance(raw_topic, str) and raw_topic.strip() else None
+    if dead_letter_topic is None and not topic_unknown:
+        uncertainties.append("dead_letter_policy.dead_letter_topic is not represented in the Terraform plan")
+
+    raw_attempts = first_policy.get("max_delivery_attempts")
+    max_delivery_attempts = None if attempts_unknown else as_optional_int(raw_attempts)
+    if raw_attempts is not None and max_delivery_attempts is None and not attempts_unknown:
+        uncertainties.append("dead_letter_policy.max_delivery_attempts has an unrecognized value shape")
+
+    state = STATE_CONFIGURED if dead_letter_topic is not None and not topic_unknown else STATE_UNKNOWN
+    return policy, state, dead_letter_topic, max_delivery_attempts
 
 
 def normalize_bigquery_dataset(resource: TerraformResource) -> NormalizedResource:
