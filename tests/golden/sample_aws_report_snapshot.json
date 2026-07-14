@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 205,
+      "registered_rule_count": 208,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -109,6 +109,9 @@
         "aws-role-trust-missing-narrowing",
         "gcp-sensitive-resource-iam-external-access",
         "gcp-pubsub-public-access",
+        "gcp-pubsub-topic-customer-managed-encryption-missing",
+        "gcp-pubsub-message-retention-insufficient",
+        "gcp-pubsub-subscription-dead-letter-policy-missing",
         "gcp-bigquery-public-access",
         "gcp-public-workload-sensitive-data-access",
         "gcp-cloud-sql-public-authorized-network",
@@ -318,6 +321,9 @@
         "aws-role-trust-missing-narrowing": 1,
         "gcp-sensitive-resource-iam-external-access": 0,
         "gcp-pubsub-public-access": 0,
+        "gcp-pubsub-topic-customer-managed-encryption-missing": 0,
+        "gcp-pubsub-message-retention-insufficient": 0,
+        "gcp-pubsub-subscription-dead-letter-policy-missing": 0,
         "gcp-bigquery-public-access": 0,
         "gcp-public-workload-sensitive-data-access": 0,
         "gcp-cloud-sql-public-authorized-network": 0,

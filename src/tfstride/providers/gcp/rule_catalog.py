@@ -27,6 +27,39 @@ GCP_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-pubsub-topic-customer-managed-encryption-missing",
+        title="Pub/Sub topic does not use customer-managed encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure a customer-managed Cloud KMS key for sensitive Pub/Sub topics where key ownership, "
+            "rotation, audit separation, or compliance requirements warrant it."
+        ),
+        tags=("gcp", "pubsub", "encryption", "cmek"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-pubsub-message-retention-insufficient",
+        title="Pub/Sub message retention is below the recovery baseline",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure Pub/Sub topic or subscription message retention to meet the workload recovery objective, "
+            "including enough time to replay messages after subscriber failures or destructive changes."
+        ),
+        tags=("gcp", "pubsub", "retention", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-pubsub-subscription-dead-letter-policy-missing",
+        title="Pub/Sub subscription does not configure a dead-letter policy",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure a reviewed Pub/Sub dead-letter topic and delivery-attempt threshold for subscriptions "
+            "where poison messages or repeated delivery failures could disrupt processing."
+        ),
+        tags=("gcp", "pubsub", "dead-letter", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-bigquery-public-access",
         title="BigQuery IAM binding allows public or broad data access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

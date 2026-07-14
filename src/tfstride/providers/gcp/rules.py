@@ -16,6 +16,9 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
         "gcp-sensitive-resource-iam-external-access",
         "gcp-pubsub-public-access",
+        "gcp-pubsub-topic-customer-managed-encryption-missing",
+        "gcp-pubsub-message-retention-insufficient",
+        "gcp-pubsub-subscription-dead-letter-policy-missing",
         "gcp-bigquery-public-access",
         "gcp-cloud-sql-public-authorized-network",
         "gcp-cloud-sql-backup-disabled",
@@ -98,6 +101,13 @@ def build_gcp_rule_contribution(
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "gcp-sensitive-resource-iam-external-access": gcp_detectors.detect_sensitive_iam_external_access,
         "gcp-pubsub-public-access": gcp_detectors.detect_pubsub_public_access,
+        "gcp-pubsub-topic-customer-managed-encryption-missing": (
+            gcp_detectors.detect_pubsub_topic_customer_managed_encryption_missing
+        ),
+        "gcp-pubsub-message-retention-insufficient": (gcp_detectors.detect_pubsub_message_retention_insufficient),
+        "gcp-pubsub-subscription-dead-letter-policy-missing": (
+            gcp_detectors.detect_pubsub_subscription_dead_letter_policy_missing
+        ),
         "gcp-bigquery-public-access": gcp_detectors.detect_bigquery_public_access,
         "gcp-cloud-sql-public-authorized-network": gcp_detectors.detect_cloud_sql_public_authorized_network,
         "gcp-cloud-sql-backup-disabled": gcp_detectors.detect_cloud_sql_backup_disabled,

@@ -106,8 +106,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
             "gcp-lb-compute-sql": (GCP_LB_COMPUTE_SQL_FIXTURE_PATH, 2, {"medium": 2}),
             "gcp-serverless": (GCP_SERVERLESS_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
             "gcp-cross-project-iam": (GCP_CROSS_PROJECT_IAM_FIXTURE_PATH, 6, {"high": 3, "medium": 3}),
-            "gcp-inventory": (GCP_FIXTURE_PATH, 24, {"high": 6, "medium": 18}),
-            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 43, {"high": 14, "medium": 27, "low": 2}),
+            "gcp-inventory": (GCP_FIXTURE_PATH, 26, {"high": 6, "medium": 20}),
+            "gcp-nightmare": (GCP_NIGHTMARE_FIXTURE_PATH, 45, {"high": 14, "medium": 29, "low": 2}),
             "azure-safe": (AZURE_SAFE_FIXTURE_PATH, 0, {}),
             "azure-compute": (AZURE_COMPUTE_FIXTURE_PATH, 3, {"medium": 3}),
             "azure-identity": (AZURE_IDENTITY_FIXTURE_PATH, 5, {"high": 2, "medium": 3}),
@@ -208,6 +208,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Internet-exposed GCP workload can access sensitive data services": 1,
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
+                "Pub/Sub subscription does not configure a dead-letter policy": 1,
+                "Pub/Sub topic does not use customer-managed encryption": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Secret Manager secret does not use customer-managed encryption": 1,
                 "Secret Manager lifecycle posture is incomplete": 1,
@@ -250,6 +252,8 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
                 "Inherited GCP IAM grant reaches sensitive resources": 1,
                 "Inherited GCP IAM grant expands descendant blast radius": 1,
                 "Pub/Sub IAM binding allows public or broad data access": 1,
+                "Pub/Sub subscription does not configure a dead-letter policy": 1,
+                "Pub/Sub topic does not use customer-managed encryption": 1,
                 "Sensitive GCP resource IAM binding allows broad or external access": 2,
                 "Secret Manager secret does not use customer-managed encryption": 1,
                 "Secret Manager lifecycle posture is incomplete": 1,
@@ -497,7 +501,7 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.analysis_coverage.resources.normalized_resources, 23)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resources, 0)
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
-        self.assertEqual(len(result.findings), 24)
+        self.assertEqual(len(result.findings), 26)
         findings_by_rule = {finding.rule_id: finding for finding in result.findings}
         finding = findings_by_rule["gcp-public-compute-broad-ingress"]
         self.assertEqual(finding.severity, Severity.MEDIUM)
@@ -566,6 +570,14 @@ class FixtureAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(
             findings_by_rule["gcp-pubsub-public-access"].affected_resources,
             ["google_pubsub_topic.events", "google_pubsub_topic_iam_member.public_publisher"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-pubsub-topic-customer-managed-encryption-missing"].affected_resources,
+            ["google_pubsub_topic.events"],
+        )
+        self.assertEqual(
+            findings_by_rule["gcp-pubsub-subscription-dead-letter-policy-missing"].affected_resources,
+            ["google_pubsub_subscription.events"],
         )
         self.assertEqual(
             findings_by_rule["gcp-bigquery-public-access"].affected_resources,

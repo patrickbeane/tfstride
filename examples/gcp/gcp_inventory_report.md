@@ -7,10 +7,10 @@
 
 ## Summary
 
-This run identified **4 trust boundaries** and **24 findings** across **23 normalized resources**.
+This run identified **4 trust boundaries** and **26 findings** across **23 normalized resources**.
 
 - High severity findings: `6`
-- Medium severity findings: `18`
+- Medium severity findings: `20`
 - Low severity findings: `0`
 
 ## Analysis Coverage
@@ -19,14 +19,16 @@ This run identified **4 trust boundaries** and **24 findings** across **23 norma
 - Provider resources considered: `23`
 - Normalized resources: `23`
 - Unsupported resources: `0`
-- Registered rules: `205`
-- Enabled rules: `205`
+- Registered rules: `208`
+- Enabled rules: `208`
 - Disabled rules: `0`
 - Severity overrides: `0`
 - Unresolved in-plan references: `0`
 - Findings by rule:
   - `gcp-sensitive-resource-iam-external-access`: `2`
   - `gcp-pubsub-public-access`: `1`
+  - `gcp-pubsub-topic-customer-managed-encryption-missing`: `1`
+  - `gcp-pubsub-subscription-dead-letter-policy-missing`: `1`
   - `gcp-bigquery-public-access`: `1`
   - `gcp-public-workload-sensitive-data-access`: `1`
   - `gcp-cloud-sql-public-authorized-network`: `1`
@@ -343,6 +345,30 @@ This run identified **4 trust boundaries** and **24 findings** across **23 norma
   - network tags: web
   - internet ingress reasons: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
+
+#### Pub/Sub subscription does not configure a dead-letter policy
+
+- STRIDE category: Denial of Service
+- Affected resources: `google_pubsub_subscription.events`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_pubsub_subscription.events does not configure a Pub/Sub dead-letter policy. Poison messages or repeated delivery failures can consume subscriber capacity and reduce recovery options for failed processing.
+- Recommended mitigation: Configure a reviewed Pub/Sub dead-letter topic and delivery-attempt threshold for subscriptions where poison messages or repeated delivery failures could disrupt processing.
+- Evidence:
+  - target resource: address=google_pubsub_subscription.events; resource_type=google_pubsub_subscription
+  - dead letter posture: dead_letter_policy_state=not_configured; dead_letter_topic=unset
+
+#### Pub/Sub topic does not use customer-managed encryption
+
+- STRIDE category: Information Disclosure
+- Affected resources: `google_pubsub_topic.events`
+- Trust boundary: `not-applicable`
+- Severity reasoning: internet_exposure +0, privilege_breadth +0, data_sensitivity +2, lateral_movement +0, blast_radius +1, final_score 3 => medium
+- Rationale: google_pubsub_topic.events relies on Google-managed Pub/Sub encryption rather than a customer-managed Cloud KMS key. Google-managed encryption still protects message data; this finding concerns key ownership, rotation, audit separation, and compliance posture.
+- Recommended mitigation: Configure a customer-managed Cloud KMS key for sensitive Pub/Sub topics where key ownership, rotation, audit separation, or compliance requirements warrant it.
+- Evidence:
+  - target resource: address=google_pubsub_topic.events; resource_type=google_pubsub_topic
+  - encryption ownership: cmek_state=not_configured; kms_key_name=unset
 
 #### Secret Manager lifecycle posture is incomplete
 
