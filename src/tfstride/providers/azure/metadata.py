@@ -15,6 +15,18 @@ class AzureResourceMetadata:
 
     NAME = OptionalStringMetadataField("name")
     STORAGE_ACCOUNT_ID = OptionalStringMetadataField("storage_account_id")
+    SERVICE_BUS_NAMESPACE_ID = OptionalStringMetadataField("service_bus_namespace_id")
+    SERVICE_BUS_NAMESPACE_REFERENCE = OptionalStringMetadataField("service_bus_namespace_reference")
+    RESOLVED_SERVICE_BUS_NAMESPACE_ADDRESS = OptionalStringMetadataField("resolved_service_bus_namespace_address")
+    SERVICE_BUS_SKU = OptionalStringMetadataField("service_bus_sku")
+    SERVICE_BUS_TIER = OptionalStringMetadataField("service_bus_tier")
+    SERVICE_BUS_LOCAL_AUTH_STATE = OptionalStringMetadataField("service_bus_local_auth_state")
+    SERVICE_BUS_CUSTOMER_MANAGED_KEY_STATE = OptionalStringMetadataField("service_bus_customer_managed_key_state")
+    SERVICE_BUS_KEY_VAULT_KEY_ID = OptionalStringMetadataField("service_bus_key_vault_key_id")
+    SERVICE_BUS_NETWORK_RULE_SOURCE_ADDRESS = OptionalStringMetadataField("service_bus_network_rule_source_address")
+    SERVICE_BUS_CUSTOMER_MANAGED_KEY_SOURCE_ADDRESS = OptionalStringMetadataField(
+        "service_bus_customer_managed_key_source_address"
+    )
     STORAGE_ACCOUNT_REFERENCE = OptionalStringMetadataField("storage_account_reference")
     RESOLVED_STORAGE_ACCOUNT_ADDRESS = OptionalStringMetadataField("resolved_storage_account_address")
     KEY_VAULT_ID = OptionalStringMetadataField("key_vault_id")
@@ -210,6 +222,8 @@ class AzureResourceMetadata:
     PUBLIC_CONTAINER_ADDRESSES = StringListMetadataField("public_container_addresses")
     UNRESOLVED_STORAGE_ACCOUNT_REFERENCES = StringListMetadataField("unresolved_storage_account_references")
     STORAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("storage_posture_uncertainties")
+    SERVICE_BUS_POSTURE_UNCERTAINTIES = StringListMetadataField("service_bus_posture_uncertainties")
+    UNRESOLVED_SERVICE_BUS_NAMESPACE_REFERENCES = StringListMetadataField("unresolved_service_bus_namespace_references")
     STORAGE_BLOB_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_blob_delete_retention_days")
     STORAGE_CONTAINER_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_container_delete_retention_days")
     STORAGE_BLOB_RESTORE_POLICY_DAYS = OptionalIntMetadataField("storage_blob_restore_policy_days")

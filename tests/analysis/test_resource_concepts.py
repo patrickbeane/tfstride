@@ -124,6 +124,7 @@ class ResourceConceptTests(unittest.TestCase):
                     "azurerm_mssql_database",
                     "azurerm_postgresql_flexible_server",
                     "azurerm_postgresql_flexible_server_database",
+                    "azurerm_servicebus_namespace",
                 }
             ),
         )

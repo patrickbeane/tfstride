@@ -15,6 +15,7 @@ from tfstride.providers.azure.resource_decoration.network_security import (
     ResolveNetworkSecurityAssociationsStage,
 )
 from tfstride.providers.azure.resource_decoration.public_exposure import DerivePublicComputeExposureStage
+from tfstride.providers.azure.resource_decoration.service_bus import DecorateServiceBusRelationshipsStage
 from tfstride.providers.azure.resource_decoration.storage import DecorateStorageRelationshipsStage
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 
@@ -36,6 +37,7 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         ResolveVirtualMachineRelationshipsStage(),
         DerivePublicComputeExposureStage(),
         DecorateStorageRelationshipsStage(),
+        DecorateServiceBusRelationshipsStage(),
         DecorateKeyVaultRelationshipsStage(),
         DecorateManagedIdentityRoleAssignmentsStage(),
     )

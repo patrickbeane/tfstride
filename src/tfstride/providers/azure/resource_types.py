@@ -9,6 +9,9 @@ class AzureResourceType:
     STORAGE_ACCOUNT = "azurerm_storage_account"
     STORAGE_ACCOUNT_NETWORK_RULES = "azurerm_storage_account_network_rules"
     STORAGE_CONTAINER = "azurerm_storage_container"
+    SERVICE_BUS_NAMESPACE = "azurerm_servicebus_namespace"
+    SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET = "azurerm_servicebus_namespace_network_rule_set"
+    SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY = "azurerm_servicebus_namespace_customer_managed_key"
     KEY_VAULT = "azurerm_key_vault"
     KEY_VAULT_ACCESS_POLICY = "azurerm_key_vault_access_policy"
     KEY_VAULT_SECRET = "azurerm_key_vault_secret"
@@ -62,6 +65,14 @@ AZURE_STORAGE_RESOURCE_TYPES = frozenset(
         AzureResourceType.STORAGE_ACCOUNT,
         AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES,
         AzureResourceType.STORAGE_CONTAINER,
+    }
+)
+
+AZURE_SERVICE_BUS_RESOURCE_TYPES = frozenset(
+    {
+        AzureResourceType.SERVICE_BUS_NAMESPACE,
+        AzureResourceType.SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET,
+        AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY,
     }
 )
 
@@ -150,6 +161,7 @@ AZURE_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
 
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
+    | AZURE_SERVICE_BUS_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
     | AZURE_IDENTITY_RESOURCE_TYPES
     | AZURE_RBAC_RESOURCE_TYPES

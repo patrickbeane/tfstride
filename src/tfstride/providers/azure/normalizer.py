@@ -73,6 +73,11 @@ from tfstride.providers.azure.postgresql_normalizers import (
 )
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.service_bus_normalizers import (
+    normalize_servicebus_namespace,
+    normalize_servicebus_namespace_customer_managed_key,
+    normalize_servicebus_namespace_network_rule_set,
+)
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.resource_metadata import InventoryMetadata
 
@@ -80,6 +85,9 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.STORAGE_ACCOUNT: normalize_storage_account,
     AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES: normalize_storage_account_network_rules,
     AzureResourceType.STORAGE_CONTAINER: normalize_storage_container,
+    AzureResourceType.SERVICE_BUS_NAMESPACE: normalize_servicebus_namespace,
+    AzureResourceType.SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET: normalize_servicebus_namespace_network_rule_set,
+    AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY: normalize_servicebus_namespace_customer_managed_key,
     AzureResourceType.KEY_VAULT: normalize_key_vault,
     AzureResourceType.KEY_VAULT_ACCESS_POLICY: normalize_key_vault_access_policy,
     AzureResourceType.KEY_VAULT_SECRET: normalize_key_vault_secret,
@@ -133,7 +141,7 @@ SUPPORTED_AZURE_TYPES = frozenset(_AZURE_RESOURCE_NORMALIZERS)
 
 
 class AzureNormalizer(ProviderNormalizer):
-    """Normalize supported AzureRM storage, identity, Key Vault, network, compute, AKS, and app resources."""
+    """Normalize supported AzureRM storage, Service Bus, identity, Key Vault, network, compute, AKS, and app resources."""
 
     provider = "azure"
 

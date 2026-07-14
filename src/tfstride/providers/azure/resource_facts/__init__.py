@@ -11,12 +11,14 @@ from tfstride.providers.azure.resource_facts.network import AzureNetworkFacts
 from tfstride.providers.azure.resource_facts.postgresql import AzurePostgresqlFacts
 from tfstride.providers.azure.resource_facts.private_endpoint import AzurePrivateEndpointFacts
 from tfstride.providers.azure.resource_facts.rbac import AzureRbacFacts
+from tfstride.providers.azure.resource_facts.service_bus import AzureServiceBusFacts
 from tfstride.providers.azure.resource_facts.sql import AzureSqlFacts
 from tfstride.providers.azure.resource_facts.storage import AzureStorageFacts
 
 
 class AzureResourceFacts(
     AzureStorageFacts,
+    AzureServiceBusFacts,
     AzureAksFacts,
     AzureAppServiceFacts,
     AzureKeyVaultFacts,
