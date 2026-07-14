@@ -48,6 +48,7 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_secretsmanager_secret_rotation,
     normalize_sns_topic,
     normalize_sqs_queue,
+    normalize_sqs_queue_redrive_policy,
 )
 from tfstride.providers.aws.eks_normalizers import normalize_eks_addon, normalize_eks_cluster
 from tfstride.providers.aws.iam_normalizers import (
@@ -139,6 +140,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_security_group_rule": normalize_security_group_rule,
     "aws_sns_topic": normalize_sns_topic,
     "aws_sqs_queue": normalize_sqs_queue,
+    "aws_sqs_queue_redrive_policy": normalize_sqs_queue_redrive_policy,
     "aws_subnet": normalize_subnet,
     "aws_vpc": normalize_vpc,
     "aws_vpc_endpoint": normalize_vpc_endpoint,

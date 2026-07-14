@@ -212,6 +212,31 @@ class ApplyS3PostureResourcesStage:
         )
 
 
+class ApplySqsRedrivePolicyResourcesStage:
+    name = "apply_sqs_redrive_policy_resources"
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        for posture_resource in resources:
+            if posture_resource.resource_type != "aws_sqs_queue_redrive_policy":
+                continue
+            posture_facts = aws_facts(posture_resource)
+            queue = context.index.sqs_queues.get(posture_facts.sqs_queue_url)
+            if queue is None:
+                posture_facts.add_unresolved_sqs_queue_reference(posture_facts.sqs_queue_url)
+                continue
+            queue_facts = aws_facts(queue)
+            queue_facts.set_sqs_redrive_posture(
+                state=posture_facts.sqs_redrive_state or "unknown",
+                target_arn=posture_facts.sqs_redrive_target_arn,
+                max_receive_count=posture_facts.sqs_redrive_max_receive_count,
+                policy=posture_facts.sqs_redrive_policy,
+                source_address=posture_resource.address,
+            )
+            queue_facts.extend_sqs_posture_uncertainties(
+                _source_uncertainties(posture_resource, posture_facts.sqs_posture_uncertainties)
+            )
+
+
 class ApplySecretsManagerPostureResourcesStage:
     name = "apply_secrets_manager_posture_resources"
 

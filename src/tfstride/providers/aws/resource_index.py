@@ -17,6 +17,7 @@ class AwsResourceIndex:
     route_tables: dict[str | None, NormalizedResource]
     buckets: dict[str, NormalizedResource]
     secrets: dict[str, NormalizedResource]
+    sqs_queues: dict[str, NormalizedResource]
     lambda_functions: dict[str, NormalizedResource]
     ecs_clusters: dict[str, NormalizedResource]
     ecs_task_definitions: dict[str, NormalizedResource]
@@ -47,6 +48,7 @@ class AwsResourceIndexBuilder:
         route_tables: dict[str | None, NormalizedResource] = {}
         buckets: dict[str, NormalizedResource] = {}
         secrets: dict[str, NormalizedResource] = {}
+        sqs_queues: dict[str, NormalizedResource] = {}
         lambda_functions: dict[str, NormalizedResource] = {}
         ecs_clusters: dict[str, NormalizedResource] = {}
         ecs_task_definitions: dict[str, NormalizedResource] = {}
@@ -91,6 +93,17 @@ class AwsResourceIndexBuilder:
                         f"{resource.address}.arn",
                         resource.arn,
                         facts.name,
+                    ),
+                )
+            elif resource_type == "aws_sqs_queue":
+                _index_resource_aliases(
+                    sqs_queues,
+                    resource,
+                    (
+                        resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.url",
+                        facts.sqs_queue_url,
                     ),
                 )
             elif resource_type == "aws_lambda_function":
@@ -202,6 +215,7 @@ class AwsResourceIndexBuilder:
             route_tables=route_tables,
             buckets=buckets,
             secrets=secrets,
+            sqs_queues=sqs_queues,
             lambda_functions=lambda_functions,
             ecs_clusters=ecs_clusters,
             ecs_task_definitions=ecs_task_definitions,

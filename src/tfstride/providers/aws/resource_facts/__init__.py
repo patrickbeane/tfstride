@@ -7,6 +7,7 @@ from tfstride.providers.aws.resource_facts.data import AwsDataFacts
 from tfstride.providers.aws.resource_facts.edge import AwsEdgeFacts
 from tfstride.providers.aws.resource_facts.iam import AwsIamFacts
 from tfstride.providers.aws.resource_facts.identity import AwsIdentityFacts
+from tfstride.providers.aws.resource_facts.messaging import AwsMessagingFacts
 from tfstride.providers.aws.resource_facts.network import AwsNetworkFacts
 from tfstride.providers.aws.resource_facts.storage import AwsStorageFacts
 
@@ -19,6 +20,7 @@ class AwsResourceFacts(
     AwsComputeFacts,
     AwsEdgeFacts,
     AwsDataFacts,
+    AwsMessagingFacts,
     AwsAuditFacts,
 ):
     __slots__ = ()

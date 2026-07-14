@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -11,8 +12,10 @@ from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
     STATE_DISABLED,
     STATE_ENABLED,
+    STATE_NOT_CONFIGURED,
     STATE_UNKNOWN,
     as_optional_int,
     attribute_unknown,
@@ -421,7 +424,16 @@ def normalize_kms_key(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_sns_topic(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
     policy_document = load_json_document(values.get("policy"))
+    uncertainties: list[str] = []
+    kms_master_key_id = known_string(
+        values,
+        unknown_values,
+        "kms_master_key_id",
+        uncertainties,
+        require_string=True,
+    )
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -433,14 +445,42 @@ def normalize_sns_topic(resource: TerraformResource) -> NormalizedResource:
         policy_statements=parse_policy_statements(policy_document),
         metadata={
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
-            "display_name": values.get("display_name"),
+            AwsResourceMetadata.SNS_DISPLAY_NAME: known_string(
+                values,
+                unknown_values,
+                "display_name",
+                uncertainties,
+                require_string=True,
+            ),
+            AwsResourceMetadata.SNS_KMS_MASTER_KEY_ID: kms_master_key_id,
+            AwsResourceMetadata.SNS_ENCRYPTION_OWNERSHIP_STATE: _messaging_encryption_ownership_state(
+                kms_master_key_id,
+                service_managed_sse_state=None,
+                uncertainties=uncertainties,
+            ),
+            AwsResourceMetadata.SNS_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
 
 
 def normalize_sqs_queue(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
     policy_document = load_json_document(values.get("policy"))
+    uncertainties: list[str] = []
+    kms_master_key_id = known_string(
+        values,
+        unknown_values,
+        "kms_master_key_id",
+        uncertainties,
+        require_string=True,
+    )
+    managed_sse_state = _sqs_managed_sse_enabled_state(values, unknown_values, uncertainties)
+    redrive_state, redrive_target_arn, redrive_max_receive_count, redrive_policy = _sqs_redrive_posture(
+        values,
+        unknown_values,
+        uncertainties,
+    )
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -452,9 +492,155 @@ def normalize_sqs_queue(resource: TerraformResource) -> NormalizedResource:
         policy_statements=parse_policy_statements(policy_document),
         metadata={
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
-            "queue_url": values.get("url"),
+            AwsResourceMetadata.SQS_QUEUE_URL: known_string(
+                values,
+                unknown_values,
+                "url",
+                uncertainties,
+                require_string=True,
+            ),
+            AwsResourceMetadata.SQS_KMS_MASTER_KEY_ID: kms_master_key_id,
+            AwsResourceMetadata.SQS_MANAGED_SSE_ENABLED_STATE: managed_sse_state,
+            AwsResourceMetadata.SQS_ENCRYPTION_OWNERSHIP_STATE: _messaging_encryption_ownership_state(
+                kms_master_key_id,
+                service_managed_sse_state=managed_sse_state,
+                uncertainties=uncertainties,
+            ),
+            AwsResourceMetadata.SQS_MESSAGE_RETENTION_SECONDS: _known_top_level_int(
+                values,
+                unknown_values,
+                "message_retention_seconds",
+                uncertainties,
+            ),
+            AwsResourceMetadata.SQS_REDRIVE_STATE: redrive_state,
+            AwsResourceMetadata.SQS_REDRIVE_TARGET_ARN: redrive_target_arn,
+            AwsResourceMetadata.SQS_REDRIVE_MAX_RECEIVE_COUNT: redrive_max_receive_count,
+            AwsResourceMetadata.SQS_REDRIVE_POLICY: redrive_policy,
+            AwsResourceMetadata.SQS_REDRIVE_SOURCE_ADDRESS: resource.address,
+            AwsResourceMetadata.SQS_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
+
+
+def normalize_sqs_queue_redrive_policy(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    redrive_state, redrive_target_arn, redrive_max_receive_count, redrive_policy = _sqs_redrive_posture(
+        values,
+        unknown_values,
+        uncertainties,
+    )
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.DATA,
+        identifier=values.get("id") or values.get("queue_url") or resource.address,
+        metadata={
+            AwsResourceMetadata.SQS_QUEUE_URL: known_string(
+                values,
+                unknown_values,
+                "queue_url",
+                uncertainties,
+                require_string=True,
+            ),
+            AwsResourceMetadata.SQS_REDRIVE_STATE: redrive_state,
+            AwsResourceMetadata.SQS_REDRIVE_TARGET_ARN: redrive_target_arn,
+            AwsResourceMetadata.SQS_REDRIVE_MAX_RECEIVE_COUNT: redrive_max_receive_count,
+            AwsResourceMetadata.SQS_REDRIVE_POLICY: redrive_policy,
+            AwsResourceMetadata.SQS_REDRIVE_SOURCE_ADDRESS: resource.address,
+            AwsResourceMetadata.SQS_POSTURE_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
+def _sqs_managed_sse_enabled_state(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> str:
+    if attribute_unknown(unknown_values, "sqs_managed_sse_enabled"):
+        uncertainties.append("sqs_managed_sse_enabled is unknown after planning")
+        return STATE_UNKNOWN
+    if "sqs_managed_sse_enabled" not in values or values.get("sqs_managed_sse_enabled") is None:
+        return STATE_NOT_CONFIGURED
+    value = known_bool(
+        values,
+        unknown_values,
+        "sqs_managed_sse_enabled",
+        uncertainties,
+        allow_string=False,
+    )
+    if value is True:
+        return STATE_ENABLED
+    if value is False:
+        return STATE_DISABLED
+    return STATE_UNKNOWN
+
+
+def _messaging_encryption_ownership_state(
+    kms_master_key_id: str | None,
+    *,
+    service_managed_sse_state: str | None,
+    uncertainties: list[str],
+) -> str:
+    if kms_master_key_id:
+        return "service_managed" if _is_aws_managed_messaging_key(kms_master_key_id) else "customer_managed"
+    if service_managed_sse_state == STATE_ENABLED:
+        return "service_managed"
+    if uncertainties:
+        return STATE_UNKNOWN
+    return "absent"
+
+
+def _is_aws_managed_messaging_key(value: str) -> bool:
+    key_id = value.strip().lower()
+    return "alias/aws/" in key_id or key_id.startswith("aws/")
+
+
+def _sqs_redrive_posture(
+    values: Mapping[str, Any],
+    unknown_values: Mapping[str, Any] | None,
+    uncertainties: list[str],
+) -> tuple[str, str | None, int | None, dict[str, Any]]:
+    if attribute_unknown(unknown_values, "redrive_policy"):
+        uncertainties.append("redrive_policy is unknown after planning")
+        return STATE_UNKNOWN, None, None, {}
+
+    raw_policy = values.get("redrive_policy")
+    if raw_policy in (None, ""):
+        return STATE_NOT_CONFIGURED, None, None, {}
+    if isinstance(raw_policy, Mapping):
+        policy = dict(raw_policy)
+    elif isinstance(raw_policy, str):
+        try:
+            loaded = json.loads(raw_policy)
+        except json.JSONDecodeError:
+            uncertainties.append("redrive_policy is not valid JSON")
+            return STATE_UNKNOWN, None, None, {}
+        if not isinstance(loaded, dict):
+            uncertainties.append("redrive_policy has an unrecognized value shape")
+            return STATE_UNKNOWN, None, None, {}
+        policy = loaded
+    else:
+        uncertainties.append("redrive_policy has an unrecognized value shape")
+        return STATE_UNKNOWN, None, None, {}
+
+    raw_target_arn = policy.get("deadLetterTargetArn")
+    target_arn = raw_target_arn.strip() if isinstance(raw_target_arn, str) and raw_target_arn.strip() else None
+    if target_arn is None:
+        uncertainties.append("redrive_policy.deadLetterTargetArn is not represented in the Terraform plan")
+
+    raw_max_receive_count = policy.get("maxReceiveCount")
+    max_receive_count = None if isinstance(raw_max_receive_count, bool) else as_optional_int(raw_max_receive_count)
+    if max_receive_count is None:
+        uncertainties.append("redrive_policy.maxReceiveCount has an unrecognized value shape")
+
+    if target_arn is None or max_receive_count is None:
+        return STATE_UNKNOWN, target_arn, max_receive_count, policy
+    return STATE_CONFIGURED, target_arn, max_receive_count, policy
 
 
 def normalize_secretsmanager_secret(resource: TerraformResource) -> NormalizedResource:

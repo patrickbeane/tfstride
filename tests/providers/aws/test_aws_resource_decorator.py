@@ -168,6 +168,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "apply_s3_public_access_blocks",
                 "apply_s3_posture_resources",
                 "apply_secrets_manager_posture_resources",
+                "apply_sqs_redrive_policy_resources",
                 "derive_subnet_posture",
                 "infer_vpc_ids",
                 "derive_public_exposure",
