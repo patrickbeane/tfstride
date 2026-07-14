@@ -12,6 +12,9 @@ from tfstride.providers.azure.resource_types import AzureResourceType
 _STORAGE_ID = "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs"
 _KEY_VAULT_ID = "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.KeyVault/vaults/app"
 _MSSQL_ID = "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Sql/servers/app-sql"
+_SERVICE_BUS_NAMESPACE_ID = (
+    "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.ServiceBus/namespaces/events"
+)
 
 
 def _resource(
@@ -71,6 +74,24 @@ def _mssql_server(*, name: str = "app", server_id: str = _MSSQL_ID) -> Terraform
             "name": name,
             "public_network_access_enabled": False,
             "minimum_tls_version": "1.2",
+        },
+    )
+
+
+def _service_bus_namespace(
+    *,
+    name: str = "events",
+    namespace_id: str = _SERVICE_BUS_NAMESPACE_ID,
+    namespace_name: str = "events",
+) -> TerraformResource:
+    return _resource(
+        AzureResourceType.SERVICE_BUS_NAMESPACE,
+        name,
+        {
+            "id": namespace_id,
+            "name": namespace_name,
+            "sku": "Premium",
+            "public_network_access_enabled": False,
         },
     )
 
@@ -153,6 +174,72 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
         self.assertTrue(coverage.has_private_endpoint)
         self.assertEqual(coverage.private_endpoint_addresses, ("azurerm_private_endpoint.sql",))
         self.assertEqual(coverage.subresource_names, ("sqlServer",))
+
+    def test_resolved_private_endpoint_targets_service_bus_namespace(self) -> None:
+        inventory = _normalized(
+            _service_bus_namespace(),
+            _private_endpoint(
+                "events",
+                _SERVICE_BUS_NAMESPACE_ID,
+                subresources=("namespace",),
+                dns_zone_ids=("azurerm_private_dns_zone.servicebus.id",),
+                dns_group_name="servicebus-dns",
+            ),
+        )
+        namespace = inventory.get_by_address("azurerm_servicebus_namespace.events")
+        assert namespace is not None
+
+        coverage = build_azure_private_endpoint_index(inventory).coverage_for(namespace)
+
+        self.assertTrue(coverage.has_private_endpoint)
+        self.assertEqual(coverage.private_endpoint_addresses, ("azurerm_private_endpoint.events",))
+        self.assertEqual(coverage.subresource_names, ("namespace",))
+        self.assertEqual(coverage.private_dns_zone_group_names, ("servicebus-dns",))
+        self.assertEqual(coverage.private_dns_zone_ids, ("azurerm_private_dns_zone.servicebus.id",))
+        self.assertEqual(coverage.connections[0].target_resource_id, _SERVICE_BUS_NAMESPACE_ID)
+
+    def test_service_bus_terraform_address_reference_resolves_deterministically(self) -> None:
+        inventory = _normalized(
+            _service_bus_namespace(),
+            _private_endpoint("events", "azurerm_servicebus_namespace.events.id", subresources=("namespace",)),
+        )
+        namespace = inventory.get_by_address("azurerm_servicebus_namespace.events")
+        assert namespace is not None
+
+        coverage = build_azure_private_endpoint_index(inventory).coverage_for(namespace)
+
+        self.assertTrue(coverage.has_private_endpoint)
+        self.assertEqual(coverage.connections[0].target_resource_id, "azurerm_servicebus_namespace.events.id")
+
+    def test_unresolved_service_bus_namespace_id_is_retained(self) -> None:
+        target_id = "${data.azurerm_servicebus_namespace.external.id}"
+        inventory = _normalized(
+            _service_bus_namespace(),
+            _private_endpoint("external", target_id, subresources=("namespace",)),
+        )
+        namespace = inventory.get_by_address("azurerm_servicebus_namespace.events")
+        assert namespace is not None
+
+        index = build_azure_private_endpoint_index(inventory)
+
+        self.assertFalse(index.coverage_for(namespace).has_private_endpoint)
+        self.assertEqual(len(index.unresolved_targets), 1)
+        self.assertEqual(index.unresolved_targets[0].target_resource_id, target_id)
+        self.assertEqual(index.unresolved_targets[0].subresource_names, ("namespace",))
+
+    def test_service_bus_namespace_name_does_not_create_private_endpoint_coverage(self) -> None:
+        inventory = _normalized(
+            _service_bus_namespace(namespace_name="shared"),
+            _private_endpoint("name_only", "shared", subresources=("namespace",)),
+        )
+        namespace = inventory.get_by_address("azurerm_servicebus_namespace.events")
+        assert namespace is not None
+
+        index = build_azure_private_endpoint_index(inventory)
+
+        self.assertFalse(index.coverage_for(namespace).has_private_endpoint)
+        self.assertEqual(len(index.unresolved_targets), 1)
+        self.assertEqual(index.unresolved_targets[0].target_resource_id, "shared")
 
     def test_terraform_id_reference_target_resolves_deterministically(self) -> None:
         inventory = _normalized(
