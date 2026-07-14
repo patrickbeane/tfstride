@@ -325,6 +325,12 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                     "id": "https://sqs.us-east-1.amazonaws.com/111122223333/jobs",
                                     "name": "jobs",
                                     "arn": "arn:aws:sqs:us-east-1:111122223333:jobs",
+                                    "kms_master_key_id": "arn:aws:kms:us-east-1:111122223333:key/jobs",
+                                    "message_retention_seconds": 345600,
+                                    "redrive_policy": {
+                                        "deadLetterTargetArn": "arn:aws:sqs:us-east-1:111122223333:jobs-dead-letter",
+                                        "maxReceiveCount": 5,
+                                    },
                                     "policy": {
                                         "Version": "2012-10-17",
                                         "Statement": [
@@ -370,6 +376,12 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
                                     "id": "https://sqs.us-east-1.amazonaws.com/111122223333/jobs",
                                     "name": "jobs",
                                     "arn": "arn:aws:sqs:us-east-1:111122223333:jobs",
+                                    "kms_master_key_id": "arn:aws:kms:us-east-1:111122223333:key/jobs",
+                                    "message_retention_seconds": 345600,
+                                    "redrive_policy": {
+                                        "deadLetterTargetArn": "arn:aws:sqs:us-east-1:111122223333:jobs-dead-letter",
+                                        "maxReceiveCount": 5,
+                                    },
                                     "policy": {
                                         "Version": "2012-10-17",
                                         "Statement": [

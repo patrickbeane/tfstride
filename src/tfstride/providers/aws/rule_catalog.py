@@ -453,6 +453,50 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-sns-customer-managed-encryption-missing",
+        title="SNS topic does not use a customer-managed KMS key",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `kms_master_key_id` with a customer-managed KMS key for SNS topics where key ownership, "
+            "rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "sns", "messaging", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-sqs-customer-managed-encryption-missing",
+        title="SQS queue does not use a customer-managed KMS key",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `kms_master_key_id` with a customer-managed KMS key for SQS queues where key ownership, "
+            "rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "sqs", "messaging", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-sqs-message-retention-insufficient",
+        title="SQS queue message retention is too short",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Set `message_retention_seconds` to a recovery window that gives operators enough time to replay "
+            "messages after subscriber failures, destructive changes, or delayed incident detection."
+        ),
+        tags=("aws", "sqs", "messaging", "recovery", "retention"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-sqs-dead-letter-queue-not-configured",
+        title="SQS queue does not configure a dead-letter queue",
+        category=StrideCategory.DENIAL_OF_SERVICE,
+        recommended_mitigation=(
+            "Configure an SQS `redrive_policy` or `aws_sqs_queue_redrive_policy` with a reviewed dead-letter "
+            "queue and maximum receive count so poison messages do not repeatedly consume subscriber capacity."
+        ),
+        tags=("aws", "sqs", "messaging", "dead-letter", "recovery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-secretsmanager-customer-managed-kms-key-missing",
         title="Secrets Manager secret does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

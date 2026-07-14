@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 208,
+      "registered_rule_count": 212,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -79,6 +79,10 @@
         "aws-s3-versioning-disabled",
         "aws-s3-object-lock-retention-missing",
         "aws-s3-lifecycle-noncurrent-retention-insufficient",
+        "aws-sns-customer-managed-encryption-missing",
+        "aws-sqs-customer-managed-encryption-missing",
+        "aws-sqs-message-retention-insufficient",
+        "aws-sqs-dead-letter-queue-not-configured",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
@@ -291,6 +295,10 @@
         "aws-s3-versioning-disabled": 0,
         "aws-s3-object-lock-retention-missing": 0,
         "aws-s3-lifecycle-noncurrent-retention-insufficient": 0,
+        "aws-sns-customer-managed-encryption-missing": 0,
+        "aws-sqs-customer-managed-encryption-missing": 0,
+        "aws-sqs-message-retention-insufficient": 0,
+        "aws-sqs-dead-letter-queue-not-configured": 0,
         "aws-secretsmanager-customer-managed-kms-key-missing": 0,
         "aws-secretsmanager-recovery-window-too-short": 0,
         "aws-secretsmanager-rotation-not-configured-or-too-long": 0,

@@ -15,6 +15,7 @@ from tfstride.providers.aws.iam_rules import AwsIamRuleDetectors
 from tfstride.providers.aws.kms_rules import AwsKmsRuleDetectors
 from tfstride.providers.aws.lambda_rules import AwsLambdaRuleDetectors
 from tfstride.providers.aws.load_balancer_rules import AwsLoadBalancerRuleDetectors
+from tfstride.providers.aws.messaging_rules import AwsMessagingPostureRuleDetectors
 from tfstride.providers.aws.network_data_rules import AwsNetworkDataRuleDetectors
 from tfstride.providers.aws.network_telemetry_rules import AwsNetworkTelemetryRuleDetectors
 from tfstride.providers.aws.path_chain_rules import AwsPathChainRuleDetectors
@@ -66,6 +67,10 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-versioning-disabled",
         "aws-s3-object-lock-retention-missing",
         "aws-s3-lifecycle-noncurrent-retention-insufficient",
+        "aws-sns-customer-managed-encryption-missing",
+        "aws-sqs-customer-managed-encryption-missing",
+        "aws-sqs-message-retention-insufficient",
+        "aws-sqs-dead-letter-queue-not-configured",
         "aws-secretsmanager-customer-managed-kms-key-missing",
         "aws-secretsmanager-recovery-window-too-short",
         "aws-secretsmanager-rotation-not-configured-or-too-long",
@@ -123,6 +128,7 @@ def build_aws_rule_contribution(
     policy_trust_detectors = AwsPolicyTrustRuleDetectors(finding_factory)
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
+    messaging_detectors = AwsMessagingPostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     kms_detectors = AwsKmsRuleDetectors(finding_factory)
     eks_detectors = AwsEksRuleDetectors(finding_factory)
@@ -180,6 +186,14 @@ def build_aws_rule_contribution(
         "aws-s3-lifecycle-noncurrent-retention-insufficient": (
             s3_posture_detectors.detect_lifecycle_noncurrent_retention_insufficient
         ),
+        "aws-sns-customer-managed-encryption-missing": (
+            messaging_detectors.detect_sns_customer_managed_encryption_missing
+        ),
+        "aws-sqs-customer-managed-encryption-missing": (
+            messaging_detectors.detect_sqs_customer_managed_encryption_missing
+        ),
+        "aws-sqs-message-retention-insufficient": (messaging_detectors.detect_sqs_message_retention_insufficient),
+        "aws-sqs-dead-letter-queue-not-configured": (messaging_detectors.detect_sqs_dead_letter_queue_not_configured),
         "aws-secretsmanager-customer-managed-kms-key-missing": (
             secrets_manager_detectors.detect_customer_managed_kms_key_missing
         ),
