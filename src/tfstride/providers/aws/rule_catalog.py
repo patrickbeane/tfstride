@@ -453,6 +453,39 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-ecr-image-tag-mutability-enabled",
+        title="ECR repository permits mutable image tags",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Use immutable ECR image tags for deployment artifacts, or document and narrowly scope any required "
+            "mutable-tag exclusions so a later push cannot silently replace a referenced image."
+        ),
+        tags=("aws", "ecr", "container", "supply-chain", "tag-mutability"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-ecr-customer-managed-encryption-missing",
+        title="ECR repository does not use a customer-managed KMS key",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure ECR repository encryption with KMS and a customer-managed key where image key ownership, "
+            "rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("aws", "ecr", "container", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="aws-ecr-repository-scanning-disabled",
+        title="ECR repository scan-on-push is disabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable ECR repository scan-on-push or configure an explicit registry scanning policy that covers the "
+            "repository, then retain scan findings in the account's container security workflow."
+        ),
+        tags=("aws", "ecr", "container", "supply-chain", "scanning"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

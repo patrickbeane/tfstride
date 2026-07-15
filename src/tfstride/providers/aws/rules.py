@@ -8,6 +8,7 @@ from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.api_gateway_rules import AwsApiGatewayRuleDetectors
 from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
+from tfstride.providers.aws.ecr_rules import AwsEcrRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.iam_assignment_rules import AwsIamAssignmentRuleDetectors
@@ -67,6 +68,9 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-s3-versioning-disabled",
         "aws-s3-object-lock-retention-missing",
         "aws-s3-lifecycle-noncurrent-retention-insufficient",
+        "aws-ecr-image-tag-mutability-enabled",
+        "aws-ecr-customer-managed-encryption-missing",
+        "aws-ecr-repository-scanning-disabled",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -128,6 +132,7 @@ def build_aws_rule_contribution(
     policy_trust_detectors = AwsPolicyTrustRuleDetectors(finding_factory)
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
+    ecr_detectors = AwsEcrRuleDetectors(finding_factory)
     messaging_detectors = AwsMessagingPostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     kms_detectors = AwsKmsRuleDetectors(finding_factory)
@@ -186,6 +191,9 @@ def build_aws_rule_contribution(
         "aws-s3-lifecycle-noncurrent-retention-insufficient": (
             s3_posture_detectors.detect_lifecycle_noncurrent_retention_insufficient
         ),
+        "aws-ecr-image-tag-mutability-enabled": ecr_detectors.detect_mutable_image_tags,
+        "aws-ecr-customer-managed-encryption-missing": ecr_detectors.detect_customer_managed_encryption_missing,
+        "aws-ecr-repository-scanning-disabled": ecr_detectors.detect_repository_scanning_disabled,
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),
