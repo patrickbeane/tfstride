@@ -27,6 +27,8 @@ def normalize_artifact_registry_repository(resource: TerraformResource) -> Norma
     uncertainties: list[str] = []
     format_value = _known_string(values, resource.unknown_values, GcpAttr.FORMAT, uncertainties)
     repository_id = _known_string(values, resource.unknown_values, GcpAttr.REPOSITORY_ID, uncertainties)
+    project = _known_string(values, resource.unknown_values, GcpAttr.PROJECT, uncertainties)
+    location = _known_string(values, resource.unknown_values, GcpAttr.LOCATION, uncertainties)
     mode = _known_string(values, resource.unknown_values, GcpAttr.MODE, uncertainties)
     kms_key_name = _known_string(values, resource.unknown_values, GcpAttr.KMS_KEY_NAME, uncertainties)
 
@@ -81,10 +83,13 @@ def normalize_artifact_registry_repository(resource: TerraformResource) -> Norma
         data_sensitivity="sensitive",
         metadata={
             GcpResourceMetadata.NAME: resource_name(resource),
-            GcpResourceMetadata.PROJECT: _known_string(values, resource.unknown_values, GcpAttr.PROJECT, uncertainties),
-            GcpResourceMetadata.REGION: _known_string(values, resource.unknown_values, GcpAttr.LOCATION, uncertainties),
+            GcpResourceMetadata.PROJECT: project,
+            GcpResourceMetadata.REGION: location,
             GcpResourceMetadata.LABELS: values.get(GcpAttr.LABELS),
             GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_ID: repository_id,
+            GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_PATH: _artifact_registry_repository_path(
+                project, location, repository_id
+            ),
             GcpResourceMetadata.ARTIFACT_REGISTRY_FORMAT: format_value,
             GcpResourceMetadata.ARTIFACT_REGISTRY_MODE: mode,
             GcpResourceMetadata.ARTIFACT_REGISTRY_KMS_KEY_NAME: kms_key_name,
@@ -121,6 +126,16 @@ def normalize_artifact_registry_repository(resource: TerraformResource) -> Norma
     )
     gcp_mutations(normalized).set_storage_encrypted(True)
     return normalized
+
+
+def _artifact_registry_repository_path(
+    project: str | None,
+    location: str | None,
+    repository_id: str | None,
+) -> str | None:
+    if not project or not location or not repository_id:
+        return None
+    return f"projects/{project}/locations/{location}/repositories/{repository_id}"
 
 
 def _known_string(

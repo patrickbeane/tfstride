@@ -15,6 +15,10 @@ class GcpArtifactRegistryFacts(GcpBaseFacts):
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_ID)
 
     @property
+    def artifact_registry_repository_path(self) -> str | None:
+        return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_PATH)
+
+    @property
     def artifact_registry_format(self) -> str | None:
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_FORMAT)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_facts.base import GcpBaseFacts
 
@@ -26,3 +28,11 @@ class GcpComputeFacts(GcpBaseFacts):
     @property
     def internet_facing_load_balancer_addresses(self) -> list[str]:
         return self.get(GcpResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES)
+
+    @property
+    def container_image_references(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.CONTAINER_IMAGE_REFERENCES)
+
+    @property
+    def container_image_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
