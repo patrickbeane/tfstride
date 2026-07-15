@@ -310,6 +310,8 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
         self.assertIn("KEY_VAULT_ROLE_ASSIGNMENTS", azure_owned)
         self.assertIn("IDENTITY_TYPE", azure_owned)
         self.assertIn("ATTACHED_IDENTITY_REFERENCES", azure_owned)
+        self.assertIn("CONTAINER_IMAGE_REFERENCES", azure_owned)
+        self.assertIn("CONTAINER_IMAGE_POSTURE_UNCERTAINTIES", azure_owned)
         self.assertIn("DIRECT_INTERNET_REACHABLE", contract.shared_core_fields)
         self.assertIn("SECURITY_GROUP_ID", aws_owned)
         self.assertIn("TASK_ROLE_ARN", aws_owned)

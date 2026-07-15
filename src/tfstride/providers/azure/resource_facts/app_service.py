@@ -94,6 +94,14 @@ class AzureAppServiceFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES)
 
     @property
+    def container_image_references(self) -> list[dict[str, Any]]:
+        return self.get(AzureResourceMetadata.CONTAINER_IMAGE_REFERENCES)
+
+    @property
+    def container_image_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
+
+    @property
     def app_service_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES)
 

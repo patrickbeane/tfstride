@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.azure.container_registry_references import normalize_container_registry_login_server
 from tfstride.providers.azure.identity_normalizers import managed_identity_metadata
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
@@ -39,6 +40,16 @@ def normalize_container_registry(resource: TerraformResource) -> NormalizedResou
     registry_id = known_string(values, resource.unknown_values, "id", uncertainties, require_string=True)
     name = known_string(values, resource.unknown_values, "name", uncertainties, require_string=True) or resource.name
     sku = known_string(values, resource.unknown_values, "sku", uncertainties, require_string=True)
+    raw_login_server = known_string(
+        values,
+        resource.unknown_values,
+        "login_server",
+        uncertainties,
+        require_string=True,
+    )
+    login_server = normalize_container_registry_login_server(raw_login_server)
+    if raw_login_server and login_server is None:
+        uncertainties.append("login_server is unresolved")
     public_network_access_enabled = known_bool(
         values,
         resource.unknown_values,
@@ -78,13 +89,7 @@ def normalize_container_registry(resource: TerraformResource) -> NormalizedResou
         ),
         AzureResourceMetadata.CONTAINER_REGISTRY_ID: registry_id,
         AzureResourceMetadata.CONTAINER_REGISTRY_SKU: sku,
-        AzureResourceMetadata.CONTAINER_REGISTRY_LOGIN_SERVER: known_string(
-            values,
-            resource.unknown_values,
-            "login_server",
-            uncertainties,
-            require_string=True,
-        ),
+        AzureResourceMetadata.CONTAINER_REGISTRY_LOGIN_SERVER: login_server,
         AzureResourceMetadata.CONTAINER_REGISTRY_PREMIUM_TIER_STATE: _premium_tier_state(sku),
         AzureResourceMetadata.PUBLIC_NETWORK_FALLBACK_STATE: public_network_fallback_state(
             public_network_access_enabled

@@ -63,6 +63,8 @@ class AzureResourceMetadataTests(unittest.TestCase):
             "APP_SERVICE_SCM_USE_MAIN_IP_RESTRICTION",
             "APP_SERVICE_AUTH_SETTINGS",
             "APP_SERVICE_AUTH_SETTINGS_V2",
+            "CONTAINER_IMAGE_REFERENCES",
+            "CONTAINER_IMAGE_POSTURE_UNCERTAINTIES",
             "AKS_CLUSTER_ID",
             "AKS_PRIVATE_CLUSTER_STATE",
             "AKS_PRIVATE_DNS_ZONE_ID",

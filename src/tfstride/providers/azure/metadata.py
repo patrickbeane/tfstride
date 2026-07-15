@@ -265,6 +265,8 @@ class AzureResourceMetadata:
     APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
     APP_SERVICE_AUTH_SETTINGS = DictMetadataField("app_service_auth_settings")
     APP_SERVICE_AUTH_SETTINGS_V2 = DictMetadataField("app_service_auth_settings_v2")
+    CONTAINER_IMAGE_REFERENCES = DictListMetadataField("container_image_references")
+    CONTAINER_IMAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("container_image_posture_uncertainties")
     AKS_AUTHORIZED_IP_RANGES = StringListMetadataField("aks_authorized_ip_ranges")
     AKS_AAD_ADMIN_GROUP_OBJECT_IDS = StringListMetadataField("aks_aad_admin_group_object_ids")
     AKS_USER_ASSIGNED_IDENTITY_IDS = StringListMetadataField("aks_user_assigned_identity_ids")

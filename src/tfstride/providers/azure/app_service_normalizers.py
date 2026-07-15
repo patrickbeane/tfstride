@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.azure.app_service_container_images import app_service_container_image_metadata
 from tfstride.providers.azure.identity_normalizers import managed_identity_metadata
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.public_network import public_network_fallback_state
@@ -147,6 +148,7 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
         metadata[AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES] = uncertainties
     if auth_uncertainties:
         metadata[AzureResourceMetadata.APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES] = auth_uncertainties
+    metadata.update(app_service_container_image_metadata(resource, site_config))
     metadata.update(managed_identity_metadata(resource))
 
     return NormalizedResource(
