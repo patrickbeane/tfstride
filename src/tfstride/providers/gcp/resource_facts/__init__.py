@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.resource_facts.artifact_registry import GcpArtifactRegistryFacts
 from tfstride.providers.gcp.resource_facts.audit import GcpAuditFacts
 from tfstride.providers.gcp.resource_facts.cloud_sql import GcpCloudSqlFacts
 from tfstride.providers.gcp.resource_facts.compute import GcpComputeFacts
@@ -16,6 +17,7 @@ from tfstride.providers.gcp.resource_facts.storage import GcpStorageFacts
 
 
 class GcpResourceFacts(
+    GcpArtifactRegistryFacts,
     GcpStorageFacts,
     GcpMessagingFacts,
     GcpSecretManagerFacts,

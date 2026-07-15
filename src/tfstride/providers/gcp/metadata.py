@@ -101,6 +101,32 @@ class GcpResourceMetadata:
     KMS_DESTROY_SCHEDULED_DURATION = OptionalStringMetadataField("kms_destroy_scheduled_duration")
     PUBLIC_ACCESS_PREVENTION = OptionalStringMetadataField("public_access_prevention")
     GCS_DEFAULT_KMS_KEY_NAME = OptionalStringMetadataField("gcs_default_kms_key_name")
+    ARTIFACT_REGISTRY_REPOSITORY_ID = OptionalStringMetadataField("artifact_registry_repository_id")
+    ARTIFACT_REGISTRY_FORMAT = OptionalStringMetadataField("artifact_registry_format")
+    ARTIFACT_REGISTRY_MODE = OptionalStringMetadataField("artifact_registry_mode")
+    ARTIFACT_REGISTRY_KMS_KEY_NAME = OptionalStringMetadataField("artifact_registry_kms_key_name")
+    ARTIFACT_REGISTRY_ENCRYPTION_STATE = OptionalStringMetadataField("artifact_registry_encryption_state")
+    ARTIFACT_REGISTRY_DOCKER_IMMUTABLE_TAGS_STATE = OptionalStringMetadataField(
+        "artifact_registry_docker_immutable_tags_state"
+    )
+    ARTIFACT_REGISTRY_VULNERABILITY_SCANNING_ENABLEMENT_CONFIG = OptionalStringMetadataField(
+        "artifact_registry_vulnerability_scanning_enablement_config"
+    )
+    ARTIFACT_REGISTRY_VULNERABILITY_SCANNING_ENABLEMENT_STATE = OptionalStringMetadataField(
+        "artifact_registry_vulnerability_scanning_enablement_state"
+    )
+    ARTIFACT_REGISTRY_VULNERABILITY_SCANNING_STATE = OptionalStringMetadataField(
+        "artifact_registry_vulnerability_scanning_state"
+    )
+    ARTIFACT_REGISTRY_VULNERABILITY_SCANNING_STATE_REASON = OptionalStringMetadataField(
+        "artifact_registry_vulnerability_scanning_state_reason"
+    )
+    ARTIFACT_REGISTRY_CLEANUP_POLICY_STATE = OptionalStringMetadataField("artifact_registry_cleanup_policy_state")
+    ARTIFACT_REGISTRY_CLEANUP_POLICY_DRY_RUN_STATE = OptionalStringMetadataField(
+        "artifact_registry_cleanup_policy_dry_run_state"
+    )
+    ARTIFACT_REGISTRY_DELETION_POLICY = OptionalStringMetadataField("artifact_registry_deletion_policy")
+    ARTIFACT_REGISTRY_DELETION_POLICY_STATE = OptionalStringMetadataField("artifact_registry_deletion_policy_state")
     GCS_RETENTION_PERIOD_SECONDS = OptionalIntMetadataField("gcs_retention_period_seconds")
     PUBSUB_TOPIC_MESSAGE_RETENTION_SECONDS = OptionalIntMetadataField("pubsub_topic_message_retention_seconds")
     PUBSUB_SUBSCRIPTION_ACK_DEADLINE_SECONDS = OptionalIntMetadataField("pubsub_subscription_ack_deadline_seconds")
@@ -238,6 +264,7 @@ class GcpResourceMetadata:
     CUSTOM_ROLE_PERMISSIONS = StringListMetadataField("custom_role_permissions")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("gcp_resource_policy_source_addresses")
     GCS_RETENTION_POLICY_UNCERTAINTIES = StringListMetadataField("gcs_retention_policy_uncertainties")
+    ARTIFACT_REGISTRY_POSTURE_UNCERTAINTIES = StringListMetadataField("artifact_registry_posture_uncertainties")
     PUBSUB_POSTURE_UNCERTAINTIES = StringListMetadataField("pubsub_posture_uncertainties")
     SECRET_MANAGER_KMS_KEY_NAMES = StringListMetadataField("secret_manager_kms_key_names")
     SECRET_MANAGER_POSTURE_UNCERTAINTIES = StringListMetadataField("secret_manager_posture_uncertainties")
@@ -309,6 +336,7 @@ class GcpResourceMetadata:
     PUBSUB_SUBSCRIPTION_EXPIRATION_POLICY = DictListMetadataField("pubsub_subscription_expiration_policy")
     PUBSUB_SUBSCRIPTION_PUSH_CONFIG = DictListMetadataField("pubsub_subscription_push_config")
     PUBSUB_SUBSCRIPTION_RETRY_POLICY = DictListMetadataField("pubsub_subscription_retry_policy")
+    ARTIFACT_REGISTRY_CLEANUP_POLICIES = DictListMetadataField("artifact_registry_cleanup_policies")
     CLOUD_SQL_AUTHORIZED_NETWORKS = DictListMetadataField("cloud_sql_authorized_networks")
     CLOUD_SQL_BACKUP_CONFIGURATION = DictMetadataField("cloud_sql_backup_configuration")
     CLOUD_SQL_IP_CONFIGURATION = DictMetadataField("cloud_sql_ip_configuration")
@@ -316,6 +344,10 @@ class GcpResourceMetadata:
     GCS_VERSIONING_CONFIGURATION = DictMetadataField("gcs_versioning_configuration")
     GCS_ENCRYPTION_CONFIGURATION = DictMetadataField("gcs_encryption_configuration")
     GCS_RETENTION_POLICY_CONFIGURATION = DictMetadataField("gcs_retention_policy_configuration")
+    ARTIFACT_REGISTRY_DOCKER_CONFIG = DictMetadataField("artifact_registry_docker_config")
+    ARTIFACT_REGISTRY_VULNERABILITY_SCANNING_CONFIG = DictMetadataField(
+        "artifact_registry_vulnerability_scanning_config"
+    )
     SECRET_MANAGER_REPLICATION = DictMetadataField("secret_manager_replication")
     PSC_CONFIG = DictMetadataField("psc_config")
     PSC_CONSUMER_ACCEPT_LIST = DictListMetadataField("psc_consumer_accept_list")

@@ -6,6 +6,7 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.gcp.artifact_registry_normalizers import normalize_artifact_registry_repository
 from tfstride.providers.gcp.audit_normalizers import (
     normalize_logging_organization_exclusion,
     normalize_logging_organization_sink,
@@ -134,6 +135,7 @@ from tfstride.resource_metadata import InventoryMetadata
 ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
+    GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY: normalize_artifact_registry_repository,
     GcpResourceType.COMPUTE_BACKEND_BUCKET: normalize_compute_backend_bucket,
     GcpResourceType.COMPUTE_BACKEND_SERVICE: normalize_compute_backend_service,
     GcpResourceType.COMPUTE_FIREWALL: normalize_compute_firewall,

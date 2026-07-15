@@ -6,6 +6,7 @@ class GcpResourceType:
 
     PREFIX = "google_"
 
+    ARTIFACT_REGISTRY_REPOSITORY = "google_artifact_registry_repository"
     BIGQUERY_DATASET = "google_bigquery_dataset"
     BIGQUERY_DATASET_IAM_BINDING = "google_bigquery_dataset_iam_binding"
     BIGQUERY_DATASET_IAM_MEMBER = "google_bigquery_dataset_iam_member"
@@ -381,6 +382,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.COMPUTE_TARGET_HTTP_PROXY,
         GcpResourceType.COMPUTE_TARGET_HTTPS_PROXY,
         GcpResourceType.COMPUTE_URL_MAP,
+        GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY,
         GcpResourceType.BIGQUERY_DATASET,
         GcpResourceType.BIGQUERY_DATASET_IAM_BINDING,
         GcpResourceType.BIGQUERY_DATASET_IAM_MEMBER,
