@@ -10,6 +10,10 @@ class AwsEcrFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property
+    def ecr_repository_url(self) -> str | None:
+        return self.get(AwsResourceMetadata.ECR_REPOSITORY_URL)
+
+    @property
     def ecr_encryption_type(self) -> str | None:
         return self.get(AwsResourceMetadata.ECR_ENCRYPTION_TYPE)
 

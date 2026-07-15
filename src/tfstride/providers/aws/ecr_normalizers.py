@@ -66,6 +66,13 @@ def normalize_ecr_repository(resource: TerraformResource) -> NormalizedResource:
         data_sensitivity="sensitive",
         metadata={
             AwsResourceMetadata.NAME: known_string(values, unknown_values, "name", uncertainties) or resource.name,
+            AwsResourceMetadata.ECR_REPOSITORY_URL: known_string(
+                values,
+                unknown_values,
+                "repository_url",
+                uncertainties,
+                require_string=True,
+            ),
             AwsResourceMetadata.ECR_ENCRYPTION_TYPE: encryption_type,
             AwsResourceMetadata.ECR_KMS_KEY: kms_key,
             AwsResourceMetadata.ECR_ENCRYPTION_OWNERSHIP_STATE: _encryption_ownership_state(

@@ -51,6 +51,18 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.FUNCTION_NAME)
 
     @property
+    def lambda_package_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LAMBDA_PACKAGE_TYPE)
+
+    @property
+    def container_image_references(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.CONTAINER_IMAGE_REFERENCES)
+
+    @property
+    def container_image_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
+
+    @property
     def lambda_function_url_function_reference(self) -> str | None:
         return self.function_name
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -15,12 +17,15 @@ from tfstride.providers.aws.policy_documents import (
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import ecs_task_definition_identifier
 from tfstride.providers.coercion import (
+    attribute_unknown,
     first_mapping,
     known_block_bool_state,
     known_block_int,
     known_block_strings,
     known_string,
+    value_is_unknown,
 )
+from tfstride.providers.container_images import ContainerImageReference, parse_container_image_reference
 
 
 def normalize_instance(resource: TerraformResource) -> NormalizedResource:
@@ -71,8 +76,9 @@ def normalize_ecs_cluster(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    family = values.get("family")
     revision = as_optional_int(values.get("revision"))
+    image_references, image_uncertainties = _ecs_container_image_references(resource)
+    family = values.get("family")
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -88,6 +94,8 @@ def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedReso
             "requires_compatibilities": compact(as_list(values.get("requires_compatibilities"))),
             "task_role_arn": values.get("task_role_arn"),
             "execution_role_arn": values.get("execution_role_arn"),
+            AwsResourceMetadata.CONTAINER_IMAGE_REFERENCES: image_references,
+            AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES: image_uncertainties,
         },
     )
 
@@ -128,7 +136,29 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_lambda_function(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
     vpc_config = first_item(values.get("vpc_config"))
+    uncertainties: list[str] = []
+    package_type = known_string(values, unknown_values, "package_type", uncertainties, require_string=True)
+    image_uri = known_string(values, unknown_values, "image_uri", uncertainties, require_string=True)
+    package_type_unknown = attribute_unknown(unknown_values, "package_type")
+    image_uri_unknown = attribute_unknown(unknown_values, "image_uri")
+    image_references: list[dict[str, Any]] = []
+    if package_type == "Image" or package_type_unknown or image_uri is not None or "image_uri" in values:
+        image_reference = (
+            _unknown_image_reference(image_uri) if image_uri_unknown else parse_container_image_reference(image_uri)
+        )
+        image_references.append(
+            _aws_image_reference_record(
+                image_reference,
+                source="aws_lambda_function",
+                path="image_uri",
+                package_type=package_type,
+            )
+        )
+        if not image_uri_unknown:
+            _append_image_uncertainty(uncertainties, "image_uri", image_reference)
+
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -144,6 +174,9 @@ def normalize_lambda_function(resource: TerraformResource) -> NormalizedResource
             "runtime": values.get("runtime"),
             "handler": values.get("handler"),
             "vpc_enabled": bool(vpc_config),
+            AwsResourceMetadata.LAMBDA_PACKAGE_TYPE: package_type,
+            AwsResourceMetadata.CONTAINER_IMAGE_REFERENCES: image_references,
+            AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
 
@@ -217,6 +250,126 @@ def _lambda_function_url_cors_evidence(cors: Mapping[str, Any] | None) -> dict[s
         )
         if key in cors
     }
+
+
+def _ecs_container_image_references(
+    resource: TerraformResource,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    raw_definitions = values.get("container_definitions")
+    if unknown_values.get("container_definitions") is True:
+        return [], ["container_definitions is unknown after planning"]
+    if raw_definitions is None:
+        return [], ["container_definitions is not represented in planned values"]
+
+    if isinstance(raw_definitions, str):
+        try:
+            definitions = json.loads(raw_definitions)
+        except json.JSONDecodeError:
+            return [], ["container_definitions is not valid JSON"]
+    else:
+        definitions = raw_definitions
+
+    if not isinstance(definitions, list):
+        return [], ["container_definitions is not a JSON array"]
+
+    references: list[dict[str, Any]] = []
+    uncertainties: list[str] = []
+    unknown_definition_values = unknown_values.get("container_definitions")
+    for index, definition in enumerate(definitions):
+        if not isinstance(definition, Mapping):
+            uncertainties.append(f"container_definitions[{index}] is not an object")
+            continue
+        unknown_definition = (
+            unknown_definition_values[index]
+            if isinstance(unknown_definition_values, list) and index < len(unknown_definition_values)
+            else None
+        )
+        if "image" not in definition:
+            continue
+        path = f"container_definitions[{index}].image"
+        image_value = definition.get("image")
+        image_reference = (
+            _unknown_image_reference(image_value)
+            if isinstance(unknown_definition, Mapping) and value_is_unknown(unknown_definition.get("image"))
+            else parse_container_image_reference(image_value)
+        )
+        references.append(
+            _aws_image_reference_record(
+                image_reference,
+                source="aws_ecs_task_definition",
+                path=path,
+            )
+        )
+        _append_image_uncertainty(uncertainties, path, image_reference)
+    return references, uncertainties
+
+
+def _unknown_image_reference(value: object) -> ContainerImageReference:
+    return ContainerImageReference(
+        raw=value if isinstance(value, str) else None,
+        registry_host=None,
+        repository=None,
+        tag=None,
+        digest=None,
+        digest_pinned=None,
+        unresolved_value=value,
+        unresolved_reason="image reference is unknown after planning",
+    )
+
+
+def _aws_image_reference_record(
+    reference: ContainerImageReference,
+    *,
+    source: str,
+    path: str,
+    package_type: str | None = None,
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "source": source,
+        "path": path,
+        "raw": reference.raw,
+        "registry_host": reference.registry_host,
+        "repository": reference.repository,
+        "tag": reference.tag,
+        "digest": reference.digest,
+        "digest_pinned": reference.digest_pinned,
+        "is_resolved": reference.is_resolved,
+    }
+    if package_type is not None:
+        record["package_type"] = package_type
+    if reference.unresolved_value is not None:
+        record["unresolved_value"] = reference.unresolved_value
+    if reference.unresolved_reason is not None:
+        record["unresolved_reason"] = reference.unresolved_reason
+
+    if reference.registry_host and reference.repository:
+        match = _ECR_REGISTRY_HOST_PATTERN.fullmatch(reference.registry_host.lower())
+        if match:
+            record.update(
+                {
+                    "ecr_account_id": match.group("account_id"),
+                    "ecr_region": match.group("region"),
+                    "ecr_repository_path": reference.repository,
+                    "ecr_repository_url": f"{reference.registry_host.lower()}/{reference.repository}",
+                }
+            )
+    return record
+
+
+def _append_image_uncertainty(
+    uncertainties: list[str],
+    path: str,
+    reference: ContainerImageReference,
+) -> None:
+    if reference.unresolved_reason:
+        uncertainties.append(f"{path}: {reference.unresolved_reason}")
+
+
+_ECR_REGISTRY_HOST_PATTERN = re.compile(
+    r"^(?P<account_id>\d{12})\.dkr\.ecr\.(?P<region>[a-z0-9-]+)\.amazonaws\.com(?:\.cn)?$"
+)
 
 
 def normalize_lambda_permission(resource: TerraformResource) -> NormalizedResource:
