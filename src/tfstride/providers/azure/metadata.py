@@ -27,6 +27,30 @@ class AzureResourceMetadata:
     SERVICE_BUS_CUSTOMER_MANAGED_KEY_SOURCE_ADDRESS = OptionalStringMetadataField(
         "service_bus_customer_managed_key_source_address"
     )
+    CONTAINER_REGISTRY_ID = OptionalStringMetadataField("container_registry_id")
+    CONTAINER_REGISTRY_SKU = OptionalStringMetadataField("container_registry_sku")
+    CONTAINER_REGISTRY_LOGIN_SERVER = OptionalStringMetadataField("container_registry_login_server")
+    CONTAINER_REGISTRY_PREMIUM_TIER_STATE = OptionalStringMetadataField("container_registry_premium_tier_state")
+    CONTAINER_REGISTRY_ADMIN_STATE = OptionalStringMetadataField("container_registry_admin_state")
+    CONTAINER_REGISTRY_ANONYMOUS_PULL_STATE = OptionalStringMetadataField("container_registry_anonymous_pull_state")
+    CONTAINER_REGISTRY_CUSTOMER_MANAGED_KEY_STATE = OptionalStringMetadataField(
+        "container_registry_customer_managed_key_state"
+    )
+    CONTAINER_REGISTRY_KEY_VAULT_KEY_ID = OptionalStringMetadataField("container_registry_key_vault_key_id")
+    CONTAINER_REGISTRY_ENCRYPTION_IDENTITY_CLIENT_ID = OptionalStringMetadataField(
+        "container_registry_encryption_identity_client_id"
+    )
+    CONTAINER_REGISTRY_RETENTION_STATE = OptionalStringMetadataField("container_registry_retention_state")
+    CONTAINER_REGISTRY_EXPORT_POLICY_STATE = OptionalStringMetadataField("container_registry_export_policy_state")
+    CONTAINER_REGISTRY_QUARANTINE_POLICY_STATE = OptionalStringMetadataField(
+        "container_registry_quarantine_policy_state"
+    )
+    CONTAINER_REGISTRY_TRUST_POLICY_STATE = OptionalStringMetadataField("container_registry_trust_policy_state")
+    CONTAINER_REGISTRY_ZONE_REDUNDANCY_STATE = OptionalStringMetadataField("container_registry_zone_redundancy_state")
+    CONTAINER_REGISTRY_DATA_ENDPOINT_STATE = OptionalStringMetadataField("container_registry_data_endpoint_state")
+    CONTAINER_REGISTRY_NETWORK_RULE_BYPASS_OPTION = OptionalStringMetadataField(
+        "container_registry_network_rule_bypass_option"
+    )
     STORAGE_ACCOUNT_REFERENCE = OptionalStringMetadataField("storage_account_reference")
     RESOLVED_STORAGE_ACCOUNT_ADDRESS = OptionalStringMetadataField("resolved_storage_account_address")
     KEY_VAULT_ID = OptionalStringMetadataField("key_vault_id")
@@ -224,6 +248,8 @@ class AzureResourceMetadata:
     STORAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("storage_posture_uncertainties")
     SERVICE_BUS_POSTURE_UNCERTAINTIES = StringListMetadataField("service_bus_posture_uncertainties")
     UNRESOLVED_SERVICE_BUS_NAMESPACE_REFERENCES = StringListMetadataField("unresolved_service_bus_namespace_references")
+    CONTAINER_REGISTRY_POSTURE_UNCERTAINTIES = StringListMetadataField("container_registry_posture_uncertainties")
+    CONTAINER_REGISTRY_RETENTION_DAYS = OptionalIntMetadataField("container_registry_retention_days")
     STORAGE_BLOB_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_blob_delete_retention_days")
     STORAGE_CONTAINER_DELETE_RETENTION_DAYS = OptionalIntMetadataField("storage_container_delete_retention_days")
     STORAGE_BLOB_RESTORE_POLICY_DAYS = OptionalIntMetadataField("storage_blob_restore_policy_days")
@@ -332,3 +358,5 @@ class AzureResourceMetadata:
     DIAGNOSTIC_LOG_RECORDS = DictListMetadataField("diagnostic_log_records")
     DIAGNOSTIC_METRIC_RECORDS = DictListMetadataField("diagnostic_metric_records")
     DEFENDER_EXTENSIONS = DictListMetadataField("defender_extensions")
+    CONTAINER_REGISTRY_NETWORK_RULE_SET = DictMetadataField("container_registry_network_rule_set")
+    CONTAINER_REGISTRY_ENCRYPTION_CONFIGURATION = DictMetadataField("container_registry_encryption_configuration")

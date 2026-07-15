@@ -12,6 +12,7 @@ class AzureResourceType:
     SERVICE_BUS_NAMESPACE = "azurerm_servicebus_namespace"
     SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET = "azurerm_servicebus_namespace_network_rule_set"
     SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY = "azurerm_servicebus_namespace_customer_managed_key"
+    CONTAINER_REGISTRY = "azurerm_container_registry"
     KEY_VAULT = "azurerm_key_vault"
     KEY_VAULT_ACCESS_POLICY = "azurerm_key_vault_access_policy"
     KEY_VAULT_SECRET = "azurerm_key_vault_secret"
@@ -75,6 +76,8 @@ AZURE_SERVICE_BUS_RESOURCE_TYPES = frozenset(
         AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY,
     }
 )
+
+AZURE_CONTAINER_REGISTRY_RESOURCE_TYPES = frozenset({AzureResourceType.CONTAINER_REGISTRY})
 
 AZURE_KEY_VAULT_RESOURCE_TYPES = frozenset(
     {
@@ -162,6 +165,7 @@ AZURE_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
 AZURE_SUPPORTED_RESOURCE_TYPES = (
     AZURE_STORAGE_RESOURCE_TYPES
     | AZURE_SERVICE_BUS_RESOURCE_TYPES
+    | AZURE_CONTAINER_REGISTRY_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
     | AZURE_IDENTITY_RESOURCE_TYPES
     | AZURE_RBAC_RESOURCE_TYPES

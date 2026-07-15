@@ -25,6 +25,7 @@ from tfstride.providers.azure.compute_normalizers import (
     normalize_linux_virtual_machine,
     normalize_windows_virtual_machine,
 )
+from tfstride.providers.azure.container_registry_normalizers import normalize_container_registry
 from tfstride.providers.azure.data_normalizers import (
     normalize_storage_account,
     normalize_storage_account_network_rules,
@@ -88,6 +89,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.SERVICE_BUS_NAMESPACE: normalize_servicebus_namespace,
     AzureResourceType.SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET: normalize_servicebus_namespace_network_rule_set,
     AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY: normalize_servicebus_namespace_customer_managed_key,
+    AzureResourceType.CONTAINER_REGISTRY: normalize_container_registry,
     AzureResourceType.KEY_VAULT: normalize_key_vault,
     AzureResourceType.KEY_VAULT_ACCESS_POLICY: normalize_key_vault_access_policy,
     AzureResourceType.KEY_VAULT_SECRET: normalize_key_vault_secret,

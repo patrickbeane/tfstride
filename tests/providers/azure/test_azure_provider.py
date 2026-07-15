@@ -60,6 +60,7 @@ class AzureProviderTests(unittest.TestCase):
         )
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.CONTAINER_REGISTRY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.ROLE_DEFINITION))

@@ -5,6 +5,7 @@ from tfstride.providers.azure.resource_facts.aks import AzureAksFacts
 from tfstride.providers.azure.resource_facts.app_service import AzureAppServiceFacts
 from tfstride.providers.azure.resource_facts.audit import AzureAuditFacts
 from tfstride.providers.azure.resource_facts.compute import AzureComputeFacts
+from tfstride.providers.azure.resource_facts.container_registry import AzureContainerRegistryFacts
 from tfstride.providers.azure.resource_facts.identity import AzureIdentityFacts
 from tfstride.providers.azure.resource_facts.key_vault import AzureKeyVaultFacts
 from tfstride.providers.azure.resource_facts.network import AzureNetworkFacts
@@ -19,6 +20,7 @@ from tfstride.providers.azure.resource_facts.storage import AzureStorageFacts
 class AzureResourceFacts(
     AzureStorageFacts,
     AzureServiceBusFacts,
+    AzureContainerRegistryFacts,
     AzureAksFacts,
     AzureAppServiceFacts,
     AzureKeyVaultFacts,
