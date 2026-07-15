@@ -85,6 +85,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-access-restrictions-not-default-deny",
         "azure-app-service-broad-access-restriction-allow",
         "azure-app-service-scm-access-unrestricted",
+        "azure-app-service-image-not-digest-pinned",
         "azure-diagnostic-settings-missing",
         "azure-diagnostic-setting-no-log-destination",
         "azure-diagnostic-setting-audit-logs-incomplete",
@@ -239,6 +240,7 @@ def build_azure_rule_contribution(
             app_service_detectors.detect_broad_access_restriction_allow
         ),
         "azure-app-service-scm-access-unrestricted": app_service_detectors.detect_scm_access_unrestricted,
+        "azure-app-service-image-not-digest-pinned": (app_service_detectors.detect_container_image_not_digest_pinned),
         "azure-diagnostic-settings-missing": audit_detectors.detect_missing_diagnostic_settings,
         "azure-diagnostic-setting-no-log-destination": audit_detectors.detect_diagnostic_setting_no_log_destination,
         "azure-diagnostic-setting-audit-logs-incomplete": (

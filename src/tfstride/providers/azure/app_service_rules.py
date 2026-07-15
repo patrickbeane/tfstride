@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding
+from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_DISABLED
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES
@@ -484,9 +484,70 @@ class AzureAppServiceRuleDetectors:
             )
         return findings
 
+    def detect_container_image_not_digest_pinned(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "azure":
+            return []
 
-def _target_resource_evidence(app) -> list[str]:
+        findings: list[Finding] = []
+        for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+            facts = azure_facts(app)
+            for image_reference in facts.container_image_references:
+                if not _is_resolved_unpinned_reference(image_reference):
+                    continue
+
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=0,
+                    data_sensitivity=0,
+                    lateral_movement=0,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[app.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{app.display_name} deploys container image "
+                            f"{image_reference.get('raw') or 'with an unresolved image value'} without a digest pin. "
+                            "A tag or registry resolution can change the artifact selected by a future deployment; "
+                            "pin deployment images to immutable digests for reproducible workload integrity."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_resource", _target_resource_evidence(app)),
+                            evidence_item("image_reference", _image_reference_evidence(image_reference)),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
+
+def _target_resource_evidence(app: NormalizedResource) -> list[str]:
     return [f"address={app.address}", f"type={app.resource_type}"]
+
+
+def _is_resolved_unpinned_reference(reference: Mapping[str, Any]) -> bool:
+    return reference.get("is_resolved") is True and reference.get("digest_pinned") is False
+
+
+def _image_reference_evidence(reference: Mapping[str, Any]) -> list[str]:
+    return [
+        f"source={reference.get('source') or 'unknown'}",
+        f"path={reference.get('path') or 'unknown'}",
+        f"raw={reference.get('raw') or 'unknown'}",
+        f"registry_host={reference.get('registry_host') or 'implicit'}",
+        f"repository={reference.get('repository') or 'unknown'}",
+        f"tag={reference.get('tag') or 'unset'}",
+        f"digest={reference.get('digest') or 'unset'}",
+        f"digest_pinned={reference.get('digest_pinned')}",
+        f"container_registry_login_server={reference.get('container_registry_login_server') or 'unset'}",
+    ]
 
 
 def _public_network_evidence(facts: AzureResourceFacts) -> list[str]:

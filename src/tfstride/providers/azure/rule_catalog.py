@@ -639,6 +639,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "privilege_breadth", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-image-not-digest-pinned",
+        title="Azure App Service container image is not digest-pinned",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Pin App Service and Function App container images to an immutable `sha256` digest, and update the "
+            "digest through a reviewed build and deployment process when releasing a new artifact."
+        ),
+        tags=("azure", "app-service", "function-app", "container", "supply-chain", "image-integrity"),
+        severity_factors=("blast_radius",),
+    ),
+    RuleMetadata(
         rule_id="azure-diagnostic-settings-missing",
         title="Azure resource lacks diagnostic settings",
         category=StrideCategory.REPUDIATION,

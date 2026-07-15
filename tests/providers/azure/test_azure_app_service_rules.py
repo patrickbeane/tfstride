@@ -20,6 +20,7 @@ _APP_RULE_IDS = (
     "azure-app-service-access-restrictions-not-default-deny",
     "azure-app-service-broad-access-restriction-allow",
     "azure-app-service-scm-access-unrestricted",
+    "azure-app-service-image-not-digest-pinned",
 )
 _MISSING = object()
 
