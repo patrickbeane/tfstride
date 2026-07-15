@@ -508,6 +508,8 @@
         "aws_config_configuration_recorder_status",
         "aws_config_delivery_channel",
         "aws_db_instance",
+        "aws_ecr_registry_scanning_configuration",
+        "aws_ecr_repository",
         "aws_ecs_cluster",
         "aws_ecs_service",
         "aws_ecs_task_definition",

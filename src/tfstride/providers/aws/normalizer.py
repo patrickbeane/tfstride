@@ -50,6 +50,10 @@ from tfstride.providers.aws.data_normalizers import (
     normalize_sqs_queue,
     normalize_sqs_queue_redrive_policy,
 )
+from tfstride.providers.aws.ecr_normalizers import (
+    normalize_ecr_registry_scanning_configuration,
+    normalize_ecr_repository,
+)
 from tfstride.providers.aws.eks_normalizers import normalize_eks_addon, normalize_eks_cluster
 from tfstride.providers.aws.iam_normalizers import (
     normalize_iam_instance_profile,
@@ -102,6 +106,8 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_ecs_cluster": normalize_ecs_cluster,
     "aws_ecs_service": normalize_ecs_service,
     "aws_ecs_task_definition": normalize_ecs_task_definition,
+    "aws_ecr_registry_scanning_configuration": normalize_ecr_registry_scanning_configuration,
+    "aws_ecr_repository": normalize_ecr_repository,
     "aws_eks_addon": normalize_eks_addon,
     "aws_eks_cluster": normalize_eks_cluster,
     "aws_flow_log": normalize_flow_log,
