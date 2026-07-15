@@ -37,6 +37,9 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
+        "gcp-artifact-registry-docker-tags-mutable",
+        "gcp-artifact-registry-customer-managed-encryption-missing",
+        "gcp-artifact-registry-vulnerability-scanning-disabled",
         "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-secret-manager-lifecycle-posture-incomplete",
         "gcp-kms-key-rotation-not-configured-or-too-long",
@@ -138,6 +141,13 @@ def build_gcp_rule_contribution(
         "gcp-gcs-versioning-disabled": gcp_detectors.detect_gcs_versioning_disabled,
         "gcp-gcs-customer-managed-encryption-missing": gcp_detectors.detect_gcs_customer_managed_encryption_missing,
         "gcp-gcs-retention-policy-insufficient": gcp_detectors.detect_gcs_retention_policy_insufficient,
+        "gcp-artifact-registry-docker-tags-mutable": (gcp_detectors.detect_artifact_registry_docker_tags_mutable),
+        "gcp-artifact-registry-customer-managed-encryption-missing": (
+            gcp_detectors.detect_artifact_registry_customer_managed_encryption_missing
+        ),
+        "gcp-artifact-registry-vulnerability-scanning-disabled": (
+            gcp_detectors.detect_artifact_registry_vulnerability_scanning_disabled
+        ),
         "gcp-secret-manager-customer-managed-encryption-missing": (
             gcp_detectors.detect_secret_manager_customer_managed_encryption_missing
         ),

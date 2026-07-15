@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 221,
+      "registered_rule_count": 224,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -138,6 +138,9 @@
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
+        "gcp-artifact-registry-docker-tags-mutable",
+        "gcp-artifact-registry-customer-managed-encryption-missing",
+        "gcp-artifact-registry-vulnerability-scanning-disabled",
         "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-secret-manager-lifecycle-posture-incomplete",
         "gcp-kms-key-rotation-not-configured-or-too-long",
@@ -363,6 +366,9 @@
         "gcp-gcs-versioning-disabled": 0,
         "gcp-gcs-customer-managed-encryption-missing": 0,
         "gcp-gcs-retention-policy-insufficient": 0,
+        "gcp-artifact-registry-docker-tags-mutable": 0,
+        "gcp-artifact-registry-customer-managed-encryption-missing": 0,
+        "gcp-artifact-registry-vulnerability-scanning-disabled": 0,
         "gcp-secret-manager-customer-managed-encryption-missing": 0,
         "gcp-secret-manager-lifecycle-posture-incomplete": 0,
         "gcp-kms-key-rotation-not-configured-or-too-long": 0,

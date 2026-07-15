@@ -219,6 +219,9 @@ EXPECTED_GCP_RULE_GROUP_IDS = (
         "gcp-gcs-versioning-disabled",
         "gcp-gcs-customer-managed-encryption-missing",
         "gcp-gcs-retention-policy-insufficient",
+        "gcp-artifact-registry-docker-tags-mutable",
+        "gcp-artifact-registry-customer-managed-encryption-missing",
+        "gcp-artifact-registry-vulnerability-scanning-disabled",
         "gcp-secret-manager-customer-managed-encryption-missing",
         "gcp-secret-manager-lifecycle-posture-incomplete",
         "gcp-kms-key-rotation-not-configured-or-too-long",
@@ -374,10 +377,10 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (198, 2, 2, 14, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (201, 2, 2, 14, 3, 2)
         )
         self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (64, 2, 2, 3, 2, 2))
-        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (53, 0, 0, 11, 1, 0))
+        self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (56, 0, 0, 11, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (81, 0, 0, 0, 0, 0))
 
     def test_default_rule_ids_are_unique(self) -> None:

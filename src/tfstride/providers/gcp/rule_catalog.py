@@ -280,6 +280,39 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-artifact-registry-docker-tags-mutable",
+        title="Artifact Registry Docker repository permits mutable image tags",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable Docker immutable tags for Artifact Registry repositories used by deployments, or document and "
+            "narrow any required exceptions so a later image push cannot silently replace a referenced artifact."
+        ),
+        tags=("gcp", "artifact-registry", "container", "supply-chain", "tag-mutability"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-artifact-registry-customer-managed-encryption-missing",
+        title="Artifact Registry repository does not use customer-managed encryption",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Configure `kms_key_name` with a customer-managed Cloud KMS key for Artifact Registry repositories "
+            "where image key ownership, rotation, audit separation, or compliance controls are required."
+        ),
+        tags=("gcp", "artifact-registry", "container", "encryption", "kms"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-artifact-registry-vulnerability-scanning-disabled",
+        title="Artifact Registry vulnerability scanning is explicitly disabled",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable Artifact Registry vulnerability scanning or configure an explicit registry-level scanning "
+            "control that covers the repository, then retain scan findings in the container security workflow."
+        ),
+        tags=("gcp", "artifact-registry", "container", "supply-chain", "scanning"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-secret-manager-customer-managed-encryption-missing",
         title="Secret Manager secret does not use customer-managed encryption",
         category=StrideCategory.INFORMATION_DISCLOSURE,
