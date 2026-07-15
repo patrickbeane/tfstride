@@ -486,6 +486,28 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-workload-image-not-digest-pinned",
+        title="Workload container image is not digest-pinned",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Pin ECS task definition and image-based Lambda deployment references to immutable image digests so "
+            "future registry tag changes cannot silently change the artifact selected by a workload."
+        ),
+        tags=("aws", "container", "workload", "supply-chain", "reproducibility"),
+        severity_factors=("blast_radius",),
+    ),
+    RuleMetadata(
+        rule_id="aws-workload-ecr-mutable-tag",
+        title="Workload deploys a mutable ECR image tag",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Use an immutable ECR tag policy and prefer digest-pinned workload references; keep any mutable-tag "
+            "exception narrowly scoped and intentional."
+        ),
+        tags=("aws", "ecr", "container", "workload", "supply-chain", "tag-mutability"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

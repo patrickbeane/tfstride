@@ -8,6 +8,7 @@ from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.aws.api_gateway_rules import AwsApiGatewayRuleDetectors
 from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
+from tfstride.providers.aws.container_rules import AwsContainerDeploymentRuleDetectors
 from tfstride.providers.aws.ecr_rules import AwsEcrRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
@@ -71,6 +72,8 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-ecr-image-tag-mutability-enabled",
         "aws-ecr-customer-managed-encryption-missing",
         "aws-ecr-repository-scanning-disabled",
+        "aws-workload-image-not-digest-pinned",
+        "aws-workload-ecr-mutable-tag",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -133,6 +136,7 @@ def build_aws_rule_contribution(
     rds_posture_detectors = AwsRdsPostureRuleDetectors(finding_factory)
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     ecr_detectors = AwsEcrRuleDetectors(finding_factory)
+    container_deployment_detectors = AwsContainerDeploymentRuleDetectors(finding_factory)
     messaging_detectors = AwsMessagingPostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     kms_detectors = AwsKmsRuleDetectors(finding_factory)
@@ -194,6 +198,8 @@ def build_aws_rule_contribution(
         "aws-ecr-image-tag-mutability-enabled": ecr_detectors.detect_mutable_image_tags,
         "aws-ecr-customer-managed-encryption-missing": ecr_detectors.detect_customer_managed_encryption_missing,
         "aws-ecr-repository-scanning-disabled": ecr_detectors.detect_repository_scanning_disabled,
+        "aws-workload-image-not-digest-pinned": (container_deployment_detectors.detect_image_not_digest_pinned),
+        "aws-workload-ecr-mutable-tag": container_deployment_detectors.detect_mutable_ecr_tag,
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),
