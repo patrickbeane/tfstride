@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 224,
+      "registered_rule_count": 229,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -208,6 +208,11 @@
         "azure-service-bus-local-auth-enabled",
         "azure-service-bus-customer-managed-key-missing",
         "azure-service-bus-missing-private-endpoint",
+        "azure-container-registry-public-network-access-not-disabled",
+        "azure-container-registry-admin-account-enabled",
+        "azure-container-registry-anonymous-pull-enabled",
+        "azure-container-registry-customer-managed-key-missing",
+        "azure-container-registry-missing-private-endpoint",
         "azure-key-vault-public-network-access",
         "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
@@ -436,6 +441,11 @@
         "azure-service-bus-local-auth-enabled": 0,
         "azure-service-bus-customer-managed-key-missing": 0,
         "azure-service-bus-missing-private-endpoint": 0,
+        "azure-container-registry-public-network-access-not-disabled": 0,
+        "azure-container-registry-admin-account-enabled": 0,
+        "azure-container-registry-anonymous-pull-enabled": 0,
+        "azure-container-registry-customer-managed-key-missing": 0,
+        "azure-container-registry-missing-private-endpoint": 0,
         "azure-key-vault-public-network-access": 0,
         "azure-key-vault-missing-private-endpoint": 0,
         "azure-key-vault-privileged-access": 0,

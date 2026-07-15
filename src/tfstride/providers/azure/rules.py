@@ -13,6 +13,7 @@ from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
+from tfstride.providers.azure.container_registry_rules import AzureContainerRegistryRuleDetectors
 from tfstride.providers.azure.iam_assignment_rules import AzureIamAssignmentRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.load_balancer_rules import AzureLoadBalancerRuleDetectors
@@ -53,6 +54,11 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-service-bus-local-auth-enabled",
         "azure-service-bus-customer-managed-key-missing",
         "azure-service-bus-missing-private-endpoint",
+        "azure-container-registry-public-network-access-not-disabled",
+        "azure-container-registry-admin-account-enabled",
+        "azure-container-registry-anonymous-pull-enabled",
+        "azure-container-registry-customer-managed-key-missing",
+        "azure-container-registry-missing-private-endpoint",
         "azure-key-vault-public-network-access",
         "azure-key-vault-missing-private-endpoint",
         "azure-key-vault-privileged-access",
@@ -129,6 +135,7 @@ def build_azure_rule_contribution(
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
     service_bus_detectors = AzureServiceBusRuleDetectors(finding_factory)
+    container_registry_detectors = AzureContainerRegistryRuleDetectors(finding_factory)
     key_vault_detectors = AzureKeyVaultRuleDetectors(finding_factory)
     custom_role_detectors = AzureCustomRoleRuleDetectors(finding_factory)
     iam_assignment_detectors = AzureIamAssignmentRuleDetectors(finding_factory)
@@ -178,6 +185,17 @@ def build_azure_rule_contribution(
         "azure-service-bus-customer-managed-key-missing": (service_bus_detectors.detect_customer_managed_key_missing),
         "azure-service-bus-missing-private-endpoint": (
             private_endpoint_detectors.detect_service_bus_namespace_missing_private_endpoint
+        ),
+        "azure-container-registry-public-network-access-not-disabled": (
+            container_registry_detectors.detect_public_network_access_not_disabled
+        ),
+        "azure-container-registry-admin-account-enabled": (container_registry_detectors.detect_admin_account_enabled),
+        "azure-container-registry-anonymous-pull-enabled": (container_registry_detectors.detect_anonymous_pull_enabled),
+        "azure-container-registry-customer-managed-key-missing": (
+            container_registry_detectors.detect_customer_managed_key_missing
+        ),
+        "azure-container-registry-missing-private-endpoint": (
+            private_endpoint_detectors.detect_container_registry_missing_private_endpoint
         ),
         "azure-key-vault-public-network-access": key_vault_detectors.detect_public_network_access,
         "azure-key-vault-missing-private-endpoint": (

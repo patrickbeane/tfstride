@@ -291,6 +291,62 @@ AZURE_RULE_METADATA = (
         severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-container-registry-public-network-access-not-disabled",
+        title="Azure Container Registry does not disable public network access",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable public network access for Container Registry where possible. If public connectivity is "
+            "required, use default-deny network rules with narrow reviewed exceptions and do not treat firewall "
+            "rules as equivalent to private-only access."
+        ),
+        tags=("azure", "container-registry", "network", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-container-registry-admin-account-enabled",
+        title="Azure Container Registry admin account is enabled",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Disable the Container Registry admin account and use Microsoft Entra ID, managed identities, and "
+            "least-privilege Azure RBAC roles for image push and pull operations."
+        ),
+        tags=("azure", "container-registry", "identity", "local-auth", "admin-account"),
+        severity_factors=("internet_exposure", "privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-container-registry-anonymous-pull-enabled",
+        title="Azure Container Registry permits anonymous image pulls",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Disable anonymous pull access and require Microsoft Entra ID or scoped registry authentication for "
+            "all image retrieval."
+        ),
+        tags=("azure", "container-registry", "anonymous-access", "public-access"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-container-registry-customer-managed-key-missing",
+        title="Premium Azure Container Registry lacks customer-managed key control",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "For Premium registries that require customer key ownership, configure a customer-managed Key Vault "
+            "key and managed identity, and retain deterministic Terraform references for key governance."
+        ),
+        tags=("azure", "container-registry", "encryption", "cmk", "key-management"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-container-registry-missing-private-endpoint",
+        title="Premium Azure Container Registry lacks resolved private endpoint coverage",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Add a Private Endpoint for the Premium registry, configure Private DNS, verify clients use the "
+            "private path, and explicitly disable public network access where possible."
+        ),
+        tags=("azure", "container-registry", "private-endpoint", "public-fallback"),
+        severity_factors=("internet_exposure", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-key-vault-public-network-access",
         title="Azure Key Vault allows unrestricted public network access",
         category=StrideCategory.INFORMATION_DISCLOSURE,

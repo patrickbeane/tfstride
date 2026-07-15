@@ -31,6 +31,7 @@ _PRIVATE_ENDPOINT_TARGET_TYPES = (
     AzureResourceType.KEY_VAULT,
     AzureResourceType.MSSQL_SERVER,
     AzureResourceType.SERVICE_BUS_NAMESPACE,
+    AzureResourceType.CONTAINER_REGISTRY,
 )
 
 
@@ -107,6 +108,23 @@ class AzurePrivateEndpointPostureRuleDetectors:
                 "through public Azure Service Bus endpoints when public network fallback is enabled or unknown."
             ),
             eligible=lambda _resource, facts: facts.service_bus_is_premium_tier,
+        )
+
+    def detect_container_registry_missing_private_endpoint(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        return self._detect_missing_private_endpoint(
+            context,
+            rule_id,
+            resource_type=AzureResourceType.CONTAINER_REGISTRY,
+            rationale=lambda resource: (
+                f"{resource.display_name} does not have a resolved private endpoint and may remain reachable "
+                "through public Azure Container Registry data-plane endpoints when public network fallback is "
+                "enabled or unknown."
+            ),
+            eligible=lambda _resource, facts: facts.container_registry_is_premium is True,
         )
 
     def detect_private_endpoint_public_fallback(
@@ -593,6 +611,8 @@ def _posture_uncertainties(
         return facts.mssql_posture_uncertainties
     if resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
         return facts.service_bus_posture_uncertainties
+    if resource.resource_type == AzureResourceType.CONTAINER_REGISTRY:
+        return facts.container_registry_posture_uncertainties
     return []
 
 
