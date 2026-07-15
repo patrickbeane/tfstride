@@ -15,6 +15,9 @@ _MSSQL_ID = "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Sql/
 _SERVICE_BUS_NAMESPACE_ID = (
     "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.ServiceBus/namespaces/events"
 )
+_CONTAINER_REGISTRY_ID = (
+    "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.ContainerRegistry/registries/images"
+)
 
 
 def _resource(
@@ -90,6 +93,24 @@ def _service_bus_namespace(
         {
             "id": namespace_id,
             "name": namespace_name,
+            "sku": "Premium",
+            "public_network_access_enabled": False,
+        },
+    )
+
+
+def _container_registry(
+    *,
+    name: str = "images",
+    registry_id: str = _CONTAINER_REGISTRY_ID,
+    registry_name: str = "images",
+) -> TerraformResource:
+    return _resource(
+        AzureResourceType.CONTAINER_REGISTRY,
+        name,
+        {
+            "id": registry_id,
+            "name": registry_name,
             "sku": "Premium",
             "public_network_access_enabled": False,
         },
@@ -238,6 +259,76 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
         index = build_azure_private_endpoint_index(inventory)
 
         self.assertFalse(index.coverage_for(namespace).has_private_endpoint)
+        self.assertEqual(len(index.unresolved_targets), 1)
+        self.assertEqual(index.unresolved_targets[0].target_resource_id, "shared")
+
+    def test_resolved_private_endpoint_targets_container_registry(self) -> None:
+        inventory = _normalized(
+            _container_registry(),
+            _private_endpoint(
+                "images",
+                _CONTAINER_REGISTRY_ID,
+                subresources=("registry",),
+                dns_zone_ids=("azurerm_private_dns_zone.registry.id",),
+                dns_group_name="registry-dns",
+            ),
+        )
+        registry = inventory.get_by_address("azurerm_container_registry.images")
+        assert registry is not None
+
+        coverage = build_azure_private_endpoint_index(inventory).coverage_for(registry)
+
+        self.assertTrue(coverage.has_private_endpoint)
+        self.assertEqual(coverage.private_endpoint_addresses, ("azurerm_private_endpoint.images",))
+        self.assertEqual(coverage.subresource_names, ("registry",))
+        self.assertEqual(coverage.private_dns_zone_group_names, ("registry-dns",))
+        self.assertEqual(coverage.private_dns_zone_ids, ("azurerm_private_dns_zone.registry.id",))
+        self.assertEqual(coverage.connections[0].target_resource_id, _CONTAINER_REGISTRY_ID)
+
+    def test_container_registry_terraform_address_reference_resolves_deterministically(self) -> None:
+        inventory = _normalized(
+            _container_registry(),
+            _private_endpoint(
+                "images",
+                "azurerm_container_registry.images.id",
+                subresources=("registry",),
+            ),
+        )
+        registry = inventory.get_by_address("azurerm_container_registry.images")
+        assert registry is not None
+
+        coverage = build_azure_private_endpoint_index(inventory).coverage_for(registry)
+
+        self.assertTrue(coverage.has_private_endpoint)
+        self.assertEqual(coverage.connections[0].target_resource_id, "azurerm_container_registry.images.id")
+
+    def test_unresolved_container_registry_target_is_retained(self) -> None:
+        target_id = "${data.azurerm_container_registry.external.id}"
+        inventory = _normalized(
+            _container_registry(),
+            _private_endpoint("external", target_id, subresources=("registry",)),
+        )
+        registry = inventory.get_by_address("azurerm_container_registry.images")
+        assert registry is not None
+
+        index = build_azure_private_endpoint_index(inventory)
+
+        self.assertFalse(index.coverage_for(registry).has_private_endpoint)
+        self.assertEqual(len(index.unresolved_targets), 1)
+        self.assertEqual(index.unresolved_targets[0].target_resource_id, target_id)
+        self.assertEqual(index.unresolved_targets[0].subresource_names, ("registry",))
+
+    def test_container_registry_name_does_not_create_private_endpoint_coverage(self) -> None:
+        inventory = _normalized(
+            _container_registry(registry_name="shared"),
+            _private_endpoint("name_only", "shared", subresources=("registry",)),
+        )
+        registry = inventory.get_by_address("azurerm_container_registry.images")
+        assert registry is not None
+
+        index = build_azure_private_endpoint_index(inventory)
+
+        self.assertFalse(index.coverage_for(registry).has_private_endpoint)
         self.assertEqual(len(index.unresolved_targets), 1)
         self.assertEqual(index.unresolved_targets[0].target_resource_id, "shared")
 

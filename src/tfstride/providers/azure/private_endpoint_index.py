@@ -16,6 +16,7 @@ _SUPPORTED_PRIVATE_ENDPOINT_TARGET_TYPES = frozenset(
         AzureResourceType.KEY_VAULT,
         AzureResourceType.MSSQL_SERVER,
         AzureResourceType.SERVICE_BUS_NAMESPACE,
+        AzureResourceType.CONTAINER_REGISTRY,
     }
 )
 
@@ -166,6 +167,8 @@ def _primary_target_resource_key(resource: NormalizedResource) -> str:
         target_id = facts.mssql_server_id
     elif resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
         target_id = facts.service_bus_namespace_id
+    elif resource.resource_type == AzureResourceType.CONTAINER_REGISTRY:
+        target_id = facts.container_registry_id
     else:
         target_id = None
     return azure_reference_key(target_id or f"{resource.address}.id")
@@ -185,6 +188,8 @@ def _target_resource_keys(resource: NormalizedResource) -> tuple[str, ...]:
         target_ids.append(facts.mssql_server_id)
     elif resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
         target_ids.append(facts.service_bus_namespace_id)
+    elif resource.resource_type == AzureResourceType.CONTAINER_REGISTRY:
+        target_ids.append(facts.container_registry_id)
     return tuple(azure_reference_key(value) for value in compact_strings(target_ids))
 
 
