@@ -648,6 +648,28 @@ GCP_RULE_METADATA = (
         severity_factors=("internet_exposure", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-run-image-not-digest-pinned",
+        title="Cloud Run container image is not digest-pinned",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Pin Cloud Run container image references to immutable digests so future registry tag changes cannot "
+            "silently change the artifact selected by a deployment."
+        ),
+        tags=("gcp", "cloud-run", "container", "workload", "supply-chain", "reproducibility"),
+        severity_factors=("blast_radius",),
+    ),
+    RuleMetadata(
+        rule_id="gcp-cloud-run-artifact-registry-mutable-tag",
+        title="Cloud Run service deploys a mutable Artifact Registry image tag",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Enable immutable Docker tags for the exact Artifact Registry repository and prefer digest-pinned "
+            "Cloud Run image references; keep any mutable-tag exception narrowly scoped and intentional."
+        ),
+        tags=("gcp", "cloud-run", "artifact-registry", "container", "supply-chain", "tag-mutability"),
+        severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

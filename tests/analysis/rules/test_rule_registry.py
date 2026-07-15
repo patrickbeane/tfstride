@@ -155,6 +155,8 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "gcp-gke-binary-authorization-not-enabled",
     "gcp-cloud-run-public-invoker",
     "gcp-cloud-functions-public-invoker",
+    "gcp-cloud-run-image-not-digest-pinned",
+    "gcp-cloud-run-artifact-registry-mutable-tag",
     "gcp-service-account-iam-broad-principal",
     "gcp-service-account-iam-privileged-role",
     "gcp-service-account-key-hygiene",
@@ -298,7 +300,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 231)
+        self.assertEqual(len(metadata), 233)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -308,7 +310,7 @@ class RuleRegistryTests(unittest.TestCase):
 
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 77)
-        self.assertEqual(len(gcp_metadata_ids), 68)
+        self.assertEqual(len(gcp_metadata_ids), 70)
         self.assertEqual(len(azure_metadata_ids), 86)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
