@@ -18,6 +18,9 @@ from tfstride.providers.gcp.iam_project_normalizers import (
     normalize_project_iam_policy,
 )
 from tfstride.providers.gcp.iam_resource_normalizers import (
+    normalize_artifact_registry_repository_iam_binding,
+    normalize_artifact_registry_repository_iam_member,
+    normalize_artifact_registry_repository_iam_policy,
     normalize_bigquery_dataset_iam_binding,
     normalize_bigquery_dataset_iam_member,
     normalize_bigquery_dataset_iam_policy,
@@ -52,6 +55,9 @@ from tfstride.providers.gcp.iam_service_account_normalizers import (
 )
 
 __all__ = (
+    "normalize_artifact_registry_repository_iam_binding",
+    "normalize_artifact_registry_repository_iam_member",
+    "normalize_artifact_registry_repository_iam_policy",
     "normalize_bigquery_dataset_iam_binding",
     "normalize_bigquery_dataset_iam_member",
     "normalize_bigquery_dataset_iam_policy",

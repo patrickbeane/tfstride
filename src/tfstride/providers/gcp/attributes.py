@@ -136,6 +136,7 @@ class GcpAttr:
     DEFAULT_TABLE_EXPIRATION_MS = RawAttribute("default_table_expiration_ms")
     DEFAULT_KMS_KEY_NAME = OptionalStringAttribute("default_kms_key_name")
     REPOSITORY_ID = OptionalStringAttribute("repository_id")
+    REPOSITORY = OptionalStringAttribute("repository")
     FORMAT = OptionalStringAttribute("format")
     DELETE_CONTENTS_ON_DESTROY = BoolAttribute("delete_contents_on_destroy")
     DELETION_PROTECTION = BoolAttribute("deletion_protection")

@@ -30,6 +30,9 @@ from tfstride.providers.gcp.data_normalizers import (
     normalize_storage_bucket,
 )
 from tfstride.providers.gcp.iam_normalizers import (
+    normalize_artifact_registry_repository_iam_binding,
+    normalize_artifact_registry_repository_iam_member,
+    normalize_artifact_registry_repository_iam_policy,
     normalize_bigquery_dataset_iam_binding,
     normalize_bigquery_dataset_iam_member,
     normalize_bigquery_dataset_iam_policy,
@@ -136,6 +139,9 @@ ResourceNormalizer = Callable[[TerraformResource], NormalizedResource]
 
 _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY: normalize_artifact_registry_repository,
+    GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY_IAM_BINDING: normalize_artifact_registry_repository_iam_binding,
+    GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY_IAM_MEMBER: normalize_artifact_registry_repository_iam_member,
+    GcpResourceType.ARTIFACT_REGISTRY_REPOSITORY_IAM_POLICY: normalize_artifact_registry_repository_iam_policy,
     GcpResourceType.COMPUTE_BACKEND_BUCKET: normalize_compute_backend_bucket,
     GcpResourceType.COMPUTE_BACKEND_SERVICE: normalize_compute_backend_service,
     GcpResourceType.COMPUTE_FIREWALL: normalize_compute_firewall,

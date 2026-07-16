@@ -19,6 +19,10 @@ class GcpArtifactRegistryFacts(GcpBaseFacts):
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_PATH)
 
     @property
+    def artifact_registry_repository_reference(self) -> str | None:
+        return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_REFERENCE)
+
+    @property
     def artifact_registry_format(self) -> str | None:
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_FORMAT)
 
@@ -93,6 +97,10 @@ class GcpArtifactRegistryFacts(GcpBaseFacts):
     @property
     def artifact_registry_posture_uncertainties(self) -> list[str]:
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_POSTURE_UNCERTAINTIES)
+
+    @property
+    def artifact_registry_iam_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_IAM_POSTURE_UNCERTAINTIES)
 
 
 def _state_bool(state: str | None) -> bool | None:

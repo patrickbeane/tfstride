@@ -5,6 +5,7 @@ import unittest
 from tests.helpers.paths import SOURCE_ROOT
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.gcp.constants import (
+    GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
     GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
@@ -124,7 +125,8 @@ class GcpProviderTests(unittest.TestCase):
             | GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES
             | GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES
             | GCP_CLOUD_RUN_IAM_RESOURCE_TYPES
-            | GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
+            | GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES
+            | GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES,
         )
         self.assertEqual(
             GCP_IAM_GRANT_RESOURCE_TYPES,
@@ -270,6 +272,7 @@ class GcpProviderTests(unittest.TestCase):
                 "ORG_POLICY_RULES",
                 "BUCKET_NAME",
                 "ARTIFACT_REGISTRY_REPOSITORY_ID",
+                "ARTIFACT_REGISTRY_REPOSITORY_REFERENCE",
                 "ARTIFACT_REGISTRY_REPOSITORY_PATH",
                 "ARTIFACT_REGISTRY_FORMAT",
                 "ARTIFACT_REGISTRY_MODE",
@@ -288,6 +291,7 @@ class GcpProviderTests(unittest.TestCase):
                 "ARTIFACT_REGISTRY_DELETION_POLICY",
                 "ARTIFACT_REGISTRY_DELETION_POLICY_STATE",
                 "ARTIFACT_REGISTRY_POSTURE_UNCERTAINTIES",
+                "ARTIFACT_REGISTRY_IAM_POSTURE_UNCERTAINTIES",
                 "GCS_DEFAULT_KMS_KEY_NAME",
                 "CUSTOMER_MANAGED_ENCRYPTION",
                 "GCS_VERSIONING_ENABLED",

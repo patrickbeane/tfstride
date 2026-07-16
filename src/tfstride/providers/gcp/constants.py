@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tfstride.providers.gcp.resource_types import (
+    GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
     GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
@@ -30,6 +31,7 @@ from tfstride.providers.gcp.resource_types import (
 PUBLIC_GCP_IAM_MEMBERS = frozenset({"allUsers", "allAuthenticatedUsers"})
 
 __all__ = [
+    "GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES",
     "GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES",
     "GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES",
     "GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES",

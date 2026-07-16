@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.coercion import attribute_unknown, known_string, known_string_list
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import compact
 from tfstride.providers.gcp.iam_normalizer_utils import (
@@ -16,6 +17,134 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import first_non_empty
 from tfstride.providers.json_documents import load_json_document
+
+
+def normalize_artifact_registry_repository_iam_member(resource: TerraformResource) -> NormalizedResource:
+    _values, target_reference, project, role, member, members, condition, uncertainties = _artifact_registry_iam_values(
+        resource
+    )
+    members = compact([member])
+    return _normalize_artifact_registry_iam_resource(
+        resource,
+        target_reference=target_reference,
+        project=project,
+        role=role,
+        member=member,
+        members=members,
+        condition=condition,
+        bindings=_iam_bindings(role, members, condition=condition),
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_artifact_registry_repository_iam_binding(resource: TerraformResource) -> NormalizedResource:
+    _values, target_reference, project, role, _, members, condition, uncertainties = _artifact_registry_iam_values(
+        resource
+    )
+    return _normalize_artifact_registry_iam_resource(
+        resource,
+        target_reference=target_reference,
+        project=project,
+        role=role,
+        member=None,
+        members=members,
+        condition=condition,
+        bindings=_iam_bindings(role, members, condition=condition),
+        uncertainties=uncertainties,
+    )
+
+
+def normalize_artifact_registry_repository_iam_policy(resource: TerraformResource) -> NormalizedResource:
+    values, target_reference, project, _, _, _, _, uncertainties = _artifact_registry_iam_values(resource)
+    if attribute_unknown(resource.unknown_values, GcpAttr.POLICY_DATA.key):
+        uncertainties.append("policy_data is unknown after planning")
+    policy_document = load_json_document(values.raw(GcpAttr.POLICY_DATA))
+    return _normalize_artifact_registry_iam_resource(
+        resource,
+        target_reference=target_reference,
+        project=project,
+        role=None,
+        member=None,
+        members=[],
+        condition={},
+        bindings=_policy_bindings(policy_document),
+        policy_document=policy_document,
+        uncertainties=uncertainties,
+    )
+
+
+def _artifact_registry_iam_values(
+    resource: TerraformResource,
+) -> tuple[GcpValues, str | None, str | None, str | None, str | None, list[str], dict[str, Any], list[str]]:
+    values = GcpValues(resource.values)
+    uncertainties: list[str] = []
+    target_reference = None
+    for target_attribute in (GcpAttr.REPOSITORY, GcpAttr.REPOSITORY_ID):
+        target_reference = known_string(
+            resource.values,
+            resource.unknown_values,
+            target_attribute.key,
+            uncertainties,
+        )
+        if target_reference:
+            break
+    project = known_string(resource.values, resource.unknown_values, GcpAttr.PROJECT.key, uncertainties)
+    role = known_string(resource.values, resource.unknown_values, GcpAttr.ROLE.key, uncertainties)
+    member = known_string(resource.values, resource.unknown_values, GcpAttr.MEMBER.key, uncertainties)
+    members = known_string_list(resource.values, resource.unknown_values, GcpAttr.MEMBERS.key, uncertainties)
+    condition = _artifact_registry_iam_condition(resource, uncertainties)
+    return values, target_reference, project, role, member, members, condition, uncertainties
+
+
+def _artifact_registry_iam_condition(
+    resource: TerraformResource,
+    uncertainties: list[str],
+) -> dict[str, Any]:
+    if attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key):
+        uncertainties.append("condition is unknown after planning")
+        return {}
+    return _condition(resource.values.get(GcpAttr.CONDITION.key))
+
+
+def _normalize_artifact_registry_iam_resource(
+    resource: TerraformResource,
+    *,
+    target_reference: str | None,
+    project: str | None,
+    role: str | None,
+    member: str | None,
+    members: list[str],
+    condition: dict[str, Any],
+    bindings: list[dict[str, Any]],
+    uncertainties: list[str],
+    policy_document: dict[str, Any] | None = None,
+) -> NormalizedResource:
+    metadata: dict[Any, Any] = {
+        GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_REFERENCE: target_reference,
+        GcpResourceMetadata.PROJECT: project,
+        GcpResourceMetadata.IAM_ROLE: role,
+        GcpResourceMetadata.IAM_MEMBER: member,
+        GcpResourceMetadata.IAM_MEMBERS: members,
+        GcpResourceMetadata.IAM_CONDITION: condition,
+        GcpResourceMetadata.IAM_BINDINGS: bindings,
+        GcpResourceMetadata.ARTIFACT_REGISTRY_IAM_POSTURE_UNCERTAINTIES: uncertainties,
+    }
+    if policy_document is not None:
+        metadata[GcpResourceMetadata.POLICY_DOCUMENT] = policy_document
+    return NormalizedResource(
+        address=resource.address,
+        provider=GCP_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=first_non_empty(
+            resource.values.get(GcpAttr.ID.key),
+            _binding_identifier(target_reference, role, members),
+            target_reference,
+            resource.address,
+        ),
+        metadata=metadata,
+    )
 
 
 def normalize_storage_bucket_iam_member(resource: TerraformResource) -> NormalizedResource:
