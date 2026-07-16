@@ -274,6 +274,7 @@ class GcpProviderTests(unittest.TestCase):
                 "ARTIFACT_REGISTRY_REPOSITORY_ID",
                 "ARTIFACT_REGISTRY_REPOSITORY_REFERENCE",
                 "ARTIFACT_REGISTRY_REPOSITORY_PATH",
+                "ARTIFACT_REGISTRY_WRITE_PATHS",
                 "ARTIFACT_REGISTRY_FORMAT",
                 "ARTIFACT_REGISTRY_MODE",
                 "ARTIFACT_REGISTRY_KMS_KEY_NAME",

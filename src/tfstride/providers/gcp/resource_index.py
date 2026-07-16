@@ -7,6 +7,7 @@ from types import MappingProxyType
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_types import (
+    GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_DATASET_IAM_RESOURCE_TYPES,
     GCP_BIGQUERY_TABLE_IAM_RESOURCE_TYPES,
     GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES,
@@ -45,6 +46,7 @@ class GcpResourceIndex:
     kms_key_ring_iam_resources: tuple[NormalizedResource, ...]
     cloud_run_iam_resources: tuple[NormalizedResource, ...]
     cloud_function_iam_resources: tuple[NormalizedResource, ...]
+    artifact_registry_iam_resources: tuple[NormalizedResource, ...]
 
 
 @dataclass(slots=True)
@@ -74,6 +76,7 @@ class GcpResourceIndexBuilder:
         kms_key_ring_iam_resources: list[NormalizedResource] = []
         cloud_run_iam_resources: list[NormalizedResource] = []
         cloud_function_iam_resources: list[NormalizedResource] = []
+        artifact_registry_iam_resources: list[NormalizedResource] = []
         for resource in resources:
             resource_references = gcp_resource_references(resource)
             for reference in resource_references:
@@ -123,6 +126,8 @@ class GcpResourceIndexBuilder:
                 cloud_run_iam_resources.append(resource)
             elif resource.resource_type in GCP_CLOUD_FUNCTION_IAM_RESOURCE_TYPES:
                 cloud_function_iam_resources.append(resource)
+            elif resource.resource_type in GCP_ARTIFACT_REGISTRY_REPOSITORY_IAM_RESOURCE_TYPES:
+                artifact_registry_iam_resources.append(resource)
         return GcpResourceIndex(
             resources_by_reference=MappingProxyType(resources_by_reference),
             network_references=MappingProxyType(network_references),
@@ -144,6 +149,7 @@ class GcpResourceIndexBuilder:
             kms_key_ring_iam_resources=tuple(kms_key_ring_iam_resources),
             cloud_run_iam_resources=tuple(cloud_run_iam_resources),
             cloud_function_iam_resources=tuple(cloud_function_iam_resources),
+            artifact_registry_iam_resources=tuple(artifact_registry_iam_resources),
         )
 
 
@@ -170,6 +176,7 @@ def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.CLOUD_FUNCTION_REFERENCE),
         resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
+        resource.get_metadata_field(GcpResourceMetadata.ARTIFACT_REGISTRY_REPOSITORY_PATH),
     ):
         if reference:
             references.add(reference)

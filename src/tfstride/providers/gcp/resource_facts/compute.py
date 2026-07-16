@@ -36,3 +36,17 @@ class GcpComputeFacts(GcpBaseFacts):
     @property
     def container_image_posture_uncertainties(self) -> list[str]:
         return self.get(GcpResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
+
+    @property
+    def artifact_registry_write_paths(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATHS)
+
+    @property
+    def artifact_registry_write_path_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATH_UNCERTAINTIES)
+
+    def set_artifact_registry_write_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATHS, values)
+
+    def extend_artifact_registry_write_path_uncertainties(self, values: list[str]) -> None:
+        self.extend(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATH_UNCERTAINTIES, values)
