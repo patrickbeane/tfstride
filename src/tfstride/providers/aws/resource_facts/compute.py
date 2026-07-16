@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from tfstride.providers.aws.metadata import AwsResourceMetadata
@@ -61,6 +62,14 @@ class AwsComputeFacts(AwsBaseFacts):
     @property
     def container_image_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
+
+    @property
+    def ecr_write_paths(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECR_WRITE_PATHS)
+
+    @property
+    def ecr_write_path_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECR_WRITE_PATH_UNCERTAINTIES)
 
     @property
     def lambda_function_url_function_reference(self) -> str | None:
@@ -436,6 +445,12 @@ class AwsComputeFacts(AwsBaseFacts):
 
     def set_execution_role_arn(self, value: str | None) -> None:
         self.set(AwsResourceMetadata.EXECUTION_ROLE_ARN, value)
+
+    def set_ecr_write_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(AwsResourceMetadata.ECR_WRITE_PATHS, values)
+
+    def extend_ecr_write_path_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AwsResourceMetadata.ECR_WRITE_PATH_UNCERTAINTIES, values)
 
     def add_unresolved_cluster_reference(self, value: str | None) -> None:
         self.append(AwsResourceMetadata.UNRESOLVED_CLUSTER_REFERENCES, value)

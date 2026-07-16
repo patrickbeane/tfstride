@@ -21,6 +21,7 @@ class AwsResourceIndex:
     lambda_functions: dict[str, NormalizedResource]
     ecs_clusters: dict[str, NormalizedResource]
     ecs_task_definitions: dict[str, NormalizedResource]
+    ecr_repositories: dict[str, NormalizedResource]
     load_balancers: dict[str, NormalizedResource]
     load_balancer_listeners: dict[str, NormalizedResource]
     load_balancer_listener_rules: tuple[NormalizedResource, ...]
@@ -52,6 +53,7 @@ class AwsResourceIndexBuilder:
         lambda_functions: dict[str, NormalizedResource] = {}
         ecs_clusters: dict[str, NormalizedResource] = {}
         ecs_task_definitions: dict[str, NormalizedResource] = {}
+        ecr_repositories: dict[str, NormalizedResource] = {}
         load_balancers: dict[str, NormalizedResource] = {}
         load_balancer_listeners: dict[str, NormalizedResource] = {}
         load_balancer_listener_rules: list[NormalizedResource] = []
@@ -138,6 +140,17 @@ class AwsResourceIndexBuilder:
                         ),
                     ),
                 )
+            elif resource_type == "aws_ecr_repository":
+                _index_resource_aliases(
+                    ecr_repositories,
+                    resource,
+                    (
+                        facts.ecr_repository_url,
+                        resource.address,
+                        resource.identifier,
+                        resource.arn,
+                    ),
+                )
             elif resource_type == "aws_lb":
                 _index_resource_aliases(
                     load_balancers,
@@ -219,6 +232,7 @@ class AwsResourceIndexBuilder:
             lambda_functions=lambda_functions,
             ecs_clusters=ecs_clusters,
             ecs_task_definitions=ecs_task_definitions,
+            ecr_repositories=ecr_repositories,
             load_balancers=load_balancers,
             load_balancer_listeners=load_balancer_listeners,
             load_balancer_listener_rules=tuple(load_balancer_listener_rules),

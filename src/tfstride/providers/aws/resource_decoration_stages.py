@@ -4,6 +4,7 @@ from typing import Protocol
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_decoration.api_gateway import ResolveApiGatewayRelationshipsStage
+from tfstride.providers.aws.resource_decoration.ecr_write_paths import ModelWorkloadEcrWritePathsStage
 from tfstride.providers.aws.resource_decoration.ecs import (
     MarkEcsLoadBalancerExposureStage,
     ResolveEcsServiceRelationshipsStage,
@@ -48,6 +49,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         NormalizeIamAssignmentPostureStage(),
         ResolveInstanceProfileRolesStage(),
         ResolveEcsServiceRelationshipsStage(),
+        ModelWorkloadEcrWritePathsStage(),
         ResolveApiGatewayRelationshipsStage(),
         MergeResourcePolicyResourcesStage(),
         ApplyS3PublicAccessBlocksStage(),
