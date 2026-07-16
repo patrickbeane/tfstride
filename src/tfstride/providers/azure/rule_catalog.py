@@ -650,6 +650,17 @@ AZURE_RULE_METADATA = (
         severity_factors=("blast_radius",),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-can-modify-image-repository",
+        title="Azure App Service runtime identity can modify its deployed image repository",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Remove ACR push and equivalent custom-role data permissions from the App Service runtime identity, "
+            "use a separate deployment identity, and deploy digest-pinned container images."
+        ),
+        tags=("azure", "app-service", "function-app", "acr", "managed-identity", "supply-chain", "persistence"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-diagnostic-settings-missing",
         title="Azure resource lacks diagnostic settings",
         category=StrideCategory.REPUDIATION,

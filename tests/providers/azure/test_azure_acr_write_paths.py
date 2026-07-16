@@ -136,6 +136,7 @@ def _role_assignment(
     principal_id: object = _SYSTEM_PRINCIPAL_ID,
     scope: object = "azurerm_container_registry.images.id",
     role_name: object = "AcrPush",
+    role_definition_id: object = ("/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/acr-push"),
     condition: object | None = None,
     unknown_values: dict[str, object] | None = None,
     name: str = "push",
@@ -143,7 +144,7 @@ def _role_assignment(
     values: dict[str, object] = {
         "scope": scope,
         "role_definition_name": role_name,
-        "role_definition_id": ("/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/acr-push"),
+        "role_definition_id": role_definition_id,
         "principal_id": principal_id,
         "principal_type": "ServicePrincipal",
     }
@@ -153,6 +154,37 @@ def _role_assignment(
         AzureResourceType.ROLE_ASSIGNMENT,
         values,
         name=name,
+        unknown_values=unknown_values,
+    )
+
+
+def _role_definition(
+    *,
+    data_actions: list[str],
+    not_data_actions: list[str] | None = None,
+    actions: list[str] | None = None,
+    role_definition_id: str = (
+        "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-acr-writer"
+    ),
+    unknown_values: dict[str, object] | None = None,
+) -> TerraformResource:
+    return _resource(
+        AzureResourceType.ROLE_DEFINITION,
+        {
+            "id": role_definition_id,
+            "name": "Custom ACR Writer",
+            "scope": "/subscriptions/sub-0001",
+            "assignable_scopes": ["/subscriptions/sub-0001"],
+            "permissions": [
+                {
+                    "actions": actions or [],
+                    "not_actions": [],
+                    "data_actions": data_actions,
+                    "not_data_actions": not_data_actions or [],
+                }
+            ],
+        },
+        name="custom_acr_writer",
         unknown_values=unknown_values,
     )
 
@@ -221,6 +253,128 @@ class AzureAcrWritePathTests(unittest.TestCase):
         self.assertEqual(paths[0]["principal_id"], _USER_PRINCIPAL_ID)
         self.assertEqual(paths[0]["role_kind"], "writer")
         self.assertEqual(paths[0]["image_reference"], "images.azurecr.io/jobs/worker:2026.07")
+
+    def test_deterministic_custom_role_content_write_path_is_modeled(self) -> None:
+        role_definition_id = (
+            "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-acr-writer"
+        )
+        inventory = _normalize(
+            [
+                _registry(),
+                _web_app(),
+                _role_definition(
+                    data_actions=["Microsoft.ContainerRegistry/registries/repositories/content/write"],
+                    role_definition_id=role_definition_id,
+                ),
+                _role_assignment(
+                    role_name=None,
+                    role_definition_id=role_definition_id,
+                ),
+            ]
+        )
+        workload = inventory.get_by_address("azurerm_linux_web_app.api")
+
+        self.assertIsNotNone(workload)
+        assert workload is not None
+        paths = azure_facts(workload).acr_write_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["role_kind"], "custom_writer")
+        self.assertEqual(
+            paths[0]["grant_basis"],
+            "azure_custom_role_registry_scoped_rbac",
+        )
+        self.assertEqual(
+            paths[0]["role_definition_address"],
+            "azurerm_role_definition.custom_acr_writer",
+        )
+        self.assertEqual(
+            paths[0]["permission_patterns"],
+            ["microsoft.containerregistry/registries/repositories/content/write"],
+        )
+        self.assertEqual(
+            paths[0]["matched_write_actions"],
+            ["microsoft.containerregistry/registries/repositories/content/write"],
+        )
+
+    def test_custom_role_deny_or_management_only_permission_does_not_create_path(self) -> None:
+        role_definition_id = (
+            "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-acr-writer"
+        )
+        denied = _normalize(
+            [
+                _registry(),
+                _web_app(),
+                _role_definition(
+                    data_actions=["Microsoft.ContainerRegistry/registries/*"],
+                    not_data_actions=["Microsoft.ContainerRegistry/registries/*"],
+                    role_definition_id=role_definition_id,
+                ),
+                _role_assignment(
+                    role_name=None,
+                    role_definition_id=role_definition_id,
+                ),
+            ]
+        )
+        management_only = _normalize(
+            [
+                _registry(),
+                _web_app(),
+                _role_definition(
+                    actions=["Microsoft.ContainerRegistry/registries/write"],
+                    data_actions=[],
+                    role_definition_id=role_definition_id,
+                ),
+                _role_assignment(
+                    role_name=None,
+                    role_definition_id=role_definition_id,
+                ),
+            ]
+        )
+
+        denied_workload = denied.get_by_address("azurerm_linux_web_app.api")
+        management_workload = management_only.get_by_address("azurerm_linux_web_app.api")
+        assert denied_workload is not None
+        assert management_workload is not None
+        self.assertEqual(azure_facts(denied_workload).acr_write_paths, [])
+        self.assertEqual(azure_facts(management_workload).acr_write_paths, [])
+
+    def test_unresolved_custom_role_data_actions_do_not_create_path(self) -> None:
+        role_definition_id = (
+            "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-acr-writer"
+        )
+        inventory = _normalize(
+            [
+                _registry(),
+                _web_app(),
+                _role_definition(
+                    data_actions=[],
+                    role_definition_id=role_definition_id,
+                    unknown_values={
+                        "permissions": [
+                            {
+                                "data_actions": True,
+                            }
+                        ]
+                    },
+                ),
+                _role_assignment(
+                    role_name=None,
+                    role_definition_id=role_definition_id,
+                ),
+            ]
+        )
+        workload = inventory.get_by_address("azurerm_linux_web_app.api")
+
+        self.assertIsNotNone(workload)
+        assert workload is not None
+        facts = azure_facts(workload)
+        self.assertEqual(facts.acr_write_paths, [])
+        self.assertTrue(
+            any(
+                "custom role azurerm_role_definition.custom_acr_writer data actions are unresolved" in uncertainty
+                for uncertainty in facts.acr_write_path_uncertainties
+            )
+        )
 
     def test_login_server_scope_and_principal_must_match_exactly(self) -> None:
         login_mismatch = _normalize(

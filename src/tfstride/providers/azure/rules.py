@@ -10,6 +10,7 @@ from tfstride.analysis.rule_definitions import (
 )
 from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
+from tfstride.providers.azure.app_service_container_rules import AzureAppServiceContainerRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
@@ -86,6 +87,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-broad-access-restriction-allow",
         "azure-app-service-scm-access-unrestricted",
         "azure-app-service-image-not-digest-pinned",
+        "azure-app-service-can-modify-image-repository",
         "azure-diagnostic-settings-missing",
         "azure-diagnostic-setting-no-log-destination",
         "azure-diagnostic-setting-audit-logs-incomplete",
@@ -132,6 +134,7 @@ def build_azure_rule_contribution(
     load_balancer_detectors = AzureLoadBalancerRuleDetectors(finding_factory)
     network_telemetry_detectors = AzureNetworkTelemetryRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
+    app_service_container_detectors = AzureAppServiceContainerRuleDetectors(finding_factory)
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
@@ -240,7 +243,12 @@ def build_azure_rule_contribution(
             app_service_detectors.detect_broad_access_restriction_allow
         ),
         "azure-app-service-scm-access-unrestricted": app_service_detectors.detect_scm_access_unrestricted,
-        "azure-app-service-image-not-digest-pinned": (app_service_detectors.detect_container_image_not_digest_pinned),
+        "azure-app-service-image-not-digest-pinned": (
+            app_service_container_detectors.detect_container_image_not_digest_pinned
+        ),
+        "azure-app-service-can-modify-image-repository": (
+            app_service_container_detectors.detect_container_image_self_modification_path
+        ),
         "azure-diagnostic-settings-missing": audit_detectors.detect_missing_diagnostic_settings,
         "azure-diagnostic-setting-no-log-destination": audit_detectors.detect_diagnostic_setting_no_log_destination,
         "azure-diagnostic-setting-audit-logs-incomplete": (

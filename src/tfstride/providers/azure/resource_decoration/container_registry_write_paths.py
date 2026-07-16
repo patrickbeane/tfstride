@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from typing import Any
 
 from tfstride.models import NormalizedResource
@@ -13,6 +15,21 @@ _ACR_WRITE_ROLE_KINDS = {
     "acrpush": "writer",
     "container registry repository writer": "writer",
 }
+_ACR_CONTENT_WRITE_ACTIONS = (
+    "microsoft.containerregistry/registries/push/write",
+    "microsoft.containerregistry/registries/repositories/content/write",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _AcrWriteGrant:
+    role_name: str
+    role_kind: str
+    grant_basis: str
+    role_definition_address: str | None = None
+    permission_patterns: tuple[str, ...] = ()
+    not_permission_patterns: tuple[str, ...] = ()
+    matched_write_actions: tuple[str, ...] = ()
 
 
 class ModelAppServiceAcrWritePathsStage:
@@ -130,36 +147,102 @@ def _append_identity_write_paths(
         if any("condition is unknown" in value for value in assignment_facts.key_vault_authorization_uncertainties):
             uncertainties.append(f"{workload.address}: {assignment_resource.address} condition is unresolved")
             continue
-        role_name = _string_value(assignment.get("role_definition_name"))
-        role_kind = _ACR_WRITE_ROLE_KINDS.get((role_name or "").strip().lower())
-        if role_kind is None:
-            if not role_name:
-                uncertainties.append(f"{workload.address}: {assignment_resource.address} role is unresolved")
+        grant, uncertainty = _acr_write_grant(assignment, assignment_resource, context)
+        if uncertainty:
+            uncertainties.append(f"{workload.address}: {assignment_resource.address} {uncertainty}")
+        if grant is None:
             continue
         registry_facts = azure_facts(registry)
-        paths.append(
-            {
-                "workload_address": workload.address,
-                "workload_type": workload.resource_type,
-                "identity_address": identity.address,
-                "identity_kind": identity_kind,
-                "principal_id": identity_facts.principal_id,
-                "image_reference": image.get("raw"),
-                "image_reference_path": image.get("path"),
-                "image_tag": image.get("tag"),
-                "image_digest": image.get("digest"),
-                "image_digest_pinned": image.get("digest_pinned"),
-                "container_registry_address": registry.address,
-                "container_registry_id": registry_facts.container_registry_id,
-                "container_registry_login_server": registry_facts.container_registry_login_server,
-                "role_assignment_address": assignment_resource.address,
-                "role_definition_name": role_name,
-                "role_definition_id": assignment.get("role_definition_id"),
-                "role_kind": role_kind,
-                "grant_basis": "azure_registry_scoped_rbac",
-                "registry_scope": "exact_container_registry",
-            }
+        path = {
+            "workload_address": workload.address,
+            "workload_type": workload.resource_type,
+            "identity_address": identity.address,
+            "identity_kind": identity_kind,
+            "principal_id": identity_facts.principal_id,
+            "image_reference": image.get("raw"),
+            "image_reference_path": image.get("path"),
+            "image_tag": image.get("tag"),
+            "image_digest": image.get("digest"),
+            "image_digest_pinned": image.get("digest_pinned"),
+            "container_registry_address": registry.address,
+            "container_registry_id": registry_facts.container_registry_id,
+            "container_registry_login_server": registry_facts.container_registry_login_server,
+            "role_assignment_address": assignment_resource.address,
+            "role_definition_name": grant.role_name,
+            "role_definition_id": assignment.get("role_definition_id"),
+            "role_kind": grant.role_kind,
+            "grant_basis": grant.grant_basis,
+            "registry_scope": "exact_container_registry",
+        }
+        if grant.role_definition_address:
+            path["role_definition_address"] = grant.role_definition_address
+            path["permission_patterns"] = list(grant.permission_patterns)
+            path["not_permission_patterns"] = list(grant.not_permission_patterns)
+            path["matched_write_actions"] = list(grant.matched_write_actions)
+        paths.append(path)
+
+
+def _acr_write_grant(
+    assignment: Mapping[str, Any],
+    assignment_resource: NormalizedResource,
+    context: AzureDecorationContext,
+) -> tuple[_AcrWriteGrant | None, str | None]:
+    role_name = _string_value(assignment.get("role_definition_name"))
+    role_kind = _ACR_WRITE_ROLE_KINDS.get((role_name or "").strip().lower())
+    if role_kind is not None and role_name is not None:
+        return (
+            _AcrWriteGrant(
+                role_name=role_name,
+                role_kind=role_kind,
+                grant_basis="azure_registry_scoped_rbac",
+            ),
+            None,
         )
+
+    assignment_facts = azure_facts(assignment_resource)
+    role_definition_address = assignment_facts.resolved_role_definition_address
+    role_definition = context.index.resolve(role_definition_address)
+    if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
+        if not role_name:
+            return None, "role is unresolved"
+        return None, None
+
+    role_facts = azure_facts(role_definition)
+    if any(
+        "data_actions" in value or "not_data_actions" in value for value in role_facts.role_definition_uncertainties
+    ):
+        return None, f"custom role {role_definition.address} data actions are unresolved"
+
+    permission_patterns = tuple(_normalized_actions(role_facts.role_definition_data_actions))
+    not_permission_patterns = tuple(_normalized_actions(role_facts.role_definition_not_data_actions))
+    matched_write_actions = tuple(
+        action
+        for action in _ACR_CONTENT_WRITE_ACTIONS
+        if _matches_any(action, permission_patterns) and not _matches_any(action, not_permission_patterns)
+    )
+    if not matched_write_actions:
+        return None, None
+
+    return (
+        _AcrWriteGrant(
+            role_name=role_name or role_facts.name or role_definition.address,
+            role_kind="custom_writer",
+            grant_basis="azure_custom_role_registry_scoped_rbac",
+            role_definition_address=role_definition.address,
+            permission_patterns=permission_patterns,
+            not_permission_patterns=not_permission_patterns,
+            matched_write_actions=matched_write_actions,
+        ),
+        None,
+    )
+
+
+def _normalized_actions(values: list[str]) -> list[str]:
+    return [value.strip().lower() for value in values if value.strip()]
+
+
+def _matches_any(action: str, patterns: tuple[str, ...]) -> bool:
+    return any(fnmatchcase(action, pattern) for pattern in patterns)
 
 
 def _registries_by_login_server(
