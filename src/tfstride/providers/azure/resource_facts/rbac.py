@@ -26,6 +26,10 @@ class AzureRbacFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.ROLE_DEFINITION_SCOPE)
 
     @property
+    def role_assignment_condition(self) -> str | None:
+        return self.get(AzureResourceMetadata.ROLE_ASSIGNMENT_CONDITION)
+
+    @property
     def role_definition_assignable_scopes(self) -> list[str]:
         return self.get(AzureResourceMetadata.ROLE_DEFINITION_ASSIGNABLE_SCOPES)
 

@@ -102,6 +102,20 @@ class AzureAppServiceFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
 
     @property
+    def acr_write_paths(self) -> list[dict[str, Any]]:
+        return self.get(AzureResourceMetadata.ACR_WRITE_PATHS)
+
+    @property
+    def acr_write_path_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.ACR_WRITE_PATH_UNCERTAINTIES)
+
+    def set_acr_write_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(AzureResourceMetadata.ACR_WRITE_PATHS, values)
+
+    def extend_acr_write_path_uncertainties(self, values: list[str]) -> None:
+        self.extend(AzureResourceMetadata.ACR_WRITE_PATH_UNCERTAINTIES, values)
+
+    @property
     def app_service_posture_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.APP_SERVICE_POSTURE_UNCERTAINTIES)
 

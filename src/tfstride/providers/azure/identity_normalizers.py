@@ -109,6 +109,7 @@ def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource
     role_definition_id = known_string(values, resource.unknown_values, "role_definition_id", uncertainties)
     principal_id = known_string(values, resource.unknown_values, "principal_id", uncertainties)
     principal_type = known_string(values, resource.unknown_values, "principal_type", uncertainties)
+    condition = known_string(values, resource.unknown_values, "condition", uncertainties)
     assignment = {
         "source": resource.address,
         "scope": scope,
@@ -130,6 +131,7 @@ def normalize_role_assignment(resource: TerraformResource) -> NormalizedResource
             AzureResourceMetadata.ROLE_DEFINITION_ID: role_definition_id,
             AzureResourceMetadata.PRINCIPAL_ID: principal_id,
             AzureResourceMetadata.PRINCIPAL_TYPE: principal_type,
+            AzureResourceMetadata.ROLE_ASSIGNMENT_CONDITION: condition,
             AzureResourceMetadata.KEY_VAULT_ROLE_ASSIGNMENTS: [assignment],
             AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES: uncertainties,
         },

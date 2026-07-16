@@ -4,6 +4,9 @@ from typing import Protocol
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_decoration.compute import ResolveVirtualMachineRelationshipsStage
+from tfstride.providers.azure.resource_decoration.container_registry_write_paths import (
+    ModelAppServiceAcrWritePathsStage,
+)
 from tfstride.providers.azure.resource_decoration.identity import DecorateManagedIdentityRoleAssignmentsStage
 from tfstride.providers.azure.resource_decoration.key_vault import DecorateKeyVaultRelationshipsStage
 from tfstride.providers.azure.resource_decoration.network_posture import (
@@ -40,4 +43,5 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         DecorateServiceBusRelationshipsStage(),
         DecorateKeyVaultRelationshipsStage(),
         DecorateManagedIdentityRoleAssignmentsStage(),
+        ModelAppServiceAcrWritePathsStage(),
     )
