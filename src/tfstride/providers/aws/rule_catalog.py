@@ -508,6 +508,18 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-workload-can-modify-image-repository",
+        title="Workload runtime identity can modify its image repository",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Remove ECR upload and `PutImage` permissions from workload runtime roles, grant repository writes only "
+            "to a separate deployment identity, enforce immutable tags, and pin workload images to reviewed "
+            "digests."
+        ),
+        tags=("aws", "ecr", "container", "workload", "iam", "supply-chain", "self-modification"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

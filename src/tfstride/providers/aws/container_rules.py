@@ -115,6 +115,72 @@ class AwsContainerDeploymentRuleDetectors:
                     )
         return findings
 
+    def detect_ecr_self_modification_path(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        findings: list[Finding] = []
+        for workload in context.inventory.by_type(*_AWS_WORKLOAD_RESOURCE_TYPES):
+            for write_path in aws_facts(workload).ecr_write_paths:
+                if not _is_reportable_self_modification_path(write_path):
+                    continue
+
+                repository = _resource_by_address(
+                    context,
+                    write_path.get("ecr_repository_address"),
+                    expected_type=_AWS_ECR_REPOSITORY,
+                )
+                role = _resource_by_address(
+                    context,
+                    write_path.get("role_address"),
+                    expected_type="aws_iam_role",
+                )
+                if repository is None or role is None:
+                    continue
+                repository_facts = aws_facts(repository)
+                if _ecr_tag_is_mutable(repository_facts, write_path.get("image_tag")) is not True:
+                    continue
+
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=1,
+                    data_sensitivity=1,
+                    lateral_movement=2,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[workload.address, repository.address, role.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{workload.display_name} deploys the unpinned ECR image "
+                            f"{write_path.get('image_reference')} from {repository.display_name}, and its runtime "
+                            f"{_role_kind_label(write_path.get('role_kind'))} {role.display_name} has modeled "
+                            "`ecr:PutImage` access to that repository. Because the referenced tag is mutable, "
+                            "a compromised workload can publish a replacement artifact selected by a future "
+                            "deployment, creating a self-modification and persistence path."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_resource", _target_resource_evidence(workload)),
+                            evidence_item("image_reference", _write_path_image_evidence(write_path)),
+                            evidence_item("runtime_identity", _write_path_identity_evidence(write_path)),
+                            evidence_item("ecr_write_path", _ecr_write_path_evidence(write_path)),
+                            evidence_item(
+                                "ecr_repository",
+                                _ecr_repository_evidence(repository, repository_facts),
+                            ),
+                        ),
+                        severity_reasoning=severity_reasoning,
+                    )
+                )
+        return findings
+
 
 def _ecr_repositories_by_url(context: RuleEvaluationContext) -> dict[str, list[NormalizedResource]]:
     repositories_by_url: dict[str, list[NormalizedResource]] = {}
@@ -123,6 +189,75 @@ def _ecr_repositories_by_url(context: RuleEvaluationContext) -> dict[str, list[N
         if repository_url:
             repositories_by_url.setdefault(repository_url, []).append(repository)
     return repositories_by_url
+
+
+def _resource_by_address(
+    context: RuleEvaluationContext,
+    address: object,
+    *,
+    expected_type: str,
+) -> NormalizedResource | None:
+    if not isinstance(address, str) or not address:
+        return None
+    resource = context.inventory.get_by_address(address)
+    if resource is None or resource.resource_type != expected_type:
+        return None
+    return resource
+
+
+def _is_reportable_self_modification_path(path: Mapping[str, Any]) -> bool:
+    return (
+        path.get("runtime_credentials_available") is True
+        and path.get("credential_context") == "workload_runtime"
+        and path.get("can_put_image") is True
+        and path.get("role_policy_complete") is True
+        and path.get("image_digest_pinned") is False
+        and isinstance(path.get("image_tag"), str)
+        and bool(path.get("image_tag"))
+    )
+
+
+def _role_kind_label(value: object) -> str:
+    if value == "ecs_task_role":
+        return "ECS task role"
+    if value == "lambda_execution_role":
+        return "Lambda execution role"
+    return "runtime role"
+
+
+def _write_path_image_evidence(path: Mapping[str, Any]) -> list[str]:
+    return [
+        f"raw={path.get('image_reference') or 'unknown'}",
+        f"path={path.get('image_reference_path') or 'unknown'}",
+        f"tag={path.get('image_tag') or 'unset'}",
+        f"digest={path.get('image_digest') or 'unset'}",
+        f"digest_pinned={path.get('image_digest_pinned')}",
+    ]
+
+
+def _write_path_identity_evidence(path: Mapping[str, Any]) -> list[str]:
+    return [
+        f"role_kind={path.get('role_kind') or 'unknown'}",
+        f"role_address={path.get('role_address') or 'unknown'}",
+        f"role_arn={path.get('role_arn') or 'unknown'}",
+        f"credential_context={path.get('credential_context') or 'unknown'}",
+        f"runtime_credentials_available={path.get('runtime_credentials_available')}",
+        f"role_policy_complete={path.get('role_policy_complete')}",
+    ]
+
+
+def _ecr_write_path_evidence(path: Mapping[str, Any]) -> list[str]:
+    return [
+        f"repository_address={path.get('ecr_repository_address') or 'unknown'}",
+        f"repository_url={path.get('ecr_repository_url') or 'unknown'}",
+        f"repository_arn={path.get('ecr_repository_arn') or 'unknown'}",
+        f"grant_basis={path.get('grant_basis') or 'unknown'}",
+        f"can_put_image={path.get('can_put_image')}",
+        f"matched_actions={path.get('matched_actions') or '[]'}",
+        f"policy_action_patterns={path.get('policy_action_patterns') or '[]'}",
+        f"policy_resources={path.get('policy_resources') or '[]'}",
+        f"resource_scope={path.get('resource_scope') or 'unknown'}",
+    ]
 
 
 def _is_resolved_unpinned_reference(reference: Mapping[str, Any]) -> bool:

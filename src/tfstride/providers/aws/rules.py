@@ -74,6 +74,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-ecr-repository-scanning-disabled",
         "aws-workload-image-not-digest-pinned",
         "aws-workload-ecr-mutable-tag",
+        "aws-workload-can-modify-image-repository",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -200,6 +201,7 @@ def build_aws_rule_contribution(
         "aws-ecr-repository-scanning-disabled": ecr_detectors.detect_repository_scanning_disabled,
         "aws-workload-image-not-digest-pinned": (container_deployment_detectors.detect_image_not_digest_pinned),
         "aws-workload-ecr-mutable-tag": container_deployment_detectors.detect_mutable_ecr_tag,
+        "aws-workload-can-modify-image-repository": (container_deployment_detectors.detect_ecr_self_modification_path),
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),

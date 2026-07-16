@@ -12,7 +12,8 @@ from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 
 _IMAGE_PIN_RULE = "aws-workload-image-not-digest-pinned"
 _MUTABLE_ECR_RULE = "aws-workload-ecr-mutable-tag"
-_CONTAINER_RULE_IDS = (_IMAGE_PIN_RULE, _MUTABLE_ECR_RULE)
+_SELF_MODIFICATION_RULE = "aws-workload-can-modify-image-repository"
+_CONTAINER_RULE_IDS = (_IMAGE_PIN_RULE, _MUTABLE_ECR_RULE, _SELF_MODIFICATION_RULE)
 _ECR_URL = "111122223333.dkr.ecr.us-east-1.amazonaws.com/orders"
 
 
