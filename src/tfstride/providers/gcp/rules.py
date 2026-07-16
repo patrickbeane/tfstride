@@ -72,6 +72,7 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-cloud-functions-public-invoker",
         "gcp-cloud-run-image-not-digest-pinned",
         "gcp-cloud-run-artifact-registry-mutable-tag",
+        "gcp-cloud-run-can-modify-image-repository",
     ),
     (),
     (),
@@ -202,6 +203,9 @@ def build_gcp_rule_contribution(
         "gcp-cloud-functions-public-invoker": gcp_detectors.detect_cloud_function_public_invoker,
         "gcp-cloud-run-image-not-digest-pinned": gcp_detectors.detect_cloud_run_image_not_digest_pinned,
         "gcp-cloud-run-artifact-registry-mutable-tag": (gcp_detectors.detect_cloud_run_artifact_registry_mutable_tag),
+        "gcp-cloud-run-can-modify-image-repository": (
+            gcp_detectors.detect_cloud_run_artifact_registry_self_modification_path
+        ),
         "gcp-service-account-iam-broad-principal": gcp_detectors.detect_service_account_iam_broad_principal,
         "gcp-service-account-iam-privileged-role": gcp_detectors.detect_service_account_iam_privileged_role,
         "gcp-service-account-key-hygiene": gcp_detectors.detect_service_account_key_hygiene,

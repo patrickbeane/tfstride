@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 235,
+      "registered_rule_count": 236,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -176,6 +176,7 @@
         "gcp-cloud-functions-public-invoker",
         "gcp-cloud-run-image-not-digest-pinned",
         "gcp-cloud-run-artifact-registry-mutable-tag",
+        "gcp-cloud-run-can-modify-image-repository",
         "gcp-service-account-iam-broad-principal",
         "gcp-service-account-iam-privileged-role",
         "gcp-service-account-key-hygiene",
@@ -413,6 +414,9 @@
         "gcp-gke-binary-authorization-not-enabled": 0,
         "gcp-cloud-run-public-invoker": 0,
         "gcp-cloud-functions-public-invoker": 0,
+        "gcp-cloud-run-image-not-digest-pinned": 0,
+        "gcp-cloud-run-artifact-registry-mutable-tag": 0,
+        "gcp-cloud-run-can-modify-image-repository": 0,
         "gcp-service-account-iam-broad-principal": 0,
         "gcp-service-account-iam-privileged-role": 0,
         "gcp-service-account-key-hygiene": 0,
@@ -510,9 +514,7 @@
         "azure-postgresql-public-network-access-enabled": 0,
         "azure-postgresql-firewall-broad-public-access": 0,
         "azure-postgresql-weak-tls-or-ssl": 0,
-        "azure-postgresql-geo-backup-disabled": 0,
-        "gcp-cloud-run-image-not-digest-pinned": 0,
-        "gcp-cloud-run-artifact-registry-mutable-tag": 0
+        "azure-postgresql-geo-backup-disabled": 0
       }
     },
     "references": {

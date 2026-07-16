@@ -670,6 +670,17 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-run-can-modify-image-repository",
+        title="Cloud Run runtime identity can modify its deployed image repository",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Remove Artifact Registry writer and administrator roles from the Cloud Run runtime service account, "
+            "use a separate deployment identity, enable immutable Docker tags, and deploy digest-pinned images."
+        ),
+        tags=("gcp", "cloud-run", "artifact-registry", "iam", "container", "supply-chain", "persistence"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
