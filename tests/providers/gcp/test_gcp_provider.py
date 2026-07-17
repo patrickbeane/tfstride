@@ -254,6 +254,8 @@ class GcpProviderTests(unittest.TestCase):
                 "IAM_CONDITION",
                 "IAM_MEMBERS",
                 "IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES",
+                "WORKLOAD_IDENTITY_FEDERATION_TRUST_PATHS",
+                "WORKLOAD_IDENTITY_FEDERATION_TRUST_PATH_UNCERTAINTIES",
                 "CUSTOM_ROLE_ID",
                 "CUSTOM_ROLE_PERMISSIONS",
                 "CUSTOM_ROLE_STAGE",

@@ -87,6 +87,14 @@ class GcpIdentityFacts(GcpBaseFacts):
         return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_POSTURE_UNCERTAINTIES)
 
     @property
+    def workload_identity_federation_trust_paths(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_FEDERATION_TRUST_PATHS)
+
+    @property
+    def workload_identity_federation_trust_path_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_FEDERATION_TRUST_PATH_UNCERTAINTIES)
+
+    @property
     def service_account_key_keepers(self) -> dict[str, Any]:
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS)
 
@@ -152,6 +160,15 @@ class GcpIdentityFacts(GcpBaseFacts):
 
     def extend_iam_assignment_posture_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(GcpResourceMetadata.IAM_ASSIGNMENT_POSTURE_UNCERTAINTIES, values)
+
+    def set_workload_identity_federation_trust_paths(self, values: Sequence[dict[str, Any]]) -> None:
+        self.set(GcpResourceMetadata.WORKLOAD_IDENTITY_FEDERATION_TRUST_PATHS, list(values))
+
+    def extend_workload_identity_federation_trust_path_uncertainties(
+        self,
+        values: Sequence[str | None],
+    ) -> None:
+        self.extend(GcpResourceMetadata.WORKLOAD_IDENTITY_FEDERATION_TRUST_PATH_UNCERTAINTIES, values)
 
 
 def _service_account_email(value: Any) -> str | None:

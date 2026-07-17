@@ -263,6 +263,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                 "derive_public_exposure",
                 "decorate_sensitive_iam_bindings",
                 "model_cloud_run_artifact_registry_write_paths",
+                "model_workload_identity_federation_trust_paths",
                 "normalize_iam_assignment_posture",
             ],
         )

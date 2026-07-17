@@ -322,6 +322,9 @@ class GcpResourceMetadata:
     WORKLOAD_IDENTITY_POOL_POSTURE_UNCERTAINTIES = StringListMetadataField(
         "workload_identity_pool_posture_uncertainties"
     )
+    WORKLOAD_IDENTITY_FEDERATION_TRUST_PATH_UNCERTAINTIES = StringListMetadataField(
+        "workload_identity_federation_trust_path_uncertainties"
+    )
     GKE_POSTURE_UNCERTAINTIES = StringListMetadataField("gke_posture_uncertainties")
     AUDIT_SECURITY_POSTURE_UNCERTAINTIES = StringListMetadataField("audit_security_posture_uncertainties")
     SUBNETWORK_FLOW_LOG_METADATA_FIELDS = StringListMetadataField("subnetwork_flow_log_metadata_fields")
@@ -337,6 +340,7 @@ class GcpResourceMetadata:
     FIREWALL_POLICY_MATCH = DictMetadataField("firewall_policy_match")
     IAM_BINDINGS = DictListMetadataField("iam_bindings")
     PRIVILEGED_ACCESS_GRANTS = DictListMetadataField("privileged_access_grants")
+    WORKLOAD_IDENTITY_FEDERATION_TRUST_PATHS = DictListMetadataField("workload_identity_federation_trust_paths")
     LOAD_BALANCER_BACKENDS = DictListMetadataField("load_balancer_backends")
     LOAD_BALANCER_HOST_RULES = DictListMetadataField("load_balancer_host_rules")
     LOAD_BALANCER_PATH_MATCHERS = DictListMetadataField("load_balancer_path_matchers")

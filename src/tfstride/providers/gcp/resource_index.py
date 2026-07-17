@@ -18,6 +18,7 @@ from tfstride.providers.gcp.resource_types import (
     GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES,
     GCP_PUBSUB_TOPIC_IAM_RESOURCE_TYPES,
     GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
+    GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
@@ -47,6 +48,10 @@ class GcpResourceIndex:
     cloud_run_iam_resources: tuple[NormalizedResource, ...]
     cloud_function_iam_resources: tuple[NormalizedResource, ...]
     artifact_registry_iam_resources: tuple[NormalizedResource, ...]
+    service_accounts: tuple[NormalizedResource, ...]
+    service_account_iam_resources: tuple[NormalizedResource, ...]
+    workload_identity_pools: tuple[NormalizedResource, ...]
+    workload_identity_pool_providers: tuple[NormalizedResource, ...]
 
 
 @dataclass(slots=True)
@@ -77,6 +82,10 @@ class GcpResourceIndexBuilder:
         cloud_run_iam_resources: list[NormalizedResource] = []
         cloud_function_iam_resources: list[NormalizedResource] = []
         artifact_registry_iam_resources: list[NormalizedResource] = []
+        service_accounts: list[NormalizedResource] = []
+        service_account_iam_resources: list[NormalizedResource] = []
+        workload_identity_pools: list[NormalizedResource] = []
+        workload_identity_pool_providers: list[NormalizedResource] = []
         for resource in resources:
             resource_references = gcp_resource_references(resource)
             for reference in resource_references:
@@ -106,6 +115,14 @@ class GcpResourceIndexBuilder:
                 firewall_policy_rules.append(resource)
             elif resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_ASSOCIATION:
                 firewall_policy_associations.append(resource)
+            elif resource.resource_type == GcpResourceType.SERVICE_ACCOUNT:
+                service_accounts.append(resource)
+            elif resource.resource_type in GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES:
+                service_account_iam_resources.append(resource)
+            elif resource.resource_type == GcpResourceType.WORKLOAD_IDENTITY_POOL:
+                workload_identity_pools.append(resource)
+            elif resource.resource_type == GcpResourceType.WORKLOAD_IDENTITY_POOL_PROVIDER:
+                workload_identity_pool_providers.append(resource)
             elif resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
                 bucket_iam_resources.append(resource)
             elif resource.resource_type in GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES:
@@ -150,6 +167,10 @@ class GcpResourceIndexBuilder:
             cloud_run_iam_resources=tuple(cloud_run_iam_resources),
             cloud_function_iam_resources=tuple(cloud_function_iam_resources),
             artifact_registry_iam_resources=tuple(artifact_registry_iam_resources),
+            service_accounts=tuple(service_accounts),
+            service_account_iam_resources=tuple(service_account_iam_resources),
+            workload_identity_pools=tuple(workload_identity_pools),
+            workload_identity_pool_providers=tuple(workload_identity_pool_providers),
         )
 
 
