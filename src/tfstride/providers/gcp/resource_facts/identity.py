@@ -31,6 +31,62 @@ class GcpIdentityFacts(GcpBaseFacts):
         )
 
     @property
+    def workload_identity_pool_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_ID)
+
+    @property
+    def workload_identity_pool_mode(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_MODE)
+
+    @property
+    def workload_identity_pool_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_STATE)
+
+    @property
+    def workload_identity_pool_disabled_state(self) -> str | None:
+        return self.workload_identity_pool_state
+
+    @property
+    def workload_identity_pool_provider_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_ID)
+
+    @property
+    def workload_identity_pool_provider_type(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_TYPE)
+
+    @property
+    def workload_identity_pool_provider_state(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_STATE)
+
+    @property
+    def workload_identity_pool_provider_disabled_state(self) -> str | None:
+        return self.workload_identity_pool_provider_state
+
+    @property
+    def workload_identity_pool_provider_issuer_uri(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_ISSUER_URI)
+
+    @property
+    def workload_identity_pool_provider_allowed_audiences(self) -> list[str]:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_ALLOWED_AUDIENCES)
+
+    @property
+    def workload_identity_pool_provider_attribute_mappings(self) -> dict[str, Any]:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_ATTRIBUTE_MAPPINGS)
+
+    @property
+    def workload_identity_pool_provider_attribute_condition(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_ATTRIBUTE_CONDITION)
+
+    @property
+    def workload_identity_pool_provider_aws_account_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_PROVIDER_AWS_ACCOUNT_ID)
+
+    @property
+    def workload_identity_pool_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.WORKLOAD_IDENTITY_POOL_POSTURE_UNCERTAINTIES)
+
+    @property
     def service_account_key_keepers(self) -> dict[str, Any]:
         return self.get(GcpResourceMetadata.SERVICE_ACCOUNT_KEY_KEEPERS)
 

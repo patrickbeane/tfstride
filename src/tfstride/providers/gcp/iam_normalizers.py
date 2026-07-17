@@ -53,6 +53,10 @@ from tfstride.providers.gcp.iam_service_account_normalizers import (
     normalize_service_account_iam_policy,
     normalize_service_account_key,
 )
+from tfstride.providers.gcp.iam_workload_identity_normalizers import (
+    normalize_workload_identity_pool,
+    normalize_workload_identity_pool_provider,
+)
 
 __all__ = (
     "normalize_artifact_registry_repository_iam_binding",
@@ -95,6 +99,8 @@ __all__ = (
     "normalize_service_account_iam_member",
     "normalize_service_account_iam_policy",
     "normalize_service_account_key",
+    "normalize_workload_identity_pool",
+    "normalize_workload_identity_pool_provider",
     "normalize_storage_bucket_iam_binding",
     "normalize_storage_bucket_iam_member",
     "normalize_storage_bucket_iam_policy",

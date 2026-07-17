@@ -110,6 +110,8 @@ class GcpResourceType:
     SERVICE_ACCOUNT_IAM_MEMBER = "google_service_account_iam_member"
     SERVICE_ACCOUNT_IAM_POLICY = "google_service_account_iam_policy"
     SERVICE_ACCOUNT_KEY = "google_service_account_key"
+    WORKLOAD_IDENTITY_POOL = "google_iam_workload_identity_pool"
+    WORKLOAD_IDENTITY_POOL_PROVIDER = "google_iam_workload_identity_pool_provider"
     SCC_ORGANIZATION_SETTINGS = "google_scc_organization_settings"
     SQL_DATABASE_INSTANCE = "google_sql_database_instance"
     STORAGE_BUCKET = "google_storage_bucket"
@@ -468,6 +470,8 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.SERVICE_ACCOUNT_IAM_MEMBER,
         GcpResourceType.SERVICE_ACCOUNT_IAM_POLICY,
         GcpResourceType.SERVICE_ACCOUNT_KEY,
+        GcpResourceType.WORKLOAD_IDENTITY_POOL,
+        GcpResourceType.WORKLOAD_IDENTITY_POOL_PROVIDER,
         GcpResourceType.SCC_ORGANIZATION_SETTINGS,
         GcpResourceType.SQL_DATABASE_INSTANCE,
         GcpResourceType.STORAGE_BUCKET,

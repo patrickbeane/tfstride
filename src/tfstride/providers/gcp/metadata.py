@@ -184,6 +184,21 @@ class GcpResourceMetadata:
     MANAGED_SSL_CERTIFICATE_STATUS = OptionalStringMetadataField("managed_ssl_certificate_status")
     GKE_ENDPOINT = OptionalStringMetadataField("gke_endpoint")
     GKE_WORKLOAD_IDENTITY_POOL = OptionalStringMetadataField("gke_workload_identity_pool")
+    WORKLOAD_IDENTITY_POOL_ID = OptionalStringMetadataField("workload_identity_pool_id")
+    WORKLOAD_IDENTITY_POOL_MODE = OptionalStringMetadataField("workload_identity_pool_mode")
+    WORKLOAD_IDENTITY_POOL_STATE = OptionalStringMetadataField("workload_identity_pool_state")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_ID = OptionalStringMetadataField("workload_identity_pool_provider_id")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_TYPE = OptionalStringMetadataField("workload_identity_pool_provider_type")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_STATE = OptionalStringMetadataField("workload_identity_pool_provider_state")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_ISSUER_URI = OptionalStringMetadataField(
+        "workload_identity_pool_provider_issuer_uri"
+    )
+    WORKLOAD_IDENTITY_POOL_PROVIDER_ATTRIBUTE_CONDITION = OptionalStringMetadataField(
+        "workload_identity_pool_provider_attribute_condition"
+    )
+    WORKLOAD_IDENTITY_POOL_PROVIDER_AWS_ACCOUNT_ID = OptionalStringMetadataField(
+        "workload_identity_pool_provider_aws_account_id"
+    )
     GKE_NODE_SERVICE_ACCOUNT = OptionalStringMetadataField("gke_node_service_account")
     GKE_NODE_METADATA_MODE = OptionalStringMetadataField("gke_node_metadata_mode")
     GKE_LOGGING_SERVICE = OptionalStringMetadataField("gke_logging_service")
@@ -301,6 +316,12 @@ class GcpResourceMetadata:
     INTERNET_FACING_LOAD_BALANCER_ADDRESSES = StringListMetadataField("internet_facing_load_balancer_addresses")
     GKE_NODE_OAUTH_SCOPES = StringListMetadataField("gke_node_oauth_scopes")
     GKE_LOGGING_COMPONENTS = StringListMetadataField("gke_logging_components")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_ALLOWED_AUDIENCES = StringListMetadataField(
+        "workload_identity_pool_provider_allowed_audiences"
+    )
+    WORKLOAD_IDENTITY_POOL_POSTURE_UNCERTAINTIES = StringListMetadataField(
+        "workload_identity_pool_posture_uncertainties"
+    )
     GKE_POSTURE_UNCERTAINTIES = StringListMetadataField("gke_posture_uncertainties")
     AUDIT_SECURITY_POSTURE_UNCERTAINTIES = StringListMetadataField("audit_security_posture_uncertainties")
     SUBNETWORK_FLOW_LOG_METADATA_FIELDS = StringListMetadataField("subnetwork_flow_log_metadata_fields")
@@ -334,6 +355,9 @@ class GcpResourceMetadata:
     GKE_RELEASE_CHANNEL_CONFIG = DictMetadataField("gke_release_channel_config")
     GKE_SHIELDED_NODES_CONFIG = DictMetadataField("gke_shielded_nodes_config")
     GKE_BINARY_AUTHORIZATION = DictMetadataField("gke_binary_authorization")
+    WORKLOAD_IDENTITY_POOL_PROVIDER_ATTRIBUTE_MAPPINGS = DictMetadataField(
+        "workload_identity_pool_provider_attribute_mappings"
+    )
     SCC_ASSET_DISCOVERY_CONFIG = DictMetadataField("scc_asset_discovery_config")
     SUBNETWORK_FLOW_LOG_CONFIG = DictMetadataField("subnetwork_flow_log_config")
     PUBSUB_TOPIC_MESSAGE_STORAGE_POLICY = DictListMetadataField("pubsub_topic_message_storage_policy")

@@ -73,6 +73,8 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_storage_bucket_iam_binding,
     normalize_storage_bucket_iam_member,
     normalize_storage_bucket_iam_policy,
+    normalize_workload_identity_pool,
+    normalize_workload_identity_pool_provider,
 )
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
@@ -244,6 +246,8 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     GcpResourceType.SERVICE_ACCOUNT_IAM_MEMBER: normalize_service_account_iam_member,
     GcpResourceType.SERVICE_ACCOUNT_IAM_POLICY: normalize_service_account_iam_policy,
     GcpResourceType.SERVICE_ACCOUNT_KEY: normalize_service_account_key,
+    GcpResourceType.WORKLOAD_IDENTITY_POOL: normalize_workload_identity_pool,
+    GcpResourceType.WORKLOAD_IDENTITY_POOL_PROVIDER: normalize_workload_identity_pool_provider,
     GcpResourceType.SCC_ORGANIZATION_SETTINGS: normalize_scc_organization_settings,
     GcpResourceType.SQL_DATABASE_INSTANCE: normalize_sql_database_instance,
     GcpResourceType.STORAGE_BUCKET: normalize_storage_bucket,
