@@ -69,6 +69,9 @@ class AwsIamFacts(AwsBaseFacts):
     def set_resolved_role_references(self, values: list[str]) -> None:
         self.set(AwsResourceMetadata.RESOLVED_ROLE_REFERENCES, values)
 
+    def set_trust_statements(self, values: list[dict[str, Any]]) -> None:
+        self.set(AwsResourceMetadata.TRUST_STATEMENTS, values)
+
     def set_policy_document(self, value: dict[str, Any] | None) -> None:
         self.set(AwsResourceMetadata.POLICY_DOCUMENT, value)
 

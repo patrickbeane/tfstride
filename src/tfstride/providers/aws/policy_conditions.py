@@ -21,6 +21,7 @@ class PrincipalAssessment:
     is_service: bool
     is_federated: bool
     federated_provider_type: str | None
+    oidc_condition_key_prefix: str | None
     is_wildcard: bool
     is_root_like: bool
     is_foreign_account: bool
@@ -33,11 +34,15 @@ def assess_principal(
     primary_account_id: str | None,
     *,
     principal_kind: str | None = None,
+    federated_provider_type_override: str | None = None,
+    oidc_condition_key_prefix: str | None = None,
 ) -> PrincipalAssessment:
     principal_kind = _classify_principal_kind(principal, principal_kind)
     is_service = principal_kind == "Service"
     is_federated = principal_kind == "Federated"
-    federated_provider_type = _federated_provider_type(principal) if is_federated else None
+    federated_provider_type = (
+        federated_provider_type_override or _federated_provider_type(principal) if is_federated else None
+    )
     is_wildcard = principal == "*"
     account_id = parse_aws_account_id(principal, allow_bare=True)
     is_root_like = _is_root_like_principal(principal)
@@ -91,6 +96,7 @@ def assess_principal(
         is_service=is_service,
         is_federated=is_federated,
         federated_provider_type=federated_provider_type,
+        oidc_condition_key_prefix=oidc_condition_key_prefix,
         is_wildcard=is_wildcard,
         is_root_like=is_root_like,
         is_foreign_account=is_foreign_account,
@@ -104,7 +110,23 @@ def trust_statement_principal_assessments(
     primary_account_id: str | None,
 ) -> list[PrincipalAssessment]:
     entries = _trust_statement_principal_entries(trust_statement)
-    return [assess_principal(value, primary_account_id, principal_kind=kind) for kind, value in entries]
+    assessments: list[PrincipalAssessment] = []
+    for kind, value in entries:
+        resolved_providers = _matching_resolved_oidc_providers(trust_statement, value)
+        resolved_provider = resolved_providers[0] if resolved_providers else None
+        condition_key_prefix = (
+            _oidc_condition_key_prefix_from_url(resolved_provider.get("url")) if resolved_provider is not None else None
+        )
+        assessments.append(
+            assess_principal(
+                value,
+                primary_account_id,
+                principal_kind=kind,
+                federated_provider_type_override="oidc" if resolved_provider is not None else None,
+                oidc_condition_key_prefix=condition_key_prefix,
+            )
+        )
+    return assessments
 
 
 def policy_statement_principal_assessments(
@@ -139,6 +161,35 @@ def trust_statement_narrowing_conditions(trust_statement: Mapping[str, Any]) -> 
 
     return [
         IAMPolicyCondition(operator="", key=key, values=[]) for key in trust_statement_narrowing_keys(trust_statement)
+    ]
+
+
+def trust_statement_resolved_oidc_provider_addresses(
+    trust_statement: Mapping[str, Any],
+    principal: str,
+) -> list[str]:
+    addresses: list[str] = []
+    seen: set[str] = set()
+    for raw_provider in _matching_resolved_oidc_providers(trust_statement, principal):
+        address = str(raw_provider.get("address") or "").strip()
+        if not address or address in seen:
+            continue
+        seen.add(address)
+        addresses.append(address)
+    return addresses
+
+
+def _matching_resolved_oidc_providers(
+    trust_statement: Mapping[str, Any],
+    principal: str,
+) -> list[Mapping[str, Any]]:
+    raw_providers = trust_statement.get("resolved_oidc_providers")
+    if not isinstance(raw_providers, list):
+        return []
+    return [
+        raw_provider
+        for raw_provider in raw_providers
+        if isinstance(raw_provider, Mapping) and str(raw_provider.get("principal") or "").strip() == principal
     ]
 
 
@@ -189,7 +240,9 @@ def trust_statement_has_effective_narrowing_for_principal(
     if assessment.federated_provider_type == "saml":
         return bool(narrowing_keys.intersection(SAML_TRUST_NARROWING_KEYS))
     if assessment.federated_provider_type == "oidc":
-        provider_prefix = _oidc_provider_condition_key_prefix(assessment.principal)
+        provider_prefix = assessment.oidc_condition_key_prefix or _oidc_provider_condition_key_prefix(
+            assessment.principal
+        )
         if provider_prefix is None:
             return False
         return {
@@ -341,7 +394,9 @@ def _federated_condition_keys(assessment: PrincipalAssessment) -> frozenset[str]
     if assessment.federated_provider_type == "saml":
         return SAML_TRUST_NARROWING_KEYS
     if assessment.federated_provider_type == "oidc":
-        provider_prefix = _oidc_provider_condition_key_prefix(assessment.principal)
+        provider_prefix = assessment.oidc_condition_key_prefix or _oidc_provider_condition_key_prefix(
+            assessment.principal
+        )
         if provider_prefix is None:
             return frozenset()
         return frozenset(
@@ -361,6 +416,15 @@ def _oidc_provider_condition_key_prefix(principal: str) -> str | None:
         return None
     provider = principal.split(marker, 1)[1].strip("/")
     return provider or None
+
+
+def _oidc_condition_key_prefix_from_url(value: object) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if "://" in url:
+        url = url.split("://", 1)[1]
+    return url.strip("/") or None
 
 
 def _is_root_like_principal(principal: str) -> bool:

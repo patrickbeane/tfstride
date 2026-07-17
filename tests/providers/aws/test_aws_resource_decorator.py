@@ -162,6 +162,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "merge_role_policy_resources",
                 "normalize_iam_assignment_posture",
                 "resolve_instance_profile_roles",
+                "resolve_oidc_provider_trust",
                 "resolve_ecs_service_relationships",
                 "model_workload_ecr_write_paths",
                 "resolve_api_gateway_relationships",

@@ -86,22 +86,23 @@ def extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, 
             key=lambda entry: (entry["kind"], entry["value"]),
         )
         narrowing_conditions = extract_supported_trust_narrowing_conditions(statement.conditions)
-        trust_statements.append(
-            {
-                "principals": principals,
-                "principal_entries": principal_entries,
-                "narrowing_condition_keys": sorted({condition.key for condition in narrowing_conditions}),
-                "narrowing_conditions": [
-                    {
-                        "operator": condition.operator,
-                        "key": condition.key,
-                        "values": list(condition.values),
-                    }
-                    for condition in narrowing_conditions
-                ],
-                "has_narrowing_conditions": bool(narrowing_conditions),
-            }
-        )
+        trust_statement = {
+            "principals": principals,
+            "principal_entries": principal_entries,
+            "narrowing_condition_keys": sorted({condition.key for condition in narrowing_conditions}),
+            "narrowing_conditions": [
+                {
+                    "operator": condition.operator,
+                    "key": condition.key,
+                    "values": list(condition.values),
+                }
+                for condition in narrowing_conditions
+            ],
+            "has_narrowing_conditions": bool(narrowing_conditions),
+        }
+        if any(action.lower() == "sts:assumerolewithwebidentity" for action in statement.actions):
+            trust_statement["actions"] = sorted(set(statement.actions))
+        trust_statements.append(trust_statement)
     return trust_statements
 
 

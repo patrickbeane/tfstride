@@ -29,6 +29,7 @@ class AwsResourceIndex:
     role_index: dict[str, NormalizedResource]
     instance_profile_index: dict[str, NormalizedResource]
     policy_index: dict[str, NormalizedResource]
+    oidc_provider_index: dict[str, NormalizedResource]
     api_gateway_rest_apis: dict[str, NormalizedResource]
     apigatewayv2_apis: dict[str, NormalizedResource]
     vpcs_with_igw: set[str]
@@ -61,6 +62,7 @@ class AwsResourceIndexBuilder:
         role_index: dict[str, NormalizedResource] = {}
         instance_profile_index: dict[str, NormalizedResource] = {}
         policy_index: dict[str, NormalizedResource] = {}
+        oidc_provider_index: dict[str, NormalizedResource] = {}
         api_gateway_rest_apis: dict[str, NormalizedResource] = {}
         apigatewayv2_apis: dict[str, NormalizedResource] = {}
         vpcs_with_igw: set[str] = set()
@@ -199,6 +201,16 @@ class AwsResourceIndexBuilder:
                     resource,
                     (resource.identifier, resource.address, resource.arn),
                 )
+            elif resource_type == "aws_iam_openid_connect_provider":
+                _index_resource_aliases(
+                    oidc_provider_index,
+                    resource,
+                    (
+                        resource.arn,
+                        facts.oidc_provider_arn,
+                        f"{resource.address}.arn",
+                    ),
+                )
             elif resource_type == "aws_iam_instance_profile":
                 _index_resource_aliases(
                     instance_profile_index,
@@ -240,6 +252,7 @@ class AwsResourceIndexBuilder:
             role_index=role_index,
             instance_profile_index=instance_profile_index,
             policy_index=policy_index,
+            oidc_provider_index=oidc_provider_index,
             api_gateway_rest_apis=api_gateway_rest_apis,
             apigatewayv2_apis=apigatewayv2_apis,
             vpcs_with_igw=vpcs_with_igw,

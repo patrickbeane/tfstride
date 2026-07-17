@@ -24,6 +24,7 @@ from tfstride.providers.aws.policy_conditions import (
     trust_statement_has_effective_narrowing_for_principal,
     trust_statement_has_supported_narrowing_for_principal,
     trust_statement_principal_assessments,
+    trust_statement_resolved_oidc_provider_addresses,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -191,11 +192,15 @@ class AwsPolicyTrustRuleDetectors:
                         blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
                     boundary = context.boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
+                    provider_addresses = trust_statement_resolved_oidc_provider_addresses(
+                        trust_statement,
+                        principal,
+                    )
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
                             severity=severity_reasoning.severity,
-                            affected_resources=[role.address],
+                            affected_resources=[role.address, *provider_addresses],
                             trust_boundary_id=boundary.identifier if boundary else None,
                             rationale=_trust_expansion_rationale(role.display_name, principal, assessment),
                             evidence=collect_evidence(
@@ -204,6 +209,7 @@ class AwsPolicyTrustRuleDetectors:
                                     "trust_path",
                                     [assessment.trust_path_description],
                                 ),
+                                evidence_item("trust_provider_resources", provider_addresses),
                             ),
                             severity_reasoning=severity_reasoning,
                         )
@@ -242,11 +248,15 @@ class AwsPolicyTrustRuleDetectors:
                         blast_radius=2 if assessment.is_wildcard or assessment.is_foreign_account else 1,
                     )
                     boundary = context.boundary_index.get((BoundaryType.CROSS_ACCOUNT_OR_ROLE, principal, role.address))
+                    provider_addresses = trust_statement_resolved_oidc_provider_addresses(
+                        trust_statement,
+                        principal,
+                    )
                     findings.append(
                         self._finding_factory.build(
                             rule_id=rule_id,
                             severity=severity_reasoning.severity,
-                            affected_resources=[role.address],
+                            affected_resources=[role.address, *provider_addresses],
                             trust_boundary_id=boundary.identifier if boundary else None,
                             rationale=_missing_narrowing_rationale(role.display_name, principal, assessment),
                             evidence=collect_evidence(
@@ -256,6 +266,7 @@ class AwsPolicyTrustRuleDetectors:
                                     "trust_narrowing",
                                     describe_trust_narrowing_for_principal(trust_statement, assessment),
                                 ),
+                                evidence_item("trust_provider_resources", provider_addresses),
                             ),
                             severity_reasoning=severity_reasoning,
                         )

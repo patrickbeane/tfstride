@@ -12,6 +12,7 @@ from tfstride.providers.aws.policy_conditions import (
     describe_trust_narrowing_for_principal,
     trust_statement_has_effective_narrowing_for_principal,
     trust_statement_principal_assessments,
+    trust_statement_resolved_oidc_provider_addresses,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.coercion import STATE_ENABLED
@@ -94,12 +95,16 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
                 if observation_key in seen:
                     continue
                 seen.add(observation_key)
+                provider_addresses = trust_statement_resolved_oidc_provider_addresses(
+                    trust_statement,
+                    principal,
+                )
                 observations.append(
                     Observation(
                         title="Cross-account or broad role trust is narrowed by assume-role conditions",
                         observation_id="aws-role-trust-narrowed",
                         category="iam",
-                        affected_resources=[role.address],
+                        affected_resources=[role.address, *provider_addresses],
                         rationale=(
                             f"{role.display_name} trusts {principal}, but supported assume-role conditions narrow "
                             "when that trust can be exercised."
@@ -111,6 +116,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
                                 "trust_narrowing",
                                 describe_trust_narrowing_for_principal(trust_statement, assessment),
                             ),
+                            evidence_item("trust_provider_resources", provider_addresses),
                         ),
                     )
                 )

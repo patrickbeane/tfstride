@@ -18,6 +18,7 @@ from tfstride.providers.aws.resource_decoration.network_posture import (
     DeriveSubnetPostureStage,
     InferVpcIdsStage,
 )
+from tfstride.providers.aws.resource_decoration.oidc_trust import ResolveOidcProviderTrustStage
 from tfstride.providers.aws.resource_decoration.public_exposure import (
     DerivePublicExposureStage,
 )
@@ -48,6 +49,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         MergeRolePolicyResourcesStage(),
         NormalizeIamAssignmentPostureStage(),
         ResolveInstanceProfileRolesStage(),
+        ResolveOidcProviderTrustStage(),
         ResolveEcsServiceRelationshipsStage(),
         ModelWorkloadEcrWritePathsStage(),
         ResolveApiGatewayRelationshipsStage(),
