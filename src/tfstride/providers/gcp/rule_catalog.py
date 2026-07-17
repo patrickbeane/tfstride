@@ -727,6 +727,48 @@ GCP_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-workload-identity-pool-wide-impersonation",
+        title="Pool-wide workload identity principal can impersonate a service account",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace pool-wide `principalSet` service-account grants with exact subject, group, or custom-attribute "
+            "principals; add reviewed provider and IAM conditions, and disable unused federation providers."
+        ),
+        tags=("gcp", "iam", "workload-identity-federation", "service-account", "impersonation"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-workload-identity-provider-unconditioned-broad-trust",
+        title="Active workload identity provider has unconditioned broad service-account trust",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Configure a deterministic provider `attribute_condition`, replace pool-wide service-account bindings "
+            "with narrower principal selectors, and retain IAM conditions as an additional control rather than the "
+            "only federation boundary."
+        ),
+        tags=("gcp", "iam", "workload-identity-federation", "provider", "trust"),
+        severity_factors=("privilege_breadth", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="gcp-workload-identity-privileged-service-account-access",
+        title="Federated identity can reach privileged service-account access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Remove broad or high-impact IAM grants from service accounts trusted by external identities, narrow "
+            "federated principals and provider conditions, and use dedicated least-privilege service accounts for "
+            "each external workload."
+        ),
+        tags=(
+            "gcp",
+            "iam",
+            "workload-identity-federation",
+            "service-account",
+            "privileged-access",
+            "transitive-path",
+        ),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-org-folder-iam-broad-principal",
         title="GCP organization or folder IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

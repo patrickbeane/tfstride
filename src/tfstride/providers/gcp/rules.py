@@ -11,6 +11,7 @@ from tfstride.providers.gcp.iam_assignment_rules import GcpIamAssignmentRuleDete
 from tfstride.providers.gcp.network_telemetry_rules import GcpNetworkTelemetryRuleDetectors
 from tfstride.providers.gcp.path_chain_rules import GcpPathChainRuleDetectors
 from tfstride.providers.gcp.private_connectivity_rules import GcpPrivateConnectivityRuleDetectors
+from tfstride.providers.gcp.workload_identity_rules import GcpWorkloadIdentityRuleDetectors
 
 GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
     (
@@ -81,6 +82,9 @@ GCP_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "gcp-service-account-iam-privileged-role",
         "gcp-service-account-key-hygiene",
         "gcp-service-account-key-effective-access",
+        "gcp-workload-identity-pool-wide-impersonation",
+        "gcp-workload-identity-provider-unconditioned-broad-trust",
+        "gcp-workload-identity-privileged-service-account-access",
         "gcp-org-folder-iam-broad-principal",
         "gcp-org-folder-iam-privileged-role",
         "gcp-project-iam-broad-principal",
@@ -104,6 +108,7 @@ def build_gcp_rule_contribution(
     iam_assignment_detectors = GcpIamAssignmentRuleDetectors(finding_factory)
     private_connectivity_detectors = GcpPrivateConnectivityRuleDetectors(finding_factory)
     path_chain_detectors = GcpPathChainRuleDetectors(finding_factory)
+    workload_identity_detectors = GcpWorkloadIdentityRuleDetectors(finding_factory)
     detectors_by_rule_id: Mapping[str, RuleDetector] = {
         "gcp-sensitive-resource-iam-external-access": gcp_detectors.detect_sensitive_iam_external_access,
         "gcp-pubsub-public-access": gcp_detectors.detect_pubsub_public_access,
@@ -210,6 +215,15 @@ def build_gcp_rule_contribution(
         "gcp-service-account-iam-privileged-role": gcp_detectors.detect_service_account_iam_privileged_role,
         "gcp-service-account-key-hygiene": gcp_detectors.detect_service_account_key_hygiene,
         "gcp-service-account-key-effective-access": gcp_detectors.detect_service_account_key_effective_access,
+        "gcp-workload-identity-pool-wide-impersonation": (
+            workload_identity_detectors.detect_pool_wide_service_account_impersonation
+        ),
+        "gcp-workload-identity-provider-unconditioned-broad-trust": (
+            workload_identity_detectors.detect_active_provider_unconditioned_broad_trust
+        ),
+        "gcp-workload-identity-privileged-service-account-access": (
+            workload_identity_detectors.detect_federated_privileged_service_account_access
+        ),
         "gcp-org-folder-iam-broad-principal": gcp_detectors.detect_org_folder_iam_broad_principal,
         "gcp-org-folder-iam-privileged-role": gcp_detectors.detect_org_folder_iam_privileged_role,
         "gcp-project-iam-broad-principal": gcp_detectors.detect_project_iam_broad_principal,
