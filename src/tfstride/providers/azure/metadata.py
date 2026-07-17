@@ -297,6 +297,9 @@ class AzureResourceMetadata:
     FEDERATED_IDENTITY_CREDENTIAL_PARENT_ID = OptionalStringMetadataField("federated_identity_credential_parent_id")
     FEDERATED_IDENTITY_CREDENTIAL_AUDIENCES = StringListMetadataField("federated_identity_credential_audiences")
     FEDERATED_IDENTITY_CREDENTIAL_UNCERTAINTIES = StringListMetadataField("federated_identity_credential_uncertainties")
+    FEDERATED_MANAGED_IDENTITY_TRUST_PATH_UNCERTAINTIES = StringListMetadataField(
+        "federated_managed_identity_trust_path_uncertainties"
+    )
     ROLE_ASSIGNMENT_BREADTH_SIGNALS = StringListMetadataField("role_assignment_breadth_signals")
     ROLE_ASSIGNMENT_BREADTH_MITIGATIONS = StringListMetadataField("role_assignment_breadth_mitigations")
     ROLE_DEFINITION_ASSIGNABLE_SCOPES = StringListMetadataField("role_definition_assignable_scopes")
@@ -358,6 +361,7 @@ class AzureResourceMetadata:
     KEY_VAULT_ROLE_ASSIGNMENTS = DictListMetadataField("key_vault_role_assignments")
     KEY_VAULT_ROTATION_POLICY = DictMetadataField("key_vault_rotation_policy")
     MANAGED_IDENTITY_ROLE_ASSIGNMENTS = DictListMetadataField("managed_identity_role_assignments")
+    FEDERATED_MANAGED_IDENTITY_TRUST_PATHS = DictListMetadataField("federated_managed_identity_trust_paths")
     ACR_WRITE_PATHS = DictListMetadataField("acr_write_paths")
     PRIVILEGED_ACCESS_GRANTS = DictListMetadataField("privileged_access_grants")
     ROLE_DEFINITION_PERMISSIONS = DictListMetadataField("role_definition_permissions")

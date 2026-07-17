@@ -84,6 +84,14 @@ class AzureIdentityFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_UNCERTAINTIES)
 
     @property
+    def federated_managed_identity_trust_paths(self) -> list[dict]:
+        return self.get(AzureResourceMetadata.FEDERATED_MANAGED_IDENTITY_TRUST_PATHS)
+
+    @property
+    def federated_managed_identity_trust_path_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.FEDERATED_MANAGED_IDENTITY_TRUST_PATH_UNCERTAINTIES)
+
+    @property
     def has_system_assigned_identity(self) -> bool:
         return _identity_type_includes(self.identity_type, "SystemAssigned")
 
@@ -93,6 +101,18 @@ class AzureIdentityFacts(AzureBaseFacts):
 
     def set_resolved_managed_identity_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_MANAGED_IDENTITY_ADDRESS, address)
+
+    def add_federated_managed_identity_trust_path(self, value: dict[str, object]) -> None:
+        paths = self.federated_managed_identity_trust_paths
+        if value not in paths:
+            paths.append(dict(value))
+            self.set(AzureResourceMetadata.FEDERATED_MANAGED_IDENTITY_TRUST_PATHS, paths)
+
+    def extend_federated_managed_identity_trust_path_uncertainties(
+        self,
+        values: Sequence[str | None],
+    ) -> None:
+        self.extend(AzureResourceMetadata.FEDERATED_MANAGED_IDENTITY_TRUST_PATH_UNCERTAINTIES, values)
 
     def add_managed_identity_role_assignment(self, assignment: dict) -> None:
         assignments = self.managed_identity_role_assignments

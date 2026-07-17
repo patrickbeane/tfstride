@@ -7,6 +7,9 @@ from tfstride.providers.azure.resource_decoration.compute import ResolveVirtualM
 from tfstride.providers.azure.resource_decoration.container_registry_write_paths import (
     ModelAppServiceAcrWritePathsStage,
 )
+from tfstride.providers.azure.resource_decoration.federated_identity import (
+    ModelFederatedManagedIdentityTrustPathsStage,
+)
 from tfstride.providers.azure.resource_decoration.identity import DecorateManagedIdentityRoleAssignmentsStage
 from tfstride.providers.azure.resource_decoration.key_vault import DecorateKeyVaultRelationshipsStage
 from tfstride.providers.azure.resource_decoration.network_posture import (
@@ -43,5 +46,6 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         DecorateServiceBusRelationshipsStage(),
         DecorateKeyVaultRelationshipsStage(),
         DecorateManagedIdentityRoleAssignmentsStage(),
+        ModelFederatedManagedIdentityTrustPathsStage(),
         ModelAppServiceAcrWritePathsStage(),
     )
