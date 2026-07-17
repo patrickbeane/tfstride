@@ -57,6 +57,7 @@ from tfstride.providers.aws.ecr_normalizers import (
 from tfstride.providers.aws.eks_normalizers import normalize_eks_addon, normalize_eks_cluster
 from tfstride.providers.aws.iam_normalizers import (
     normalize_iam_instance_profile,
+    normalize_iam_openid_connect_provider,
     normalize_iam_policy,
     normalize_iam_role,
     normalize_iam_role_policy,
@@ -112,6 +113,7 @@ _AWS_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     "aws_eks_cluster": normalize_eks_cluster,
     "aws_flow_log": normalize_flow_log,
     "aws_iam_instance_profile": normalize_iam_instance_profile,
+    "aws_iam_openid_connect_provider": normalize_iam_openid_connect_provider,
     "aws_iam_policy": normalize_iam_policy,
     "aws_iam_role": normalize_iam_role,
     "aws_iam_role_policy": normalize_iam_role_policy,

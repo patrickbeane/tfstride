@@ -13,6 +13,26 @@ class AwsIdentityFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property
+    def oidc_provider_url(self) -> str | None:
+        return self.get(AwsResourceMetadata.OIDC_PROVIDER_URL)
+
+    @property
+    def oidc_provider_arn(self) -> str | None:
+        return self.get(AwsResourceMetadata.OIDC_PROVIDER_ARN)
+
+    @property
+    def oidc_provider_client_ids(self) -> list[str]:
+        return self.get(AwsResourceMetadata.OIDC_PROVIDER_CLIENT_IDS)
+
+    @property
+    def oidc_provider_thumbprints(self) -> list[str]:
+        return self.get(AwsResourceMetadata.OIDC_PROVIDER_THUMBPRINTS)
+
+    @property
+    def oidc_provider_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.OIDC_PROVIDER_POSTURE_UNCERTAINTIES)
+
+    @property
     def privileged_access_grants(self) -> tuple[PrivilegedAccessGrant, ...]:
         return deserialize_privileged_access_grants(self.get(AwsResourceMetadata.PRIVILEGED_ACCESS_GRANTS))
 

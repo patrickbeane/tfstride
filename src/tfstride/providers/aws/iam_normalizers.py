@@ -9,6 +9,7 @@ from tfstride.providers.aws.policy_documents import (
     extract_trust_statements,
     parse_policy_statements,
 )
+from tfstride.providers.coercion import known_string, known_string_list
 from tfstride.providers.json_documents import load_json_document
 
 
@@ -101,5 +102,40 @@ def normalize_iam_instance_profile(resource: TerraformResource) -> NormalizedRes
         arn=values.get("arn"),
         metadata={
             "role_references": role_references,
+        },
+    )
+
+
+def normalize_iam_openid_connect_provider(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    url = known_string(values, unknown_values, "url", uncertainties, require_string=True)
+    arn = known_string(values, unknown_values, "arn", uncertainties, require_string=True)
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AWS_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=arn or url or resource.address,
+        arn=arn,
+        metadata={
+            AwsResourceMetadata.OIDC_PROVIDER_URL: url,
+            AwsResourceMetadata.OIDC_PROVIDER_ARN: arn,
+            AwsResourceMetadata.OIDC_PROVIDER_CLIENT_IDS: known_string_list(
+                values,
+                unknown_values,
+                "client_id_list",
+                uncertainties,
+            ),
+            AwsResourceMetadata.OIDC_PROVIDER_THUMBPRINTS: known_string_list(
+                values,
+                unknown_values,
+                "thumbprint_list",
+                uncertainties,
+            ),
+            AwsResourceMetadata.OIDC_PROVIDER_POSTURE_UNCERTAINTIES: uncertainties,
         },
     )
