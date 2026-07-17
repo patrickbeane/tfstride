@@ -15,6 +15,7 @@ from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetect
 from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.container_registry_rules import AzureContainerRegistryRuleDetectors
+from tfstride.providers.azure.federated_identity_rules import AzureFederatedIdentityRuleDetectors
 from tfstride.providers.azure.iam_assignment_rules import AzureIamAssignmentRuleDetectors
 from tfstride.providers.azure.key_vault_rules import AzureKeyVaultRuleDetectors
 from tfstride.providers.azure.load_balancer_rules import AzureLoadBalancerRuleDetectors
@@ -75,6 +76,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-custom-role-assignment-blast-radius",
         "azure-rbac-privileged-assignment",
         "azure-managed-identity-broad-rbac",
+        "azure-federated-identity-privileged-access",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
         "azure-app-service-platform-authentication-disabled",
@@ -144,6 +146,7 @@ def build_azure_rule_contribution(
     custom_role_detectors = AzureCustomRoleRuleDetectors(finding_factory)
     iam_assignment_detectors = AzureIamAssignmentRuleDetectors(finding_factory)
     managed_identity_detectors = AzureManagedIdentityRuleDetectors(finding_factory)
+    federated_identity_detectors = AzureFederatedIdentityRuleDetectors(finding_factory)
     mssql_detectors = AzureMssqlRuleDetectors(finding_factory)
     postgresql_detectors = AzurePostgresqlRuleDetectors(finding_factory)
     private_endpoint_detectors = AzurePrivateEndpointPostureRuleDetectors(finding_factory)
@@ -220,6 +223,7 @@ def build_azure_rule_contribution(
         "azure-custom-role-assignment-blast-radius": (custom_role_detectors.detect_assigned_custom_role_blast_radius),
         "azure-rbac-privileged-assignment": iam_assignment_detectors.detect_privileged_assignment,
         "azure-managed-identity-broad-rbac": managed_identity_detectors.detect_broad_rbac,
+        "azure-federated-identity-privileged-access": federated_identity_detectors.detect_privileged_access,
         "azure-public-workload-sensitive-resource-access": (
             managed_identity_detectors.detect_public_workload_sensitive_resource_access
         ),

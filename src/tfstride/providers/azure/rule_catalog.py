@@ -515,6 +515,25 @@ AZURE_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-federated-identity-privileged-access",
+        title="Federated identity can reach privileged Azure managed identity access",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Narrow federated credential subjects and audiences to exact workloads, remove broad managed-identity "
+            "RBAC assignments, scope roles to the smallest required resource, and separate deployment identities "
+            "from runtime identities."
+        ),
+        tags=(
+            "azure",
+            "managed-identity",
+            "federated-identity",
+            "rbac",
+            "privileged-access",
+            "transitive-path",
+        ),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-public-workload-sensitive-resource-access",
         title="Internet-exposed Azure workload can access sensitive resources",
         category=StrideCategory.INFORMATION_DISCLOSURE,

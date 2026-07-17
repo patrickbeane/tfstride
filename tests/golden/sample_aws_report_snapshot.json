@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 240,
+      "registered_rule_count": 241,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -237,6 +237,7 @@
         "azure-custom-role-assignment-blast-radius",
         "azure-rbac-privileged-assignment",
         "azure-managed-identity-broad-rbac",
+        "azure-federated-identity-privileged-access",
         "azure-public-workload-sensitive-resource-access",
         "azure-app-service-public-network-access-not-disabled",
         "azure-app-service-platform-authentication-disabled",
@@ -481,6 +482,7 @@
         "azure-custom-role-assignment-blast-radius": 0,
         "azure-rbac-privileged-assignment": 0,
         "azure-managed-identity-broad-rbac": 0,
+        "azure-federated-identity-privileged-access": 0,
         "azure-public-workload-sensitive-resource-access": 0,
         "azure-app-service-public-network-access-not-disabled": 0,
         "azure-app-service-platform-authentication-disabled": 0,
