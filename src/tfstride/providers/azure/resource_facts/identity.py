@@ -64,6 +64,26 @@ class AzureIdentityFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.MANAGED_IDENTITY_UNCERTAINTIES)
 
     @property
+    def federated_identity_credential_issuer(self) -> str | None:
+        return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_ISSUER)
+
+    @property
+    def federated_identity_credential_subject(self) -> str | None:
+        return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_SUBJECT)
+
+    @property
+    def federated_identity_credential_audiences(self) -> list[str]:
+        return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_AUDIENCES)
+
+    @property
+    def federated_identity_credential_parent_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_PARENT_ID)
+
+    @property
+    def federated_identity_credential_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_UNCERTAINTIES)
+
+    @property
     def has_system_assigned_identity(self) -> bool:
         return _identity_type_includes(self.identity_type, "SystemAssigned")
 

@@ -32,6 +32,7 @@ from tfstride.providers.azure.data_normalizers import (
     normalize_storage_container,
 )
 from tfstride.providers.azure.identity_normalizers import (
+    normalize_federated_identity_credential,
     normalize_role_assignment,
     normalize_role_definition,
     normalize_user_assigned_identity,
@@ -98,6 +99,7 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.ROLE_ASSIGNMENT: normalize_role_assignment,
     AzureResourceType.ROLE_DEFINITION: normalize_role_definition,
     AzureResourceType.USER_ASSIGNED_IDENTITY: normalize_user_assigned_identity,
+    AzureResourceType.FEDERATED_IDENTITY_CREDENTIAL: normalize_federated_identity_credential,
     AzureResourceType.VIRTUAL_NETWORK: normalize_virtual_network,
     AzureResourceType.SUBNET: normalize_subnet,
     AzureResourceType.NETWORK_SECURITY_GROUP: normalize_network_security_group,

@@ -21,6 +21,7 @@ class AzureResourceType:
     ROLE_ASSIGNMENT = "azurerm_role_assignment"
     ROLE_DEFINITION = "azurerm_role_definition"
     USER_ASSIGNED_IDENTITY = "azurerm_user_assigned_identity"
+    FEDERATED_IDENTITY_CREDENTIAL = "azurerm_federated_identity_credential"
     VIRTUAL_NETWORK = "azurerm_virtual_network"
     SUBNET = "azurerm_subnet"
     NETWORK_SECURITY_GROUP = "azurerm_network_security_group"
@@ -91,6 +92,7 @@ AZURE_KEY_VAULT_RESOURCE_TYPES = frozenset(
 )
 
 AZURE_IDENTITY_RESOURCE_TYPES = frozenset({AzureResourceType.USER_ASSIGNED_IDENTITY})
+AZURE_FEDERATED_IDENTITY_RESOURCE_TYPES = frozenset({AzureResourceType.FEDERATED_IDENTITY_CREDENTIAL})
 AZURE_RBAC_RESOURCE_TYPES = frozenset({AzureResourceType.ROLE_ASSIGNMENT, AzureResourceType.ROLE_DEFINITION})
 
 AZURE_NETWORK_RESOURCE_TYPES = frozenset(
@@ -168,6 +170,7 @@ AZURE_SUPPORTED_RESOURCE_TYPES = (
     | AZURE_CONTAINER_REGISTRY_RESOURCE_TYPES
     | AZURE_KEY_VAULT_RESOURCE_TYPES
     | AZURE_IDENTITY_RESOURCE_TYPES
+    | AZURE_FEDERATED_IDENTITY_RESOURCE_TYPES
     | AZURE_RBAC_RESOURCE_TYPES
     | AZURE_NETWORK_RESOURCE_TYPES
     | AZURE_COMPUTE_RESOURCE_TYPES

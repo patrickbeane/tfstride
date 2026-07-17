@@ -51,6 +51,52 @@ def normalize_user_assigned_identity(resource: TerraformResource) -> NormalizedR
     )
 
 
+def normalize_federated_identity_credential(resource: TerraformResource) -> NormalizedResource:
+    values = resource.values
+    uncertainties: list[str] = []
+    credential_id = None if resource.unknown_values.get("id") is True else first_non_empty(values.get("id"))
+    name = known_string(values, resource.unknown_values, "name", uncertainties) or resource.name
+    issuer = known_string(
+        values,
+        resource.unknown_values,
+        "issuer",
+        uncertainties,
+        require_string=True,
+    )
+    subject = known_string(
+        values,
+        resource.unknown_values,
+        "subject",
+        uncertainties,
+        require_string=True,
+    )
+    audiences = known_string_list(values, resource.unknown_values, "audiences", uncertainties)
+    parent_id = known_string(
+        values,
+        resource.unknown_values,
+        "parent_id",
+        uncertainties,
+        require_string=True,
+    )
+
+    return NormalizedResource(
+        address=resource.address,
+        provider=AZURE_PROVIDER,
+        resource_type=resource.resource_type,
+        name=resource.name,
+        category=ResourceCategory.IAM,
+        identifier=credential_id or resource.address,
+        metadata={
+            AzureResourceMetadata.NAME: name,
+            AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_ISSUER: issuer,
+            AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_SUBJECT: subject,
+            AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_AUDIENCES: audiences,
+            AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_PARENT_ID: parent_id,
+            AzureResourceMetadata.FEDERATED_IDENTITY_CREDENTIAL_UNCERTAINTIES: uncertainties,
+        },
+    )
+
+
 def normalize_role_definition(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     uncertainties: list[str] = []
