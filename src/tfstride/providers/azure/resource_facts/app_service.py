@@ -18,6 +18,18 @@ class AzureAppServiceFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.APP_SERVICE_PLAN_REFERENCE)
 
     @property
+    def app_service_key_vault_reference_identity_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.APP_SERVICE_KEY_VAULT_REFERENCE_IDENTITY_ID)
+
+    @property
+    def app_service_secret_references(self) -> list[dict[str, Any]]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_SECRET_REFERENCES)
+
+    @property
+    def app_service_secret_posture_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_SECRET_POSTURE_UNCERTAINTIES)
+
+    @property
     def app_service_vnet_integration_subnet_id(self) -> str | None:
         return self.get(AzureResourceMetadata.APP_SERVICE_VNET_INTEGRATION_SUBNET_ID)
 

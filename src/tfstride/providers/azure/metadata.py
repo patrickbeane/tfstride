@@ -56,6 +56,9 @@ class AzureResourceMetadata:
     KEY_VAULT_ID = OptionalStringMetadataField("key_vault_id")
     APP_SERVICE_ID = OptionalStringMetadataField("app_service_id")
     APP_SERVICE_PLAN_REFERENCE = OptionalStringMetadataField("app_service_plan_reference")
+    APP_SERVICE_KEY_VAULT_REFERENCE_IDENTITY_ID = OptionalStringMetadataField(
+        "app_service_key_vault_reference_identity_id"
+    )
     APP_SERVICE_VNET_INTEGRATION_SUBNET_ID = OptionalStringMetadataField("app_service_vnet_integration_subnet_id")
     APP_SERVICE_IP_RESTRICTION_DEFAULT_ACTION = OptionalStringMetadataField("app_service_ip_restriction_default_action")
     APP_SERVICE_SCM_IP_RESTRICTION_DEFAULT_ACTION = OptionalStringMetadataField(
@@ -262,8 +265,10 @@ class AzureResourceMetadata:
     NETWORK_TELEMETRY_POSTURE_UNCERTAINTIES = StringListMetadataField("network_telemetry_posture_uncertainties")
     APP_SERVICE_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_posture_uncertainties")
     APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_auth_posture_uncertainties")
+    APP_SERVICE_SECRET_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_secret_posture_uncertainties")
     APP_SERVICE_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_access_restrictions")
     APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
+    APP_SERVICE_SECRET_REFERENCES = DictListMetadataField("app_service_secret_references")
     APP_SERVICE_AUTH_SETTINGS = DictMetadataField("app_service_auth_settings")
     APP_SERVICE_AUTH_SETTINGS_V2 = DictMetadataField("app_service_auth_settings_v2")
     CONTAINER_IMAGE_REFERENCES = DictListMetadataField("container_image_references")
