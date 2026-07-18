@@ -681,6 +681,18 @@ GCP_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-run-sensitive-environment-value-inline",
+        title="Cloud Run service materializes a sensitive setting as a literal value",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Move credential material from Cloud Run literal environment values to Secret Manager-backed "
+            "environment references, and keep literals out of Terraform configuration, plans, state, and "
+            "Cloud Run revision configuration."
+        ),
+        tags=("gcp", "cloud-run", "serverless", "secrets", "environment", "credential-delivery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
