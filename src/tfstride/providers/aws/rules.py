@@ -10,6 +10,7 @@ from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
 from tfstride.providers.aws.container_rules import AwsContainerDeploymentRuleDetectors
 from tfstride.providers.aws.ecr_rules import AwsEcrRuleDetectors
+from tfstride.providers.aws.ecs_secret_rules import AwsEcsSecretDeliveryRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
 from tfstride.providers.aws.iam_assignment_rules import AwsIamAssignmentRuleDetectors
@@ -75,6 +76,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-workload-image-not-digest-pinned",
         "aws-workload-ecr-mutable-tag",
         "aws-workload-can-modify-image-repository",
+        "aws-ecs-sensitive-environment-value-inline",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -138,6 +140,7 @@ def build_aws_rule_contribution(
     s3_posture_detectors = AwsS3PostureRuleDetectors(finding_factory)
     ecr_detectors = AwsEcrRuleDetectors(finding_factory)
     container_deployment_detectors = AwsContainerDeploymentRuleDetectors(finding_factory)
+    ecs_secret_detectors = AwsEcsSecretDeliveryRuleDetectors(finding_factory)
     messaging_detectors = AwsMessagingPostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     kms_detectors = AwsKmsRuleDetectors(finding_factory)
@@ -202,6 +205,7 @@ def build_aws_rule_contribution(
         "aws-workload-image-not-digest-pinned": (container_deployment_detectors.detect_image_not_digest_pinned),
         "aws-workload-ecr-mutable-tag": container_deployment_detectors.detect_mutable_ecr_tag,
         "aws-workload-can-modify-image-repository": (container_deployment_detectors.detect_ecr_self_modification_path),
+        "aws-ecs-sensitive-environment-value-inline": (ecs_secret_detectors.detect_inline_sensitive_environment_value),
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),

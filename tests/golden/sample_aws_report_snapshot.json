@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 241,
+      "registered_rule_count": 242,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -85,6 +85,7 @@
         "aws-workload-image-not-digest-pinned",
         "aws-workload-ecr-mutable-tag",
         "aws-workload-can-modify-image-repository",
+        "aws-ecs-sensitive-environment-value-inline",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -330,6 +331,7 @@
         "aws-workload-image-not-digest-pinned": 0,
         "aws-workload-ecr-mutable-tag": 0,
         "aws-workload-can-modify-image-repository": 0,
+        "aws-ecs-sensitive-environment-value-inline": 0,
         "aws-sns-customer-managed-encryption-missing": 0,
         "aws-sqs-customer-managed-encryption-missing": 0,
         "aws-sqs-message-retention-insufficient": 0,

@@ -84,7 +84,7 @@ class MarkdownReportTests(unittest.TestCase):
 
         self.assertIn("- Terraform resources seen: `24`", report)
         self.assertIn("- Provider resources considered: `24`", report)
-        self.assertIn("- Registered rules: `241`", report)
+        self.assertIn("- Registered rules: `242`", report)
         self.assertIn("- Unresolved in-plan references: `0`", report)
         self.assertIn("- Unsupported resource types:", report)
         self.assertIn("  - `aws_cloudwatch_log_group`: `1`", report)
@@ -505,7 +505,7 @@ class JsonReportTests(unittest.TestCase):
             coverage["resources"]["unsupported_resource_types"],
             {"aws_cloudwatch_log_group": 1},
         )
-        self.assertEqual(coverage["rules"]["registered_rule_count"], 241)
+        self.assertEqual(coverage["rules"]["registered_rule_count"], 242)
         self.assertIn("aws-database-permissive-ingress", coverage["rules"]["enabled_rules"])
         self.assertEqual(coverage["rules"]["disabled_rules"], [])
         self.assertEqual(coverage["rules"]["severity_overrides"], {})

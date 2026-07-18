@@ -520,6 +520,18 @@ AWS_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-ecs-sensitive-environment-value-inline",
+        title="ECS task definition materializes a sensitive setting as a literal value",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Move credential material from ECS environment entries to the task definition secrets integration "
+            "backed by Secrets Manager or Systems Manager Parameter Store, and keep literal values out of "
+            "Terraform configuration, plans, state, and task definition revisions."
+        ),
+        tags=("aws", "ecs", "container", "secrets", "environment", "credential-delivery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,
