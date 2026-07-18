@@ -18,6 +18,7 @@ from tfstride.providers.gcp.resource_utils import (
     resource_name,
     service_account_member,
 )
+from tfstride.providers.gcp.secret_delivery_normalizers import cloud_run_secret_metadata
 from tfstride.providers.json_documents import load_json_document
 from tfstride.providers.kubernetes import block_value, first_unknown_block, unknown_block_at_index
 
@@ -39,6 +40,12 @@ def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResour
         block_value(unknown_spec, GcpAttr.CONTAINERS.key),
         path_prefix="template[0].spec[0].containers",
     )
+    secret_metadata = cloud_run_secret_metadata(
+        resource,
+        spec.raw(GcpAttr.CONTAINERS),
+        block_value(unknown_spec, GcpAttr.CONTAINERS.key),
+        path_prefix="template[0].spec[0].containers",
+    )
     service_account = first_non_empty(spec.get(GcpAttr.SERVICE_ACCOUNT_NAME))
     ingress = first_non_empty(annotations.get(GcpAttr.RUN_INGRESS_ANNOTATION), values.get(GcpAttr.INGRESS))
     public_access_configured = _cloud_run_ingress_allows_internet(ingress)
@@ -54,6 +61,7 @@ def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResour
             "url": _cloud_run_v1_url(values),
             "metadata": metadata_values,
             **image_metadata,
+            **secret_metadata,
         },
     )
 
@@ -64,6 +72,12 @@ def normalize_cloud_run_v2_service(resource: TerraformResource) -> NormalizedRes
     template = GcpValues(template_values)
     unknown_template = first_unknown_block(resource.unknown_values.get(GcpAttr.TEMPLATE.key))
     image_metadata = _cloud_run_image_metadata(
+        resource,
+        template.raw(GcpAttr.CONTAINERS),
+        block_value(unknown_template, GcpAttr.CONTAINERS.key),
+        path_prefix="template[0].containers",
+    )
+    secret_metadata = cloud_run_secret_metadata(
         resource,
         template.raw(GcpAttr.CONTAINERS),
         block_value(unknown_template, GcpAttr.CONTAINERS.key),
@@ -84,6 +98,7 @@ def normalize_cloud_run_v2_service(resource: TerraformResource) -> NormalizedRes
             "uri": values.get(GcpAttr.URI),
             "template": template_values,
             **image_metadata,
+            **secret_metadata,
         },
     )
 

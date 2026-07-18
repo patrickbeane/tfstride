@@ -38,6 +38,14 @@ class GcpComputeFacts(GcpBaseFacts):
         return self.get(GcpResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
 
     @property
+    def cloud_run_secret_references(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.CLOUD_RUN_SECRET_REFERENCES)
+
+    @property
+    def cloud_run_secret_posture_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.CLOUD_RUN_SECRET_POSTURE_UNCERTAINTIES)
+
+    @property
     def artifact_registry_write_paths(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATHS)
 
