@@ -680,6 +680,18 @@ AZURE_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-sensitive-app-setting-inline",
+        title="Azure App Service materializes a sensitive setting as a literal value",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Move credential material from App Service application settings to Key Vault references or "
+            "managed-identity-backed secret retrieval, and keep literal values out of Terraform configuration, "
+            "plans, state, and App Service configuration."
+        ),
+        tags=("azure", "app-service", "function-app", "secrets", "app-settings", "credential-delivery"),
+        severity_factors=("data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-diagnostic-settings-missing",
         title="Azure resource lacks diagnostic settings",
         category=StrideCategory.REPUDIATION,

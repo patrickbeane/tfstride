@@ -12,6 +12,7 @@ from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_container_rules import AzureAppServiceContainerRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
+from tfstride.providers.azure.app_service_secret_rules import AzureAppServiceSecretDeliveryRuleDetectors
 from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.container_registry_rules import AzureContainerRegistryRuleDetectors
@@ -90,6 +91,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-scm-access-unrestricted",
         "azure-app-service-image-not-digest-pinned",
         "azure-app-service-can-modify-image-repository",
+        "azure-app-service-sensitive-app-setting-inline",
         "azure-diagnostic-settings-missing",
         "azure-diagnostic-setting-no-log-destination",
         "azure-diagnostic-setting-audit-logs-incomplete",
@@ -137,6 +139,7 @@ def build_azure_rule_contribution(
     network_telemetry_detectors = AzureNetworkTelemetryRuleDetectors(finding_factory)
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     app_service_container_detectors = AzureAppServiceContainerRuleDetectors(finding_factory)
+    app_service_secret_detectors = AzureAppServiceSecretDeliveryRuleDetectors(finding_factory)
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
     storage_detectors = AzureStorageRuleDetectors(finding_factory)
@@ -252,6 +255,9 @@ def build_azure_rule_contribution(
         ),
         "azure-app-service-can-modify-image-repository": (
             app_service_container_detectors.detect_container_image_self_modification_path
+        ),
+        "azure-app-service-sensitive-app-setting-inline": (
+            app_service_secret_detectors.detect_inline_sensitive_app_setting
         ),
         "azure-diagnostic-settings-missing": audit_detectors.detect_missing_diagnostic_settings,
         "azure-diagnostic-setting-no-log-destination": audit_detectors.detect_diagnostic_setting_no_log_destination,
