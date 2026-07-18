@@ -96,7 +96,6 @@ def normalize_cloud_run_v2_service(resource: TerraformResource) -> NormalizedRes
             GcpResourceMetadata.REGION: values.get(GcpAttr.LOCATION),
             GcpResourceMetadata.SERVERLESS_INGRESS: ingress,
             "uri": values.get(GcpAttr.URI),
-            "template": template_values,
             **image_metadata,
             **secret_metadata,
         },

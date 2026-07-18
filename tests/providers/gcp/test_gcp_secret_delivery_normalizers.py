@@ -131,6 +131,7 @@ class GcpCloudRunSecretDeliveryNormalizerTests(unittest.TestCase):
         self.assertEqual(references[0]["state"], "literal")
         self.assertEqual(references[0]["normalized_setting_name"], "db_password")
         self.assertNotIn(literal, repr(references))
+        self.assertNotIn(literal, repr(normalized.metadata_snapshot()))
 
     def test_unresolved_reference_and_unknown_version_are_explicit(self) -> None:
         normalized = normalize_cloud_run_v2_service(
