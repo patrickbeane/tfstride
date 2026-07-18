@@ -64,6 +64,14 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES)
 
     @property
+    def ecs_secret_references(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_SECRET_REFERENCES)
+
+    @property
+    def ecs_secret_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_SECRET_POSTURE_UNCERTAINTIES)
+
+    @property
     def ecr_write_paths(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECR_WRITE_PATHS)
 

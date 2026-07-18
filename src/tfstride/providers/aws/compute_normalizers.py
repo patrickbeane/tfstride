@@ -26,6 +26,7 @@ from tfstride.providers.coercion import (
     value_is_unknown,
 )
 from tfstride.providers.container_images import ContainerImageReference, parse_container_image_reference
+from tfstride.providers.secret_settings import SensitiveSettingClassification, classify_sensitive_setting_name
 
 
 def normalize_instance(resource: TerraformResource) -> NormalizedResource:
@@ -78,6 +79,7 @@ def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedReso
     values = resource.values
     revision = as_optional_int(values.get("revision"))
     image_references, image_uncertainties = _ecs_container_image_references(resource)
+    secret_references, secret_uncertainties = _ecs_secret_references(resource)
     family = values.get("family")
     return NormalizedResource(
         address=resource.address,
@@ -96,6 +98,8 @@ def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedReso
             "execution_role_arn": values.get("execution_role_arn"),
             AwsResourceMetadata.CONTAINER_IMAGE_REFERENCES: image_references,
             AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES: image_uncertainties,
+            AwsResourceMetadata.ECS_SECRET_REFERENCES: secret_references,
+            AwsResourceMetadata.ECS_SECRET_POSTURE_UNCERTAINTIES: secret_uncertainties,
         },
     )
 
@@ -252,13 +256,9 @@ def _lambda_function_url_cors_evidence(cors: Mapping[str, Any] | None) -> dict[s
     }
 
 
-def _ecs_container_image_references(
-    resource: TerraformResource,
-) -> tuple[list[dict[str, Any]], list[str]]:
-    values = resource.values
-    unknown_values = resource.unknown_values
-    raw_definitions = values.get("container_definitions")
-    if unknown_values.get("container_definitions") is True:
+def _ecs_container_definitions(resource: TerraformResource) -> tuple[list[Any], list[str]]:
+    raw_definitions = resource.values.get("container_definitions")
+    if resource.unknown_values.get("container_definitions") is True:
         return [], ["container_definitions is unknown after planning"]
     if raw_definitions is None:
         return [], ["container_definitions is not represented in planned values"]
@@ -270,13 +270,18 @@ def _ecs_container_image_references(
             return [], ["container_definitions is not valid JSON"]
     else:
         definitions = raw_definitions
-
     if not isinstance(definitions, list):
         return [], ["container_definitions is not a JSON array"]
+    return definitions, []
 
+
+def _ecs_container_image_references(
+    resource: TerraformResource,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    definitions, parse_uncertainties = _ecs_container_definitions(resource)
     references: list[dict[str, Any]] = []
-    uncertainties: list[str] = []
-    unknown_definition_values = unknown_values.get("container_definitions")
+    uncertainties = list(parse_uncertainties)
+    unknown_definition_values = resource.unknown_values.get("container_definitions")
     for index, definition in enumerate(definitions):
         if not isinstance(definition, Mapping):
             uncertainties.append(f"container_definitions[{index}] is not an object")
@@ -304,6 +309,298 @@ def _ecs_container_image_references(
         )
         _append_image_uncertainty(uncertainties, path, image_reference)
     return references, uncertainties
+
+
+def _ecs_secret_references(resource: TerraformResource) -> tuple[list[dict[str, Any]], list[str]]:
+    definitions, parse_uncertainties = _ecs_container_definitions(resource)
+    references: list[dict[str, Any]] = []
+    uncertainties = list(parse_uncertainties)
+    unknown_definitions = resource.unknown_values.get("container_definitions")
+    for index, definition in enumerate(definitions):
+        container_path = f"container_definitions[{index}]"
+        if not isinstance(definition, Mapping):
+            uncertainties.append(f"{container_path} is not an object")
+            continue
+        unknown_definition = (
+            unknown_definitions[index]
+            if isinstance(unknown_definitions, list) and index < len(unknown_definitions)
+            else None
+        )
+        container_name = definition.get("name") if isinstance(definition.get("name"), str) else None
+        _append_ecs_secret_items(
+            references,
+            uncertainties,
+            definition,
+            unknown_definition,
+            container_path,
+            container_name,
+            "secrets",
+        )
+        _append_ecs_secret_items(
+            references,
+            uncertainties,
+            definition,
+            unknown_definition,
+            container_path,
+            container_name,
+            "environment",
+            sensitive_settings_only=True,
+        )
+    return references, uncertainties
+
+
+def _append_ecs_secret_items(
+    references: list[dict[str, Any]],
+    uncertainties: list[str],
+    definition: Mapping[str, Any],
+    unknown_definition: object,
+    container_path: str,
+    container_name: str | None,
+    block_name: str,
+    *,
+    sensitive_settings_only: bool = False,
+) -> None:
+    block_path = f"{container_path}.{block_name}"
+    unknown_block = unknown_definition.get(block_name) if isinstance(unknown_definition, Mapping) else None
+    block = definition.get(block_name)
+    if unknown_block is True:
+        references.append(_ecs_unknown_secret_record(block_path, f"{block_path} is unknown after planning"))
+        uncertainties.append(f"{block_path} is unknown after planning")
+        return
+    if block is None:
+        return
+    if not isinstance(block, list):
+        uncertainties.append(f"{block_path} is not a JSON array")
+        return
+
+    unknown_items = unknown_block if isinstance(unknown_block, list) else []
+    for item_index, item in enumerate(block):
+        item_path = f"{block_path}[{item_index}]"
+        unknown_item = unknown_items[item_index] if item_index < len(unknown_items) else None
+        if not isinstance(item, Mapping):
+            references.append(_ecs_unknown_secret_record(item_path, f"{item_path} is not an object"))
+            uncertainties.append(f"{item_path} is not an object")
+            continue
+
+        name_unknown = _ecs_field_is_unknown(unknown_item, "name")
+        setting_name = item.get("name") if isinstance(item.get("name"), str) else None
+        classification = classify_sensitive_setting_name(setting_name)
+        if sensitive_settings_only and classification is None and not name_unknown:
+            continue
+
+        if name_unknown:
+            name_reason = f"{item_path}.name is unknown after planning"
+        elif not setting_name or not setting_name.strip():
+            name_reason = f"{item_path}.name is not represented as a non-empty string"
+        else:
+            name_reason = None
+
+        if block_name == "secrets":
+            record = _ecs_secret_reference_record(
+                item,
+                unknown_item,
+                item_path,
+                container_name,
+                setting_name,
+                classification,
+            )
+        else:
+            record = _ecs_literal_setting_record(
+                item,
+                unknown_item,
+                item_path,
+                container_name,
+                setting_name,
+                classification,
+            )
+        references.append(record)
+        if name_reason:
+            uncertainties.append(name_reason)
+        if record.get("unresolved_reason"):
+            uncertainties.append(f"{item_path}: {record['unresolved_reason']}")
+
+
+def _ecs_setting_record_base(
+    path: str,
+    container_name: str | None,
+    setting_name: str | None,
+    classification: SensitiveSettingClassification | None,
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "source": "aws_ecs_task_definition",
+        "path": path,
+        "container_name": container_name,
+        "setting_name": setting_name,
+    }
+    if classification is not None:
+        record["normalized_setting_name"] = classification.normalized_name
+        record["sensitive_category"] = classification.category.value
+    return record
+
+
+def _ecs_secret_reference_record(
+    item: Mapping[str, Any],
+    unknown_item: object,
+    path: str,
+    container_name: str | None,
+    setting_name: str | None,
+    classification: SensitiveSettingClassification | None,
+) -> dict[str, Any]:
+    record = _ecs_setting_record_base(path, container_name, setting_name, classification)
+    value_path = f"{path}.valueFrom"
+    record["value_path"] = value_path
+    if _ecs_field_is_unknown(unknown_item, "valueFrom"):
+        record.update(
+            state="unknown",
+            is_resolved=False,
+            unresolved_reason=f"{value_path} is unknown after planning",
+        )
+        return record
+
+    value_from = item.get("valueFrom")
+    if not isinstance(value_from, str) or not value_from.strip():
+        record.update(
+            state="unknown",
+            is_resolved=False,
+            unresolved_reason=f"{value_path} is not represented as a non-empty string",
+        )
+        return record
+    record.update(_classify_ecs_secret_reference(value_from.strip()))
+    return record
+
+
+def _ecs_literal_setting_record(
+    item: Mapping[str, Any],
+    unknown_item: object,
+    path: str,
+    container_name: str | None,
+    setting_name: str | None,
+    classification: SensitiveSettingClassification | None,
+) -> dict[str, Any]:
+    record = _ecs_setting_record_base(path, container_name, setting_name, classification)
+    value_path = f"{path}.value"
+    record["value_path"] = value_path
+    if _ecs_field_is_unknown(unknown_item, "value"):
+        record.update(
+            state="unknown",
+            is_resolved=False,
+            unresolved_reason=f"{value_path} is unknown after planning",
+        )
+    elif "value" in item:
+        record.update(state="literal", is_resolved=True)
+    else:
+        record.update(
+            state="unknown",
+            is_resolved=False,
+            unresolved_reason=f"{value_path} is not represented",
+        )
+    return record
+
+
+def _ecs_unknown_secret_record(path: str, reason: str) -> dict[str, Any]:
+    return {
+        "source": "aws_ecs_task_definition",
+        "path": path,
+        "container_name": None,
+        "setting_name": None,
+        "state": "unknown",
+        "is_resolved": False,
+        "unresolved_reason": reason,
+    }
+
+
+def _classify_ecs_secret_reference(reference: str) -> dict[str, Any]:
+    if _looks_like_terraform_reference(reference):
+        return {
+            "state": "reference",
+            "reference": reference,
+            "reference_kind": "terraform",
+            "target_resolution": "unresolved",
+            "is_resolved": False,
+            "unresolved_reference": reference,
+            "unresolved_reason": "Terraform secret reference is unresolved during normalization",
+        }
+
+    parsed_arn = _parse_secrets_manager_arn(reference)
+    if parsed_arn is not None:
+        return {
+            "state": "reference",
+            "reference": reference,
+            "reference_kind": "secrets_manager_arn",
+            "target_resolution": "resolved",
+            "is_resolved": True,
+            **parsed_arn,
+        }
+
+    if _looks_like_secrets_manager_arn(reference):
+        return {
+            "state": "reference",
+            "reference": reference,
+            "reference_kind": "secrets_manager_arn",
+            "target_resolution": "unresolved",
+            "is_resolved": False,
+            "unresolved_reference": reference,
+            "unresolved_reason": "Secrets Manager ARN has unsupported syntax",
+        }
+
+    if _looks_like_ssm_parameter_arn(reference):
+        return {
+            "state": "reference",
+            "reference": reference,
+            "reference_kind": "ssm_parameter_arn",
+            "target_resolution": "unsupported",
+            "is_resolved": True,
+        }
+
+    return {
+        "state": "reference",
+        "reference": reference,
+        "reference_kind": "external_or_unresolved",
+        "target_resolution": "unresolved",
+        "is_resolved": False,
+        "unresolved_reference": reference,
+        "unresolved_reason": "secret reference is not a recognized AWS ARN or Terraform reference",
+    }
+
+
+def _parse_secrets_manager_arn(reference: str) -> dict[str, Any] | None:
+    match = _SECRETS_MANAGER_ARN_PATTERN.fullmatch(reference)
+    if match is None:
+        return None
+    record: dict[str, Any] = {
+        "secrets_manager_secret_arn": reference,
+        "aws_partition": match.group("partition"),
+        "aws_region": match.group("region"),
+        "aws_account_id": match.group("account_id"),
+        "secret_name": match.group("secret_name"),
+    }
+    for key in ("json_key", "version_stage", "version_id"):
+        if match.group(key):
+            record[key] = match.group(key)
+    return record
+
+
+def _ecs_field_is_unknown(unknown_item: object, key: str) -> bool:
+    return unknown_item is True or (isinstance(unknown_item, Mapping) and value_is_unknown(unknown_item.get(key)))
+
+
+def _looks_like_terraform_reference(value: str) -> bool:
+    return "$" + "{" in value or "aws_secretsmanager_secret." in value or "aws_ssm_parameter." in value
+
+
+def _looks_like_secrets_manager_arn(value: str) -> bool:
+    return value.startswith("arn:") and ":secretsmanager:" in value and ":secret:" in value
+
+
+def _looks_like_ssm_parameter_arn(value: str) -> bool:
+    return value.startswith("arn:") and ":ssm:" in value and ":parameter/" in value
+
+
+_SECRETS_MANAGER_ARN_PATTERN = re.compile(
+    r"^arn:(?P<partition>aws(?:-us-gov|-cn)?):secretsmanager:(?P<region>[a-z0-9-]+):"
+    r"(?P<account_id>\d{12}):secret:(?P<secret_name>[^:]+)"
+    r"(?::(?P<json_key>[^:]*):(?P<version_stage>[^:]*):(?P<version_id>[^:]*))?$"
+)
 
 
 def _unknown_image_reference(value: object) -> ContainerImageReference:
