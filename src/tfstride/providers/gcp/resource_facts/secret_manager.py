@@ -10,6 +10,10 @@ class GcpSecretManagerFacts(GcpBaseFacts):
     __slots__ = ()
 
     @property
+    def secret_id(self) -> str | None:
+        return self.get(GcpResourceMetadata.SECRET_ID)
+
+    @property
     def secret_manager_replication_mode(self) -> str | None:
         return self.get(GcpResourceMetadata.SECRET_MANAGER_REPLICATION_MODE)
 
