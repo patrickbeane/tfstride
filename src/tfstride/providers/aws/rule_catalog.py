@@ -532,6 +532,18 @@ AWS_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-ecs-secret-access-blast-radius",
+        title="ECS execution role grants broader secret access than the task consumes",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Restrict the ECS task execution role to `secretsmanager:GetSecretValue` on only the exact secret ARNs "
+            "referenced by the task definition. Keep application runtime permissions on the separate task role, "
+            "and avoid wildcard Secrets Manager actions or resources in the execution role."
+        ),
+        tags=("aws", "ecs", "secrets-manager", "iam", "least-privilege", "credential-delivery"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

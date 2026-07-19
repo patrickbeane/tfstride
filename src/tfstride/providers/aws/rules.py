@@ -77,6 +77,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-workload-ecr-mutable-tag",
         "aws-workload-can-modify-image-repository",
         "aws-ecs-sensitive-environment-value-inline",
+        "aws-ecs-secret-access-blast-radius",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -206,6 +207,7 @@ def build_aws_rule_contribution(
         "aws-workload-ecr-mutable-tag": container_deployment_detectors.detect_mutable_ecr_tag,
         "aws-workload-can-modify-image-repository": (container_deployment_detectors.detect_ecr_self_modification_path),
         "aws-ecs-sensitive-environment-value-inline": (ecs_secret_detectors.detect_inline_sensitive_environment_value),
+        "aws-ecs-secret-access-blast-radius": ecs_secret_detectors.detect_secret_access_blast_radius,
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),

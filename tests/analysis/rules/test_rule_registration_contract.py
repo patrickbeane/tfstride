@@ -61,6 +61,7 @@ EXPECTED_AWS_RULE_GROUP_IDS = (
         "aws-workload-ecr-mutable-tag",
         "aws-workload-can-modify-image-repository",
         "aws-ecs-sensitive-environment-value-inline",
+        "aws-ecs-secret-access-blast-radius",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -397,9 +398,9 @@ class DefaultRuleRegistrationContractTests(unittest.TestCase):
     def test_default_rule_group_count_and_lengths_are_stable(self) -> None:
         self.assertEqual(len(EXPECTED_DEFAULT_RULE_GROUP_IDS), 6)
         self.assertEqual(
-            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (218, 2, 2, 17, 3, 2)
+            tuple(len(rule_group) for rule_group in EXPECTED_DEFAULT_RULE_GROUP_IDS), (219, 2, 2, 17, 3, 2)
         )
-        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (68, 2, 2, 3, 2, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in aws_rules.AWS_RULE_GROUP_IDS), (69, 2, 2, 3, 2, 2))
         self.assertEqual(tuple(len(rule_group) for rule_group in gcp_rules.GCP_RULE_GROUP_IDS), (60, 0, 0, 14, 1, 0))
         self.assertEqual(tuple(len(rule_group) for rule_group in azure_rules.AZURE_RULE_GROUP_IDS), (90, 0, 0, 0, 0, 0))
 
