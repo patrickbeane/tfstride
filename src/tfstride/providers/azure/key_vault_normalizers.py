@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -32,11 +33,19 @@ _PERMISSION_FIELDS = (
     "certificate_permissions",
     "storage_permissions",
 )
+_KEY_VAULT_DNS_SUFFIXES = (
+    ".vault.azure.net",
+    ".vault.azure.cn",
+    ".vault.usgovcloudapi.net",
+    ".vault.microsoftazure.de",
+)
 
 
 def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    vault_id = first_non_empty(values.get("id"))
+    identity_uncertainties: list[str] = []
+    vault_id = known_string(values, resource.unknown_values, "id", identity_uncertainties, require_string=True)
+    vault_uri = _known_key_vault_uri(resource, "vault_uri", identity_uncertainties)
     name = first_non_empty(values.get("name"), resource.name)
     network_acls = first_mapping(values.get("network_acls"))
     network_uncertainties: list[str] = []
@@ -71,6 +80,7 @@ def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: name,
         AzureResourceMetadata.KEY_VAULT_ID: vault_id,
+        AzureResourceMetadata.KEY_VAULT_URI: vault_uri,
         AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
         AzureResourceMetadata.TENANT_ID: first_non_empty(values.get("tenant_id")),
         AzureResourceMetadata.NETWORK_DEFAULT_ACTION: network_default_action,
@@ -98,6 +108,8 @@ def normalize_key_vault(resource: TerraformResource) -> NormalizedResource:
         metadata[AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES] = authorization_uncertainties
     if recovery_uncertainties:
         metadata[AzureResourceMetadata.KEY_VAULT_RECOVERY_UNCERTAINTIES] = recovery_uncertainties
+    if identity_uncertainties:
+        metadata[AzureResourceMetadata.KEY_VAULT_IDENTITY_UNCERTAINTIES] = identity_uncertainties
 
     return _with_storage_encrypted(
         NormalizedResource(
@@ -154,12 +166,18 @@ def normalize_key_vault_certificate(resource: TerraformResource) -> NormalizedRe
 
 def _normalize_key_vault_child(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    name = first_non_empty(values.get("name"), resource.name)
+    identity_uncertainties: list[str] = []
+    known_name = known_string(values, resource.unknown_values, "name", identity_uncertainties, require_string=True)
+    name = first_non_empty(known_name, resource.name)
     metadata: dict[Any, Any] = {
         AzureResourceMetadata.NAME: name,
         AzureResourceMetadata.KEY_VAULT_REFERENCE: first_non_empty(values.get("key_vault_id")),
     }
+    if resource.resource_type == AzureResourceType.KEY_VAULT_SECRET:
+        metadata.update(_key_vault_secret_identity_metadata(resource, known_name, identity_uncertainties))
     _set_key_vault_child_lifecycle(metadata, resource, values)
+    if identity_uncertainties:
+        metadata[AzureResourceMetadata.KEY_VAULT_IDENTITY_UNCERTAINTIES] = identity_uncertainties
     return _with_storage_encrypted(
         NormalizedResource(
             address=resource.address,
@@ -167,10 +185,182 @@ def _normalize_key_vault_child(resource: TerraformResource) -> NormalizedResourc
             resource_type=resource.resource_type,
             name=resource.name,
             category=ResourceCategory.DATA,
-            identifier=first_non_empty(values.get("id"), name, resource.address),
+            identifier=first_non_empty(values.get("id"), values.get("resource_id"), name, resource.address),
             data_sensitivity="sensitive",
             metadata=metadata,
         )
+    )
+
+
+def _key_vault_secret_identity_metadata(
+    resource: TerraformResource,
+    known_name: str | None,
+    uncertainties: list[str],
+) -> dict[Any, Any]:
+    values = resource.values
+    metadata: dict[Any, Any] = {AzureResourceMetadata.KEY_VAULT_SECRET_NAME: known_name}
+    vault_uri = _known_key_vault_uri(resource, "vault_uri", uncertainties)
+    if vault_uri is None and "key_vault_uri" in values:
+        vault_uri = _known_key_vault_uri(resource, "key_vault_uri", uncertainties)
+    if vault_uri is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_URI] = vault_uri
+
+    version = _known_exact_identifier(resource, "version", uncertainties)
+    if version is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_SECRET_VERSION] = version
+
+    raw_identifiers = {
+        key: _known_exact_identifier(resource, key, uncertainties) for key in ("id", "versionless_id", "resource_id")
+    }
+    resource_id = raw_identifiers["resource_id"]
+    if resource_id is not None and _is_key_vault_secret_resource_id(resource_id):
+        metadata[AzureResourceMetadata.KEY_VAULT_SECRET_RESOURCE_ID] = resource_id
+
+    versionless_uri: str | None = None
+    secret_uri: str | None = None
+    for key in ("versionless_id", "id", "resource_id"):
+        value = raw_identifiers[key]
+        if value is None:
+            continue
+        parsed = _normalize_key_vault_secret_uri(value)
+        if parsed is not None:
+            parsed_versionless, parsed_versioned, parsed_version = parsed
+            versionless_uri = versionless_uri or parsed_versionless
+            if parsed_versioned is not None:
+                secret_uri = parsed_versioned
+            elif secret_uri is None:
+                secret_uri = parsed_versionless
+            version = version or parsed_version
+            continue
+        if key != "resource_id" and not _is_key_vault_secret_resource_id(value):
+            uncertainties.append(f"{key} has an unrecognized value shape")
+        elif resource_id is None and _is_key_vault_secret_resource_id(value):
+            metadata[AzureResourceMetadata.KEY_VAULT_SECRET_RESOURCE_ID] = value
+
+    if versionless_uri is None and vault_uri is not None and known_name is not None:
+        if _valid_secret_path_segment(known_name):
+            versionless_uri = f"{vault_uri}/secrets/{known_name}"
+        else:
+            uncertainties.append("name has an unrecognized Key Vault secret shape")
+    if versionless_uri is not None and version is not None:
+        if _valid_secret_path_segment(version):
+            derived_secret_uri = f"{versionless_uri}/{version}"
+            if secret_uri in (None, versionless_uri):
+                secret_uri = derived_secret_uri
+        else:
+            uncertainties.append("version has an unrecognized Key Vault secret shape")
+
+    if versionless_uri is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_SECRET_VERSIONLESS_URI] = versionless_uri
+    if secret_uri is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_SECRET_URI] = secret_uri
+    if version is not None:
+        metadata[AzureResourceMetadata.KEY_VAULT_SECRET_VERSION] = version
+    return metadata
+
+
+def _known_key_vault_uri(
+    resource: TerraformResource,
+    key: str,
+    uncertainties: list[str],
+) -> str | None:
+    raw = known_string(resource.values, resource.unknown_values, key, uncertainties, require_string=True)
+    if raw is None:
+        return None
+    normalized = _normalize_key_vault_uri(raw)
+    if normalized is None:
+        uncertainties.append(f"{key} has an unrecognized value shape")
+    return normalized
+
+
+def _known_exact_identifier(
+    resource: TerraformResource,
+    key: str,
+    uncertainties: list[str],
+) -> str | None:
+    if attribute_unknown(resource.unknown_values, key):
+        uncertainties.append(f"{key} is unknown after planning")
+        return None
+    raw = resource.values.get(key)
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        uncertainties.append(f"{key} has an unrecognized value shape")
+        return None
+    value = first_non_empty(raw)
+    if value is None:
+        return None
+    if _looks_unresolved_reference(value):
+        uncertainties.append(f"{key} is unresolved after planning")
+        return None
+    return value
+
+
+def _normalize_key_vault_uri(value: str) -> str | None:
+    parsed = urlsplit(value.strip())
+    host = parsed.hostname
+    if (
+        parsed.scheme.lower() != "https"
+        or host is None
+        or parsed.netloc.lower() != host.lower()
+        or parsed.query
+        or parsed.fragment
+        or parsed.path.strip("/")
+        or not _is_key_vault_host(host)
+    ):
+        return None
+    return f"https://{host.lower()}"
+
+
+def _normalize_key_vault_secret_uri(value: str) -> tuple[str, str | None, str | None] | None:
+    parsed = urlsplit(value.strip())
+    host = parsed.hostname
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if (
+        parsed.scheme.lower() != "https"
+        or host is None
+        or parsed.netloc.lower() != host.lower()
+        or parsed.query
+        or parsed.fragment
+        or len(segments) not in {2, 3}
+        or segments[0].lower() != "secrets"
+        or not all(_valid_secret_path_segment(segment) for segment in segments[1:])
+        or not _is_key_vault_host(host)
+    ):
+        return None
+    versionless_uri = f"https://{host.lower()}/secrets/{segments[1]}"
+    versioned_uri = f"{versionless_uri}/{segments[2]}" if len(segments) == 3 else None
+    return versionless_uri, versioned_uri, segments[2] if len(segments) == 3 else None
+
+
+def _is_key_vault_host(host: str) -> bool:
+    normalized = host.lower().rstrip(".")
+    for suffix in _KEY_VAULT_DNS_SUFFIXES:
+        if normalized.endswith(suffix):
+            vault_name = normalized[: -len(suffix)]
+            return bool(vault_name) and "." not in vault_name
+    return False
+
+
+def _valid_secret_path_segment(value: str) -> bool:
+    return bool(value) and all(character.isalnum() or character == "-" for character in value)
+
+
+def _is_key_vault_secret_resource_id(value: str) -> bool:
+    normalized = value.lower()
+    return (
+        normalized.startswith("/subscriptions/")
+        and "/providers/microsoft.keyvault/vaults/" in normalized
+        and "/secrets/" in normalized
+    )
+
+
+def _looks_unresolved_reference(value: str) -> bool:
+    normalized = value.strip().lower()
+    if any(marker in normalized for marker in ("${", "known after apply", "<known")):
+        return True
+    return normalized.startswith(("azurerm_", "data.azurerm_")) and normalized.endswith(
+        (".id", ".resource_id", ".versionless_id")
     )
 
 

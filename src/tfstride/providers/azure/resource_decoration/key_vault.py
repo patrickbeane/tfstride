@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
-from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -37,7 +37,17 @@ class DecorateKeyVaultRelationshipsStage:
                 facts.add_unresolved_resource_reference("key_vault", facts.key_vault_reference)
                 continue
             facts.set_resolved_key_vault_address(vault.address)
-            azure_facts(vault).add_key_vault_related_resource_address(resource.address)
+            vault_facts = azure_facts(vault)
+            if vault_facts.key_vault_uri is not None:
+                if facts.key_vault_uri is None:
+                    facts.set_key_vault_uri(vault_facts.key_vault_uri)
+                if resource.resource_type == AzureResourceType.KEY_VAULT_SECRET:
+                    _derive_secret_identity(facts, vault_facts.key_vault_uri)
+            elif vault_facts.key_vault_identity_uncertainties:
+                facts.extend_key_vault_identity_uncertainties(
+                    [f"{vault.address}: {uncertainty}" for uncertainty in vault_facts.key_vault_identity_uncertainties]
+                )
+            vault_facts.add_key_vault_related_resource_address(resource.address)
 
     def _merge_access_policies(
         self,
@@ -108,6 +118,23 @@ class DecorateKeyVaultRelationshipsStage:
                     f"effective network default_action is {default_action}",
                 ]
             facts.set_public_endpoint_posture(reachable=reachable, reasons=reasons)
+
+
+def _derive_secret_identity(facts: AzureResourceFacts, vault_uri: str) -> None:
+    secret_name = facts.key_vault_secret_name
+    if secret_name is None or not _valid_secret_path_segment(secret_name):
+        return
+    versionless_uri = f"{vault_uri}/secrets/{secret_name}"
+    version = facts.key_vault_secret_version
+    versioned_uri = f"{versionless_uri}/{version}" if version and _valid_secret_path_segment(version) else None
+    facts.set_key_vault_secret_identity(
+        versionless_uri=versionless_uri,
+        secret_uri=versioned_uri or versionless_uri,
+    )
+
+
+def _valid_secret_path_segment(value: str) -> bool:
+    return bool(value) and all(character.isalnum() or character == "-" for character in value)
 
 
 def _looks_like_key_vault_reference(reference: str | None) -> bool:

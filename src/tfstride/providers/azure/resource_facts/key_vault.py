@@ -14,12 +14,36 @@ class AzureKeyVaultFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.KEY_VAULT_ID)
 
     @property
+    def key_vault_uri(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_URI)
+
+    @property
     def key_vault_reference(self) -> str | None:
         return self.get(AzureResourceMetadata.KEY_VAULT_REFERENCE)
 
     @property
     def resolved_key_vault_address(self) -> str | None:
         return self.get(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS)
+
+    @property
+    def key_vault_secret_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_SECRET_NAME)
+
+    @property
+    def key_vault_secret_uri(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_SECRET_URI)
+
+    @property
+    def key_vault_secret_versionless_uri(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_SECRET_VERSIONLESS_URI)
+
+    @property
+    def key_vault_secret_version(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_SECRET_VERSION)
+
+    @property
+    def key_vault_secret_resource_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.KEY_VAULT_SECRET_RESOURCE_ID)
 
     @property
     def key_vault_expiration_date(self) -> str | None:
@@ -116,6 +140,30 @@ class AzureKeyVaultFacts(AzureBaseFacts):
     @property
     def key_vault_lifecycle_uncertainties(self) -> list[str]:
         return self.get(AzureResourceMetadata.KEY_VAULT_LIFECYCLE_UNCERTAINTIES)
+
+    @property
+    def key_vault_identity_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.KEY_VAULT_IDENTITY_UNCERTAINTIES)
+
+    def set_key_vault_uri(self, uri: str) -> None:
+        self.set(AzureResourceMetadata.KEY_VAULT_URI, uri)
+
+    def set_key_vault_secret_identity(
+        self,
+        *,
+        versionless_uri: str | None = None,
+        secret_uri: str | None = None,
+        version: str | None = None,
+    ) -> None:
+        if versionless_uri is not None and self.key_vault_secret_versionless_uri is None:
+            self.set(AzureResourceMetadata.KEY_VAULT_SECRET_VERSIONLESS_URI, versionless_uri)
+        if secret_uri is not None and self.key_vault_secret_uri is None:
+            self.set(AzureResourceMetadata.KEY_VAULT_SECRET_URI, secret_uri)
+        if version is not None and self.key_vault_secret_version is None:
+            self.set(AzureResourceMetadata.KEY_VAULT_SECRET_VERSION, version)
+
+    def extend_key_vault_identity_uncertainties(self, uncertainties: Sequence[str | None]) -> None:
+        self.extend(AzureResourceMetadata.KEY_VAULT_IDENTITY_UNCERTAINTIES, uncertainties)
 
     def set_resolved_key_vault_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_KEY_VAULT_ADDRESS, address)

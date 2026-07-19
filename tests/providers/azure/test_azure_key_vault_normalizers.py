@@ -11,6 +11,7 @@ from tfstride.providers.azure.key_vault_normalizers import (
     normalize_key_vault_key,
     normalize_key_vault_secret,
 )
+from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -51,6 +52,7 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         facts = azure_facts(normalized)
 
         self.assertEqual(facts.key_vault_id, normalized.identifier)
+        self.assertIsNone(facts.key_vault_uri)
         self.assertTrue(facts.public_network_access_enabled)
         self.assertEqual(facts.public_network_fallback_state, "enabled")
         self.assertEqual(facts.network_default_action, "Allow")
@@ -208,6 +210,111 @@ class AzureKeyVaultNormalizerTests(unittest.TestCase):
         self.assertEqual(azure_facts(secret).key_vault_reference, "azurerm_key_vault.application.id")
         self.assertTrue(secret.storage_encrypted)
         self.assertEqual(secret.data_sensitivity, "sensitive")
+
+    def test_key_vault_and_secret_capture_exact_data_plane_identifiers(self) -> None:
+        secret = normalize_key_vault_secret(
+            _resource(
+                AzureResourceType.KEY_VAULT_SECRET,
+                {
+                    "id": "https://application.vault.azure.net/secrets/api-key/secret-version",
+                    "versionless_id": "https://application.vault.azure.net/secrets/api-key",
+                    "resource_id": (
+                        "/subscriptions/example/resourceGroups/app/providers/"
+                        "Microsoft.KeyVault/vaults/application/secrets/api-key"
+                    ),
+                    "name": "api-key",
+                    "version": "secret-version",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                },
+            )
+        )
+        facts = azure_facts(secret)
+
+        self.assertEqual(facts.key_vault_secret_name, "api-key")
+        self.assertEqual(
+            facts.key_vault_secret_uri,
+            "https://application.vault.azure.net/secrets/api-key/secret-version",
+        )
+        self.assertEqual(
+            facts.key_vault_secret_versionless_uri,
+            "https://application.vault.azure.net/secrets/api-key",
+        )
+        self.assertEqual(facts.key_vault_secret_version, "secret-version")
+        self.assertEqual(
+            facts.key_vault_secret_resource_id,
+            "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/application/secrets/api-key",
+        )
+        self.assertEqual(facts.key_vault_identity_uncertainties, [])
+
+    def test_key_vault_relationship_derives_secret_identifiers_from_exact_vault_uri(self) -> None:
+        vault = _resource(
+            AzureResourceType.KEY_VAULT,
+            {
+                "id": "/subscriptions/example/resourceGroups/app/providers/Microsoft.KeyVault/vaults/application",
+                "name": "application",
+                "vault_uri": "https://application.vault.azure.net/",
+            },
+        )
+        secret = _resource(
+            AzureResourceType.KEY_VAULT_SECRET,
+            {
+                "name": "api-key",
+                "version": "secret-version",
+                "key_vault_id": "azurerm_key_vault.example.id",
+            },
+        )
+
+        inventory = AzureNormalizer().normalize([vault, secret])
+        normalized_secret = inventory.get_by_address("azurerm_key_vault_secret.example")
+        assert normalized_secret is not None
+        facts = azure_facts(normalized_secret)
+
+        self.assertEqual(facts.resolved_key_vault_address, "azurerm_key_vault.example")
+        self.assertEqual(facts.key_vault_uri, "https://application.vault.azure.net")
+        self.assertEqual(
+            facts.key_vault_secret_versionless_uri,
+            "https://application.vault.azure.net/secrets/api-key",
+        )
+        self.assertEqual(
+            facts.key_vault_secret_uri,
+            "https://application.vault.azure.net/secrets/api-key/secret-version",
+        )
+
+    def test_key_vault_secret_does_not_derive_identity_from_name_only(self) -> None:
+        secret = normalize_key_vault_secret(
+            _resource(
+                AzureResourceType.KEY_VAULT_SECRET,
+                {"name": "api-key", "key_vault_id": "azurerm_key_vault.application.id"},
+            )
+        )
+        facts = azure_facts(secret)
+
+        self.assertIsNone(facts.key_vault_uri)
+        self.assertIsNone(facts.key_vault_secret_uri)
+        self.assertIsNone(facts.key_vault_secret_versionless_uri)
+        self.assertEqual(facts.key_vault_identity_uncertainties, [])
+
+    def test_key_vault_secret_preserves_unresolved_identity_fields(self) -> None:
+        secret = normalize_key_vault_secret(
+            _resource(
+                AzureResourceType.KEY_VAULT_SECRET,
+                {
+                    "name": "api-key",
+                    "key_vault_id": "azurerm_key_vault.application.id",
+                    "id": "${azurerm_key_vault_secret.api_key.id}",
+                    "version": None,
+                },
+                unknown_values={"version": True},
+            )
+        )
+        facts = azure_facts(secret)
+
+        self.assertIsNone(facts.key_vault_secret_uri)
+        self.assertIsNone(facts.key_vault_secret_versionless_uri)
+        self.assertEqual(
+            facts.key_vault_identity_uncertainties,
+            ["version is unknown after planning", "id is unresolved after planning"],
+        )
 
     def test_key_vault_secret_preserves_lifecycle_posture(self) -> None:
         secret = normalize_key_vault_secret(
