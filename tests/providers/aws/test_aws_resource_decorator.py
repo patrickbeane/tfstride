@@ -164,6 +164,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "resolve_instance_profile_roles",
                 "resolve_oidc_provider_trust",
                 "resolve_ecs_service_relationships",
+                "model_ecs_secret_access_paths",
                 "model_workload_ecr_write_paths",
                 "resolve_api_gateway_relationships",
                 "merge_resource_policy_resources",

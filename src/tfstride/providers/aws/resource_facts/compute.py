@@ -72,6 +72,14 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.ECS_SECRET_POSTURE_UNCERTAINTIES)
 
     @property
+    def ecs_secret_access_paths(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_SECRET_ACCESS_PATHS)
+
+    @property
+    def ecs_secret_access_path_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_SECRET_ACCESS_PATH_UNCERTAINTIES)
+
+    @property
     def ecr_write_paths(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECR_WRITE_PATHS)
 
@@ -456,6 +464,12 @@ class AwsComputeFacts(AwsBaseFacts):
 
     def set_ecr_write_paths(self, values: list[dict[str, Any]]) -> None:
         self.set(AwsResourceMetadata.ECR_WRITE_PATHS, values)
+
+    def set_ecs_secret_access_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(AwsResourceMetadata.ECS_SECRET_ACCESS_PATHS, values)
+
+    def extend_ecs_secret_access_path_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AwsResourceMetadata.ECS_SECRET_ACCESS_PATH_UNCERTAINTIES, values)
 
     def extend_ecr_write_path_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(AwsResourceMetadata.ECR_WRITE_PATH_UNCERTAINTIES, values)
