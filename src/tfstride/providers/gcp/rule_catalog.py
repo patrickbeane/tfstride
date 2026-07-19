@@ -693,6 +693,18 @@ GCP_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-cloud-run-secret-access-blast-radius",
+        title="Cloud Run service account has broader secret access than the workload consumes",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Grant roles/secretmanager.secretAccessor or an equivalent custom role on only the exact Secret "
+            "Manager secret resources consumed by the Cloud Run service. Avoid project-, folder-, or "
+            "organization-wide secret access on workload runtime identities."
+        ),
+        tags=("gcp", "cloud-run", "secret-manager", "iam", "least-privilege", "credential-delivery"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
