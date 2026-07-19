@@ -17,6 +17,7 @@ class ProviderCoercionTests(unittest.TestCase):
         self.assertEqual(coercion.as_optional_int("443"), 443)
         self.assertIsNone(coercion.as_optional_int(""))
         self.assertEqual(coercion.compact([None, "", [], "value", 12]), ["value", "12"])
+        self.assertEqual(coercion.compact(None), [])
         self.assertEqual(coercion.compact_strings([" a ", "a", None, "b"]), ["a", "b"])
 
     def test_first_mapping_preserves_provider_list_semantics(self) -> None:

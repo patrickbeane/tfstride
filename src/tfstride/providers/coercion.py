@@ -10,7 +10,9 @@ STATE_CONFIGURED = "configured"
 STATE_NOT_CONFIGURED = "not_configured"
 
 
-def compact(values: Iterable[Any]) -> list[str]:
+def compact(values: Iterable[Any] | None) -> list[str]:
+    if values is None:
+        return []
     return [str(value) for value in values if value not in (None, "", [])]
 
 

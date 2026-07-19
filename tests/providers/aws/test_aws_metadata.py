@@ -65,6 +65,8 @@ class AwsResourceMetadataTests(unittest.TestCase):
             "S3_POSTURE_UNCERTAINTIES": "s3_posture_uncertainties",
             "CONTAINER_IMAGE_POSTURE_UNCERTAINTIES": "container_image_posture_uncertainties",
             "ECS_SECRET_POSTURE_UNCERTAINTIES": "ecs_secret_posture_uncertainties",
+            "ECS_NETWORK_POSTURE_UNCERTAINTIES": "ecs_network_posture_uncertainties",
+            "ECS_SECURITY_GROUP_REFERENCE_STATE": "ecs_security_group_reference_state",
             "ECS_SECRET_ACCESS_PATH_UNCERTAINTIES": "ecs_secret_access_path_uncertainties",
             "ECR_REPOSITORY_URL": "ecr_repository_url",
             "ECR_ENCRYPTION_TYPE": "ecr_encryption_type",

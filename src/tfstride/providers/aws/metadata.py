@@ -111,6 +111,8 @@ class AwsResourceMetadata:
     UNRESOLVED_FUNCTION_REFERENCES = StringListMetadataField("unresolved_function_references")
     CONTAINER_IMAGE_POSTURE_UNCERTAINTIES = StringListMetadataField("container_image_posture_uncertainties")
     ECS_SECRET_POSTURE_UNCERTAINTIES = StringListMetadataField("ecs_secret_posture_uncertainties")
+    ECS_NETWORK_POSTURE_UNCERTAINTIES = StringListMetadataField("ecs_network_posture_uncertainties")
+    ECS_SECURITY_GROUP_REFERENCE_STATE = OptionalStringMetadataField("ecs_security_group_reference_state")
     REQUIRES_COMPATIBILITIES = StringListMetadataField("requires_compatibilities")
     TRUST_PRINCIPALS = StringListMetadataField("trust_principals")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("resource_policy_source_addresses")

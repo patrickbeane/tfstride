@@ -4,7 +4,7 @@ import unittest
 from typing import Any
 
 from tfstride.models import ResourceCategory, TerraformResource
-from tfstride.providers.aws.compute_normalizers import normalize_lambda_function_url
+from tfstride.providers.aws.compute_normalizers import normalize_ecs_service, normalize_lambda_function_url
 from tfstride.providers.aws.normalizer import AwsNormalizer
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -27,6 +27,40 @@ def _terraform_resource(
 
 
 class AwsComputeNormalizerTests(unittest.TestCase):
+    def test_ecs_service_preserves_unknown_null_security_groups(self) -> None:
+        resource = _terraform_resource(
+            "aws_ecs_service",
+            {
+                "id": "orders",
+                "name": "orders",
+                "network_configuration": [
+                    {
+                        "assign_public_ip": False,
+                        "subnets": ["subnet-app"],
+                        "security_groups": None,
+                    }
+                ],
+            },
+            unknown_values={
+                "network_configuration": [
+                    {
+                        "security_groups": True,
+                    }
+                ]
+            },
+        )
+
+        normalized = normalize_ecs_service(resource)
+        facts = aws_facts(normalized)
+
+        self.assertEqual(normalized.subnet_ids, ("subnet-app",))
+        self.assertEqual(normalized.security_group_ids, ())
+        self.assertEqual(facts.ecs_security_group_reference_state, "unknown")
+        self.assertEqual(
+            facts.ecs_network_posture_uncertainties,
+            ["network_configuration.security_groups is unknown after planning"],
+        )
+
     def test_lambda_function_url_normalizes_authorization_target_and_cors_evidence(self) -> None:
         resource = _terraform_resource(
             "aws_lambda_function_url",

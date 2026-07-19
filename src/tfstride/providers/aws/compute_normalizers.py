@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.aws.coercion import as_bool, as_list, as_optional_int, compact, first_item
+from tfstride.providers.aws.coercion import as_list, as_optional_int, compact, first_item
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import (
@@ -17,12 +17,18 @@ from tfstride.providers.aws.policy_documents import (
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import ecs_task_definition_identifier
 from tfstride.providers.coercion import (
+    STATE_CONFIGURED,
+    STATE_NOT_CONFIGURED,
+    STATE_UNKNOWN,
     attribute_unknown,
+    block_attribute_unknown,
     first_mapping,
+    known_block_bool,
     known_block_bool_state,
     known_block_int,
     known_block_strings,
     known_string,
+    unknown_block_at,
     value_is_unknown,
 )
 from tfstride.providers.container_images import ContainerImageReference, parse_container_image_reference
@@ -107,7 +113,44 @@ def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedReso
 def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     network_configuration = first_item(values.get("network_configuration"))
-    assign_public_ip = as_bool(network_configuration.get("assign_public_ip")) if network_configuration else False
+    raw_unknown_network_configuration = resource.unknown_values.get("network_configuration")
+    unknown_network_configuration = (
+        raw_unknown_network_configuration
+        if raw_unknown_network_configuration is True or isinstance(raw_unknown_network_configuration, Mapping)
+        else unknown_block_at(raw_unknown_network_configuration, 0)
+    )
+    network_uncertainties: list[str] = []
+    subnet_ids = known_block_strings(
+        network_configuration,
+        unknown_network_configuration,
+        "subnets",
+        network_uncertainties,
+        path="network_configuration",
+    )
+    security_group_ids = known_block_strings(
+        network_configuration,
+        unknown_network_configuration,
+        "security_groups",
+        network_uncertainties,
+        path="network_configuration",
+    )
+    security_group_reference_state = (
+        STATE_UNKNOWN
+        if block_attribute_unknown(unknown_network_configuration, "security_groups")
+        else STATE_CONFIGURED
+        if security_group_ids
+        else STATE_NOT_CONFIGURED
+    )
+    assign_public_ip = (
+        known_block_bool(
+            network_configuration,
+            unknown_network_configuration,
+            "assign_public_ip",
+            network_uncertainties,
+            path="network_configuration",
+        )
+        is True
+    )
     public_access_reasons = ["ECS service assigns public IPs to tasks"] if assign_public_ip else []
     normalized = NormalizedResource(
         address=resource.address,
@@ -117,10 +160,8 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
         category=ResourceCategory.COMPUTE,
         identifier=values.get("name") or values.get("id"),
         arn=values.get("arn"),
-        subnet_ids=tuple(compact(network_configuration.get("subnets", []) if network_configuration else [])),
-        security_group_ids=tuple(
-            compact(network_configuration.get("security_groups", []) if network_configuration else [])
-        ),
+        subnet_ids=tuple(subnet_ids),
+        security_group_ids=tuple(security_group_ids),
         public_access_configured=assign_public_ip,
         metadata={
             "cluster": values.get("cluster"),
@@ -130,6 +171,8 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
             "platform_version": values.get("platform_version"),
             "assign_public_ip": assign_public_ip,
             AwsResourceMetadata.ECS_LOAD_BALANCERS: as_list(values.get("load_balancer")),
+            AwsResourceMetadata.ECS_NETWORK_POSTURE_UNCERTAINTIES: network_uncertainties,
+            AwsResourceMetadata.ECS_SECURITY_GROUP_REFERENCE_STATE: security_group_reference_state,
         },
     )
     mutations = aws_mutations(normalized)

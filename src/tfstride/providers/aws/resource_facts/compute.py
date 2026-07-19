@@ -72,6 +72,14 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.ECS_SECRET_POSTURE_UNCERTAINTIES)
 
     @property
+    def ecs_network_posture_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_NETWORK_POSTURE_UNCERTAINTIES)
+
+    @property
+    def ecs_security_group_reference_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.ECS_SECURITY_GROUP_REFERENCE_STATE)
+
+    @property
     def ecs_secret_access_paths(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECS_SECRET_ACCESS_PATHS)
 
