@@ -272,9 +272,13 @@ class AzureResourceMetadata:
     APP_SERVICE_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_posture_uncertainties")
     APP_SERVICE_AUTH_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_auth_posture_uncertainties")
     APP_SERVICE_SECRET_POSTURE_UNCERTAINTIES = StringListMetadataField("app_service_secret_posture_uncertainties")
+    APP_SERVICE_KEY_VAULT_ACCESS_PATH_UNCERTAINTIES = StringListMetadataField(
+        "app_service_key_vault_access_path_uncertainties"
+    )
     APP_SERVICE_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_access_restrictions")
     APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
     APP_SERVICE_SECRET_REFERENCES = DictListMetadataField("app_service_secret_references")
+    APP_SERVICE_KEY_VAULT_ACCESS_PATHS = DictListMetadataField("app_service_key_vault_access_paths")
     APP_SERVICE_AUTH_SETTINGS = DictMetadataField("app_service_auth_settings")
     APP_SERVICE_AUTH_SETTINGS_V2 = DictMetadataField("app_service_auth_settings_v2")
     CONTAINER_IMAGE_REFERENCES = DictListMetadataField("container_image_references")
