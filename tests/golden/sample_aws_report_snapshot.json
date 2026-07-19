@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 246,
+      "registered_rule_count": 248,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -256,6 +256,8 @@
         "azure-app-service-image-not-digest-pinned",
         "azure-app-service-can-modify-image-repository",
         "azure-app-service-sensitive-app-setting-inline",
+        "azure-app-service-key-vault-reference-identity-not-configured",
+        "azure-app-service-key-vault-secret-access-overprivileged",
         "azure-diagnostic-settings-missing",
         "azure-diagnostic-setting-no-log-destination",
         "azure-diagnostic-setting-audit-logs-incomplete",
@@ -506,6 +508,8 @@
         "azure-app-service-image-not-digest-pinned": 0,
         "azure-app-service-can-modify-image-repository": 0,
         "azure-app-service-sensitive-app-setting-inline": 0,
+        "azure-app-service-key-vault-reference-identity-not-configured": 0,
+        "azure-app-service-key-vault-secret-access-overprivileged": 0,
         "azure-diagnostic-settings-missing": 0,
         "azure-diagnostic-setting-no-log-destination": 0,
         "azure-diagnostic-setting-audit-logs-incomplete": 0,

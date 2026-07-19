@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import unittest
 
+from tfstride.analysis.boundaries import detect_trust_boundaries
+from tfstride.analysis.rule_registry import RulePolicy
+from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -67,7 +70,7 @@ def _secret() -> TerraformResource:
 
 def _web_app(
     *,
-    identity_type: str = "SystemAssigned",
+    identity_type: str | None = "SystemAssigned",
     principal_id: object = _SYSTEM_PRINCIPAL_ID,
     identity_ids: list[str] | None = None,
     key_vault_reference_identity_id: object | None = None,
@@ -80,14 +83,15 @@ def _web_app(
         "app_settings": {
             "DB_PASSWORD": f"@Microsoft.KeyVault(SecretUri={secret_uri})",
         },
-        "identity": [
+    }
+    if identity_type is not None:
+        values["identity"] = [
             {
                 "type": identity_type,
                 "principal_id": principal_id,
                 "identity_ids": identity_ids or [],
             }
-        ],
-    }
+        ]
     if key_vault_reference_identity_id is not None or (
         unknown_values and "key_vault_reference_identity_id" in unknown_values
     ):
@@ -184,6 +188,16 @@ def _workload_facts(resources: list[TerraformResource]):
     workload = inventory.get_by_address("azurerm_linux_web_app.api")
     assert workload is not None
     return azure_facts(workload)
+
+
+def _evaluate(resources: list[TerraformResource], *rule_ids: str):
+    inventory = AzureNormalizer().normalize(resources)
+    boundaries = detect_trust_boundaries(inventory)
+    return StrideRuleEngine().evaluate(
+        inventory,
+        boundaries,
+        rule_policy=RulePolicy(enabled_rule_ids=frozenset(rule_ids)),
+    )
 
 
 class AzureAppServiceKeyVaultAccessPathTests(unittest.TestCase):
@@ -351,6 +365,179 @@ class AzureAppServiceKeyVaultAccessPathTests(unittest.TestCase):
         self.assertEqual(
             facts.app_service_key_vault_access_path_uncertainties,
             ["azurerm_linux_web_app.api: key_vault_reference_identity_id is unknown after planning"],
+        )
+
+
+class AzureAppServiceKeyVaultRuleTests(unittest.TestCase):
+    def test_missing_identity_reuses_existing_managed_identity_finding(self) -> None:
+        findings = _evaluate(
+            [_vault(), _secret(), _web_app(identity_type=None)],
+            "azure-app-service-managed-identity-missing",
+            "azure-app-service-key-vault-reference-identity-not-configured",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-managed-identity-missing"],
+        )
+        finding = findings[0]
+        self.assertIn("Key Vault secret references", finding.rationale)
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertEqual(
+            evidence["key_vault_references"],
+            [
+                "setting_key=DB_PASSWORD; path=app_settings['DB_PASSWORD']; "
+                f"vault_uri={_VAULT_URI}; secret_uri={_SECRET_VERSIONLESS_URI}"
+            ],
+        )
+
+    def test_user_assigned_identity_without_reference_identity_is_detected(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(),
+                _secret(),
+                _user_assigned_identity(),
+                _web_app(
+                    identity_type="UserAssigned",
+                    principal_id=None,
+                    identity_ids=["azurerm_user_assigned_identity.runtime.id"],
+                ),
+            ],
+            "azure-app-service-key-vault-reference-identity-not-configured",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-key-vault-reference-identity-not-configured"],
+        )
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["identity_posture"],
+            [
+                "identity_type=UserAssigned",
+                "system_assigned_identity=false",
+                "user_assigned_identity=true",
+                "key_vault_reference_identity_id=not_configured",
+            ],
+        )
+
+    def test_unknown_reference_identity_does_not_become_configuration_claim(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(),
+                _secret(),
+                _user_assigned_identity(),
+                _web_app(
+                    identity_type="UserAssigned",
+                    principal_id=None,
+                    identity_ids=["azurerm_user_assigned_identity.runtime.id"],
+                    key_vault_reference_identity_id=None,
+                    unknown_values={"key_vault_reference_identity_id": True},
+                ),
+            ],
+            "azure-app-service-key-vault-reference-identity-not-configured",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_vault_scoped_administrator_access_is_overprivileged(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _secret(),
+                _web_app(),
+                _role_assignment(role_name="Key Vault Administrator"),
+            ],
+            "azure-app-service-key-vault-secret-access-overprivileged",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-key-vault-secret-access-overprivileged"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_web_app.api",
+                "azurerm_role_assignment.secret_access",
+                "azurerm_key_vault.orders",
+                "azurerm_key_vault_secret.database_password",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertIn("role=Key Vault Administrator", evidence["key_vault_access_paths"][0])
+
+    def test_write_capable_access_policy_is_overprivileged(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(),
+                _secret(),
+                _web_app(),
+                _access_policy(
+                    object_id=_SYSTEM_PRINCIPAL_ID,
+                    secret_permissions=["Get", "Set"],
+                ),
+            ],
+            "azure-app-service-key-vault-secret-access-overprivileged",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-app-service-key-vault-secret-access-overprivileged"],
+        )
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertEqual(
+            evidence["excess_privilege"],
+            ["grant=azurerm_key_vault_access_policy.runtime; secret_permissions=get,set"],
+        )
+
+    def test_read_only_secret_access_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _secret(),
+                _web_app(),
+                _role_assignment(role_name="Key Vault Secrets User"),
+            ],
+            "azure-app-service-key-vault-secret-access-overprivileged",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_broad_scope_uses_existing_managed_identity_finding_only(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _secret(),
+                _web_app(),
+                _role_assignment(
+                    role_name="Key Vault Administrator",
+                    scope="/subscriptions/sub-0001/resourceGroups/app",
+                ),
+            ],
+            "azure-managed-identity-broad-rbac",
+            "azure-app-service-key-vault-secret-access-overprivileged",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-managed-identity-broad-rbac"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_web_app.api",
+                "azurerm_role_assignment.secret_access",
+                "azurerm_key_vault.orders",
+                "azurerm_key_vault_secret.database_password",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertIn(
+            "workload=azurerm_linux_web_app.api",
+            evidence["app_service_key_vault_access_paths"][0],
         )
 
 

@@ -13,6 +13,10 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrivilegedAccessGrant
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.azure.app_service_key_vault_rules import (
+    app_service_key_vault_paths_for_assignments,
+    key_vault_access_path_evidence,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
@@ -48,6 +52,11 @@ class AzureManagedIdentityRuleDetectors:
             if not assignments:
                 continue
             signals = _assignment_breadth_signals(assignments)
+            key_vault_paths = app_service_key_vault_paths_for_assignments(
+                context.inventory,
+                identity.address,
+                assignments,
+            )
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=3 if "broad_builtin_role" in signals else 2,
@@ -62,8 +71,11 @@ class AzureManagedIdentityRuleDetectors:
                     affected_resources=dedupe_addresses(
                         [
                             identity.address,
+                            *_path_values(key_vault_paths, "workload_address"),
                             *_assignment_values(assignments, "source"),
                             *_assignment_values(assignments, "target_resource_address"),
+                            *_path_values(key_vault_paths, "key_vault_address"),
+                            *_path_values(key_vault_paths, "secret_resource_address"),
                         ]
                     ),
                     trust_boundary_id=None,
@@ -76,6 +88,10 @@ class AzureManagedIdentityRuleDetectors:
                         evidence_item("managed_identity", _managed_identity_evidence(identity)),
                         evidence_item("role_assignments", _describe_role_assignments(assignments)),
                         evidence_item("breadth_signals", signals),
+                        evidence_item(
+                            "app_service_key_vault_access_paths",
+                            key_vault_access_path_evidence(key_vault_paths),
+                        ),
                         evidence_item(
                             "privileged_access",
                             _privileged_access_evidence(facts.privileged_access_grants),
@@ -188,6 +204,10 @@ def _assignment_breadth_signals(assignments: list[Mapping[str, Any]]) -> list[st
 
 def _assignment_values(assignments: list[Mapping[str, Any]], key: str) -> list[str]:
     return dedupe_strings(str(assignment[key]) for assignment in assignments if assignment.get(key))
+
+
+def _path_values(paths: list[Mapping[str, Any]], key: str) -> list[str]:
+    return dedupe_strings(str(path[key]) for path in paths if path.get(key))
 
 
 def _describe_role_assignments(assignments: list[Mapping[str, Any]]) -> list[str]:

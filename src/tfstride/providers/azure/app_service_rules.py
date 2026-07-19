@@ -267,6 +267,7 @@ class AzureAppServiceRuleDetectors:
             if _identity_is_unknown(facts):
                 continue
             public_enabled = facts.public_network_access_enabled is True
+            key_vault_references = _exact_key_vault_reference_evidence(facts)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=public_enabled,
                 privilege_breadth=1,
@@ -284,10 +285,17 @@ class AzureAppServiceRuleDetectors:
                         f"{app.display_name} does not configure a managed identity. App Service workloads without "
                         "managed identity commonly fall back to static credentials or deployment-time secrets for "
                         "Azure resource access."
+                        + (
+                            " Its modeled Key Vault secret references therefore have no deterministic managed "
+                            "identity available for reference resolution."
+                            if key_vault_references
+                            else ""
+                        )
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("identity_posture", _identity_posture_evidence(facts)),
+                        evidence_item("key_vault_references", key_vault_references),
                         evidence_item("network_posture", _public_network_evidence(facts)),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -573,6 +581,25 @@ def _identity_posture_evidence(facts: AzureResourceFacts) -> list[str]:
 
 def _identity_is_unknown(facts: AzureResourceFacts) -> bool:
     return any("identity" in uncertainty for uncertainty in facts.managed_identity_uncertainties)
+
+
+def _exact_key_vault_reference_evidence(facts: AzureResourceFacts) -> list[str]:
+    return [
+        "; ".join(
+            part
+            for part in (
+                f"setting_key={record.get('setting_name')}",
+                f"path={record.get('path')}",
+                f"vault_uri={record.get('key_vault_uri')}",
+                f"secret_uri={record.get('key_vault_secret_versionless_uri')}",
+            )
+            if part and not part.endswith("=None") and not part.endswith("=")
+        )
+        for record in facts.app_service_secret_references
+        if record.get("state") == "reference"
+        and record.get("reference_kind") == "key_vault_secret_uri"
+        and record.get("target_resolution") == "resolved"
+    ]
 
 
 def _vnet_integration_evidence(facts: AzureResourceFacts) -> list[str]:

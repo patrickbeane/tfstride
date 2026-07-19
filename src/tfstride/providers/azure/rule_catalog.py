@@ -692,6 +692,28 @@ AZURE_RULE_METADATA = (
         severity_factors=("data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-app-service-key-vault-reference-identity-not-configured",
+        title="Azure App Service Key Vault reference identity is not configured",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Configure key_vault_reference_identity_id with the exact attached user-assigned managed identity, "
+            "or enable a system-assigned identity for Key Vault reference resolution."
+        ),
+        tags=("azure", "app-service", "function-app", "key-vault", "managed-identity"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
+    ),
+    RuleMetadata(
+        rule_id="azure-app-service-key-vault-secret-access-overprivileged",
+        title="Azure App Service Key Vault secret access is overprivileged",
+        category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+        recommended_mitigation=(
+            "Replace Key Vault administration, write, deletion, or recovery permissions with Key Vault Secrets "
+            "User or an equivalent read-only secret access policy scoped to the required vault or secret."
+        ),
+        tags=("azure", "app-service", "function-app", "key-vault", "managed-identity", "least-privilege"),
+        severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
+    ),
+    RuleMetadata(
         rule_id="azure-diagnostic-settings-missing",
         title="Azure resource lacks diagnostic settings",
         category=StrideCategory.REPUDIATION,
