@@ -294,7 +294,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn(GCP_FIXTURE_PATH.name, response.text)
         self.assertIn("google_compute_instance.web", response.text)
         self.assertIn("Internet-exposed GCP compute instance permits broad ingress", response.text)
-        self.assertIn("GCP support currently provides initial inventory normalization", response.text)
+        self.assertIn("GCP support covers a curated set", response.text)
 
     def test_gcp_safe_demo_uses_provider_specific_unsupported_empty_state(self) -> None:
         response = self.client.get("/demo/gcp-safe")

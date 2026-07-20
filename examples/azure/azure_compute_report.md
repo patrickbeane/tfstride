@@ -89,5 +89,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support currently covers AzureRM storage posture, Key Vault network and privileged-access posture, SQL Database posture (public network access, firewall, TLS, security alerting), PostgreSQL Flexible Server posture (public network access, firewall, TLS/SSL, geo-redundant backup), Private Endpoint coverage for supported data-plane resources, AKS control-plane posture findings, and public virtual-machine exposure through public-IP, NIC, subnet, and NSG relationships; broader Azure RBAC hierarchy, MySQL, Private Endpoint DNS correctness, load-balancer, and broader platform-service modeling are not implemented yet.
+- Azure support covers a curated AzureRM set including Storage, Service Bus, Container Registry, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS, networking and public edge, Private Endpoint/DNS-zone-group, diagnostic/Defender, and RBAC/identity posture. Remaining limitations include full Private DNS record correctness, broader RBAC hierarchy, MySQL, runtime application authentication and routing, full AKS node/workload posture, and unsupported platform services; analysis remains plan-local.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, CloudTrail evidence, or post-deploy control-plane activity.

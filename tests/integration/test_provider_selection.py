@@ -168,7 +168,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.inventory.resources[0].address, "google_storage_bucket.logs")
         self.assertEqual(result.inventory.unsupported_resources, [])
         self.assertEqual(result.findings, [])
-        self.assertIn("GCP support currently provides initial inventory normalization", result.limitations[0])
+        self.assertIn("GCP support covers a curated set", result.limitations[0])
 
     def test_analysis_auto_selects_azure_storage_provider(self) -> None:
         payload = {
@@ -239,7 +239,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.analysis_coverage.resources.unsupported_resource_types, {})
         self.assertEqual(result.trust_boundaries, [])
         self.assertEqual(result.findings, [])
-        self.assertIn("covers AzureRM storage posture", result.limitations[0])
+        self.assertIn("Azure support covers a curated AzureRM set", result.limitations[0])
 
     def test_analysis_accepts_explicit_azure_provider_for_fixture(self) -> None:
         result = TfStride(provider="azure").analyze_plan(AZURE_SAFE_FIXTURE_PATH)

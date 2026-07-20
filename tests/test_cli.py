@@ -238,7 +238,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(report["inventory"]["resources"]), 23)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 26)
-        self.assertIn("GCP support currently provides initial inventory normalization", report["limitations"][0])
+        self.assertIn("GCP support covers a curated set", report["limitations"][0])
 
     def test_cli_provider_option_can_select_azure_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -262,7 +262,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(report["inventory"]["resources"]), 4)
         self.assertEqual(report["inventory"]["unsupported_resources"], [])
         self.assertEqual(report["summary"]["active_findings"], 0)
-        self.assertIn("covers AzureRM storage posture", report["limitations"][0])
+        self.assertIn("Azure support covers a curated AzureRM set", report["limitations"][0])
 
     def test_cli_reports_mixed_provider_plans_as_input_error(self) -> None:
         payload = {
