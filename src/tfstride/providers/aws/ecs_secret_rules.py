@@ -6,7 +6,7 @@ from typing import Any
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource
+from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.secret_settings import (
     SensitiveSettingCategory,
@@ -15,6 +15,9 @@ from tfstride.providers.secret_settings import (
 )
 
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
+_AWS_ECS_SERVICE = "aws_ecs_service"
+_AWS_SECRETS_MANAGER_SECRET = "aws_secretsmanager_secret"
+_GET_SECRET_VALUE = "secretsmanager:GetSecretValue"
 
 
 class AwsEcsSecretDeliveryRuleDetectors:
@@ -136,6 +139,202 @@ class AwsEcsSecretDeliveryRuleDetectors:
                     )
                 )
         return findings
+
+    def detect_public_service_secret_access(
+        self,
+        context: RuleEvaluationContext,
+        rule_id: str,
+    ) -> list[Finding]:
+        if context.inventory.provider != "aws":
+            return []
+
+        secret_addresses_by_arn = {
+            secret.arn: secret.address
+            for secret in context.inventory.by_type(_AWS_SECRETS_MANAGER_SECRET)
+            if secret.arn
+        }
+        findings: list[Finding] = []
+        for service in context.inventory.by_type(_AWS_ECS_SERVICE):
+            deterministic_paths = [
+                path
+                for path in aws_facts(service).ecs_secret_access_paths
+                if _is_deterministic_allowed_service_path(path, service.address)
+            ]
+            if not deterministic_paths:
+                continue
+
+            load_balancer_addresses = _resolved_public_load_balancers(
+                deterministic_paths,
+                context,
+            )
+            if not load_balancer_addresses:
+                continue
+
+            task_definition_addresses = _path_string_values(
+                deterministic_paths,
+                "task_definition_address",
+            )
+            role_addresses = _path_string_values(deterministic_paths, "role_address")
+            secret_arns = _path_string_values(deterministic_paths, "secret_arn")
+            affected_resources = [
+                *load_balancer_addresses,
+                service.address,
+                *task_definition_addresses,
+                *role_addresses,
+                *[
+                    secret_addresses_by_arn[secret_arn]
+                    for secret_arn in secret_arns
+                    if secret_arn in secret_addresses_by_arn
+                ],
+            ]
+            severity_reasoning = build_severity_reasoning(
+                internet_exposure=True,
+                privilege_breadth=1,
+                data_sensitivity=2,
+                lateral_movement=1,
+                blast_radius=1,
+            )
+            findings.append(
+                self._finding_factory.build(
+                    rule_id=rule_id,
+                    severity=severity_reasoning.severity,
+                    affected_resources=list(dict.fromkeys(affected_resources)),
+                    trust_boundary_id=_internet_boundary_id(load_balancer_addresses, context),
+                    rationale=(
+                        f"{service.display_name} is reachable through an internet-facing load balancer and its "
+                        "resolved task definition uses an ECS task execution role to retrieve "
+                        f"{len(secret_arns)} exact Secrets Manager secret reference(s). A compromise of the "
+                        "public workload could expose credentials delivered to its containers. This path does "
+                        "not mean that the Secrets Manager secret itself is public."
+                    ),
+                    evidence=collect_evidence(
+                        evidence_item(
+                            "network_path",
+                            _public_service_network_path(load_balancer_addresses, service.address),
+                        ),
+                        evidence_item(
+                            "task_definitions",
+                            [f"address={address}" for address in task_definition_addresses],
+                        ),
+                        evidence_item(
+                            "execution_roles",
+                            _service_execution_role_evidence(deterministic_paths),
+                        ),
+                        evidence_item(
+                            "secret_access_paths",
+                            _service_secret_access_evidence(deterministic_paths),
+                        ),
+                    ),
+                    severity_reasoning=severity_reasoning,
+                )
+            )
+        return findings
+
+
+def _is_deterministic_allowed_service_path(
+    path: Mapping[str, Any],
+    service_address: str,
+) -> bool:
+    return (
+        path.get("workload_type") == _AWS_ECS_SERVICE
+        and path.get("workload_address") == service_address
+        and all(
+            isinstance(path.get(key), str) and bool(path.get(key))
+            for key in ("task_definition_address", "role_address", "secret_arn")
+        )
+        and path.get("access_state") == "allowed"
+        and path.get("modeled_access_state") == "allowed"
+        and path.get("role_policy_complete") is True
+        and path.get("explicit_deny") is False
+        and path.get("conditional_evaluation_required") is False
+        and _GET_SECRET_VALUE in _string_values(path.get("matched_actions"))
+    )
+
+
+def _resolved_public_load_balancers(
+    paths: list[dict[str, Any]],
+    context: RuleEvaluationContext,
+) -> list[str]:
+    addresses = _path_string_values(paths, "internet_facing_load_balancers")
+    return [
+        address
+        for address in addresses
+        if (resource := context.inventory.get_by_address(address)) is not None
+        and resource.resource_type == "aws_lb"
+        and resource.public_exposure
+    ]
+
+
+def _path_string_values(paths: list[dict[str, Any]], key: str) -> list[str]:
+    values: set[str] = set()
+    for path in paths:
+        value = path.get(key)
+        if isinstance(value, str) and value:
+            values.add(value)
+        elif isinstance(value, list):
+            values.update(item for item in value if isinstance(item, str) and item)
+    return sorted(values)
+
+
+def _internet_boundary_id(
+    load_balancer_addresses: list[str],
+    context: RuleEvaluationContext,
+) -> str | None:
+    return next(
+        (
+            boundary.identifier
+            for address in load_balancer_addresses
+            if (boundary := context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", address)))
+            is not None
+        ),
+        None,
+    )
+
+
+def _public_service_network_path(load_balancer_addresses: list[str], service_address: str) -> list[str]:
+    return [
+        item
+        for address in load_balancer_addresses
+        for item in (
+            f"internet reaches {address}",
+            f"{address} fronts {service_address}",
+        )
+    ]
+
+
+def _service_execution_role_evidence(paths: list[dict[str, Any]]) -> list[str]:
+    return sorted(
+        {
+            "; ".join(
+                (
+                    f"address={path['role_address']}",
+                    f"arn={path.get('role_arn') or 'unknown'}",
+                    "role_kind=ecs_task_execution_role",
+                    "role_policy_complete=true",
+                )
+            )
+            for path in paths
+        }
+    )
+
+
+def _service_secret_access_evidence(paths: list[dict[str, Any]]) -> list[str]:
+    return sorted(
+        {
+            "; ".join(
+                (
+                    f"secret_arn={path['secret_arn']}",
+                    f"task_definition={path['task_definition_address']}",
+                    f"execution_role={path['role_address']}",
+                    f"action={_GET_SECRET_VALUE}",
+                    "access_state=allowed",
+                    "explicit_deny=false",
+                    "conditions=none",
+                )
+            )
+            for path in paths
+        }
+    )
 
 
 def _literal_sensitive_setting(record: Mapping[str, Any]) -> SensitiveSettingClassification | None:

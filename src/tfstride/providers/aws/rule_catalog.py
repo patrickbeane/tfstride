@@ -544,6 +544,25 @@ AWS_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="aws-public-ecs-secret-access",
+        title="Internet-facing ECS service can retrieve Secrets Manager secrets",
+        category=StrideCategory.INFORMATION_DISCLOSURE,
+        recommended_mitigation=(
+            "Reduce public ingress to the ECS service, isolate the workload behind authenticated edge controls, "
+            "and restrict its task execution role to only the exact Secrets Manager ARNs required for container "
+            "secret delivery. Treat internet-facing workloads that receive sensitive credentials as a high-value "
+            "hardening and monitoring boundary."
+        ),
+        tags=("aws", "ecs", "secrets-manager", "iam", "public-access", "credential-delivery"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

@@ -69,6 +69,7 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "aws-workload-can-modify-image-repository",
     "aws-ecs-sensitive-environment-value-inline",
     "aws-ecs-secret-access-blast-radius",
+    "aws-public-ecs-secret-access",
     "aws-sns-customer-managed-encryption-missing",
     "aws-sqs-customer-managed-encryption-missing",
     "aws-sqs-message-retention-insufficient",
@@ -315,7 +316,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 248)
+        self.assertEqual(len(metadata), 249)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -324,7 +325,7 @@ class RuleRegistryTests(unittest.TestCase):
         azure_metadata_ids = tuple(rule_id for rule_id in metadata_ids if rule_id.startswith("azure-"))
 
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
-        self.assertEqual(len(aws_metadata_ids), 80)
+        self.assertEqual(len(aws_metadata_ids), 81)
         self.assertEqual(len(gcp_metadata_ids), 76)
         self.assertEqual(len(azure_metadata_ids), 92)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
