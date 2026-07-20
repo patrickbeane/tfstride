@@ -75,6 +75,7 @@ def _web_app(
     identity_ids: list[str] | None = None,
     key_vault_reference_identity_id: object | None = None,
     secret_uri: str = _SECRET_URI,
+    public_network_access_enabled: bool | None = None,
     unknown_values: dict[str, object] | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
@@ -84,6 +85,8 @@ def _web_app(
             "DB_PASSWORD": f"@Microsoft.KeyVault(SecretUri={secret_uri})",
         },
     }
+    if public_network_access_enabled is not None:
+        values["public_network_access_enabled"] = public_network_access_enabled
     if identity_type is not None:
         values["identity"] = [
             {
@@ -369,6 +372,112 @@ class AzureAppServiceKeyVaultAccessPathTests(unittest.TestCase):
 
 
 class AzureAppServiceKeyVaultRuleTests(unittest.TestCase):
+    def test_public_app_service_exact_key_vault_rbac_path_enriches_sensitive_finding(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _secret(),
+                _web_app(public_network_access_enabled=True),
+                _role_assignment(role_name="Key Vault Secrets User"),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-public-workload-sensitive-resource-access"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_web_app.api",
+                "azurerm_role_assignment.secret_access",
+                "azurerm_key_vault.orders",
+                "azurerm_key_vault_secret.database_password",
+            ],
+        )
+        evidence = {item.key: item.values for item in finding.evidence}
+        self.assertNotIn("sensitive_resource_assignments", evidence)
+        path = evidence["app_service_key_vault_access_paths"][0]
+        self.assertIn("workload=azurerm_linux_web_app.api", path)
+        self.assertIn("identity=azurerm_linux_web_app.api", path)
+        self.assertIn("identity_kind=system_assigned", path)
+        self.assertIn(f"principal_id={_SYSTEM_PRINCIPAL_ID}", path)
+        self.assertIn("vault=azurerm_key_vault.orders", path)
+        self.assertIn("secret=azurerm_key_vault_secret.database_password", path)
+        self.assertIn("grant=azurerm_role_assignment.secret_access", path)
+        self.assertIn("grant_kind=rbac", path)
+        self.assertIn("role=Key Vault Secrets User", path)
+        self.assertIn("condition_state=not_configured", path)
+
+    def test_public_app_service_access_policy_path_is_reported_exactly(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(),
+                _secret(),
+                _web_app(public_network_access_enabled=True),
+                _access_policy(object_id=_SYSTEM_PRINCIPAL_ID),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-public-workload-sensitive-resource-access"],
+        )
+        finding = findings[0]
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "azurerm_linux_web_app.api",
+                "azurerm_key_vault_access_policy.runtime",
+                "azurerm_key_vault.orders",
+                "azurerm_key_vault_secret.database_password",
+            ],
+        )
+        path = {item.key: item.values for item in finding.evidence}["app_service_key_vault_access_paths"][0]
+        self.assertIn("grant_kind=access_policy", path)
+        self.assertIn("secret_permissions=get", path)
+        self.assertIn("condition_state=not_configured", path)
+
+    def test_public_app_service_conditional_rbac_path_preserves_condition(self) -> None:
+        condition = "@Resource[Microsoft.KeyVault/vaults].name StringEquals 'orders'"
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _secret(),
+                _web_app(public_network_access_enabled=True),
+                _role_assignment(role_name="Key Vault Secrets User", condition=condition),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(
+            [finding.rule_id for finding in findings],
+            ["azure-public-workload-sensitive-resource-access"],
+        )
+        path = {item.key: item.values for item in findings[0].evidence}["app_service_key_vault_access_paths"][0]
+        self.assertIn("access_state=conditional", path)
+        self.assertIn("condition_state=configured", path)
+        self.assertIn("condition=", path)
+        self.assertIn("Microsoft.KeyVault/vaults", path)
+
+    def test_public_app_service_key_vault_assignment_without_exact_reference_stays_quiet(self) -> None:
+        findings = _evaluate(
+            [
+                _vault(rbac_enabled=True),
+                _web_app(
+                    public_network_access_enabled=True,
+                    secret_uri="https://unmodeled.vault.azure.net/secrets/database-password",
+                ),
+                _role_assignment(role_name="Key Vault Secrets User"),
+            ],
+            "azure-public-workload-sensitive-resource-access",
+        )
+
+        self.assertEqual(findings, [])
+
     def test_missing_identity_reuses_existing_managed_identity_finding(self) -> None:
         findings = _evaluate(
             [_vault(), _secret(), _web_app(identity_type=None)],

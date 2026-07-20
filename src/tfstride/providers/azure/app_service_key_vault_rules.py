@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from fnmatch import fnmatchcase
 from typing import Any
@@ -165,19 +166,30 @@ def key_vault_access_path_evidence(paths: list[Mapping[str, Any]]) -> list[str]:
             for part in (
                 f"workload={path.get('workload_address')}",
                 f"identity={path.get('identity_address')}",
+                f"identity_kind={path.get('identity_kind')}",
+                f"principal_id={path.get('principal_id')}",
                 f"vault={path.get('key_vault_address')}",
                 f"secret={path.get('secret_resource_address') or path.get('secret_versionless_uri')}",
                 f"grant={path.get('grant_source_address')}",
                 f"grant_kind={path.get('grant_kind')}",
                 f"role={path.get('role_definition_name') or path.get('role_definition_id')}",
+                f"secret_permissions={','.join(sorted(_normalized_strings(path.get('secret_permissions'))))}",
                 f"scope_type={path.get('grant_scope_type')}",
                 f"scope={path.get('grant_scope')}",
                 f"access_state={path.get('access_state')}",
+                f"condition_state={path.get('condition_state')}",
+                _condition_evidence(path.get("condition")),
             )
             if part and not part.endswith("=None") and not part.endswith("=")
         )
         for path in paths
     ]
+
+
+def _condition_evidence(value: object) -> str | None:
+    if value in (None, "", {}, []):
+        return None
+    return f"condition={json.dumps(value, sort_keys=True, separators=(',', ':'), default=str)}"
 
 
 def _exact_key_vault_references(records: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:

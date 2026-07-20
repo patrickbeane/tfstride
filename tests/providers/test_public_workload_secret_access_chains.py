@@ -3,11 +3,17 @@ from __future__ import annotations
 import unittest
 
 from tests.integration.analysis_support import ECS_FARGATE_FIXTURE_PATH
-from tests.providers.azure.test_azure_managed_identity_rules import (
-    _app_service,
-    _role_assignment,
-    _storage_account,
-    _system_assigned_app_identity,
+from tests.providers.azure.test_azure_app_service_key_vault_access_paths import (
+    _role_assignment as _azure_key_vault_role_assignment,
+)
+from tests.providers.azure.test_azure_app_service_key_vault_access_paths import (
+    _secret as _azure_key_vault_secret,
+)
+from tests.providers.azure.test_azure_app_service_key_vault_access_paths import (
+    _vault as _azure_key_vault,
+)
+from tests.providers.azure.test_azure_app_service_key_vault_access_paths import (
+    _web_app as _azure_web_app,
 )
 from tests.providers.gcp.rule_support.data import (
     _secret_manager_secret,
@@ -131,12 +137,10 @@ class PublicWorkloadSecretAccessChainCharacterizationTests(unittest.TestCase):
     def test_azure_app_service_public_access_secret_assignment_evidence_is_pinned(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
-                _storage_account(),
-                _app_service(identity=_system_assigned_app_identity()),
-                _role_assignment(
-                    role_definition_name="Storage Blob Data Owner",
-                    scope="azurerm_storage_account.logs.id",
-                ),
+                _azure_key_vault(rbac_enabled=True),
+                _azure_key_vault_secret(),
+                _azure_web_app(public_network_access_enabled=True),
+                _azure_key_vault_role_assignment(role_name="Key Vault Secrets User"),
             ]
         )
         boundaries = detect_trust_boundaries(inventory)
@@ -155,19 +159,22 @@ class PublicWorkloadSecretAccessChainCharacterizationTests(unittest.TestCase):
         self.assertEqual(
             finding.affected_resources,
             [
-                "azurerm_linux_web_app.app",
-                "azurerm_role_assignment.assignment",
-                "azurerm_storage_account.logs",
+                "azurerm_linux_web_app.api",
+                "azurerm_role_assignment.secret_access",
+                "azurerm_key_vault.orders",
+                "azurerm_key_vault_secret.database_password",
             ],
         )
         self.assertIsNone(finding.trust_boundary_id)
         evidence = _evidence(finding)
         self.assertEqual(
             evidence["public_workloads"],
-            ["address=azurerm_linux_web_app.app; public_network_access_enabled=true"],
+            ["address=azurerm_linux_web_app.api; public_network_access_enabled=true"],
         )
-        self.assertIn("identity_type=SystemAssigned", evidence["managed_identity"])
+        self.assertIn("identity_kind=system_assigned", evidence["app_service_key_vault_access_paths"][0])
+        self.assertIn("vault=azurerm_key_vault.orders", evidence["app_service_key_vault_access_paths"][0])
         self.assertIn(
-            "target=azurerm_storage_account.logs",
-            evidence["sensitive_resource_assignments"][0],
+            "secret=azurerm_key_vault_secret.database_password",
+            evidence["app_service_key_vault_access_paths"][0],
         )
+        self.assertIn("role=Key Vault Secrets User", evidence["app_service_key_vault_access_paths"][0])

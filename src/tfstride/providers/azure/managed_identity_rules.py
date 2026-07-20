@@ -114,23 +114,36 @@ class AzureManagedIdentityRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
-        public_workloads_by_identity = _public_workloads_by_identity_address(context.inventory)
+        inventory = context.inventory
+        public_workloads_by_identity = _public_workloads_by_identity_address(inventory)
+        key_vault_paths_by_identity = _public_app_service_key_vault_paths_by_identity(inventory)
         findings: list[Finding] = []
-        for identity in _managed_identity_resources(context.inventory):
+        for identity in _managed_identity_resources(inventory):
             public_workloads = public_workloads_by_identity.get(identity.address, [])
             if not public_workloads:
                 continue
+            key_vault_paths = key_vault_paths_by_identity.get(identity.address, [])
             assignments = [
                 assignment
                 for assignment in azure_facts(identity).managed_identity_role_assignments
                 if _assignment_grants_sensitive_resource_access(assignment)
             ]
-            if not assignments:
+            if not any(workload.resource_type in AZURE_COMPUTE_RESOURCE_TYPES for workload in public_workloads):
+                assignments = [
+                    assignment
+                    for assignment in assignments
+                    if not _assignment_targets_key_vault_resource(assignment, inventory)
+                ]
+            if not assignments and not key_vault_paths:
                 continue
+
             boundary = _first_public_workload_boundary(public_workloads, context)
+            broad_privilege = "broad_builtin_role" in _assignment_breadth_signals(assignments) or any(
+                _key_vault_path_has_broad_privilege(path) for path in key_vault_paths
+            )
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
-                privilege_breadth=3 if "broad_builtin_role" in _assignment_breadth_signals(assignments) else 2,
+                privilege_breadth=3 if broad_privilege else 2,
                 data_sensitivity=2,
                 lateral_movement=1,
                 blast_radius=2,
@@ -145,23 +158,134 @@ class AzureManagedIdentityRuleDetectors:
                             *([] if identity in public_workloads else [identity.address]),
                             *_assignment_values(assignments, "source"),
                             *_assignment_values(assignments, "target_resource_address"),
+                            *_path_values(key_vault_paths, "grant_source_address"),
+                            *_path_values(key_vault_paths, "key_vault_address"),
+                            *_path_values(key_vault_paths, "secret_resource_address"),
                         ]
                     ),
                     trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{identity.display_name} is usable by an internet-exposed Azure workload and has a "
-                        "deterministic role assignment to a sensitive Azure resource. This creates a clear "
-                        "public workload to sensitive resource path if the workload identity is abused."
+                    rationale=_public_sensitive_path_rationale(
+                        identity.display_name,
+                        has_exact_key_vault_paths=bool(key_vault_paths),
+                        has_sensitive_assignments=bool(assignments),
                     ),
                     evidence=collect_evidence(
                         evidence_item("public_workloads", _public_workload_evidence(public_workloads)),
                         evidence_item("managed_identity", _managed_identity_evidence(identity)),
                         evidence_item("sensitive_resource_assignments", _describe_role_assignments(assignments)),
+                        evidence_item(
+                            "app_service_key_vault_access_paths",
+                            key_vault_access_path_evidence(key_vault_paths),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
             )
         return findings
+
+
+def _public_app_service_key_vault_paths_by_identity(inventory) -> dict[str, list[Mapping[str, Any]]]:
+    paths_by_identity: dict[str, list[Mapping[str, Any]]] = {}
+    for workload in inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
+        if not _is_public_workload(workload):
+            continue
+        for path in azure_facts(workload).app_service_key_vault_access_paths:
+            if not _is_exact_app_service_key_vault_path(path, workload.address):
+                continue
+            identity_address = str(path["identity_address"])
+            paths_by_identity.setdefault(identity_address, []).append(path)
+    return paths_by_identity
+
+
+def _is_exact_app_service_key_vault_path(path: Mapping[str, Any], workload_address: str) -> bool:
+    if path.get("workload_address") != workload_address:
+        return False
+    if path.get("access_state") not in {"granted", "conditional"}:
+        return False
+    if path.get("secret_target_resolution") not in {"resolved_in_plan", "exact_secret_uri"}:
+        return False
+    if not all(
+        isinstance(path.get(key), str) and bool(path.get(key))
+        for key in (
+            "identity_address",
+            "principal_id",
+            "key_vault_address",
+            "grant_source_address",
+            "grant_kind",
+            "grant_scope_type",
+            "grant_scope",
+        )
+    ):
+        return False
+    if not path.get("secret_resource_address") and not path.get("secret_versionless_uri"):
+        return False
+    if path.get("grant_kind") == "access_policy":
+        permissions = _normalized_path_strings(path.get("secret_permissions"))
+        return bool(permissions & {"get", "all", "*"}) and path.get("condition_state") == "not_configured"
+    if path.get("grant_kind") != "rbac":
+        return False
+    if not path.get("role_definition_name") and not path.get("role_definition_id"):
+        return False
+    if path.get("access_state") == "conditional":
+        return path.get("condition_state") == "configured" and bool(path.get("condition"))
+    return path.get("condition_state") == "not_configured"
+
+
+def _normalized_path_strings(value: object) -> set[str]:
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return set()
+    return {str(item).strip().lower() for item in value if str(item).strip()}
+
+
+def _assignment_targets_key_vault_resource(assignment: Mapping[str, Any], inventory) -> bool:
+    target_address = assignment.get("target_resource_address")
+    if not isinstance(target_address, str):
+        return False
+    target = inventory.get_by_address(target_address)
+    return target is not None and target.resource_type in {
+        AzureResourceType.KEY_VAULT,
+        AzureResourceType.KEY_VAULT_SECRET,
+        AzureResourceType.KEY_VAULT_KEY,
+        AzureResourceType.KEY_VAULT_CERTIFICATE,
+    }
+
+
+def _key_vault_path_has_broad_privilege(path: Mapping[str, Any]) -> bool:
+    if path.get("grant_scope_type") in {"subscription", "resource_group"}:
+        return True
+    return str(path.get("role_definition_name") or "").strip().lower() in {
+        "contributor",
+        "key vault administrator",
+        "key vault data access administrator",
+        "key vault secrets officer",
+        "owner",
+    }
+
+
+def _public_sensitive_path_rationale(
+    identity_display_name: str,
+    *,
+    has_exact_key_vault_paths: bool,
+    has_sensitive_assignments: bool,
+) -> str:
+    if has_exact_key_vault_paths and has_sensitive_assignments:
+        return (
+            f"{identity_display_name} is usable by an internet-exposed Azure workload and has both an exact "
+            "App Service Key Vault secret access path and deterministic assignments to other sensitive Azure "
+            "resources. Abuse of the workload identity can therefore cross directly into sensitive data planes."
+        )
+    if has_exact_key_vault_paths:
+        return (
+            f"{identity_display_name} is usable by an internet-exposed App Service or Function App, and an exact "
+            "Key Vault reference resolves through the modeled identity and authorization grant to a specific "
+            "vault secret. Abuse of the public workload identity can therefore reach that secret; conditional "
+            "grant constraints, when present, are retained in the evidence."
+        )
+    return (
+        f"{identity_display_name} is usable by an internet-exposed Azure workload and has a deterministic role "
+        "assignment to a sensitive Azure resource. This creates a clear public workload to sensitive resource "
+        "path if the workload identity is abused."
+    )
 
 
 def _managed_identity_resources(inventory) -> list[Any]:
