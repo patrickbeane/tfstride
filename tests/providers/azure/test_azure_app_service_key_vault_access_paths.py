@@ -441,7 +441,7 @@ class AzureAppServiceKeyVaultRuleTests(unittest.TestCase):
         self.assertIn("secret_permissions=get", path)
         self.assertIn("condition_state=not_configured", path)
 
-    def test_public_app_service_conditional_rbac_path_preserves_condition(self) -> None:
+    def test_public_app_service_conditional_rbac_path_stays_quiet(self) -> None:
         condition = "@Resource[Microsoft.KeyVault/vaults].name StringEquals 'orders'"
         findings = _evaluate(
             [
@@ -453,15 +453,7 @@ class AzureAppServiceKeyVaultRuleTests(unittest.TestCase):
             "azure-public-workload-sensitive-resource-access",
         )
 
-        self.assertEqual(
-            [finding.rule_id for finding in findings],
-            ["azure-public-workload-sensitive-resource-access"],
-        )
-        path = {item.key: item.values for item in findings[0].evidence}["app_service_key_vault_access_paths"][0]
-        self.assertIn("access_state=conditional", path)
-        self.assertIn("condition_state=configured", path)
-        self.assertIn("condition=", path)
-        self.assertIn("Microsoft.KeyVault/vaults", path)
+        self.assertEqual(findings, [])
 
     def test_public_app_service_key_vault_assignment_without_exact_reference_stays_quiet(self) -> None:
         findings = _evaluate(

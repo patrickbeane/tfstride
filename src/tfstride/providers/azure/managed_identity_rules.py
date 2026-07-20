@@ -200,7 +200,7 @@ def _public_app_service_key_vault_paths_by_identity(inventory) -> dict[str, list
 def _is_exact_app_service_key_vault_path(path: Mapping[str, Any], workload_address: str) -> bool:
     if path.get("workload_address") != workload_address:
         return False
-    if path.get("access_state") not in {"granted", "conditional"}:
+    if path.get("access_state") != "granted":
         return False
     if path.get("secret_target_resolution") not in {"resolved_in_plan", "exact_secret_uri"}:
         return False
@@ -226,8 +226,6 @@ def _is_exact_app_service_key_vault_path(path: Mapping[str, Any], workload_addre
         return False
     if not path.get("role_definition_name") and not path.get("role_definition_id"):
         return False
-    if path.get("access_state") == "conditional":
-        return path.get("condition_state") == "configured" and bool(path.get("condition"))
     return path.get("condition_state") == "not_configured"
 
 
@@ -277,9 +275,8 @@ def _public_sensitive_path_rationale(
     if has_exact_key_vault_paths:
         return (
             f"{identity_display_name} is usable by an internet-exposed App Service or Function App, and an exact "
-            "Key Vault reference resolves through the modeled identity and authorization grant to a specific "
-            "vault secret. Abuse of the public workload identity can therefore reach that secret; conditional "
-            "grant constraints, when present, are retained in the evidence."
+            "Key Vault reference resolves through the modeled identity and an unconditional authorization grant "
+            "to a specific vault secret. Abuse of the public workload identity can therefore reach that secret."
         )
     return (
         f"{identity_display_name} is usable by an internet-exposed Azure workload and has a deterministic role "
