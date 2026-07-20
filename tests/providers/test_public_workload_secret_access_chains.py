@@ -82,7 +82,7 @@ class PublicWorkloadSecretAccessChainCharacterizationTests(unittest.TestCase):
         service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
         inventory = GcpNormalizer().normalize(
             [
-                _cloud_run_service(),
+                _cloud_run_service(secret_reference="projects/tfstride-demo/secrets/tfstride-api-key"),
                 _cloud_run_service_iam_member(),
                 _secret_manager_secret(),
                 _secret_manager_secret_iam_member(member=service_account),
@@ -116,8 +116,16 @@ class PublicWorkloadSecretAccessChainCharacterizationTests(unittest.TestCase):
         )
         self.assertEqual(evidence["workload_identity"], [service_account])
         self.assertEqual(
-            evidence["data_access_path"],
-            ["google_cloud_run_v2_service.api reaches google_secret_manager_secret.api_key"],
+            evidence["cloud_run_secret_access_paths"],
+            [
+                "secret_resource=google_secret_manager_secret.api_key; "
+                "secret_reference=projects/tfstride-demo/secrets/tfstride-api-key; "
+                "secret_version=5; service_account=tfstride-run@tfstride-demo.iam.gserviceaccount.com; "
+                "iam_resource=google_secret_manager_secret_iam_member.public_accessor; "
+                "role=roles/secretmanager.secretAccessor; "
+                "grant_scope=secret:projects/tfstride-demo/secrets/tfstride-api-key; "
+                "access_state=granted; condition_state=not_configured"
+            ],
         )
 
     def test_azure_app_service_public_access_secret_assignment_evidence_is_pinned(self) -> None:

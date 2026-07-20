@@ -117,7 +117,7 @@ class GcpSensitiveDataPathRuleTests(unittest.TestCase):
         service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
         inventory = GcpNormalizer().normalize(
             [
-                _cloud_run_service(),
+                _cloud_run_service(secret_reference="projects/tfstride-demo/secrets/tfstride-api-key"),
                 _cloud_run_service_iam_member(),
                 _secret_manager_secret(),
                 _secret_manager_secret_iam_member(member=service_account),
@@ -154,13 +154,37 @@ class GcpSensitiveDataPathRuleTests(unittest.TestCase):
         )
         self.assertEqual(evidence["workload_identity"], [service_account])
         self.assertEqual(
-            evidence["data_access_path"],
-            ["google_cloud_run_v2_service.api reaches google_secret_manager_secret.api_key"],
+            evidence["cloud_run_secret_access_paths"],
+            [
+                "secret_resource=google_secret_manager_secret.api_key; "
+                "secret_reference=projects/tfstride-demo/secrets/tfstride-api-key; "
+                "secret_version=5; service_account=tfstride-run@tfstride-demo.iam.gserviceaccount.com; "
+                "iam_resource=google_secret_manager_secret_iam_member.public_accessor; "
+                "role=roles/secretmanager.secretAccessor; "
+                "grant_scope=secret:projects/tfstride-demo/secrets/tfstride-api-key; "
+                "access_state=granted; condition_state=not_configured"
+            ],
         )
-        self.assertIn(
-            "google_secret_manager_secret_iam_member.public_accessor grants roles/secretmanager.secretAccessor",
-            evidence["boundary_rationale"][0],
+
+    def test_public_cloud_run_secret_grant_without_exact_secret_path_is_not_reported(self) -> None:
+        service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"
+        inventory = GcpNormalizer().normalize(
+            [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(),
+                _secret_manager_secret(),
+                _secret_manager_secret_iam_member(member=service_account),
+            ]
         )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-public-workload-sensitive-data-access"})),
+        )
+
+        self.assertEqual(findings, [])
 
     def test_private_cloud_run_sensitive_data_path_is_not_reported(self) -> None:
         service_account = "serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com"

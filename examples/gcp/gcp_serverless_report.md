@@ -67,7 +67,7 @@ This run identified **4 trust boundaries** and **5 findings** across **11 normal
 #### Internet-exposed GCP workload can access sensitive data services
 
 - STRIDE category: Information Disclosure
-- Affected resources: `google_cloud_run_v2_service.api`, `google_secret_manager_secret.api_key`, `google_secret_manager_secret_iam_member.run_accessor`, `google_secret_manager_secret_iam_member.function_accessor`
+- Affected resources: `google_cloud_run_v2_service.api`, `google_secret_manager_secret.api_key`, `google_secret_manager_secret_iam_member.run_accessor`
 - Trust boundary: `workload-to-data-store:google_cloud_run_v2_service.api->google_secret_manager_secret.api_key`
 - Severity reasoning: internet_exposure +2, privilege_breadth +1, data_sensitivity +2, lateral_movement +1, blast_radius +1, final_score 7 => high
 - Rationale: google_cloud_run_v2_service.api is internet-exposed and runs with GCP workload identity serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com. That identity can access google_secret_manager_secret.api_key. A compromise of the public workload can therefore become direct access to sensitive GCP data services.
@@ -75,9 +75,8 @@ This run identified **4 trust boundaries** and **5 findings** across **11 normal
 - Evidence:
   - public exposure reasons: google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers
   - workload identity: serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com
-  - data access path: google_cloud_run_v2_service.api reaches google_secret_manager_secret.api_key
-  - boundary rationale: GCP workloads cross into a higher-sensitivity data plane when their attached service account is granted data access through IAM: google_secret_manager_secret_iam_member.run_accessor grants roles/secretmanager.secretAccessor to serviceAccount:tfstride-run@tfstride-demo.iam.gserviceaccount.com.
-  - resource policy sources: google_secret_manager_secret_iam_member.run_accessor; google_secret_manager_secret_iam_member.function_accessor
+  - cloud run secret access paths: secret_resource=google_secret_manager_secret.api_key; secret_reference=projects/tfstride-demo/secrets/tfstride-api-key; secret_version=5; service_account=tfstride-run@tfstride-demo.iam.gserviceaccount.com; iam_resource=google_secret_manager_secret_iam_member.run_accessor; role=roles/secretmanager.secretAccessor; grant_scope=secret:projects/tfstride-demo/secrets/tfstride-api-key; access_state=granted; condition_state=not_configured
+  - resource policy sources: google_secret_manager_secret_iam_member.run_accessor
 
 #### Internet-exposed GCP workload can access sensitive data services
 

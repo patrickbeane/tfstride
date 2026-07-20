@@ -7,7 +7,30 @@ def _cloud_run_service(
     *,
     public_ingress: bool = True,
     service_account_email: str = "tfstride-run@tfstride-demo.iam.gserviceaccount.com",
+    secret_reference: str | None = None,
 ) -> TerraformResource:
+    template: dict[str, object] = {"service_account": service_account_email}
+    if secret_reference is not None:
+        template["containers"] = [
+            {
+                "name": "api",
+                "env": [
+                    {
+                        "name": "DB_PASSWORD",
+                        "value_source": [
+                            {
+                                "secret_key_ref": [
+                                    {
+                                        "secret": secret_reference,
+                                        "version": "5",
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
     return TerraformResource(
         address="google_cloud_run_v2_service.api",
         mode="managed",
@@ -19,7 +42,7 @@ def _cloud_run_service(
             "project": "tfstride-demo",
             "location": "us-central1",
             "ingress": "INGRESS_TRAFFIC_ALL" if public_ingress else "INGRESS_TRAFFIC_INTERNAL_ONLY",
-            "template": [{"service_account": service_account_email}],
+            "template": [template],
         },
     )
 
