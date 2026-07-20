@@ -9,7 +9,10 @@ from tfstride.providers.aws.resource_decoration.ecs import (
     MarkEcsLoadBalancerExposureStage,
     ResolveEcsServiceRelationshipsStage,
 )
-from tfstride.providers.aws.resource_decoration.ecs_secret_access_paths import ModelEcsSecretAccessPathsStage
+from tfstride.providers.aws.resource_decoration.ecs_secret_access_paths import (
+    ModelEcsSecretAccessPathsStage,
+    ProjectEcsSecretAccessPathsOntoServicesStage,
+)
 from tfstride.providers.aws.resource_decoration.iam import (
     MergeRolePolicyResourcesStage,
     NormalizeIamAssignmentPostureStage,
@@ -64,4 +67,5 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         InferVpcIdsStage(),
         DerivePublicExposureStage(),
         MarkEcsLoadBalancerExposureStage(),
+        ProjectEcsSecretAccessPathsOntoServicesStage(),
     )

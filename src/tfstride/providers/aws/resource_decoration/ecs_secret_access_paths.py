@@ -26,6 +26,57 @@ class ModelEcsSecretAccessPathsStage:
             facts.extend_ecs_secret_access_path_uncertainties(uncertainties)
 
 
+class ProjectEcsSecretAccessPathsOntoServicesStage:
+    name = "project_ecs_secret_access_paths_onto_services"
+
+    def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        for service in resources:
+            if service.resource_type != "aws_ecs_service":
+                continue
+
+            facts = aws_facts(service)
+            projected_paths: list[dict[str, Any]] = []
+            uncertainties = [
+                f"{service.address}: task definition reference {reference} is unresolved for "
+                "secret access-path projection"
+                for reference in facts.unresolved_task_definition_references
+            ]
+            for task_definition_address in facts.resolved_task_definition_addresses:
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                if task_definition is None:
+                    uncertainties.append(
+                        f"{service.address}: resolved task definition {task_definition_address} is unavailable "
+                        "for secret access-path projection"
+                    )
+                    continue
+
+                task_definition_facts = aws_facts(task_definition)
+                uncertainties.extend(task_definition_facts.ecs_secret_access_path_uncertainties)
+                projected_paths.extend(
+                    _service_access_path(service, task_definition, path)
+                    for path in task_definition_facts.ecs_secret_access_paths
+                )
+
+            facts.set_ecs_secret_access_paths(projected_paths)
+            facts.extend_ecs_secret_access_path_uncertainties(dedupe(uncertainties))
+
+
+def _service_access_path(
+    service: NormalizedResource,
+    task_definition: NormalizedResource,
+    path: Mapping[str, Any],
+) -> dict[str, Any]:
+    service_facts = aws_facts(service)
+    return {
+        **path,
+        "workload_address": service.address,
+        "workload_type": service.resource_type,
+        "task_definition_address": task_definition.address,
+        "task_definition_arn": task_definition.arn,
+        "internet_facing_load_balancers": service_facts.internet_facing_load_balancer_addresses,
+    }
+
+
 def _ecs_secret_access_paths(
     task_definition: NormalizedResource,
     context: AwsDecorationContext,

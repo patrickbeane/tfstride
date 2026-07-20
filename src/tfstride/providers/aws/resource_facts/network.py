@@ -133,6 +133,10 @@ class AwsNetworkFacts(AwsBaseFacts):
     def flow_log_posture_uncertainties(self) -> list[str]:
         return self.get(AwsResourceMetadata.FLOW_LOG_POSTURE_UNCERTAINTIES)
 
+    @property
+    def internet_facing_load_balancer_addresses(self) -> list[str]:
+        return self.get(AwsResourceMetadata.INTERNET_FACING_LOAD_BALANCER_ADDRESSES)
+
     def set_route_table_ids(self, values: list[str]) -> None:
         self.set(AwsResourceMetadata.ROUTE_TABLE_IDS, values)
 

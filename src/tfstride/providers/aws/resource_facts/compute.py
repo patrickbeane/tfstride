@@ -88,6 +88,14 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.ECS_SECRET_ACCESS_PATH_UNCERTAINTIES)
 
     @property
+    def unresolved_task_definition_references(self) -> list[str]:
+        return self.get(AwsResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES)
+
+    @property
+    def resolved_task_definition_addresses(self) -> list[str]:
+        return self.get(AwsResourceMetadata.RESOLVED_TASK_DEFINITION_ADDRESSES)
+
+    @property
     def ecr_write_paths(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECR_WRITE_PATHS)
 

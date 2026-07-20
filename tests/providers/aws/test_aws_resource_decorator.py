@@ -176,6 +176,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "infer_vpc_ids",
                 "derive_public_exposure",
                 "mark_ecs_services_fronted_by_internet_facing_load_balancers",
+                "project_ecs_secret_access_paths_onto_services",
             ],
         )
 

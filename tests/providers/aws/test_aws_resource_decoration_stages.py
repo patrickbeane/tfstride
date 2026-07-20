@@ -12,6 +12,9 @@ from tfstride.providers.aws.resource_decoration.ecs import (
     MarkEcsLoadBalancerExposureStage,
     ResolveEcsServiceRelationshipsStage,
 )
+from tfstride.providers.aws.resource_decoration.ecs_secret_access_paths import (
+    ProjectEcsSecretAccessPathsOntoServicesStage,
+)
 from tfstride.providers.aws.resource_decoration.iam import (
     ResolveInstanceProfileRolesStage,
 )
@@ -1077,6 +1080,78 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertEqual(
             service.metadata["internet_facing_load_balancer_addresses"],
             ["aws_lb.web"],
+        )
+
+    def test_ecs_secret_paths_project_complete_evidence_onto_resolved_service(self) -> None:
+        path = {
+            "workload_address": "aws_ecs_task_definition.app",
+            "workload_type": "aws_ecs_task_definition",
+            "secret_arn": "arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
+            "role_address": "aws_iam_role.execution",
+            "role_arn": "arn:aws:iam::111122223333:role/execution",
+            "access_state": "unknown",
+            "modeled_access_state": "unknown",
+            "explicit_deny": True,
+            "conditional_evaluation_required": True,
+            "policy_statements": [
+                {
+                    "effect": "deny",
+                    "conditions": [
+                        {
+                            "operator": "StringNotEquals",
+                            "key": "aws:PrincipalAccount",
+                            "values": ["111122223333"],
+                        }
+                    ],
+                }
+            ],
+        }
+        task_definition = _resource(
+            "aws_ecs_task_definition.app",
+            "aws_ecs_task_definition",
+            ResourceCategory.COMPUTE,
+            identifier="app:12",
+            arn="arn:aws:ecs:us-east-1:111122223333:task-definition/app:12",
+            metadata={
+                "ecs_secret_access_paths": [path],
+                "ecs_secret_access_path_uncertainties": [
+                    "aws_ecs_task_definition.app: conditional deny requires runtime evaluation"
+                ],
+            },
+        )
+        service = _resource(
+            "aws_ecs_service.app",
+            "aws_ecs_service",
+            ResourceCategory.COMPUTE,
+            metadata={
+                "resolved_task_definition_addresses": [task_definition.address],
+                "fronted_by_internet_facing_load_balancer": True,
+                "internet_facing_load_balancer_addresses": ["aws_lb.web"],
+            },
+        )
+
+        ProjectEcsSecretAccessPathsOntoServicesStage().apply(
+            [task_definition, service],
+            _context([task_definition, service]),
+        )
+
+        service_facts = aws_facts(service)
+        self.assertEqual(len(service_facts.ecs_secret_access_paths), 1)
+        projected = service_facts.ecs_secret_access_paths[0]
+        self.assertEqual(projected["workload_address"], service.address)
+        self.assertEqual(projected["task_definition_address"], task_definition.address)
+        self.assertEqual(projected["task_definition_arn"], task_definition.arn)
+        self.assertEqual(projected["secret_arn"], path["secret_arn"])
+        self.assertEqual(projected["role_address"], path["role_address"])
+        self.assertEqual(projected["role_arn"], path["role_arn"])
+        self.assertEqual(projected["access_state"], "unknown")
+        self.assertTrue(projected["explicit_deny"])
+        self.assertTrue(projected["conditional_evaluation_required"])
+        self.assertEqual(projected["policy_statements"], path["policy_statements"])
+        self.assertEqual(projected["internet_facing_load_balancers"], ["aws_lb.web"])
+        self.assertEqual(
+            service_facts.ecs_secret_access_path_uncertainties,
+            ["aws_ecs_task_definition.app: conditional deny requires runtime evaluation"],
         )
 
     def test_ecs_load_balancer_stage_marks_services_from_listener_target_group_path(self) -> None:

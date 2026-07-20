@@ -89,6 +89,17 @@ def _task_definition(
     return _resource("aws_ecs_task_definition", "orders", values)
 
 
+def _service(task_definition: str = "orders:1") -> TerraformResource:
+    return _resource(
+        "aws_ecs_service",
+        "orders",
+        {
+            "name": "orders",
+            "task_definition": task_definition,
+        },
+    )
+
+
 def _facts(resources: list[TerraformResource]):
     inventory = AwsNormalizer().normalize(resources)
     task_definition = inventory.get_by_address("aws_ecs_task_definition.orders")
@@ -97,6 +108,37 @@ def _facts(resources: list[TerraformResource]):
 
 
 class AwsEcsSecretAccessPathTests(unittest.TestCase):
+    def test_resolved_task_definition_paths_are_projected_onto_ecs_service(self) -> None:
+        inventory = AwsNormalizer().normalize(
+            [
+                _role(
+                    "execution",
+                    _EXECUTION_ROLE_ARN,
+                    [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)],
+                ),
+                _task_definition(task_role_arn=None),
+                _service(),
+            ]
+        )
+        task_definition = inventory.get_by_address("aws_ecs_task_definition.orders")
+        service = inventory.get_by_address("aws_ecs_service.orders")
+        assert task_definition is not None
+        assert service is not None
+
+        task_definition_path = aws_facts(task_definition).ecs_secret_access_paths[0]
+        service_path = aws_facts(service).ecs_secret_access_paths[0]
+        self.assertEqual(task_definition_path["workload_address"], task_definition.address)
+        self.assertEqual(service_path["workload_address"], service.address)
+        self.assertEqual(service_path["workload_type"], "aws_ecs_service")
+        self.assertEqual(service_path["task_definition_address"], task_definition.address)
+        self.assertEqual(service_path["secret_arn"], _SECRET_ARN)
+        self.assertEqual(service_path["role_address"], "aws_iam_role.execution")
+        self.assertEqual(service_path["role_arn"], _EXECUTION_ROLE_ARN)
+        self.assertEqual(service_path["access_state"], "allowed")
+        self.assertFalse(service_path["explicit_deny"])
+        self.assertFalse(service_path["conditional_evaluation_required"])
+        self.assertEqual(service_path["internet_facing_load_balancers"], [])
+
     def test_exact_secret_reference_connects_to_execution_role_and_preserves_selectors(self) -> None:
         facts = _facts(
             [

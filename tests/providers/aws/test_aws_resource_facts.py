@@ -907,7 +907,6 @@ class AwsResourceFactsTests(unittest.TestCase):
             "network_tags",
             "internet_ingress_firewalls",
             "fronted_by_internet_facing_load_balancer",
-            "internet_facing_load_balancer_addresses",
             "load_balancer_frontends",
             "load_balancer_reachable_backends",
             "gke_endpoint",
