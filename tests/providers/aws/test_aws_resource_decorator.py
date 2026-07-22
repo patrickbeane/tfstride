@@ -165,6 +165,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "resolve_oidc_provider_trust",
                 "resolve_ecs_service_relationships",
                 "model_ecs_secret_access_paths",
+                "model_ecs_s3_access_paths",
                 "model_workload_ecr_write_paths",
                 "resolve_api_gateway_relationships",
                 "merge_resource_policy_resources",
@@ -177,6 +178,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "derive_public_exposure",
                 "mark_ecs_services_fronted_by_internet_facing_load_balancers",
                 "project_ecs_secret_access_paths_onto_services",
+                "project_ecs_s3_access_paths_onto_services",
             ],
         )
 
