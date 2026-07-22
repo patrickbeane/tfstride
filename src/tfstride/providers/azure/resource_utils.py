@@ -25,7 +25,7 @@ from tfstride.providers.coercion import tls_version_below_1_2 as tls_version_bel
 from tfstride.providers.coercion import unknown_block_at as unknown_block_at
 from tfstride.providers.coercion import value_is_unknown as value_is_unknown
 
-_AZURE_REFERENCE_SUFFIXES = (".id", ".name")
+_AZURE_REFERENCE_SUFFIXES = (".resource_manager_id", ".id", ".name")
 
 
 def azure_reference_key(value: str | None) -> str:
@@ -47,6 +47,7 @@ def azure_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         resource.address,
         f"{resource.address}.id",
         f"{resource.address}.name",
+        f"{resource.address}.resource_manager_id",
     }
     for value in (
         resource.identifier,

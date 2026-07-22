@@ -44,6 +44,20 @@ class AzureAppServiceFacts(AzureBaseFacts):
         self.extend(AzureResourceMetadata.APP_SERVICE_KEY_VAULT_ACCESS_PATH_UNCERTAINTIES, values)
 
     @property
+    def app_service_storage_access_paths(self) -> list[dict[str, Any]]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_STORAGE_ACCESS_PATHS)
+
+    @property
+    def app_service_storage_access_path_uncertainties(self) -> list[str]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_STORAGE_ACCESS_PATH_UNCERTAINTIES)
+
+    def set_app_service_storage_access_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(AzureResourceMetadata.APP_SERVICE_STORAGE_ACCESS_PATHS, values)
+
+    def extend_app_service_storage_access_path_uncertainties(self, values: list[str]) -> None:
+        self.extend(AzureResourceMetadata.APP_SERVICE_STORAGE_ACCESS_PATH_UNCERTAINTIES, values)
+
+    @property
     def app_service_vnet_integration_subnet_id(self) -> str | None:
         return self.get(AzureResourceMetadata.APP_SERVICE_VNET_INTEGRATION_SUBNET_ID)
 

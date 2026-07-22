@@ -6,6 +6,9 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_decoration.app_service_key_vault_access_paths import (
     ModelAppServiceKeyVaultAccessPathsStage,
 )
+from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
+    ModelAppServiceStorageAccessPathsStage,
+)
 from tfstride.providers.azure.resource_decoration.compute import ResolveVirtualMachineRelationshipsStage
 from tfstride.providers.azure.resource_decoration.container_registry_write_paths import (
     ModelAppServiceAcrWritePathsStage,
@@ -50,6 +53,7 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         DecorateKeyVaultRelationshipsStage(),
         DecorateManagedIdentityRoleAssignmentsStage(),
         ModelAppServiceKeyVaultAccessPathsStage(),
+        ModelAppServiceStorageAccessPathsStage(),
         ModelFederatedManagedIdentityTrustPathsStage(),
         ModelAppServiceAcrWritePathsStage(),
     )
