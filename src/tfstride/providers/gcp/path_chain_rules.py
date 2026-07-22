@@ -48,6 +48,9 @@ class GcpPathChainRuleDetectors:
                 and exact_cloud_run_path is None
             ):
                 continue
+            gcs_read_state = _exact_cloud_run_gcs_read_state(workload, data_store)
+            if gcs_read_state is False:
+                continue
             paths_by_workload.setdefault(workload.address, []).append((data_store, boundary, exact_cloud_run_path))
 
         for workload_address in sorted(paths_by_workload):
@@ -143,6 +146,37 @@ def _exact_cloud_run_secret_access_path(
         ):
             return path
     return None
+
+
+def _exact_cloud_run_gcs_read_state(
+    workload: NormalizedResource,
+    data_store: NormalizedResource,
+) -> bool | None:
+    if (
+        workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES
+        or data_store.resource_type != GcpResourceType.STORAGE_BUCKET
+    ):
+        return None
+
+    matching_paths = [
+        path
+        for path in gcp_facts(workload).cloud_run_gcs_access_paths
+        if path.get("bucket_address") == data_store.address
+    ]
+    if not matching_paths:
+        return None
+    return any(
+        path.get("access_state") == "granted"
+        and path.get("condition_state") == "not_configured"
+        and "read" in _string_list(path.get("access_classes"))
+        for path in matching_paths
+    )
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
 
 
 def _has_nonempty_strings(path: dict[str, Any], *keys: str) -> bool:

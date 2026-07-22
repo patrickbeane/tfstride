@@ -705,6 +705,24 @@ GCP_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="gcp-public-cloud-run-gcs-mutation-access",
+        title="Public Cloud Run service can modify GCS object storage",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Restrict public invocation of the Cloud Run service and grant its runtime service account only the "
+            "exact GCS object actions and bucket scope required. Remove delete and storage-administration roles "
+            "from public workloads, and use separate identities for privileged data-management operations."
+        ),
+        tags=("gcp", "cloud-run", "gcs", "iam", "public-access", "object-storage", "tampering"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,
