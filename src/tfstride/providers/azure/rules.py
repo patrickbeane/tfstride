@@ -14,6 +14,7 @@ from tfstride.providers.azure.app_service_container_rules import AzureAppService
 from tfstride.providers.azure.app_service_key_vault_rules import AzureAppServiceKeyVaultRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.app_service_secret_rules import AzureAppServiceSecretDeliveryRuleDetectors
+from tfstride.providers.azure.app_service_storage_rules import AzureAppServiceStorageRuleDetectors
 from tfstride.providers.azure.audit_rules import AzureAuditRuleDetectors
 from tfstride.providers.azure.compute_rules import AzureComputeRuleDetectors
 from tfstride.providers.azure.container_registry_rules import AzureContainerRegistryRuleDetectors
@@ -92,6 +93,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-scm-access-unrestricted",
         "azure-app-service-image-not-digest-pinned",
         "azure-app-service-can-modify-image-repository",
+        "azure-public-app-service-storage-mutation-access",
         "azure-app-service-sensitive-app-setting-inline",
         "azure-app-service-key-vault-reference-identity-not-configured",
         "azure-app-service-key-vault-secret-access-overprivileged",
@@ -143,6 +145,7 @@ def build_azure_rule_contribution(
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     app_service_container_detectors = AzureAppServiceContainerRuleDetectors(finding_factory)
     app_service_secret_detectors = AzureAppServiceSecretDeliveryRuleDetectors(finding_factory)
+    app_service_storage_detectors = AzureAppServiceStorageRuleDetectors(finding_factory)
     app_service_key_vault_detectors = AzureAppServiceKeyVaultRuleDetectors(finding_factory)
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
     aks_detectors = AzureAksRuleDetectors(finding_factory)
@@ -259,6 +262,9 @@ def build_azure_rule_contribution(
         ),
         "azure-app-service-can-modify-image-repository": (
             app_service_container_detectors.detect_container_image_self_modification_path
+        ),
+        "azure-public-app-service-storage-mutation-access": (
+            app_service_storage_detectors.detect_public_app_service_storage_mutation_access
         ),
         "azure-app-service-sensitive-app-setting-inline": (
             app_service_secret_detectors.detect_inline_sensitive_app_setting

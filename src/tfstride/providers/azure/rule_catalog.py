@@ -680,6 +680,32 @@ AZURE_RULE_METADATA = (
         severity_factors=("privilege_breadth", "data_sensitivity", "lateral_movement", "blast_radius"),
     ),
     RuleMetadata(
+        rule_id="azure-public-app-service-storage-mutation-access",
+        title="Public Azure App Service identity can mutate Blob Storage",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Remove Storage Blob Data Contributor, Storage Blob Data Owner, and equivalent custom-role mutation "
+            "permissions from public App Service runtime identities; scope required access to the exact account or "
+            "container, separate privileged storage mutation from public runtimes, and restrict public ingress."
+        ),
+        tags=(
+            "azure",
+            "app-service",
+            "function-app",
+            "storage",
+            "managed-identity",
+            "public-access",
+            "tampering",
+        ),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="azure-app-service-sensitive-app-setting-inline",
         title="Azure App Service materializes a sensitive setting as a literal value",
         category=StrideCategory.INFORMATION_DISCLOSURE,

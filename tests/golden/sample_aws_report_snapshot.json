@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 251,
+      "registered_rule_count": 252,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -258,6 +258,7 @@
         "azure-app-service-scm-access-unrestricted",
         "azure-app-service-image-not-digest-pinned",
         "azure-app-service-can-modify-image-repository",
+        "azure-public-app-service-storage-mutation-access",
         "azure-app-service-sensitive-app-setting-inline",
         "azure-app-service-key-vault-reference-identity-not-configured",
         "azure-app-service-key-vault-secret-access-overprivileged",
@@ -513,6 +514,7 @@
         "azure-app-service-scm-access-unrestricted": 0,
         "azure-app-service-image-not-digest-pinned": 0,
         "azure-app-service-can-modify-image-repository": 0,
+        "azure-public-app-service-storage-mutation-access": 0,
         "azure-app-service-sensitive-app-setting-inline": 0,
         "azure-app-service-key-vault-reference-identity-not-configured": 0,
         "azure-app-service-key-vault-secret-access-overprivileged": 0,
