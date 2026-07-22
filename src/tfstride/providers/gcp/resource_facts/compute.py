@@ -54,6 +54,14 @@ class GcpComputeFacts(GcpBaseFacts):
         return self.get(GcpResourceMetadata.CLOUD_RUN_SECRET_ACCESS_PATH_UNCERTAINTIES)
 
     @property
+    def cloud_run_gcs_access_paths(self) -> list[dict[str, Any]]:
+        return self.get(GcpResourceMetadata.CLOUD_RUN_GCS_ACCESS_PATHS)
+
+    @property
+    def cloud_run_gcs_access_path_uncertainties(self) -> list[str]:
+        return self.get(GcpResourceMetadata.CLOUD_RUN_GCS_ACCESS_PATH_UNCERTAINTIES)
+
+    @property
     def artifact_registry_write_paths(self) -> list[dict[str, Any]]:
         return self.get(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATHS)
 
@@ -66,6 +74,12 @@ class GcpComputeFacts(GcpBaseFacts):
 
     def extend_cloud_run_secret_access_path_uncertainties(self, values: list[str]) -> None:
         self.extend(GcpResourceMetadata.CLOUD_RUN_SECRET_ACCESS_PATH_UNCERTAINTIES, values)
+
+    def set_cloud_run_gcs_access_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(GcpResourceMetadata.CLOUD_RUN_GCS_ACCESS_PATHS, values)
+
+    def extend_cloud_run_gcs_access_path_uncertainties(self, values: list[str]) -> None:
+        self.extend(GcpResourceMetadata.CLOUD_RUN_GCS_ACCESS_PATH_UNCERTAINTIES, values)
 
     def set_artifact_registry_write_paths(self, values: list[dict[str, Any]]) -> None:
         self.set(GcpResourceMetadata.ARTIFACT_REGISTRY_WRITE_PATHS, values)

@@ -277,6 +277,8 @@ class GcpProviderTests(unittest.TestCase):
                 "ARTIFACT_REGISTRY_REPOSITORY_REFERENCE",
                 "ARTIFACT_REGISTRY_REPOSITORY_PATH",
                 "ARTIFACT_REGISTRY_WRITE_PATHS",
+                "CLOUD_RUN_GCS_ACCESS_PATH_UNCERTAINTIES",
+                "CLOUD_RUN_GCS_ACCESS_PATHS",
                 "CLOUD_RUN_SECRET_ACCESS_PATHS",
                 "ARTIFACT_REGISTRY_FORMAT",
                 "ARTIFACT_REGISTRY_MODE",

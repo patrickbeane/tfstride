@@ -6,6 +6,9 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.resource_decoration.artifact_registry_write_paths import (
     ModelCloudRunArtifactRegistryWritePathsStage,
 )
+from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import (
+    ModelCloudRunGcsAccessPathsStage,
+)
 from tfstride.providers.gcp.resource_decoration.cloud_run_secret_access_paths import (
     ModelCloudRunSecretAccessPathsStage,
 )
@@ -34,6 +37,7 @@ def default_gcp_decoration_stages() -> tuple[GcpDecorationStage, ...]:
         DeriveNetworkPostureStage(),
         DerivePublicExposureStage(),
         DecorateSensitiveIamBindingsStage(),
+        ModelCloudRunGcsAccessPathsStage(),
         ModelCloudRunSecretAccessPathsStage(),
         ModelCloudRunArtifactRegistryWritePathsStage(),
         ModelWorkloadIdentityFederationTrustPathsStage(),
