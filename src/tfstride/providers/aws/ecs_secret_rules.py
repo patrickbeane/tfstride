@@ -6,7 +6,13 @@ from typing import Any
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.aws.ecs_path_rule_helpers import (
+    internet_boundary_id,
+    path_string_values,
+    public_service_network_path,
+    resolved_public_load_balancers,
+)
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.secret_settings import (
     SensitiveSettingCategory,
@@ -163,19 +169,19 @@ class AwsEcsSecretDeliveryRuleDetectors:
             if not deterministic_paths:
                 continue
 
-            load_balancer_addresses = _resolved_public_load_balancers(
+            load_balancer_addresses = resolved_public_load_balancers(
                 deterministic_paths,
                 context,
             )
             if not load_balancer_addresses:
                 continue
 
-            task_definition_addresses = _path_string_values(
+            task_definition_addresses = path_string_values(
                 deterministic_paths,
                 "task_definition_address",
             )
-            role_addresses = _path_string_values(deterministic_paths, "role_address")
-            secret_arns = _path_string_values(deterministic_paths, "secret_arn")
+            role_addresses = path_string_values(deterministic_paths, "role_address")
+            secret_arns = path_string_values(deterministic_paths, "secret_arn")
             affected_resources = [
                 *load_balancer_addresses,
                 service.address,
@@ -199,7 +205,7 @@ class AwsEcsSecretDeliveryRuleDetectors:
                     rule_id=rule_id,
                     severity=severity_reasoning.severity,
                     affected_resources=list(dict.fromkeys(affected_resources)),
-                    trust_boundary_id=_internet_boundary_id(load_balancer_addresses, context),
+                    trust_boundary_id=internet_boundary_id(load_balancer_addresses, context),
                     rationale=(
                         f"{service.display_name} is reachable through an internet-facing load balancer and its "
                         "resolved task definition uses an ECS task execution role to retrieve "
@@ -210,7 +216,7 @@ class AwsEcsSecretDeliveryRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item(
                             "network_path",
-                            _public_service_network_path(load_balancer_addresses, service.address),
+                            public_service_network_path(load_balancer_addresses, service.address),
                         ),
                         evidence_item(
                             "task_definitions",
@@ -249,57 +255,6 @@ def _is_deterministic_allowed_service_path(
         and path.get("conditional_evaluation_required") is False
         and _GET_SECRET_VALUE in _string_values(path.get("matched_actions"))
     )
-
-
-def _resolved_public_load_balancers(
-    paths: list[dict[str, Any]],
-    context: RuleEvaluationContext,
-) -> list[str]:
-    addresses = _path_string_values(paths, "internet_facing_load_balancers")
-    return [
-        address
-        for address in addresses
-        if (resource := context.inventory.get_by_address(address)) is not None
-        and resource.resource_type == "aws_lb"
-        and resource.public_exposure
-    ]
-
-
-def _path_string_values(paths: list[dict[str, Any]], key: str) -> list[str]:
-    values: set[str] = set()
-    for path in paths:
-        value = path.get(key)
-        if isinstance(value, str) and value:
-            values.add(value)
-        elif isinstance(value, list):
-            values.update(item for item in value if isinstance(item, str) and item)
-    return sorted(values)
-
-
-def _internet_boundary_id(
-    load_balancer_addresses: list[str],
-    context: RuleEvaluationContext,
-) -> str | None:
-    return next(
-        (
-            boundary.identifier
-            for address in load_balancer_addresses
-            if (boundary := context.boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", address)))
-            is not None
-        ),
-        None,
-    )
-
-
-def _public_service_network_path(load_balancer_addresses: list[str], service_address: str) -> list[str]:
-    return [
-        item
-        for address in load_balancer_addresses
-        for item in (
-            f"internet reaches {address}",
-            f"{address} fronts {service_address}",
-        )
-    ]
 
 
 def _service_execution_role_evidence(paths: list[dict[str, Any]]) -> list[str]:

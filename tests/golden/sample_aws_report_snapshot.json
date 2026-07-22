@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 249,
+      "registered_rule_count": 250,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -88,6 +88,7 @@
         "aws-ecs-sensitive-environment-value-inline",
         "aws-ecs-secret-access-blast-radius",
         "aws-public-ecs-secret-access",
+        "aws-public-ecs-s3-mutation-access",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -341,6 +342,7 @@
         "aws-ecs-sensitive-environment-value-inline": 0,
         "aws-ecs-secret-access-blast-radius": 0,
         "aws-public-ecs-secret-access": 0,
+        "aws-public-ecs-s3-mutation-access": 0,
         "aws-sns-customer-managed-encryption-missing": 0,
         "aws-sqs-customer-managed-encryption-missing": 0,
         "aws-sqs-message-retention-insufficient": 0,

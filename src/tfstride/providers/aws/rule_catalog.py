@@ -563,6 +563,25 @@ AWS_RULE_METADATA = (
         ),
     ),
     RuleMetadata(
+        rule_id="aws-public-ecs-s3-mutation-access",
+        title="Internet-facing ECS service can modify S3 object storage",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Reduce public ingress to the ECS service and restrict its task role to only the exact S3 read or "
+            "write actions and bucket prefixes required at runtime. Remove delete and bucket-administration "
+            "permissions from public workloads, and use a separate deployment or data-management identity for "
+            "privileged storage changes."
+        ),
+        tags=("aws", "ecs", "s3", "iam", "public-access", "object-storage", "tampering"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

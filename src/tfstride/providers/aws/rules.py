@@ -10,6 +10,7 @@ from tfstride.providers.aws.audit_rules import AwsAccountAuditRuleDetectors
 from tfstride.providers.aws.cloudfront_rules import AwsCloudFrontRuleDetectors
 from tfstride.providers.aws.container_rules import AwsContainerDeploymentRuleDetectors
 from tfstride.providers.aws.ecr_rules import AwsEcrRuleDetectors
+from tfstride.providers.aws.ecs_s3_rules import AwsEcsS3AccessRuleDetectors
 from tfstride.providers.aws.ecs_secret_rules import AwsEcsSecretDeliveryRuleDetectors
 from tfstride.providers.aws.edge_protection_rules import AwsEdgeProtectionRuleDetectors
 from tfstride.providers.aws.eks_rules import AwsEksRuleDetectors
@@ -79,6 +80,7 @@ AWS_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "aws-ecs-sensitive-environment-value-inline",
         "aws-ecs-secret-access-blast-radius",
         "aws-public-ecs-secret-access",
+        "aws-public-ecs-s3-mutation-access",
         "aws-sns-customer-managed-encryption-missing",
         "aws-sqs-customer-managed-encryption-missing",
         "aws-sqs-message-retention-insufficient",
@@ -143,6 +145,7 @@ def build_aws_rule_contribution(
     ecr_detectors = AwsEcrRuleDetectors(finding_factory)
     container_deployment_detectors = AwsContainerDeploymentRuleDetectors(finding_factory)
     ecs_secret_detectors = AwsEcsSecretDeliveryRuleDetectors(finding_factory)
+    ecs_s3_detectors = AwsEcsS3AccessRuleDetectors(finding_factory)
     messaging_detectors = AwsMessagingPostureRuleDetectors(finding_factory)
     secrets_manager_detectors = AwsSecretsManagerPostureRuleDetectors(finding_factory)
     kms_detectors = AwsKmsRuleDetectors(finding_factory)
@@ -210,6 +213,7 @@ def build_aws_rule_contribution(
         "aws-ecs-sensitive-environment-value-inline": (ecs_secret_detectors.detect_inline_sensitive_environment_value),
         "aws-ecs-secret-access-blast-radius": ecs_secret_detectors.detect_secret_access_blast_radius,
         "aws-public-ecs-secret-access": ecs_secret_detectors.detect_public_service_secret_access,
+        "aws-public-ecs-s3-mutation-access": ecs_s3_detectors.detect_public_service_mutation_access,
         "aws-sns-customer-managed-encryption-missing": (
             messaging_detectors.detect_sns_customer_managed_encryption_missing
         ),
