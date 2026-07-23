@@ -14,6 +14,14 @@ class GcpComputeFacts(GcpBaseFacts):
         return self.optional_bool(GcpResourceMetadata.OS_LOGIN_ENABLED)
 
     @property
+    def serverless_ingress(self) -> str | None:
+        return self.get(GcpResourceMetadata.SERVERLESS_INGRESS)
+
+    @property
+    def cloud_run_invoker_iam_disabled(self) -> bool | None:
+        return self.optional_bool(GcpResourceMetadata.CLOUD_RUN_INVOKER_IAM_DISABLED)
+
+    @property
     def network_tags(self) -> list[str]:
         return self.get(GcpResourceMetadata.NETWORK_TAGS)
 

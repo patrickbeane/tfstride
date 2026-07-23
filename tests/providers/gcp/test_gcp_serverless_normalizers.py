@@ -8,6 +8,7 @@ from tests.providers.gcp.normalizer_support import (
 )
 from tfstride.models import ResourceCategory
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.serverless_normalizers import (
     normalize_cloud_run_service_iam_member,
     normalize_cloud_run_v2_service,
@@ -27,6 +28,7 @@ class GcpServerlessNormalizerTests(GcpNormalizerTestCase):
                     "project": "tfstride-demo",
                     "location": "us-central1",
                     "ingress": "INGRESS_TRAFFIC_ALL",
+                    "invoker_iam_disabled": True,
                     "uri": "https://tfstride-api.run.app",
                     "template": [
                         {
@@ -40,6 +42,8 @@ class GcpServerlessNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(normalized.category, ResourceCategory.COMPUTE)
         self.assertTrue(normalized.public_access_configured)
         self.assertFalse(normalized.vpc_enabled)
+        self.assertTrue(gcp_facts(normalized).cloud_run_invoker_iam_disabled)
+        self.assertEqual(gcp_facts(normalized).serverless_ingress, "INGRESS_TRAFFIC_ALL")
         self.assertEqual(
             normalized.get_metadata_field(GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE),
             "tfstride-api",
@@ -52,6 +56,23 @@ class GcpServerlessNormalizerTests(GcpNormalizerTestCase):
             normalized.get_metadata_field(GcpResourceMetadata.SERVICE_ACCOUNTS),
             [{"email": "tfstride-api@tfstride-demo.iam.gserviceaccount.com"}],
         )
+
+    def test_cloud_run_v2_service_preserves_unknown_invoker_iam_check(self) -> None:
+        normalized = normalize_cloud_run_v2_service(
+            _terraform_resource(
+                "google_cloud_run_v2_service.api",
+                "google_cloud_run_v2_service",
+                {
+                    "name": "tfstride-api",
+                    "location": "us-central1",
+                    "ingress": "INGRESS_TRAFFIC_ALL",
+                    "template": [{}],
+                },
+                unknown_values={"invoker_iam_disabled": True},
+            )
+        )
+
+        self.assertIsNone(gcp_facts(normalized).cloud_run_invoker_iam_disabled)
 
     def test_cloud_run_service_iam_member_normalizer_preserves_binding_parts(self) -> None:
         normalized = normalize_cloud_run_service_iam_member(

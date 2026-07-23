@@ -19,7 +19,7 @@ from tfstride.providers.gcp.resource_types import (
 )
 from tfstride.providers.gcp.resource_utils import binding_members
 
-_CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker"})
+_CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/run.servicesInvoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 
 
@@ -35,7 +35,8 @@ class GcpServerlessRuleDetectors:
         findings: list[Finding] = []
         for service in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = _cloud_run_public_invoker_bindings(service)
-            if not service.public_exposure or not public_invokers:
+            invoker_iam_check_disabled = gcp_facts(service).cloud_run_invoker_iam_disabled is True
+            if not service.public_exposure or (not public_invokers and not invoker_iam_check_disabled):
                 continue
             condition = _public_invoker_condition(public_invokers)
             severity_reasoning = guardrail_adjusted_severity_reasoning(
@@ -56,10 +57,9 @@ class GcpServerlessRuleDetectors:
                     severity=severity_reasoning.severity,
                     affected_resources=affected_resources,
                     trust_boundary_id=boundary.identifier if boundary else None,
-                    rationale=(
-                        f"{service.display_name} allows public ingress and grants Cloud Run invoke "
-                        "permission to public GCP principals. Unauthenticated internet clients can reach "
-                        "the service entry point without an organization-owned identity boundary."
+                    rationale=_cloud_run_public_access_rationale(
+                        service,
+                        invoker_iam_check_disabled=invoker_iam_check_disabled,
                     ),
                     evidence=collect_evidence(
                         evidence_item(
@@ -143,6 +143,24 @@ class GcpServerlessRuleDetectors:
         return findings
 
 
+def _cloud_run_public_access_rationale(
+    service: NormalizedResource,
+    *,
+    invoker_iam_check_disabled: bool,
+) -> str:
+    if invoker_iam_check_disabled:
+        return (
+            f"{service.display_name} allows public ingress and disables the Cloud Run Invoker IAM check. "
+            "Unauthenticated internet clients can reach the service entry point without an "
+            "organization-owned identity boundary."
+        )
+    return (
+        f"{service.display_name} allows public ingress and grants Cloud Run invoke permission to public "
+        "GCP principals. Unauthenticated internet clients can reach the service entry point without an "
+        "organization-owned identity boundary."
+    )
+
+
 def _cloud_run_public_invoker_bindings(resource: NormalizedResource) -> list[tuple[str, str, str, dict | None]]:
     return _public_invoker_bindings(resource, _CLOUD_RUN_PUBLIC_INVOKER_ROLES)
 
@@ -157,6 +175,8 @@ def _public_invoker_bindings(
 ) -> list[tuple[str, str, str, dict | None]]:
     bindings: list[tuple[str, str, str, dict | None]] = []
     for binding in gcp_facts(resource).bindings:
+        if binding.get("condition_state") == "unknown":
+            continue
         role = str(binding.get("role") or "").strip()
         if role not in invoker_roles:
             continue

@@ -8,6 +8,7 @@ def _cloud_run_service(
     public_ingress: bool = True,
     service_account_email: str = "tfstride-run@tfstride-demo.iam.gserviceaccount.com",
     secret_reference: str | None = None,
+    invoker_iam_disabled: bool | None = None,
 ) -> TerraformResource:
     template: dict[str, object] = {"service_account": service_account_email}
     if secret_reference is not None:
@@ -43,6 +44,7 @@ def _cloud_run_service(
             "location": "us-central1",
             "ingress": "INGRESS_TRAFFIC_ALL" if public_ingress else "INGRESS_TRAFFIC_INTERNAL_ONLY",
             "template": [template],
+            **({"invoker_iam_disabled": invoker_iam_disabled} if invoker_iam_disabled is not None else {}),
         },
     )
 

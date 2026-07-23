@@ -8,15 +8,18 @@ from tfstride.providers.gcp.resource_decoration.iam import (
     resource_iam_target_reference,
     serverless_iam_resources,
 )
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, gcp_resource_references
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
+from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     binding_members,
     gcp_reference_key,
 )
 
-_SERVERLESS_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/cloudfunctions.invoker"})
+_CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/run.servicesInvoker"})
+_CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
 
 
 def derive_public_serverless_exposure(
@@ -41,6 +44,13 @@ def _serverless_public_access_reasons(
     iam_resources: tuple[NormalizedResource, ...],
 ) -> list[str]:
     reasons: list[str] = []
+    if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES and gcp_facts(resource).cloud_run_invoker_iam_disabled:
+        reasons.append(f"{resource.address} disables the Cloud Run Invoker IAM check")
+    public_invoker_roles = (
+        _CLOUD_RUN_PUBLIC_INVOKER_ROLES
+        if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
+        else _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES
+    )
     resource_references = set(gcp_resource_references(resource))
     for iam_resource in iam_resources:
         target_reference = resource_iam_target_reference(iam_resource)
@@ -50,8 +60,10 @@ def _serverless_public_access_reasons(
         ):
             continue
         for binding in iam_bindings(iam_resource):
+            if binding.get("condition_state") == "unknown":
+                continue
             role = str(binding.get("role") or "unknown role")
-            if role not in _SERVERLESS_PUBLIC_INVOKER_ROLES:
+            if role not in public_invoker_roles:
                 continue
             public_members = sorted(member for member in binding_members(binding) if member in PUBLIC_GCP_IAM_MEMBERS)
             for member in public_members:

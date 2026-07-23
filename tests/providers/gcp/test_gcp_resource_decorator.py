@@ -594,7 +594,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
             GcpResourceType.CLOUD_RUN_SERVICE_IAM_MEMBER,
             GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE,
             "projects/demo/locations/us-central1/services/api",
-            role="roles/run.invoker",
+            role="roles/run.servicesInvoker",
             member="allUsers",
         )
         function = _serverless_workload(
@@ -617,7 +617,7 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertTrue(cloud_run.public_exposure)
         self.assertEqual(
             cloud_run.public_exposure_reasons,
-            ["google_cloud_run_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+            ["google_cloud_run_service_iam_member.public_invoker grants roles/run.servicesInvoker to allUsers"],
         )
         self.assertTrue(function.public_exposure)
         self.assertEqual(
@@ -626,6 +626,28 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                 "google_cloudfunctions_function_iam_member.public_invoker grants "
                 "roles/cloudfunctions.invoker to allAuthenticatedUsers"
             ],
+        )
+
+    def test_disabled_cloud_run_invoker_iam_check_marks_public_exposure(self) -> None:
+        cloud_run = _gcp_resource(
+            "google_cloud_run_v2_service.api",
+            GcpResourceType.CLOUD_RUN_V2_SERVICE,
+            ResourceCategory.COMPUTE,
+            identifier="projects/demo/locations/us-central1/services/api",
+            public_access_configured=True,
+            metadata={
+                GcpResourceMetadata.NAME: "api",
+                GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE: ("projects/demo/locations/us-central1/services/api"),
+                GcpResourceMetadata.CLOUD_RUN_INVOKER_IAM_DISABLED: True,
+            },
+        )
+
+        GcpResourceDecorator().decorate([cloud_run])
+
+        self.assertTrue(cloud_run.public_exposure)
+        self.assertEqual(
+            cloud_run.public_exposure_reasons,
+            ["google_cloud_run_v2_service.api disables the Cloud Run Invoker IAM check"],
         )
 
     def test_sensitive_resource_iam_bindings_are_attached_to_target_resource(self) -> None:

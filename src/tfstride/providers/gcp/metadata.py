@@ -67,6 +67,7 @@ class GcpResourceMetadata:
     ARTIFACT_REGISTRY_WRITE_PATHS = DictListMetadataField("artifact_registry_write_paths")
     CLOUD_FUNCTION_REFERENCE = OptionalStringMetadataField("cloud_function_reference")
     SERVERLESS_INGRESS = OptionalStringMetadataField("serverless_ingress")
+    CLOUD_RUN_INVOKER_IAM_DISABLED = BoolMetadataField("cloud_run_invoker_iam_disabled")
     SERVICE_ACCOUNT_UNIQUE_ID = OptionalStringMetadataField("service_account_unique_id")
     SERVICE_ACCOUNT_KEY_ALGORITHM = OptionalStringMetadataField("service_account_key_algorithm")
     SERVICE_ACCOUNT_PUBLIC_KEY_TYPE = OptionalStringMetadataField("service_account_public_key_type")

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
-from tfstride.providers.coercion import value_is_unknown
+from tfstride.providers.coercion import attribute_unknown, known_bool, value_is_unknown
 from tfstride.providers.container_images import ContainerImageReference, parse_container_image_reference
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import as_list, compact, first_item
@@ -48,6 +48,12 @@ def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResour
     )
     service_account = first_non_empty(spec.get(GcpAttr.SERVICE_ACCOUNT_NAME))
     ingress = first_non_empty(annotations.get(GcpAttr.RUN_INGRESS_ANNOTATION), values.get(GcpAttr.INGRESS))
+    invoker_iam_disabled = known_bool(
+        annotations.values,
+        None,
+        GcpAttr.RUN_INVOKER_IAM_DISABLED_ANNOTATION.key,
+        [],
+    )
     public_access_configured = _cloud_run_ingress_allows_internet(ingress)
     return _serverless_workload(
         resource,
@@ -58,6 +64,7 @@ def normalize_cloud_run_service(resource: TerraformResource) -> NormalizedResour
             GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE: _serverless_reference(values, resource),
             GcpResourceMetadata.REGION: values.get(GcpAttr.LOCATION),
             GcpResourceMetadata.SERVERLESS_INGRESS: ingress,
+            GcpResourceMetadata.CLOUD_RUN_INVOKER_IAM_DISABLED: invoker_iam_disabled,
             "url": _cloud_run_v1_url(values),
             "metadata": metadata_values,
             **image_metadata,
@@ -85,6 +92,12 @@ def normalize_cloud_run_v2_service(resource: TerraformResource) -> NormalizedRes
     )
     service_account = first_non_empty(template.get(GcpAttr.SERVICE_ACCOUNT))
     ingress = first_non_empty(values.get(GcpAttr.INGRESS))
+    invoker_iam_disabled = known_bool(
+        resource.values,
+        resource.unknown_values,
+        GcpAttr.INVOKER_IAM_DISABLED.key,
+        [],
+    )
     public_access_configured = _cloud_run_ingress_allows_internet(ingress)
     return _serverless_workload(
         resource,
@@ -95,6 +108,7 @@ def normalize_cloud_run_v2_service(resource: TerraformResource) -> NormalizedRes
             GcpResourceMetadata.CLOUD_RUN_SERVICE_REFERENCE: _serverless_reference(values, resource),
             GcpResourceMetadata.REGION: values.get(GcpAttr.LOCATION),
             GcpResourceMetadata.SERVERLESS_INGRESS: ingress,
+            GcpResourceMetadata.CLOUD_RUN_INVOKER_IAM_DISABLED: invoker_iam_disabled,
             "uri": values.get(GcpAttr.URI),
             **image_metadata,
             **secret_metadata,
@@ -420,7 +434,10 @@ def _normalize_serverless_iam_member(
             GcpResourceMetadata.IAM_MEMBERS: compact([member]),
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
             GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
-                role, compact([member]), condition=values.raw(GcpAttr.CONDITION)
+                role,
+                compact([member]),
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
             ),
         },
     )
@@ -454,7 +471,12 @@ def _normalize_serverless_iam_binding(
             GcpResourceMetadata.IAM_ROLE: role,
             GcpResourceMetadata.IAM_MEMBERS: members,
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
-            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(role, members, condition=values.raw(GcpAttr.CONDITION)),
+            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
+                role,
+                members,
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
+            ),
         },
     )
 
@@ -502,12 +524,15 @@ def _iam_bindings(
     members: list[str],
     *,
     condition: Any = None,
+    condition_unknown: bool = False,
 ) -> list[dict[str, object]]:
     if not role or not members:
         return []
     binding: dict[str, object] = {"role": role, "members": members}
     normalized_condition = _condition(condition)
-    if normalized_condition:
+    if condition_unknown:
+        binding["condition_state"] = "unknown"
+    elif normalized_condition:
         binding["condition"] = normalized_condition
     return [binding]
 

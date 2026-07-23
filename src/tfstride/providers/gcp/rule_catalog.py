@@ -723,6 +723,25 @@ GCP_RULE_METADATA = (
         ),
     ),
     RuleMetadata(
+        rule_id="gcp-public-cloud-run-pubsub-mutation-access",
+        title="Public Cloud Run service has Pub/Sub publish, deletion, or administrative access",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Restrict public invocation of the Cloud Run service and grant its runtime service account only "
+            "the exact Pub/Sub publishing, deletion, or administration permissions required. Separate publisher and "
+            "messaging-administration identities, and avoid administrative topic or subscription roles on "
+            "public workloads."
+        ),
+        tags=("gcp", "cloud-run", "pubsub", "iam", "public-access", "messaging", "tampering"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="gcp-service-account-iam-broad-principal",
         title="GCP service account IAM grants access to broad principals",
         category=StrideCategory.ELEVATION_OF_PRIVILEGE,

@@ -37,7 +37,7 @@
       }
     },
     "rules": {
-      "registered_rule_count": 253,
+      "registered_rule_count": 254,
       "enabled_rules": [
         "aws-public-compute-broad-ingress",
         "aws-lambda-public-invocation",
@@ -185,6 +185,7 @@
         "gcp-cloud-run-sensitive-environment-value-inline",
         "gcp-cloud-run-secret-access-blast-radius",
         "gcp-public-cloud-run-gcs-mutation-access",
+        "gcp-public-cloud-run-pubsub-mutation-access",
         "gcp-service-account-iam-broad-principal",
         "gcp-service-account-iam-privileged-role",
         "gcp-service-account-key-hygiene",
@@ -442,6 +443,7 @@
         "gcp-cloud-run-sensitive-environment-value-inline": 0,
         "gcp-cloud-run-secret-access-blast-radius": 0,
         "gcp-public-cloud-run-gcs-mutation-access": 0,
+        "gcp-public-cloud-run-pubsub-mutation-access": 0,
         "gcp-service-account-iam-broad-principal": 0,
         "gcp-service-account-iam-privileged-role": 0,
         "gcp-service-account-key-hygiene": 0,

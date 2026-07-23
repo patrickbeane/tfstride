@@ -49,6 +49,32 @@ class GcpServerlessRuleTests(unittest.TestCase):
             ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
         )
 
+    def test_cloud_run_public_access_supports_current_invocation_mechanisms(self) -> None:
+        cases = {
+            "services invoker role": [
+                _cloud_run_service(),
+                _cloud_run_service_iam_member(role="roles/run.servicesInvoker"),
+            ],
+            "invoker IAM check disabled": [
+                _cloud_run_service(invoker_iam_disabled=True),
+            ],
+        }
+
+        for case, resources in cases.items():
+            with self.subTest(case=case):
+                inventory = GcpNormalizer().normalize(resources)
+                boundaries = detect_trust_boundaries(inventory)
+                findings = StrideRuleEngine().evaluate(
+                    inventory,
+                    boundaries,
+                    rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+                )
+
+                self.assertEqual(
+                    [finding.rule_id for finding in findings],
+                    ["gcp-cloud-run-public-invoker"],
+                )
+
     def test_cloud_run_public_invoker_reports_constraining_iam_condition(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
