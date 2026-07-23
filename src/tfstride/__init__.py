@@ -1,4 +1,4 @@
 """tfstride package."""
 
 __all__ = ["__version__"]
-__version__ = "0.4.22"
+__version__ = "0.4.23"
