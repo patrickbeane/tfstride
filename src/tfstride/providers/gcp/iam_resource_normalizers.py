@@ -413,7 +413,10 @@ def _normalize_target_iam_member(
             GcpResourceMetadata.IAM_MEMBERS: compact([member]),
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
             GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
-                role, compact([member]), condition=values.raw(GcpAttr.CONDITION)
+                role,
+                compact([member]),
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
             ),
         },
     )
@@ -444,7 +447,12 @@ def _normalize_target_iam_binding(
             GcpResourceMetadata.IAM_ROLE: role,
             GcpResourceMetadata.IAM_MEMBERS: members,
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
-            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(role, members, condition=values.raw(GcpAttr.CONDITION)),
+            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
+                role,
+                members,
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
+            ),
         },
     )
 

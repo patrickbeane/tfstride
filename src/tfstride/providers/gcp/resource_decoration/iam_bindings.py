@@ -99,6 +99,9 @@ def _derive_sensitive_resource_iam_bindings(
             condition = binding.get("condition")
             if condition:
                 decorated_binding["condition"] = condition
+            condition_state = binding.get("condition_state")
+            if isinstance(condition_state, str) and condition_state:
+                decorated_binding["condition_state"] = condition_state
             bindings.append(decorated_binding)
             source_addresses.append(iam_resource.address)
 

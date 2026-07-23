@@ -11,6 +11,14 @@ class GcpMessagingFacts(GcpBaseFacts):
     __slots__ = ()
 
     @property
+    def pubsub_topic_reference(self) -> str | None:
+        return self.get(GcpResourceMetadata.PUBSUB_TOPIC_REFERENCE)
+
+    @property
+    def pubsub_subscription_reference(self) -> str | None:
+        return self.get(GcpResourceMetadata.PUBSUB_SUBSCRIPTION_REFERENCE)
+
+    @property
     def pubsub_topic_kms_key_name(self) -> str | None:
         return self.get(GcpResourceMetadata.PUBSUB_TOPIC_KMS_KEY_NAME)
 
