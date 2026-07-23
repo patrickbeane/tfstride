@@ -12,6 +12,7 @@ from tfstride.analysis.rule_registry import RuleRegistry, default_rule_registry
 from tfstride.providers.azure.aks_rules import AzureAksRuleDetectors
 from tfstride.providers.azure.app_service_container_rules import AzureAppServiceContainerRuleDetectors
 from tfstride.providers.azure.app_service_key_vault_rules import AzureAppServiceKeyVaultRuleDetectors
+from tfstride.providers.azure.app_service_messaging_rules import AzureAppServiceMessagingRuleDetectors
 from tfstride.providers.azure.app_service_rules import AzureAppServiceRuleDetectors
 from tfstride.providers.azure.app_service_secret_rules import AzureAppServiceSecretDeliveryRuleDetectors
 from tfstride.providers.azure.app_service_storage_rules import AzureAppServiceStorageRuleDetectors
@@ -94,6 +95,7 @@ AZURE_RULE_GROUP_IDS: tuple[tuple[str, ...], ...] = (
         "azure-app-service-image-not-digest-pinned",
         "azure-app-service-can-modify-image-repository",
         "azure-public-app-service-storage-mutation-access",
+        "azure-public-app-service-service-bus-mutation-access",
         "azure-app-service-sensitive-app-setting-inline",
         "azure-app-service-key-vault-reference-identity-not-configured",
         "azure-app-service-key-vault-secret-access-overprivileged",
@@ -145,6 +147,7 @@ def build_azure_rule_contribution(
     app_service_detectors = AzureAppServiceRuleDetectors(finding_factory)
     app_service_container_detectors = AzureAppServiceContainerRuleDetectors(finding_factory)
     app_service_secret_detectors = AzureAppServiceSecretDeliveryRuleDetectors(finding_factory)
+    app_service_messaging_detectors = AzureAppServiceMessagingRuleDetectors(finding_factory)
     app_service_storage_detectors = AzureAppServiceStorageRuleDetectors(finding_factory)
     app_service_key_vault_detectors = AzureAppServiceKeyVaultRuleDetectors(finding_factory)
     audit_detectors = AzureAuditRuleDetectors(finding_factory)
@@ -265,6 +268,9 @@ def build_azure_rule_contribution(
         ),
         "azure-public-app-service-storage-mutation-access": (
             app_service_storage_detectors.detect_public_app_service_storage_mutation_access
+        ),
+        "azure-public-app-service-service-bus-mutation-access": (
+            app_service_messaging_detectors.detect_public_app_service_service_bus_mutation_access
         ),
         "azure-app-service-sensitive-app-setting-inline": (
             app_service_secret_detectors.detect_inline_sensitive_app_setting

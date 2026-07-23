@@ -243,6 +243,7 @@ EXPECTED_DEFAULT_RULE_METADATA_IDS = (
     "azure-app-service-image-not-digest-pinned",
     "azure-app-service-can-modify-image-repository",
     "azure-public-app-service-storage-mutation-access",
+    "azure-public-app-service-service-bus-mutation-access",
     "azure-app-service-sensitive-app-setting-inline",
     "azure-app-service-key-vault-reference-identity-not-configured",
     "azure-app-service-key-vault-secret-access-overprivileged",
@@ -321,7 +322,7 @@ class RuleRegistryTests(unittest.TestCase):
             tuple(item.rule_id for item in metadata),
             EXPECTED_DEFAULT_RULE_METADATA_IDS,
         )
-        self.assertEqual(len(metadata), 254)
+        self.assertEqual(len(metadata), 255)
 
     def test_default_rule_metadata_is_partitioned_by_provider(self) -> None:
         metadata_ids = tuple(metadata.rule_id for metadata in default_rule_registry().rules())
@@ -332,7 +333,7 @@ class RuleRegistryTests(unittest.TestCase):
         self.assertEqual(metadata_ids, aws_metadata_ids + gcp_metadata_ids + azure_metadata_ids)
         self.assertEqual(len(aws_metadata_ids), 83)
         self.assertEqual(len(gcp_metadata_ids), 78)
-        self.assertEqual(len(azure_metadata_ids), 93)
+        self.assertEqual(len(azure_metadata_ids), 94)
         self.assertEqual(set(aws_metadata_ids), set(_flatten_rule_groups(AWS_RULE_GROUP_IDS)))
         self.assertEqual(set(gcp_metadata_ids), set(_flatten_rule_groups(GCP_RULE_GROUP_IDS)))
         self.assertEqual(set(azure_metadata_ids), set(_flatten_rule_groups(AZURE_RULE_GROUP_IDS)))

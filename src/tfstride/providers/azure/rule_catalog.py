@@ -706,6 +706,33 @@ AZURE_RULE_METADATA = (
         ),
     ),
     RuleMetadata(
+        rule_id="azure-public-app-service-service-bus-mutation-access",
+        title="Public Azure App Service identity can mutate Service Bus messaging",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Remove Azure Service Bus Data Sender, unnecessary Azure Service Bus Data Owner, and equivalent "
+            "custom-role mutation permissions from public App Service runtime identities; scope required access "
+            "to the exact namespace or entity, separate message publishing from public runtimes where possible, "
+            "and restrict public ingress."
+        ),
+        tags=(
+            "azure",
+            "app-service",
+            "function-app",
+            "service-bus",
+            "managed-identity",
+            "public-access",
+            "tampering",
+        ),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="azure-app-service-sensitive-app-setting-inline",
         title="Azure App Service materializes a sensitive setting as a literal value",
         category=StrideCategory.INFORMATION_DISCLOSURE,
