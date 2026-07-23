@@ -582,6 +582,25 @@ AWS_RULE_METADATA = (
         ),
     ),
     RuleMetadata(
+        rule_id="aws-public-ecs-messaging-mutation-access",
+        title="Internet-facing ECS service can mutate managed messaging resources",
+        category=StrideCategory.TAMPERING,
+        recommended_mitigation=(
+            "Reduce public ingress to the ECS service and restrict its task role to only the exact SNS publish or "
+            "SQS send actions required at runtime. Remove topic/queue deletion, purge, permission-management, and "
+            "administrative actions from public workloads, and use separate operational identities for privileged "
+            "messaging changes."
+        ),
+        tags=("aws", "ecs", "sns", "sqs", "iam", "public-access", "messaging", "tampering"),
+        severity_factors=(
+            "internet_exposure",
+            "privilege_breadth",
+            "data_sensitivity",
+            "lateral_movement",
+            "blast_radius",
+        ),
+    ),
+    RuleMetadata(
         rule_id="aws-sns-customer-managed-encryption-missing",
         title="SNS topic does not use a customer-managed KMS key",
         category=StrideCategory.INFORMATION_DISCLOSURE,

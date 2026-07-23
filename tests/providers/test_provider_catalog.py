@@ -194,7 +194,7 @@ class ProviderCatalogTests(unittest.TestCase):
         contribution = default_rule_contribution(FindingFactory(registry))
         rule_ids_by_group = tuple(tuple(rule.metadata.rule_id for rule in group) for group in contribution.rule_groups)
 
-        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (226, 2, 2, 17, 3, 2))
+        self.assertEqual(tuple(len(rule_group) for rule_group in rule_ids_by_group), (227, 2, 2, 17, 3, 2))
         self.assertEqual(
             {rule_id for rule_group in rule_ids_by_group for rule_id in rule_group},
             registry.known_rule_ids(),
