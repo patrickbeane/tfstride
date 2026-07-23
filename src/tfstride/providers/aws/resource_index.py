@@ -17,6 +17,7 @@ class AwsResourceIndex:
     route_tables: dict[str | None, NormalizedResource]
     buckets: dict[str, NormalizedResource]
     secrets: dict[str, NormalizedResource]
+    sns_topics: dict[str, NormalizedResource]
     sqs_queues: dict[str, NormalizedResource]
     lambda_functions: dict[str, NormalizedResource]
     ecs_clusters: dict[str, NormalizedResource]
@@ -50,6 +51,7 @@ class AwsResourceIndexBuilder:
         route_tables: dict[str | None, NormalizedResource] = {}
         buckets: dict[str, NormalizedResource] = {}
         secrets: dict[str, NormalizedResource] = {}
+        sns_topics: dict[str, NormalizedResource] = {}
         sqs_queues: dict[str, NormalizedResource] = {}
         lambda_functions: dict[str, NormalizedResource] = {}
         ecs_clusters: dict[str, NormalizedResource] = {}
@@ -99,6 +101,17 @@ class AwsResourceIndexBuilder:
                         facts.name,
                     ),
                 )
+            elif resource_type == "aws_sns_topic":
+                _index_resource_aliases(
+                    sns_topics,
+                    resource,
+                    (
+                        resource.address,
+                        f"{resource.address}.id",
+                        f"{resource.address}.arn",
+                        resource.arn,
+                    ),
+                )
             elif resource_type == "aws_sqs_queue":
                 _index_resource_aliases(
                     sqs_queues,
@@ -106,7 +119,9 @@ class AwsResourceIndexBuilder:
                     (
                         resource.address,
                         f"{resource.address}.id",
+                        f"{resource.address}.arn",
                         f"{resource.address}.url",
+                        resource.arn,
                         facts.sqs_queue_url,
                     ),
                 )
@@ -240,6 +255,7 @@ class AwsResourceIndexBuilder:
             route_tables=route_tables,
             buckets=buckets,
             secrets=secrets,
+            sns_topics=sns_topics,
             sqs_queues=sqs_queues,
             lambda_functions=lambda_functions,
             ecs_clusters=ecs_clusters,

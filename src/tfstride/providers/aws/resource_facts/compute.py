@@ -96,6 +96,14 @@ class AwsComputeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.ECS_S3_ACCESS_PATH_UNCERTAINTIES)
 
     @property
+    def ecs_messaging_access_paths(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_MESSAGING_ACCESS_PATHS)
+
+    @property
+    def ecs_messaging_access_path_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_MESSAGING_ACCESS_PATH_UNCERTAINTIES)
+
+    @property
     def unresolved_task_definition_references(self) -> list[str]:
         return self.get(AwsResourceMetadata.UNRESOLVED_TASK_DEFINITION_REFERENCES)
 
@@ -500,6 +508,12 @@ class AwsComputeFacts(AwsBaseFacts):
 
     def extend_ecs_s3_access_path_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(AwsResourceMetadata.ECS_S3_ACCESS_PATH_UNCERTAINTIES, values)
+
+    def set_ecs_messaging_access_paths(self, values: list[dict[str, Any]]) -> None:
+        self.set(AwsResourceMetadata.ECS_MESSAGING_ACCESS_PATHS, values)
+
+    def extend_ecs_messaging_access_path_uncertainties(self, values: Sequence[str | None]) -> None:
+        self.extend(AwsResourceMetadata.ECS_MESSAGING_ACCESS_PATH_UNCERTAINTIES, values)
 
     def extend_ecr_write_path_uncertainties(self, values: Sequence[str | None]) -> None:
         self.extend(AwsResourceMetadata.ECR_WRITE_PATH_UNCERTAINTIES, values)
