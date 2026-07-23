@@ -24,6 +24,34 @@ class AzureServiceBusFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.RESOLVED_SERVICE_BUS_NAMESPACE_ADDRESS)
 
     @property
+    def service_bus_entity_id(self) -> str | None:
+        return self.get(AzureResourceMetadata.SERVICE_BUS_ENTITY_ID)
+
+    @property
+    def service_bus_entity_name(self) -> str | None:
+        return self.get(AzureResourceMetadata.SERVICE_BUS_ENTITY_NAME)
+
+    @property
+    def service_bus_entity_kind(self) -> str | None:
+        return self.get(AzureResourceMetadata.SERVICE_BUS_ENTITY_KIND)
+
+    @property
+    def service_bus_topic_reference(self) -> str | None:
+        return self.get(AzureResourceMetadata.SERVICE_BUS_TOPIC_REFERENCE)
+
+    @property
+    def resolved_service_bus_topic_address(self) -> str | None:
+        return self.get(AzureResourceMetadata.RESOLVED_SERVICE_BUS_TOPIC_ADDRESS)
+
+    @property
+    def service_bus_entity_namespace_reference(self) -> str | None:
+        return self.service_bus_namespace_reference
+
+    @property
+    def unresolved_service_bus_topic_references(self) -> list[str]:
+        return self.get(AzureResourceMetadata.UNRESOLVED_SERVICE_BUS_TOPIC_REFERENCES)
+
+    @property
     def service_bus_sku(self) -> str | None:
         return self.get(AzureResourceMetadata.SERVICE_BUS_SKU)
 
@@ -75,6 +103,9 @@ class AzureServiceBusFacts(AzureBaseFacts):
     def set_resolved_service_bus_namespace_address(self, address: str) -> None:
         self.set(AzureResourceMetadata.RESOLVED_SERVICE_BUS_NAMESPACE_ADDRESS, address)
 
+    def set_resolved_service_bus_topic_address(self, address: str) -> None:
+        self.set(AzureResourceMetadata.RESOLVED_SERVICE_BUS_TOPIC_ADDRESS, address)
+
     def set_effective_service_bus_network_rule(
         self,
         *,
@@ -108,3 +139,6 @@ class AzureServiceBusFacts(AzureBaseFacts):
 
     def add_unresolved_service_bus_namespace_reference(self, reference: str | None) -> None:
         self.append(AzureResourceMetadata.UNRESOLVED_SERVICE_BUS_NAMESPACE_REFERENCES, reference)
+
+    def add_unresolved_service_bus_topic_reference(self, reference: str | None) -> None:
+        self.append(AzureResourceMetadata.UNRESOLVED_SERVICE_BUS_TOPIC_REFERENCES, reference)

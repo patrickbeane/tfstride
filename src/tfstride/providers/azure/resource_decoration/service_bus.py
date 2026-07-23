@@ -15,6 +15,12 @@ class DecorateServiceBusRelationshipsStage:
                 self._apply_network_rule_set(resource, context)
             elif resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY:
                 self._apply_customer_managed_key(resource, context)
+            elif resource.resource_type in {
+                AzureResourceType.SERVICE_BUS_QUEUE,
+                AzureResourceType.SERVICE_BUS_TOPIC,
+                AzureResourceType.SERVICE_BUS_SUBSCRIPTION,
+            }:
+                self._apply_entity(resource, context)
 
     def _apply_network_rule_set(
         self,
@@ -36,6 +42,41 @@ class DecorateServiceBusRelationshipsStage:
         namespace_facts.extend_service_bus_posture_uncertainties(
             [f"{network_rule_set.address}: {uncertainty}" for uncertainty in facts.service_bus_posture_uncertainties]
         )
+
+    def _apply_entity(
+        self,
+        entity: NormalizedResource,
+        context: AzureDecorationContext,
+    ) -> None:
+        if entity.resource_type == AzureResourceType.SERVICE_BUS_SUBSCRIPTION:
+            self._apply_subscription(entity, context)
+            return
+
+        facts = azure_facts(entity)
+        namespace = _resolve_namespace(context, facts.service_bus_entity_namespace_reference)
+        if namespace is None:
+            facts.add_unresolved_service_bus_namespace_reference(facts.service_bus_entity_namespace_reference)
+        else:
+            facts.set_resolved_service_bus_namespace_address(namespace.address)
+
+    def _apply_subscription(
+        self,
+        subscription: NormalizedResource,
+        context: AzureDecorationContext,
+    ) -> None:
+        facts = azure_facts(subscription)
+        topic = _resolve_topic(context, facts.service_bus_topic_reference)
+        if topic is None:
+            facts.add_unresolved_service_bus_topic_reference(facts.service_bus_topic_reference)
+            return
+
+        facts.set_resolved_service_bus_topic_address(topic.address)
+        topic_namespace_reference = azure_facts(topic).service_bus_entity_namespace_reference
+        namespace = _resolve_namespace(context, topic_namespace_reference)
+        if namespace is None:
+            facts.add_unresolved_service_bus_namespace_reference(topic_namespace_reference)
+            return
+        facts.set_resolved_service_bus_namespace_address(namespace.address)
 
     def _apply_customer_managed_key(
         self,
@@ -74,6 +115,18 @@ def _resolve_namespace(
     return namespace
 
 
+def _resolve_topic(
+    context: AzureDecorationContext,
+    reference: str | None,
+) -> NormalizedResource | None:
+    if not _is_deterministic_topic_reference(reference):
+        return None
+    topic = context.index.resolve(reference)
+    if topic is None or topic.resource_type != AzureResourceType.SERVICE_BUS_TOPIC:
+        return None
+    return topic
+
+
 def _is_deterministic_namespace_reference(reference: str | None) -> bool:
     if reference is None:
         return False
@@ -81,3 +134,12 @@ def _is_deterministic_namespace_reference(reference: str | None) -> bool:
     if value.startswith("${") and value.endswith("}"):
         value = value[2:-1].strip()
     return value.startswith("/") or value.lower().startswith(f"{AzureResourceType.SERVICE_BUS_NAMESPACE}.")
+
+
+def _is_deterministic_topic_reference(reference: str | None) -> bool:
+    if reference is None:
+        return False
+    value = reference.strip()
+    if value.startswith("${") and value.endswith("}"):
+        value = value[2:-1].strip()
+    return value.startswith("/") or value.lower().startswith(f"{AzureResourceType.SERVICE_BUS_TOPIC}.")

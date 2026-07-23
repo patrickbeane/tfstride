@@ -12,6 +12,9 @@ class AzureResourceType:
     SERVICE_BUS_NAMESPACE = "azurerm_servicebus_namespace"
     SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET = "azurerm_servicebus_namespace_network_rule_set"
     SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY = "azurerm_servicebus_namespace_customer_managed_key"
+    SERVICE_BUS_QUEUE = "azurerm_servicebus_queue"
+    SERVICE_BUS_TOPIC = "azurerm_servicebus_topic"
+    SERVICE_BUS_SUBSCRIPTION = "azurerm_servicebus_subscription"
     CONTAINER_REGISTRY = "azurerm_container_registry"
     KEY_VAULT = "azurerm_key_vault"
     KEY_VAULT_ACCESS_POLICY = "azurerm_key_vault_access_policy"
@@ -75,6 +78,9 @@ AZURE_SERVICE_BUS_RESOURCE_TYPES = frozenset(
         AzureResourceType.SERVICE_BUS_NAMESPACE,
         AzureResourceType.SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET,
         AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY,
+        AzureResourceType.SERVICE_BUS_QUEUE,
+        AzureResourceType.SERVICE_BUS_TOPIC,
+        AzureResourceType.SERVICE_BUS_SUBSCRIPTION,
     }
 )
 

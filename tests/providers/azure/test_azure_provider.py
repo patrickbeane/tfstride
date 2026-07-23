@@ -61,6 +61,9 @@ class AzureProviderTests(unittest.TestCase):
         self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.CONTAINER_REGISTRY))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SERVICE_BUS_QUEUE))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SERVICE_BUS_TOPIC))
+        self.assertTrue(plugin.supports_resource_type(AzureResourceType.SERVICE_BUS_SUBSCRIPTION))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.KEY_VAULT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.USER_ASSIGNED_IDENTITY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.FEDERATED_IDENTITY_CREDENTIAL))
@@ -84,6 +87,26 @@ class AzureProviderTests(unittest.TestCase):
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.OBJECT_STORAGE),
             frozenset({AzureResourceType.STORAGE_ACCOUNT}),
+        )
+        self.assertEqual(
+            plugin.resource_types_for_capability(ResourceCapability.DATA_STORE),
+            frozenset(
+                {
+                    AzureResourceType.STORAGE_ACCOUNT,
+                    AzureResourceType.SERVICE_BUS_NAMESPACE,
+                    AzureResourceType.SERVICE_BUS_QUEUE,
+                    AzureResourceType.SERVICE_BUS_TOPIC,
+                    AzureResourceType.SERVICE_BUS_SUBSCRIPTION,
+                    AzureResourceType.KEY_VAULT,
+                    AzureResourceType.KEY_VAULT_SECRET,
+                    AzureResourceType.KEY_VAULT_KEY,
+                    AzureResourceType.KEY_VAULT_CERTIFICATE,
+                    AzureResourceType.MSSQL_SERVER,
+                    AzureResourceType.MSSQL_DATABASE,
+                    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER,
+                    AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_DATABASE,
+                }
+            ),
         )
         self.assertEqual(
             plugin.resource_types_for_capability(ResourceCapability.WORKLOAD),

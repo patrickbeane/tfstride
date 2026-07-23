@@ -10,7 +10,14 @@ from tfstride.providers.azure.resource_types import (
 from tfstride.providers.resource_capabilities import ResourceCapability, ResourceCapabilityMap
 
 _STORAGE_ACCOUNTS = frozenset({AzureResourceType.STORAGE_ACCOUNT})
-_SERVICE_BUS_NAMESPACES = frozenset({AzureResourceType.SERVICE_BUS_NAMESPACE})
+_SERVICE_BUS_DATA_RESOURCES = frozenset(
+    {
+        AzureResourceType.SERVICE_BUS_NAMESPACE,
+        AzureResourceType.SERVICE_BUS_QUEUE,
+        AzureResourceType.SERVICE_BUS_TOPIC,
+        AzureResourceType.SERVICE_BUS_SUBSCRIPTION,
+    }
+)
 _VIRTUAL_MACHINES = AZURE_COMPUTE_RESOURCE_TYPES
 _APP_SERVICES = AZURE_APP_SERVICE_RESOURCE_TYPES
 _KEY_VAULTS = frozenset({AzureResourceType.KEY_VAULT})
@@ -35,7 +42,7 @@ AZURE_RESOURCE_CAPABILITIES: ResourceCapabilityMap = MappingProxyType(
         ResourceCapability.SECURITY_GROUP_BACKED_WORKLOAD: _VIRTUAL_MACHINES,
         ResourceCapability.PUBLIC_COMPUTE: _VIRTUAL_MACHINES,
         ResourceCapability.DATA_STORE: (
-            _STORAGE_ACCOUNTS | _SERVICE_BUS_NAMESPACES | _KEY_VAULT_DATA | _SQL_DATA | _POSTGRESQL_DATA
+            _STORAGE_ACCOUNTS | _SERVICE_BUS_DATA_RESOURCES | _KEY_VAULT_DATA | _SQL_DATA | _POSTGRESQL_DATA
         ),
         ResourceCapability.PUBLIC_EDGE: _STORAGE_ACCOUNTS
         | _KEY_VAULTS

@@ -75,6 +75,11 @@ from tfstride.providers.azure.postgresql_normalizers import (
 )
 from tfstride.providers.azure.resource_decorator import AzureResourceDecorator
 from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.service_bus_entity_normalizers import (
+    normalize_servicebus_queue,
+    normalize_servicebus_subscription,
+    normalize_servicebus_topic,
+)
 from tfstride.providers.azure.service_bus_normalizers import (
     normalize_servicebus_namespace,
     normalize_servicebus_namespace_customer_managed_key,
@@ -90,6 +95,9 @@ _AZURE_RESOURCE_NORMALIZERS = {
     AzureResourceType.SERVICE_BUS_NAMESPACE: normalize_servicebus_namespace,
     AzureResourceType.SERVICE_BUS_NAMESPACE_NETWORK_RULE_SET: normalize_servicebus_namespace_network_rule_set,
     AzureResourceType.SERVICE_BUS_NAMESPACE_CUSTOMER_MANAGED_KEY: normalize_servicebus_namespace_customer_managed_key,
+    AzureResourceType.SERVICE_BUS_QUEUE: normalize_servicebus_queue,
+    AzureResourceType.SERVICE_BUS_TOPIC: normalize_servicebus_topic,
+    AzureResourceType.SERVICE_BUS_SUBSCRIPTION: normalize_servicebus_subscription,
     AzureResourceType.CONTAINER_REGISTRY: normalize_container_registry,
     AzureResourceType.KEY_VAULT: normalize_key_vault,
     AzureResourceType.KEY_VAULT_ACCESS_POLICY: normalize_key_vault_access_policy,
