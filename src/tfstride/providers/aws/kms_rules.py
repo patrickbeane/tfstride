@@ -9,6 +9,7 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.kms_evidence import AwsKmsGrantRelationship, AwsKmsKeyPolicyEvidence
 from tfstride.providers.aws.policy_conditions import assess_principal
@@ -58,13 +59,14 @@ class AwsKmsRuleDetectors:
         findings: list[Finding] = []
         for key in context.inventory.by_type(_AWS_KMS_KEY):
             facts = aws_facts(key)
-            if not _kms_rotation_applicable(facts):
+            lifecycle_posture = _kms_key_lifecycle_posture(facts)
+            if not lifecycle_posture.is_applicable:
                 continue
-            issue_state = _kms_rotation_issue_state(facts)
-            if issue_state is None:
+            if not lifecycle_posture.requires_attention and lifecycle_posture.assessment != "unknown":
                 continue
+            issue_state = _kms_rotation_evidence_state(lifecycle_posture)
 
-            unknown = issue_state == STATE_UNKNOWN
+            unknown = lifecycle_posture.assessment == "unknown"
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -88,7 +90,7 @@ class AwsKmsRuleDetectors:
                         ),
                         evidence_item(
                             "posture_uncertainty",
-                            _kms_rotation_uncertainty_evidence(facts),
+                            list(lifecycle_posture.uncertainties),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -275,18 +277,65 @@ class AwsKmsRuleDetectors:
         return findings
 
 
-def _kms_rotation_applicable(facts: AwsResourceFacts) -> bool:
-    for field_path in (
+def _kms_key_lifecycle_posture(facts: AwsResourceFacts) -> ManagedKeyLifecyclePosture:
+    applicability_uncertainties = tuple(_kms_rotation_applicability_uncertainties(facts))
+    if applicability_uncertainties:
+        return ManagedKeyLifecyclePosture(
+            "unknown",
+            "not_evaluated",
+            uncertainties=applicability_uncertainties,
+        )
+    if not _kms_automatic_rotation_supported(facts):
+        return ManagedKeyLifecyclePosture("not_applicable", "not_evaluated")
+
+    rotation_uncertainties = tuple(_kms_rotation_uncertainty_evidence(facts))
+    state = facts.kms_enable_key_rotation_state or STATE_DISABLED
+    if state == STATE_DISABLED:
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "action_required",
+            issues=("rotation_disabled",),
+            uncertainties=rotation_uncertainties,
+        )
+    if state != STATE_ENABLED or _kms_uncertainty_evidence(facts, "rotation_period_in_days"):
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "unknown",
+            uncertainties=rotation_uncertainties,
+        )
+
+    rotation_period_days = facts.kms_rotation_period_in_days or _KMS_DEFAULT_ROTATION_PERIOD_DAYS
+    if rotation_period_days > _KMS_ROTATION_BASELINE_MAX_DAYS:
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "action_required",
+            issues=("rotation_interval_too_long",),
+            uncertainties=rotation_uncertainties,
+        )
+    return ManagedKeyLifecyclePosture(
+        "applicable",
+        "compliant",
+        uncertainties=rotation_uncertainties,
+    )
+
+
+def _kms_rotation_applicability_uncertainties(facts: AwsResourceFacts) -> list[str]:
+    field_paths = (
         "key_usage",
         "key_spec",
         "customer_master_key_spec",
         "origin",
         "custom_key_store_id",
         "xks_key_id",
-    ):
-        if _kms_uncertainty_evidence(facts, field_path):
-            return False
+    )
+    return [
+        uncertainty
+        for uncertainty in facts.kms_posture_uncertainties
+        if any(field_path in uncertainty for field_path in field_paths)
+    ]
 
+
+def _kms_automatic_rotation_supported(facts: AwsResourceFacts) -> bool:
     key_usage = _normalized_upper(facts.kms_key_usage) or "ENCRYPT_DECRYPT"
     if key_usage != "ENCRYPT_DECRYPT":
         return False
@@ -304,21 +353,14 @@ def _kms_rotation_applicable(facts: AwsResourceFacts) -> bool:
     )
 
 
-def _kms_rotation_issue_state(facts: AwsResourceFacts) -> str | None:
-    state = facts.kms_enable_key_rotation_state or STATE_DISABLED
-    if state == STATE_DISABLED:
+def _kms_rotation_evidence_state(lifecycle_posture: ManagedKeyLifecyclePosture) -> str:
+    if lifecycle_posture.assessment == "unknown":
+        return STATE_UNKNOWN
+    if lifecycle_posture.issues == ("rotation_disabled",):
         return STATE_DISABLED
-    if state == STATE_UNKNOWN:
-        return STATE_UNKNOWN
-    if state != STATE_ENABLED:
-        return STATE_UNKNOWN
-    if _kms_uncertainty_evidence(facts, "rotation_period_in_days"):
-        return STATE_UNKNOWN
-
-    rotation_period_days = facts.kms_rotation_period_in_days or _KMS_DEFAULT_ROTATION_PERIOD_DAYS
-    if rotation_period_days > _KMS_ROTATION_BASELINE_MAX_DAYS:
+    if lifecycle_posture.issues == ("rotation_interval_too_long",):
         return "too_long"
-    return None
+    raise ValueError(f"unsupported AWS managed-key lifecycle posture: {lifecycle_posture!r}")
 
 
 def _normalized_upper(value: str | None) -> str | None:

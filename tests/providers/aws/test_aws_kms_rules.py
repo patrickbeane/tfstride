@@ -6,7 +6,9 @@ from typing import Any
 
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import TerraformResource
+from tfstride.providers.aws.kms_rules import _kms_key_lifecycle_posture
 from tfstride.providers.aws.normalizer import AwsNormalizer
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -155,7 +157,105 @@ def _evidence_by_key(finding):
     return {item.key: item.values for item in finding.evidence}
 
 
+def _lifecycle_posture(resource: TerraformResource) -> ManagedKeyLifecyclePosture:
+    inventory = AwsNormalizer().normalize([resource])
+    key = inventory.get_by_address(resource.address)
+    assert key is not None
+    return _kms_key_lifecycle_posture(aws_facts(key))
+
+
 class AwsKmsRuleTests(unittest.TestCase):
+    def test_aws_adapter_maps_provider_semantics_to_shared_lifecycle_posture(self) -> None:
+        cases = (
+            (
+                "missing-rotation",
+                _kms_key(),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("rotation_disabled",),
+                ),
+            ),
+            (
+                "enabled-default-period",
+                _kms_key(enable_key_rotation=True),
+                ManagedKeyLifecyclePosture("applicable", "compliant"),
+            ),
+            (
+                "enabled-at-boundary",
+                _kms_key(enable_key_rotation=True, rotation_period_in_days=365),
+                ManagedKeyLifecyclePosture("applicable", "compliant"),
+            ),
+            (
+                "enabled-over-boundary",
+                _kms_key(enable_key_rotation=True, rotation_period_in_days=366),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("rotation_interval_too_long",),
+                ),
+            ),
+            (
+                "unresolved-rotation",
+                _kms_key(unknown_values={"enable_key_rotation": True}),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "unknown",
+                    uncertainties=("enable_key_rotation is unknown after planning",),
+                ),
+            ),
+            (
+                "unresolved-period",
+                _kms_key(
+                    enable_key_rotation=True,
+                    unknown_values={"rotation_period_in_days": True},
+                ),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "unknown",
+                    uncertainties=("rotation_period_in_days is unknown after planning",),
+                ),
+            ),
+            (
+                "signing-key",
+                _kms_key(key_usage="SIGN_VERIFY", key_spec="ECC_NIST_P256"),
+                ManagedKeyLifecyclePosture("not_applicable", "not_evaluated"),
+            ),
+            (
+                "asymmetric-encryption-key",
+                _kms_key(key_spec="RSA_2048"),
+                ManagedKeyLifecyclePosture("not_applicable", "not_evaluated"),
+            ),
+            (
+                "imported-key",
+                _kms_key(origin="EXTERNAL"),
+                ManagedKeyLifecyclePosture("not_applicable", "not_evaluated"),
+            ),
+            (
+                "custom-store-key",
+                _kms_key(origin="AWS_KMS", custom_key_store_id="cks-1234"),
+                ManagedKeyLifecyclePosture("not_applicable", "not_evaluated"),
+            ),
+            (
+                "xks-key",
+                _kms_key(origin="EXTERNAL_KEY_STORE", xks_key_id="xks-key"),
+                ManagedKeyLifecyclePosture("not_applicable", "not_evaluated"),
+            ),
+            (
+                "unresolved-origin",
+                _kms_key(unknown_values={"origin": True}),
+                ManagedKeyLifecyclePosture(
+                    "unknown",
+                    "not_evaluated",
+                    uncertainties=("origin is unknown after planning",),
+                ),
+            ),
+        )
+
+        for case, resource, expected in cases:
+            with self.subTest(case=case):
+                self.assertEqual(_lifecycle_posture(resource), expected)
+
     def test_symmetric_customer_key_with_rotation_disabled_is_detected(self) -> None:
         findings = _findings([_kms_key(enable_key_rotation=False)])
 
