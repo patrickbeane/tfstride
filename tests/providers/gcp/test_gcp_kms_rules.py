@@ -5,8 +5,11 @@ import unittest
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import TerraformResource
+from tfstride.providers.gcp.kms_rules import _kms_key_lifecycle_posture
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_facts import gcp_facts
 
 _KMS_ROTATION_RULE_ID = "gcp-kms-key-rotation-not-configured-or-too-long"
 _KMS_DESTROY_RULE_ID = "gcp-kms-key-destroy-scheduled-duration-too-short"
@@ -53,7 +56,88 @@ def _evidence_by_key(finding):
     return {item.key: item.values for item in finding.evidence}
 
 
+def _lifecycle_posture(resource: TerraformResource) -> ManagedKeyLifecyclePosture:
+    inventory = GcpNormalizer().normalize([resource])
+    key = inventory.get_by_address(resource.address)
+    assert key is not None
+    return _kms_key_lifecycle_posture(gcp_facts(key))
+
+
 class GcpKmsRuleTests(unittest.TestCase):
+    def test_gcp_adapter_maps_provider_semantics_to_shared_lifecycle_posture(self) -> None:
+        cases = (
+            (
+                "missing",
+                _kms_key(),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("rotation_period_missing",),
+                ),
+            ),
+            (
+                "configured",
+                _kms_key(rotation_period="7776000s"),
+                ManagedKeyLifecyclePosture("applicable", "compliant"),
+            ),
+            (
+                "too-long",
+                _kms_key(rotation_period="7776001s"),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("rotation_interval_too_long",),
+                ),
+            ),
+            (
+                "unresolved-period",
+                _kms_key(unknown_values={"rotation_period": True}),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "unknown",
+                    uncertainties=("rotation_period is unknown after planning",),
+                ),
+            ),
+            (
+                "unparseable-period",
+                _kms_key(rotation_period="not-a-duration"),
+                ManagedKeyLifecyclePosture("applicable", "unknown"),
+            ),
+            (
+                "asymmetric-purpose",
+                _kms_key(purpose="ASYMMETRIC_SIGN"),
+                ManagedKeyLifecyclePosture(
+                    "not_applicable",
+                    "not_evaluated",
+                ),
+            ),
+            (
+                "unresolved-purpose",
+                _kms_key(unknown_values={"purpose": True}),
+                ManagedKeyLifecyclePosture(
+                    "unknown",
+                    "not_evaluated",
+                    uncertainties=("purpose is unknown after planning",),
+                ),
+            ),
+            (
+                "unresolved-provider-posture",
+                _kms_key(
+                    rotation_period="7776000s",
+                    unknown_values={"destroy_scheduled_duration": True},
+                ),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "unknown",
+                    uncertainties=("destroy_scheduled_duration is unknown after planning",),
+                ),
+            ),
+        )
+
+        for case, resource, expected in cases:
+            with self.subTest(case=case):
+                self.assertEqual(_lifecycle_posture(resource), expected)
+
     def test_kms_crypto_key_missing_rotation_period_is_detected(self) -> None:
         findings = _findings([_kms_key()])
 

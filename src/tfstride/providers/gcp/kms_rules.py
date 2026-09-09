@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.gcp.data_rule_utils import gcp_duration_seconds as _gcp_duration_seconds
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
@@ -29,9 +30,10 @@ class GcpKmsRuleDetectors:
             key_facts = gcp_facts(key)
             if key.data_sensitivity != "sensitive":
                 continue
-            rotation_issues = _kms_rotation_issues(key_facts)
-            if not rotation_issues:
+            lifecycle_posture = _kms_key_lifecycle_posture(key_facts)
+            if not lifecycle_posture.requires_attention:
                 continue
+            rotation_issues = _kms_rotation_issue_evidence(key_facts, lifecycle_posture)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -110,22 +112,66 @@ class GcpKmsRuleDetectors:
         return findings
 
 
-def _kms_rotation_issues(key_facts: GcpResourceFacts) -> list[str]:
-    if key_facts.kms_posture_uncertainties:
-        return []
+def _kms_key_lifecycle_posture(key_facts: GcpResourceFacts) -> ManagedKeyLifecyclePosture:
+    uncertainties = tuple(key_facts.kms_posture_uncertainties)
+    if any("purpose" in uncertainty for uncertainty in uncertainties):
+        return ManagedKeyLifecyclePosture(
+            "unknown",
+            "not_evaluated",
+            uncertainties=uncertainties,
+        )
     if not _kms_rotation_supported_for_purpose(key_facts.kms_purpose):
-        return []
+        return ManagedKeyLifecyclePosture(
+            "not_applicable",
+            "not_evaluated",
+            uncertainties=uncertainties,
+        )
+    if uncertainties:
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "unknown",
+            uncertainties=uncertainties,
+        )
 
     rotation_period = key_facts.kms_rotation_period
     if not rotation_period:
-        return ["rotation_period is missing"]
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "action_required",
+            issues=("rotation_period_missing",),
+        )
 
     rotation_seconds = _gcp_duration_seconds(rotation_period)
     if rotation_seconds is None:
-        return []
+        return ManagedKeyLifecyclePosture("applicable", "unknown")
     if rotation_seconds > _KMS_MAX_ROTATION_PERIOD_SECONDS:
-        return [f"rotation_period is {rotation_seconds} seconds; maximum is {_KMS_MAX_ROTATION_PERIOD_SECONDS} seconds"]
-    return []
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "action_required",
+            issues=("rotation_interval_too_long",),
+        )
+    return ManagedKeyLifecyclePosture("applicable", "compliant")
+
+
+def _kms_rotation_issue_evidence(
+    key_facts: GcpResourceFacts,
+    lifecycle_posture: ManagedKeyLifecyclePosture,
+) -> list[str]:
+    values: list[str] = []
+    for issue in lifecycle_posture.issues:
+        if issue == "rotation_period_missing":
+            values.append("rotation_period is missing")
+            continue
+        if issue == "rotation_interval_too_long":
+            rotation_seconds = _gcp_duration_seconds(key_facts.kms_rotation_period)
+            if rotation_seconds is None:
+                raise ValueError("rotation interval issue requires a parseable GCP rotation_period")
+            values.append(
+                f"rotation_period is {rotation_seconds} seconds; maximum is {_KMS_MAX_ROTATION_PERIOD_SECONDS} seconds"
+            )
+            continue
+        raise ValueError(f"unsupported GCP managed-key lifecycle issue: {issue!r}")
+    return values
 
 
 def _kms_rotation_evidence(key_facts: GcpResourceFacts) -> list[str]:
