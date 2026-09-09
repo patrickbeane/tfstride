@@ -5,7 +5,9 @@ import unittest
 from tfstride.analysis.boundaries import detect_trust_boundaries
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import TerraformResource
+from tfstride.providers.azure.key_vault_rules import _key_vault_key_lifecycle_posture
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.observations import observe_azure_posture
 from tfstride.providers.azure.resource_facts import azure_facts
@@ -165,7 +167,101 @@ def _evaluate(resources: list[TerraformResource], *rule_ids: str):
     return inventory, boundaries, findings
 
 
+def _key_lifecycle_posture(resource: TerraformResource) -> ManagedKeyLifecyclePosture:
+    inventory = AzureNormalizer().normalize([resource])
+    key = inventory.get_by_address(resource.address)
+    assert key is not None
+    return _key_vault_key_lifecycle_posture(azure_facts(key))
+
+
 class AzureKeyVaultRuleTests(unittest.TestCase):
+    def test_azure_adapter_maps_ordered_provider_issues_to_shared_lifecycle_posture(self) -> None:
+        cases = (
+            (
+                "missing-policy",
+                _key(),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("rotation_policy_missing",),
+                ),
+            ),
+            (
+                "bounded-policy",
+                _key(
+                    rotation_policy=_rotation_policy(),
+                    not_before_date="2026-01-01T00:00:00Z",
+                    expiration_date="2028-01-01T00:00:00Z",
+                ),
+                ManagedKeyLifecyclePosture("applicable", "compliant"),
+            ),
+            (
+                "missing-policy-controls",
+                _key(rotation_policy=[{"notify_before_expiry": "P30D"}]),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=("expiration_policy_missing", "rotation_automation_missing"),
+                ),
+            ),
+            (
+                "time-before-expiry-automation",
+                _key(
+                    rotation_policy=_rotation_policy(
+                        time_after_creation=_MISSING,
+                        time_before_expiry="P30D",
+                    )
+                ),
+                ManagedKeyLifecyclePosture("applicable", "compliant"),
+            ),
+            (
+                "ordered-excessive-intervals",
+                _key(
+                    rotation_policy=_rotation_policy(
+                        expire_after="P731D",
+                        time_after_creation="P366D",
+                    ),
+                    not_before_date="2026-01-01T00:00:00Z",
+                    expiration_date="2028-01-02T00:00:00Z",
+                ),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "action_required",
+                    issues=(
+                        "expiration_interval_too_long",
+                        "rotation_interval_too_long",
+                        "key_lifetime_too_long",
+                    ),
+                ),
+            ),
+            (
+                "unresolved-policy",
+                _key(
+                    rotation_policy=[{"automatic": [{}]}],
+                    unknown_values={
+                        "rotation_policy": [
+                            {
+                                "expire_after": True,
+                                "automatic": [{"time_after_creation": True}],
+                            }
+                        ]
+                    },
+                ),
+                ManagedKeyLifecyclePosture(
+                    "applicable",
+                    "unknown",
+                    uncertainties=(
+                        "rotation_policy.expire_after is unknown after planning",
+                        "rotation_policy.automatic.time_after_creation is unknown after planning",
+                    ),
+                ),
+            ),
+        )
+
+        for case, resource, expected in cases:
+            with self.subTest(case=case):
+                self.assertEqual(_key_lifecycle_posture(resource), expected)
+
     def test_public_key_vault_emits_network_finding_and_boundary(self) -> None:
         _, boundaries, findings = _evaluate(
             [_vault()],

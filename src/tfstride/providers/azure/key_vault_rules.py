@@ -13,6 +13,7 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.key_management import ManagedKeyLifecycleIssue, ManagedKeyLifecyclePosture
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
@@ -271,9 +272,10 @@ class AzureKeyVaultRuleDetectors:
         findings: list[Finding] = []
         for key in context.inventory.by_type(AzureResourceType.KEY_VAULT_KEY):
             facts = azure_facts(key)
-            rotation_issues = _key_vault_key_rotation_issues(facts)
-            if not rotation_issues:
+            lifecycle_posture = _key_vault_key_lifecycle_posture(facts)
+            if not lifecycle_posture.requires_attention:
                 continue
+            rotation_issues = _key_vault_key_rotation_issue_evidence(facts, lifecycle_posture)
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
                 privilege_breadth=0,
@@ -367,43 +369,97 @@ def _key_vault_key_strength_issues(facts: AzureResourceFacts) -> list[str]:
     return []
 
 
-def _key_vault_key_rotation_issues(facts: AzureResourceFacts) -> list[str]:
-    if facts.key_vault_key_posture_uncertainties:
-        return []
+def _key_vault_key_lifecycle_posture(facts: AzureResourceFacts) -> ManagedKeyLifecyclePosture:
+    uncertainties = tuple(facts.key_vault_key_posture_uncertainties)
+    if uncertainties:
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "unknown",
+            uncertainties=uncertainties,
+        )
 
-    issues: list[str] = []
+    issues: list[ManagedKeyLifecycleIssue] = []
     if not facts.key_vault_rotation_policy:
-        issues.append("key has no rotation_policy")
+        issues.append("rotation_policy_missing")
     else:
         if not facts.key_vault_rotation_policy_expire_after:
-            issues.append("rotation_policy.expire_after is not configured")
+            issues.append("expiration_policy_missing")
         if not (
             facts.key_vault_rotation_policy_automatic_time_after_creation
             or facts.key_vault_rotation_policy_automatic_time_before_expiry
         ):
-            issues.append("rotation_policy.automatic is not configured")
+            issues.append("rotation_automation_missing")
 
     expire_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_expire_after)
     if expire_after_days is not None and expire_after_days > _KEY_VAULT_MAX_KEY_EXPIRY_DAYS:
-        issues.append(
-            f"rotation_policy.expire_after is {facts.key_vault_rotation_policy_expire_after} "
-            f"({expire_after_days} days); maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
-        )
+        issues.append("expiration_interval_too_long")
 
     rotate_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_automatic_time_after_creation)
     if rotate_after_days is not None and rotate_after_days > _KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS:
-        issues.append(
-            "rotation_policy.automatic.time_after_creation is "
-            f"{facts.key_vault_rotation_policy_automatic_time_after_creation} ({rotate_after_days} days); "
-            f"maximum is {_KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS} days"
-        )
+        issues.append("rotation_interval_too_long")
 
     lifetime_days = _key_vault_lifetime_days(facts.key_vault_not_before_date, facts.key_vault_expiration_date)
     if lifetime_days is not None and lifetime_days > _KEY_VAULT_MAX_KEY_EXPIRY_DAYS:
-        issues.append(
-            f"configured key lifetime is {lifetime_days} days; maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
+        issues.append("key_lifetime_too_long")
+
+    if issues:
+        return ManagedKeyLifecyclePosture(
+            "applicable",
+            "action_required",
+            issues=tuple(issues),
         )
-    return issues
+    return ManagedKeyLifecyclePosture("applicable", "compliant")
+
+
+def _key_vault_key_rotation_issue_evidence(
+    facts: AzureResourceFacts,
+    lifecycle_posture: ManagedKeyLifecyclePosture,
+) -> list[str]:
+    values: list[str] = []
+    for issue in lifecycle_posture.issues:
+        if issue == "rotation_policy_missing":
+            values.append("key has no rotation_policy")
+            continue
+        if issue == "expiration_policy_missing":
+            values.append("rotation_policy.expire_after is not configured")
+            continue
+        if issue == "rotation_automation_missing":
+            values.append("rotation_policy.automatic is not configured")
+            continue
+        if issue == "expiration_interval_too_long":
+            expire_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_expire_after)
+            if expire_after_days is None:
+                raise ValueError("expiration interval issue requires a parseable Azure expire_after period")
+            values.append(
+                f"rotation_policy.expire_after is {facts.key_vault_rotation_policy_expire_after} "
+                f"({expire_after_days} days); maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
+            )
+            continue
+        if issue == "rotation_interval_too_long":
+            rotate_after_days = _parse_iso_period_days(facts.key_vault_rotation_policy_automatic_time_after_creation)
+            if rotate_after_days is None:
+                raise ValueError(
+                    "rotation interval issue requires a parseable Azure automatic time_after_creation period"
+                )
+            values.append(
+                "rotation_policy.automatic.time_after_creation is "
+                f"{facts.key_vault_rotation_policy_automatic_time_after_creation} ({rotate_after_days} days); "
+                f"maximum is {_KEY_VAULT_MAX_KEY_ROTATION_INTERVAL_DAYS} days"
+            )
+            continue
+        if issue == "key_lifetime_too_long":
+            lifetime_days = _key_vault_lifetime_days(
+                facts.key_vault_not_before_date,
+                facts.key_vault_expiration_date,
+            )
+            if lifetime_days is None:
+                raise ValueError("key lifetime issue requires parseable Azure lifecycle timestamps")
+            values.append(
+                f"configured key lifetime is {lifetime_days} days; maximum is {_KEY_VAULT_MAX_KEY_EXPIRY_DAYS} days"
+            )
+            continue
+        raise ValueError(f"unsupported Azure managed-key lifecycle issue: {issue!r}")
+    return values
 
 
 def _key_vault_lifecycle_issues(resource_type: str, facts: AzureResourceFacts) -> list[str]:
