@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import re
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass
 
+from tfstride.dependencies import (
+    CandidateAssessment,
+    CandidateSelection,
+    DependencyCandidate,
+    DependencyInput,
+    DependencyReferenceProvenance,
+    DependencyResolution,
+    DependencyResolutionState,
+    DependencyResolver,
+    matching_configuration_resolutions,
+)
 from tfstride.models import (
     NormalizedResource,
     TerraformExpressionPath,
-    TerraformReferenceProvenance,
-    TerraformReferenceResolution,
-    TerraformReferenceResolutionState,
+    TerraformReferenceTarget,
 )
 from tfstride.providers.coercion import (
     STATE_CONFIGURED,
@@ -19,8 +27,7 @@ from tfstride.providers.coercion import (
 from tfstride.providers.gcp.kms_dependency_evidence import (
     GcpKmsDependencyCandidate,
     GcpKmsDependencyReferenceKind,
-    GcpKmsDependencyReferenceProvenance,
-    GcpKmsDependencyResolutionState,
+    GcpKmsDependencyTargetKind,
     GcpKmsEncryptionDependency,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -43,7 +50,6 @@ _SUPPORTED_DEPENDENT_TYPES = frozenset(
         GcpResourceType.STORAGE_BUCKET,
     }
 )
-_KEY_REFERENCE_SUFFIXES = frozenset({".id"})
 _KEY_PATH_PATTERN = re.compile(
     r"^projects/(?P<project>[^/]+)/locations/(?P<location>[^/]+)/"
     r"keyRings/(?P<key_ring>[^/]+)/cryptoKeys/(?P<key>[^/]+)$"
@@ -63,27 +69,23 @@ _SECRET_REPLICA_UNCERTAINTY_PATTERN = re.compile(
 )
 
 
-@dataclass(frozen=True, slots=True)
-class _DependencyInput:
-    dependent: NormalizedResource
-    source: NormalizedResource
-    configuration_path: TerraformExpressionPath
-    resolution_paths: tuple[TerraformExpressionPath, ...]
-    configured_reference: str | None
-    ownership_state: str | None
-    source_uncertainties: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _ResolutionEvidence:
-    state: GcpKmsDependencyResolutionState
-    provenance: GcpKmsDependencyReferenceProvenance | None
-    reference_kind: GcpKmsDependencyReferenceKind | None
-    configured_reference: str | None
-    candidates: tuple[NormalizedResource, ...]
-    selected_key: NormalizedResource | None
-    uncertainties: tuple[str, ...]
-    version_reference_is_explicit: bool
+_GcpDependencyInput = DependencyInput[NormalizedResource, str | None]
+_GcpDependencyCandidate = DependencyCandidate[
+    NormalizedResource,
+    GcpKmsDependencyTargetKind | None,
+]
+_GcpDependencyResolution = DependencyResolution[
+    NormalizedResource,
+    GcpKmsDependencyTargetKind | None,
+    NormalizedResource,
+]
+_GcpDependencyResolver = DependencyResolver[
+    NormalizedResource,
+    str | None,
+    NormalizedResource,
+    GcpKmsDependencyTargetKind | None,
+    NormalizedResource,
+]
 
 
 class ResolveGcpKmsEncryptionDependenciesStage:
@@ -101,6 +103,10 @@ class ResolveGcpKmsEncryptionDependenciesStage:
             references_for_resource=_native_kms_references,
         )
         exact_resources_by_address = {resource.address: resource for resource in resources}
+        resolver = _dependency_resolver(
+            native_index=native_index,
+            resources_by_address=exact_resources_by_address,
+        )
         dependencies_by_address: dict[str, list[GcpKmsEncryptionDependency]] = {
             resource.address: []
             for resource in resources
@@ -116,10 +122,9 @@ class ResolveGcpKmsEncryptionDependenciesStage:
                 f"{dependent.address}: {uncertainty}" for uncertainty in uncovered_uncertainties
             )
             for dependency_input in inputs:
-                record = _dependency_record(
+                record = resolver.resolve_record(
                     dependency_input,
-                    native_index=native_index,
-                    resources_by_address=exact_resources_by_address,
+                    render=_render_dependency_record,
                 )
                 dependencies_by_address[dependent.address].append(record)
                 uncertainties_by_address[dependent.address].extend(
@@ -146,7 +151,7 @@ class ResolveGcpKmsEncryptionDependenciesStage:
 
 def _dependency_inputs(
     dependent: NormalizedResource,
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_GcpDependencyInput], list[str]]:
     facts = gcp_facts(dependent)
     if dependent.resource_type == GcpResourceType.STORAGE_BUCKET:
         paths = (("encryption", 0, "default_kms_key_name"),)
@@ -157,9 +162,11 @@ def _dependency_inputs(
             if unresolved_key_field
             else _state_from_optional_bool(
                 facts.customer_managed_encryption,
-                has_symbolic_reference=_has_matching_resolution(
-                    dependent,
-                    paths,
+                has_symbolic_reference=bool(
+                    matching_configuration_resolutions(
+                        dependent,
+                        paths,
+                    )
                 ),
             )
         )
@@ -228,7 +235,7 @@ def _single_dependency_inputs(
     configured_reference: str | None,
     ownership_state: str | None,
     uncertainties: Sequence[str],
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_GcpDependencyInput], list[str]]:
     dependency = _input_if_relevant(
         dependent=dependent,
         configuration_path=configuration_path,
@@ -246,11 +253,11 @@ def _single_dependency_inputs(
 
 def _secret_manager_dependency_inputs(
     dependent: NormalizedResource,
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_GcpDependencyInput], list[str]]:
     facts = gcp_facts(dependent)
     replication = facts.secret_manager_replication
     uncertainties = facts.secret_manager_posture_uncertainties
-    inputs: list[_DependencyInput] = []
+    inputs: list[_GcpDependencyInput] = []
 
     if facts.secret_manager_replication_mode == "automatic":
         key_names = _record_string_list(replication, "kms_key_names")
@@ -383,10 +390,12 @@ def _input_if_relevant(
     configured_reference: str | None,
     ownership_state: str | None,
     source_uncertainties: Sequence[str],
-) -> _DependencyInput | None:
-    has_resolution = _has_matching_resolution(
-        dependent,
-        resolution_paths,
+) -> _GcpDependencyInput | None:
+    has_resolution = bool(
+        matching_configuration_resolutions(
+            dependent,
+            resolution_paths,
+        )
     )
     if (
         configured_reference is None
@@ -395,49 +404,83 @@ def _input_if_relevant(
         and ownership_state != STATE_UNKNOWN
     ):
         return None
-    return _DependencyInput(
+    return DependencyInput(
         dependent=dependent,
         source=dependent,
         configuration_path=configuration_path,
         resolution_paths=resolution_paths,
         configured_reference=configured_reference,
-        ownership_state=ownership_state,
         source_uncertainties=tuple(source_uncertainties),
+        adapter_data=ownership_state,
     )
 
 
-def _dependency_record(
-    dependency_input: _DependencyInput,
+def _dependency_resolver(
     *,
     native_index: ResourceReferenceIndex,
     resources_by_address: Mapping[str, NormalizedResource],
-) -> GcpKmsEncryptionDependency:
-    evidence = _resolve_dependency(
-        dependency_input,
-        native_index=native_index,
-        resources_by_address=resources_by_address,
+) -> _GcpDependencyResolver:
+    def resolve_native(
+        dependency_input: _GcpDependencyInput,
+        reference: str,
+    ) -> _GcpDependencyResolution:
+        return _resolve_native_reference(
+            reference,
+            dependency_input,
+            native_index=native_index,
+        )
+
+    def assess_target(
+        dependency_input: _GcpDependencyInput,
+        target: TerraformReferenceTarget,
+    ) -> CandidateAssessment[NormalizedResource, GcpKmsDependencyTargetKind | None]:
+        return _assess_configuration_target(
+            target,
+            dependency_input=dependency_input,
+            resources_by_address=resources_by_address,
+        )
+
+    return DependencyResolver(
+        resolve_native_reference=resolve_native,
+        assess_configuration_target=assess_target,
+        resolve_configuration_candidate=_resolve_configuration_candidate,
     )
-    selected_key = evidence.selected_key
+
+
+def _render_dependency_record(
+    dependency_input: _GcpDependencyInput,
+    resolution: _GcpDependencyResolution,
+    configuration_path: TerraformExpressionPath,
+) -> GcpKmsEncryptionDependency:
+    selected_key = resolution.selection
     key_resource_name = _key_resource_name(selected_key) if selected_key is not None else None
     key_match = _KEY_PATH_PATTERN.fullmatch(key_resource_name) if key_resource_name is not None else None
     key_facts = gcp_facts(selected_key) if selected_key is not None else None
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
+    configured_reference = resolution.configured_reference
+    if resolution.provenance == "configuration_reference" and not resolution.candidates:
+        configured_reference = None
+    reference_kind: GcpKmsDependencyReferenceKind | None = (
+        "terraform_reference"
+        if resolution.provenance == "configuration_reference"
+        else _native_reference_kind(resolution.configured_reference)
+        if resolution.configured_reference is not None
+        else None
     )
-    configuration_path = resolutions[0].path if len(resolutions) == 1 else dependency_input.configuration_path
+    version_reference_is_explicit = reference_kind == "crypto_key_version_resource_name" or any(
+        candidate.metadata == "crypto_key_version" for candidate in resolution.candidates
+    )
     return {
         "dependent_address": dependency_input.dependent.address,
         "dependent_resource_type": dependency_input.dependent.resource_type,
         "dependency_source_address": dependency_input.source.address,
         "dependency_source_type": dependency_input.source.resource_type,
         "configuration_path": list(configuration_path),
-        "configured_key_reference": evidence.configured_reference,
-        "reference_provenance": evidence.provenance,
-        "reference_kind": evidence.reference_kind,
-        "resolution_state": evidence.state,
-        "customer_managed_encryption_state": (dependency_input.ownership_state),
-        "candidate_targets": [_dependency_candidate(candidate) for candidate in evidence.candidates],
+        "configured_key_reference": configured_reference,
+        "reference_provenance": resolution.provenance,
+        "reference_kind": reference_kind,
+        "resolution_state": resolution.state,
+        "customer_managed_encryption_state": dependency_input.adapter_data,
+        "candidate_targets": [_dependency_candidate(candidate) for candidate in resolution.candidates],
         "key_address": (selected_key.address if selected_key is not None else None),
         "key_resource_name": key_resource_name,
         "key_project": (key_match.group("project") if key_match is not None else None),
@@ -446,73 +489,29 @@ def _dependency_record(
         "key_purpose": (key_facts.kms_purpose if key_facts is not None else None),
         "key_version_address": None,
         "key_version_resource_name": None,
-        "version_reference_is_explicit": (evidence.version_reference_is_explicit),
-        "posture_uncertainties": list(evidence.uncertainties),
+        "version_reference_is_explicit": version_reference_is_explicit,
+        "posture_uncertainties": list(_resolution_uncertainties(dependency_input, resolution)),
     }
-
-
-def _resolve_dependency(
-    dependency_input: _DependencyInput,
-    *,
-    native_index: ResourceReferenceIndex,
-    resources_by_address: Mapping[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
-    )
-    configured_reference = dependency_input.configured_reference
-    if configured_reference and not _is_symbolic_placeholder(
-        configured_reference,
-        resolutions,
-    ):
-        return _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-        )
-    if resolutions:
-        return _resolve_configuration_references(
-            resolutions,
-            dependency_input,
-            resources_by_address=resources_by_address,
-        )
-    if configured_reference:
-        return _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-        )
-    return _unresolved_evidence(
-        state="unresolved",
-        provenance=None,
-        reference_kind=None,
-        configured_reference=None,
-        candidates=(),
-        uncertainties=(*(dependency_input.source_uncertainties or ("Cloud KMS key reference is unresolved",)),),
-        version_reference_is_explicit=False,
-    )
 
 
 def _resolve_native_reference(
     reference: str,
-    dependency_input: _DependencyInput,
+    dependency_input: _GcpDependencyInput,
     *,
     native_index: ResourceReferenceIndex,
-) -> _ResolutionEvidence:
+) -> _GcpDependencyResolution:
     normalized = reference.strip()
     reference_kind = _native_reference_kind(normalized)
     candidates = tuple(
-        candidate
+        _candidate(candidate, normalized)
         for candidate in native_index.candidates(normalized)
         if candidate.resource_type in {_KMS_KEY, _KMS_KEY_VERSION}
     )
     version_reference = reference_kind == "crypto_key_version_resource_name"
     if reference_kind != "crypto_key_resource_name":
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="unsupported",
             provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=normalized,
             candidates=candidates,
             uncertainties=(
@@ -521,209 +520,154 @@ def _resolve_native_reference(
                 f"{dependency_input.source.resource_type}",
                 *dependency_input.source_uncertainties,
             ),
-            version_reference_is_explicit=version_reference,
         )
     if len(candidates) > 1:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="ambiguous",
             provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=normalized,
             candidates=candidates,
             uncertainties=(
                 f"Cloud KMS reference {normalized} matches multiple modeled CryptoKeys",
                 *dependency_input.source_uncertainties,
             ),
-            version_reference_is_explicit=False,
         )
     if not candidates:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="unresolved",
             provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=normalized,
             candidates=(),
             uncertainties=(
                 f"Cloud KMS reference {normalized} does not resolve to a modeled CryptoKey",
                 *dependency_input.source_uncertainties,
             ),
-            version_reference_is_explicit=False,
         )
     candidate = candidates[0]
-    if candidate.resource_type != _KMS_KEY:
-        return _unresolved_evidence(
+    if candidate.metadata == "crypto_key_version" or version_reference:
+        return _unselected_resolution(
             state="unsupported",
             provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=normalized,
             candidates=candidates,
             uncertainties=(
                 f"Cloud KMS reference {normalized} identifies a CryptoKeyVersion where a CryptoKey is required",
                 *dependency_input.source_uncertainties,
             ),
-            version_reference_is_explicit=True,
         )
-    return _select_key_candidate(
-        candidate,
-        candidates=candidates,
-        configured_reference=normalized,
-        provenance="planned_value",
-        reference_kind=reference_kind,
-        dependency_input=dependency_input,
-    )
-
-
-def _resolve_configuration_references(
-    resolutions: tuple[TerraformReferenceResolution, ...],
-    dependency_input: _DependencyInput,
-    *,
-    resources_by_address: Mapping[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    candidates: dict[str, NormalizedResource] = {}
-    target_references: dict[str, str] = {}
-    reasons: list[str] = []
-    ambiguous = False
-    unsupported = False
-    unresolved = False
-    version_reference = False
-
-    for resolution in resolutions:
-        if resolution.state == TerraformReferenceResolutionState.AMBIGUOUS:
-            ambiguous = True
-        elif resolution.state == TerraformReferenceResolutionState.UNSUPPORTED:
-            unsupported = True
-        elif resolution.state == TerraformReferenceResolutionState.UNRESOLVED:
-            unresolved = True
-        elif resolution.state != TerraformReferenceResolutionState.SYMBOLIC:
-            unsupported = True
-        if resolution.reason:
-            reasons.append(resolution.reason)
-
-        for target in resolution.targets:
-            candidate = resources_by_address.get(target.address)
-            if candidate is None or candidate.resource_type not in {
-                _KMS_KEY,
-                _KMS_KEY_VERSION,
-            }:
-                unsupported = True
-                reasons.append(
-                    f"Terraform target {target.address} is not a modeled Cloud KMS CryptoKey or CryptoKeyVersion"
-                )
-                continue
-            candidates.setdefault(candidate.address, candidate)
-            target_references.setdefault(
-                candidate.address,
-                target.reference,
-            )
-            if candidate.resource_type == _KMS_KEY_VERSION:
-                version_reference = True
-                unsupported = True
-                reasons.append(
-                    f"Terraform target {target.reference} identifies a CryptoKeyVersion where a CryptoKey is required"
-                )
-            elif not _reference_has_suffix(
-                target.reference,
-                _KEY_REFERENCE_SUFFIXES,
-            ):
-                unsupported = True
-                reasons.append(
-                    f"Terraform target reference {target.reference} "
-                    f"is unsupported for "
-                    f"{dependency_input.source.resource_type}"
-                )
-
-    ordered_candidates = tuple(
-        sorted(
-            candidates.values(),
-            key=lambda candidate: candidate.address,
-        )
-    )
-    configured_reference = target_references[ordered_candidates[0].address] if len(ordered_candidates) == 1 else None
-    if ambiguous or len(ordered_candidates) > 1:
-        return _unresolved_evidence(
-            state="ambiguous",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            uncertainties=(
-                "Terraform configuration reference has multiple modeled Cloud KMS targets",
-                *reasons,
-                *dependency_input.source_uncertainties,
-            ),
-            version_reference_is_explicit=version_reference,
-        )
-    if unsupported:
-        return _unresolved_evidence(
-            state="unsupported",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            uncertainties=(
-                *(reasons or ["Terraform configuration reference uses unsupported Cloud KMS relationship evidence"]),
-                *dependency_input.source_uncertainties,
-            ),
-            version_reference_is_explicit=version_reference,
-        )
-    if unresolved or len(ordered_candidates) != 1:
-        return _unresolved_evidence(
-            state="unresolved",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            uncertainties=(
-                *(reasons or ["Terraform configuration reference does not resolve to a modeled Cloud KMS CryptoKey"]),
-                *dependency_input.source_uncertainties,
-            ),
-            version_reference_is_explicit=version_reference,
-        )
-
-    candidate = ordered_candidates[0]
-    return _select_key_candidate(
-        candidate,
-        candidates=ordered_candidates,
-        configured_reference=target_references[candidate.address],
-        provenance="configuration_reference",
-        reference_kind="terraform_reference",
-        dependency_input=dependency_input,
-    )
-
-
-def _select_key_candidate(
-    candidate: NormalizedResource,
-    *,
-    candidates: tuple[NormalizedResource, ...],
-    configured_reference: str,
-    provenance: GcpKmsDependencyReferenceProvenance,
-    reference_kind: GcpKmsDependencyReferenceKind,
-    dependency_input: _DependencyInput,
-) -> _ResolutionEvidence:
-    key_resource_name = _key_resource_name(candidate)
-    if key_resource_name is None:
-        return _unresolved_evidence(
-            state="unresolved",
-            provenance=provenance,
-            reference_kind=reference_kind,
-            configured_reference=configured_reference,
-            candidates=candidates,
-            uncertainties=(
-                f"{candidate.address} does not retain an exact provider-native CryptoKey resource name",
-                *dependency_input.source_uncertainties,
-            ),
-            version_reference_is_explicit=False,
-        )
-    return _ResolutionEvidence(
+    return DependencyResolution(
         state="resolved",
+        provenance="planned_value",
+        configured_reference=normalized,
+        candidates=candidates,
+        selected_candidate=candidate,
+        selection=candidate.value,
+        details=_applicability_uncertainties(dependency_input),
+    )
+
+
+def _assess_configuration_target(
+    target: TerraformReferenceTarget,
+    *,
+    dependency_input: _GcpDependencyInput,
+    resources_by_address: Mapping[str, NormalizedResource],
+) -> CandidateAssessment[NormalizedResource, GcpKmsDependencyTargetKind | None]:
+    candidate = resources_by_address.get(target.address)
+    if candidate is None or candidate.resource_type not in {_KMS_KEY, _KMS_KEY_VERSION}:
+        return CandidateAssessment(
+            candidate=None,
+            metadata=None,
+            supported=False,
+            details=(f"Terraform target {target.address} is not a modeled Cloud KMS CryptoKey or CryptoKeyVersion",),
+        )
+    target_kind = _candidate_target_kind(candidate)
+    if target_kind == "crypto_key_version":
+        return CandidateAssessment(
+            candidate=candidate,
+            metadata=target_kind,
+            supported=False,
+            details=(
+                f"Terraform target {target.reference} identifies a CryptoKeyVersion where a CryptoKey is required",
+            ),
+        )
+    if not target.reference.endswith(".id"):
+        return CandidateAssessment(
+            candidate=candidate,
+            metadata=target_kind,
+            supported=False,
+            details=(
+                f"Terraform target reference {target.reference} "
+                f"is unsupported for {dependency_input.source.resource_type}",
+            ),
+        )
+    return CandidateAssessment(
+        candidate=candidate,
+        metadata=target_kind,
+        supported=True,
+    )
+
+
+def _resolve_configuration_candidate(
+    dependency_input: _GcpDependencyInput,
+    candidate: _GcpDependencyCandidate,
+    candidates: tuple[_GcpDependencyCandidate, ...],
+) -> CandidateSelection[NormalizedResource]:
+    _ = candidates
+    key_resource_name = _key_resource_name(candidate.value)
+    if key_resource_name is None:
+        return CandidateSelection(
+            state="unresolved",
+            value=None,
+            causes=("unresolved_reference",),
+            details=tuple(
+                _dedupe(
+                    (
+                        f"{candidate.address} does not retain an exact provider-native CryptoKey resource name",
+                        *dependency_input.source_uncertainties,
+                    )
+                )
+            ),
+        )
+    return CandidateSelection(
+        state="resolved",
+        value=candidate.value,
+        details=_applicability_uncertainties(dependency_input),
+    )
+
+
+def _unselected_resolution(
+    *,
+    state: DependencyResolutionState,
+    provenance: DependencyReferenceProvenance | None,
+    configured_reference: str | None,
+    candidates: tuple[_GcpDependencyCandidate, ...],
+    uncertainties: Sequence[str],
+) -> _GcpDependencyResolution:
+    return DependencyResolution(
+        state=state,
         provenance=provenance,
-        reference_kind=reference_kind,
         configured_reference=configured_reference,
         candidates=candidates,
-        selected_key=candidate,
-        uncertainties=_applicability_uncertainties(dependency_input),
-        version_reference_is_explicit=False,
+        selected_candidate=None,
+        selection=None,
+        details=tuple(_dedupe(uncertainties)),
     )
+
+
+def _candidate(
+    resource: NormalizedResource,
+    reference: str,
+) -> _GcpDependencyCandidate:
+    return DependencyCandidate(
+        address=resource.address,
+        value=resource,
+        reference=reference,
+        metadata=_candidate_target_kind(resource),
+    )
+
+
+def _candidate_target_kind(resource: NormalizedResource) -> GcpKmsDependencyTargetKind:
+    return "crypto_key_version" if resource.resource_type == _KMS_KEY_VERSION else "crypto_key"
 
 
 def _native_kms_references(
@@ -792,83 +736,51 @@ def _native_reference_kind(
     return None
 
 
-def _is_symbolic_placeholder(
-    value: str,
-    resolutions: Sequence[TerraformReferenceResolution],
-) -> bool:
-    normalized = value.strip()
-    return any(
-        normalized
-        in {
-            target.address,
-            target.reference,
-            f"${{{target.reference}}}",
-        }
-        for resolution in resolutions
-        for target in resolution.targets
-    )
-
-
-def _matching_resolutions(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> tuple[TerraformReferenceResolution, ...]:
-    allowed_paths = set(paths)
-    return tuple(
-        resolution
-        for resolution in resource.reference_resolutions
-        if resolution.path in allowed_paths
-        and resolution.provenance == TerraformReferenceProvenance.CONFIGURATION_REFERENCE
-    )
-
-
-def _has_matching_resolution(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> bool:
-    return bool(_matching_resolutions(resource, paths))
-
-
-def _reference_has_suffix(
-    reference: str,
-    suffixes: Collection[str],
-) -> bool:
-    return any(reference.endswith(suffix) for suffix in suffixes)
-
-
 def _dependency_candidate(
-    resource: NormalizedResource,
+    candidate: _GcpDependencyCandidate,
 ) -> GcpKmsDependencyCandidate:
+    target_kind = candidate.metadata
+    assert target_kind is not None
     return {
-        "address": resource.address,
-        "target_kind": ("crypto_key_version" if resource.resource_type == _KMS_KEY_VERSION else "crypto_key"),
+        "address": candidate.address,
+        "target_kind": target_kind,
     }
 
 
-def _unresolved_evidence(
-    *,
-    state: GcpKmsDependencyResolutionState,
-    provenance: GcpKmsDependencyReferenceProvenance | None,
-    reference_kind: GcpKmsDependencyReferenceKind | None,
-    configured_reference: str | None,
-    candidates: tuple[NormalizedResource, ...],
-    uncertainties: Sequence[str],
-    version_reference_is_explicit: bool,
-) -> _ResolutionEvidence:
-    return _ResolutionEvidence(
-        state=state,
-        provenance=provenance,
-        reference_kind=reference_kind,
-        configured_reference=configured_reference,
-        candidates=candidates,
-        selected_key=None,
-        uncertainties=tuple(_dedupe(uncertainties)),
-        version_reference_is_explicit=version_reference_is_explicit,
+def _resolution_uncertainties(
+    dependency_input: _GcpDependencyInput,
+    resolution: _GcpDependencyResolution,
+) -> tuple[str, ...]:
+    if resolution.state == "resolved":
+        return resolution.details
+    if resolution.provenance is None:
+        return resolution.details or ("Cloud KMS key reference is unresolved",)
+    if resolution.provenance == "planned_value":
+        return resolution.details
+
+    source_uncertainties = frozenset(dependency_input.source_uncertainties)
+    specific_details = tuple(detail for detail in resolution.details if detail not in source_uncertainties)
+    if resolution.state == "ambiguous":
+        return tuple(
+            _dedupe(
+                (
+                    "Terraform configuration reference has multiple modeled Cloud KMS targets",
+                    *resolution.details,
+                )
+            )
+        )
+    if specific_details:
+        return resolution.details
+    fallback = (
+        "Terraform configuration reference uses unsupported Cloud KMS relationship evidence"
+        if resolution.state == "unsupported"
+        else "Terraform configuration reference does not resolve to a modeled Cloud KMS CryptoKey"
     )
+    return tuple(_dedupe((fallback, *dependency_input.source_uncertainties)))
 
 
 def _applicability_uncertainties(
-    dependency_input: _DependencyInput,
+    dependency_input: _GcpDependencyInput,
 ) -> tuple[str, ...]:
     terminal = dependency_input.configuration_path[-1]
     if not isinstance(terminal, str):
