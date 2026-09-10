@@ -14,6 +14,8 @@ from tfstride.dependencies import (
     DependencyResolutionCause,
     DependencyResolutionState,
     DependencyResolver,
+    dedupe_strings,
+    dependency_record_sort_key,
     matching_configuration_resolutions,
 )
 from tfstride.models import (
@@ -161,8 +163,8 @@ class ResolveAzureKeyVaultEncryptionDependenciesStage:
             if resource is None:
                 continue
             azure_facts(resource).set_key_vault_encryption_dependency_posture(
-                dependencies=sorted(dependencies, key=_dependency_sort_key),
-                uncertainties=_dedupe(uncertainties_by_address.get(address, [])),
+                dependencies=sorted(dependencies, key=dependency_record_sort_key),
+                uncertainties=dedupe_strings(uncertainties_by_address.get(address, [])),
             )
 
 
@@ -624,7 +626,7 @@ def _resolve_configuration_candidate(
             value=None,
             causes=("unresolved_reference",),
             details=tuple(
-                _dedupe(
+                dedupe_strings(
                     (
                         f"{candidate.address} does not retain the exact provider-native "
                         f"{_target_kind_label(target_kind)} identity required by the dependency",
@@ -669,7 +671,7 @@ def _reconcile_concrete_and_symbolic(
         selection=None,
         causes=("conflicting_evidence",),
         details=tuple(
-            _dedupe(
+            dedupe_strings(
                 (
                     "Concrete Key Vault key identity conflicts with symbolic "
                     f"configuration evidence at {list(dependency_input.configuration_path)}",
@@ -693,7 +695,7 @@ def _apply_source_evidence_ambiguity(
         selected_candidate=None,
         selection=None,
         details=tuple(
-            _dedupe(
+            dedupe_strings(
                 (
                     "Multiple alternate Key Vault key fields contain relationship "
                     "evidence; no exact source field is authoritative",
@@ -720,7 +722,7 @@ def _unselected_resolution(
         selected_candidate=None,
         selection=None,
         causes=(cause,),
-        details=tuple(_dedupe(uncertainties)),
+        details=tuple(dedupe_strings(uncertainties)),
     )
 
 
@@ -764,7 +766,7 @@ def _resolution_uncertainties(
     specific_details = tuple(detail for detail in resolution.details if detail not in source_uncertainties)
     if resolution.state == "ambiguous":
         return tuple(
-            _dedupe(
+            dedupe_strings(
                 (
                     "Terraform configuration reference has multiple modeled Key Vault key targets",
                     *resolution.details,
@@ -779,7 +781,7 @@ def _resolution_uncertainties(
         else "Terraform configuration reference does not resolve to a modeled Key Vault key"
     )
     return tuple(
-        _dedupe(
+        dedupe_strings(
             (
                 fallback,
                 *dependency_input.source_uncertainties,
@@ -966,18 +968,3 @@ def _matching_uncertainties(
     return [
         uncertainty for uncertainty in uncertainties if any(term in uncertainty.casefold() for term in normalized_terms)
     ]
-
-
-def _dependency_sort_key(
-    dependency: AzureKeyVaultEncryptionDependency,
-) -> tuple[str, str, str, str]:
-    return (
-        dependency["dependent_address"],
-        dependency["dependency_source_address"],
-        repr(dependency["configuration_path"]),
-        dependency["configured_key_reference"] or "",
-    )
-
-
-def _dedupe(values: Sequence[str]) -> list[str]:
-    return list(dict.fromkeys(value for value in values if value))

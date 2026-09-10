@@ -10,12 +10,15 @@ from tfstride.dependencies import (
     CandidateSelection,
     DependencyCandidate,
     DependencyInput,
+    DependencyRecordSortFields,
     DependencyReferenceProvenance,
     DependencyResolution,
     DependencyResolutionCause,
     DependencyResolutionState,
     DependencyResolver,
     configured_reference_is_symbolic,
+    dedupe_strings,
+    dependency_record_sort_key,
     effective_configuration_path,
     matching_configuration_resolutions,
 )
@@ -524,6 +527,28 @@ class DependencyResolutionTests(unittest.TestCase):
                 "state": "resolved",
                 "path": _ALTERNATE_PATH,
             },
+        )
+
+    def test_shared_record_helpers_preserve_dependency_ordering_contract(self) -> None:
+        record: DependencyRecordSortFields = {
+            "dependent_address": "workload.example",
+            "dependency_source_address": "source.example",
+            "configuration_path": ["encryption", 0, "key_id"],
+            "configured_key_reference": None,
+        }
+
+        self.assertEqual(
+            dependency_record_sort_key(record),
+            (
+                "workload.example",
+                "source.example",
+                "['encryption', 0, 'key_id']",
+                "",
+            ),
+        )
+        self.assertEqual(
+            dedupe_strings(("second", "", "first", "second")),
+            ["second", "first"],
         )
 
     def test_envelopes_are_frozen_slotted_and_retain_exact_instances(self) -> None:

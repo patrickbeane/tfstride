@@ -12,6 +12,8 @@ from tfstride.dependencies import (
     DependencyResolution,
     DependencyResolutionState,
     DependencyResolver,
+    dedupe_strings,
+    dependency_record_sort_key,
     matching_configuration_resolutions,
 )
 from tfstride.models import (
@@ -143,9 +145,9 @@ class ResolveGcpKmsEncryptionDependenciesStage:
             gcp_facts(resource).set_kms_encryption_dependency_posture(
                 dependencies=sorted(
                     dependencies,
-                    key=_dependency_sort_key,
+                    key=dependency_record_sort_key,
                 ),
-                uncertainties=_dedupe(uncertainties_by_address.get(address, [])),
+                uncertainties=dedupe_strings(uncertainties_by_address.get(address, [])),
             )
 
 
@@ -620,7 +622,7 @@ def _resolve_configuration_candidate(
             value=None,
             causes=("unresolved_reference",),
             details=tuple(
-                _dedupe(
+                dedupe_strings(
                     (
                         f"{candidate.address} does not retain an exact provider-native CryptoKey resource name",
                         *dependency_input.source_uncertainties,
@@ -650,7 +652,7 @@ def _unselected_resolution(
         candidates=candidates,
         selected_candidate=None,
         selection=None,
-        details=tuple(_dedupe(uncertainties)),
+        details=tuple(dedupe_strings(uncertainties)),
     )
 
 
@@ -762,7 +764,7 @@ def _resolution_uncertainties(
     specific_details = tuple(detail for detail in resolution.details if detail not in source_uncertainties)
     if resolution.state == "ambiguous":
         return tuple(
-            _dedupe(
+            dedupe_strings(
                 (
                     "Terraform configuration reference has multiple modeled Cloud KMS targets",
                     *resolution.details,
@@ -776,7 +778,7 @@ def _resolution_uncertainties(
         if resolution.state == "unsupported"
         else "Terraform configuration reference does not resolve to a modeled Cloud KMS CryptoKey"
     )
-    return tuple(_dedupe((fallback, *dependency_input.source_uncertainties)))
+    return tuple(dedupe_strings((fallback, *dependency_input.source_uncertainties)))
 
 
 def _applicability_uncertainties(
@@ -852,18 +854,3 @@ def _record_mapping_list(
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, Mapping)]
-
-
-def _dependency_sort_key(
-    dependency: GcpKmsEncryptionDependency,
-) -> tuple[str, str, str, str]:
-    return (
-        dependency["dependent_address"],
-        dependency["dependency_source_address"],
-        repr(dependency["configuration_path"]),
-        dependency["configured_key_reference"] or "",
-    )
-
-
-def _dedupe(values: Sequence[str]) -> list[str]:
-    return list(dict.fromkeys(value for value in values if value))

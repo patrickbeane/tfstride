@@ -13,6 +13,8 @@ from tfstride.dependencies import (
     DependencyResolutionCause,
     DependencyResolutionState,
     DependencyResolver,
+    dedupe_strings,
+    dependency_record_sort_key,
     matching_configuration_resolutions,
 )
 from tfstride.models import (
@@ -153,8 +155,8 @@ class ResolveAwsKmsEncryptionDependenciesStage:
             if resource is None:
                 continue
             aws_facts(resource).set_kms_encryption_dependency_posture(
-                dependencies=sorted(dependencies, key=_dependency_sort_key),
-                uncertainties=_dedupe(uncertainties_by_address.get(address, [])),
+                dependencies=sorted(dependencies, key=dependency_record_sort_key),
+                uncertainties=dedupe_strings(uncertainties_by_address.get(address, [])),
             )
 
 
@@ -428,7 +430,7 @@ def _dependency_inputs(
             if dependency is not None:
                 inputs.append(dependency)
 
-    return inputs, _dedupe(uncovered_uncertainties)
+    return inputs, dedupe_strings(uncovered_uncertainties)
 
 
 def _input_if_relevant(
@@ -706,7 +708,7 @@ def _select_candidate(
             value=None,
             causes=("unresolved_reference",),
             details=tuple(
-                _dedupe(
+                dedupe_strings(
                     (
                         f"{candidate.address} does not retain the provider-native "
                         f"identity required by {candidate.reference}",
@@ -733,7 +735,7 @@ def _select_candidate(
             value=None,
             causes=(_resolution_cause(alias_state),),
             details=tuple(
-                _dedupe(
+                dedupe_strings(
                     (
                         *alias_uncertainties,
                         *dependency_input.source_uncertainties,
@@ -764,7 +766,7 @@ def _unselected_resolution(
         selected_candidate=None,
         selection=None,
         causes=(_resolution_cause(state),),
-        details=tuple(_dedupe(uncertainties)),
+        details=tuple(dedupe_strings(uncertainties)),
     )
 
 
@@ -822,7 +824,7 @@ def _configuration_resolution_details(
             )
         if reason is not None and reason in details:
             details.remove(reason)
-    return tuple(_dedupe((*inserted_details, *details)))
+    return tuple(dedupe_strings((*inserted_details, *details)))
 
 
 def _resolution_uncertainties(
@@ -844,7 +846,7 @@ def _resolution_uncertainties(
     specific_details = tuple(detail for detail in details if detail not in source_uncertainties)
     if resolution.state == "ambiguous":
         return tuple(
-            _dedupe(
+            dedupe_strings(
                 (
                     "Terraform configuration reference has multiple modeled KMS targets",
                     *details,
@@ -859,7 +861,7 @@ def _resolution_uncertainties(
         else "Terraform configuration reference does not resolve to a modeled KMS target"
     )
     return tuple(
-        _dedupe(
+        dedupe_strings(
             (
                 fallback,
                 *dependency_input.source_uncertainties,
@@ -956,7 +958,7 @@ def _resolve_alias_key(
         return (
             None,
             "unresolved",
-            tuple(_dedupe(uncertainties or [f"{alias.address} target KMS key is unresolved"])),
+            tuple(dedupe_strings(uncertainties or [f"{alias.address} target KMS key is unresolved"])),
         )
     if len(ordered) != 1:
         return (
@@ -1128,18 +1130,3 @@ def _record_string_list(
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
-
-
-def _dependency_sort_key(
-    dependency: AwsKmsEncryptionDependency,
-) -> tuple[str, str, str, str]:
-    return (
-        dependency["dependent_address"],
-        dependency["dependency_source_address"],
-        repr(dependency["configuration_path"]),
-        dependency["configured_key_reference"] or "",
-    )
-
-
-def _dedupe(values: Sequence[str]) -> list[str]:
-    return list(dict.fromkeys(value for value in values if value))

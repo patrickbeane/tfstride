@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from typing import Generic, Literal, Protocol, TypeVar
+from typing import Generic, Literal, Protocol, TypedDict, TypeVar
 
 from tfstride.models import (
     TerraformExpressionPath,
@@ -30,6 +30,15 @@ DependencyResolutionCause = Literal[
     "conflicting_candidate_evidence",
     "conflicting_evidence",
 ]
+
+
+class DependencyRecordSortFields(TypedDict):
+    """Common fields used to order provider dependency records."""
+
+    dependent_address: str
+    dependency_source_address: str
+    configuration_path: list[str | int]
+    configured_key_reference: str | None
 
 
 class ConfigurationResolutionSource(Protocol):
@@ -333,6 +342,25 @@ def effective_configuration_path(
     return resolutions[0].path if len(resolutions) == 1 else dependency_input.configuration_path
 
 
+def dependency_record_sort_key(
+    dependency: DependencyRecordSortFields,
+) -> tuple[str, str, str, str]:
+    """Return the stable cross-provider dependency-record ordering key."""
+
+    return (
+        dependency["dependent_address"],
+        dependency["dependency_source_address"],
+        repr(dependency["configuration_path"]),
+        dependency["configured_key_reference"] or "",
+    )
+
+
+def dedupe_strings(values: Collection[str]) -> list[str]:
+    """Preserve the first occurrence of each non-empty string."""
+
+    return list(dict.fromkeys(value for value in values if value))
+
+
 def _symbolic_configured_reference(
     resolutions: tuple[TerraformReferenceResolution, ...],
     candidates: tuple[DependencyCandidate[_CandidateT, _CandidateMetadataT], ...],
@@ -364,4 +392,4 @@ def _classified_resolution(
 
 
 def _dedupe_strings(values: Collection[str]) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(value for value in values if value))
+    return tuple(dedupe_strings(values))
