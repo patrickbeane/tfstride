@@ -45,6 +45,9 @@ include = [
   "src/tfstride/providers/resource_reference_index.py",
   "src/tfstride/resource_metadata.py",
 
+  # Shared dependency-resolution contracts.
+  "src/tfstride/dependencies/resolution.py",
+
   # Shared storage posture contracts.
   "src/tfstride/storage/versioning.py",
 
