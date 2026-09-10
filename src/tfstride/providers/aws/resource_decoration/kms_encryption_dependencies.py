@@ -2,19 +2,29 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
+from functools import partial
 
+from tfstride.dependencies import (
+    CandidateAssessment,
+    CandidateSelection,
+    DependencyCandidate,
+    DependencyInput,
+    DependencyResolution,
+    DependencyResolutionCause,
+    DependencyResolutionState,
+    DependencyResolver,
+    matching_configuration_resolutions,
+)
 from tfstride.models import (
     NormalizedResource,
     TerraformExpressionPath,
-    TerraformReferenceProvenance,
-    TerraformReferenceResolution,
     TerraformReferenceResolutionState,
+    TerraformReferenceTarget,
 )
 from tfstride.providers.aws.kms_dependency_evidence import (
     AwsKmsDependencyCandidate,
     AwsKmsDependencyReferenceKind,
-    AwsKmsDependencyReferenceProvenance,
-    AwsKmsDependencyResolutionState,
+    AwsKmsDependencyTargetKind,
     AwsKmsEncryptionDependency,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
@@ -56,28 +66,37 @@ _PROVIDER_MANAGED_OWNERSHIP_STATES = frozenset(
 
 
 @dataclass(frozen=True, slots=True)
-class _DependencyInput:
-    dependent: NormalizedResource
-    source: NormalizedResource
-    configuration_path: TerraformExpressionPath
-    resolution_paths: tuple[TerraformExpressionPath, ...]
-    configured_reference: str | None
+class _AwsDependencyInputData:
     ownership_state: str | None
     key_reference_suffixes: frozenset[str]
     alias_reference_suffixes: frozenset[str]
-    source_uncertainties: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class _ResolutionEvidence:
-    state: AwsKmsDependencyResolutionState
-    provenance: AwsKmsDependencyReferenceProvenance | None
-    reference_kind: AwsKmsDependencyReferenceKind | None
-    configured_reference: str | None
-    candidates: tuple[NormalizedResource, ...]
-    selected_target: NormalizedResource | None
-    selected_key: NormalizedResource | None
-    uncertainties: tuple[str, ...]
+class _AwsDependencySelection:
+    target: NormalizedResource
+    key: NormalizedResource
+
+
+_AwsCandidateMetadata = AwsKmsDependencyTargetKind | None
+_AwsDependencyInput = DependencyInput[NormalizedResource, _AwsDependencyInputData]
+_AwsDependencyCandidate = DependencyCandidate[NormalizedResource, _AwsCandidateMetadata]
+_AwsDependencyResolution = DependencyResolution[
+    NormalizedResource,
+    _AwsCandidateMetadata,
+    _AwsDependencySelection,
+]
+_AwsDependencyResolver = DependencyResolver[
+    NormalizedResource,
+    _AwsDependencyInputData,
+    NormalizedResource,
+    _AwsCandidateMetadata,
+    _AwsDependencySelection,
+]
+_AwsCandidateAssessment = CandidateAssessment[
+    NormalizedResource,
+    _AwsCandidateMetadata,
+]
 
 
 class ResolveAwsKmsEncryptionDependenciesStage:
@@ -90,6 +109,10 @@ class ResolveAwsKmsEncryptionDependenciesStage:
             references_for_resource=_native_kms_references,
         )
         resources_by_address = context.index.resources_by_address
+        resolver = _dependency_resolver(
+            native_index=native_index,
+            resources_by_address=resources_by_address,
+        )
         dependencies_by_address: dict[str, list[AwsKmsEncryptionDependency]] = {
             resource.address: []
             for resource in resources
@@ -108,13 +131,13 @@ class ResolveAwsKmsEncryptionDependenciesStage:
                 f"{dependent.address}: {uncertainty}" for uncertainty in uncovered_uncertainties
             )
             for dependency_input in inputs:
-                record = _dependency_record(
-                    dependency_input,
-                    native_index=native_index,
-                    resources_by_address=resources_by_address,
-                )
-                if record is None:
+                configured_reference = dependency_input.configured_reference
+                if configured_reference and _is_aws_managed_key_reference(configured_reference):
                     continue
+                record = resolver.resolve_record(
+                    dependency_input,
+                    render=_render_dependency_record,
+                )
                 dependencies_by_address[dependent.address].append(record)
                 uncertainties_by_address[dependent.address].extend(
                     f"{dependent.address}: {uncertainty}" for uncertainty in record["posture_uncertainties"]
@@ -138,9 +161,9 @@ class ResolveAwsKmsEncryptionDependenciesStage:
 def _dependency_inputs(
     dependent: NormalizedResource,
     resources_by_address: dict[str, NormalizedResource],
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_AwsDependencyInput], list[str]]:
     facts = aws_facts(dependent)
-    inputs: list[_DependencyInput] = []
+    inputs: list[_AwsDependencyInput] = []
     uncovered_uncertainties: list[str] = []
 
     if dependent.resource_type == "aws_cloudtrail":
@@ -243,9 +266,11 @@ def _dependency_inputs(
             facts.s3_posture_uncertainties,
             ("encryption", "kms_master_key_id", "rule"),
         )
-        has_key_resolution = _has_matching_resolution(
-            source,
-            (("rule", 0, "apply_server_side_encryption_by_default", 0, "kms_master_key_id"),),
+        has_key_resolution = bool(
+            matching_configuration_resolutions(
+                source,
+                (("rule", 0, "apply_server_side_encryption_by_default", 0, "kms_master_key_id"),),
+            )
         )
         if algorithm in _KMS_S3_ALGORITHMS or (
             algorithm is None and (facts.s3_kms_master_key_id or has_key_resolution)
@@ -370,9 +395,11 @@ def _dependency_inputs(
     elif dependent.resource_type == "aws_ecr_repository":
         encryption_type = facts.ecr_encryption_type.strip().upper() if facts.ecr_encryption_type else None
         resolution_paths = (("encryption_configuration", 0, "kms_key"),)
-        has_symbolic_reference = _has_matching_resolution(
-            dependent,
-            resolution_paths,
+        has_symbolic_reference = bool(
+            matching_configuration_resolutions(
+                dependent,
+                resolution_paths,
+            )
         )
         source_uncertainties = _matching_uncertainties(
             facts.ecr_posture_uncertainties,
@@ -415,25 +442,27 @@ def _input_if_relevant(
     key_reference_suffixes: frozenset[str],
     alias_reference_suffixes: frozenset[str],
     source_uncertainties: Sequence[str],
-) -> _DependencyInput | None:
+) -> _AwsDependencyInput | None:
     if ownership_state in _PROVIDER_MANAGED_OWNERSHIP_STATES:
         return None
     if (
         configured_reference is None
-        and not _has_matching_resolution(source, resolution_paths)
+        and not matching_configuration_resolutions(source, resolution_paths)
         and not source_uncertainties
     ):
         return None
-    return _DependencyInput(
+    return DependencyInput(
         dependent=dependent,
         source=source,
         configuration_path=configuration_path,
         resolution_paths=resolution_paths,
         configured_reference=configured_reference,
-        ownership_state=ownership_state,
-        key_reference_suffixes=key_reference_suffixes,
-        alias_reference_suffixes=alias_reference_suffixes,
         source_uncertainties=tuple(source_uncertainties),
+        adapter_data=_AwsDependencyInputData(
+            ownership_state=ownership_state,
+            key_reference_suffixes=key_reference_suffixes,
+            alias_reference_suffixes=alias_reference_suffixes,
+        ),
     )
 
 
@@ -447,8 +476,8 @@ def _record_dependencies(
     key_reference_suffixes: frozenset[str],
     alias_reference_suffixes: frozenset[str],
     source_uncertainties: Sequence[str],
-) -> list[_DependencyInput]:
-    dependencies: list[_DependencyInput] = []
+) -> list[_AwsDependencyInput]:
+    dependencies: list[_AwsDependencyInput] = []
     resolution_indexes = {
         resolution.path[1]
         for resolution in source.reference_resolutions
@@ -486,45 +515,68 @@ def _record_dependencies(
     return dependencies
 
 
-def _dependency_record(
-    dependency_input: _DependencyInput,
+def _dependency_resolver(
     *,
     native_index: ResourceReferenceIndex,
     resources_by_address: dict[str, NormalizedResource],
-) -> AwsKmsEncryptionDependency | None:
-    evidence = _resolve_dependency(
-        dependency_input,
-        native_index=native_index,
-        resources_by_address=resources_by_address,
+) -> _AwsDependencyResolver:
+    return DependencyResolver(
+        resolve_native_reference=partial(
+            _resolve_native_reference,
+            native_index=native_index,
+            resources_by_address=resources_by_address,
+        ),
+        assess_configuration_target=partial(
+            _assess_configuration_target,
+            resources_by_address=resources_by_address,
+        ),
+        resolve_configuration_candidate=partial(
+            _select_candidate,
+            native_index=native_index,
+            resources_by_address=resources_by_address,
+        ),
     )
-    if evidence is None:
-        return None
 
-    selected_key = evidence.selected_key
+
+def _render_dependency_record(
+    dependency_input: _AwsDependencyInput,
+    resolution: _AwsDependencyResolution,
+    configuration_path: TerraformExpressionPath,
+) -> AwsKmsEncryptionDependency:
+    selection = resolution.selection
+    selected_target = selection.target if selection is not None else None
+    selected_key = selection.key if selection is not None else None
     selected_alias = (
-        evidence.selected_target
-        if evidence.selected_target is not None and evidence.selected_target.resource_type == _KMS_ALIAS
-        else None
+        selected_target if selected_target is not None and selected_target.resource_type == _KMS_ALIAS else None
     )
     key_facts = aws_facts(selected_key) if selected_key is not None else None
     alias_facts = aws_facts(selected_alias) if selected_alias is not None else None
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
+    configured_reference = resolution.configured_reference
+    if (
+        resolution.provenance == "configuration_reference"
+        and resolution.state != "unresolved"
+        and not resolution.candidates
+    ):
+        configured_reference = None
+    reference_kind: AwsKmsDependencyReferenceKind | None = (
+        "terraform_reference"
+        if resolution.provenance == "configuration_reference"
+        else _native_reference_kind(resolution.configured_reference)
+        if resolution.configured_reference is not None
+        else None
     )
-    configuration_path = resolutions[0].path if len(resolutions) == 1 else dependency_input.configuration_path
     return {
         "dependent_address": dependency_input.dependent.address,
         "dependent_resource_type": dependency_input.dependent.resource_type,
         "dependency_source_address": dependency_input.source.address,
         "dependency_source_type": dependency_input.source.resource_type,
         "configuration_path": list(configuration_path),
-        "configured_key_reference": evidence.configured_reference,
-        "reference_provenance": evidence.provenance,
-        "reference_kind": evidence.reference_kind,
-        "resolution_state": evidence.state,
-        "encryption_ownership_state": dependency_input.ownership_state,
-        "candidate_targets": [_dependency_candidate(candidate) for candidate in evidence.candidates],
+        "configured_key_reference": configured_reference,
+        "reference_provenance": resolution.provenance,
+        "reference_kind": reference_kind,
+        "resolution_state": resolution.state,
+        "encryption_ownership_state": dependency_input.adapter_data.ownership_state,
+        "candidate_targets": [_dependency_candidate(candidate) for candidate in resolution.candidates],
         "key_address": selected_key.address if selected_key is not None else None,
         "key_arn": key_facts.kms_key_arn if key_facts is not None else None,
         "key_id": key_facts.kms_key_id if key_facts is not None else None,
@@ -533,81 +585,31 @@ def _dependency_record(
         "alias_arn": alias_facts.kms_alias_arn if alias_facts is not None else None,
         "key_origin": key_facts.kms_key_origin if key_facts is not None else None,
         "multi_region_state": (key_facts.kms_multi_region_state if key_facts is not None else None),
-        "posture_uncertainties": list(evidence.uncertainties),
+        "posture_uncertainties": list(_resolution_uncertainties(dependency_input, resolution)),
     }
 
 
-def _resolve_dependency(
-    dependency_input: _DependencyInput,
-    *,
-    native_index: ResourceReferenceIndex,
-    resources_by_address: dict[str, NormalizedResource],
-) -> _ResolutionEvidence | None:
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
-    )
-    configured_reference = dependency_input.configured_reference
-    if configured_reference and _is_aws_managed_key_reference(configured_reference):
-        return None
-    if configured_reference and not _is_symbolic_placeholder(
-        configured_reference,
-        resolutions,
-    ):
-        return _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-            resources_by_address=resources_by_address,
-        )
-    if resolutions:
-        return _resolve_configuration_references(
-            resolutions,
-            dependency_input,
-            native_index=native_index,
-            resources_by_address=resources_by_address,
-        )
-    if configured_reference:
-        return _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-            resources_by_address=resources_by_address,
-        )
-    uncertainties = dependency_input.source_uncertainties or ("KMS key reference is unresolved",)
-    return _ResolutionEvidence(
-        state="unresolved",
-        provenance=None,
-        reference_kind=None,
-        configured_reference=None,
-        candidates=(),
-        selected_target=None,
-        selected_key=None,
-        uncertainties=tuple(uncertainties),
-    )
-
-
 def _resolve_native_reference(
+    dependency_input: _AwsDependencyInput,
     reference: str,
-    dependency_input: _DependencyInput,
     *,
     native_index: ResourceReferenceIndex,
     resources_by_address: dict[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    candidates = tuple(
-        candidate
+) -> _AwsDependencyResolution:
+    candidates: tuple[_AwsDependencyCandidate, ...] = tuple(
+        DependencyCandidate(
+            address=candidate.address,
+            value=candidate,
+            reference=reference,
+            metadata=_candidate_target_kind(candidate),
+        )
         for candidate in native_index.candidates(reference)
         if candidate.resource_type in {_KMS_KEY, _KMS_ALIAS}
     )
     reference_kind = _native_reference_kind(reference)
-    if not _native_reference_kind_is_supported(
-        reference_kind,
-        dependency_input,
-    ):
-        return _unresolved_evidence(
+    if not _native_reference_kind_is_supported(reference_kind, dependency_input):
+        return _unselected_resolution(
             state="unsupported",
-            provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=reference,
             candidates=candidates,
             uncertainties=(
@@ -616,206 +618,253 @@ def _resolve_native_reference(
             ),
         )
     if len(candidates) > 1:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="ambiguous",
-            provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=reference,
             candidates=candidates,
             uncertainties=(f"KMS reference {reference} matches multiple modeled keys or aliases",),
         )
     if not candidates:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="unresolved",
-            provenance="planned_value",
-            reference_kind=reference_kind,
             configured_reference=reference,
             candidates=(),
             uncertainties=(f"KMS reference {reference} does not resolve to a modeled key or alias",),
         )
-    return _select_candidate(
-        candidates[0],
-        candidates=candidates,
-        configured_reference=reference,
-        provenance="planned_value",
-        reference_kind=reference_kind,
-        target_reference=reference,
-        dependency_input=dependency_input,
+
+    candidate = candidates[0]
+    selection = _select_candidate(
+        dependency_input,
+        candidate,
+        candidates,
         native_index=native_index,
         resources_by_address=resources_by_address,
     )
+    return DependencyResolution(
+        state=selection.state,
+        provenance="planned_value",
+        configured_reference=reference,
+        candidates=candidates,
+        selected_candidate=(candidate if selection.state == "resolved" else None),
+        selection=selection.value,
+        causes=selection.causes,
+        details=selection.details,
+    )
 
 
-def _resolve_configuration_references(
-    resolutions: tuple[TerraformReferenceResolution, ...],
-    dependency_input: _DependencyInput,
+def _assess_configuration_target(
+    dependency_input: _AwsDependencyInput,
+    target: TerraformReferenceTarget,
     *,
-    native_index: ResourceReferenceIndex,
     resources_by_address: dict[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    candidates: dict[str, NormalizedResource] = {}
-    unsupported = False
-    ambiguous = False
-    unresolved = False
-    target_references: dict[str, str] = {}
-    reasons: list[str] = []
-    for resolution in resolutions:
-        if resolution.state == TerraformReferenceResolutionState.AMBIGUOUS:
-            ambiguous = True
-        elif resolution.state == TerraformReferenceResolutionState.UNSUPPORTED:
-            unsupported = True
-        elif resolution.state == TerraformReferenceResolutionState.UNRESOLVED:
-            unresolved = True
-            reasons.append(
-                resolution.reason or "Terraform configuration reference does not identify a modeled KMS target"
-            )
-        elif resolution.state != TerraformReferenceResolutionState.SYMBOLIC:
-            unsupported = True
-            reasons.append(
-                f"Terraform configuration reference state {resolution.state.value} "
-                "cannot establish a symbolic KMS dependency"
-            )
-        for target in resolution.targets:
-            candidate = resources_by_address.get(target.address)
-            if candidate is None or candidate.resource_type not in {
-                _KMS_KEY,
-                _KMS_ALIAS,
-            }:
-                unsupported = True
-                reasons.append(f"Terraform target {target.address} is not a modeled KMS key or alias")
-                continue
-            candidates.setdefault(candidate.address, candidate)
-            target_references.setdefault(candidate.address, target.reference)
-            expected_suffixes = (
-                dependency_input.key_reference_suffixes
-                if candidate.resource_type == _KMS_KEY
-                else dependency_input.alias_reference_suffixes
-            )
-            if not _reference_has_suffix(target.reference, expected_suffixes):
-                unsupported = True
-                reasons.append(
-                    f"Terraform target reference {target.reference} is unsupported for "
-                    f"{dependency_input.source.resource_type}"
-                )
+) -> _AwsCandidateAssessment:
+    candidate = resources_by_address.get(target.address)
+    if candidate is None or candidate.resource_type not in {_KMS_KEY, _KMS_ALIAS}:
+        return CandidateAssessment(
+            candidate=None,
+            metadata=None,
+            supported=False,
+            details=(f"Terraform target {target.address} is not a modeled KMS key or alias",),
+        )
 
-    ordered_candidates = tuple(sorted(candidates.values(), key=lambda candidate: candidate.address))
-    configured_reference = target_references[ordered_candidates[0].address] if len(ordered_candidates) == 1 else None
-    if ambiguous or len(ordered_candidates) > 1:
-        return _unresolved_evidence(
-            state="ambiguous",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            uncertainties=(
-                "Terraform configuration reference has multiple modeled KMS targets",
-                *reasons,
-                *dependency_input.source_uncertainties,
+    target_kind = _candidate_target_kind(candidate)
+    expected_suffixes = (
+        dependency_input.adapter_data.key_reference_suffixes
+        if target_kind == "key"
+        else dependency_input.adapter_data.alias_reference_suffixes
+    )
+    if not any(target.reference.endswith(suffix) for suffix in expected_suffixes):
+        return CandidateAssessment(
+            candidate=candidate,
+            metadata=target_kind,
+            supported=False,
+            details=(
+                f"Terraform target reference {target.reference} is unsupported for "
+                f"{dependency_input.source.resource_type}",
             ),
         )
-    if unsupported:
-        return _unresolved_evidence(
-            state="unsupported",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            uncertainties=(
-                *(reasons or ["Terraform configuration reference uses unsupported KMS relationship evidence"]),
-                *dependency_input.source_uncertainties,
-            ),
-        )
-    if unresolved or len(ordered_candidates) != 1:
-        return _unresolved_evidence(
-            state="unresolved",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=(
-                resolutions[0].references[0] if len(resolutions) == 1 and len(resolutions[0].references) == 1 else None
-            ),
-            candidates=ordered_candidates,
-            uncertainties=(
-                *(reasons or ["Terraform configuration reference does not resolve to a modeled KMS target"]),
-                *dependency_input.source_uncertainties,
-            ),
-        )
-    candidate = ordered_candidates[0]
-    target_reference = target_references[candidate.address]
-    return _select_candidate(
-        candidate,
-        candidates=ordered_candidates,
-        configured_reference=target_reference,
-        provenance="configuration_reference",
-        reference_kind="terraform_reference",
-        target_reference=target_reference,
-        dependency_input=dependency_input,
-        native_index=native_index,
-        resources_by_address=resources_by_address,
+    return CandidateAssessment(
+        candidate=candidate,
+        metadata=target_kind,
+        supported=True,
     )
 
 
 def _select_candidate(
-    candidate: NormalizedResource,
+    dependency_input: _AwsDependencyInput,
+    candidate: _AwsDependencyCandidate,
+    candidates: tuple[_AwsDependencyCandidate, ...],
     *,
-    candidates: tuple[NormalizedResource, ...],
-    configured_reference: str,
-    provenance: AwsKmsDependencyReferenceProvenance,
-    reference_kind: AwsKmsDependencyReferenceKind,
-    target_reference: str,
-    dependency_input: _DependencyInput,
     native_index: ResourceReferenceIndex,
     resources_by_address: dict[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    if not _target_identity_is_known(candidate, target_reference):
-        return _unresolved_evidence(
+) -> CandidateSelection[_AwsDependencySelection]:
+    _ = candidates
+    target = candidate.value
+    if not _target_identity_is_known(target, candidate.reference):
+        return CandidateSelection(
             state="unresolved",
-            provenance=provenance,
-            reference_kind=reference_kind,
-            configured_reference=configured_reference,
-            candidates=candidates,
-            uncertainties=(
-                f"{candidate.address} does not retain the provider-native identity required by {target_reference}",
-                *dependency_input.source_uncertainties,
+            value=None,
+            causes=("unresolved_reference",),
+            details=tuple(
+                _dedupe(
+                    (
+                        f"{candidate.address} does not retain the provider-native "
+                        f"identity required by {candidate.reference}",
+                        *dependency_input.source_uncertainties,
+                    )
+                )
             ),
         )
-    if candidate.resource_type == _KMS_KEY:
-        return _ResolutionEvidence(
+    if target.resource_type == _KMS_KEY:
+        return CandidateSelection(
             state="resolved",
-            provenance=provenance,
-            reference_kind=reference_kind,
-            configured_reference=configured_reference,
-            candidates=candidates,
-            selected_target=candidate,
-            selected_key=candidate,
-            uncertainties=_applicability_uncertainties(dependency_input),
+            value=_AwsDependencySelection(target=target, key=target),
+            details=_applicability_uncertainties(dependency_input),
         )
 
     key, alias_state, alias_uncertainties = _resolve_alias_key(
-        candidate,
+        target,
         native_index=native_index,
         resources_by_address=resources_by_address,
     )
     if key is None:
-        return _unresolved_evidence(
+        return CandidateSelection(
             state=alias_state,
-            provenance=provenance,
-            reference_kind=reference_kind,
-            configured_reference=configured_reference,
-            candidates=candidates,
-            uncertainties=(
-                *alias_uncertainties,
-                *dependency_input.source_uncertainties,
+            value=None,
+            causes=(_resolution_cause(alias_state),),
+            details=tuple(
+                _dedupe(
+                    (
+                        *alias_uncertainties,
+                        *dependency_input.source_uncertainties,
+                    )
+                )
             ),
         )
-    return _ResolutionEvidence(
+    return CandidateSelection(
         state="resolved",
-        provenance=provenance,
-        reference_kind=reference_kind,
+        value=_AwsDependencySelection(target=target, key=key),
+        details=_applicability_uncertainties(dependency_input),
+    )
+
+
+def _unselected_resolution(
+    *,
+    state: DependencyResolutionState,
+    configured_reference: str,
+    candidates: tuple[_AwsDependencyCandidate, ...],
+    uncertainties: Sequence[str],
+) -> _AwsDependencyResolution:
+    assert state != "resolved"
+    return DependencyResolution(
+        state=state,
+        provenance="planned_value",
         configured_reference=configured_reference,
         candidates=candidates,
-        selected_target=candidate,
-        selected_key=key,
-        uncertainties=_applicability_uncertainties(dependency_input),
+        selected_candidate=None,
+        selection=None,
+        causes=(_resolution_cause(state),),
+        details=tuple(_dedupe(uncertainties)),
+    )
+
+
+def _resolution_cause(
+    state: DependencyResolutionState,
+) -> DependencyResolutionCause:
+    assert state != "resolved"
+    if state == "ambiguous":
+        return "multiple_candidates"
+    if state == "unsupported":
+        return "unsupported_reference"
+    return "unresolved_reference"
+
+
+def _candidate_target_kind(
+    candidate: NormalizedResource,
+) -> AwsKmsDependencyTargetKind:
+    return "alias" if candidate.resource_type == _KMS_ALIAS else "key"
+
+
+def _dependency_candidate(
+    candidate: _AwsDependencyCandidate,
+) -> AwsKmsDependencyCandidate:
+    target_kind = candidate.metadata
+    assert target_kind is not None
+    return {
+        "address": candidate.address,
+        "target_kind": target_kind,
+    }
+
+
+def _configuration_resolution_details(
+    dependency_input: _AwsDependencyInput,
+    resolution: _AwsDependencyResolution,
+) -> tuple[str, ...]:
+    details = list(resolution.details)
+    inserted_details: list[str] = []
+    for retained in matching_configuration_resolutions(
+        dependency_input.source,
+        dependency_input.resolution_paths,
+    ):
+        reason = retained.reason
+        if retained.state == TerraformReferenceResolutionState.UNRESOLVED:
+            if reason is None:
+                inserted_details.append("Terraform configuration reference does not identify a modeled KMS target")
+            continue
+        if retained.state not in {
+            TerraformReferenceResolutionState.AMBIGUOUS,
+            TerraformReferenceResolutionState.UNSUPPORTED,
+            TerraformReferenceResolutionState.SYMBOLIC,
+        }:
+            inserted_details.append(
+                f"Terraform configuration reference state {retained.state.value} "
+                "cannot establish a symbolic KMS dependency"
+            )
+        if reason is not None and reason in details:
+            details.remove(reason)
+    return tuple(_dedupe((*inserted_details, *details)))
+
+
+def _resolution_uncertainties(
+    dependency_input: _AwsDependencyInput,
+    resolution: _AwsDependencyResolution,
+) -> tuple[str, ...]:
+    if resolution.state == "resolved":
+        return resolution.details
+    if resolution.provenance is None:
+        return resolution.details or ("KMS key reference is unresolved",)
+    if resolution.provenance == "planned_value":
+        return resolution.details
+
+    details = _configuration_resolution_details(
+        dependency_input,
+        resolution,
+    )
+    source_uncertainties = frozenset(dependency_input.source_uncertainties)
+    specific_details = tuple(detail for detail in details if detail not in source_uncertainties)
+    if resolution.state == "ambiguous":
+        return tuple(
+            _dedupe(
+                (
+                    "Terraform configuration reference has multiple modeled KMS targets",
+                    *details,
+                )
+            )
+        )
+    if specific_details:
+        return details
+    fallback = (
+        "Terraform configuration reference uses unsupported KMS relationship evidence"
+        if resolution.state == "unsupported"
+        else "Terraform configuration reference does not resolve to a modeled KMS target"
+    )
+    return tuple(
+        _dedupe(
+            (
+                fallback,
+                *dependency_input.source_uncertainties,
+            )
+        )
     )
 
 
@@ -826,7 +875,7 @@ def _resolve_alias_key(
     resources_by_address: dict[str, NormalizedResource],
 ) -> tuple[
     NormalizedResource | None,
-    AwsKmsDependencyResolutionState,
+    DependencyResolutionState,
     tuple[str, ...],
 ]:
     facts = aws_facts(alias)
@@ -855,7 +904,7 @@ def _resolve_alias_key(
             has_unmatched_native_reference = True
             uncertainties.append(f"{alias.address} target reference {reference} does not resolve to a modeled KMS key")
 
-    for resolution in _matching_resolutions(
+    for resolution in matching_configuration_resolutions(
         alias,
         (("target_key_id",), ("target_key_arn",)),
     ):
@@ -878,7 +927,7 @@ def _resolve_alias_key(
                 unsupported = True
                 continue
             expected_suffixes = _KEY_ARN_SUFFIXES if resolution.path == ("target_key_arn",) else _KEY_ID_SUFFIXES
-            if not _reference_has_suffix(target.reference, expected_suffixes):
+            if not any(target.reference.endswith(suffix) for suffix in expected_suffixes):
                 unsupported = True
                 continue
             if not _target_identity_is_known(candidate, target.reference):
@@ -983,16 +1032,17 @@ def _native_reference_kind(reference: str) -> AwsKmsDependencyReferenceKind:
 
 def _native_reference_kind_is_supported(
     reference_kind: AwsKmsDependencyReferenceKind,
-    dependency_input: _DependencyInput,
+    dependency_input: _AwsDependencyInput,
 ) -> bool:
+    adapter_data = dependency_input.adapter_data
     if reference_kind == "key_arn":
-        return ".arn" in dependency_input.key_reference_suffixes
+        return ".arn" in adapter_data.key_reference_suffixes
     if reference_kind == "key_id":
-        return bool(dependency_input.key_reference_suffixes & {".id", ".key_id"})
+        return bool(adapter_data.key_reference_suffixes & {".id", ".key_id"})
     if reference_kind == "alias_arn":
-        return ".arn" in dependency_input.alias_reference_suffixes
+        return ".arn" in adapter_data.alias_reference_suffixes
     if reference_kind == "alias_name":
-        return bool(dependency_input.alias_reference_suffixes & {".id", ".name"})
+        return bool(adapter_data.alias_reference_suffixes & {".id", ".name"})
     return False
 
 
@@ -1001,86 +1051,13 @@ def _is_aws_managed_key_reference(reference: str) -> bool:
     return normalized.startswith("alias/aws/") or normalized.startswith("aws/") or ":alias/aws/" in normalized
 
 
-def _is_symbolic_placeholder(
-    value: str,
-    resolutions: Sequence[TerraformReferenceResolution],
-) -> bool:
-    normalized = value.strip()
-    for resolution in resolutions:
-        for target in resolution.targets:
-            if normalized in {
-                target.address,
-                target.reference,
-                f"${{{target.reference}}}",
-            }:
-                return True
-    return False
-
-
 def _looks_like_terraform_reference(value: str) -> bool:
     normalized = value.strip()
     return normalized.startswith("aws_kms_") and "." in normalized
 
 
-def _matching_resolutions(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> tuple[TerraformReferenceResolution, ...]:
-    allowed_paths = set(paths)
-    return tuple(
-        resolution
-        for resolution in resource.reference_resolutions
-        if resolution.path in allowed_paths
-        and resolution.provenance == TerraformReferenceProvenance.CONFIGURATION_REFERENCE
-    )
-
-
-def _has_matching_resolution(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> bool:
-    return bool(_matching_resolutions(resource, paths))
-
-
-def _reference_has_suffix(
-    reference: str,
-    suffixes: Collection[str],
-) -> bool:
-    return any(reference.endswith(suffix) for suffix in suffixes)
-
-
-def _dependency_candidate(
-    resource: NormalizedResource,
-) -> AwsKmsDependencyCandidate:
-    return {
-        "address": resource.address,
-        "target_kind": ("alias" if resource.resource_type == _KMS_ALIAS else "key"),
-    }
-
-
-def _unresolved_evidence(
-    *,
-    state: AwsKmsDependencyResolutionState,
-    provenance: AwsKmsDependencyReferenceProvenance | None,
-    reference_kind: AwsKmsDependencyReferenceKind | None,
-    configured_reference: str | None,
-    candidates: tuple[NormalizedResource, ...],
-    uncertainties: tuple[str, ...],
-) -> _ResolutionEvidence:
-    return _ResolutionEvidence(
-        state=state,
-        provenance=provenance,
-        reference_kind=reference_kind,
-        configured_reference=configured_reference,
-        candidates=candidates,
-        selected_target=None,
-        selected_key=None,
-        uncertainties=tuple(_dedupe(uncertainties)),
-    )
-
-
 def _applicability_uncertainties(
-    dependency_input: _DependencyInput,
+    dependency_input: _AwsDependencyInput,
 ) -> tuple[str, ...]:
     terminal = dependency_input.configuration_path[-1]
     if not isinstance(terminal, str):
@@ -1122,7 +1099,7 @@ def _matching_uncertainties(
 
 def _uncovered_key_uncertainties(
     uncertainties: Sequence[str],
-    inputs: Sequence[_DependencyInput],
+    inputs: Sequence[_AwsDependencyInput],
     terms: Collection[str],
 ) -> list[str]:
     covered = {uncertainty for dependency_input in inputs for uncertainty in dependency_input.source_uncertainties}
