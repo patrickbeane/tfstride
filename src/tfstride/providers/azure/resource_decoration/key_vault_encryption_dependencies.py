@@ -2,19 +2,27 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import partial
 from urllib.parse import urlsplit
 
+from tfstride.dependencies import (
+    CandidateAssessment,
+    CandidateSelection,
+    DependencyCandidate,
+    DependencyInput,
+    DependencyResolution,
+    DependencyResolutionCause,
+    DependencyResolutionState,
+    DependencyResolver,
+    matching_configuration_resolutions,
+)
 from tfstride.models import (
     NormalizedResource,
     TerraformExpressionPath,
-    TerraformReferenceProvenance,
-    TerraformReferenceResolution,
-    TerraformReferenceResolutionState,
+    TerraformReferenceTarget,
 )
 from tfstride.providers.azure.key_vault_dependency_evidence import (
     AzureKeyVaultDependencyReferenceKind,
-    AzureKeyVaultDependencyReferenceProvenance,
-    AzureKeyVaultDependencyResolutionState,
     AzureKeyVaultDependencyTargetKind,
     AzureKeyVaultEncryptionDependency,
 )
@@ -63,29 +71,32 @@ _KEY_VAULT_DNS_SUFFIXES = (
 
 
 @dataclass(frozen=True, slots=True)
-class _DependencyInput:
-    dependent: NormalizedResource
-    source: NormalizedResource
-    configuration_path: TerraformExpressionPath
-    resolution_paths: tuple[TerraformExpressionPath, ...]
-    configured_reference: str | None
+class _AzureDependencyInputData:
     ownership_state: str | None
-    source_uncertainties: tuple[str, ...]
     allowed_reference_kinds: frozenset[AzureKeyVaultDependencyReferenceKind]
     allowed_reference_suffixes: frozenset[str]
     source_evidence_ambiguous: bool = False
 
 
-@dataclass(frozen=True, slots=True)
-class _ResolutionEvidence:
-    state: AzureKeyVaultDependencyResolutionState
-    provenance: AzureKeyVaultDependencyReferenceProvenance | None
-    reference_kind: AzureKeyVaultDependencyReferenceKind | None
-    configured_reference: str | None
-    candidates: tuple[NormalizedResource, ...]
-    target_kind: AzureKeyVaultDependencyTargetKind | None
-    selected_key: NormalizedResource | None
-    uncertainties: tuple[str, ...]
+_AzureCandidateMetadata = AzureKeyVaultDependencyTargetKind | None
+_AzureDependencyInput = DependencyInput[NormalizedResource, _AzureDependencyInputData]
+_AzureDependencyCandidate = DependencyCandidate[NormalizedResource, _AzureCandidateMetadata]
+_AzureDependencyResolution = DependencyResolution[
+    NormalizedResource,
+    _AzureCandidateMetadata,
+    NormalizedResource,
+]
+_AzureDependencyResolver = DependencyResolver[
+    NormalizedResource,
+    _AzureDependencyInputData,
+    NormalizedResource,
+    _AzureCandidateMetadata,
+    NormalizedResource,
+]
+_AzureCandidateAssessment = CandidateAssessment[
+    NormalizedResource,
+    _AzureCandidateMetadata,
+]
 
 
 class ResolveAzureKeyVaultEncryptionDependenciesStage:
@@ -104,6 +115,15 @@ class ResolveAzureKeyVaultEncryptionDependenciesStage:
             reference_key=azure_reference_key,
         )
         resources_by_address = {resource.address: resource for resource in resources}
+        resolver = _dependency_resolver(
+            native_index=native_index,
+            resources_by_address=resources_by_address,
+        )
+        render_dependency = partial(
+            _render_dependency_record,
+            resources_by_address=resources_by_address,
+        )
+
         dependencies_by_address: dict[str, list[AzureKeyVaultEncryptionDependency]] = {
             resource.address: []
             for resource in resources
@@ -122,10 +142,9 @@ class ResolveAzureKeyVaultEncryptionDependenciesStage:
                 f"{dependent.address}: {uncertainty}" for uncertainty in uncovered_uncertainties
             )
             for dependency_input in inputs:
-                record = _dependency_record(
+                record = resolver.resolve_record(
                     dependency_input,
-                    native_index=native_index,
-                    resources_by_address=resources_by_address,
+                    render=render_dependency,
                 )
                 dependencies_by_address[dependent.address].append(record)
                 uncertainties_by_address[dependent.address].extend(
@@ -151,7 +170,7 @@ def _dependency_inputs(
     dependent: NormalizedResource,
     *,
     resources_by_address: Mapping[str, NormalizedResource],
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_AzureDependencyInput], list[str]]:
     facts = azure_facts(dependent)
     if dependent.resource_type == AzureResourceType.STORAGE_ACCOUNT:
         paths = (
@@ -298,7 +317,7 @@ def _single_dependency_inputs(
     uncertainties: Sequence[str],
     allowed_reference_kinds: frozenset[AzureKeyVaultDependencyReferenceKind],
     allowed_reference_suffixes: frozenset[str],
-) -> tuple[list[_DependencyInput], list[str]]:
+) -> tuple[list[_AzureDependencyInput], list[str]]:
     dependency = _input_if_relevant(
         dependent=dependent,
         source=source,
@@ -329,8 +348,8 @@ def _alternate_dependency_inputs(
     uncertainties: Sequence[str],
     allowed_reference_kinds: frozenset[AzureKeyVaultDependencyReferenceKind],
     allowed_reference_suffixes: frozenset[str],
-) -> tuple[list[_DependencyInput], list[str]]:
-    inputs: list[_DependencyInput] = []
+) -> tuple[list[_AzureDependencyInput], list[str]]:
+    inputs: list[_AzureDependencyInput] = []
     consumed_uncertainties: set[str] = set()
     for path, configured_reference in fields:
         path_uncertainties = _matching_path_uncertainties(uncertainties, path)
@@ -352,7 +371,13 @@ def _alternate_dependency_inputs(
         consumed_uncertainties.update(path_uncertainties)
 
     if len(inputs) > 1:
-        inputs = [replace(dependency, source_evidence_ambiguous=True) for dependency in inputs]
+        inputs = [
+            replace(
+                dependency,
+                adapter_data=replace(dependency.adapter_data, source_evidence_ambiguous=True),
+            )
+            for dependency in inputs
+        ]
     return inputs, [uncertainty for uncertainty in uncertainties if uncertainty not in consumed_uncertainties]
 
 
@@ -368,63 +393,96 @@ def _input_if_relevant(
     allowed_reference_kinds: frozenset[AzureKeyVaultDependencyReferenceKind],
     allowed_reference_suffixes: frozenset[str],
     unknown_ownership_establishes_relevance: bool = True,
-) -> _DependencyInput | None:
+) -> _AzureDependencyInput | None:
     if (
         configured_reference is None
-        and not _has_matching_resolution(source, resolution_paths)
+        and not matching_configuration_resolutions(source, resolution_paths)
         and not source_uncertainties
         and (ownership_state != STATE_UNKNOWN or not unknown_ownership_establishes_relevance)
     ):
         return None
-    return _DependencyInput(
+    return DependencyInput(
         dependent=dependent,
         source=source,
         configuration_path=configuration_path,
         resolution_paths=resolution_paths,
         configured_reference=configured_reference,
-        ownership_state=ownership_state,
         source_uncertainties=tuple(source_uncertainties),
-        allowed_reference_kinds=allowed_reference_kinds,
-        allowed_reference_suffixes=allowed_reference_suffixes,
+        adapter_data=_AzureDependencyInputData(
+            ownership_state=ownership_state,
+            allowed_reference_kinds=allowed_reference_kinds,
+            allowed_reference_suffixes=allowed_reference_suffixes,
+        ),
     )
 
 
-def _dependency_record(
-    dependency_input: _DependencyInput,
+def _dependency_resolver(
     *,
     native_index: ResourceReferenceIndex,
     resources_by_address: Mapping[str, NormalizedResource],
+) -> _AzureDependencyResolver:
+    def resolve_native(
+        dependency_input: _AzureDependencyInput,
+        reference: str,
+    ) -> _AzureDependencyResolution:
+        return _resolve_native_reference(
+            reference,
+            dependency_input,
+            native_index=native_index,
+        )
+
+    def assess_target(
+        dependency_input: _AzureDependencyInput,
+        target: TerraformReferenceTarget,
+    ) -> _AzureCandidateAssessment:
+        return _assess_configuration_target(
+            target,
+            dependency_input=dependency_input,
+            resources_by_address=resources_by_address,
+        )
+
+    return DependencyResolver(
+        resolve_native_reference=resolve_native,
+        assess_configuration_target=assess_target,
+        resolve_configuration_candidate=_resolve_configuration_candidate,
+        reconcile_evidence=_reconcile_concrete_and_symbolic,
+    )
+
+
+def _render_dependency_record(
+    dependency_input: _AzureDependencyInput,
+    resolution: _AzureDependencyResolution,
+    configuration_path: TerraformExpressionPath,
+    *,
+    resources_by_address: Mapping[str, NormalizedResource],
 ) -> AzureKeyVaultEncryptionDependency:
-    evidence = _resolve_dependency(
+    resolution = _apply_source_evidence_ambiguity(
+        resolution,
         dependency_input,
-        native_index=native_index,
-        resources_by_address=resources_by_address,
     )
-    selected_key = evidence.selected_key
+    selected_key = resolution.selection
     key_facts = azure_facts(selected_key) if selected_key is not None else None
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
-    )
-    configuration_path = resolutions[0].path if len(resolutions) == 1 else dependency_input.configuration_path
     key_vault_address = key_facts.resolved_key_vault_address if key_facts is not None else None
     vault = resources_by_address.get(key_vault_address) if key_vault_address is not None else None
     vault_facts = azure_facts(vault) if vault is not None else None
     key_versionless_uri = key_facts.key_vault_key_versionless_uri if key_facts is not None else None
     key_versionless_resource_id = key_facts.key_vault_key_versionless_resource_id if key_facts is not None else None
+    configured_reference = resolution.configured_reference
+    if resolution.provenance == "configuration_reference" and not resolution.candidates:
+        configured_reference = None
     return {
         "dependent_address": dependency_input.dependent.address,
         "dependent_resource_type": dependency_input.dependent.resource_type,
         "dependency_source_address": dependency_input.source.address,
         "dependency_source_type": dependency_input.source.resource_type,
         "configuration_path": list(configuration_path),
-        "configured_key_reference": evidence.configured_reference,
-        "reference_provenance": evidence.provenance,
-        "reference_kind": evidence.reference_kind,
-        "resolution_state": evidence.state,
-        "customer_managed_key_state": dependency_input.ownership_state,
-        "candidate_key_addresses": [candidate.address for candidate in evidence.candidates],
-        "target_kind": evidence.target_kind,
+        "configured_key_reference": configured_reference,
+        "reference_provenance": resolution.provenance,
+        "reference_kind": _resolution_reference_kind(resolution),
+        "resolution_state": resolution.state,
+        "customer_managed_key_state": dependency_input.adapter_data.ownership_state,
+        "candidate_key_addresses": [candidate.address for candidate in resolution.candidates],
+        "target_kind": _resolution_target_kind(resolution),
         "key_address": selected_key.address if selected_key is not None else None,
         "key_vault_address": key_vault_address,
         "key_vault_id": (
@@ -441,164 +499,35 @@ def _dependency_record(
         "key_versionless_uri": key_versionless_uri,
         "key_resource_id": (key_facts.key_vault_key_resource_id if key_facts is not None else None),
         "key_versionless_resource_id": key_versionless_resource_id,
-        "posture_uncertainties": list(evidence.uncertainties),
+        "posture_uncertainties": list(_resolution_uncertainties(dependency_input, resolution)),
     }
-
-
-def _resolve_dependency(
-    dependency_input: _DependencyInput,
-    *,
-    native_index: ResourceReferenceIndex,
-    resources_by_address: Mapping[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    resolutions = _matching_resolutions(
-        dependency_input.source,
-        dependency_input.resolution_paths,
-    )
-    configured_reference = dependency_input.configured_reference
-    concrete_reference = configured_reference is not None and not _is_symbolic_placeholder(
-        configured_reference, resolutions
-    )
-    if concrete_reference:
-        assert configured_reference is not None
-        native_evidence = _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-        )
-        if resolutions and native_evidence.state == "resolved":
-            symbolic_evidence = _resolve_configuration_references(
-                resolutions,
-                dependency_input,
-                resources_by_address=resources_by_address,
-            )
-            evidence = _reconcile_concrete_and_symbolic(
-                native_evidence,
-                symbolic_evidence,
-                dependency_input,
-            )
-        else:
-            evidence = native_evidence
-    elif resolutions:
-        evidence = _resolve_configuration_references(
-            resolutions,
-            dependency_input,
-            resources_by_address=resources_by_address,
-        )
-    elif configured_reference:
-        evidence = _resolve_native_reference(
-            configured_reference,
-            dependency_input,
-            native_index=native_index,
-        )
-    else:
-        evidence = _unresolved_evidence(
-            state="unresolved",
-            provenance=None,
-            reference_kind=None,
-            configured_reference=None,
-            candidates=(),
-            target_kind=None,
-            uncertainties=(*(dependency_input.source_uncertainties or ("Key Vault key reference is unresolved",)),),
-        )
-    return _apply_source_evidence_ambiguity(evidence, dependency_input)
-
-
-def _reconcile_concrete_and_symbolic(
-    concrete: _ResolutionEvidence,
-    symbolic: _ResolutionEvidence,
-    dependency_input: _DependencyInput,
-) -> _ResolutionEvidence:
-    concrete_key = concrete.selected_key
-    symbolic_key = symbolic.selected_key
-    if symbolic.state != "resolved" or symbolic_key is None:
-        return concrete
-    if (
-        concrete_key is not None
-        and concrete_key.address == symbolic_key.address
-        and concrete.target_kind == symbolic.target_kind
-    ):
-        return concrete
-    candidates = tuple(
-        sorted(
-            {candidate.address: candidate for candidate in (*concrete.candidates, *symbolic.candidates)}.values(),
-            key=lambda candidate: candidate.address,
-        )
-    )
-    return _unresolved_evidence(
-        state="ambiguous",
-        provenance="planned_value",
-        reference_kind=concrete.reference_kind,
-        configured_reference=concrete.configured_reference,
-        candidates=candidates,
-        target_kind=None,
-        uncertainties=(
-            "Concrete Key Vault key identity conflicts with symbolic "
-            f"configuration evidence at {list(dependency_input.configuration_path)}",
-            *concrete.uncertainties,
-            *symbolic.uncertainties,
-        ),
-    )
-
-
-def _apply_source_evidence_ambiguity(
-    evidence: _ResolutionEvidence,
-    dependency_input: _DependencyInput,
-) -> _ResolutionEvidence:
-    if not dependency_input.source_evidence_ambiguous:
-        return evidence
-    return _unresolved_evidence(
-        state="ambiguous",
-        provenance=evidence.provenance,
-        reference_kind=evidence.reference_kind,
-        configured_reference=evidence.configured_reference,
-        candidates=evidence.candidates,
-        target_kind=evidence.target_kind,
-        uncertainties=(
-            "Multiple alternate Key Vault key fields contain relationship "
-            "evidence; no exact source field is authoritative",
-            *evidence.uncertainties,
-        ),
-    )
-
-
-def _is_symbolic_placeholder(
-    configured_reference: str,
-    resolutions: Sequence[TerraformReferenceResolution],
-) -> bool:
-    normalized = configured_reference.strip()
-    return any(
-        normalized
-        in {
-            target.address,
-            target.reference,
-            f"${{{target.reference}}}",
-        }
-        for resolution in resolutions
-        for target in resolution.targets
-    )
 
 
 def _resolve_native_reference(
     reference: str,
-    dependency_input: _DependencyInput,
+    dependency_input: _AzureDependencyInput,
     *,
     native_index: ResourceReferenceIndex,
-) -> _ResolutionEvidence:
+) -> _AzureDependencyResolution:
     normalized = reference.strip()
     reference_kind = _native_reference_kind(normalized)
-    candidates = tuple(
-        candidate for candidate in native_index.candidates(normalized) if candidate.resource_type == _KEY
-    )
     target_kind = _target_kind_for_reference_kind(reference_kind)
-    if reference_kind is None or reference_kind not in dependency_input.allowed_reference_kinds:
-        return _unresolved_evidence(
+    candidates: tuple[_AzureDependencyCandidate, ...] = tuple(
+        DependencyCandidate(
+            address=candidate.address,
+            value=candidate,
+            reference=normalized,
+            metadata=target_kind,
+        )
+        for candidate in native_index.candidates(normalized)
+        if candidate.resource_type == _KEY
+    )
+    if reference_kind is None or reference_kind not in dependency_input.adapter_data.allowed_reference_kinds:
+        return _unselected_resolution(
             state="unsupported",
-            provenance="planned_value",
-            reference_kind=reference_kind,
+            cause="unsupported_reference",
             configured_reference=normalized,
             candidates=candidates,
-            target_kind=target_kind,
             uncertainties=(
                 f"Key Vault key reference {normalized} has an unsupported identity "
                 f"shape for {dependency_input.source.resource_type}",
@@ -606,182 +535,256 @@ def _resolve_native_reference(
             ),
         )
     if len(candidates) > 1:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="ambiguous",
-            provenance="planned_value",
-            reference_kind=reference_kind,
+            cause="multiple_candidates",
             configured_reference=normalized,
             candidates=candidates,
-            target_kind=target_kind,
             uncertainties=(
                 f"Key Vault key reference {normalized} matches multiple modeled keys",
                 *dependency_input.source_uncertainties,
             ),
         )
     if not candidates:
-        return _unresolved_evidence(
+        return _unselected_resolution(
             state="unresolved",
-            provenance="planned_value",
-            reference_kind=reference_kind,
+            cause="unresolved_reference",
             configured_reference=normalized,
             candidates=(),
-            target_kind=target_kind,
             uncertainties=(
                 f"Key Vault key reference {normalized} does not resolve to a modeled key",
                 *dependency_input.source_uncertainties,
             ),
         )
-    return _select_key_candidate(
-        candidates[0],
-        candidates=candidates,
-        configured_reference=normalized,
-        provenance="planned_value",
-        reference_kind=reference_kind,
-        target_kind=target_kind,
-        dependency_input=dependency_input,
-    )
 
-
-def _resolve_configuration_references(
-    resolutions: tuple[TerraformReferenceResolution, ...],
-    dependency_input: _DependencyInput,
-    *,
-    resources_by_address: Mapping[str, NormalizedResource],
-) -> _ResolutionEvidence:
-    candidates: dict[str, NormalizedResource] = {}
-    target_references: dict[str, str] = {}
-    target_kinds: set[AzureKeyVaultDependencyTargetKind] = set()
-    reasons: list[str] = []
-    ambiguous = False
-    unsupported = False
-    unresolved = False
-
-    for resolution in resolutions:
-        if resolution.state == TerraformReferenceResolutionState.AMBIGUOUS:
-            ambiguous = True
-        elif resolution.state == TerraformReferenceResolutionState.UNSUPPORTED:
-            unsupported = True
-        elif resolution.state == TerraformReferenceResolutionState.UNRESOLVED:
-            unresolved = True
-        elif resolution.state != TerraformReferenceResolutionState.SYMBOLIC:
-            unsupported = True
-        if resolution.reason:
-            reasons.append(resolution.reason)
-
-        for target in resolution.targets:
-            candidate = resources_by_address.get(target.address)
-            if candidate is None or candidate.resource_type != _KEY:
-                unsupported = True
-                reasons.append(f"Terraform target {target.address} is not a modeled Key Vault key")
-                continue
-            candidates.setdefault(candidate.address, candidate)
-            target_references.setdefault(candidate.address, target.reference)
-            target_kind = _target_kind_for_reference_suffix(target.reference)
-            if target_kind is not None:
-                target_kinds.add(target_kind)
-            if not _reference_has_suffix(
-                target.reference,
-                dependency_input.allowed_reference_suffixes,
-            ):
-                unsupported = True
-                reasons.append(
-                    f"Terraform target reference {target.reference} is unsupported "
-                    f"for {dependency_input.source.resource_type}"
-                )
-
-    ordered_candidates = tuple(sorted(candidates.values(), key=lambda candidate: candidate.address))
-    target_kind = next(iter(target_kinds)) if len(target_kinds) == 1 else None
-    configured_reference = target_references[ordered_candidates[0].address] if len(ordered_candidates) == 1 else None
-    if ambiguous or len(ordered_candidates) > 1:
-        return _unresolved_evidence(
-            state="ambiguous",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            target_kind=target_kind,
-            uncertainties=(
-                "Terraform configuration reference has multiple modeled Key Vault key targets",
-                *reasons,
-                *dependency_input.source_uncertainties,
-            ),
-        )
-    if unsupported or len(target_kinds) > 1:
-        return _unresolved_evidence(
-            state="unsupported",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            target_kind=target_kind,
-            uncertainties=(
-                *(
-                    reasons
-                    or ["Terraform configuration reference uses unsupported Key Vault key relationship evidence"]
-                ),
-                *dependency_input.source_uncertainties,
-            ),
-        )
-    if unresolved or len(ordered_candidates) != 1 or target_kind is None:
-        return _unresolved_evidence(
-            state="unresolved",
-            provenance="configuration_reference",
-            reference_kind="terraform_reference",
-            configured_reference=configured_reference,
-            candidates=ordered_candidates,
-            target_kind=target_kind,
-            uncertainties=(
-                *(reasons or ["Terraform configuration reference does not resolve to a modeled Key Vault key"]),
-                *dependency_input.source_uncertainties,
-            ),
-        )
-
-    candidate = ordered_candidates[0]
-    return _select_key_candidate(
+    candidate = candidates[0]
+    selection = _resolve_configuration_candidate(
+        dependency_input,
         candidate,
-        candidates=ordered_candidates,
-        configured_reference=target_references[candidate.address],
-        provenance="configuration_reference",
-        reference_kind="terraform_reference",
-        target_kind=target_kind,
-        dependency_input=dependency_input,
+        candidates,
+    )
+    return DependencyResolution(
+        state=selection.state,
+        provenance="planned_value",
+        configured_reference=normalized,
+        candidates=candidates,
+        selected_candidate=(candidate if selection.state == "resolved" else None),
+        selection=selection.value,
+        causes=selection.causes,
+        details=selection.details,
     )
 
 
-def _select_key_candidate(
-    candidate: NormalizedResource,
+def _assess_configuration_target(
+    target: TerraformReferenceTarget,
     *,
-    candidates: tuple[NormalizedResource, ...],
-    configured_reference: str,
-    provenance: AzureKeyVaultDependencyReferenceProvenance,
-    reference_kind: AzureKeyVaultDependencyReferenceKind,
-    target_kind: AzureKeyVaultDependencyTargetKind | None,
-    dependency_input: _DependencyInput,
-) -> _ResolutionEvidence:
-    facts = azure_facts(candidate)
-    if facts.key_vault_key_identity_state != "resolved" or not _identity_for_target_kind(candidate, target_kind):
-        return _unresolved_evidence(
-            state="unresolved",
-            provenance=provenance,
-            reference_kind=reference_kind,
-            configured_reference=configured_reference,
-            candidates=candidates,
-            target_kind=target_kind,
-            uncertainties=(
-                f"{candidate.address} does not retain the exact provider-native "
-                f"{_target_kind_label(target_kind)} identity required by the dependency",
-                *dependency_input.source_uncertainties,
+    dependency_input: _AzureDependencyInput,
+    resources_by_address: Mapping[str, NormalizedResource],
+) -> _AzureCandidateAssessment:
+    candidate = resources_by_address.get(target.address)
+    if candidate is None or candidate.resource_type != _KEY:
+        return CandidateAssessment(
+            candidate=None,
+            metadata=None,
+            supported=False,
+            details=(f"Terraform target {target.address} is not a modeled Key Vault key",),
+        )
+
+    target_kind = _target_kind_for_reference_suffix(target.reference)
+    if not any(
+        target.reference.endswith(suffix) for suffix in dependency_input.adapter_data.allowed_reference_suffixes
+    ):
+        return CandidateAssessment(
+            candidate=candidate,
+            metadata=target_kind,
+            supported=False,
+            details=(
+                f"Terraform target reference {target.reference} is unsupported "
+                f"for {dependency_input.source.resource_type}",
             ),
         )
-    return _ResolutionEvidence(
+    return CandidateAssessment(
+        candidate=candidate,
+        metadata=target_kind,
+        supported=True,
+    )
+
+
+def _resolve_configuration_candidate(
+    dependency_input: _AzureDependencyInput,
+    candidate: _AzureDependencyCandidate,
+    candidates: tuple[_AzureDependencyCandidate, ...],
+) -> CandidateSelection[NormalizedResource]:
+    _ = candidates
+    target_kind = candidate.metadata
+    facts = azure_facts(candidate.value)
+    if facts.key_vault_key_identity_state != "resolved" or not _identity_for_target_kind(candidate.value, target_kind):
+        return CandidateSelection(
+            state="unresolved",
+            value=None,
+            causes=("unresolved_reference",),
+            details=tuple(
+                _dedupe(
+                    (
+                        f"{candidate.address} does not retain the exact provider-native "
+                        f"{_target_kind_label(target_kind)} identity required by the dependency",
+                        *dependency_input.source_uncertainties,
+                    )
+                )
+            ),
+        )
+    return CandidateSelection(
         state="resolved",
-        provenance=provenance,
-        reference_kind=reference_kind,
+        value=candidate.value,
+        details=_applicability_uncertainties(dependency_input),
+    )
+
+
+def _reconcile_concrete_and_symbolic(
+    dependency_input: _AzureDependencyInput,
+    concrete: _AzureDependencyResolution,
+    symbolic: _AzureDependencyResolution,
+) -> _AzureDependencyResolution:
+    if symbolic.state != "resolved" or symbolic.selected_candidate is None:
+        return concrete
+    if (
+        concrete.selected_candidate is not None
+        and concrete.selected_candidate.address == symbolic.selected_candidate.address
+        and concrete.selected_candidate.metadata == symbolic.selected_candidate.metadata
+    ):
+        return concrete
+
+    candidates = tuple(
+        sorted(
+            {candidate.address: candidate for candidate in (*concrete.candidates, *symbolic.candidates)}.values(),
+            key=lambda candidate: candidate.address,
+        )
+    )
+    return DependencyResolution(
+        state="ambiguous",
+        provenance="planned_value",
+        configured_reference=concrete.configured_reference,
+        candidates=candidates,
+        selected_candidate=None,
+        selection=None,
+        causes=("conflicting_evidence",),
+        details=tuple(
+            _dedupe(
+                (
+                    "Concrete Key Vault key identity conflicts with symbolic "
+                    f"configuration evidence at {list(dependency_input.configuration_path)}",
+                    *concrete.details,
+                    *symbolic.details,
+                )
+            )
+        ),
+    )
+
+
+def _apply_source_evidence_ambiguity(
+    resolution: _AzureDependencyResolution,
+    dependency_input: _AzureDependencyInput,
+) -> _AzureDependencyResolution:
+    if not dependency_input.adapter_data.source_evidence_ambiguous:
+        return resolution
+    return replace(
+        resolution,
+        state="ambiguous",
+        selected_candidate=None,
+        selection=None,
+        details=tuple(
+            _dedupe(
+                (
+                    "Multiple alternate Key Vault key fields contain relationship "
+                    "evidence; no exact source field is authoritative",
+                    *resolution.details,
+                )
+            )
+        ),
+    )
+
+
+def _unselected_resolution(
+    *,
+    state: DependencyResolutionState,
+    cause: DependencyResolutionCause,
+    configured_reference: str,
+    candidates: tuple[_AzureDependencyCandidate, ...],
+    uncertainties: Sequence[str],
+) -> _AzureDependencyResolution:
+    return DependencyResolution(
+        state=state,
+        provenance="planned_value",
         configured_reference=configured_reference,
         candidates=candidates,
-        target_kind=target_kind,
-        selected_key=candidate,
-        uncertainties=_applicability_uncertainties(dependency_input),
+        selected_candidate=None,
+        selection=None,
+        causes=(cause,),
+        details=tuple(_dedupe(uncertainties)),
+    )
+
+
+def _resolution_reference_kind(
+    resolution: _AzureDependencyResolution,
+) -> AzureKeyVaultDependencyReferenceKind | None:
+    if resolution.provenance == "configuration_reference":
+        return "terraform_reference"
+    if resolution.configured_reference is None:
+        return None
+    return _native_reference_kind(resolution.configured_reference)
+
+
+def _resolution_target_kind(
+    resolution: _AzureDependencyResolution,
+) -> AzureKeyVaultDependencyTargetKind | None:
+    if any(cause in {"conflicting_candidate_evidence", "conflicting_evidence"} for cause in resolution.causes):
+        return None
+    if resolution.provenance == "planned_value":
+        return _target_kind_for_reference_kind(_resolution_reference_kind(resolution))
+    target_kinds: set[AzureKeyVaultDependencyTargetKind] = {
+        candidate.metadata for candidate in resolution.candidates if candidate.metadata is not None
+    }
+    return next(iter(target_kinds)) if len(target_kinds) == 1 else None
+
+
+def _resolution_uncertainties(
+    dependency_input: _AzureDependencyInput,
+    resolution: _AzureDependencyResolution,
+) -> tuple[str, ...]:
+    if dependency_input.adapter_data.source_evidence_ambiguous:
+        return resolution.details
+    if resolution.state == "resolved":
+        return resolution.details
+    if resolution.provenance is None:
+        return resolution.details or ("Key Vault key reference is unresolved",)
+    if resolution.provenance == "planned_value":
+        return resolution.details
+
+    source_uncertainties = frozenset(dependency_input.source_uncertainties)
+    specific_details = tuple(detail for detail in resolution.details if detail not in source_uncertainties)
+    if resolution.state == "ambiguous":
+        return tuple(
+            _dedupe(
+                (
+                    "Terraform configuration reference has multiple modeled Key Vault key targets",
+                    *resolution.details,
+                )
+            )
+        )
+    if specific_details:
+        return resolution.details
+    fallback = (
+        "Terraform configuration reference uses unsupported Key Vault key relationship evidence"
+        if resolution.state == "unsupported"
+        else "Terraform configuration reference does not resolve to a modeled Key Vault key"
+    )
+    return tuple(
+        _dedupe(
+            (
+                fallback,
+                *dependency_input.source_uncertainties,
+            )
+        )
     )
 
 
@@ -918,55 +921,6 @@ def _vault_uri_from_key_uri(reference: str | None) -> str | None:
     return reference.rsplit("/keys/", 1)[0]
 
 
-def _matching_resolutions(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> tuple[TerraformReferenceResolution, ...]:
-    allowed_paths = set(paths)
-    return tuple(
-        resolution
-        for resolution in resource.reference_resolutions
-        if resolution.path in allowed_paths
-        and resolution.provenance == TerraformReferenceProvenance.CONFIGURATION_REFERENCE
-    )
-
-
-def _has_matching_resolution(
-    resource: NormalizedResource,
-    paths: Collection[TerraformExpressionPath],
-) -> bool:
-    return bool(_matching_resolutions(resource, paths))
-
-
-def _reference_has_suffix(
-    reference: str,
-    suffixes: Collection[str],
-) -> bool:
-    return any(reference.endswith(suffix) for suffix in suffixes)
-
-
-def _unresolved_evidence(
-    *,
-    state: AzureKeyVaultDependencyResolutionState,
-    provenance: AzureKeyVaultDependencyReferenceProvenance | None,
-    reference_kind: AzureKeyVaultDependencyReferenceKind | None,
-    configured_reference: str | None,
-    candidates: tuple[NormalizedResource, ...],
-    target_kind: AzureKeyVaultDependencyTargetKind | None,
-    uncertainties: Sequence[str],
-) -> _ResolutionEvidence:
-    return _ResolutionEvidence(
-        state=state,
-        provenance=provenance,
-        reference_kind=reference_kind,
-        configured_reference=configured_reference,
-        candidates=candidates,
-        target_kind=target_kind,
-        selected_key=None,
-        uncertainties=tuple(_dedupe(uncertainties)),
-    )
-
-
 def _ownership_state(
     configured_reference: str | None,
     source: NormalizedResource,
@@ -975,13 +929,13 @@ def _ownership_state(
 ) -> str:
     if configured_reference is not None:
         return STATE_CONFIGURED
-    if _has_matching_resolution(source, paths) or uncertainties:
+    if matching_configuration_resolutions(source, paths) or uncertainties:
         return STATE_UNKNOWN
     return STATE_NOT_CONFIGURED
 
 
 def _applicability_uncertainties(
-    dependency_input: _DependencyInput,
+    dependency_input: _AzureDependencyInput,
 ) -> tuple[str, ...]:
     terminals = {
         path[-1].casefold() for path in dependency_input.resolution_paths if path and isinstance(path[-1], str)
