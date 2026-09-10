@@ -329,8 +329,8 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
         key = inventory.get_by_address("azurerm_key_vault_key.data")
         assert key is not None
         self.assertEqual(
-            {dependency["dependent_address"] for dependency in azure_facts(key).key_vault_encryption_dependencies},
-            set(expected),
+            [dependency["dependent_address"] for dependency in azure_facts(key).key_vault_encryption_dependencies],
+            sorted(expected),
         )
 
     def test_symbolic_versionless_reference_resolves_without_fabricating_a_uri(
@@ -420,6 +420,7 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
             (
                 "azurerm_key_vault_key.data",
                 "azurerm_key_vault_key.audit",
+                "azurerm_key_vault_key.data",
             ),
             ".versionless_id",
             state=TerraformReferenceResolutionState.AMBIGUOUS,
@@ -441,6 +442,12 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
         dependency = azure_facts(account).key_vault_encryption_dependencies[0]
 
         self.assertEqual(dependency["resolution_state"], "ambiguous")
+        self.assertEqual(dependency["configuration_path"], ["key_vault_key_id"])
+        self.assertEqual(
+            dependency["reference_provenance"],
+            "configuration_reference",
+        )
+        self.assertEqual(dependency["reference_kind"], "terraform_reference")
         self.assertEqual(
             dependency["candidate_key_addresses"],
             [
@@ -451,6 +458,21 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
         self.assertEqual(dependency["target_kind"], "key")
         self.assertIsNone(dependency["key_address"])
         self.assertIsNone(dependency["key_versionless_uri"])
+        self.assertEqual(
+            dependency["posture_uncertainties"],
+            [
+                "Terraform configuration reference has multiple modeled Key Vault key targets",
+                "key_vault_key_id is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            azure_facts(account).key_vault_encryption_dependency_uncertainties,
+            [
+                "azurerm_cosmosdb_account.ambiguous: Terraform configuration reference has "
+                "multiple modeled Key Vault key targets",
+                "azurerm_cosmosdb_account.ambiguous: key_vault_key_id is unknown after planning",
+            ],
+        )
         self.assertEqual(
             azure_facts(data_key).key_vault_encryption_dependencies,
             [],
@@ -486,14 +508,35 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
             ["azurerm_key_vault_key.data"],
         )
         self.assertEqual(dependency["target_kind"], "key")
+        self.assertEqual(dependency["configuration_path"], ["key_vault_key_id"])
+        self.assertEqual(
+            dependency["reference_provenance"],
+            "configuration_reference",
+        )
         self.assertIsNone(dependency["key_address"])
         self.assertIsNone(dependency["key_uri"])
         self.assertIsNone(dependency["key_versionless_uri"])
         self.assertEqual(
+            dependency["posture_uncertainties"],
+            [
+                "azurerm_key_vault_key.data does not retain the exact provider-native "
+                "versionless Key Vault key identity required by the dependency",
+                "key_vault_key_id is unknown after planning",
+            ],
+        )
+        self.assertEqual(
             azure_facts(key).key_vault_encryption_dependencies,
             [],
         )
-        self.assertTrue(azure_facts(account).key_vault_encryption_dependency_uncertainties)
+        self.assertEqual(
+            azure_facts(account).key_vault_encryption_dependency_uncertainties,
+            [
+                "azurerm_cosmosdb_account.unresolved: azurerm_key_vault_key.data does not retain "
+                "the exact provider-native versionless Key Vault key identity required by the "
+                "dependency",
+                "azurerm_cosmosdb_account.unresolved: key_vault_key_id is unknown after planning",
+            ],
+        )
 
     def test_cosmosdb_rejects_versioned_or_arm_key_references(self) -> None:
         versioned_symbolic = _reference_resolution(
@@ -708,8 +751,33 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
         dependency = azure_facts(normalized).key_vault_encryption_dependencies[0]
 
         self.assertEqual(dependency["resolution_state"], "ambiguous")
+        self.assertEqual(
+            dependency["configuration_path"],
+            ["customer_managed_key", 0, "key_vault_key_id"],
+        )
+        self.assertEqual(dependency["reference_provenance"], "planned_value")
+        self.assertEqual(dependency["reference_kind"], "versioned_uri")
+        self.assertEqual(
+            dependency["candidate_key_addresses"],
+            ["azurerm_key_vault_key.data"],
+        )
         self.assertIsNone(dependency["target_kind"])
         self.assertIsNone(dependency["key_address"])
+        self.assertEqual(
+            dependency["posture_uncertainties"],
+            [
+                "Concrete Key Vault key identity conflicts with symbolic configuration evidence "
+                "at ['customer_managed_key', 0, 'key_vault_key_id']"
+            ],
+        )
+        self.assertEqual(
+            azure_facts(normalized).key_vault_encryption_dependency_uncertainties,
+            [
+                "azurerm_storage_account.conflicting: Concrete Key Vault key identity conflicts "
+                "with symbolic configuration evidence at "
+                "['customer_managed_key', 0, 'key_vault_key_id']"
+            ],
+        )
         self.assertEqual(
             azure_facts(key).key_vault_encryption_dependencies,
             [],
@@ -771,10 +839,28 @@ class AzureKeyVaultEncryptionDependencyTests(unittest.TestCase):
 
         self.assertEqual(len(dependencies), 2)
         self.assertEqual(
-            {dependency["resolution_state"] for dependency in dependencies},
-            {"ambiguous"},
+            [dependency["configuration_path"] for dependency in dependencies],
+            [
+                ["customer_managed_key", 0, "key_vault_key_id"],
+                ["customer_managed_key", 0, "key_vault_key_uri"],
+            ],
         )
+        self.assertEqual(
+            [dependency["configured_key_reference"] for dependency in dependencies],
+            [
+                _KEY_URI,
+                f"{_VAULT_URI}/keys/audit/{_KEY_VERSION}",
+            ],
+        )
+        self.assertTrue(all(dependency["resolution_state"] == "ambiguous" for dependency in dependencies))
         self.assertTrue(all(dependency["key_address"] is None for dependency in dependencies))
+        self.assertEqual(
+            azure_facts(normalized).key_vault_encryption_dependency_uncertainties,
+            [
+                "azurerm_storage_account.alternate_conflict: Multiple alternate Key Vault key "
+                "fields contain relationship evidence; no exact source field is authoritative"
+            ],
+        )
         self.assertEqual(
             azure_facts(data_key).key_vault_encryption_dependencies,
             [],

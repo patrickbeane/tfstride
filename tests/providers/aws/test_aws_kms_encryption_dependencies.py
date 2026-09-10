@@ -297,17 +297,35 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
             ]
         )
 
-        expected_sources = {
-            "aws_cloudtrail.orders": "aws_cloudtrail.orders",
-            "aws_dynamodb_table.orders": "aws_dynamodb_table.orders",
-            "aws_db_instance.orders": "aws_db_instance.orders",
-            "aws_s3_bucket.orders": ("aws_s3_bucket_server_side_encryption_configuration.orders"),
-            "aws_secretsmanager_secret.orders": "aws_secretsmanager_secret.orders",
-            "aws_sns_topic.orders": "aws_sns_topic.orders",
-            "aws_sqs_queue.orders": "aws_sqs_queue.orders",
-            "aws_ecr_repository.orders": "aws_ecr_repository.orders",
+        expected_dependencies = {
+            "aws_cloudtrail.orders": ("aws_cloudtrail.orders", ["kms_key_id"]),
+            "aws_dynamodb_table.orders": (
+                "aws_dynamodb_table.orders",
+                ["server_side_encryption", 0, "kms_key_arn"],
+            ),
+            "aws_db_instance.orders": ("aws_db_instance.orders", ["kms_key_id"]),
+            "aws_s3_bucket.orders": (
+                "aws_s3_bucket_server_side_encryption_configuration.orders",
+                [
+                    "rule",
+                    0,
+                    "apply_server_side_encryption_by_default",
+                    0,
+                    "kms_master_key_id",
+                ],
+            ),
+            "aws_secretsmanager_secret.orders": (
+                "aws_secretsmanager_secret.orders",
+                ["kms_key_id"],
+            ),
+            "aws_sns_topic.orders": ("aws_sns_topic.orders", ["kms_master_key_id"]),
+            "aws_sqs_queue.orders": ("aws_sqs_queue.orders", ["kms_master_key_id"]),
+            "aws_ecr_repository.orders": (
+                "aws_ecr_repository.orders",
+                ["encryption_configuration", 0, "kms_key"],
+            ),
         }
-        for address, source_address in expected_sources.items():
+        for address, (source_address, configuration_path) in expected_dependencies.items():
             with self.subTest(address=address):
                 resource = inventory.get_by_address(address)
                 assert resource is not None
@@ -318,6 +336,7 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
                 self.assertEqual(dependency["reference_provenance"], "planned_value")
                 self.assertEqual(dependency["reference_kind"], "key_arn")
                 self.assertEqual(dependency["dependency_source_address"], source_address)
+                self.assertEqual(dependency["configuration_path"], configuration_path)
                 self.assertEqual(dependency["key_address"], "aws_kms_key.data")
                 self.assertEqual(dependency["key_arn"], _KEY_ARN)
                 self.assertEqual(dependency["key_id"], _KEY_ID)
@@ -330,8 +349,8 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
         key = inventory.get_by_address("aws_kms_key.data")
         assert key is not None
         self.assertEqual(
-            {dependency["dependent_address"] for dependency in aws_facts(key).kms_encryption_dependencies},
-            set(expected_sources),
+            [dependency["dependent_address"] for dependency in aws_facts(key).kms_encryption_dependencies],
+            sorted(expected_dependencies),
         )
 
     def test_customer_aliases_resolve_through_one_exact_modeled_key(self) -> None:
@@ -429,7 +448,20 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
         )
         self.assertIsNone(dependency["alias_address"])
         self.assertIsNone(dependency["key_address"])
-        self.assertTrue(dependency["posture_uncertainties"])
+        self.assertEqual(
+            dependency["posture_uncertainties"],
+            [
+                "aws_kms_alias.conflicting target reference "
+                "99999999-9999-9999-9999-999999999999 does not resolve to a modeled KMS key"
+            ],
+        )
+        self.assertEqual(
+            aws_facts(queue).kms_encryption_dependency_uncertainties,
+            [
+                "aws_sqs_queue.conflicting: aws_kms_alias.conflicting target reference "
+                "99999999-9999-9999-9999-999999999999 does not resolve to a modeled KMS key"
+            ],
+        )
         self.assertEqual(aws_facts(key).kms_encryption_dependencies, [])
 
     def test_cloudtrail_and_ecr_require_exact_key_arn_references(self) -> None:
@@ -609,6 +641,7 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
             (
                 ("aws_kms_key.data", ".arn"),
                 ("aws_kms_key.audit", ".arn"),
+                ("aws_kms_key.data", ".arn"),
             ),
             state=TerraformReferenceResolutionState.AMBIGUOUS,
         )
@@ -663,10 +696,22 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
 
         ambiguous_dependency = aws_facts(ambiguous_table).kms_encryption_dependencies[0]
         self.assertEqual(ambiguous_dependency["resolution_state"], "ambiguous")
-        self.assertEqual(ambiguous_dependency["key_address"], None)
-        self.assertIn(
-            "server_side_encryption.kms_key_arn is unknown after planning",
+        self.assertEqual(
+            ambiguous_dependency["configuration_path"],
+            ["server_side_encryption", 0, "kms_key_arn"],
+        )
+        self.assertEqual(
+            ambiguous_dependency["reference_provenance"],
+            "configuration_reference",
+        )
+        self.assertEqual(ambiguous_dependency["reference_kind"], "terraform_reference")
+        self.assertIsNone(ambiguous_dependency["key_address"])
+        self.assertEqual(
             ambiguous_dependency["posture_uncertainties"],
+            [
+                "Terraform configuration reference has multiple modeled KMS targets",
+                "server_side_encryption.kms_key_arn is unknown after planning",
+            ],
         )
         self.assertEqual(
             ambiguous_dependency["candidate_targets"],
@@ -675,6 +720,23 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
                 {"address": "aws_kms_key.data", "target_kind": "key"},
             ],
         )
+        self.assertEqual(
+            aws_facts(ambiguous_table).kms_encryption_dependency_uncertainties,
+            [
+                "aws_dynamodb_table.ambiguous: Terraform configuration reference has multiple modeled KMS targets",
+                "aws_dynamodb_table.ambiguous: server_side_encryption.kms_key_arn is unknown after planning",
+            ],
+        )
+
+        data_key = inventory.get_by_address("aws_kms_key.data")
+        audit_key = inventory.get_by_address("aws_kms_key.audit")
+        assert data_key is not None
+        assert audit_key is not None
+        self.assertEqual(
+            [dependency["dependent_address"] for dependency in aws_facts(data_key).kms_encryption_dependencies],
+            ["aws_dynamodb_table.exact"],
+        )
+        self.assertEqual(aws_facts(audit_key).kms_encryption_dependencies, [])
 
     def test_symbolic_alias_and_missing_native_identity_remain_distinct(
         self,
@@ -715,8 +777,22 @@ class AwsKmsEncryptionDependencyTests(unittest.TestCase):
         )
         self.assertIsNone(unresolved["alias_address"])
         self.assertIsNone(unresolved["key_address"])
-        self.assertTrue(unresolved["posture_uncertainties"])
-        self.assertTrue(aws_facts(unresolved_queue).kms_encryption_dependency_uncertainties)
+        self.assertEqual(
+            unresolved["posture_uncertainties"],
+            [
+                "aws_kms_alias.unresolved does not retain the provider-native identity required "
+                "by aws_kms_alias.unresolved.name",
+                "kms_master_key_id is unknown after planning",
+            ],
+        )
+        self.assertEqual(
+            aws_facts(unresolved_queue).kms_encryption_dependency_uncertainties,
+            [
+                "aws_sqs_queue.unresolved: aws_kms_alias.unresolved does not retain the "
+                "provider-native identity required by aws_kms_alias.unresolved.name",
+                "aws_sqs_queue.unresolved: kms_master_key_id is unknown after planning",
+            ],
+        )
 
     def test_replica_only_unknowns_do_not_create_primary_dependencies(
         self,

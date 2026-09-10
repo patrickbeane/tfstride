@@ -329,8 +329,8 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
         key = inventory.get_by_address("google_kms_crypto_key.orders")
         assert key is not None
         self.assertEqual(
-            {dependency["dependent_address"] for dependency in gcp_facts(key).kms_encryption_dependencies},
-            set(expected_paths),
+            [dependency["dependent_address"] for dependency in gcp_facts(key).kms_encryption_dependencies],
+            sorted(expected_paths),
         )
 
     def test_exact_symbolic_id_references_resolve_for_each_source_shape(self) -> None:
@@ -463,6 +463,7 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
             (
                 ("google_kms_crypto_key.orders", ".id"),
                 ("google_kms_crypto_key.audit", ".id"),
+                ("google_kms_crypto_key.orders", ".id"),
             ),
             state=TerraformReferenceResolutionState.AMBIGUOUS,
         )
@@ -505,6 +506,10 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
                         "target_kind": "crypto_key",
                     },
                 ],
+                [
+                    "Terraform configuration reference has multiple modeled Cloud KMS targets",
+                    "kms_key_name is unknown after planning",
+                ],
             ),
             "google_pubsub_topic.unresolved": (
                 "unresolved",
@@ -513,6 +518,10 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
                         "address": "google_kms_crypto_key.orders",
                         "target_kind": "crypto_key",
                     }
+                ],
+                [
+                    "Terraform configuration reference does not resolve to a modeled Cloud KMS CryptoKey",
+                    "kms_key_name is unknown after planning",
                 ],
             ),
             "google_pubsub_topic.wrong-suffix": (
@@ -523,6 +532,11 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
                         "target_kind": "crypto_key",
                     }
                 ],
+                [
+                    "Terraform target reference google_kms_crypto_key.orders.name is unsupported "
+                    "for google_pubsub_topic",
+                    "kms_key_name is unknown after planning",
+                ],
             ),
             "google_pubsub_topic.missing-identity": (
                 "unresolved",
@@ -532,17 +546,32 @@ class GcpKmsEncryptionDependencyTests(unittest.TestCase):
                         "target_kind": "crypto_key",
                     }
                 ],
+                [
+                    "google_kms_crypto_key.unresolved does not retain an exact provider-native CryptoKey resource name",
+                    "kms_key_name is unknown after planning",
+                ],
             ),
         }
-        for address, (state, candidates) in expected.items():
+        for address, (state, candidates, uncertainties) in expected.items():
             with self.subTest(address=address):
                 resource = inventory.get_by_address(address)
                 assert resource is not None
                 dependency = gcp_facts(resource).kms_encryption_dependencies[0]
                 self.assertEqual(dependency["resolution_state"], state)
+                self.assertEqual(dependency["configuration_path"], ["kms_key_name"])
+                self.assertEqual(
+                    dependency["reference_provenance"],
+                    "configuration_reference",
+                )
+                self.assertEqual(dependency["reference_kind"], "terraform_reference")
                 self.assertEqual(dependency["candidate_targets"], candidates)
                 self.assertIsNone(dependency["key_address"])
                 self.assertIsNone(dependency["key_resource_name"])
+                self.assertEqual(dependency["posture_uncertainties"], uncertainties)
+                self.assertEqual(
+                    gcp_facts(resource).kms_encryption_dependency_uncertainties,
+                    [f"{address}: {uncertainty}" for uncertainty in uncertainties],
+                )
 
         for key_address in (
             "google_kms_crypto_key.orders",
