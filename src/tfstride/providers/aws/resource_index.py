@@ -34,7 +34,7 @@ class AwsResourceReferenceView:
     _index: ResourceReferenceIndex
     _resources_by_address: dict[str, NormalizedResource]
     _resource_types: frozenset[str]
-    _resources: tuple[NormalizedResource, ...]
+    resources: tuple[NormalizedResource, ...]
 
     def resolve(
         self,
@@ -85,21 +85,6 @@ class AwsResourceReferenceView:
         selected = self.resolve(reference, source=source).selected_candidate
         return selected if selected is not None else default
 
-    def __getitem__(self, reference: str) -> NormalizedResource:
-        selected = self.get(reference)
-        if selected is None:
-            raise KeyError(reference)
-        return selected
-
-    def __contains__(self, reference: object) -> bool:
-        return isinstance(reference, str) and self.get(reference) is not None
-
-    def __bool__(self) -> bool:
-        return bool(self._resources)
-
-    def values(self) -> tuple[NormalizedResource, ...]:
-        return self._resources
-
 
 @dataclass(slots=True)
 class AwsResourceIndex:
@@ -129,7 +114,7 @@ class AwsResourceIndex:
     vpcs_with_igw: set[str]
     vpcs_with_public_routes: set[str]
     nat_gateway_ids: set[str]
-    resources_by_address: dict[str, NormalizedResource] = field(default_factory=dict)
+    resources_by_address: dict[str, NormalizedResource]
 
 
 @dataclass(slots=True)
@@ -171,7 +156,7 @@ class AwsResourceIndexBuilder:
                 _index=reference_index,
                 _resources_by_address=resources_by_address,
                 _resource_types=frozenset({resource_type}),
-                _resources=tuple(resources_by_type.get(resource_type, ())),
+                resources=tuple(resources_by_type.get(resource_type, ())),
             )
 
         return AwsResourceIndex(

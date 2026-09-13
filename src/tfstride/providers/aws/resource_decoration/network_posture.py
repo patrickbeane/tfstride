@@ -33,7 +33,7 @@ class DeriveSubnetPostureStage:
             )
 
         public_subnet_ids: set[str] = set()
-        for subnet in context.index.subnets.values():
+        for subnet in context.index.subnets.resources:
             route_table_references = subnet_route_table_references.get(subnet.address, [])
             associated_route_table_ids = [route_table_id for route_table_id, _association in route_table_references]
             associated_route_tables = tuple(

@@ -68,7 +68,6 @@ class GcpResourceReferenceView:
 
     _index: ResourceReferenceIndex
     _resources_by_address: Mapping[str, NormalizedResource]
-    _resources: tuple[NormalizedResource, ...]
     _resource_types: frozenset[str] | None = None
 
     def resolve(
@@ -133,21 +132,6 @@ class GcpResourceReferenceView:
         ).selected_candidate
         return selected if selected is not None else default
 
-    def __getitem__(self, reference: str) -> NormalizedResource:
-        selected = self.get(reference)
-        if selected is None:
-            raise KeyError(reference)
-        return selected
-
-    def __contains__(self, reference: object) -> bool:
-        return isinstance(reference, str) and self.get(reference) is not None
-
-    def __bool__(self) -> bool:
-        return bool(self._resources)
-
-    def values(self) -> tuple[NormalizedResource, ...]:
-        return self._resources
-
     def _expected_resource_types(
         self,
         resource_types: Collection[str] | None,
@@ -211,18 +195,6 @@ class GcpNetworkReferenceView:
     ) -> str | None:
         selected = self.resolve(reference, source=source).selected_candidate
         return selected.address if selected is not None else default
-
-    def __getitem__(self, reference: str) -> str:
-        selected = self.get(reference)
-        if selected is None:
-            raise KeyError(reference)
-        return selected
-
-    def __contains__(self, reference: object) -> bool:
-        return isinstance(reference, str) and self.get(reference) is not None
-
-    def __bool__(self) -> bool:
-        return bool(self._resources)
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,14 +313,12 @@ class GcpResourceIndexBuilder:
             return GcpResourceReferenceView(
                 _index=reference_index,
                 _resources_by_address=frozen_resources_by_address,
-                _resources=tuple(resources_by_type.get(resource_type, ())),
                 _resource_types=frozenset({resource_type}),
             )
 
         all_resources = GcpResourceReferenceView(
             _index=reference_index,
             _resources_by_address=frozen_resources_by_address,
-            _resources=resource_tuple,
         )
         return GcpResourceIndex(
             resources_by_reference=all_resources,
@@ -394,7 +364,6 @@ def build_gcp_network_reference_view(
         GcpResourceReferenceView(
             _index=reference_index,
             _resources_by_address=resources_by_address,
-            _resources=network_resources,
             _resource_types=frozenset({GcpResourceType.COMPUTE_NETWORK}),
         )
     )

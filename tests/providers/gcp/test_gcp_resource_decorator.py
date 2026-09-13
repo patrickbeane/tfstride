@@ -288,8 +288,8 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                         resource_types={GcpResourceType.KMS_CRYPTO_KEY},
                     )
                 )
-                self.assertIs(index.resources_by_reference[first_key.address], first_key)
-                self.assertIs(index.resources_by_reference[second_key.address], second_key)
+                self.assertIs(index.resources_by_reference.get(first_key.address), first_key)
+                self.assertIs(index.resources_by_reference.get(second_key.address), second_key)
                 exact = index.resources_by_reference.resolve(
                     first_key.address,
                     resource_types={GcpResourceType.KMS_CRYPTO_KEY},
@@ -581,7 +581,9 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                 self._call_name = call_name
 
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"{self._call_name}:{bool(context.index.resources_by_reference)}")
+                calls.append(
+                    f"{self._call_name}:{context.index.resources_by_reference.get('google_compute_network.main') is not None}"
+                )
 
         network = _gcp_resource(
             "google_compute_network.main",
@@ -642,7 +644,9 @@ class GcpResourceDecoratorTests(unittest.TestCase):
             name = "recording"
 
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"stage:{bool(context.index.resources_by_reference)}")
+                calls.append(
+                    f"stage:{context.index.resources_by_reference.get('google_compute_network.main') is not None}"
+                )
 
         network = _gcp_resource(
             "google_compute_network.main",

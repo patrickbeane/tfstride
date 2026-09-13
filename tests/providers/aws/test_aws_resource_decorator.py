@@ -92,10 +92,10 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
 
         index = AwsResourceIndexBuilder().build([bucket, secret, route_table, nat_gateway])
 
-        self.assertIs(index.buckets["logs"], bucket)
-        self.assertIs(index.buckets["aws_s3_bucket.logs"], bucket)
-        self.assertIs(index.buckets["arn:aws:s3:::logs"], bucket)
-        self.assertIs(index.secrets["app"], secret)
+        self.assertIs(index.buckets.get("logs"), bucket)
+        self.assertIs(index.buckets.get("aws_s3_bucket.logs"), bucket)
+        self.assertIs(index.buckets.get("arn:aws:s3:::logs"), bucket)
+        self.assertIs(index.secrets.get("app"), secret)
         self.assertEqual(index.vpcs_with_public_routes, {"vpc-app"})
         self.assertEqual(index.nat_gateway_ids, {"nat-private"})
 
@@ -145,8 +145,8 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
                 )
                 self.assertIsNone(strong_resolution.selected_candidate)
                 self.assertIsNone(index.buckets.get("logs"))
-                self.assertIs(index.buckets["aws_s3_bucket.first"], first_bucket)
-                self.assertIs(index.buckets["aws_s3_bucket.second"], second_bucket)
+                self.assertIs(index.buckets.get("aws_s3_bucket.first"), first_bucket)
+                self.assertIs(index.buckets.get("aws_s3_bucket.second"), second_bucket)
 
     def test_exact_address_precedes_a_colliding_native_alias(self) -> None:
         exact_bucket = _resource(
@@ -369,8 +369,8 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         index = AwsResourceIndexBuilder().build([subnet])
 
         self.assertEqual(index.subnets.resolve(None).state, "unresolved")
-        self.assertNotIn(None, index.subnets)
-        self.assertIs(index.subnets[subnet.address], subnet)
+        self.assertIsNone(index.subnets.get(None))
+        self.assertIs(index.subnets.get(subnet.address), subnet)
 
 
 class AwsResourceDecoratorTests(unittest.TestCase):
@@ -384,7 +384,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 self._call_name = call_name
 
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"{self._call_name}:{bool(context.index.subnets)}")
+                calls.append(f"{self._call_name}:{bool(context.index.subnets.resources)}")
 
         subnet = _resource(
             address="aws_subnet.app",
@@ -467,7 +467,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             name = "recording"
 
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"stage:{bool(context.index.subnets)}")
+                calls.append(f"stage:{bool(context.index.subnets.resources)}")
 
         subnet = _resource(
             address="aws_subnet.app",
@@ -490,7 +490,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             name = "recording"
 
             def apply(self, resources: list[NormalizedResource], context) -> None:
-                calls.append(f"recording:{bool(context.index.security_groups)}")
+                calls.append(f"recording:{bool(context.index.security_groups.resources)}")
 
         security_group = _resource(
             address="aws_security_group.app",

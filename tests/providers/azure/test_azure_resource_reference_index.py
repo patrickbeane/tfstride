@@ -80,8 +80,8 @@ class AzureResourceReferenceIndexTests(unittest.TestCase):
                         resource_types={AzureResourceType.STORAGE_ACCOUNT},
                     )
                 )
-                self.assertIs(references[first_account.address.upper()], first_account)
-                self.assertIs(references[second_account.address], second_account)
+                self.assertIs(references.get(first_account.address.upper()), first_account)
+                self.assertIs(references.get(second_account.address), second_account)
 
     def test_exact_address_precedes_a_colliding_native_alias(self) -> None:
         exact_account = _resource(

@@ -26,7 +26,6 @@ class AzureResourceReferenceView:
     """Resolve Azure references without discarding colliding native aliases."""
 
     _index: ResourceReferenceIndex
-    _resources: tuple[NormalizedResource, ...]
     _resource_types: frozenset[str] | None = None
 
     def resolve(
@@ -85,21 +84,6 @@ class AzureResourceReferenceView:
         ).selected_candidate
         return selected if selected is not None else default
 
-    def __getitem__(self, reference: str) -> NormalizedResource:
-        selected = self.get(reference)
-        if selected is None:
-            raise KeyError(reference)
-        return selected
-
-    def __contains__(self, reference: object) -> bool:
-        return isinstance(reference, str) and self.get(reference) is not None
-
-    def __bool__(self) -> bool:
-        return bool(self._resources)
-
-    def values(self) -> tuple[NormalizedResource, ...]:
-        return self._resources
-
     def _expected_resource_types(
         self,
         resource_types: Collection[str] | None,
@@ -116,11 +100,6 @@ class AzureResourceReferenceView:
 class AzureResourceIndex:
     resources_by_address: Mapping[str, NormalizedResource]
     resources_by_reference: AzureResourceReferenceView
-    virtual_networks: AzureResourceReferenceView
-    subnets: AzureResourceReferenceView
-    network_security_groups: AzureResourceReferenceView
-    network_interfaces: AzureResourceReferenceView
-    public_ips: AzureResourceReferenceView
     network_security_rules: tuple[NormalizedResource, ...]
     subnet_nsg_associations: tuple[NormalizedResource, ...]
     nic_nsg_associations: tuple[NormalizedResource, ...]
@@ -148,14 +127,12 @@ class AzureResourceIndexBuilder:
     def build(self, resources: list[NormalizedResource]) -> AzureResourceIndex:
         resource_tuple = tuple(resources)
         resources_by_address: dict[str, NormalizedResource] = {}
-        resources_by_type: dict[str, list[NormalizedResource]] = {}
         network_security_rules: list[NormalizedResource] = []
         subnet_nsg_associations: list[NormalizedResource] = []
         nic_nsg_associations: list[NormalizedResource] = []
 
         for resource in resource_tuple:
             resources_by_address.setdefault(resource.address, resource)
-            resources_by_type.setdefault(resource.resource_type, []).append(resource)
             if resource.resource_type == AzureResourceType.NETWORK_SECURITY_RULE:
                 network_security_rules.append(resource)
             elif resource.resource_type == AzureResourceType.SUBNET_NETWORK_SECURITY_GROUP_ASSOCIATION:
@@ -169,24 +146,11 @@ class AzureResourceIndexBuilder:
             reference_key=azure_reference_key,
         )
 
-        def view(resource_type: str) -> AzureResourceReferenceView:
-            return AzureResourceReferenceView(
-                _index=reference_index,
-                _resources=tuple(resources_by_type.get(resource_type, ())),
-                _resource_types=frozenset({resource_type}),
-            )
-
         return AzureResourceIndex(
             resources_by_address=MappingProxyType(resources_by_address),
             resources_by_reference=AzureResourceReferenceView(
                 _index=reference_index,
-                _resources=resource_tuple,
             ),
-            virtual_networks=view(AzureResourceType.VIRTUAL_NETWORK),
-            subnets=view(AzureResourceType.SUBNET),
-            network_security_groups=view(AzureResourceType.NETWORK_SECURITY_GROUP),
-            network_interfaces=view(AzureResourceType.NETWORK_INTERFACE),
-            public_ips=view(AzureResourceType.PUBLIC_IP),
             network_security_rules=tuple(network_security_rules),
             subnet_nsg_associations=tuple(subnet_nsg_associations),
             nic_nsg_associations=tuple(nic_nsg_associations),

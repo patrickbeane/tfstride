@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.aws.resource_index import (
-    AwsDecorationContext,
-    AwsResourceIndex,
-    AwsResourceReferenceView,
-)
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import append_unique, dedupe
 
@@ -84,7 +80,7 @@ def _internet_facing_load_balancer_addresses_by_target_group(
     index: AwsResourceIndex,
 ) -> dict[str, list[str]]:
     load_balancers_by_target_group: dict[str, list[str]] = {}
-    for listener in index.load_balancer_listeners.values():
+    for listener in index.load_balancer_listeners.resources:
         load_balancer = _listener_load_balancer(listener, index)
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
@@ -98,8 +94,7 @@ def _internet_facing_load_balancer_addresses_by_target_group(
             )
 
     for listener_rule in index.load_balancer_listener_rules:
-        listener = _resource_by_reference(
-            index.load_balancer_listeners,
+        listener = index.load_balancer_listeners.get(
             aws_facts(listener_rule).listener_arn,
             source=listener_rule,
         )
@@ -121,7 +116,7 @@ def _internet_facing_load_balancer_addresses_by_security_group(
     index: AwsResourceIndex,
 ) -> dict[str, list[str]]:
     load_balancers_by_security_group: dict[str, list[str]] = {}
-    for load_balancer in index.load_balancers.values():
+    for load_balancer in index.load_balancers.resources:
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
         for security_group_id in load_balancer.security_group_ids:
@@ -140,13 +135,12 @@ def _fronting_load_balancers_for_ecs_service(
 ) -> list[str]:
     fronting_load_balancers: list[str] = []
     for load_balancer_reference in _ecs_load_balancer_references(service):
-        load_balancer = _resource_by_reference(index.load_balancers, load_balancer_reference, source=service)
+        load_balancer = index.load_balancers.get(load_balancer_reference, source=service)
         if _is_internet_facing_load_balancer(load_balancer):
             append_unique(fronting_load_balancers, load_balancer.address)
 
     for target_group_reference in _ecs_target_group_references(service):
-        target_group = _resource_by_reference(
-            index.load_balancer_target_groups,
+        target_group = index.load_balancer_target_groups.get(
             target_group_reference,
             source=service,
         )
@@ -203,8 +197,7 @@ def _append_load_balancer_target_group_references(
     *,
     source: NormalizedResource,
 ) -> None:
-    target_group = _resource_by_reference(
-        index.load_balancer_target_groups,
+    target_group = index.load_balancer_target_groups.get(
         target_group_reference,
         source=source,
     )
@@ -222,8 +215,7 @@ def _listener_load_balancer(
 ) -> NormalizedResource | None:
     if listener is None:
         return None
-    return _resource_by_reference(
-        index.load_balancers,
+    return index.load_balancers.get(
         aws_facts(listener).load_balancer_arn,
         source=listener,
     )
@@ -249,17 +241,6 @@ def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
         if elb_name:
             references.append(str(elb_name))
     return dedupe(references)
-
-
-def _resource_by_reference(
-    index: AwsResourceReferenceView,
-    reference: str | None,
-    *,
-    source: NormalizedResource | None = None,
-) -> NormalizedResource | None:
-    if not reference:
-        return None
-    return index.get(reference, source=source)
 
 
 def _resource_reference_values(resource: NormalizedResource) -> list[str]:

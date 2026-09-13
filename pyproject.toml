@@ -45,6 +45,11 @@ include = [
   "src/tfstride/providers/resource_reference_index.py",
   "src/tfstride/resource_metadata.py",
 
+  # Provider resource-reference indexes.
+  "src/tfstride/providers/aws/resource_index.py",
+  "src/tfstride/providers/gcp/resource_index.py",
+  "src/tfstride/providers/azure/resource_index.py",
+
   # Shared dependency-resolution contracts.
   "src/tfstride/dependencies/resolution.py",
 
