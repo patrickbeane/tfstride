@@ -3,15 +3,37 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Literal
 
 from tfstride.models import NormalizedResource
 
 ResourceReferences = Callable[[NormalizedResource], Iterable[str | None]]
 ResourceReferenceKey = Callable[[str], str]
+ResourceReferenceCandidateFilter = Callable[[NormalizedResource], bool]
+ResourceReferenceResolutionState = Literal["resolved", "ambiguous", "unresolved"]
 
 
 def _identity_reference_key(reference: str) -> str:
     return reference
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceReferenceResolution:
+    """Classify the provider-filtered candidates for one resource reference."""
+
+    candidates: tuple[NormalizedResource, ...]
+
+    @property
+    def state(self) -> ResourceReferenceResolutionState:
+        if not self.candidates:
+            return "unresolved"
+        if len(self.candidates) == 1:
+            return "resolved"
+        return "ambiguous"
+
+    @property
+    def selected_candidate(self) -> NormalizedResource | None:
+        return self.candidates[0] if self.state == "resolved" else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,9 +51,21 @@ class ResourceReferenceIndex:
             return ()
         return self.resources_by_reference.get(key, ())
 
-    def unique_candidate(self, reference: str | None) -> NormalizedResource | None:
+    def resolve(
+        self,
+        reference: str | None,
+        *,
+        candidate_filter: ResourceReferenceCandidateFilter | None = None,
+    ) -> ResourceReferenceResolution:
+        """Apply provider-owned filtering before classifying the candidate set."""
+
         candidates = self.candidates(reference)
-        return candidates[0] if len(candidates) == 1 else None
+        if candidate_filter is not None:
+            candidates = tuple(candidate for candidate in candidates if candidate_filter(candidate))
+        return ResourceReferenceResolution(candidates=candidates)
+
+    def unique_candidate(self, reference: str | None) -> NormalizedResource | None:
+        return self.resolve(reference).selected_candidate
 
 
 def build_resource_reference_index(

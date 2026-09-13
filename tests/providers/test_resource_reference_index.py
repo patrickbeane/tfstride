@@ -6,11 +6,16 @@ from tfstride.models import NormalizedResource, ResourceCategory
 from tfstride.providers.resource_reference_index import build_resource_reference_index
 
 
-def _resource(address: str, *, identifier: str) -> NormalizedResource:
+def _resource(
+    address: str,
+    *,
+    identifier: str,
+    resource_type: str = "test_key",
+) -> NormalizedResource:
     return NormalizedResource(
         address=address,
         provider="test",
-        resource_type="test_key",
+        resource_type=resource_type,
         name=address.rsplit(".", 1)[-1],
         category=ResourceCategory.DATA,
         identifier=identifier,
@@ -55,6 +60,58 @@ class ResourceReferenceIndexTests(unittest.TestCase):
         self.assertIs(index.unique_candidate("/keys/exact"), key)
         self.assertEqual(index.candidates(None), ())
         self.assertEqual(index.candidates("/keys/missing"), ())
+
+    def test_resolution_classifies_candidate_cardinality(self) -> None:
+        first = _resource("test_key.first", identifier="/keys/shared")
+        second = _resource("test_key.second", identifier="/KEYS/SHARED")
+        index = build_resource_reference_index(
+            (second, first),
+            references_for_resource=_references,
+            reference_key=str.casefold,
+        )
+
+        resolved = index.resolve(first.address)
+        ambiguous = index.resolve("/Keys/Shared")
+        unresolved = index.resolve(None)
+
+        self.assertEqual(resolved.state, "resolved")
+        self.assertEqual(resolved.candidates, (first,))
+        self.assertIs(resolved.selected_candidate, first)
+        self.assertEqual(ambiguous.state, "ambiguous")
+        self.assertEqual(ambiguous.candidates, (first, second))
+        self.assertIsNone(ambiguous.selected_candidate)
+        self.assertEqual(unresolved.state, "unresolved")
+        self.assertEqual(unresolved.candidates, ())
+        self.assertIsNone(unresolved.selected_candidate)
+
+    def test_resolution_filters_candidates_before_classifying(self) -> None:
+        key = _resource("test_key.first", identifier="/keys/shared")
+        alias = _resource(
+            "test_key.second",
+            identifier="/KEYS/SHARED",
+            resource_type="test_alias",
+        )
+        index = build_resource_reference_index(
+            (alias, key),
+            references_for_resource=_references,
+            reference_key=str.casefold,
+        )
+
+        resolved = index.resolve(
+            "/Keys/Shared",
+            candidate_filter=lambda candidate: candidate.resource_type == "test_key",
+        )
+        unresolved = index.resolve(
+            "/Keys/Shared",
+            candidate_filter=lambda candidate: candidate.resource_type == "missing",
+        )
+
+        self.assertEqual(resolved.state, "resolved")
+        self.assertEqual(resolved.candidates, (key,))
+        self.assertIs(resolved.selected_candidate, key)
+        self.assertEqual(unresolved.state, "unresolved")
+        self.assertEqual(unresolved.candidates, ())
+        self.assertIsNone(unresolved.selected_candidate)
 
 
 if __name__ == "__main__":
