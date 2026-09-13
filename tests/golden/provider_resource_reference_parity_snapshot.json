@@ -1,0 +1,405 @@
+{
+  "aws_ambiguous": {
+    "findings": [],
+    "provider": "aws",
+    "resources": [
+      {
+        "address": "aws_s3_bucket.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_s3_bucket"
+      },
+      {
+        "address": "aws_secretsmanager_secret.primary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_secretsmanager_secret"
+      },
+      {
+        "address": "aws_secretsmanager_secret.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_secretsmanager_secret"
+      },
+      {
+        "address": "aws_secretsmanager_secret_policy.shared",
+        "policy_statement_count": 1,
+        "public_exposure": false,
+        "reference_metadata": {
+          "unresolved_secret_arns": [
+            "shared"
+          ]
+        },
+        "resource_type": "aws_secretsmanager_secret_policy"
+      }
+    ],
+    "summary": {
+      "active_findings": 0,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 0,
+        "low": 0,
+        "medium": 0
+      }
+    }
+  },
+  "aws_scoped": {
+    "findings": [
+      {
+        "affected_resources": [
+          "aws_secretsmanager_secret.primary",
+          "aws_secretsmanager_secret_policy.shared"
+        ],
+        "category": "Information Disclosure",
+        "evidence": [
+          {
+            "key": "trust_principals",
+            "values": [
+              "*"
+            ]
+          },
+          {
+            "key": "trust_scope",
+            "values": [
+              "principal is wildcard"
+            ]
+          },
+          {
+            "key": "policy_actions",
+            "values": [
+              "secretsmanager:GetSecretValue"
+            ]
+          },
+          {
+            "key": "policy_statements",
+            "values": [
+              "Allow actions=[secretsmanager:GetSecretValue] resources=[*]"
+            ]
+          },
+          {
+            "key": "resource_policy_sources",
+            "values": [
+              "aws_secretsmanager_secret_policy.shared"
+            ]
+          }
+        ],
+        "rule_id": "aws-sensitive-resource-policy-external-access",
+        "severity": "high",
+        "trust_boundary_id": null
+      }
+    ],
+    "provider": "aws",
+    "resources": [
+      {
+        "address": "aws_s3_bucket.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_s3_bucket"
+      },
+      {
+        "address": "aws_secretsmanager_secret.primary",
+        "policy_statement_count": 1,
+        "public_exposure": false,
+        "reference_metadata": {
+          "resource_policy_source_addresses": [
+            "aws_secretsmanager_secret_policy.shared"
+          ]
+        },
+        "resource_type": "aws_secretsmanager_secret"
+      },
+      {
+        "address": "aws_secretsmanager_secret.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_secretsmanager_secret"
+      },
+      {
+        "address": "aws_secretsmanager_secret_policy.shared",
+        "policy_statement_count": 1,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "aws_secretsmanager_secret_policy"
+      }
+    ],
+    "summary": {
+      "active_findings": 1,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 1,
+        "low": 0,
+        "medium": 0
+      }
+    }
+  },
+  "azure_ambiguous": {
+    "findings": [],
+    "provider": "azure",
+    "resources": [
+      {
+        "address": "azurerm_key_vault.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "azurerm_key_vault"
+      },
+      {
+        "address": "azurerm_storage_account.primary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "azurerm_storage_account"
+      },
+      {
+        "address": "azurerm_storage_account.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "azurerm_storage_account"
+      },
+      {
+        "address": "azurerm_storage_container.public",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {
+          "unresolved_storage_account_references": [
+            "shared"
+          ]
+        },
+        "resource_type": "azurerm_storage_container"
+      }
+    ],
+    "summary": {
+      "active_findings": 0,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 0,
+        "low": 0,
+        "medium": 0
+      }
+    }
+  },
+  "azure_scoped": {
+    "findings": [
+      {
+        "affected_resources": [
+          "azurerm_storage_account.primary",
+          "azurerm_storage_container.public"
+        ],
+        "category": "Information Disclosure",
+        "evidence": [
+          {
+            "key": "public_exposure_reasons",
+            "values": [
+              "container_access_type is blob",
+              "azurerm_storage_account.primary allows nested items to be public",
+              "azurerm_storage_account.primary is reachable through its public network endpoint"
+            ]
+          }
+        ],
+        "rule_id": "azure-storage-container-public-access",
+        "severity": "medium",
+        "trust_boundary_id": null
+      }
+    ],
+    "provider": "azure",
+    "resources": [
+      {
+        "address": "azurerm_key_vault.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "azurerm_key_vault"
+      },
+      {
+        "address": "azurerm_storage_account.primary",
+        "policy_statement_count": 0,
+        "public_exposure": true,
+        "reference_metadata": {
+          "public_container_addresses": [
+            "azurerm_storage_container.public"
+          ]
+        },
+        "resource_type": "azurerm_storage_account"
+      },
+      {
+        "address": "azurerm_storage_account.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "azurerm_storage_account"
+      },
+      {
+        "address": "azurerm_storage_container.public",
+        "policy_statement_count": 0,
+        "public_exposure": true,
+        "reference_metadata": {
+          "resolved_storage_account_address": "azurerm_storage_account.primary"
+        },
+        "resource_type": "azurerm_storage_container"
+      }
+    ],
+    "summary": {
+      "active_findings": 1,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 0,
+        "low": 0,
+        "medium": 1
+      }
+    }
+  },
+  "gcp_ambiguous": {
+    "findings": [],
+    "provider": "gcp",
+    "resources": [
+      {
+        "address": "google_compute_backend_service.primary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_compute_backend_service"
+      },
+      {
+        "address": "google_compute_backend_service.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_compute_backend_service"
+      },
+      {
+        "address": "google_compute_global_forwarding_rule.frontend",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_compute_global_forwarding_rule"
+      },
+      {
+        "address": "google_kms_crypto_key.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_kms_crypto_key"
+      }
+    ],
+    "summary": {
+      "active_findings": 0,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 0,
+        "low": 0,
+        "medium": 0
+      }
+    }
+  },
+  "gcp_scoped": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_compute_backend_service.primary",
+          "google_compute_global_forwarding_rule.frontend"
+        ],
+        "category": "Spoofing",
+        "evidence": [
+          {
+            "key": "frontend_load_balancers",
+            "values": [
+              "google_compute_global_forwarding_rule.frontend"
+            ]
+          },
+          {
+            "key": "load_balancer_paths",
+            "values": [
+              "forwarding_rule=google_compute_global_forwarding_rule.frontend; scheme=EXTERNAL_MANAGED; ip_address=35.1.2.3; ports=443; path=google_compute_global_forwarding_rule.frontend -> google_compute_backend_service.primary"
+            ]
+          },
+          {
+            "key": "direct_public_exposure",
+            "values": [
+              "false"
+            ]
+          }
+        ],
+        "rule_id": "gcp-public-load-balanced-workload",
+        "severity": "medium",
+        "trust_boundary_id": null
+      }
+    ],
+    "provider": "gcp",
+    "resources": [
+      {
+        "address": "google_compute_backend_service.primary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {
+          "fronted_by_internet_facing_load_balancer": true,
+          "internet_facing_load_balancer_addresses": [
+            "google_compute_global_forwarding_rule.frontend"
+          ],
+          "load_balancer_frontends": [
+            {
+              "forwarding_rule": "google_compute_global_forwarding_rule.frontend",
+              "ip_address": "35.1.2.3",
+              "load_balancing_scheme": "EXTERNAL_MANAGED",
+              "path": [
+                "google_compute_global_forwarding_rule.frontend",
+                "google_compute_backend_service.primary"
+              ],
+              "ports": [
+                "443"
+              ]
+            }
+          ]
+        },
+        "resource_type": "google_compute_backend_service"
+      },
+      {
+        "address": "google_compute_backend_service.secondary",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_compute_backend_service"
+      },
+      {
+        "address": "google_compute_global_forwarding_rule.frontend",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {
+          "load_balancer_reachable_backends": [
+            {
+              "backend": "google_compute_backend_service.primary",
+              "backend_type": "google_compute_backend_service",
+              "forwarding_rule": "google_compute_global_forwarding_rule.frontend",
+              "ip_address": "35.1.2.3",
+              "path": [
+                "google_compute_global_forwarding_rule.frontend",
+                "google_compute_backend_service.primary"
+              ]
+            }
+          ]
+        },
+        "resource_type": "google_compute_global_forwarding_rule"
+      },
+      {
+        "address": "google_kms_crypto_key.shared",
+        "policy_statement_count": 0,
+        "public_exposure": false,
+        "reference_metadata": {},
+        "resource_type": "google_kms_crypto_key"
+      }
+    ],
+    "summary": {
+      "active_findings": 1,
+      "normalized_resources": 4,
+      "severity_counts": {
+        "high": 0,
+        "low": 0,
+        "medium": 1
+      }
+    }
+  }
+}
