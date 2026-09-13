@@ -7,7 +7,7 @@ from tfstride.analysis.resource_concepts import (
     OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES,
     OBJECT_STORAGE_RESOURCE_TYPES,
 )
-from tfstride.models import NormalizedResource, Observation, ResourceInventory
+from tfstride.models import Observation, ResourceInventory
 from tfstride.providers.aws.policy_conditions import (
     describe_trust_narrowing_for_principal,
     trust_statement_has_effective_narrowing_for_principal,
@@ -16,6 +16,7 @@ from tfstride.providers.aws.policy_conditions import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.coercion import STATE_ENABLED
+from tfstride.providers.resource_reference_index import build_resource_reference_index
 from tfstride.resource_helpers import policy_allows_public_access
 
 
@@ -33,11 +34,10 @@ def observe_aws_controls(inventory: ResourceInventory) -> list[Observation]:
 
 def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
-    access_block_index: dict[str, NormalizedResource] = {}
-    for access_block in inventory.by_type(*OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES):
-        bucket_name = aws_facts(access_block).bucket_name
-        if bucket_name:
-            access_block_index[bucket_name] = access_block
+    access_block_index = build_resource_reference_index(
+        inventory.by_type(*OBJECT_STORAGE_PUBLIC_ACCESS_CONTROL_RESOURCE_TYPES),
+        references_for_resource=lambda resource: (aws_facts(resource).bucket_name,),
+    )
     for bucket in inventory.by_type(*OBJECT_STORAGE_RESOURCE_TYPES):
         bucket_facts = aws_facts(bucket)
         access_block = bucket_facts.public_access_block
@@ -52,9 +52,14 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
         if not mitigation_signals:
             continue
         affected_resources = [bucket.address]
-        access_block_resource = access_block_index.get(bucket_facts.bucket_name)
-        if access_block_resource is not None:
-            affected_resources.append(access_block_resource.address)
+        access_block_candidates = access_block_index.candidates(bucket_facts.bucket_name)
+        if bucket.provider_config_key is not None:
+            access_block_candidates = tuple(
+                candidate
+                for candidate in access_block_candidates
+                if candidate.provider_config_key == bucket.provider_config_key
+            )
+        affected_resources.extend(candidate.address for candidate in access_block_candidates)
         observations.append(
             Observation(
                 title="S3 public access is reduced by a public access block",

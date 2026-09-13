@@ -9,6 +9,10 @@ from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _USER_ASSIGNED_IDENTITY_ARM_ID = re.compile(
     r"^/subscriptions/[^/]+/resourcegroups/[^/]+/providers/"
@@ -22,7 +26,7 @@ class ModelFederatedManagedIdentityTrustPathsStage:
 
     def apply(self, resources: list[NormalizedResource], context: AzureDecorationContext) -> None:
         del context
-        identities_by_reference = _user_assigned_identities_by_exact_reference(resources)
+        identity_index = _user_assigned_identity_reference_index(resources)
         for credential in sorted(
             (
                 resource
@@ -31,12 +35,12 @@ class ModelFederatedManagedIdentityTrustPathsStage:
             ),
             key=lambda resource: resource.address,
         ):
-            self._model_credential_path(credential, identities_by_reference)
+            self._model_credential_path(credential, identity_index)
 
     def _model_credential_path(
         self,
         credential: NormalizedResource,
-        identities_by_reference: dict[str, list[NormalizedResource]],
+        identity_index: ResourceReferenceIndex,
     ) -> None:
         credential_facts = azure_facts(credential)
         parent_id = credential_facts.federated_identity_credential_parent_id
@@ -50,11 +54,12 @@ class ModelFederatedManagedIdentityTrustPathsStage:
             )
             return
 
-        matches = identities_by_reference.get(parent_key, [])
-        if len(matches) != 1:
+        resolution = identity_index.resolve(parent_key)
+        identity = resolution.selected_candidate
+        if identity is None:
             reason = (
                 "matches multiple modeled user-assigned identities"
-                if matches
+                if resolution.state == "ambiguous"
                 else "does not resolve to a modeled user-assigned identity by exact Terraform reference or ARM ID"
             )
             credential_facts.extend_federated_managed_identity_trust_path_uncertainties(
@@ -62,7 +67,6 @@ class ModelFederatedManagedIdentityTrustPathsStage:
             )
             return
 
-        identity = matches[0]
         credential_facts.set_resolved_managed_identity_address(identity.address)
         identity_facts = azure_facts(identity)
         identity_facts.add_federated_managed_identity_trust_path(_trust_path_record(credential, identity))
@@ -72,27 +76,21 @@ class ModelFederatedManagedIdentityTrustPathsStage:
         )
 
 
-def _user_assigned_identities_by_exact_reference(
+def _user_assigned_identity_reference_index(
     resources: Iterable[NormalizedResource],
-) -> dict[str, list[NormalizedResource]]:
-    identities: dict[str, list[NormalizedResource]] = {}
-    for identity in resources:
-        if identity.resource_type != AzureResourceType.USER_ASSIGNED_IDENTITY:
-            continue
-        references = {
-            identity.address,
-            f"{identity.address}.id",
-        }
-        if _USER_ASSIGNED_IDENTITY_ARM_ID.fullmatch(identity.identifier or ""):
-            references.add(identity.identifier or "")
-        for reference in references:
-            key = _exact_parent_reference_key(reference)
-            if not key:
-                continue
-            matches = identities.setdefault(key, [])
-            if all(match.address != identity.address for match in matches):
-                matches.append(identity)
-    return identities
+) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        (resource for resource in resources if resource.resource_type == AzureResourceType.USER_ASSIGNED_IDENTITY),
+        references_for_resource=_exact_user_assigned_identity_references,
+        reference_key=_exact_parent_reference_key,
+    )
+
+
+def _exact_user_assigned_identity_references(identity: NormalizedResource) -> tuple[str, ...]:
+    references = {identity.address, f"{identity.address}.id"}
+    if _USER_ASSIGNED_IDENTITY_ARM_ID.fullmatch(identity.identifier or ""):
+        references.add(identity.identifier or "")
+    return tuple(references)
 
 
 def _exact_parent_reference_key(value: str | None) -> str:

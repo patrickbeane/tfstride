@@ -185,7 +185,7 @@ def _trusted_workload_security_group_ids(
 ) -> set[str]:
     trusted_group_ids: set[str] = set()
     for security_group_id in data_store.security_group_ids:
-        security_group = indexes.security_groups_by_reference.get(security_group_id)
+        security_group = indexes.security_groups_by_reference.unique_candidate(security_group_id)
         if security_group is None:
             continue
         for rule in security_group.network_rules:
@@ -420,7 +420,7 @@ def _database_allows_workload_security_group(
         return False
     workload_group_ids = set(workload.security_group_ids)
     for security_group_id in data_store.security_group_ids:
-        security_group = indexes.security_groups_by_reference.get(security_group_id)
+        security_group = indexes.security_groups_by_reference.unique_candidate(security_group_id)
         if security_group is None:
             continue
         for rule in security_group.network_rules:

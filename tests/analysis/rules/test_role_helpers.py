@@ -66,7 +66,9 @@ class RoleHelperTests(unittest.TestCase):
             attached_role_arns=["missing-role"],
         )
 
-        self.assertIsNone(resolve_workload_role(workload, {}))
+        role_index = build_analysis_indexes(ResourceInventory(provider="aws", resources=[workload])).role_index
+
+        self.assertIsNone(resolve_workload_role(workload, role_index))
 
 
 if __name__ == "__main__":

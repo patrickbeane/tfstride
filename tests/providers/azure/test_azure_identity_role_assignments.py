@@ -188,6 +188,22 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             [observation.observation_id for observation in observe_azure_posture(inventory)],
         )
 
+    def test_duplicate_principal_id_is_ambiguous_in_any_input_order(self) -> None:
+        first_identity = _user_assigned_identity(name="first")
+        second_identity = _user_assigned_identity(name="second")
+
+        for identities in ([first_identity, second_identity], [second_identity, first_identity]):
+            with self.subTest(order=[identity.address for identity in identities]):
+                inventory = AzureNormalizer().normalize([*identities, _role_assignment()])
+                assignment = inventory.get_by_address("azurerm_role_assignment.assignment")
+                assert assignment is not None
+
+                self.assertIsNone(azure_facts(assignment).resolved_managed_identity_address)
+                for identity in identities:
+                    normalized = inventory.get_by_address(identity.address)
+                    assert normalized is not None
+                    self.assertEqual(azure_facts(normalized).managed_identity_role_assignments, [])
+
     def test_unknown_principal_id_does_not_connect_role_assignment(self) -> None:
         inventory = AzureNormalizer().normalize(
             [
@@ -473,6 +489,31 @@ class AzureManagedIdentityRoleAssignmentTests(unittest.TestCase):
             assignment_facts.role_assignment_breadth_signals,
             ["subscription_scope", OWNER_LIKE_OR_WILDCARD],
         )
+
+    def test_duplicate_custom_role_reference_is_ambiguous_in_any_input_order(self) -> None:
+        role_definition_id = "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/custom-role"
+        first_role = _role_definition(role_definition_id=role_definition_id, name="first", actions=["*"])
+        second_role = _role_definition(role_definition_id=role_definition_id, name="second", actions=["*"])
+
+        for roles in ([first_role, second_role], [second_role, first_role]):
+            with self.subTest(order=[role.address for role in roles]):
+                inventory = AzureNormalizer().normalize(
+                    [
+                        _user_assigned_identity(),
+                        *roles,
+                        _role_assignment(
+                            role_definition_name=None,
+                            role_definition_id=role_definition_id,
+                            name="ambiguous_custom_role",
+                        ),
+                    ]
+                )
+                assignment = inventory.get_by_address("azurerm_role_assignment.ambiguous_custom_role")
+                assert assignment is not None
+                facts = azure_facts(assignment)
+
+                self.assertIsNone(facts.resolved_role_definition_address)
+                self.assertEqual(facts.role_assignment_breadth_signals, ["subscription_scope"])
 
     def test_unresolved_custom_role_definition_reference_is_preserved_without_relationship(self) -> None:
         inventory = AzureNormalizer().normalize(

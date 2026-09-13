@@ -25,6 +25,10 @@ from tfstride.providers.azure.resource_types import (
 )
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
 from tfstride.providers.coercion import dedupe_strings
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _AZURE_WORKLOAD_RESOURCE_TYPES = tuple(sorted(AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES))
 
@@ -396,19 +400,19 @@ def _public_workloads_by_identity_address(inventory) -> dict[str, list[Any]]:
         if facts.has_system_assigned_identity and facts.principal_id:
             public_workloads_by_identity.setdefault(workload.address, []).append(workload)
         for reference in facts.attached_identity_references:
-            identity = identity_by_reference.get(azure_reference_key(reference))
+            identity = identity_by_reference.unique_candidate(reference)
             if identity is None:
                 continue
             _append_unique_resource(public_workloads_by_identity.setdefault(identity.address, []), workload)
     return public_workloads_by_identity
 
 
-def _identity_resources_by_reference(inventory) -> dict[str, Any]:
-    references: dict[str, Any] = {}
-    for identity in inventory.by_type(AzureResourceType.USER_ASSIGNED_IDENTITY):
-        for reference in azure_resource_references(identity):
-            references.setdefault(reference, identity)
-    return references
+def _identity_resources_by_reference(inventory) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        inventory.by_type(AzureResourceType.USER_ASSIGNED_IDENTITY),
+        references_for_resource=azure_resource_references,
+        reference_key=azure_reference_key,
+    )
 
 
 def _is_public_workload(workload: Any) -> bool:

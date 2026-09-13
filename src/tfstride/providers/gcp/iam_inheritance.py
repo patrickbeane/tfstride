@@ -14,6 +14,10 @@ from tfstride.providers.gcp.resource_types import (
     GCP_PROJECT_IAM_RESOURCE_TYPES,
 )
 from tfstride.providers.gcp.resource_utils import gcp_reference_key
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _T = TypeVar("_T")
 
@@ -97,7 +101,11 @@ def build_gcp_iam_inheritance_index(
     if not any(resource.provider == "gcp" for resource in resource_tuple):
         return empty_gcp_iam_inheritance_index()
 
-    reference_index = _build_resource_reference_index(resource_tuple)
+    reference_index = build_resource_reference_index(
+        (resource for resource in resource_tuple if _is_descendant_candidate(resource)),
+        references_for_resource=_resource_reference_keys,
+        reference_key=gcp_reference_key,
+    )
     resources_by_project = _group_resources_by_scope(resource_tuple, _resource_project)
     resources_by_folder = _group_resources_by_scope(resource_tuple, _resource_folder_id)
     resources_by_organization = _group_resources_by_scope(resource_tuple, _resource_organization_id)
@@ -166,7 +174,7 @@ def _build_descendant_resources_by_scope(
 
 def _resolve_iam_resource_scopes(
     resource: NormalizedResource,
-    reference_index: Mapping[str, tuple[NormalizedResource, ...]],
+    reference_index: ResourceReferenceIndex,
 ) -> list[tuple[GcpIamScopeKey, NormalizedResource | None]]:
     facts = gcp_facts(resource)
     if resource.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
@@ -188,7 +196,7 @@ def _resolve_iam_resource_scopes(
     target_reference = _resource_iam_target_reference(resource)
     if not target_reference:
         return []
-    targets = reference_index.get(gcp_reference_key(target_reference), ())
+    targets = reference_index.candidates(target_reference)
     return [
         (GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, target.address), target)
         for target in targets
@@ -198,18 +206,6 @@ def _resolve_iam_resource_scopes(
 
 def _resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     return gcp_facts(resource).target_reference
-
-
-def _build_resource_reference_index(
-    resources: tuple[NormalizedResource, ...],
-) -> Mapping[str, tuple[NormalizedResource, ...]]:
-    grouped: dict[str, list[NormalizedResource]] = {}
-    for resource in resources:
-        if not _is_descendant_candidate(resource):
-            continue
-        for reference in _resource_reference_keys(resource):
-            _append_unique(grouped.setdefault(reference, []), resource, lambda item: item.address)
-    return _freeze_resource_address_groups(grouped)
 
 
 def _resource_reference_keys(resource: NormalizedResource) -> tuple[str, ...]:
@@ -232,7 +228,7 @@ def _resource_reference_keys(resource: NormalizedResource) -> tuple[str, ...]:
         references.add(member)
         if member.startswith("serviceAccount:"):
             references.add(member.removeprefix("serviceAccount:"))
-    return tuple(sorted(gcp_reference_key(reference) for reference in references if str(reference).strip()))
+    return tuple(sorted(str(reference) for reference in references if str(reference).strip()))
 
 
 def _group_resources_by_scope(

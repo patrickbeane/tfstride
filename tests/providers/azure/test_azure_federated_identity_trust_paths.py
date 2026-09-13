@@ -162,6 +162,32 @@ class AzureFederatedIdentityTrustPathTests(unittest.TestCase):
             ],
         )
 
+    def test_duplicate_exact_parent_identity_is_ambiguous_in_any_input_order(self) -> None:
+        first_identity = _identity(name="first", principal_id="first-principal-id")
+        second_identity = _identity(name="second", principal_id="second-principal-id")
+
+        for identities in ([first_identity, second_identity], [second_identity, first_identity]):
+            with self.subTest(order=[identity.address for identity in identities]):
+                inventory = AzureNormalizer().normalize([*identities, _credential(parent_id=_IDENTITY_ARM_ID)])
+                credential = inventory.get_by_address(_CREDENTIAL_ADDRESS)
+                assert credential is not None
+
+                self.assertIsNone(azure_facts(credential).resolved_managed_identity_address)
+                self.assertEqual(
+                    azure_facts(credential).federated_managed_identity_trust_path_uncertainties,
+                    [
+                        f"{_CREDENTIAL_ADDRESS}: parent identity reference {_IDENTITY_ARM_ID} "
+                        "matches multiple modeled user-assigned identities"
+                    ],
+                )
+                for identity in identities:
+                    normalized = inventory.get_by_address(identity.address)
+                    assert normalized is not None
+                    self.assertEqual(
+                        azure_facts(normalized).federated_managed_identity_trust_paths,
+                        [],
+                    )
+
     def test_computed_trust_fields_are_retained_as_path_uncertainties(self) -> None:
         inventory = AzureNormalizer().normalize(
             [

@@ -157,16 +157,21 @@ class GcpIamInheritanceIndexTests(unittest.TestCase):
             metadata={GcpResourceMetadata.KMS_KEY_RING: "projects/tfstride-demo/locations/global/keyRings/app"},
         )
 
-        index = _inheritance_index([first_key, second_key, key_ring_iam])
+        for resources in (
+            [first_key, second_key, key_ring_iam],
+            [second_key, first_key, key_ring_iam],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                index = _inheritance_index(resources)
 
-        self.assertEqual(index.target_resources_for_iam_resource(key_ring_iam), (first_key, second_key))
-        self.assertEqual(
-            index.scopes_for_iam_resource(key_ring_iam),
-            (
-                GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, "google_kms_crypto_key.first"),
-                GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, "google_kms_crypto_key.second"),
-            ),
-        )
+                self.assertEqual(index.target_resources_for_iam_resource(key_ring_iam), (first_key, second_key))
+                self.assertEqual(
+                    index.scopes_for_iam_resource(key_ring_iam),
+                    (
+                        GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, "google_kms_crypto_key.first"),
+                        GcpIamScopeKey(GCP_IAM_SCOPE_RESOURCE, "google_kms_crypto_key.second"),
+                    ),
+                )
 
     def test_unresolved_iam_resources_track_missing_scope_context(self) -> None:
         project_iam = _gcp_resource(

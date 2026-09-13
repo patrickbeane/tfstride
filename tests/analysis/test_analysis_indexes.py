@@ -5,6 +5,7 @@ import unittest
 
 from tfstride.analysis import indexes as analysis_indexes_module
 from tfstride.analysis.indexes import AnalysisIndexExtensionError, build_analysis_indexes
+from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
 from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes
 from tfstride.providers.gcp.iam_inheritance import GcpIamInheritanceIndex
@@ -70,11 +71,14 @@ class AnalysisIndexTests(unittest.TestCase):
 
         indexes = build_analysis_indexes(inventory)
 
-        self.assertIs(indexes.role_index["aws_iam_role.app"], role)
-        self.assertIs(indexes.role_index["app-role"], role)
-        self.assertIs(indexes.role_index["arn:aws:iam::111122223333:role/app"], role)
-        self.assertIs(indexes.security_groups_by_reference["sg-web"], security_group)
-        self.assertIs(indexes.security_groups_by_reference["aws_security_group.web"], security_group)
+        self.assertIs(indexes.role_index.unique_candidate("aws_iam_role.app"), role)
+        self.assertIs(indexes.role_index.unique_candidate("app-role"), role)
+        self.assertIs(indexes.role_index.unique_candidate("arn:aws:iam::111122223333:role/app"), role)
+        self.assertIs(indexes.security_groups_by_reference.unique_candidate("sg-web"), security_group)
+        self.assertIs(
+            indexes.security_groups_by_reference.unique_candidate("aws_security_group.web"),
+            security_group,
+        )
         self.assertEqual(
             indexes.resources_by_security_group["sg-web"],
             (public_workload, private_database),
@@ -85,7 +89,7 @@ class AnalysisIndexTests(unittest.TestCase):
         )
         self.assertEqual(indexes.attached_security_groups(public_workload), [security_group])
 
-    def test_attached_security_groups_preserves_inventory_reference_precedence(self) -> None:
+    def test_security_group_type_filtering_precedes_reference_resolution(self) -> None:
         conflicting_resource = _resource(
             address="aws_instance.conflict",
             resource_type="aws_instance",
@@ -102,17 +106,75 @@ class AnalysisIndexTests(unittest.TestCase):
             address="aws_instance.web",
             resource_type="aws_instance",
             category=ResourceCategory.COMPUTE,
-            security_group_ids=["sg-shared", "aws_security_group.shared"],
-        )
-        inventory = ResourceInventory(
-            provider="aws",
-            resources=[conflicting_resource, security_group, workload],
+            security_group_ids=["sg-shared"],
         )
 
-        indexes = build_analysis_indexes(inventory)
+        for resources in (
+            [conflicting_resource, security_group, workload],
+            [security_group, conflicting_resource, workload],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                indexes = build_analysis_indexes(ResourceInventory(provider="aws", resources=resources))
 
-        self.assertNotIn("sg-shared", indexes.security_groups_by_reference)
-        self.assertEqual(indexes.attached_security_groups(workload), [security_group])
+                self.assertIs(indexes.security_groups_by_reference.unique_candidate("sg-shared"), security_group)
+                self.assertEqual(indexes.attached_security_groups(workload), [security_group])
+
+    def test_ambiguous_role_and_security_group_aliases_fail_closed_in_any_input_order(self) -> None:
+        first_role = _resource(
+            address="aws_iam_role.first",
+            resource_type="aws_iam_role",
+            category=ResourceCategory.IAM,
+            identifier="shared-role",
+        )
+        second_role = _resource(
+            address="aws_iam_role.second",
+            resource_type="aws_iam_role",
+            category=ResourceCategory.IAM,
+            identifier="shared-role",
+        )
+        first_security_group = _resource(
+            address="aws_security_group.first",
+            resource_type="aws_security_group",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-shared",
+        )
+        second_security_group = _resource(
+            address="aws_security_group.second",
+            resource_type="aws_security_group",
+            category=ResourceCategory.NETWORK,
+            identifier="sg-shared",
+        )
+        workload = _resource(
+            address="aws_instance.web",
+            resource_type="aws_instance",
+            category=ResourceCategory.COMPUTE,
+            security_group_ids=["sg-shared"],
+        )
+        workload.attached_role_arns = ["shared-role"]
+
+        for resources in (
+            [first_role, second_role, first_security_group, second_security_group, workload],
+            [second_security_group, first_security_group, second_role, first_role, workload],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                indexes = build_analysis_indexes(ResourceInventory(provider="aws", resources=resources))
+
+                role_resolution = indexes.role_index.resolve("shared-role")
+                security_group_resolution = indexes.security_groups_by_reference.resolve("sg-shared")
+                self.assertEqual(role_resolution.state, "ambiguous")
+                self.assertEqual(role_resolution.candidates, (first_role, second_role))
+                self.assertEqual(security_group_resolution.state, "ambiguous")
+                self.assertEqual(
+                    security_group_resolution.candidates,
+                    (first_security_group, second_security_group),
+                )
+                self.assertIsNone(resolve_workload_role(workload, indexes.role_index))
+                self.assertEqual(indexes.attached_security_groups(workload), [])
+                self.assertIs(indexes.role_index.unique_candidate(first_role.address), first_role)
+                self.assertIs(
+                    indexes.security_groups_by_reference.unique_candidate(first_security_group.address),
+                    first_security_group,
+                )
 
     def test_index_maps_are_top_level_immutable(self) -> None:
         role = _resource(
@@ -123,7 +185,7 @@ class AnalysisIndexTests(unittest.TestCase):
         indexes = build_analysis_indexes(ResourceInventory(provider="aws", resources=[role]))
 
         with self.assertRaises(TypeError):
-            indexes.role_index["aws_iam_role.other"] = role
+            indexes.role_index.resources_by_reference["aws_iam_role.other"] = (role,)
 
     def test_gcp_inventory_builds_both_provider_indexes(self) -> None:
         indexes = build_analysis_indexes(ResourceInventory(provider="gcp", resources=[]))

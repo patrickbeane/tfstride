@@ -18,7 +18,12 @@ _SERVICE_ACCOUNT_EMAIL = "deployer@tfstride-demo.iam.gserviceaccount.com"
 _IAM_ADDRESS = "google_service_account_iam_member.federated"
 
 
-def _pool(*, resource_name: str | None = _POOL_RESOURCE_NAME, name: str | None = None):
+def _pool(
+    *,
+    address: str = _POOL_ADDRESS,
+    resource_name: str | None = _POOL_RESOURCE_NAME,
+    name: str | None = None,
+):
     values: dict[str, object] = {
         "workload_identity_pool_id": _POOL_ID,
         "mode": "FEDERATION_ONLY",
@@ -28,7 +33,7 @@ def _pool(*, resource_name: str | None = _POOL_RESOURCE_NAME, name: str | None =
         values["id"] = resource_name
     if name is not None:
         values["name"] = name
-    return _terraform_resource(_POOL_ADDRESS, GcpResourceType.WORKLOAD_IDENTITY_POOL, values)
+    return _terraform_resource(address, GcpResourceType.WORKLOAD_IDENTITY_POOL, values)
 
 
 def _provider(
@@ -63,14 +68,18 @@ def _provider(
     )
 
 
-def _service_account():
+def _service_account(
+    *,
+    address: str = _SERVICE_ACCOUNT_ADDRESS,
+    email: str = _SERVICE_ACCOUNT_EMAIL,
+):
     return _terraform_resource(
-        _SERVICE_ACCOUNT_ADDRESS,
+        address,
         GcpResourceType.SERVICE_ACCOUNT,
         {
             "account_id": "deployer",
-            "email": _SERVICE_ACCOUNT_EMAIL,
-            "name": f"projects/tfstride-demo/serviceAccounts/{_SERVICE_ACCOUNT_EMAIL}",
+            "email": email,
+            "name": f"projects/tfstride-demo/serviceAccounts/{email}",
         },
     )
 
@@ -201,6 +210,27 @@ class GcpWorkloadIdentityTrustPathTests(unittest.TestCase):
         self.assertEqual(paths[0]["principal_value"], "platform-admins")
         self.assertEqual(paths[0]["provider_mapping_key"], "google.groups")
 
+    def test_ambiguous_pool_resource_name_fails_closed_in_any_input_order(self) -> None:
+        member = _principal("repo:tfstride/tfstride")
+        first_pool = _pool(address="google_iam_workload_identity_pool.first")
+        second_pool = _pool(address="google_iam_workload_identity_pool.second")
+
+        for pools in ([first_pool, second_pool], [second_pool, first_pool]):
+            with self.subTest(order=[pool.address for pool in pools]):
+                inventory = _normalize([*pools, _provider(), _service_account(), _iam_member(member)])
+                service_account = inventory.get_by_address(_SERVICE_ACCOUNT_ADDRESS)
+
+                self.assertIsNotNone(service_account)
+                assert service_account is not None
+                facts = gcp_facts(service_account)
+                self.assertEqual(facts.workload_identity_federation_trust_paths, [])
+                self.assertTrue(
+                    any(
+                        "does not resolve to a modeled workload identity pool" in uncertainty
+                        for uncertainty in facts.workload_identity_federation_trust_path_uncertainties
+                    )
+                )
+
     def test_same_pool_id_or_display_name_does_not_create_a_relationship(self) -> None:
         member = _principal("repo:tfstride/tfstride")
         cases = (
@@ -257,6 +287,30 @@ class GcpWorkloadIdentityTrustPathTests(unittest.TestCase):
         facts = gcp_facts(service_account)
         self.assertEqual(facts.workload_identity_federation_trust_paths, [])
         self.assertEqual(facts.workload_identity_federation_trust_path_uncertainties, [])
+
+    def test_ambiguous_exact_service_account_target_fails_closed_in_any_input_order(self) -> None:
+        first_account = _service_account(address="google_service_account.first")
+        second_account = _service_account(address="google_service_account.second")
+        member = _principal("repo:tfstride/tfstride")
+
+        for accounts in ([first_account, second_account], [second_account, first_account]):
+            with self.subTest(order=[account.address for account in accounts]):
+                inventory = _normalize(
+                    [
+                        _pool(),
+                        _provider(),
+                        *accounts,
+                        _iam_member(member, service_account_reference=_SERVICE_ACCOUNT_EMAIL),
+                    ]
+                )
+
+                for account in accounts:
+                    normalized = inventory.get_by_address(account.address)
+                    assert normalized is not None
+                    self.assertEqual(
+                        gcp_facts(normalized).workload_identity_federation_trust_paths,
+                        [],
+                    )
 
     def test_short_service_account_name_does_not_resolve_as_an_exact_target(self) -> None:
         inventory = _normalize(

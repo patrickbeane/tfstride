@@ -50,17 +50,22 @@ def _role_assignment(
     return _resource(AzureResourceType.ROLE_ASSIGNMENT, name, values, unknown_values=unknown_values)
 
 
-def _user_assigned_identity() -> TerraformResource:
-    return _resource(
-        AzureResourceType.USER_ASSIGNED_IDENTITY,
-        "deploy",
-        {
-            "name": "deploy",
-            "principal_id": "principal-id",
-            "client_id": "client-id",
-            "tenant_id": "tenant-id",
-        },
-    )
+def _user_assigned_identity(
+    name: str = "deploy",
+    *,
+    resource_id: str | None = None,
+    principal_id: str = "principal-id",
+    client_id: str = "client-id",
+) -> TerraformResource:
+    values: dict[str, object] = {
+        "name": name,
+        "principal_id": principal_id,
+        "client_id": client_id,
+        "tenant_id": "tenant-id",
+    }
+    if resource_id is not None:
+        values["id"] = resource_id
+    return _resource(AzureResourceType.USER_ASSIGNED_IDENTITY, name, values)
 
 
 def _storage_account() -> TerraformResource:
@@ -269,11 +274,13 @@ def _system_assigned_app_identity(principal_id: str = "principal-id") -> list[di
     ]
 
 
-def _user_assigned_app_identity() -> list[dict[str, object]]:
+def _user_assigned_app_identity(
+    reference: str = "azurerm_user_assigned_identity.deploy.id",
+) -> list[dict[str, object]]:
     return [
         {
             "type": "UserAssigned",
-            "identity_ids": ["azurerm_user_assigned_identity.deploy.id"],
+            "identity_ids": [reference],
         }
     ]
 
@@ -481,6 +488,43 @@ class AzureManagedIdentityRuleTests(unittest.TestCase):
             ["address=azurerm_linux_function_app.fn; public_network_access_enabled=true"],
         )
         self.assertIn("address=azurerm_user_assigned_identity.deploy", evidence["managed_identity"])
+
+    def test_ambiguous_user_assigned_identity_reference_fails_closed_in_any_input_order(self) -> None:
+        shared_id = (
+            "/subscriptions/sub-0001/resourceGroups/app/providers/"
+            "Microsoft.ManagedIdentity/userAssignedIdentities/shared"
+        )
+
+        for identity_order in (("assigned", "other"), ("other", "assigned")):
+            with self.subTest(order=identity_order):
+                identities = {
+                    "assigned": _user_assigned_identity(
+                        "assigned",
+                        resource_id=shared_id,
+                        principal_id="principal-id",
+                        client_id="assigned-client-id",
+                    ),
+                    "other": _user_assigned_identity(
+                        "other",
+                        resource_id=shared_id,
+                        principal_id="other-principal-id",
+                        client_id="other-client-id",
+                    ),
+                }
+                _, _, findings = _evaluate(
+                    [
+                        _storage_account(),
+                        *(identities[name] for name in identity_order),
+                        _app_service(identity=_user_assigned_app_identity(shared_id)),
+                        _role_assignment(
+                            role_definition_name="Storage Blob Data Owner",
+                            scope="azurerm_storage_account.logs.id",
+                        ),
+                    ],
+                    "azure-public-workload-sensitive-resource-access",
+                )
+
+                self.assertEqual(findings, [])
 
     def test_private_workload_sensitive_assignment_is_not_public_path(self) -> None:
         _, _, findings = _evaluate(

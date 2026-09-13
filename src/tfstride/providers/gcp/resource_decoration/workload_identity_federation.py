@@ -11,6 +11,10 @@ from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_utils import binding_members, gcp_reference_key
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _FEDERATED_SERVICE_ACCOUNT_ROLES = frozenset(
     {
@@ -36,13 +40,14 @@ class ModelWorkloadIdentityFederationTrustPathsStage:
     name = "model_workload_identity_federation_trust_paths"
 
     def apply(self, resources: list[NormalizedResource], context: GcpDecorationContext) -> None:
-        pools_by_name = _pools_by_resource_name(context)
+        pool_index = _pool_reference_index(context)
+        service_account_index = _service_account_reference_index(context)
         providers_by_pool = _providers_by_pool_resource_name(context)
         paths_by_service_account: dict[str, list[dict[str, Any]]] = defaultdict(list)
         uncertainties_by_service_account: dict[str, list[str]] = defaultdict(list)
 
         for iam_resource in context.index.service_account_iam_resources:
-            service_account = _service_account_target(iam_resource, context)
+            service_account = _service_account_target(iam_resource, service_account_index)
             if service_account is None:
                 continue
             for binding in iam_bindings(iam_resource):
@@ -58,7 +63,7 @@ class ModelWorkloadIdentityFederationTrustPathsStage:
                             )
                         continue
 
-                    pool = pools_by_name.get(principal.pool_resource_name)
+                    pool = pool_index.unique_candidate(principal.pool_resource_name)
                     if pool is None:
                         uncertainties_by_service_account[service_account.address].append(
                             f"{iam_resource.address}: principal member {member} does not resolve to a modeled "
@@ -108,14 +113,19 @@ class ModelWorkloadIdentityFederationTrustPathsStage:
             facts.extend_workload_identity_federation_trust_path_uncertainties(uncertainties)
 
 
-def _pools_by_resource_name(context: GcpDecorationContext) -> dict[str, NormalizedResource]:
-    pools: dict[str, NormalizedResource] = {}
-    for pool in context.index.workload_identity_pools:
-        for candidate in (pool.identifier, gcp_facts(pool).resource_name):
-            resource_name = _canonical_pool_resource_name(candidate)
-            if resource_name is not None:
-                pools.setdefault(resource_name, pool)
-    return pools
+def _pool_reference_index(context: GcpDecorationContext) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        context.index.workload_identity_pools,
+        references_for_resource=_pool_resource_names,
+    )
+
+
+def _pool_resource_names(pool: NormalizedResource) -> tuple[str, ...]:
+    return tuple(
+        resource_name
+        for candidate in (pool.identifier, gcp_facts(pool).resource_name)
+        if (resource_name := _canonical_pool_resource_name(candidate)) is not None
+    )
 
 
 def _providers_by_pool_resource_name(
@@ -136,20 +146,19 @@ def _providers_by_pool_resource_name(
     }
 
 
+def _service_account_reference_index(context: GcpDecorationContext) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        context.index.service_accounts,
+        references_for_resource=_exact_service_account_references,
+        reference_key=gcp_reference_key,
+    )
+
+
 def _service_account_target(
     iam_resource: NormalizedResource,
-    context: GcpDecorationContext,
+    service_account_index: ResourceReferenceIndex,
 ) -> NormalizedResource | None:
-    target_reference = gcp_facts(iam_resource).service_account_reference
-    if not target_reference:
-        return None
-    target_key = gcp_reference_key(target_reference)
-    matches = [
-        service_account
-        for service_account in context.index.service_accounts
-        if target_key in _exact_service_account_references(service_account)
-    ]
-    return matches[0] if len(matches) == 1 else None
+    return service_account_index.unique_candidate(gcp_facts(iam_resource).service_account_reference)
 
 
 def _exact_service_account_references(resource: NormalizedResource) -> set[str]:

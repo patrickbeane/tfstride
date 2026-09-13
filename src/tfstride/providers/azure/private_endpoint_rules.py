@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 
 from tfstride.analysis.finding_factory import FindingFactory
@@ -35,6 +35,10 @@ from tfstride.providers.coercion import (
     STATE_NOT_CONFIGURED,
     STATE_UNKNOWN,
     dedupe_strings,
+)
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
 )
 
 _PRIVATE_ENDPOINT_TARGET_TYPES = (
@@ -338,7 +342,7 @@ def _private_endpoint_dns_posture_evidence(
     connection: AzurePrivateEndpointConnection,
     endpoint: NormalizedResource | None,
     links_by_zone_key: Mapping[str, tuple[_PrivateDnsZoneLink, ...]],
-    resource_by_reference: Mapping[str, NormalizedResource],
+    resource_by_reference: ResourceReferenceIndex,
 ) -> tuple[list[str], list[str], list[str], list[str]]:
     posture = _private_dns_zone_state_posture(connection)
     state_evidence = _private_dns_state_evidence(connection)
@@ -419,7 +423,7 @@ def _private_dns_zone_link_gap_evidence(
     connection: AzurePrivateEndpointConnection,
     endpoint: NormalizedResource | None,
     links_by_zone_key: Mapping[str, tuple[_PrivateDnsZoneLink, ...]],
-    resource_by_reference: Mapping[str, NormalizedResource],
+    resource_by_reference: ResourceReferenceIndex,
 ) -> tuple[list[str], list[str], list[str]]:
     if endpoint is None or not (connection.private_dns_zone_ids or connection.private_dns_zone_addresses):
         return [], [], []
@@ -431,6 +435,7 @@ def _private_dns_zone_link_gap_evidence(
     zone_keys = _expanded_reference_keys(
         [*connection.private_dns_zone_ids, *connection.private_dns_zone_addresses],
         resource_by_reference,
+        resource_types={AzureResourceType.PRIVATE_DNS_ZONE},
     )
     relevant_links = _dedupe_links(link for zone_key in zone_keys for link in links_by_zone_key.get(zone_key, ()))
     known_vnet_links = tuple(link for link in relevant_links if link.virtual_network_keys)
@@ -474,24 +479,28 @@ def _private_endpoint_dns_posture_severity():
     )
 
 
-def _resources_by_reference(resources: Iterable[NormalizedResource]) -> dict[str, NormalizedResource]:
-    resources_by_reference: dict[str, NormalizedResource] = {}
-    for resource in resources:
-        for reference in azure_resource_references(resource):
-            resources_by_reference.setdefault(reference, resource)
-    return resources_by_reference
+def _resources_by_reference(resources: Iterable[NormalizedResource]) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        resources,
+        references_for_resource=azure_resource_references,
+        reference_key=azure_reference_key,
+    )
 
 
 def _private_dns_zone_links_by_zone_key(
     resources: Iterable[NormalizedResource],
-    resource_by_reference: Mapping[str, NormalizedResource],
+    resource_by_reference: ResourceReferenceIndex,
 ) -> dict[str, tuple[_PrivateDnsZoneLink, ...]]:
     links_by_zone_key: dict[str, list[_PrivateDnsZoneLink]] = {}
     for resource in resources:
         if resource.resource_type != AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK:
             continue
         facts = azure_facts(resource)
-        zone_keys = _expanded_reference_keys([facts.private_dns_zone_reference], resource_by_reference)
+        zone_keys = _expanded_reference_keys(
+            [facts.private_dns_zone_reference],
+            resource_by_reference,
+            resource_types={AzureResourceType.PRIVATE_DNS_ZONE},
+        )
         if not zone_keys:
             continue
         link = _PrivateDnsZoneLink(
@@ -501,6 +510,7 @@ def _private_dns_zone_links_by_zone_key(
             virtual_network_keys=_expanded_reference_keys(
                 [facts.private_dns_zone_virtual_network_reference],
                 resource_by_reference,
+                resource_types={AzureResourceType.VIRTUAL_NETWORK},
             ),
         )
         for zone_key in zone_keys:
@@ -510,7 +520,7 @@ def _private_dns_zone_links_by_zone_key(
 
 def _endpoint_virtual_network_keys(
     endpoint: NormalizedResource,
-    resource_by_reference: Mapping[str, NormalizedResource],
+    resource_by_reference: ResourceReferenceIndex,
 ) -> tuple[tuple[str, ...], list[str]]:
     references: list[str] = []
     evidence: list[str] = []
@@ -520,7 +530,11 @@ def _endpoint_virtual_network_keys(
     subnet_references = [*endpoint.subnet_ids, *azure_facts(endpoint).resolved_subnet_addresses]
     for subnet_reference in subnet_references:
         evidence.append(f"{endpoint.address}: subnet={subnet_reference}")
-        subnet = resource_by_reference.get(azure_reference_key(subnet_reference))
+        subnet = _unique_resource_by_reference(
+            resource_by_reference,
+            subnet_reference,
+            resource_types={AzureResourceType.SUBNET},
+        )
         if subnet is None:
             continue
         subnet_facts = azure_facts(subnet)
@@ -528,12 +542,21 @@ def _endpoint_virtual_network_keys(
             if virtual_network_reference:
                 references.append(virtual_network_reference)
                 evidence.append(f"{endpoint.address}: endpoint_vnet={virtual_network_reference}")
-    return _expanded_reference_keys(references, resource_by_reference), dedupe_strings(evidence)
+    return (
+        _expanded_reference_keys(
+            references,
+            resource_by_reference,
+            resource_types={AzureResourceType.VIRTUAL_NETWORK},
+        ),
+        dedupe_strings(evidence),
+    )
 
 
 def _expanded_reference_keys(
     references: Iterable[str | None],
-    resource_by_reference: Mapping[str, NormalizedResource],
+    resource_by_reference: ResourceReferenceIndex,
+    *,
+    resource_types: Collection[str],
 ) -> tuple[str, ...]:
     keys: list[str] = []
     for reference in references:
@@ -541,10 +564,37 @@ def _expanded_reference_keys(
         if not reference_key:
             continue
         keys.append(reference_key)
-        resolved_resource = resource_by_reference.get(reference_key)
-        if resolved_resource is not None:
-            keys.extend(azure_resource_references(resolved_resource))
+        resolved_resource = _unique_resource_by_reference(
+            resource_by_reference,
+            reference,
+            resource_types=resource_types,
+        )
+        if resolved_resource is None:
+            continue
+        keys.extend(
+            alias
+            for alias in azure_resource_references(resolved_resource)
+            if _unique_resource_by_reference(
+                resource_by_reference,
+                alias,
+                resource_types=resource_types,
+            )
+            is resolved_resource
+        )
     return tuple(dedupe_strings(keys))
+
+
+def _unique_resource_by_reference(
+    resource_by_reference: ResourceReferenceIndex,
+    reference: str | None,
+    *,
+    resource_types: Collection[str],
+) -> NormalizedResource | None:
+    allowed_types = frozenset(resource_types)
+    return resource_by_reference.resolve(
+        reference,
+        candidate_filter=lambda candidate: candidate.resource_type in allowed_types,
+    ).selected_candidate
 
 
 def _private_dns_zone_link_evidence(links: Iterable[_PrivateDnsZoneLink]) -> list[str]:

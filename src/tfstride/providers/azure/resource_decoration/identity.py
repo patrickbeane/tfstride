@@ -15,6 +15,10 @@ from tfstride.providers.azure.resource_types import (
     AZURE_COMPUTE_RESOURCE_TYPES,
     AzureResourceType,
 )
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _AZURE_WORKLOAD_RESOURCE_TYPES = AZURE_COMPUTE_RESOURCE_TYPES | AZURE_APP_SERVICE_RESOURCE_TYPES
 
@@ -58,8 +62,8 @@ class DecorateManagedIdentityRoleAssignmentsStage:
         self,
         role_assignment: NormalizedResource,
         context: AzureDecorationContext,
-        principal_index: dict[str, list[NormalizedResource]],
-        role_definition_index: dict[str, list[NormalizedResource]],
+        principal_index: ResourceReferenceIndex,
+        role_definition_index: ResourceReferenceIndex,
     ) -> None:
         facts = azure_facts(role_assignment)
         scope = facts.role_assignment_scope
@@ -116,8 +120,7 @@ class DecorateManagedIdentityRoleAssignmentsStage:
         principal_id = facts.principal_id
         identity = _resolved_managed_identity(facts, context)
         if identity is None:
-            matches = principal_index.get(_principal_key(principal_id), []) if principal_id else []
-            identity = matches[0] if len(matches) == 1 else None
+            identity = principal_index.unique_candidate(principal_id)
         privileged_posture = build_azure_privileged_access_posture(
             role_assignment,
             scope_kind=scope_kind,
@@ -177,19 +180,23 @@ def _resolved_managed_identity(
 
 def _managed_identities_by_principal_id(
     resources: Iterable[NormalizedResource],
-) -> dict[str, list[NormalizedResource]]:
-    identities: dict[str, list[NormalizedResource]] = {}
-    for resource in resources:
-        facts = azure_facts(resource)
-        if resource.resource_type == AzureResourceType.USER_ASSIGNED_IDENTITY:
-            principal_id = facts.principal_id
-        elif resource.resource_type in _AZURE_WORKLOAD_RESOURCE_TYPES and facts.has_system_assigned_identity:
-            principal_id = facts.principal_id
-        else:
-            continue
-        if principal_id:
-            identities.setdefault(_principal_key(principal_id), []).append(resource)
-    return identities
+) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        resources,
+        references_for_resource=_managed_identity_principal_references,
+        reference_key=_principal_key,
+    )
+
+
+def _managed_identity_principal_references(resource: NormalizedResource) -> tuple[str, ...]:
+    facts = azure_facts(resource)
+    if resource.resource_type == AzureResourceType.USER_ASSIGNED_IDENTITY:
+        principal_id = facts.principal_id
+    elif resource.resource_type in _AZURE_WORKLOAD_RESOURCE_TYPES and facts.has_system_assigned_identity:
+        principal_id = facts.principal_id
+    else:
+        return ()
+    return (principal_id,) if principal_id else ()
 
 
 def _classify_scope(scope: str | None) -> str | None:
@@ -277,32 +284,19 @@ def _custom_role_breadth_mitigations(role_definition: NormalizedResource | None)
 
 def _custom_role_definitions_by_reference(
     resources: Iterable[NormalizedResource],
-) -> dict[str, list[NormalizedResource]]:
-    definitions: dict[str, list[NormalizedResource]] = {}
-    for resource in resources:
-        if resource.resource_type != AzureResourceType.ROLE_DEFINITION:
-            continue
-        seen: set[str] = set()
-        for reference in _role_definition_references(resource):
-            key = _role_definition_reference_key(reference)
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            definitions.setdefault(key, []).append(resource)
-    return definitions
+) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        (resource for resource in resources if resource.resource_type == AzureResourceType.ROLE_DEFINITION),
+        references_for_resource=_role_definition_references,
+        reference_key=_role_definition_reference_key,
+    )
 
 
 def _resolve_custom_role_definition(
     reference: str | None,
-    definitions: dict[str, list[NormalizedResource]],
+    definitions: ResourceReferenceIndex,
 ) -> NormalizedResource | None:
-    key = _role_definition_reference_key(reference)
-    if not key:
-        return None
-    matches = definitions.get(key, [])
-    if len(matches) != 1:
-        return None
-    return matches[0]
+    return definitions.unique_candidate(reference)
 
 
 def _role_definition_references(role_definition: NormalizedResource) -> tuple[str, ...]:

@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import TerraformResource
+from tfstride.providers.azure import private_endpoint_rules
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.resource_types import AzureResourceType
 
@@ -472,6 +473,57 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
                 "azurerm_private_endpoint.logs_blob: private_dns_zone_group_state=configured",
                 "azurerm_private_endpoint.logs_blob: private_dns_zone_ids_state=unknown",
             ],
+        )
+
+    def test_private_dns_reference_helper_preserves_ambiguous_candidates_in_any_input_order(self) -> None:
+        first_zone = _private_dns_zone("first", "privatelink.shared.example")
+        second_zone = _private_dns_zone("second", "privatelink.shared.example")
+        shared_id = (
+            "/subscriptions/sub-0001/resourceGroups/dns/providers/"
+            "Microsoft.Network/privateDnsZones/privatelink.shared.example"
+        )
+
+        for zones in ([first_zone, second_zone], [second_zone, first_zone]):
+            with self.subTest(order=[zone.address for zone in zones]):
+                inventory = AzureNormalizer().normalize(zones)
+                first = inventory.get_by_address(first_zone.address)
+                second = inventory.get_by_address(second_zone.address)
+                assert first is not None
+                assert second is not None
+
+                reference_index = private_endpoint_rules._resources_by_reference(inventory.resources)
+                resolution = reference_index.resolve(shared_id.upper())
+
+                self.assertEqual(resolution.state, "ambiguous")
+                self.assertEqual(resolution.candidates, (first, second))
+                self.assertIsNone(reference_index.unique_candidate(shared_id))
+
+    def test_private_dns_reference_helper_filters_type_before_ambiguity(self) -> None:
+        zone = _private_dns_zone("shared", "privatelink.shared.example")
+        virtual_network = _resource(
+            AzureResourceType.VIRTUAL_NETWORK,
+            "collision",
+            {
+                "id": (
+                    "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Network/virtualNetworks/collision"
+                ),
+                "name": "privatelink.shared.example",
+                "address_space": ["10.0.0.0/16"],
+            },
+        )
+        inventory = AzureNormalizer().normalize([virtual_network, zone])
+        normalized_zone = inventory.get_by_address(zone.address)
+        assert normalized_zone is not None
+        reference_index = private_endpoint_rules._resources_by_reference(inventory.resources)
+
+        self.assertEqual(reference_index.resolve("privatelink.shared.example").state, "ambiguous")
+        self.assertIs(
+            private_endpoint_rules._unique_resource_by_reference(
+                reference_index,
+                "privatelink.shared.example",
+                resource_types={AzureResourceType.PRIVATE_DNS_ZONE},
+            ),
+            normalized_zone,
         )
 
     def test_private_endpoint_dns_zone_link_to_different_vnet_is_detected(self) -> None:

@@ -10,6 +10,10 @@ from tfstride.analysis.resource_concepts import (
     is_network_security_group_resource,
 )
 from tfstride.models import NormalizedResource, ResourceInventory
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _Extension = TypeVar("_Extension")
 AnalysisIndexExtensionFactory = Callable[[ResourceInventory], object]
@@ -21,8 +25,8 @@ class AnalysisIndexExtensionError(TypeError):
 
 @dataclass(frozen=True, slots=True)
 class AnalysisIndexes:
-    role_index: Mapping[str, NormalizedResource]
-    security_groups_by_reference: Mapping[str, NormalizedResource]
+    role_index: ResourceReferenceIndex
+    security_groups_by_reference: ResourceReferenceIndex
     resources_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     public_workloads_by_security_group: Mapping[str, tuple[NormalizedResource, ...]]
     provider_extension: object | None = None
@@ -31,7 +35,7 @@ class AnalysisIndexes:
         return [
             security_group
             for security_group_id in resource.security_group_ids
-            if (security_group := self.security_groups_by_reference.get(security_group_id)) is not None
+            if (security_group := self.security_groups_by_reference.unique_candidate(security_group_id)) is not None
         ]
 
     def require_provider_extension(self, extension_type: type[_Extension]) -> _Extension:
@@ -49,12 +53,14 @@ def build_analysis_indexes(
     *,
     provider_extension_factory: AnalysisIndexExtensionFactory | None = None,
 ) -> AnalysisIndexes:
-    resources_by_reference = _build_resource_reference_index(inventory.resources)
-    security_groups_by_reference = {
-        reference: resource
-        for reference, resource in resources_by_reference.items()
-        if is_network_security_group_resource(resource)
-    }
+    role_index = build_resource_reference_index(
+        inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES),
+        references_for_resource=_analysis_resource_references,
+    )
+    security_groups_by_reference = build_resource_reference_index(
+        (resource for resource in inventory.resources if is_network_security_group_resource(resource)),
+        references_for_resource=_analysis_resource_references,
+    )
 
     resolved_extension_factory = (
         provider_extension_factory
@@ -63,8 +69,8 @@ def build_analysis_indexes(
     )
 
     return AnalysisIndexes(
-        role_index=_freeze_resource_map(_build_role_index(inventory)),
-        security_groups_by_reference=_freeze_resource_map(security_groups_by_reference),
+        role_index=role_index,
+        security_groups_by_reference=security_groups_by_reference,
         resources_by_security_group=_freeze_resource_groups(_group_resources_by_security_group(inventory.resources)),
         public_workloads_by_security_group=_freeze_resource_groups(
             _group_resources_by_security_group(resource for resource in inventory.resources if resource.public_exposure)
@@ -79,26 +85,8 @@ def _default_provider_extension_factory(provider: str) -> AnalysisIndexExtension
     return default_provider_analysis_index_factory(provider)
 
 
-def _build_role_index(inventory: ResourceInventory) -> dict[str, NormalizedResource]:
-    index: dict[str, NormalizedResource] = {}
-    for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
-        if role.arn:
-            index[role.arn] = role
-        index[role.address] = role
-        if role.identifier:
-            index[role.identifier] = role
-    return index
-
-
-def _build_resource_reference_index(
-    resources: Iterable[NormalizedResource],
-) -> dict[str, NormalizedResource]:
-    index: dict[str, NormalizedResource] = {}
-    for resource in resources:
-        for reference in (resource.identifier, resource.arn, resource.address):
-            if reference:
-                index.setdefault(reference, resource)
-    return index
+def _analysis_resource_references(resource: NormalizedResource) -> tuple[str | None, ...]:
+    return resource.address, resource.identifier, resource.arn
 
 
 def _group_resources_by_security_group(
@@ -109,12 +97,6 @@ def _group_resources_by_security_group(
         for security_group_id in resource.security_group_ids:
             grouped.setdefault(security_group_id, []).append(resource)
     return grouped
-
-
-def _freeze_resource_map(
-    resource_map: dict[str, NormalizedResource],
-) -> Mapping[str, NormalizedResource]:
-    return MappingProxyType(dict(resource_map))
 
 
 def _freeze_resource_groups(
