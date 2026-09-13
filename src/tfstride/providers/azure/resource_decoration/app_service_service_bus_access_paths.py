@@ -174,7 +174,10 @@ def _assignment_resource(
     assignment: Mapping[str, Any],
     context: AzureDecorationContext,
 ) -> NormalizedResource | None:
-    resource = context.index.resolve(_string_value(assignment.get("source")))
+    resource = context.index.resolve(
+        _string_value(assignment.get("source")),
+        resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+    )
     if resource is None or resource.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
         return None
     return resource
@@ -202,7 +205,11 @@ def _exact_service_bus_target(
             f"scope {scope} does not resolve to an exact Service Bus namespace, queue, topic, or subscription",
         )
 
-    target = context.index.resolve(target_address)
+    target = context.index.resolve(
+        target_address,
+        source=assignment_resource,
+        resource_types={target_type},
+    )
     if target is None or target.address != target_address or target.resource_type != target_type:
         return (
             None,
@@ -236,7 +243,11 @@ def _service_bus_data_grant(
         )
 
     assignment_facts = azure_facts(assignment_resource)
-    role_definition = context.index.resolve(assignment_facts.resolved_role_definition_address)
+    role_definition = context.index.resolve(
+        assignment_facts.resolved_role_definition_address,
+        source=assignment_resource,
+        resource_types={AzureResourceType.ROLE_DEFINITION},
+    )
     if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
         if role_name is None:
             return None, "role is unresolved"
@@ -399,7 +410,11 @@ def _service_bus_namespace_for_target(
 ) -> NormalizedResource | None:
     if target.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
         return target
-    namespace = context.index.resolve(azure_facts(target).resolved_service_bus_namespace_address)
+    namespace = context.index.resolve(
+        azure_facts(target).resolved_service_bus_namespace_address,
+        source=target,
+        resource_types={AzureResourceType.SERVICE_BUS_NAMESPACE},
+    )
     if namespace is None or namespace.resource_type != AzureResourceType.SERVICE_BUS_NAMESPACE:
         return None
     return namespace
@@ -413,7 +428,11 @@ def _service_bus_topic_for_target(
         return target
     if target.resource_type != AzureResourceType.SERVICE_BUS_SUBSCRIPTION:
         return None
-    topic = context.index.resolve(azure_facts(target).resolved_service_bus_topic_address)
+    topic = context.index.resolve(
+        azure_facts(target).resolved_service_bus_topic_address,
+        source=target,
+        resource_types={AzureResourceType.SERVICE_BUS_TOPIC},
+    )
     if topic is None or topic.resource_type != AzureResourceType.SERVICE_BUS_TOPIC:
         return None
     return topic

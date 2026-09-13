@@ -22,7 +22,7 @@ class MergeResourcePolicyResourcesStage:
             if bucket_policy_resource.resource_type != "aws_s3_bucket_policy":
                 continue
             bucket_name = aws_facts(bucket_policy_resource).bucket_name
-            bucket = context.index.buckets.get(bucket_name)
+            bucket = context.index.buckets.get(bucket_name, source=bucket_policy_resource)
             if bucket is None:
                 aws_facts(bucket_policy_resource).add_unresolved_bucket_reference(bucket_name)
                 continue
@@ -37,7 +37,7 @@ class MergeResourcePolicyResourcesStage:
             if secret_policy_resource.resource_type != "aws_secretsmanager_secret_policy":
                 continue
             secret_arn = aws_facts(secret_policy_resource).secret_arn
-            secret = context.index.secrets.get(secret_arn)
+            secret = context.index.secrets.get(secret_arn, source=secret_policy_resource)
             if secret is None:
                 aws_facts(secret_policy_resource).add_unresolved_secret_arn(secret_arn)
                 continue
@@ -52,7 +52,7 @@ class MergeResourcePolicyResourcesStage:
             if lambda_permission_resource.resource_type != "aws_lambda_permission":
                 continue
             function_name = aws_facts(lambda_permission_resource).function_name
-            target_function = context.index.lambda_functions.get(function_name)
+            target_function = context.index.lambda_functions.get(function_name, source=lambda_permission_resource)
             if target_function is None:
                 aws_facts(lambda_permission_resource).add_unresolved_function_reference(function_name)
                 continue
@@ -74,7 +74,7 @@ class ApplyS3PublicAccessBlocksStage:
             if access_block_resource.resource_type != "aws_s3_bucket_public_access_block":
                 continue
             bucket_name = aws_facts(access_block_resource).bucket_name
-            bucket = context.index.buckets.get(bucket_name)
+            bucket = context.index.buckets.get(bucket_name, source=access_block_resource)
             if bucket is None:
                 continue
             public_access_block = {
@@ -136,7 +136,7 @@ class ApplyS3PostureResourcesStage:
         context: AwsDecorationContext,
     ) -> None:
         posture_facts = aws_facts(posture_resource)
-        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        bucket = context.index.buckets.get(posture_facts.bucket_name, source=posture_resource)
         if bucket is None:
             posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
             return
@@ -155,7 +155,7 @@ class ApplyS3PostureResourcesStage:
         context: AwsDecorationContext,
     ) -> None:
         posture_facts = aws_facts(posture_resource)
-        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        bucket = context.index.buckets.get(posture_facts.bucket_name, source=posture_resource)
         if bucket is None:
             posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
             return
@@ -176,7 +176,7 @@ class ApplyS3PostureResourcesStage:
         context: AwsDecorationContext,
     ) -> None:
         posture_facts = aws_facts(posture_resource)
-        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        bucket = context.index.buckets.get(posture_facts.bucket_name, source=posture_resource)
         if bucket is None:
             posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
             return
@@ -198,7 +198,7 @@ class ApplyS3PostureResourcesStage:
         context: AwsDecorationContext,
     ) -> None:
         posture_facts = aws_facts(posture_resource)
-        bucket = context.index.buckets.get(posture_facts.bucket_name)
+        bucket = context.index.buckets.get(posture_facts.bucket_name, source=posture_resource)
         if bucket is None:
             posture_facts.add_unresolved_bucket_reference(posture_facts.bucket_name)
             return
@@ -220,7 +220,7 @@ class ApplySqsRedrivePolicyResourcesStage:
             if posture_resource.resource_type != "aws_sqs_queue_redrive_policy":
                 continue
             posture_facts = aws_facts(posture_resource)
-            queue = context.index.sqs_queues.get(posture_facts.sqs_queue_url)
+            queue = context.index.sqs_queues.get(posture_facts.sqs_queue_url, source=posture_resource)
             if queue is None:
                 posture_facts.add_unresolved_sqs_queue_reference(posture_facts.sqs_queue_url)
                 continue
@@ -246,7 +246,7 @@ class ApplySecretsManagerPostureResourcesStage:
                 continue
             posture_facts = aws_facts(posture_resource)
             secret_id = posture_facts.secrets_manager_rotation_secret_id
-            secret = context.index.secrets.get(secret_id)
+            secret = context.index.secrets.get(secret_id, source=posture_resource)
             if secret is None:
                 posture_facts.add_unresolved_secret_reference(secret_id)
                 continue

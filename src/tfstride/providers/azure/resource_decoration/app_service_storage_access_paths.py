@@ -175,7 +175,10 @@ def _assignment_resource(
     assignment: Mapping[str, object],
     context: AzureDecorationContext,
 ) -> NormalizedResource | None:
-    resource = context.index.resolve(_string_value(assignment.get("source")))
+    resource = context.index.resolve(
+        _string_value(assignment.get("source")),
+        resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+    )
     if resource is None or resource.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
         return None
     return resource
@@ -193,7 +196,11 @@ def _exact_storage_target(
         scope = azure_facts(assignment_resource).role_assignment_scope or "unknown"
         return None, f"scope {scope} does not resolve to an exact Storage Account or container"
 
-    target = context.index.resolve(target_address)
+    target = context.index.resolve(
+        target_address,
+        source=assignment_resource,
+        resource_types={target_type},
+    )
     if target is None or target.address != target_address or target.resource_type != target_type:
         return None, f"target {target_address} is not an exact modeled Storage Account or container"
     return target, None
@@ -220,7 +227,11 @@ def _storage_data_grant(
         )
 
     assignment_facts = azure_facts(assignment_resource)
-    role_definition = context.index.resolve(assignment_facts.resolved_role_definition_address)
+    role_definition = context.index.resolve(
+        assignment_facts.resolved_role_definition_address,
+        source=assignment_resource,
+        resource_types={AzureResourceType.ROLE_DEFINITION},
+    )
     if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
         if role_name is None:
             return None, "role is unresolved"
@@ -367,7 +378,11 @@ def _storage_account_for_target(
 ) -> NormalizedResource | None:
     if target.resource_type == AzureResourceType.STORAGE_ACCOUNT:
         return target
-    account = context.index.resolve(azure_facts(target).resolved_storage_account_address)
+    account = context.index.resolve(
+        azure_facts(target).resolved_storage_account_address,
+        source=target,
+        resource_types={AzureResourceType.STORAGE_ACCOUNT},
+    )
     if account is None or account.resource_type != AzureResourceType.STORAGE_ACCOUNT:
         return None
     return account

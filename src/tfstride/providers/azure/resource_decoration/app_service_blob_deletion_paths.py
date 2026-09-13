@@ -185,7 +185,11 @@ def _deletion_relevant_access_uncertainties(
     for identity, _identity_kind in identities:
         for assignment in azure_facts(identity).managed_identity_role_assignments:
             source_address = _known_string(assignment.get("source"))
-            assignment_resource = context.index.resolve(source_address)
+            assignment_resource = context.index.resolve(
+                source_address,
+                source=identity,
+                resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+            )
             if (
                 assignment_resource is not None
                 and assignment_resource.resource_type == AzureResourceType.ROLE_ASSIGNMENT
@@ -251,7 +255,10 @@ def _access_path_targets(
     context: AzureDecorationContext,
 ) -> tuple[NormalizedResource | None, tuple[NormalizedResource, ...], str | None]:
     account_address = _known_string(access_path["storage_account_address"])
-    account = context.index.resolve(account_address)
+    account = context.index.resolve(
+        account_address,
+        resource_types={AzureResourceType.STORAGE_ACCOUNT},
+    )
     if (
         account is None
         or account.resource_type != AzureResourceType.STORAGE_ACCOUNT
@@ -269,7 +276,11 @@ def _access_path_targets(
 
     if access_path["resource_scope"] == "exact_storage_container":
         container_address = _known_string(access_path["container_address"])
-        container = context.index.resolve(container_address)
+        container = context.index.resolve(
+            container_address,
+            source=account,
+            resource_types={AzureResourceType.STORAGE_CONTAINER},
+        )
         if not _container_belongs_to_account(container, account):
             return (
                 None,

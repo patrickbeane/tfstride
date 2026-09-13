@@ -63,7 +63,7 @@ class DecorateManagedIdentityRoleAssignmentsStage:
     ) -> None:
         facts = azure_facts(role_assignment)
         scope = facts.role_assignment_scope
-        target_resource = context.index.resolve(scope)
+        target_resource = context.index.resolve(scope, source=role_assignment)
         if (
             target_resource is not None
             and target_resource.resource_type == AzureResourceType.STORAGE_CONTAINER

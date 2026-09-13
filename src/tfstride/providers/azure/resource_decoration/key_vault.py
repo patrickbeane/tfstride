@@ -34,7 +34,11 @@ class DecorateKeyVaultRelationshipsStage:
             facts = azure_facts(resource)
             vault = context.index.resources_by_address.get(facts.resolved_key_vault_address or "")
             if vault is None:
-                vault = context.index.resolve(facts.key_vault_reference)
+                vault = context.index.resolve(
+                    facts.key_vault_reference,
+                    source=resource,
+                    resource_types={AzureResourceType.KEY_VAULT},
+                )
             if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
                 facts.add_unresolved_resource_reference("key_vault", facts.key_vault_reference)
                 continue
@@ -66,7 +70,11 @@ class DecorateKeyVaultRelationshipsStage:
             if policy_resource.resource_type != AzureResourceType.KEY_VAULT_ACCESS_POLICY:
                 continue
             facts = azure_facts(policy_resource)
-            vault = context.index.resolve(facts.key_vault_reference)
+            vault = context.index.resolve(
+                facts.key_vault_reference,
+                source=policy_resource,
+                resource_types={AzureResourceType.KEY_VAULT},
+            )
             if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
                 facts.add_unresolved_resource_reference("key_vault", facts.key_vault_reference)
                 continue
@@ -93,7 +101,11 @@ class DecorateKeyVaultRelationshipsStage:
             facts = azure_facts(role_assignment)
             vault = context.index.resources_by_address.get(facts.role_assignment_target_resource_address or "")
             if vault is None:
-                vault = context.index.resolve(facts.role_assignment_scope)
+                vault = context.index.resolve(
+                    facts.role_assignment_scope,
+                    source=role_assignment,
+                    resource_types={AzureResourceType.KEY_VAULT},
+                )
             if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
                 if _looks_like_key_vault_reference(facts.role_assignment_scope):
                     facts.add_unresolved_resource_reference("key_vault_scope", facts.role_assignment_scope)

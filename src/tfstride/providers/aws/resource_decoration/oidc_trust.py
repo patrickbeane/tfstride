@@ -18,7 +18,8 @@ class ResolveOidcProviderTrustStage:
             if role.resource_type != "aws_iam_role":
                 continue
             statements = [
-                _resolve_trust_statement(statement, context) for statement in aws_facts(role).trust_statements
+                _resolve_trust_statement(statement, context, source=role)
+                for statement in aws_facts(role).trust_statements
             ]
             aws_facts(role).set_trust_statements(statements)
 
@@ -26,6 +27,8 @@ class ResolveOidcProviderTrustStage:
 def _resolve_trust_statement(
     trust_statement: dict[str, Any],
     context: AwsDecorationContext,
+    *,
+    source: NormalizedResource,
 ) -> dict[str, Any]:
     resolved_statement = dict(trust_statement)
     if _WEB_IDENTITY_ACTION not in {action.lower() for action in _string_list(trust_statement.get("actions"))}:
@@ -50,7 +53,7 @@ def _resolve_trust_statement(
             resolved_entries.append(entry)
             continue
 
-        provider = context.index.oidc_provider_index.get(_unwrap_exact_interpolation(source_value))
+        provider = context.index.oidc_provider_index.get(_unwrap_exact_interpolation(source_value), source=source)
         if provider is None:
             if _looks_like_oidc_provider_reference(source_value):
                 unresolved_references.append(source_value)

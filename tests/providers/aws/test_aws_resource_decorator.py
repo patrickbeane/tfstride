@@ -11,6 +11,7 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
 )
+from tfstride.providers.aws.resource_decoration.iam import MergeRolePolicyResourcesStage
 from tfstride.providers.aws.resource_decoration_stages import default_aws_decoration_stages
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import aws_facts
@@ -30,6 +31,7 @@ def _resource(
     public_access_configured: bool = False,
     public_exposure: bool = False,
     vpc_id: str | None = None,
+    provider_config_key: str | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
         address=address,
@@ -45,6 +47,7 @@ def _resource(
         public_access_configured=public_access_configured,
         public_exposure=public_exposure,
         vpc_id=vpc_id,
+        provider_config_key=provider_config_key,
     )
 
 
@@ -96,13 +99,14 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         self.assertEqual(index.vpcs_with_public_routes, {"vpc-app"})
         self.assertEqual(index.nat_gateway_ids, {"nat-private"})
 
-    def test_index_preserves_existing_alias_overwrite_and_none_identifier_behavior(self) -> None:
+    def test_native_alias_collisions_are_deterministic_and_fail_closed(self) -> None:
         first_bucket = _resource(
             address="aws_s3_bucket.first",
             resource_type="aws_s3_bucket",
             category=ResourceCategory.DATA,
             identifier="logs",
             arn="arn:aws:s3:::logs",
+            provider_config_key="aws.first",
         )
         second_bucket = _resource(
             address="aws_s3_bucket.second",
@@ -110,24 +114,263 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
             category=ResourceCategory.DATA,
             identifier="logs",
             arn="arn:aws:s3:::logs",
+            provider_config_key="aws.second",
         )
-        first_subnet = _resource(
-            address="aws_subnet.first",
+        unmatched_source = _resource(
+            address="aws_s3_bucket_policy.unmatched",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.unmatched",
+        )
+
+        for resources in (
+            [first_bucket, second_bucket],
+            [second_bucket, first_bucket],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                index = AwsResourceIndexBuilder().build(resources)
+                resolution = index.buckets.resolve("logs")
+                strong_resolution = index.buckets.resolve(
+                    "arn:aws:s3:::logs",
+                    source=unmatched_source,
+                )
+
+                self.assertEqual(resolution.state, "ambiguous")
+                self.assertEqual(resolution.candidates, (first_bucket, second_bucket))
+                self.assertIsNone(resolution.selected_candidate)
+                self.assertEqual(strong_resolution.state, "ambiguous")
+                self.assertEqual(
+                    strong_resolution.candidates,
+                    (first_bucket, second_bucket),
+                )
+                self.assertIsNone(strong_resolution.selected_candidate)
+                self.assertIsNone(index.buckets.get("logs"))
+                self.assertIs(index.buckets["aws_s3_bucket.first"], first_bucket)
+                self.assertIs(index.buckets["aws_s3_bucket.second"], second_bucket)
+
+    def test_exact_address_precedes_a_colliding_native_alias(self) -> None:
+        exact_bucket = _resource(
+            address="aws_s3_bucket.exact",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="exact-bucket",
+            provider_config_key="aws.primary",
+        )
+        colliding_bucket = _resource(
+            address="aws_s3_bucket.colliding",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier=exact_bucket.address,
+            provider_config_key="aws.secondary",
+        )
+        secondary_policy = _resource(
+            address="aws_s3_bucket_policy.secondary",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.secondary",
+        )
+
+        for resources in (
+            [exact_bucket, colliding_bucket],
+            [colliding_bucket, exact_bucket],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                resolution = (
+                    AwsResourceIndexBuilder()
+                    .build(resources)
+                    .buckets.resolve(exact_bucket.address, source=secondary_policy)
+                )
+
+                self.assertEqual(resolution.state, "resolved")
+                self.assertEqual(resolution.candidates, (exact_bucket,))
+                self.assertIs(resolution.selected_candidate, exact_bucket)
+
+    def test_resolution_filters_by_type_and_source_provider_configuration(self) -> None:
+        primary_bucket = _resource(
+            address="aws_s3_bucket.primary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            provider_config_key="aws.primary",
+        )
+        secondary_bucket = _resource(
+            address="aws_s3_bucket.secondary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            provider_config_key="aws.secondary",
+        )
+        unique_secondary_bucket = _resource(
+            address="aws_s3_bucket.unique_secondary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="unique-secondary",
+            arn="arn:aws:s3:::unique-secondary",
+            provider_config_key="aws.secondary",
+        )
+        primary_secret = _resource(
+            address="aws_secretsmanager_secret.primary",
+            resource_type="aws_secretsmanager_secret",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            metadata={"name": "shared"},
+            provider_config_key="aws.primary",
+        )
+        primary_policy = _resource(
+            address="aws_s3_bucket_policy.primary",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.primary",
+        )
+        unmatched_policy = _resource(
+            address="aws_s3_bucket_policy.unmatched",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.unmatched",
+        )
+        index = AwsResourceIndexBuilder().build(
+            [
+                secondary_bucket,
+                primary_secret,
+                unique_secondary_bucket,
+                primary_bucket,
+                primary_policy,
+                unmatched_policy,
+            ]
+        )
+
+        unscoped = index.buckets.resolve("shared")
+        scoped = index.buckets.resolve("shared", source=primary_policy)
+        unmatched_scope = index.buckets.resolve("shared", source=unmatched_policy)
+        typed = index.secrets.resolve("shared", source=primary_policy)
+        weak_cross_config = index.buckets.resolve(
+            "unique-secondary",
+            source=primary_policy,
+        )
+        strong_cross_config = index.buckets.resolve(
+            "arn:aws:s3:::unique-secondary",
+            source=primary_policy,
+        )
+
+        self.assertEqual(unscoped.state, "ambiguous")
+        self.assertEqual(unscoped.candidates, (primary_bucket, secondary_bucket))
+        self.assertEqual(scoped.state, "resolved")
+        self.assertIs(scoped.selected_candidate, primary_bucket)
+        self.assertEqual(unmatched_scope.state, "unresolved")
+        self.assertEqual(unmatched_scope.candidates, ())
+        self.assertEqual(typed.state, "resolved")
+        self.assertIs(typed.selected_candidate, primary_secret)
+        self.assertEqual(weak_cross_config.state, "unresolved")
+        self.assertEqual(weak_cross_config.candidates, ())
+        self.assertEqual(strong_cross_config.state, "resolved")
+        self.assertIs(strong_cross_config.selected_candidate, unique_secondary_bucket)
+
+    def test_strong_reference_precedes_a_same_config_weak_alias(self) -> None:
+        foreign_key = _resource(
+            address="aws_kms_key.foreign",
+            resource_type="aws_kms_key",
+            category=ResourceCategory.DATA,
+            identifier="foreign-key",
+            arn="arn:aws:kms:us-east-1:111122223333:key/foreign",
+            provider_config_key="aws.secondary",
+        )
+        local_arn_collision = _resource(
+            address="aws_kms_key.local_arn_collision",
+            resource_type="aws_kms_key",
+            category=ResourceCategory.DATA,
+            identifier=foreign_key.arn,
+            provider_config_key="aws.primary",
+        )
+        local_address_collision = _resource(
+            address="aws_kms_key.local_address_collision",
+            resource_type="aws_kms_key",
+            category=ResourceCategory.DATA,
+            identifier=f"{foreign_key.address}.arn",
+            provider_config_key="aws.primary",
+        )
+        primary_source = _resource(
+            address="aws_kms_alias.primary",
+            resource_type="aws_kms_alias",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.primary",
+        )
+
+        for resources in (
+            [foreign_key, local_arn_collision, local_address_collision],
+            [local_address_collision, local_arn_collision, foreign_key],
+        ):
+            for reference in (
+                foreign_key.arn,
+                f"{foreign_key.address}.arn",
+            ):
+                with self.subTest(
+                    order=[resource.address for resource in resources],
+                    reference=reference,
+                ):
+                    resolution = (
+                        AwsResourceIndexBuilder()
+                        .build(resources)
+                        .kms_keys.resolve(
+                            reference,
+                            source=primary_source,
+                        )
+                    )
+
+                    self.assertEqual(resolution.state, "resolved")
+                    self.assertEqual(resolution.candidates, (foreign_key,))
+                    self.assertIs(resolution.selected_candidate, foreign_key)
+
+    def test_fully_qualified_service_urls_resolve_across_provider_configurations(
+        self,
+    ) -> None:
+        queue_url = "https://sqs.us-east-1.amazonaws.com/111122223333/jobs"
+        repository_url = "111122223333.dkr.ecr.us-east-1.amazonaws.com/orders"
+        queue = _resource(
+            address="aws_sqs_queue.jobs",
+            resource_type="aws_sqs_queue",
+            category=ResourceCategory.DATA,
+            identifier="jobs",
+            metadata={"sqs_queue_url": queue_url},
+            provider_config_key="aws.secondary",
+        )
+        repository = _resource(
+            address="aws_ecr_repository.orders",
+            resource_type="aws_ecr_repository",
+            category=ResourceCategory.DATA,
+            identifier="orders",
+            metadata={"ecr_repository_url": repository_url},
+            provider_config_key="aws.secondary",
+        )
+        primary_source = _resource(
+            address="aws_ecs_task_definition.primary",
+            resource_type="aws_ecs_task_definition",
+            category=ResourceCategory.COMPUTE,
+            provider_config_key="aws.primary",
+        )
+        index = AwsResourceIndexBuilder().build([queue, repository])
+
+        for view, reference, expected in (
+            (index.sqs_queues, queue_url, queue),
+            (index.ecr_repositories, repository_url, repository),
+        ):
+            with self.subTest(reference=reference):
+                resolution = view.resolve(reference, source=primary_source)
+
+                self.assertEqual(resolution.state, "resolved")
+                self.assertEqual(resolution.candidates, (expected,))
+                self.assertIs(resolution.selected_candidate, expected)
+
+    def test_missing_identifiers_are_not_indexed(self) -> None:
+        subnet = _resource(
+            address="aws_subnet.app",
             resource_type="aws_subnet",
             category=ResourceCategory.NETWORK,
         )
-        second_subnet = _resource(
-            address="aws_subnet.second",
-            resource_type="aws_subnet",
-            category=ResourceCategory.NETWORK,
-        )
+        index = AwsResourceIndexBuilder().build([subnet])
 
-        index = AwsResourceIndexBuilder().build([first_bucket, first_subnet, second_bucket, second_subnet])
-
-        self.assertIs(index.buckets["logs"], second_bucket)
-        self.assertIs(index.buckets["arn:aws:s3:::logs"], second_bucket)
-        self.assertIs(index.buckets["aws_s3_bucket.first"], first_bucket)
-        self.assertIs(index.subnets[None], second_subnet)
+        self.assertEqual(index.subnets.resolve(None).state, "unresolved")
+        self.assertNotIn(None, index.subnets)
+        self.assertIs(index.subnets[subnet.address], subnet)
 
 
 class AwsResourceDecoratorTests(unittest.TestCase):
@@ -357,6 +600,59 @@ class AwsResourceDecoratorTests(unittest.TestCase):
             role.metadata["attached_policy_addresses"],
             ["aws_iam_policy.read_secret"],
         )
+
+    def test_role_policy_resolution_uses_the_source_provider_configuration(self) -> None:
+        for reverse in (False, True):
+            primary_role = _resource(
+                address="aws_iam_role.primary",
+                resource_type="aws_iam_role",
+                category=ResourceCategory.IAM,
+                identifier="application-role",
+                arn="arn:aws:iam::111122223333:role/application",
+                provider_config_key="aws.primary",
+            )
+            secondary_role = _resource(
+                address="aws_iam_role.secondary",
+                resource_type="aws_iam_role",
+                category=ResourceCategory.IAM,
+                identifier="application-role",
+                arn="arn:aws:iam::444455556666:role/application",
+                provider_config_key="aws.secondary",
+            )
+            inline_policy = _resource(
+                address="aws_iam_role_policy.primary",
+                resource_type="aws_iam_role_policy",
+                category=ResourceCategory.IAM,
+                metadata={"role": "application-role", "name": "read-secret"},
+                policy_statements=[
+                    IAMPolicyStatement(
+                        effect="Allow",
+                        actions=["secretsmanager:GetSecretValue"],
+                        resources=["*"],
+                    )
+                ],
+                provider_config_key="aws.primary",
+            )
+            resources = [secondary_role, inline_policy, primary_role]
+            if reverse:
+                resources.reverse()
+
+            with self.subTest(reverse=reverse):
+                AwsResourceDecorator(stages=(MergeRolePolicyResourcesStage(),)).decorate(resources)
+
+                self.assertEqual(
+                    aws_facts(primary_role).inline_policy_resource_addresses,
+                    [inline_policy.address],
+                )
+                self.assertEqual(
+                    primary_role.policy_statements[0].actions,
+                    ["secretsmanager:GetSecretValue"],
+                )
+                self.assertEqual(
+                    aws_facts(secondary_role).inline_policy_resource_addresses,
+                    [],
+                )
+                self.assertEqual(secondary_role.policy_statements, ())
 
     def test_instance_profile_roles_attach_to_ec2_workloads(self) -> None:
         role = _resource(

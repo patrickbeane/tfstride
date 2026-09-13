@@ -352,10 +352,11 @@ def _subscription_topic(
     reference = _known_string(gcp_facts(subscription).pubsub_topic_reference)
     if reference is None:
         return None
-    topic = context.index.resources_by_reference.get(gcp_reference_key(reference, _PUBSUB_RESOURCE_REFERENCE_SUFFIXES))
-    if topic is None or topic.resource_type != GcpResourceType.PUBSUB_TOPIC:
-        return None
-    return topic
+    return context.index.resources_by_reference.get(
+        gcp_reference_key(reference, _PUBSUB_RESOURCE_REFERENCE_SUFFIXES),
+        source=subscription,
+        resource_types={GcpResourceType.PUBSUB_TOPIC},
+    )
 
 
 def _iam_manager_ambiguities(
@@ -496,7 +497,11 @@ def _iam_scope(
     if target_reference is None:
         return None, None, f"{target.kind} target is unresolved"
     resolved = context.index.resources_by_reference.get(
-        gcp_reference_key(target_reference, _PUBSUB_RESOURCE_REFERENCE_SUFFIXES)
+        gcp_reference_key(target_reference, _PUBSUB_RESOURCE_REFERENCE_SUFFIXES),
+        source=iam_resource,
+        resource_types=(
+            {GcpResourceType.PUBSUB_TOPIC} if target.kind == "topic" else {GcpResourceType.PUBSUB_SUBSCRIPTION}
+        ),
     )
     if resolved is None:
         return None, None, f"{target.kind} target is unresolved"

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex
+from tfstride.providers.aws.resource_index import (
+    AwsDecorationContext,
+    AwsResourceIndex,
+    AwsResourceReferenceView,
+)
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import append_unique, dedupe
 
@@ -16,7 +20,7 @@ class ResolveEcsServiceRelationshipsStage:
                 continue
             cluster_ref = aws_facts(ecs_service_resource).cluster_reference
             if cluster_ref:
-                cluster = context.index.ecs_clusters.get(cluster_ref)
+                cluster = context.index.ecs_clusters.get(cluster_ref, source=ecs_service_resource)
                 if cluster is None:
                     aws_facts(ecs_service_resource).add_unresolved_cluster_reference(str(cluster_ref))
                 else:
@@ -25,7 +29,7 @@ class ResolveEcsServiceRelationshipsStage:
             task_definition_ref = aws_facts(ecs_service_resource).task_definition_reference
             if not task_definition_ref:
                 continue
-            task_definition = context.index.ecs_task_definitions.get(task_definition_ref)
+            task_definition = context.index.ecs_task_definitions.get(task_definition_ref, source=ecs_service_resource)
             if task_definition is None:
                 aws_facts(ecs_service_resource).add_unresolved_task_definition_reference(str(task_definition_ref))
                 continue
@@ -39,14 +43,14 @@ class ResolveEcsServiceRelationshipsStage:
             if task_role_arn:
                 aws_facts(ecs_service_resource).set_task_role_arn(task_role_arn)
                 aws_mutations(ecs_service_resource).attach_role_arn(task_role_arn)
-                task_role = context.index.role_index.get(task_role_arn)
+                task_role = context.index.role_index.get(task_role_arn, source=task_definition)
                 if task_role is not None:
                     aws_facts(ecs_service_resource).add_resolved_task_role_address(task_role.address)
                 else:
                     aws_facts(ecs_service_resource).add_unresolved_task_role_arn(str(task_role_arn))
             if execution_role_arn:
                 aws_facts(ecs_service_resource).set_execution_role_arn(execution_role_arn)
-                execution_role = context.index.role_index.get(execution_role_arn)
+                execution_role = context.index.role_index.get(execution_role_arn, source=task_definition)
                 if execution_role is not None:
                     aws_facts(ecs_service_resource).add_resolved_execution_role_address(execution_role.address)
                 else:
@@ -80,7 +84,7 @@ def _internet_facing_load_balancer_addresses_by_target_group(
     index: AwsResourceIndex,
 ) -> dict[str, list[str]]:
     load_balancers_by_target_group: dict[str, list[str]] = {}
-    for listener in _unique_resources(index.load_balancer_listeners.values()):
+    for listener in index.load_balancer_listeners.values():
         load_balancer = _listener_load_balancer(listener, index)
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
@@ -90,12 +94,14 @@ def _internet_facing_load_balancer_addresses_by_target_group(
                 index,
                 target_group_reference,
                 load_balancer.address,
+                source=listener,
             )
 
     for listener_rule in index.load_balancer_listener_rules:
         listener = _resource_by_reference(
             index.load_balancer_listeners,
             aws_facts(listener_rule).listener_arn,
+            source=listener_rule,
         )
         load_balancer = _listener_load_balancer(listener, index)
         if not _is_internet_facing_load_balancer(load_balancer):
@@ -106,6 +112,7 @@ def _internet_facing_load_balancer_addresses_by_target_group(
                 index,
                 target_group_reference,
                 load_balancer.address,
+                source=listener_rule,
             )
     return load_balancers_by_target_group
 
@@ -114,7 +121,7 @@ def _internet_facing_load_balancer_addresses_by_security_group(
     index: AwsResourceIndex,
 ) -> dict[str, list[str]]:
     load_balancers_by_security_group: dict[str, list[str]] = {}
-    for load_balancer in _unique_resources(index.load_balancers.values()):
+    for load_balancer in index.load_balancers.values():
         if not _is_internet_facing_load_balancer(load_balancer):
             continue
         for security_group_id in load_balancer.security_group_ids:
@@ -133,7 +140,7 @@ def _fronting_load_balancers_for_ecs_service(
 ) -> list[str]:
     fronting_load_balancers: list[str] = []
     for load_balancer_reference in _ecs_load_balancer_references(service):
-        load_balancer = _resource_by_reference(index.load_balancers, load_balancer_reference)
+        load_balancer = _resource_by_reference(index.load_balancers, load_balancer_reference, source=service)
         if _is_internet_facing_load_balancer(load_balancer):
             append_unique(fronting_load_balancers, load_balancer.address)
 
@@ -141,6 +148,7 @@ def _fronting_load_balancers_for_ecs_service(
         target_group = _resource_by_reference(
             index.load_balancer_target_groups,
             target_group_reference,
+            source=service,
         )
         references = _resource_reference_values(target_group) if target_group is not None else [target_group_reference]
         for reference in references:
@@ -170,7 +178,9 @@ def _security_group_fronting_load_balancers(
         [*service.security_group_ids, *aws_facts(service).ecs_symbolic_security_group_addresses]
     )
     attached_security_groups = [
-        index.security_groups[sg_id] for sg_id in security_group_references if sg_id in index.security_groups
+        security_group
+        for security_group_id in security_group_references
+        if (security_group := index.security_groups.get(security_group_id, source=service)) is not None
     ]
     for security_group in attached_security_groups:
         for rule in security_group.network_rules:
@@ -190,10 +200,13 @@ def _append_load_balancer_target_group_references(
     index: AwsResourceIndex,
     target_group_reference: str,
     load_balancer_address: str,
+    *,
+    source: NormalizedResource,
 ) -> None:
     target_group = _resource_by_reference(
         index.load_balancer_target_groups,
         target_group_reference,
+        source=source,
     )
     references = _resource_reference_values(target_group) if target_group is not None else [target_group_reference]
     for reference in references:
@@ -212,6 +225,7 @@ def _listener_load_balancer(
     return _resource_by_reference(
         index.load_balancers,
         aws_facts(listener).load_balancer_arn,
+        source=listener,
     )
 
 
@@ -238,12 +252,14 @@ def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
 
 
 def _resource_by_reference(
-    index: dict[str, NormalizedResource],
+    index: AwsResourceReferenceView,
     reference: str | None,
+    *,
+    source: NormalizedResource | None = None,
 ) -> NormalizedResource | None:
     if not reference:
         return None
-    return index.get(reference)
+    return index.get(reference, source=source)
 
 
 def _resource_reference_values(resource: NormalizedResource) -> list[str]:
@@ -260,14 +276,3 @@ def _resource_reference_values(resource: NormalizedResource) -> list[str]:
             if value
         ]
     )
-
-
-def _unique_resources(resources) -> tuple[NormalizedResource, ...]:
-    unique: list[NormalizedResource] = []
-    seen: set[str] = set()
-    for resource in resources:
-        if resource.address in seen:
-            continue
-        seen.add(resource.address)
-        unique.append(resource)
-    return tuple(unique)

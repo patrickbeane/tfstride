@@ -126,7 +126,7 @@ class ProjectEcsSqsMessageRemovalPathsOntoServicesStage:
                 for reference in service_facts.unresolved_task_definition_references
             ]
             for task_definition_address in service_facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition {task_definition_address} "
@@ -159,7 +159,7 @@ def _task_definition_paths(
             ],
         )
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None:
         return (
             [],
@@ -480,7 +480,7 @@ def _resource_targets_queue(
     normalized = _unwrap_reference(resource)
     if normalized == "*":
         return True
-    modeled = context.index.sqs_queues.get(normalized)
+    modeled = context.index.sqs_queues.get(normalized, source=queue)
     if modeled is not None:
         return modeled.address == queue.address
     if normalized.startswith("arn:"):

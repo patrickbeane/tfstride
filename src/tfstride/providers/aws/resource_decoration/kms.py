@@ -24,7 +24,7 @@ class DecorateKmsRelationshipsStage:
                 continue
             alias_facts = aws_facts(alias)
             target_reference = alias_facts.kms_alias_target_key_reference
-            key = context.index.kms_keys.get(target_reference) if target_reference else None
+            key = context.index.kms_keys.get(target_reference, source=alias) if target_reference else None
             if key is None or target_reference is None:
                 alias_facts.add_unresolved_kms_key_reference(target_reference)
                 continue
@@ -48,7 +48,7 @@ class DecorateKmsRelationshipsStage:
                 continue
             grant_facts = aws_facts(grant)
             key_reference = grant_facts.kms_grant_key_reference
-            key = context.index.kms_keys.get(key_reference) if key_reference else None
+            key = context.index.kms_keys.get(key_reference, source=grant) if key_reference else None
             if key is None or key_reference is None:
                 grant_facts.add_unresolved_kms_key_reference(key_reference)
                 continue
@@ -79,7 +79,7 @@ class DecorateKmsRelationshipsStage:
                 continue
             policy_facts = aws_facts(policy)
             key_reference = policy_facts.kms_key_policy_key_reference
-            key = context.index.kms_keys.get(key_reference) if key_reference else None
+            key = context.index.kms_keys.get(key_reference, source=policy) if key_reference else None
             if key is None:
                 policy_facts.add_unresolved_kms_key_reference(key_reference)
                 continue

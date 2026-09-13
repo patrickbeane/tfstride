@@ -73,7 +73,7 @@ def _workload_ecr_write_paths(
         if image_reference.get("is_resolved") is not True or not isinstance(repository_url, str):
             continue
 
-        repository = context.index.ecr_repositories.get(repository_url)
+        repository = context.index.ecr_repositories.get(repository_url, source=workload)
         if repository is None:
             uncertainties.append(
                 f"{workload.address}: image {image_reference.get('path') or 'reference'} targets "
@@ -87,7 +87,7 @@ def _workload_ecr_write_paths(
             continue
 
         for role_context in role_contexts:
-            role = context.index.role_index.get(role_context.reference)
+            role = context.index.role_index.get(role_context.reference, source=workload)
             if role is None:
                 uncertainties.append(
                     f"{workload.address}: {role_context.kind} {role_context.reference} is not modeled in the plan"

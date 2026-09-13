@@ -102,7 +102,11 @@ def _app_service_secret_management_paths(
     paths: list[AzureAppServiceKeyVaultSecretManagementPath] = []
     for secret in secrets:
         secret_facts = azure_facts(secret)
-        vault = context.index.resolve(secret_facts.resolved_key_vault_address)
+        vault = context.index.resolve(
+            secret_facts.resolved_key_vault_address,
+            source=secret,
+            resource_types={AzureResourceType.KEY_VAULT},
+        )
         if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
             if _authorization_may_match_runtime(
                 secret,

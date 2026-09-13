@@ -21,7 +21,7 @@ class MergeRolePolicyResourcesStage:
             if role_policy_resource.resource_type != "aws_iam_role_policy":
                 continue
             role_reference = aws_facts(role_policy_resource).role_reference
-            role = context.index.role_index.get(role_reference) if role_reference else None
+            role = context.index.role_index.get(role_reference, source=role_policy_resource) if role_reference else None
             if role is None:
                 continue
             source_facts = aws_facts(role_policy_resource)
@@ -44,8 +44,8 @@ class MergeRolePolicyResourcesStage:
                 continue
             role_reference = aws_facts(attachment_resource).role_reference
             policy_arn = aws_facts(attachment_resource).policy_arn
-            role = context.index.role_index.get(role_reference) if role_reference else None
-            policy = context.index.policy_index.get(policy_arn) if policy_arn else None
+            role = context.index.role_index.get(role_reference, source=attachment_resource) if role_reference else None
+            policy = context.index.policy_index.get(policy_arn, source=attachment_resource) if policy_arn else None
             if role is None:
                 continue
             role_facts = aws_facts(role)
@@ -91,7 +91,7 @@ class ResolveInstanceProfileRolesStage:
             resolved_role_addresses: list[str] = []
             unresolved_role_refs: list[str] = []
             for role_ref in aws_facts(instance_profile_resource).role_references:
-                role = context.index.role_index.get(role_ref)
+                role = context.index.role_index.get(role_ref, source=instance_profile_resource)
                 if role is None:
                     unresolved_role_refs.append(role_ref)
                     continue
@@ -109,7 +109,7 @@ class ResolveInstanceProfileRolesStage:
             instance_profile_ref = aws_facts(workload_resource).iam_instance_profile
             if not instance_profile_ref:
                 continue
-            instance_profile = context.index.instance_profile_index.get(instance_profile_ref)
+            instance_profile = context.index.instance_profile_index.get(instance_profile_ref, source=workload_resource)
             if instance_profile is None:
                 aws_facts(workload_resource).add_unresolved_instance_profile(str(instance_profile_ref))
                 continue

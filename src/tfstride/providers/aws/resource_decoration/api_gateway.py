@@ -50,9 +50,9 @@ def _parent_api_for(
     if not api_id:
         return None
     if child.resource_type in _REST_API_CHILD_TYPES:
-        return context.index.api_gateway_rest_apis.get(api_id)
+        return context.index.api_gateway_rest_apis.get(api_id, source=child)
     if child.resource_type in _V2_API_CHILD_TYPES:
-        return context.index.apigatewayv2_apis.get(api_id)
+        return context.index.apigatewayv2_apis.get(api_id, source=child)
     return None
 
 

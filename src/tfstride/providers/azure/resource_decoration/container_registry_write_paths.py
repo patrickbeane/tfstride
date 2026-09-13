@@ -107,7 +107,11 @@ def _append_identity_write_paths(
     for assignment in identity_facts.managed_identity_role_assignments:
         if assignment.get("target_resource_address") != registry.address or assignment.get("scope_kind") != "resource":
             continue
-        assignment_resource = context.index.resolve(_string_value(assignment.get("source")))
+        assignment_resource = context.index.resolve(
+            _string_value(assignment.get("source")),
+            source=identity,
+            resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+        )
         if assignment_resource is None or assignment_resource.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
             uncertainties.append(f"{workload.address}: registry role assignment resource is unresolved")
             continue
@@ -174,7 +178,11 @@ def _acr_write_grant(
 
     assignment_facts = azure_facts(assignment_resource)
     role_definition_address = assignment_facts.resolved_role_definition_address
-    role_definition = context.index.resolve(role_definition_address)
+    role_definition = context.index.resolve(
+        role_definition_address,
+        source=assignment_resource,
+        resource_types={AzureResourceType.ROLE_DEFINITION},
+    )
     if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
         if not role_name:
             return None, "role is unresolved"

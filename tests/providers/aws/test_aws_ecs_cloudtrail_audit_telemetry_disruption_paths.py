@@ -242,6 +242,7 @@ def _normalize(
     trail: TerraformResource | None = None,
     role: TerraformResource | None = None,
     task_definition: TerraformResource | None = None,
+    service: TerraformResource | None = None,
     caller: TerraformResource | None = None,
     provider_config_key: str = _PROVIDER,
     extra: list[TerraformResource] | None = None,
@@ -265,7 +266,10 @@ def _normalize(
             or _task_definition(
                 provider_config_key=provider_config_key,
             ),
-            _service(provider_config_key=provider_config_key),
+            service
+            or _service(
+                provider_config_key=provider_config_key,
+            ),
             *(extra or []),
         ]
     )
@@ -545,6 +549,9 @@ class AwsEcsCloudTrailAuditTelemetryDisruptionPathTests(
             task_definition=_task_definition(
                 provider_config_key=_ALIAS_PROVIDER,
             ),
+            service=_service(
+                provider_config_key=_ALIAS_PROVIDER,
+            ),
         )
         self.assertEqual(
             len(aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths),
@@ -553,6 +560,29 @@ class AwsEcsCloudTrailAuditTelemetryDisruptionPathTests(
         self.assertEqual(
             len(aws_facts(service).ecs_cloudtrail_audit_telemetry_disruption_paths),
             1,
+        )
+
+    def test_service_does_not_resolve_weak_task_definition_reference_across_provider_aliases(
+        self,
+    ) -> None:
+        _inventory, task, service = _normalize(
+            [_statement("Allow", _STOP_LOGGING, _TRAIL_ARN)],
+            task_definition=_task_definition(
+                provider_config_key=_ALIAS_PROVIDER,
+            ),
+        )
+
+        self.assertEqual(
+            len(aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths),
+            1,
+        )
+        self.assertEqual(
+            aws_facts(service).ecs_cloudtrail_audit_telemetry_disruption_paths,
+            [],
+        )
+        self.assertEqual(
+            aws_facts(service).unresolved_task_definition_references,
+            ["orders:1"],
         )
 
     def test_missing_caller_identity_fails_closed(self) -> None:

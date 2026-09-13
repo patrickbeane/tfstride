@@ -122,7 +122,10 @@ def _settlement_access_targets(
     namespace_address = _known_string(
         access_path.get("service_bus_resource_address"),
     )
-    namespace = context.index.resolve(namespace_address)
+    namespace = context.index.resolve(
+        namespace_address,
+        resource_types={AzureResourceType.SERVICE_BUS_NAMESPACE},
+    )
     if namespace is None or namespace.resource_type != AzureResourceType.SERVICE_BUS_NAMESPACE:
         return [], ["Service Bus namespace authorization scope is unresolved"]
 
@@ -145,7 +148,11 @@ def _settlement_access_targets(
             namespace_reference = _known_string(
                 resource_facts.service_bus_namespace_reference,
             )
-            referenced_namespace = context.index.resolve(namespace_reference)
+            referenced_namespace = context.index.resolve(
+                namespace_reference,
+                source=resource,
+                resource_types={AzureResourceType.SERVICE_BUS_NAMESPACE},
+            )
             if referenced_namespace is not None and referenced_namespace.address != namespace.address:
                 continue
             if (
@@ -198,7 +205,11 @@ def _settlement_access_targets(
 
         if resource.resource_type == AzureResourceType.SERVICE_BUS_SUBSCRIPTION:
             topic_address = resource_facts.resolved_service_bus_topic_address
-            topic = context.index.resolve(topic_address)
+            topic = context.index.resolve(
+                topic_address,
+                source=resource,
+                resource_types={AzureResourceType.SERVICE_BUS_TOPIC},
+            )
             if (
                 topic is None
                 or topic.resource_type != AzureResourceType.SERVICE_BUS_TOPIC
@@ -334,7 +345,11 @@ def _message_removal_path(
     ):
         return None, "Service Bus settlement authorization evidence is incomplete"
 
-    assignment = context.index.resolve(role_assignment_address)
+    assignment = context.index.resolve(
+        role_assignment_address,
+        source=workload,
+        resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+    )
     if assignment is None or assignment.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
         return None, "Service Bus settlement role assignment is unavailable"
     assignment_facts = azure_facts(assignment)
@@ -358,7 +373,11 @@ def _message_removal_path(
     role_definition_address = _known_string(access_path.get("role_definition_address"))
     custom_role_assignable_scope_compatibility_state = "not_applicable"
     if role_kind == "custom":
-        role_definition = context.index.resolve(role_definition_address)
+        role_definition = context.index.resolve(
+            role_definition_address,
+            source=assignment,
+            resource_types={AzureResourceType.ROLE_DEFINITION},
+        )
         if (
             role_definition is None
             or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION
@@ -469,7 +488,7 @@ def _custom_role_assignable_scope_compatibility(
         if scope_address == namespace.address
         else target
         if scope_address is None or scope_address == target.address
-        else context.index.resolve(scope_address)
+        else context.index.resolve(scope_address, source=role_definition)
     )
     assignment_arm_id = _resource_arm_id(scope_resource)
     if assignment_arm_id is None:
@@ -483,7 +502,7 @@ def _custom_role_assignable_scope_compatibility(
         if scope.startswith("/"):
             resolved_scopes.append(scope)
             continue
-        referenced_resource = context.index.resolve(scope)
+        referenced_resource = context.index.resolve(scope, source=role_definition)
         referenced_id = _resource_arm_id(referenced_resource)
         if referenced_id is None:
             return "unknown"
@@ -525,8 +544,15 @@ def _current_target(
 ]:
     target_address = _known_string(access_path.get("service_bus_resource_address"))
     namespace_address = _known_string(access_path.get("service_bus_namespace_address"))
-    target = context.index.resolve(target_address)
-    namespace = context.index.resolve(namespace_address)
+    target = context.index.resolve(
+        target_address,
+        resource_types=_SETTLEMENT_TARGET_TYPES,
+    )
+    namespace = context.index.resolve(
+        namespace_address,
+        source=target,
+        resource_types={AzureResourceType.SERVICE_BUS_NAMESPACE},
+    )
     if (
         target is None
         or target.resource_type not in _SETTLEMENT_TARGET_TYPES
@@ -557,7 +583,11 @@ def _current_target(
             return None, None, None, "Service Bus queue settlement ancestry is unresolved"
     else:
         topic_address = _known_string(access_path.get("topic_address"))
-        topic = context.index.resolve(topic_address)
+        topic = context.index.resolve(
+            topic_address,
+            source=target,
+            resource_types={AzureResourceType.SERVICE_BUS_TOPIC},
+        )
         if (
             topic is None
             or topic.resource_type != AzureResourceType.SERVICE_BUS_TOPIC

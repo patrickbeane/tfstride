@@ -23,11 +23,19 @@ def _resource(
     )
 
 
-def _network(name: str, *, self_link: str | None = None) -> TerraformResource:
+def _network(
+    name: str,
+    *,
+    terraform_name: str | None = None,
+    project: str | None = None,
+    self_link: str | None = None,
+) -> TerraformResource:
     values: dict[str, object] = {"name": name}
+    if project:
+        values["project"] = project
     if self_link:
         values["self_link"] = self_link
-    return _resource("google_compute_network", name, values)
+    return _resource("google_compute_network", terraform_name or name, values)
 
 
 def _cloud_sql(name: str, private_network: str | None) -> TerraformResource:
@@ -232,6 +240,56 @@ class GcpPrivateConnectivityIndexTests(unittest.TestCase):
         self.assertEqual(attachment.nat_subnets, ("google_compute_subnetwork.psc_nat.id",))
         self.assertEqual(attachment.domain_names, ("sql.internal.example.com",))
         self.assertEqual(attachment.consumer_accept_list[0]["project_id_or_num"], "consumer")
+
+    def test_ambiguous_network_alias_does_not_assign_private_connectivity_by_input_order(self) -> None:
+        for networks in (
+            (
+                _network(
+                    "shared",
+                    terraform_name="primary",
+                    project="primary",
+                    self_link="projects/primary/global/networks/shared",
+                ),
+                _network(
+                    "shared",
+                    terraform_name="foreign",
+                    project="foreign",
+                    self_link="projects/foreign/global/networks/shared",
+                ),
+            ),
+            (
+                _network(
+                    "shared",
+                    terraform_name="foreign",
+                    project="foreign",
+                    self_link="projects/foreign/global/networks/shared",
+                ),
+                _network(
+                    "shared",
+                    terraform_name="primary",
+                    project="primary",
+                    self_link="projects/primary/global/networks/shared",
+                ),
+            ),
+        ):
+            connection = _resource(
+                "google_service_networking_connection",
+                "private_services",
+                {
+                    "network": "shared",
+                    "service": "servicenetworking.googleapis.com",
+                    "reserved_peering_ranges": ["private-services-range"],
+                },
+            )
+            index = build_gcp_private_connectivity_index(_inventory(*networks, connection))
+
+            self.assertEqual(len(index.unresolved_private_service_access_connections), 1)
+            self.assertFalse(
+                index.coverage_for_network("projects/primary/global/networks/shared").has_private_service_access
+            )
+            self.assertFalse(
+                index.coverage_for_network("projects/foreign/global/networks/shared").has_private_service_access
+            )
 
     def test_similarly_named_networks_do_not_match_without_reference_alias(self) -> None:
         inventory = _inventory(

@@ -8,10 +8,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.coercion import dedupe_strings
 from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_index import (
-    gcp_network_reference_key,
-    gcp_resource_references,
-)
+from tfstride.providers.gcp.resource_index import GcpNetworkReferenceView, build_gcp_network_reference_view
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
 _PRIVATE_SERVICE_ACCESS_SERVICE = "servicenetworking.googleapis.com"
@@ -149,12 +146,17 @@ class GcpPrivateConnectivityIndex:
     unresolved_private_service_access_reserved_ranges: tuple[GcpPrivateServiceAccessReservedRange, ...]
     unresolved_psc_forwarding_rule_endpoints: tuple[GcpPscForwardingRuleEndpoint, ...]
     unresolved_psc_service_connection_policies: tuple[GcpPscServiceConnectionPolicy, ...]
-    network_aliases: Mapping[str, str]
+    network_references: GcpNetworkReferenceView
 
-    def coverage_for_network(self, network: str | None) -> GcpPrivateConnectivityCoverage:
+    def coverage_for_network(
+        self,
+        network: str | None,
+        *,
+        source: NormalizedResource | None = None,
+    ) -> GcpPrivateConnectivityCoverage:
         if not network:
             return GcpPrivateConnectivityCoverage((), (), (), ())
-        network_key = _canonical_network_key(network, self.network_aliases)
+        network_key = self.network_references.canonical_reference(network, source=source)
         if not network_key:
             return GcpPrivateConnectivityCoverage((), (), (), ())
         return GcpPrivateConnectivityCoverage(
@@ -168,7 +170,7 @@ class GcpPrivateConnectivityIndex:
 
     def coverage_for_cloud_sql(self, resource: NormalizedResource) -> GcpPrivateConnectivityCoverage:
         facts = gcp_facts(resource)
-        return self.coverage_for_network(facts.private_network or resource.vpc_id)
+        return self.coverage_for_network(facts.private_network or resource.vpc_id, source=resource)
 
     def has_cloud_sql_private_connectivity(self, resource: NormalizedResource) -> bool:
         return self.coverage_for_cloud_sql(resource).has_cloud_sql_private_connectivity
@@ -178,7 +180,7 @@ def build_gcp_private_connectivity_index(
     source: ResourceInventory | Iterable[NormalizedResource],
 ) -> GcpPrivateConnectivityIndex:
     resources = tuple(source.resources if isinstance(source, ResourceInventory) else source)
-    network_aliases = _network_aliases(resources)
+    network_references = build_gcp_network_reference_view(resources)
     pending_connections: dict[str, list[GcpPrivateServiceAccessConnection]] = {}
     pending_reserved_ranges: dict[str, list[GcpPrivateServiceAccessReservedRange]] = {}
     pending_psc_endpoints: dict[str, list[GcpPscForwardingRuleEndpoint]] = {}
@@ -194,8 +196,9 @@ def build_gcp_private_connectivity_index(
             record = _private_service_access_connection(resource)
             _add_network_record(
                 record,
+                resource,
                 record.network,
-                network_aliases,
+                network_references,
                 pending_connections,
                 unresolved_connections,
             )
@@ -205,8 +208,9 @@ def build_gcp_private_connectivity_index(
                 continue
             _add_network_record(
                 record,
+                resource,
                 record.network,
-                network_aliases,
+                network_references,
                 pending_reserved_ranges,
                 unresolved_reserved_ranges,
             )
@@ -219,8 +223,9 @@ def build_gcp_private_connectivity_index(
                 continue
             _add_network_record(
                 record,
+                resource,
                 record.network,
-                network_aliases,
+                network_references,
                 pending_psc_endpoints,
                 unresolved_psc_endpoints,
             )
@@ -228,8 +233,9 @@ def build_gcp_private_connectivity_index(
             record = _psc_service_connection_policy(resource)
             _add_network_record(
                 record,
+                resource,
                 record.network,
-                network_aliases,
+                network_references,
                 pending_psc_policies,
                 unresolved_psc_policies,
             )
@@ -246,7 +252,7 @@ def build_gcp_private_connectivity_index(
         unresolved_private_service_access_reserved_ranges=tuple(unresolved_reserved_ranges),
         unresolved_psc_forwarding_rule_endpoints=tuple(unresolved_psc_endpoints),
         unresolved_psc_service_connection_policies=tuple(unresolved_psc_policies),
-        network_aliases=MappingProxyType(dict(sorted(network_aliases.items()))),
+        network_references=network_references,
     )
 
 
@@ -324,38 +330,19 @@ def _psc_service_connection_policy(resource: NormalizedResource) -> GcpPscServic
     )
 
 
-def _network_aliases(resources: Iterable[NormalizedResource]) -> dict[str, str]:
-    aliases: dict[str, str] = {}
-    for resource in resources:
-        if resource.resource_type != GcpResourceType.COMPUTE_NETWORK:
-            continue
-        primary_key = gcp_network_reference_key(resource.address)
-        aliases.setdefault(primary_key, primary_key)
-        for reference in gcp_resource_references(resource):
-            aliases.setdefault(reference, primary_key)
-            aliases.setdefault(gcp_network_reference_key(reference), primary_key)
-    return aliases
-
-
 def _add_network_record(
     record: Any,
+    source: NormalizedResource,
     network: str | None,
-    network_aliases: Mapping[str, str],
+    network_references: GcpNetworkReferenceView,
     records_by_network: dict[str, list[Any]],
     unresolved_records: list[Any],
 ) -> None:
-    network_key = _canonical_network_key(network, network_aliases)
+    network_key = network_references.canonical_reference(network, source=source)
     if not network_key:
         unresolved_records.append(record)
         return
     records_by_network.setdefault(network_key, []).append(record)
-
-
-def _canonical_network_key(network: str | None, network_aliases: Mapping[str, str]) -> str | None:
-    if not network:
-        return None
-    network_key = gcp_network_reference_key(network)
-    return network_aliases.get(network_key, network_key)
 
 
 def _freeze_record_mapping(records_by_network: Mapping[str, list[Any]]) -> Mapping[str, tuple[Any, ...]]:

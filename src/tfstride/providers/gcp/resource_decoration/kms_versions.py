@@ -39,8 +39,13 @@ class NormalizeKmsCryptoKeyVersionPostureStage:
             (
                 candidate
                 for reference in parent_references
-                if (candidate := context.index.resources_by_reference.get(gcp_reference_key(reference)))
-                and candidate.resource_type == GcpResourceType.KMS_CRYPTO_KEY
+                if (
+                    candidate := context.index.resources_by_reference.get(
+                        gcp_reference_key(reference),
+                        source=version,
+                        resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                    )
+                )
             ),
             None,
         )

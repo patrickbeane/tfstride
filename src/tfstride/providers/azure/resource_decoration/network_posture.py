@@ -14,7 +14,11 @@ class ResolveSubnetVirtualNetworkStage:
             if subnet.resource_type != AzureResourceType.SUBNET:
                 continue
             facts = azure_facts(subnet)
-            virtual_network = context.index.resolve(facts.virtual_network_reference)
+            virtual_network = context.index.resolve(
+                facts.virtual_network_reference,
+                source=subnet,
+                resource_types={AzureResourceType.VIRTUAL_NETWORK},
+            )
             if virtual_network is None:
                 facts.add_unresolved_resource_reference("virtual_network", facts.virtual_network_reference)
                 continue
@@ -32,7 +36,11 @@ class ResolveNetworkInterfaceRelationshipsStage:
             original_subnet_references = tuple(network_interface.subnet_ids)
             effective_subnet_references: list[str] = []
             for subnet_reference in original_subnet_references:
-                subnet = context.index.resolve(subnet_reference)
+                subnet = context.index.resolve(
+                    subnet_reference,
+                    source=network_interface,
+                    resource_types={AzureResourceType.SUBNET},
+                )
                 if subnet is None:
                     facts.add_unresolved_resource_reference("subnet", subnet_reference)
                     effective_subnet_references.append(subnet_reference)
@@ -43,7 +51,11 @@ class ResolveNetworkInterfaceRelationshipsStage:
             facts.set_subnet_references(effective_subnet_references)
             public_ip_references = facts.public_ip_references
             for public_ip_reference in public_ip_references:
-                public_ip = context.index.resolve(public_ip_reference)
+                public_ip = context.index.resolve(
+                    public_ip_reference,
+                    source=network_interface,
+                    resource_types={AzureResourceType.PUBLIC_IP},
+                )
                 if public_ip is None:
                     facts.add_unresolved_resource_reference("public_ip", public_ip_reference)
                     continue

@@ -477,7 +477,11 @@ def _resolve_role(
         built_in = _BUILT_IN_CONTROL_PLANE_ROLES_BY_ID.get(_role_id(role_id))
         if built_in is not None:
             return _built_in_role_resolution(built_in)
-        custom = context.index.resolve(facts.resolved_role_definition_address)
+        custom = context.index.resolve(
+            facts.resolved_role_definition_address,
+            source=assignment,
+            resource_types={AzureResourceType.ROLE_DEFINITION},
+        )
         if custom is not None and custom.resource_type == AzureResourceType.ROLE_DEFINITION:
             return _custom_role_resolution(custom, assignment_arm_scope)
         return _RoleResolution("unknown", "external_or_unresolved", ())

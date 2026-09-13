@@ -543,7 +543,7 @@ def _management_lock_scope_state(
         if arm_scope.casefold().startswith("/providers/microsoft.management/managementgroups/"):
             return "unknown"
     else:
-        scope_resource = context.index.resolve(scope)
+        scope_resource = context.index.resolve(scope, source=lock)
         if scope_resource is None:
             return "unknown"
         if scope_resource.address == target.resource.address:

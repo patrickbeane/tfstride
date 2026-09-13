@@ -152,6 +152,7 @@ class ProjectEcsDynamoDbTableTopologyDestructionPathsOntoServicesStage:
             for task_definition_address in service_facts.resolved_task_definition_addresses:
                 task_definition = context.index.ecs_task_definitions.get(
                     task_definition_address,
+                    source=service,
                 )
                 if task_definition is None:
                     uncertainties.append(
@@ -190,7 +191,7 @@ def _task_definition_paths(
     if task_role_reference is None:
         return [], _task_role_resolution_uncertainties(task_definition)
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None or task_role.resource_type != _IAM_ROLE:
         if _task_role_configuration_reference_observed(task_definition):
             return (
@@ -838,7 +839,7 @@ def _resolved_table_policy_target(
 ) -> NormalizedResource | None:
     target = aws_facts(source).dynamodb_resource_policy_target_reference
     if _is_exact_dynamodb_table_arn(target):
-        modeled_target = context.index.dynamodb_tables.get(cast(str, target))
+        modeled_target = context.index.dynamodb_tables.get(cast(str, target), source=source)
         if modeled_target is not None:
             return modeled_target
     return symbolic_reference_target(

@@ -255,8 +255,12 @@ def _firewall_policy_reference_keys(
 
     expanded_keys = set(keys)
     for key in keys:
-        policy = index.resources_by_reference.get(key)
-        if policy is None or policy.resource_type != GcpResourceType.COMPUTE_FIREWALL_POLICY:
+        policy = index.resources_by_reference.get(
+            key,
+            source=resource,
+            resource_types={GcpResourceType.COMPUTE_FIREWALL_POLICY},
+        )
+        if policy is None:
             continue
         expanded_keys.update(_firewall_policy_reference_keys(policy))
     return expanded_keys

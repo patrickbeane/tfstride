@@ -5,21 +5,15 @@ from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_utils import (
     GCP_ROLE_REFERENCE_SUFFIXES,
     gcp_reference_key,
+    normalize_gcp_project,
 )
 
-
-def normalize_gcp_project(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    parts = [part for part in text.split("/") if part]
-    if len(parts) == 2 and parts[0] == "projects":
-        return parts[1]
-    if len(parts) == 1 and "${" not in text and not text.startswith("google_"):
-        return parts[0]
-    return None
+__all__ = [
+    "custom_role_reference_keys",
+    "gcs_bucket_scope_name",
+    "gcs_bucket_target_matches",
+    "normalize_gcp_project",
+]
 
 
 def custom_role_reference_keys(resource: NormalizedResource) -> set[str]:

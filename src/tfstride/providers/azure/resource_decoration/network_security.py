@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
+from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import clone_security_group_rules
 
 
@@ -12,7 +13,11 @@ class MergeNetworkSecurityRulesStage:
     def apply(self, resources: list[NormalizedResource], context: AzureDecorationContext) -> None:
         for rule_resource in context.index.network_security_rules:
             facts = azure_facts(rule_resource)
-            target = context.index.resolve(facts.network_security_group_reference)
+            target = context.index.resolve(
+                facts.network_security_group_reference,
+                source=rule_resource,
+                resource_types={AzureResourceType.NETWORK_SECURITY_GROUP},
+            )
             if target is None:
                 facts.add_unresolved_resource_reference(
                     "network_security_group", facts.network_security_group_reference
@@ -53,8 +58,19 @@ class ResolveNetworkSecurityAssociationsStage:
         context: AzureDecorationContext,
     ) -> None:
         facts = azure_facts(association)
-        target = context.index.resolve(target_reference)
-        network_security_group = context.index.resolve(facts.network_security_group_reference)
+        target_resource_type = (
+            AzureResourceType.SUBNET if target_kind == "subnet" else AzureResourceType.NETWORK_INTERFACE
+        )
+        target = context.index.resolve(
+            target_reference,
+            source=association,
+            resource_types={target_resource_type},
+        )
+        network_security_group = context.index.resolve(
+            facts.network_security_group_reference,
+            source=association,
+            resource_types={AzureResourceType.NETWORK_SECURITY_GROUP},
+        )
         if target is None:
             facts.add_unresolved_resource_reference(target_kind, target_reference)
         if network_security_group is None:

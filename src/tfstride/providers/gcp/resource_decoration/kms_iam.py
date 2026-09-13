@@ -531,7 +531,11 @@ def _applicable_scope(
         }
         return ("key_ring", key_ring) if target_key in key_ring_references else ("unrelated", None)
 
-    resolved = context.index.resources_by_reference.get(target_key)
+    resolved = context.index.resources_by_reference.get(
+        target_key,
+        source=iam_resource,
+        resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+    )
     if resolved is not None:
         return (
             ("crypto_key", key_path)
@@ -578,7 +582,11 @@ def _applicable_key_ring_scope(
         target_reference,
         GCP_NETWORK_REFERENCE_SUFFIXES,
     )
-    resolved = context.index.resources_by_reference.get(target_key)
+    resolved = context.index.resources_by_reference.get(
+        target_key,
+        source=iam_resource,
+        resource_types={GcpResourceType.KMS_KEY_RING},
+    )
     if resolved is not None:
         return (
             ("key_ring", key_ring)

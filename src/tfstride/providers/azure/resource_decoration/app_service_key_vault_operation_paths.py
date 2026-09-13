@@ -93,7 +93,11 @@ def _app_service_key_vault_operation_paths(
                 uncertainties.append(f"{workload.address}: Key Vault key {key.address} has unresolved exact identity")
             continue
 
-        vault = context.index.resolve(key_facts.resolved_key_vault_address)
+        vault = context.index.resolve(
+            key_facts.resolved_key_vault_address,
+            source=key,
+            resource_types={AzureResourceType.KEY_VAULT},
+        )
         if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
             uncertainties.append(f"{workload.address}: Key Vault key {key.address} has unresolved vault ancestry")
             continue

@@ -423,10 +423,12 @@ def _symbolic_target(
         target = resolution.targets[0]
         if not any(target.reference.endswith(suffix) for suffix in suffixes):
             continue
-        candidate = context.index.resources_by_reference.get(gcp_reference_key(target.address))
+        candidate = context.index.resources_by_reference.get(
+            gcp_reference_key(target.address),
+            source=resource,
+            resource_types=expected_types,
+        )
         if candidate is None or candidate.address != target.address:
-            continue
-        if candidate.resource_type not in expected_types:
             continue
         matches[candidate.address] = candidate
     return next(iter(matches.values())) if len(matches) == 1 else None

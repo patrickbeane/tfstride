@@ -42,7 +42,7 @@ class ProjectEcsSecretAccessPathsOntoServicesStage:
                 for reference in facts.unresolved_task_definition_references
             ]
             for task_definition_address in facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition {task_definition_address} is unavailable "
@@ -107,7 +107,7 @@ def _ecs_secret_access_paths(
         )
         return [], dedupe(uncertainties)
 
-    execution_role = context.index.role_index.get(execution_role_reference)
+    execution_role = context.index.role_index.get(execution_role_reference, source=task_definition)
     if execution_role is None:
         uncertainties.append(
             f"{task_definition.address}: ECS task execution role {execution_role_reference} is not modeled in the plan"

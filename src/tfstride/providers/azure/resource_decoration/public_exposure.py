@@ -6,7 +6,7 @@ from typing import Any
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndex
-from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES
+from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
 
 _PROTOCOLS = ("tcp", "udp")
 _ADMINISTRATIVE_PORTS = (22, 3389)
@@ -76,7 +76,11 @@ def _attached_network_security_groups(
     groups: list[NormalizedResource] = []
     seen: set[str] = set()
     for reference in virtual_machine.security_group_ids:
-        network_security_group = index.resolve(reference)
+        network_security_group = index.resolve(
+            reference,
+            source=virtual_machine,
+            resource_types={AzureResourceType.NETWORK_SECURITY_GROUP},
+        )
         if network_security_group is None or network_security_group.address in seen:
             continue
         seen.add(network_security_group.address)
@@ -201,7 +205,11 @@ def _exposure_path_record(
     facts = azure_facts(virtual_machine)
     public_ip_addresses = []
     for address in facts.resolved_public_ip_addresses:
-        public_ip = index.resolve(address)
+        public_ip = index.resolve(
+            address,
+            source=virtual_machine,
+            resource_types={AzureResourceType.PUBLIC_IP},
+        )
         value = azure_facts(public_ip).public_ip_address if public_ip is not None else None
         public_ip_addresses.append(f"{address} ({value})" if value else address)
     return {

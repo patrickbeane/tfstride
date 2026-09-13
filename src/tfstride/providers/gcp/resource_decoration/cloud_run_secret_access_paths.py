@@ -99,7 +99,7 @@ def _cloud_run_secret_access_paths(
     for reference in facts.cloud_run_secret_references:
         if reference.get("state") != "reference":
             continue
-        target = _resolve_secret_target(reference, facts.project, context)
+        target = _resolve_secret_target(reference, facts.project, workload, context)
         if target is None:
             uncertainties.append(
                 f"{workload.address}: Secret Manager reference at "
@@ -185,6 +185,7 @@ def _cloud_run_secret_access_paths(
 def _resolve_secret_target(
     reference: Mapping[str, Any],
     workload_project: str | None,
+    workload: NormalizedResource,
     context: GcpDecorationContext,
 ) -> _SecretTarget | None:
     raw_reference = _known_string(reference.get("secret_reference"))
@@ -193,7 +194,11 @@ def _resolve_secret_target(
 
     terraform_reference = _terraform_reference(raw_reference)
     if terraform_reference is not None:
-        resource = context.index.resources_by_reference.get(gcp_reference_key(terraform_reference))
+        resource = context.index.resources_by_reference.get(
+            gcp_reference_key(terraform_reference),
+            source=workload,
+            resource_types={GcpResourceType.SECRET_MANAGER_SECRET},
+        )
         return _target_from_resource(resource, "terraform_reference")
 
     canonical_name = _canonical_secret_name(raw_reference, workload_project)
@@ -202,9 +207,11 @@ def _resolve_secret_target(
     project = _secret_project(canonical_name)
     if project is None:
         return None
-    resource = context.index.resources_by_reference.get(gcp_reference_key(canonical_name))
-    if resource is not None and resource.resource_type != GcpResourceType.SECRET_MANAGER_SECRET:
-        resource = None
+    resource = context.index.resources_by_reference.get(
+        gcp_reference_key(canonical_name),
+        source=workload,
+        resource_types={GcpResourceType.SECRET_MANAGER_SECRET},
+    )
     return _SecretTarget(
         resource_name=canonical_name,
         project=project,
@@ -243,7 +250,7 @@ def _grant_scope(
         target_reference = facts.target_reference
         if not target_reference:
             return None, "secret IAM target is unresolved"
-        target_resource = _resource_from_reference(target_reference, context)
+        target_resource = _resource_from_reference(target_reference, iam_resource, context)
         if target_resource is not None:
             if target.resource is not None and target_resource.address == target.resource.address:
                 return _GrantScope("secret", target.resource_name, "secret_resource_iam"), None
@@ -291,14 +298,16 @@ def _inherited_scope(
 
 def _resource_from_reference(
     reference: str,
+    source: NormalizedResource,
     context: GcpDecorationContext,
 ) -> NormalizedResource | None:
     terraform_reference = _terraform_reference(reference)
     key = terraform_reference or reference
-    resource = context.index.resources_by_reference.get(gcp_reference_key(key))
-    if resource is None or resource.resource_type != GcpResourceType.SECRET_MANAGER_SECRET:
-        return None
-    return resource
+    return context.index.resources_by_reference.get(
+        gcp_reference_key(key),
+        source=source,
+        resource_types={GcpResourceType.SECRET_MANAGER_SECRET},
+    )
 
 
 def _secret_access_role(

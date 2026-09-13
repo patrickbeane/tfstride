@@ -151,7 +151,7 @@ class ProjectEcsS3ObjectDeletionPathsOntoServicesStage:
                 for reference in service_facts.unresolved_task_definition_references
             ]
             for task_definition_address in service_facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition {task_definition_address} "
@@ -188,7 +188,7 @@ def _task_definition_paths(
             ],
         )
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None:
         return (
             [],
@@ -712,7 +712,7 @@ def _unresolved_policy_may_affect_bucket_role_action(
     context: AwsDecorationContext,
 ) -> bool:
     target = aws_facts(source).bucket_name
-    modeled_target = context.index.buckets.get(target) if target else None
+    modeled_target = context.index.buckets.get(target, source=source) if target else None
     if modeled_target is None:
         target_address = _symbolic_bucket_target_address(target)
         candidate = context.index.resources_by_address.get(target_address) if target_address is not None else None
@@ -1136,7 +1136,7 @@ def _unresolved_bucket_policy_sources(
         if resource.resource_type != _S3_BUCKET_POLICY:
             continue
         target = aws_facts(resource).bucket_name
-        if target and context.index.buckets.get(target) is not None:
+        if target and context.index.buckets.get(target, source=resource) is not None:
             continue
         if _is_exact_unmodeled_bucket_reference(target):
             continue

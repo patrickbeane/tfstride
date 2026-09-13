@@ -4,8 +4,10 @@ import unittest
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.resource_decoration.kms_versions import NormalizeKmsCryptoKeyVersionPostureStage
 from tfstride.providers.gcp.resource_decoration_stages import default_gcp_decoration_stages
 from tfstride.providers.gcp.resource_decorator import GcpResourceDecorator
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
@@ -231,6 +233,344 @@ def _iam_member(
 
 
 class GcpResourceDecoratorTests(unittest.TestCase):
+    def test_native_alias_collisions_are_deterministic_and_fail_closed(self) -> None:
+        first_key = _gcp_resource(
+            "google_kms_crypto_key.first",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/first/locations/global/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "first",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/first/locations/global/keyRings/app",
+            },
+        )
+        second_key = _gcp_resource(
+            "google_kms_crypto_key.second",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/second/locations/global/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "second",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/second/locations/global/keyRings/app",
+            },
+        )
+        address_collision = _gcp_resource(
+            "google_kms_crypto_key.address_collision",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/second/locations/global/keyRings/app/cryptoKeys/collision",
+            metadata={
+                GcpResourceMetadata.NAME: first_key.address,
+                GcpResourceMetadata.PROJECT: "second",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/second/locations/global/keyRings/app",
+            },
+        )
+
+        for resources in (
+            [first_key, second_key, address_collision],
+            [address_collision, second_key, first_key],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                index = GcpResourceIndexBuilder().build(resources)
+                resolution = index.resources_by_reference.resolve(
+                    "shared",
+                    resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                )
+
+                self.assertEqual(resolution.state, "ambiguous")
+                self.assertEqual(resolution.candidates, (first_key, second_key))
+                self.assertIsNone(resolution.selected_candidate)
+                self.assertIsNone(
+                    index.resources_by_reference.get(
+                        "shared",
+                        resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                    )
+                )
+                self.assertIs(index.resources_by_reference[first_key.address], first_key)
+                self.assertIs(index.resources_by_reference[second_key.address], second_key)
+                exact = index.resources_by_reference.resolve(
+                    first_key.address,
+                    resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                )
+                self.assertEqual(exact.state, "resolved")
+                self.assertIs(exact.selected_candidate, first_key)
+
+    def test_resolution_filters_by_type_project_and_location(self) -> None:
+        primary_global = _gcp_resource(
+            "google_kms_crypto_key.primary_global",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/primary/locations/global/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/primary/locations/global/keyRings/app",
+            },
+        )
+        primary_regional = _gcp_resource(
+            "google_kms_crypto_key.primary_regional",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/primary/locations/us-central1/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/primary/locations/us-central1/keyRings/app",
+            },
+        )
+        foreign_global = _gcp_resource(
+            "google_kms_crypto_key.foreign_global",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/foreign/locations/global/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "foreign",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/foreign/locations/global/keyRings/app",
+            },
+        )
+        foreign_unique = _gcp_resource(
+            "google_kms_crypto_key.foreign_unique",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/foreign/locations/global/keyRings/app/cryptoKeys/unique",
+            metadata={
+                GcpResourceMetadata.NAME: "unique",
+                GcpResourceMetadata.PROJECT: "foreign",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/foreign/locations/global/keyRings/app",
+            },
+        )
+        key_ring = _gcp_resource(
+            "google_kms_key_ring.shared",
+            GcpResourceType.KMS_KEY_RING,
+            ResourceCategory.DATA,
+            identifier="projects/primary/locations/global/keyRings/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "primary",
+            },
+        )
+        source = _gcp_resource(
+            "google_kms_crypto_key_version.source",
+            GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+            ResourceCategory.DATA,
+            metadata={
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "global",
+            },
+        )
+        project_only_source = _gcp_resource(
+            "google_kms_crypto_key_version.project_only",
+            GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+            ResourceCategory.DATA,
+            metadata={GcpResourceMetadata.PROJECT: "primary"},
+        )
+        index = GcpResourceIndexBuilder().build(
+            [foreign_global, primary_regional, key_ring, foreign_unique, primary_global]
+        )
+
+        unscoped = index.resources_by_reference.resolve(
+            "shared",
+            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+        )
+        scoped = index.resources_by_reference.resolve(
+            "shared",
+            source=source,
+            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+        )
+        project_scoped = index.resources_by_reference.resolve(
+            "shared",
+            source=project_only_source,
+            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+        )
+        typed = index.resources_by_reference.resolve(
+            "shared",
+            source=source,
+            resource_types={GcpResourceType.KMS_KEY_RING},
+        )
+        weak_cross_project = index.resources_by_reference.resolve(
+            "unique",
+            source=source,
+            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+        )
+        strong_cross_project = index.resources_by_reference.resolve(
+            foreign_unique.identifier,
+            source=source,
+            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+        )
+
+        self.assertEqual(unscoped.state, "ambiguous")
+        self.assertEqual(
+            unscoped.candidates,
+            (foreign_global, primary_global, primary_regional),
+        )
+        self.assertEqual(scoped.state, "resolved")
+        self.assertIs(scoped.selected_candidate, primary_global)
+        self.assertEqual(project_scoped.state, "ambiguous")
+        self.assertEqual(project_scoped.candidates, (primary_global, primary_regional))
+        self.assertEqual(typed.state, "resolved")
+        self.assertIs(typed.selected_candidate, key_ring)
+        self.assertEqual(weak_cross_project.state, "unresolved")
+        self.assertEqual(strong_cross_project.state, "resolved")
+        self.assertIs(strong_cross_project.selected_candidate, foreign_unique)
+
+    def test_specialized_network_views_resolve_with_gcp_scope(self) -> None:
+        primary_network = _gcp_resource(
+            "google_compute_network.primary",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier="projects/primary/global/networks/main",
+            metadata={
+                GcpResourceMetadata.NAME: "main",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.SELF_LINK: "projects/primary/global/networks/main",
+            },
+        )
+        foreign_network = _gcp_resource(
+            "google_compute_network.foreign",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier="projects/foreign/global/networks/main",
+            metadata={
+                GcpResourceMetadata.NAME: "main",
+                GcpResourceMetadata.PROJECT: "foreign",
+                GcpResourceMetadata.SELF_LINK: "projects/foreign/global/networks/main",
+            },
+        )
+        central_subnetwork = _gcp_resource(
+            "google_compute_subnetwork.central",
+            GcpResourceType.COMPUTE_SUBNETWORK,
+            ResourceCategory.NETWORK,
+            identifier="projects/primary/regions/us-central1/subnetworks/app",
+            metadata={
+                GcpResourceMetadata.NAME: "app",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "us-central1",
+            },
+        )
+        east_subnetwork = _gcp_resource(
+            "google_compute_subnetwork.east",
+            GcpResourceType.COMPUTE_SUBNETWORK,
+            ResourceCategory.NETWORK,
+            identifier="projects/primary/regions/us-east1/subnetworks/app",
+            metadata={
+                GcpResourceMetadata.NAME: "app",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "us-east1",
+            },
+        )
+        source = _gcp_resource(
+            "google_compute_instance.source",
+            GcpResourceType.COMPUTE_INSTANCE,
+            ResourceCategory.COMPUTE,
+            metadata={
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.ZONE: "us-central1-a",
+            },
+        )
+        index = GcpResourceIndexBuilder().build([foreign_network, east_subnetwork, primary_network, central_subnetwork])
+
+        self.assertEqual(index.network_references.resolve("main").state, "ambiguous")
+        self.assertEqual(index.network_references.get("main", source=source), primary_network.address)
+        self.assertEqual(
+            index.network_references.get(foreign_network.identifier, source=source),
+            foreign_network.address,
+        )
+        self.assertEqual(index.subnetworks_by_reference.resolve("app").state, "ambiguous")
+        self.assertIs(index.subnetworks_by_reference.get("app", source=source), central_subnetwork)
+
+    def test_ambiguous_weak_reference_does_not_decorate_an_arbitrary_kms_parent(self) -> None:
+        def snapshot(reverse: bool) -> tuple[str | None, tuple[str, ...]]:
+            keys = [
+                _gcp_resource(
+                    f"google_kms_crypto_key.{name}",
+                    GcpResourceType.KMS_CRYPTO_KEY,
+                    ResourceCategory.DATA,
+                    identifier=f"projects/primary/locations/global/keyRings/{name}/cryptoKeys/customer",
+                    metadata={
+                        GcpResourceMetadata.NAME: "customer",
+                        GcpResourceMetadata.PROJECT: "primary",
+                        GcpResourceMetadata.KMS_KEY_RING: f"projects/primary/locations/global/keyRings/{name}",
+                    },
+                )
+                for name in ("first", "second")
+            ]
+            version = _gcp_resource(
+                "google_kms_crypto_key_version.customer",
+                GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+                ResourceCategory.DATA,
+                metadata={
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.REGION: "global",
+                    GcpResourceMetadata.KMS_CRYPTO_KEY_VERSION_CRYPTO_KEY_REFERENCE: "customer",
+                },
+            )
+            resources = [*keys, version]
+            if reverse:
+                resources.reverse()
+            GcpResourceDecorator(stages=(NormalizeKmsCryptoKeyVersionPostureStage(),)).decorate(resources)
+            facts = gcp_facts(version)
+            return (
+                facts.kms_crypto_key_version_resolved_key_address,
+                tuple(facts.kms_crypto_key_version_posture_uncertainties),
+            )
+
+        expected = (None, ("crypto_key reference customer is unresolved",))
+        self.assertEqual(snapshot(reverse=False), expected)
+        self.assertEqual(snapshot(reverse=True), expected)
+
+    def test_scoped_weak_reference_decorates_the_same_kms_parent_in_both_orders(self) -> None:
+        def snapshot(reverse: bool) -> tuple[str | None, tuple[str, ...]]:
+            primary = _gcp_resource(
+                "google_kms_crypto_key.primary",
+                GcpResourceType.KMS_CRYPTO_KEY,
+                ResourceCategory.DATA,
+                identifier="projects/primary/locations/global/keyRings/app/cryptoKeys/customer",
+                metadata={
+                    GcpResourceMetadata.NAME: "customer",
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.KMS_KEY_RING: "projects/primary/locations/global/keyRings/app",
+                    GcpResourceMetadata.KMS_PURPOSE: "ENCRYPT_DECRYPT",
+                },
+            )
+            regional = _gcp_resource(
+                "google_kms_crypto_key.regional",
+                GcpResourceType.KMS_CRYPTO_KEY,
+                ResourceCategory.DATA,
+                identifier="projects/primary/locations/us-central1/keyRings/app/cryptoKeys/customer",
+                metadata={
+                    GcpResourceMetadata.NAME: "customer",
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.KMS_KEY_RING: "projects/primary/locations/us-central1/keyRings/app",
+                    GcpResourceMetadata.KMS_PURPOSE: "ASYMMETRIC_SIGN",
+                },
+            )
+            version = _gcp_resource(
+                "google_kms_crypto_key_version.customer",
+                GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+                ResourceCategory.DATA,
+                metadata={
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.REGION: "global",
+                    GcpResourceMetadata.KMS_CRYPTO_KEY_VERSION_CRYPTO_KEY_REFERENCE: "customer",
+                },
+            )
+            resources = [primary, regional, version]
+            if reverse:
+                resources.reverse()
+            GcpResourceDecorator(stages=(NormalizeKmsCryptoKeyVersionPostureStage(),)).decorate(resources)
+            facts = gcp_facts(version)
+            return (
+                facts.kms_crypto_key_version_resolved_key_address,
+                tuple(facts.kms_crypto_key_version_posture_uncertainties),
+            )
+
+        expected = ("google_kms_crypto_key.primary", ())
+        self.assertEqual(snapshot(reverse=False), expected)
+        self.assertEqual(snapshot(reverse=True), expected)
+
     def test_decorator_runs_configured_stages_in_order_with_shared_context(self) -> None:
         calls: list[str] = []
 

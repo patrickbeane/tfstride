@@ -322,7 +322,11 @@ def _key_authorization_posture(
     if key_facts.key_vault_key_identity_state != "resolved":
         return [], [f"{key.address}: exact Key Vault key identity is unresolved"]
 
-    vault = context.index.resolve(key_facts.resolved_key_vault_address)
+    vault = context.index.resolve(
+        key_facts.resolved_key_vault_address,
+        source=key,
+        resource_types={AzureResourceType.KEY_VAULT},
+    )
     if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
         return [], [f"{key.address}: exact parent Key Vault is unresolved"]
     vault_facts = azure_facts(vault)
@@ -648,7 +652,11 @@ def _assignment_scope(
     if key_arm_id is not None and _same_scope(normalized_scope, key_arm_id):
         return _AssignmentScopeResolution("key", "resolved", key_arm_id)
 
-    resolved = context.index.resolve(scope)
+    resolved = context.index.resolve(
+        scope,
+        source=assignment,
+        resource_types={AzureResourceType.KEY_VAULT, AzureResourceType.KEY_VAULT_KEY},
+    )
     if resolved is None:
         return _AssignmentScopeResolution("unrelated", "external_or_unresolved")
     if resolved.address == vault.address:
@@ -740,7 +748,11 @@ def _resolve_role(
                 state="modeled_subset",
                 data_actions=built_in.data_actions,
             )
-        custom = context.index.resolve(facts.resolved_role_definition_address)
+        custom = context.index.resolve(
+            facts.resolved_role_definition_address,
+            source=assignment,
+            resource_types={AzureResourceType.ROLE_DEFINITION},
+        )
         if custom is not None and custom.resource_type == AzureResourceType.ROLE_DEFINITION:
             return _custom_role_resolution(custom, assignment_arm_scope)
         return _RoleResolution("unknown", "external_or_unresolved", ())

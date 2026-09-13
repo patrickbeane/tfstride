@@ -3,7 +3,7 @@ from __future__ import annotations
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
-from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES
+from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
 
 
 class ResolveVirtualMachineRelationshipsStage:
@@ -16,7 +16,11 @@ class ResolveVirtualMachineRelationshipsStage:
             facts = azure_facts(virtual_machine)
             attached_public_ip = bool(facts.public_ip_address)
             for network_interface_reference in facts.network_interface_references:
-                network_interface = context.index.resolve(network_interface_reference)
+                network_interface = context.index.resolve(
+                    network_interface_reference,
+                    source=virtual_machine,
+                    resource_types={AzureResourceType.NETWORK_INTERFACE},
+                )
                 if network_interface is None:
                     facts.add_unresolved_resource_reference("network_interface", network_interface_reference)
                     continue

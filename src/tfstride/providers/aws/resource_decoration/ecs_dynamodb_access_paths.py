@@ -203,7 +203,7 @@ class ProjectEcsDynamoDbAccessPathsOntoServicesStage:
                 for reference in facts.unresolved_task_definition_references
             ]
             for task_definition_address in facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition "
@@ -249,7 +249,7 @@ def _ecs_dynamodb_access(
     if not task_role_reference:
         return [], [], []
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None:
         return (
             [],
@@ -332,7 +332,7 @@ def _target_tables(
             if reference is not None:
                 if reference.scope != "exact_table":
                     continue
-                table = context.index.dynamodb_tables.get(reference.table_arn)
+                table = context.index.dynamodb_tables.get(reference.table_arn, source=role)
                 if table is None:
                     uncertainties.append(
                         f"{role.address} DynamoDB policy targets "
@@ -443,7 +443,7 @@ def _target_indexes(
             reference = _dynamodb_resource_reference(resource)
             if reference is None or reference.scope == "exact_table":
                 continue
-            table = context.index.dynamodb_tables.get(reference.table_arn)
+            table = context.index.dynamodb_tables.get(reference.table_arn, source=role)
             if table is None:
                 uncertainties.append(
                     f"{role.address} DynamoDB read policy targets "
@@ -510,7 +510,7 @@ def _index_relationships(
             reference = _dynamodb_resource_reference(resource)
             if reference is None or reference.scope == "exact_table":
                 continue
-            table = context.index.dynamodb_tables.get(reference.table_arn)
+            table = context.index.dynamodb_tables.get(reference.table_arn, source=role)
             if table is None:
                 uncertainties.append(
                     f"{role.address} DynamoDB index policy targets "

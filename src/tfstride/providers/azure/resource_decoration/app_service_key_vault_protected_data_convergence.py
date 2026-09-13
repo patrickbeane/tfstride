@@ -434,7 +434,11 @@ def _runtime_identity_matches(
     workload_facts = azure_facts(workload)
     attached_addresses = set(workload_facts.resolved_attached_identity_addresses)
     for reference in workload_facts.attached_identity_references:
-        attached_identity = context.index.resolve(reference)
+        attached_identity = context.index.resolve(
+            reference,
+            source=workload,
+            resource_types={AzureResourceType.USER_ASSIGNED_IDENTITY},
+        )
         if (
             attached_identity is not None
             and attached_identity.resource_type == AzureResourceType.USER_ASSIGNED_IDENTITY

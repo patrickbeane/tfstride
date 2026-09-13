@@ -39,7 +39,11 @@ def workload_managed_identities(
             identities.append((identity, "user_assigned"))
             seen_addresses.add(identity.address)
         for reference in facts.attached_identity_references:
-            identity = context.index.resolve(reference)
+            identity = context.index.resolve(
+                reference,
+                source=workload,
+                resource_types={AzureResourceType.USER_ASSIGNED_IDENTITY},
+            )
             if identity is None or identity.resource_type != AzureResourceType.USER_ASSIGNED_IDENTITY:
                 uncertainties.append(f"{workload.address}: user-assigned identity {reference} is not modeled")
                 continue

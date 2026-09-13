@@ -23,7 +23,11 @@ class DecorateStorageRelationshipsStage:
             if network_rules.resource_type != AzureResourceType.STORAGE_ACCOUNT_NETWORK_RULES:
                 continue
             facts = azure_facts(network_rules)
-            account = context.index.resolve(facts.storage_account_reference)
+            account = context.index.resolve(
+                facts.storage_account_reference,
+                source=network_rules,
+                resource_types={AzureResourceType.STORAGE_ACCOUNT},
+            )
             if account is None:
                 facts.add_unresolved_storage_account_reference(facts.storage_account_reference)
                 continue
@@ -61,7 +65,11 @@ class DecorateStorageRelationshipsStage:
             if container.resource_type != AzureResourceType.STORAGE_CONTAINER:
                 continue
             facts = azure_facts(container)
-            account = context.index.resolve(facts.storage_account_reference)
+            account = context.index.resolve(
+                facts.storage_account_reference,
+                source=container,
+                resource_types={AzureResourceType.STORAGE_ACCOUNT},
+            )
             public_access_type = facts.container_access_type
             configured_public = public_access_type is not None and public_access_type.strip().lower() in {
                 "blob",

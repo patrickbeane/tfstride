@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceReferenceView
 from tfstride.providers.coercion import dedupe
 
 MessagingService = Literal["sns", "sqs"]
@@ -91,7 +91,7 @@ class ProjectEcsMessagingAccessPathsOntoServicesStage:
                 for reference in facts.unresolved_task_definition_references
             ]
             for task_definition_address in facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition {task_definition_address} is unavailable "
@@ -133,7 +133,7 @@ def _ecs_messaging_access_paths(
     if not task_role_reference:
         return [], []
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None:
         return (
             [],
@@ -197,7 +197,7 @@ def _target_resources(
                 service, target_arn = exact_target
                 if service not in services:
                     continue
-                target = _resource_index(context, service).get(target_arn)
+                target = _resource_index(context, service).get(target_arn, source=role)
                 if target is None:
                     uncertainties.append(
                         f"{role.address} messaging policy targets {target_arn}, which is not modeled in the plan"
@@ -217,7 +217,7 @@ def _target_resources(
 def _resource_index(
     context: AwsDecorationContext,
     service: MessagingService,
-) -> dict[str, NormalizedResource]:
+) -> AwsResourceReferenceView:
     if service == "sns":
         return context.index.sns_topics
     return context.index.sqs_queues

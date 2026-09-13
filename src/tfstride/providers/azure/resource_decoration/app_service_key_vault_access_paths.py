@@ -101,7 +101,11 @@ def _reference_identity(
     facts = azure_facts(workload)
     explicit_reference = facts.app_service_key_vault_reference_identity_id
     if explicit_reference:
-        identity = context.index.resolve(explicit_reference)
+        identity = context.index.resolve(
+            explicit_reference,
+            source=workload,
+            resource_types={AzureResourceType.USER_ASSIGNED_IDENTITY},
+        )
         if identity is None or identity.resource_type != AzureResourceType.USER_ASSIGNED_IDENTITY:
             return None, [f"{workload.address}: Key Vault reference identity {explicit_reference} is not modeled"]
         if not _is_exact_user_assigned_identity_reference(explicit_reference, identity):
@@ -250,7 +254,11 @@ def _rbac_grants(
     uncertainties: list[str] = []
     for assignment in identity_facts.managed_identity_role_assignments:
         source = _string_value(assignment.get("source"))
-        assignment_resource = context.index.resolve(source)
+        assignment_resource = context.index.resolve(
+            source,
+            source=identity.resource,
+            resource_types={AzureResourceType.ROLE_ASSIGNMENT},
+        )
         if assignment_resource is None or assignment_resource.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
             if source:
                 uncertainties.append(f"role assignment {source} is not modeled")
@@ -317,7 +325,11 @@ def _secret_read_role(
     if role_name and role_name.lower() in _KEY_VAULT_SECRET_READ_ROLE_NAMES:
         return {"role_kind": "built_in"}, None
 
-    role_definition = context.index.resolve(facts.resolved_role_definition_address)
+    role_definition = context.index.resolve(
+        facts.resolved_role_definition_address,
+        source=assignment,
+        resource_types={AzureResourceType.ROLE_DEFINITION},
+    )
     if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
         if role_name is None:
             return None, "role is unresolved"

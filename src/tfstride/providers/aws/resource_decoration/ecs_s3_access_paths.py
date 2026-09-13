@@ -120,7 +120,7 @@ class ProjectEcsS3AccessPathsOntoServicesStage:
                 for reference in facts.unresolved_task_definition_references
             ]
             for task_definition_address in facts.resolved_task_definition_addresses:
-                task_definition = context.index.ecs_task_definitions.get(task_definition_address)
+                task_definition = context.index.ecs_task_definitions.get(task_definition_address, source=service)
                 if task_definition is None:
                     uncertainties.append(
                         f"{service.address}: resolved task definition {task_definition_address} is unavailable "
@@ -161,7 +161,7 @@ def _ecs_s3_access_paths(
     if not task_role_reference:
         return [], []
 
-    task_role = context.index.role_index.get(task_role_reference)
+    task_role = context.index.role_index.get(task_role_reference, source=task_definition)
     if task_role is None:
         return (
             [],
@@ -222,7 +222,7 @@ def _target_buckets(
                     f"{role.address} S3 policy resource {resource!r} does not identify an exact bucket"
                 )
                 continue
-            bucket = context.index.buckets.get(bucket_arn)
+            bucket = context.index.buckets.get(bucket_arn, source=role)
             if bucket is None:
                 uncertainties.append(f"{role.address} S3 policy targets {bucket_arn}, which is not modeled in the plan")
                 continue

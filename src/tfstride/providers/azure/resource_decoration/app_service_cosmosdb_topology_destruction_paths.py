@@ -483,7 +483,7 @@ def _management_lock_scope_state(
             return "unknown"
         return "applicable" if azure_arm_scope_contains(normalized_scope, target.resource_id) else "unrelated"
 
-    scope_resource = context.index.resolve(scope)
+    scope_resource = context.index.resolve(scope, source=lock)
     if scope_resource is None:
         return "unknown"
     scope_arm_id = _cosmosdb_resource_arm_id(scope_resource)

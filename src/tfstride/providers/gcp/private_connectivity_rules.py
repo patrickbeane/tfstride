@@ -249,7 +249,8 @@ def _disabled_private_google_access_subnetworks(
     seen_addresses: set[str] = set()
     for subnet_reference in workload.subnet_ids:
         subnetwork = resource_index.subnetworks_by_reference.get(
-            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+            source=workload,
         )
         if subnetwork is None or subnetwork.address in seen_addresses:
             continue
@@ -294,7 +295,7 @@ def _google_api_private_connectivity_coverage_evidence(
         if not network or network in seen_networks:
             continue
         seen_networks.add(network)
-        coverage = private_connectivity_index.coverage_for_network(network)
+        coverage = private_connectivity_index.coverage_for_network(network, source=subnetwork)
         values.append(f"network={network}")
         values.append(f"private_service_access_connections={len(coverage.private_service_access_connections)}")
         values.append(f"psc_forwarding_rule_endpoints={len(coverage.psc_forwarding_rule_endpoints)}")

@@ -545,7 +545,7 @@ def _unresolved_resource_policy_sources(
         if resource.resource_type != _SECRETS_MANAGER_SECRET_POLICY:
             continue
         target = aws_facts(resource).secret_arn
-        if target and context.index.secrets.get(target) is not None:
+        if target and context.index.secrets.get(target, source=resource) is not None:
             continue
         if _is_exact_secret_arn(target):
             continue

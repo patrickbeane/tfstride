@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource
@@ -9,11 +9,14 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_index import GcpDecorationContext, GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_types import (
+    GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
+    GCP_CLOUD_RUN_RESOURCE_TYPES,
     GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES,
     GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES,
     GCP_LOAD_BALANCER_NEG_TYPES,
     GCP_LOAD_BALANCER_TARGET_PROXY_TYPES,
     GCP_LOAD_BALANCER_URL_MAP_TYPES,
+    GcpResourceType,
 )
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
@@ -40,6 +43,13 @@ def _derive_load_balancer_frontend_reachability(index: GcpResourceIndex) -> None
                 index,
                 frontend,
                 reachable_backends,
+                source=forwarding_rule,
+                expected_resource_types=(
+                    GCP_LOAD_BALANCER_TARGET_PROXY_TYPES
+                    | GCP_LOAD_BALANCER_URL_MAP_TYPES
+                    | GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES
+                    | GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES
+                ),
                 path=[forwarding_rule.address],
                 visited={forwarding_rule.address},
             )
@@ -64,10 +74,12 @@ def _traverse_load_balancer_reference(
     frontend: dict[str, Any],
     reachable_backends: list[dict[str, Any]],
     *,
+    source: NormalizedResource,
+    expected_resource_types: Collection[str],
     path: list[str],
     visited: set[str],
 ) -> None:
-    resource = _resource_by_reference(reference, index)
+    resource = _resource_by_reference(reference, source, expected_resource_types, index)
     if resource is None or resource.address in visited:
         return
 
@@ -83,6 +95,8 @@ def _traverse_load_balancer_reference(
                 index,
                 frontend,
                 reachable_backends,
+                source=resource,
+                expected_resource_types=GCP_LOAD_BALANCER_URL_MAP_TYPES,
                 path=next_path,
                 visited=next_visited,
             )
@@ -95,6 +109,9 @@ def _traverse_load_balancer_reference(
                 index,
                 frontend,
                 reachable_backends,
+                source=resource,
+                expected_resource_types=GCP_LOAD_BALANCER_BACKEND_SERVICE_TYPES
+                | GCP_LOAD_BALANCER_BACKEND_BUCKET_TYPES,
                 path=next_path,
                 visited=next_visited,
             )
@@ -109,6 +126,8 @@ def _traverse_load_balancer_reference(
                 index,
                 frontend,
                 reachable_backends,
+                source=resource,
+                expected_resource_types=GCP_LOAD_BALANCER_NEG_TYPES,
                 path=next_path,
                 visited=next_visited,
             )
@@ -124,6 +143,8 @@ def _traverse_load_balancer_reference(
                 index,
                 frontend,
                 reachable_backends,
+                source=resource,
+                expected_resource_types={GcpResourceType.STORAGE_BUCKET},
                 path=next_path,
                 visited=next_visited,
             )
@@ -138,6 +159,10 @@ def _traverse_load_balancer_reference(
                 index,
                 frontend,
                 reachable_backends,
+                source=resource,
+                expected_resource_types=GCP_CLOUD_RUN_RESOURCE_TYPES
+                | GCP_CLOUD_FUNCTION_RESOURCE_TYPES
+                | {GcpResourceType.COMPUTE_INSTANCE},
                 path=next_path,
                 visited=next_visited,
             )
@@ -189,9 +214,18 @@ def _network_endpoint_group_target_references(neg: NormalizedResource) -> list[s
     return dedupe(references)
 
 
-def _resource_by_reference(reference: str, index: GcpResourceIndex) -> NormalizedResource | None:
+def _resource_by_reference(
+    reference: str,
+    source: NormalizedResource,
+    expected_resource_types: Collection[str],
+    index: GcpResourceIndex,
+) -> NormalizedResource | None:
     reference_key = gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES)
-    return index.resources_by_reference.get(reference_key)
+    return index.resources_by_reference.get(
+        reference_key,
+        source=source,
+        resource_types=expected_resource_types,
+    )
 
 
 def _load_balancer_frontend_entry(forwarding_rule: NormalizedResource) -> dict[str, Any]:

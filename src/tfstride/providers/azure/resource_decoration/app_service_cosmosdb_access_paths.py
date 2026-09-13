@@ -309,7 +309,10 @@ def _resolved_resource(
     resource_type: str,
     context: AzureDecorationContext,
 ) -> NormalizedResource | None:
-    resource = context.index.resolve(address)
+    resource = context.index.resolve(
+        address,
+        resource_types={resource_type},
+    )
     if resource is None or resource.address != address or resource.resource_type != resource_type:
         return None
     return resource

@@ -66,7 +66,7 @@ def _cloud_run_artifact_registry_write_paths(
     paths: list[dict[str, Any]] = []
     for image_reference in artifact_images:
         repository_path = image_reference["artifact_registry_repository_path"]
-        repository = _repository_for_path(repository_path, context)
+        repository = _repository_for_path(repository_path, workload, context)
         if repository is None:
             uncertainties.append(
                 f"{workload.address}: Artifact Registry repository path {repository_path} is not modeled"
@@ -135,14 +135,14 @@ def _cloud_run_artifact_registry_write_paths(
 
 def _repository_for_path(
     repository_path: str,
+    workload: NormalizedResource,
     context: GcpDecorationContext,
 ) -> NormalizedResource | None:
-    repository = context.index.resources_by_reference.get(
-        gcp_reference_key(repository_path, GCP_NETWORK_REFERENCE_SUFFIXES)
+    return context.index.resources_by_reference.get(
+        gcp_reference_key(repository_path, GCP_NETWORK_REFERENCE_SUFFIXES),
+        source=workload,
+        resource_types={_ARTIFACT_REGISTRY_REPOSITORY},
     )
-    if repository is None or repository.resource_type != _ARTIFACT_REGISTRY_REPOSITORY:
-        return None
-    return repository
 
 
 def _repository_exact_references(repository: NormalizedResource) -> set[str]:

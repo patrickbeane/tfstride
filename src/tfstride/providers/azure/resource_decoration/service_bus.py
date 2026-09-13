@@ -28,7 +28,11 @@ class DecorateServiceBusRelationshipsStage:
         context: AzureDecorationContext,
     ) -> None:
         facts = azure_facts(network_rule_set)
-        namespace = _resolve_namespace(context, facts.service_bus_namespace_reference)
+        namespace = _resolve_namespace(
+            context,
+            facts.service_bus_namespace_reference,
+            source=network_rule_set,
+        )
         if namespace is None:
             facts.add_unresolved_service_bus_namespace_reference(facts.service_bus_namespace_reference)
             return
@@ -57,6 +61,7 @@ class DecorateServiceBusRelationshipsStage:
             context,
             facts.service_bus_entity_namespace_reference,
             resolved_address=facts.resolved_service_bus_namespace_address,
+            source=entity,
         )
         if namespace is None:
             facts.add_unresolved_service_bus_namespace_reference(facts.service_bus_entity_namespace_reference)
@@ -73,6 +78,7 @@ class DecorateServiceBusRelationshipsStage:
             context,
             facts.service_bus_topic_reference,
             resolved_address=facts.resolved_service_bus_topic_address,
+            source=subscription,
         )
         if topic is None:
             facts.add_unresolved_service_bus_topic_reference(facts.service_bus_topic_reference)
@@ -85,6 +91,7 @@ class DecorateServiceBusRelationshipsStage:
             context,
             topic_namespace_reference,
             resolved_address=topic_facts.resolved_service_bus_namespace_address,
+            source=topic,
         )
         if namespace is None:
             facts.add_unresolved_service_bus_namespace_reference(topic_namespace_reference)
@@ -97,7 +104,11 @@ class DecorateServiceBusRelationshipsStage:
         context: AzureDecorationContext,
     ) -> None:
         facts = azure_facts(customer_managed_key)
-        namespace = _resolve_namespace(context, facts.service_bus_namespace_reference)
+        namespace = _resolve_namespace(
+            context,
+            facts.service_bus_namespace_reference,
+            source=customer_managed_key,
+        )
         if namespace is None:
             facts.add_unresolved_service_bus_namespace_reference(facts.service_bus_namespace_reference)
             return
@@ -120,13 +131,18 @@ def _resolve_namespace(
     context: AzureDecorationContext,
     reference: str | None,
     *,
+    source: NormalizedResource,
     resolved_address: str | None = None,
 ) -> NormalizedResource | None:
     namespace = context.index.resources_by_address.get(resolved_address or "")
     if namespace is None:
         if not _is_deterministic_namespace_reference(reference):
             return None
-        namespace = context.index.resolve(reference)
+        namespace = context.index.resolve(
+            reference,
+            source=source,
+            resource_types={AzureResourceType.SERVICE_BUS_NAMESPACE},
+        )
     if namespace is None or namespace.resource_type != AzureResourceType.SERVICE_BUS_NAMESPACE:
         return None
     return namespace
@@ -136,13 +152,18 @@ def _resolve_topic(
     context: AzureDecorationContext,
     reference: str | None,
     *,
+    source: NormalizedResource,
     resolved_address: str | None = None,
 ) -> NormalizedResource | None:
     topic = context.index.resources_by_address.get(resolved_address or "")
     if topic is None:
         if not _is_deterministic_topic_reference(reference):
             return None
-        topic = context.index.resolve(reference)
+        topic = context.index.resolve(
+            reference,
+            source=source,
+            resource_types={AzureResourceType.SERVICE_BUS_TOPIC},
+        )
     if topic is None or topic.resource_type != AzureResourceType.SERVICE_BUS_TOPIC:
         return None
     return topic

@@ -99,3 +99,17 @@ def gcp_reference_key(
     suffixes: Iterable[str] = GCP_REFERENCE_SUFFIXES,
 ) -> str:
     return strip_reference_suffix(value, suffixes)
+
+
+def normalize_gcp_project(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    parts = [part for part in text.split("/") if part]
+    if len(parts) == 2 and parts[0] == "projects":
+        return parts[1]
+    if len(parts) == 1 and "${" not in text and not text.startswith("google_"):
+        return parts[0]
+    return None

@@ -13,9 +13,15 @@ class DerivePublicExposureStage:
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
         for resource in resources:
             attached_security_groups = [
-                context.index.security_groups[sg_id]
-                for sg_id in resource.security_group_ids
-                if sg_id in context.index.security_groups
+                security_group
+                for security_group_id in resource.security_group_ids
+                if (
+                    security_group := context.index.security_groups.get(
+                        security_group_id,
+                        source=resource,
+                    )
+                )
+                is not None
             ]
             internet_ingress = any(
                 rule.direction == "ingress" and rule.allows_internet()
@@ -37,9 +43,9 @@ class DerivePublicExposureStage:
                 )
             mutations.set_nat_gateway_egress(
                 any(
-                    context.index.subnets[subnet_id].has_nat_gateway_egress
+                    subnet.has_nat_gateway_egress
                     for subnet_id in resource.subnet_ids
-                    if subnet_id in context.index.subnets
+                    if (subnet := context.index.subnets.get(subnet_id, source=resource)) is not None
                 )
                 if resource.subnet_ids
                 else resource.has_nat_gateway_egress

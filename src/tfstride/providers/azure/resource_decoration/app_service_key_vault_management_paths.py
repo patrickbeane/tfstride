@@ -124,7 +124,11 @@ def _app_service_key_vault_management_paths(
                     "for management paths"
                 )
             continue
-        vault = context.index.resolve(key_facts.resolved_key_vault_address)
+        vault = context.index.resolve(
+            key_facts.resolved_key_vault_address,
+            source=key,
+            resource_types={AzureResourceType.KEY_VAULT},
+        )
         if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
             if _key_authorization_may_match_runtime(key, runtime_identities, context):
                 uncertainties.append(

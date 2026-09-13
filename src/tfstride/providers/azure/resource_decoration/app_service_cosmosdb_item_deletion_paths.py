@@ -179,13 +179,21 @@ def _item_deletion_path(
     ):
         return None, "Cosmos DB item-deletion authorization evidence is incomplete"
 
-    assignment = context.index.resolve(role_assignment_address)
+    assignment = context.index.resolve(
+        role_assignment_address,
+        source=workload,
+        resource_types={AzureResourceType.COSMOSDB_SQL_ROLE_ASSIGNMENT},
+    )
     if assignment is None or assignment.resource_type != AzureResourceType.COSMOSDB_SQL_ROLE_ASSIGNMENT:
         return None, "Cosmos DB item-deletion role assignment is unavailable"
 
     role_definition_address = _known_string(access_path.get("role_definition_address"))
     if role_kind == "custom":
-        role_definition = context.index.resolve(role_definition_address)
+        role_definition = context.index.resolve(
+            role_definition_address,
+            source=assignment,
+            resource_types={AzureResourceType.COSMOSDB_SQL_ROLE_DEFINITION},
+        )
         if role_definition is None or role_definition.resource_type != AzureResourceType.COSMOSDB_SQL_ROLE_DEFINITION:
             return None, "custom Cosmos DB item-deletion role definition is unavailable"
     elif role_definition_address is not None:
@@ -240,7 +248,10 @@ def _current_target(
     context: AzureDecorationContext,
 ) -> tuple[_CosmosDbTarget | None, str | None]:
     account_address = _known_string(access_path.get("cosmosdb_account_address"))
-    account = context.index.resolve(account_address)
+    account = context.index.resolve(
+        account_address,
+        resource_types={AzureResourceType.COSMOSDB_ACCOUNT},
+    )
     if (
         account is None
         or account.resource_type != AzureResourceType.COSMOSDB_ACCOUNT
@@ -256,7 +267,11 @@ def _current_target(
     container: NormalizedResource | None = None
     if scope_type in {"database", "container"}:
         database_address = _known_string(access_path.get("cosmosdb_database_address"))
-        database = context.index.resolve(database_address)
+        database = context.index.resolve(
+            database_address,
+            source=account,
+            resource_types={AzureResourceType.COSMOSDB_SQL_DATABASE},
+        )
         if (
             database is None
             or database.resource_type != AzureResourceType.COSMOSDB_SQL_DATABASE
@@ -271,7 +286,11 @@ def _current_target(
 
     if scope_type == "container":
         container_address = _known_string(access_path.get("cosmosdb_container_address"))
-        container = context.index.resolve(container_address)
+        container = context.index.resolve(
+            container_address,
+            source=database,
+            resource_types={AzureResourceType.COSMOSDB_SQL_CONTAINER},
+        )
         if (
             database is None
             or container is None

@@ -225,9 +225,11 @@ def _resolve_version_parent(
             gcp_reference_key(
                 declared_reference,
                 _SECRET_VERSION_PARENT_REFERENCE_SUFFIXES,
-            )
+            ),
+            source=version,
+            resource_types={GcpResourceType.SECRET_MANAGER_SECRET},
         )
-        if resolved is not None and resolved.resource_type == GcpResourceType.SECRET_MANAGER_SECRET:
+        if resolved is not None:
             candidates[resolved.address] = resolved
     if parent_path is not None:
         for secret in secrets:
@@ -800,7 +802,11 @@ def _applicable_scope(
         target_reference,
         _SECRET_IAM_TARGET_REFERENCE_SUFFIXES,
     )
-    resolved = context.index.resources_by_reference.get(target_key)
+    resolved = context.index.resources_by_reference.get(
+        target_key,
+        source=iam_resource,
+        resource_types={GcpResourceType.SECRET_MANAGER_SECRET},
+    )
     if resolved is not None:
         return (
             ("secret", secret_path)

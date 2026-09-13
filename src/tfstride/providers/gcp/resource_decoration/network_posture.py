@@ -51,7 +51,13 @@ def _derive_subnetwork_route_posture(subnetwork: NormalizedResource, index: GcpR
     has_public_route = any(
         _route_has_internet_gateway(route)
         and not route.get_metadata_field(GcpResourceMetadata.ROUTE_TAGS)
-        and _same_network_reference(route.vpc_id, subnetwork.vpc_id, index)
+        and _same_network_reference(
+            route.vpc_id,
+            subnetwork.vpc_id,
+            index,
+            left_source=route,
+            right_source=subnetwork,
+        )
         for route in index.routes
     )
     has_nat_egress = any(_nat_applies_to_subnetwork(router_nat, subnetwork, index) for router_nat in index.router_nats)
@@ -83,7 +89,8 @@ def _resource_subnetworks(resource: NormalizedResource, index: GcpResourceIndex)
     seen: set[str] = set()
     for subnet_reference in resource.subnet_ids:
         subnetwork = index.subnetworks_by_reference.get(
-            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+            source=resource,
         )
         if subnetwork is None or subnetwork.address in seen:
             continue
@@ -95,10 +102,18 @@ def _resource_subnetworks(resource: NormalizedResource, index: GcpResourceIndex)
 def _infer_instance_vpc_id(resource: NormalizedResource, index: GcpResourceIndex) -> None:
     if resource.vpc_id:
         return
-    subnet_network_reference = _unique_network_reference(_subnetwork_vpc_references(resource, index), index)
+    subnet_network_reference = _unique_network_reference(
+        _subnetwork_vpc_references(resource, index),
+        index,
+        source=resource,
+    )
     if gcp_mutations(resource).infer_vpc_id(subnet_network_reference):
         return
-    network_reference = _unique_network_reference(_instance_network_references(resource), index)
+    network_reference = _unique_network_reference(
+        _instance_network_references(resource),
+        index,
+        source=resource,
+    )
     gcp_mutations(resource).infer_vpc_id(network_reference)
 
 
@@ -106,7 +121,8 @@ def _subnetwork_vpc_references(resource: NormalizedResource, index: GcpResourceI
     references: list[str] = []
     for subnet_reference in resource.subnet_ids:
         subnetwork = index.subnetworks_by_reference.get(
-            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+            gcp_reference_key(subnet_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+            source=resource,
         )
         if subnetwork is None:
             continue
@@ -130,11 +146,18 @@ def _instance_network_references(resource: NormalizedResource) -> list[str]:
     return dedupe(references)
 
 
-def _unique_network_reference(references: list[str], index: GcpResourceIndex) -> str | None:
+def _unique_network_reference(
+    references: list[str],
+    index: GcpResourceIndex,
+    *,
+    source: NormalizedResource,
+) -> str | None:
     inferred_reference: str | None = None
     inferred_canonical_reference: str | None = None
     for reference in references:
-        canonical_reference = _canonical_network_reference(reference, index)
+        canonical_reference = _canonical_network_reference(reference, index, source=source)
+        if canonical_reference is None:
+            return None
         if inferred_reference is None:
             inferred_reference = reference
             inferred_canonical_reference = canonical_reference
@@ -150,7 +173,13 @@ def resource_has_network_reference(
     index: GcpResourceIndex,
 ) -> bool:
     return any(
-        _same_network_reference(candidate, network_reference, index)
+        _same_network_reference(
+            candidate,
+            network_reference,
+            index,
+            left_source=resource,
+            right_source=resource,
+        )
         for candidate in _resource_network_references(resource, index)
     )
 
@@ -189,7 +218,13 @@ def _nat_applies_to_subnetwork(
     source_mode = str(gcp_facts(router_nat).nat_source_subnetwork_ip_ranges_to_nat or "").upper()
     if source_mode.startswith("ALL_SUBNETWORKS"):
         return any(
-            _same_network_reference(network_reference, subnetwork.vpc_id, index)
+            _same_network_reference(
+                network_reference,
+                subnetwork.vpc_id,
+                index,
+                left_source=router_nat,
+                right_source=subnetwork,
+            )
             for network_reference in _router_nat_network_references(router_nat, index)
         )
 
@@ -208,7 +243,10 @@ def _router_nat_network_references(
     router_reference = router_nat.get_metadata_field(GcpResourceMetadata.ROUTER_REFERENCE)
     if not router_reference:
         return ()
-    router = index.routers_by_reference.get(gcp_reference_key(router_reference, GCP_NETWORK_REFERENCE_SUFFIXES))
+    router = index.routers_by_reference.get(
+        gcp_reference_key(router_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+        source=router_nat,
+    )
     if router is None or not router.vpc_id:
         return ()
     return (router.vpc_id,)
@@ -218,18 +256,26 @@ def _same_network_reference(
     left: str | None,
     right: str | None,
     index: GcpResourceIndex | None = None,
+    *,
+    left_source: NormalizedResource | None = None,
+    right_source: NormalizedResource | None = None,
 ) -> bool:
     if not left or not right:
         return False
-    return _canonical_network_reference(left, index) == _canonical_network_reference(right, index)
+    left_reference = _canonical_network_reference(left, index, source=left_source)
+    right_reference = _canonical_network_reference(right, index, source=right_source)
+    return left_reference is not None and left_reference == right_reference
 
 
-def _canonical_network_reference(value: str, index: GcpResourceIndex | None) -> str:
-    reference_key = gcp_reference_key(value, GCP_NETWORK_REFERENCE_SUFFIXES)
-    network_key = gcp_network_reference_key(value)
-    if index is not None:
-        return index.network_references.get(reference_key) or index.network_references.get(network_key) or network_key
-    return network_key
+def _canonical_network_reference(
+    value: str,
+    index: GcpResourceIndex | None,
+    *,
+    source: NormalizedResource | None = None,
+) -> str | None:
+    if index is None:
+        return gcp_network_reference_key(value)
+    return index.network_references.canonical_reference(value, source=source)
 
 
 def _validated_network_reference(value: object) -> str | None:

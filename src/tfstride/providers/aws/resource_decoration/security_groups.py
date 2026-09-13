@@ -16,7 +16,7 @@ class MergeStandaloneSecurityGroupRulesStage:
             if rule_resource.resource_type != "aws_security_group_rule":
                 continue
             security_group_id = aws_facts(rule_resource).security_group_id
-            target_group = context.index.security_groups.get(security_group_id)
+            target_group = context.index.security_groups.get(security_group_id, source=rule_resource)
             if target_group is None:
                 continue
             aws_mutations(target_group).merge_security_group_rules(

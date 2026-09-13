@@ -470,8 +470,12 @@ def _iam_scope(
     if gcs_bucket_target_matches(reference, target.resource.address, target.name):
         return "bucket", target.reference, None
 
-    resolved = context.index.resources_by_reference.get(reference)
-    if resolved is not None and resolved.resource_type == GcpResourceType.STORAGE_BUCKET:
+    resolved = context.index.resources_by_reference.get(
+        reference,
+        source=iam_resource,
+        resource_types={GcpResourceType.STORAGE_BUCKET},
+    )
+    if resolved is not None:
         if resolved.address != target.resource.address:
             return None, None, None
         return None, None, "bucket target uses an unsupported symbolic attribute"
