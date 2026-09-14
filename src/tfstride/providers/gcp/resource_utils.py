@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -20,6 +21,15 @@ GCP_REFERENCE_SUFFIXES = (
 )
 GCP_ROLE_REFERENCE_SUFFIXES = (".id", ".name", ".role_id", ".self_link")
 GCP_BASIC_IAM_ROLES = frozenset({"roles/owner", "roles/editor", "roles/viewer"})
+
+_TERRAFORM_IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
+_TERRAFORM_INSTANCE_KEY = r'(?:\[(?:\d+|"(?:[^"\\]|\\.)*")\])?'
+_TERRAFORM_MODULE_INSTANCE = rf"module\.{_TERRAFORM_IDENTIFIER}{_TERRAFORM_INSTANCE_KEY}\."
+_TERRAFORM_GCP_RESOURCE_ADDRESS_PATTERN = re.compile(
+    rf"^(?:{_TERRAFORM_MODULE_INSTANCE})*"
+    rf"(?:data\.)?google_{_TERRAFORM_IDENTIFIER}\."
+    rf"{_TERRAFORM_IDENTIFIER}{_TERRAFORM_INSTANCE_KEY}$"
+)
 GCP_NETWORK_REFERENCE_SUFFIXES = (
     ".id",
     ".name",
@@ -87,10 +97,18 @@ def service_account_member(email: str | None) -> str | None:
 
 
 def strip_reference_suffix(value: str, suffixes: Iterable[str]) -> str:
+    """Strip a Terraform result attribute without changing provider-native identities."""
+
     text = str(value).strip()
+    traversal = text
+    if traversal.startswith("${") and traversal.endswith("}"):
+        traversal = traversal[2:-1].strip()
     for suffix in suffixes:
-        if text.endswith(suffix):
-            return text[: -len(suffix)]
+        if not traversal.endswith(suffix):
+            continue
+        resource_address = traversal[: -len(suffix)]
+        if _TERRAFORM_GCP_RESOURCE_ADDRESS_PATTERN.fullmatch(resource_address):
+            return resource_address
     return text
 
 
@@ -99,6 +117,13 @@ def gcp_reference_key(
     suffixes: Iterable[str] = GCP_REFERENCE_SUFFIXES,
 ) -> str:
     return strip_reference_suffix(value, suffixes)
+
+
+def is_gcp_terraform_resource_address(value: str) -> bool:
+    text = str(value).strip()
+    if text.startswith("${") and text.endswith("}"):
+        text = text[2:-1].strip()
+    return _TERRAFORM_GCP_RESOURCE_ADDRESS_PATTERN.fullmatch(text) is not None
 
 
 def normalize_gcp_project(value: object) -> str | None:

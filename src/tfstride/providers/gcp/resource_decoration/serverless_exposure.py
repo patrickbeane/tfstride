@@ -5,18 +5,14 @@ from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.resource_decoration.iam import (
     iam_bindings,
-    resource_iam_target_reference,
+    resolve_resource_iam_target,
     serverless_iam_resources,
 )
 from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_index import GcpResourceIndex, gcp_resource_references
+from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES
-from tfstride.providers.gcp.resource_utils import (
-    GCP_NETWORK_REFERENCE_SUFFIXES,
-    binding_members,
-    gcp_reference_key,
-)
+from tfstride.providers.gcp.resource_utils import binding_members
 
 _CLOUD_RUN_PUBLIC_INVOKER_ROLES = frozenset({"roles/run.invoker", "roles/run.servicesInvoker"})
 _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES = frozenset({"roles/cloudfunctions.invoker"})
@@ -29,6 +25,7 @@ def derive_public_serverless_exposure(
     public_access_reasons = _serverless_public_access_reasons(
         resource,
         serverless_iam_resources(resource, index),
+        index,
     )
     if public_access_reasons:
         gcp_mutations(resource).set_public_access_reasons(public_access_reasons)
@@ -42,6 +39,7 @@ def derive_public_serverless_exposure(
 def _serverless_public_access_reasons(
     resource: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
+    index: GcpResourceIndex,
 ) -> list[str]:
     reasons: list[str] = []
     if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES and gcp_facts(resource).cloud_run_invoker_iam_disabled:
@@ -51,13 +49,15 @@ def _serverless_public_access_reasons(
         if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES
         else _CLOUD_FUNCTION_PUBLIC_INVOKER_ROLES
     )
-    resource_references = set(gcp_resource_references(resource))
     for iam_resource in iam_resources:
-        target_reference = resource_iam_target_reference(iam_resource)
-        if (
-            not target_reference
-            or gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES) not in resource_references
-        ):
+        if not iam_resource.resource_type.startswith(f"{resource.resource_type}_iam_"):
+            continue
+        resolution = resolve_resource_iam_target(
+            iam_resource,
+            index,
+            resource_types={resource.resource_type},
+        )
+        if resolution.selected_candidate is not resource:
             continue
         for binding in iam_bindings(iam_resource):
             if binding.get("condition_state") == "unknown":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.rule_support.data import (
     _bigquery_dataset,
     _bigquery_dataset_iam_member,
@@ -20,6 +21,7 @@ from tests.providers.gcp.rule_support.data import (
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpResourceIamRuleTests(unittest.TestCase):
@@ -53,6 +55,57 @@ class GcpResourceIamRuleTests(unittest.TestCase):
             ],
         )
         self.assertEqual(evidence["trust_scope"], ["member is public GCP principal `allAuthenticatedUsers`"])
+
+    def test_sensitive_iam_weak_target_stays_in_source_project(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_secret_manager_secret.local",
+                    GcpResourceType.SECRET_MANAGER_SECRET,
+                    {
+                        "secret_id": "shared",
+                        "id": "projects/project-a/secrets/shared",
+                        "project": "project-a",
+                        "replication": [{"auto": []}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_secret_manager_secret.foreign",
+                    GcpResourceType.SECRET_MANAGER_SECRET,
+                    {
+                        "secret_id": "shared",
+                        "id": "projects/project-b/secrets/shared",
+                        "project": "project-b",
+                        "replication": [{"auto": []}],
+                    },
+                ),
+                _terraform_resource(
+                    "google_secret_manager_secret_iam_member.public_accessor",
+                    GcpResourceType.SECRET_MANAGER_SECRET_IAM_MEMBER,
+                    {
+                        "secret_id": "shared",
+                        "project": "project-a",
+                        "role": "roles/secretmanager.secretAccessor",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-sensitive-resource-iam-external-access"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(
+            findings[0].affected_resources,
+            [
+                "google_secret_manager_secret.local",
+                "google_secret_manager_secret_iam_member.public_accessor",
+            ],
+        )
 
     def test_sensitive_kms_foreign_service_account_binding_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_kms_crypto_key(), _kms_crypto_key_iam_member()])

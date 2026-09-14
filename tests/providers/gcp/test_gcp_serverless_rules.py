@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.rule_support.serverless import (
     _cloud_run_service,
     _cloud_run_service_iam_member,
@@ -14,6 +15,7 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpServerlessRuleTests(unittest.TestCase):
@@ -47,6 +49,63 @@ class GcpServerlessRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["public_exposure_reasons"],
             ["google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"],
+        )
+
+    def test_cloud_run_weak_iam_target_uses_source_project_and_target_type(self) -> None:
+        def cloud_run_v2(address: str, project: str):
+            return _terraform_resource(
+                address,
+                GcpResourceType.CLOUD_RUN_V2_SERVICE,
+                {
+                    "name": "shared-service",
+                    "project": project,
+                    "location": "us-central1",
+                    "ingress": "INGRESS_TRAFFIC_ALL",
+                    "template": [{"service_account": f"runtime@{project}.iam.gserviceaccount.com"}],
+                },
+            )
+
+        inventory = GcpNormalizer().normalize(
+            [
+                cloud_run_v2("google_cloud_run_v2_service.local", "project-a"),
+                cloud_run_v2("google_cloud_run_v2_service.foreign", "project-b"),
+                _terraform_resource(
+                    "google_cloud_run_service.wrong_type",
+                    GcpResourceType.CLOUD_RUN_SERVICE,
+                    {
+                        "name": "shared-service",
+                        "project": "project-a",
+                        "location": "us-central1",
+                    },
+                ),
+                _terraform_resource(
+                    "google_cloud_run_v2_service_iam_member.public_invoker",
+                    GcpResourceType.CLOUD_RUN_V2_SERVICE_IAM_MEMBER,
+                    {
+                        "name": "shared-service",
+                        "project": "project-a",
+                        "location": "us-central1",
+                        "role": "roles/run.invoker",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+        boundaries = detect_trust_boundaries(inventory)
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            boundaries,
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-cloud-run-public-invoker"})),
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(
+            findings[0].affected_resources,
+            [
+                "google_cloud_run_v2_service.local",
+                "google_cloud_run_v2_service_iam_member.public_invoker",
+            ],
         )
 
     def test_cloud_run_public_access_supports_current_invocation_mechanisms(self) -> None:

@@ -35,6 +35,31 @@ def _key(
     )
 
 
+def _ring(address: str) -> TerraformResource:
+    return _terraform_resource(
+        address,
+        GcpResourceType.KMS_KEY_RING,
+        {
+            "id": _KEY_RING,
+            "name": "application",
+            "project": _PROJECT,
+            "location": "global",
+        },
+    )
+
+
+def _custom_role(address: str, permissions: list[str]) -> TerraformResource:
+    return _terraform_resource(
+        address,
+        GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
+        {
+            "project": _PROJECT,
+            "role_id": "runtimeCrypto",
+            "permissions": permissions,
+        },
+    )
+
+
 def _project_member(
     address: str,
     *,
@@ -248,6 +273,53 @@ class GcpKmsAuthorizationPostureTests(unittest.TestCase):
             "google_project_iam_custom_role.runtime_crypto",
         )
 
+    def test_conflicting_duplicate_custom_roles_are_ambiguous_in_both_orders(self) -> None:
+        role = f"projects/{_PROJECT}/roles/runtimeCrypto"
+        privileged = _custom_role(
+            "google_project_iam_custom_role.privileged",
+            ["cloudkms.cryptoKeyVersions.useToDecrypt"],
+        )
+        benign = _custom_role(
+            "google_project_iam_custom_role.benign",
+            ["storage.objects.get"],
+        )
+        snapshots: list[tuple[object, ...]] = []
+
+        for case, definitions in {
+            "privileged first": [privileged, benign],
+            "benign first": [benign, privileged],
+        }.items():
+            with self.subTest(case=case):
+                inventory = GcpNormalizer().normalize(
+                    [
+                        _key(),
+                        *definitions,
+                        _key_member(
+                            "google_kms_crypto_key_iam_member.runtime",
+                            role=role,
+                        ),
+                    ]
+                )
+                key = inventory.get_by_address("google_kms_crypto_key.customer")
+                assert key is not None
+
+                facts = gcp_facts(key)
+                self.assertEqual(len(facts.kms_iam_grants), 1)
+                grant = facts.kms_iam_grants[0]
+                self.assertEqual(grant["role_resolution_state"], "ambiguous")
+                self.assertEqual(grant["modeled_kms_permissions"], [])
+                self.assertEqual(grant["authorization_state"], "unknown")
+                self.assertNotIn("role_definition_address", grant)
+                self.assertTrue(
+                    any(
+                        f"permissions for IAM role {role} are ambiguous" in uncertainty
+                        for uncertainty in facts.kms_iam_posture_uncertainties
+                    )
+                )
+                snapshots.append((grant, tuple(facts.kms_iam_posture_uncertainties)))
+
+        self.assertEqual(snapshots[0], snapshots[1])
+
     def test_unresolved_inherited_policy_and_role_evidence_remains_uncertain(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
@@ -409,6 +481,55 @@ class GcpKmsAuthorizationPostureTests(unittest.TestCase):
         facts = gcp_facts(key)
         self.assertEqual(facts.kms_iam_grants, [])
         self.assertEqual(facts.kms_iam_posture_uncertainties, [])
+
+    def test_duplicate_exact_crypto_key_target_does_not_attach_iam(self) -> None:
+        addresses = (
+            "google_kms_crypto_key.first",
+            "google_kms_crypto_key.second",
+        )
+        inventory = GcpNormalizer().normalize(
+            [
+                *(_key(address=address) for address in addresses),
+                _key_member(
+                    "google_kms_crypto_key_iam_member.ambiguous",
+                    key_reference=_KEY_PATH,
+                ),
+            ]
+        )
+
+        for address in addresses:
+            with self.subTest(address=address):
+                key = inventory.get_by_address(address)
+                assert key is not None
+                self.assertEqual(gcp_facts(key).bindings, [])
+                self.assertEqual(gcp_facts(key).kms_iam_grants, [])
+
+    def test_duplicate_exact_key_ring_target_does_not_attach_iam(self) -> None:
+        addresses = (
+            "google_kms_key_ring.first",
+            "google_kms_key_ring.second",
+        )
+        inventory = GcpNormalizer().normalize(
+            [
+                *(_ring(address) for address in addresses),
+                _key(),
+                _ring_binding(
+                    "google_kms_key_ring_iam_binding.ambiguous",
+                    key_ring=_KEY_RING,
+                ),
+            ]
+        )
+
+        for address in addresses:
+            with self.subTest(address=address):
+                key_ring = inventory.get_by_address(address)
+                assert key_ring is not None
+                self.assertEqual(gcp_facts(key_ring).kms_key_ring_iam_grants, [])
+
+        key = inventory.get_by_address("google_kms_crypto_key.customer")
+        assert key is not None
+        self.assertEqual(gcp_facts(key).bindings, [])
+        self.assertEqual(gcp_facts(key).kms_iam_grants, [])
 
     def test_key_scope_filters_modeled_role_permissions_to_key_resources(self) -> None:
         inventory = GcpNormalizer().normalize(

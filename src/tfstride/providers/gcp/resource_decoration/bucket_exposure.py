@@ -4,14 +4,11 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
-from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
-from tfstride.providers.gcp.resource_index import GcpResourceIndex, gcp_resource_references
+from tfstride.providers.gcp.resource_decoration.iam import iam_bindings, resolve_resource_iam_target
+from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
-from tfstride.providers.gcp.resource_utils import (
-    GCP_NETWORK_REFERENCE_SUFFIXES,
-    binding_members,
-    gcp_reference_key,
-)
+from tfstride.providers.gcp.resource_types import GcpResourceType
+from tfstride.providers.gcp.resource_utils import binding_members
 
 
 def derive_public_bucket_exposure(bucket: NormalizedResource, index: GcpResourceIndex) -> None:
@@ -30,10 +27,13 @@ def derive_public_bucket_exposure(bucket: NormalizedResource, index: GcpResource
 
 def _bucket_public_access_reasons(bucket: NormalizedResource, index: GcpResourceIndex) -> list[str]:
     reasons: list[str] = []
-    bucket_references = set(gcp_resource_references(bucket))
     for iam_resource in index.bucket_iam_resources:
-        iam_bucket = iam_resource.get_metadata_field(GcpResourceMetadata.BUCKET_NAME)
-        if not iam_bucket or gcp_reference_key(iam_bucket, GCP_NETWORK_REFERENCE_SUFFIXES) not in bucket_references:
+        resolution = resolve_resource_iam_target(
+            iam_resource,
+            index,
+            resource_types={GcpResourceType.STORAGE_BUCKET},
+        )
+        if resolution.selected_candidate is not bucket:
             continue
         for binding in iam_bindings(iam_resource):
             role = str(binding.get("role") or "unknown role")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.rule_support.common import _org_policy_policy
 from tests.providers.gcp.rule_support.data import (
     _storage_bucket,
@@ -10,6 +11,7 @@ from tests.providers.gcp.rule_support.data import (
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpStorageRuleTests(unittest.TestCase):
@@ -33,6 +35,39 @@ class GcpStorageRuleTests(unittest.TestCase):
             evidence["public_exposure_reasons"],
             ["google_storage_bucket_iam_member.public_logs_reader grants roles/storage.objectViewer to allUsers"],
         )
+
+    def test_duplicate_exact_bucket_target_does_not_create_public_exposure(self) -> None:
+        inventory = GcpNormalizer().normalize(
+            [
+                _terraform_resource(
+                    "google_storage_bucket.first",
+                    GcpResourceType.STORAGE_BUCKET,
+                    {"name": "duplicate-bucket", "project": "project-a", "location": "US"},
+                ),
+                _terraform_resource(
+                    "google_storage_bucket.second",
+                    GcpResourceType.STORAGE_BUCKET,
+                    {"name": "duplicate-bucket", "project": "project-b", "location": "US"},
+                ),
+                _terraform_resource(
+                    "google_storage_bucket_iam_member.public_reader",
+                    GcpResourceType.STORAGE_BUCKET_IAM_MEMBER,
+                    {
+                        "bucket": "duplicate-bucket",
+                        "role": "roles/storage.objectViewer",
+                        "member": "allUsers",
+                    },
+                ),
+            ]
+        )
+
+        findings = StrideRuleEngine().evaluate(
+            inventory,
+            [],
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-gcs-public-access"})),
+        )
+
+        self.assertEqual(findings, [])
 
     def test_gcs_all_authenticated_users_bucket_iam_member_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize(

@@ -23,11 +23,14 @@ from tfstride.providers.gcp.org_policy_guardrails import (
 )
 from tfstride.providers.gcp.org_policy_severity import guardrail_adjusted_severity_reasoning
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_FUNCTION_RESOURCE_TYPES,
     GCP_CLOUD_RUN_RESOURCE_TYPES,
     GCP_GKE_RESOURCE_TYPES,
+    GcpResourceType,
 )
+from tfstride.providers.gcp.resource_utils import GCP_NETWORK_REFERENCE_SUFFIXES, gcp_reference_key
 from tfstride.resource_helpers import describe_security_group_rule
 
 _GCP_FORWARDING_RULE_RESOURCE_TYPES = ("google_compute_forwarding_rule", "google_compute_global_forwarding_rule")
@@ -39,7 +42,6 @@ _GCP_HTTPS_TARGET_PROXY_RESOURCE_TYPES = (
     "google_compute_target_https_proxy",
     "google_compute_region_target_https_proxy",
 )
-_GCP_SSL_POLICY_REFERENCE_SUFFIXES = (".id", ".name", ".self_link")
 _WEAK_GCP_SSL_POLICY_MIN_TLS_VERSIONS = frozenset(
     {
         "tls_1_0",
@@ -169,8 +171,10 @@ class GcpComputeExposureRuleDetectors:
             return []
 
         findings: list[Finding] = []
+        resource_index = GcpResourceIndexBuilder().build(list(context.inventory.resources))
         for forwarding_rule, target_proxy in _public_forwarding_rule_target_proxies(
             context.inventory,
+            resource_index,
             _GCP_HTTP_TARGET_PROXY_RESOURCE_TYPES,
         ):
             severity_reasoning = build_severity_reasoning(
@@ -211,11 +215,13 @@ class GcpComputeExposureRuleDetectors:
             return []
 
         findings: list[Finding] = []
+        resource_index = GcpResourceIndexBuilder().build(list(context.inventory.resources))
         for forwarding_rule, target_proxy in _public_forwarding_rule_target_proxies(
             context.inventory,
+            resource_index,
             _GCP_HTTPS_TARGET_PROXY_RESOURCE_TYPES,
         ):
-            policy_state, ssl_policy = _target_proxy_ssl_policy_state(context.inventory, target_proxy)
+            policy_state, ssl_policy = _target_proxy_ssl_policy_state(resource_index, target_proxy)
             if policy_state in {"configured", "unresolved", "unknown"}:
                 continue
             severity_reasoning = build_severity_reasoning(
@@ -359,6 +365,7 @@ class GcpComputeExposureRuleDetectors:
 
 def _public_forwarding_rule_target_proxies(
     inventory: ResourceInventory,
+    resource_index: GcpResourceIndex,
     target_proxy_types: tuple[str, ...],
 ) -> list[tuple[NormalizedResource, NormalizedResource]]:
     matches: list[tuple[NormalizedResource, NormalizedResource]] = []
@@ -368,27 +375,14 @@ def _public_forwarding_rule_target_proxies(
         target_reference = gcp_facts(forwarding_rule).forwarding_rule_target
         if not target_reference:
             continue
-        target_proxy = _resolve_inventory_reference(inventory, target_reference)
-        if target_proxy is not None and target_proxy.resource_type in target_proxy_types:
+        target_proxy = resource_index.resources_by_reference.get(
+            gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+            source=forwarding_rule,
+            resource_types=target_proxy_types,
+        )
+        if target_proxy is not None:
             matches.append((forwarding_rule, target_proxy))
     return matches
-
-
-def _resolve_inventory_reference(inventory: ResourceInventory, reference: str) -> NormalizedResource | None:
-    for candidate in _reference_candidates(reference):
-        resource = inventory.get_by_address(candidate) or inventory.get_by_identifier(candidate)
-        if resource is not None:
-            return resource
-    return None
-
-
-def _reference_candidates(reference: str) -> list[str]:
-    text = str(reference).strip()
-    candidates = [text]
-    for suffix in _GCP_SSL_POLICY_REFERENCE_SUFFIXES:
-        if text.endswith(suffix):
-            candidates.append(text[: -len(suffix)])
-    return dedupe_addresses(candidates)
 
 
 def _forwarding_rule_boundary(
@@ -429,13 +423,17 @@ def _http_proxy_transport_evidence(target_proxy: NormalizedResource) -> list[str
 
 
 def _target_proxy_ssl_policy_state(
-    inventory: ResourceInventory,
+    resource_index: GcpResourceIndex,
     target_proxy: NormalizedResource,
 ) -> tuple[str, NormalizedResource | None]:
     ssl_policy_reference = gcp_facts(target_proxy).load_balancer_ssl_policy
     if not ssl_policy_reference:
         return "missing", None
-    ssl_policy = _resolve_inventory_reference(inventory, ssl_policy_reference)
+    ssl_policy = resource_index.resources_by_reference.get(
+        gcp_reference_key(ssl_policy_reference, GCP_NETWORK_REFERENCE_SUFFIXES),
+        source=target_proxy,
+        resource_types={GcpResourceType.COMPUTE_SSL_POLICY},
+    )
     if ssl_policy is None:
         return "unresolved", None
     min_tls_state = _ssl_policy_min_tls_state(ssl_policy)

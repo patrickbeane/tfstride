@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
 from tfstride.providers.gcp.iam_assignment_posture import (
-    build_gcp_custom_role_index,
     build_gcp_privileged_access_posture,
     serialize_privileged_access_posture,
 )

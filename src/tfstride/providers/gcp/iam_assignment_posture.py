@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
 
 from tfstride.identity import (
     AssignmentScopeKind,
@@ -16,16 +14,15 @@ from tfstride.identity import (
 )
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import append_unique, dedupe
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, custom_role_permissions
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings, resource_iam_target_reference
 from tfstride.providers.gcp.resource_types import (
-    GCP_CUSTOM_ROLE_RESOURCE_TYPES,
     GCP_FOLDER_IAM_RESOURCE_TYPES,
     GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_SERVICE_ACCOUNT_IAM_RESOURCE_TYPES,
 )
-from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 
 _GCP_PROVIDER = "gcp"
 
@@ -106,24 +103,6 @@ _AUDIT_ADMIN_ROLE_PREFIXES = (
     "roles/monitoring.",
     "roles/securitycenter.",
 )
-
-
-@dataclass(frozen=True, slots=True)
-class GcpCustomRoleIndex:
-    permissions_by_reference: Mapping[str, tuple[str, ...]]
-
-
-def build_gcp_custom_role_index(resources: Iterable[NormalizedResource]) -> GcpCustomRoleIndex:
-    permissions_by_reference: dict[str, tuple[str, ...]] = {}
-    for resource in resources:
-        if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        permissions = tuple(sorted(set(_get_list(resource, GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS))))
-        if not permissions:
-            continue
-        for reference in _custom_role_references(resource):
-            permissions_by_reference.setdefault(gcp_reference_key(reference, GCP_ROLE_REFERENCE_SUFFIXES), permissions)
-    return GcpCustomRoleIndex(MappingProxyType(permissions_by_reference))
 
 
 def build_gcp_privileged_access_posture(
@@ -238,10 +217,20 @@ def _role_privilege_posture(
     role: str,
     custom_roles: GcpCustomRoleIndex | None,
 ) -> tuple[tuple[PrivilegeCategory, ...], PrivilegeConfidence, tuple[str, ...], tuple[str, ...]]:
-    permissions = _custom_role_permissions(role, custom_roles)
-    if permissions:
-        categories = _permission_categories(permissions)
-        return categories, PrivilegeConfidence.HIGH, tuple(_privileged_permissions(permissions)), ()
+    if custom_roles is not None:
+        resolution = custom_roles.resolve(role)
+        if resolution.state == "ambiguous":
+            addresses = ", ".join(candidate.address for candidate in resolution.candidates)
+            return (
+                (),
+                PrivilegeConfidence.LOW,
+                (),
+                (f"{resource.address}: custom role {role} is ambiguous across {addresses}",),
+            )
+        permissions = custom_role_permissions(role, custom_roles)
+        if permissions:
+            categories = _permission_categories(permissions)
+            return categories, PrivilegeConfidence.HIGH, tuple(_privileged_permissions(permissions)), ()
     if _looks_like_custom_role(role):
         return (), PrivilegeConfidence.LOW, (), (f"{resource.address}: custom role {role} was not resolved",)
 
@@ -334,33 +323,6 @@ def _privileged_permissions(permissions: tuple[str, ...]) -> list[str]:
         if _permission_categories((permission,)):
             values.append(permission)
     return dedupe(values)
-
-
-def _custom_role_permissions(role: str, custom_roles: GcpCustomRoleIndex | None) -> tuple[str, ...]:
-    if custom_roles is None:
-        return ()
-    return custom_roles.permissions_by_reference.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES), ())
-
-
-def _custom_role_references(resource: NormalizedResource) -> set[str]:
-    references = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-        f"{resource.address}.role_id",
-        resource.identifier,
-        resource.name,
-        _get_string(resource, GcpResourceMetadata.NAME),
-        _get_string(resource, GcpResourceMetadata.CUSTOM_ROLE_ID),
-    }
-    project = _get_string(resource, GcpResourceMetadata.PROJECT)
-    organization_id = _get_string(resource, GcpResourceMetadata.ORGANIZATION_ID)
-    custom_role_id = _get_string(resource, GcpResourceMetadata.CUSTOM_ROLE_ID)
-    if project and custom_role_id:
-        references.add(f"projects/{project}/roles/{custom_role_id}")
-    if organization_id and custom_role_id:
-        references.add(f"organizations/{organization_id}/roles/{custom_role_id}")
-    return {str(reference).strip() for reference in references if reference not in (None, "")}
 
 
 def _assignment_scope(resource: NormalizedResource) -> PrivilegedAssignmentScope:
@@ -467,13 +429,6 @@ def _known_string(value: object) -> str | None:
 
 def _get_string(resource: NormalizedResource, field: object) -> str | None:
     return _known_string(resource.get_metadata_field(field))
-
-
-def _get_list(resource: NormalizedResource, field: object) -> tuple[str, ...]:
-    value = resource.get_metadata_field(field)
-    if not isinstance(value, list | tuple):
-        return ()
-    return tuple(normalized for item in value if (normalized := _known_string(item)))
 
 
 def _looks_like_custom_role(role: str) -> bool:

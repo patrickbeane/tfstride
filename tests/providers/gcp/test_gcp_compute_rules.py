@@ -79,11 +79,15 @@ def _target_https_proxy(*, ssl_policy: str | None = "google_compute_ssl_policy.m
     return _gcp_resource("google_compute_target_https_proxy.web", "google_compute_target_https_proxy", values)
 
 
-def _ssl_policy(*, min_tls_version: str = "TLS_1_2") -> TerraformResource:
+def _ssl_policy(
+    *,
+    name: str = "modern-tls",
+    min_tls_version: str = "TLS_1_2",
+) -> TerraformResource:
     return _gcp_resource(
         "google_compute_ssl_policy.modern",
         "google_compute_ssl_policy",
-        {"name": "modern-tls", "min_tls_version": min_tls_version, "profile": "MODERN"},
+        {"name": name, "min_tls_version": min_tls_version, "profile": "MODERN"},
     )
 
 
@@ -257,6 +261,34 @@ class GcpComputeRuleTests(unittest.TestCase):
             ["target_proxy_type=google_compute_target_http_proxy", "HTTP target proxy does not terminate TLS"],
         )
 
+    def test_forwarding_target_filters_wrong_types_before_resolution_in_both_orders(self) -> None:
+        forwarding_rule = _public_forwarding_rule(target="shared-proxy", ports=["80"])
+        target_proxy = _gcp_resource(
+            "google_compute_target_http_proxy.shared",
+            "google_compute_target_http_proxy",
+            {"name": "shared-proxy", "url_map": "google_compute_url_map.web.id"},
+        )
+        wrong_type = _gcp_resource(
+            "google_compute_ssl_policy.shared",
+            "google_compute_ssl_policy",
+            {"name": "shared-proxy", "min_tls_version": "TLS_1_2"},
+        )
+        snapshots: list[tuple[str, ...]] = []
+
+        for case, candidates in {
+            "wrong type first": [wrong_type, target_proxy],
+            "correct type first": [target_proxy, wrong_type],
+        }.items():
+            with self.subTest(case=case):
+                findings = _findings(
+                    [forwarding_rule, *candidates],
+                    _GCP_HTTP_LB_RULE,
+                )
+                self.assertEqual([finding.rule_id for finding in findings], [_GCP_HTTP_LB_RULE])
+                snapshots.append(tuple(findings[0].affected_resources))
+
+        self.assertEqual(snapshots[0], snapshots[1])
+
     def test_internal_http_load_balancer_proxy_is_quiet(self) -> None:
         self.assertEqual(
             _findings(
@@ -314,6 +346,39 @@ class GcpComputeRuleTests(unittest.TestCase):
                 "profile=MODERN",
             ],
         )
+
+    def test_ssl_policy_filters_wrong_types_before_resolution_in_both_orders(self) -> None:
+        ssl_policy = _ssl_policy(
+            name="shared-policy",
+            min_tls_version="TLS_1_0",
+        )
+        wrong_type = _gcp_resource(
+            "google_compute_url_map.shared",
+            "google_compute_url_map",
+            {
+                "name": "shared-policy",
+                "default_service": "google_compute_backend_service.web.id",
+            },
+        )
+        snapshots: list[tuple[str, ...]] = []
+
+        for case, candidates in {
+            "wrong type first": [wrong_type, ssl_policy],
+            "correct type first": [ssl_policy, wrong_type],
+        }.items():
+            with self.subTest(case=case):
+                findings = _findings(
+                    [
+                        _public_forwarding_rule(),
+                        _target_https_proxy(ssl_policy="shared-policy"),
+                        *candidates,
+                    ],
+                    _GCP_SSL_POLICY_RULE,
+                )
+                self.assertEqual([finding.rule_id for finding in findings], [_GCP_SSL_POLICY_RULE])
+                snapshots.append(tuple(findings[0].affected_resources))
+
+        self.assertEqual(snapshots[0], snapshots[1])
 
     def test_public_https_proxy_with_modern_or_unresolved_ssl_policy_is_quiet(self) -> None:
         self.assertEqual(

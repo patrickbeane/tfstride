@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES
+from tfstride.providers.gcp.resource_utils import GCP_NETWORK_REFERENCE_SUFFIXES, gcp_reference_key
+from tfstride.providers.resource_reference_index import ResourceReferenceResolution
 
 
 def serverless_iam_resources(
@@ -51,6 +54,23 @@ def resource_iam_target_reference(resource: NormalizedResource) -> str | None:
     if crypto_key_reference:
         return crypto_key_reference
     return resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING)
+
+
+def resolve_resource_iam_target(
+    resource: NormalizedResource,
+    index: GcpResourceIndex,
+    *,
+    resource_types: Collection[str],
+) -> ResourceReferenceResolution:
+    target_reference = resource_iam_target_reference(resource)
+    canonical_reference = (
+        gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES) if target_reference else None
+    )
+    return index.resources_by_reference.resolve(
+        canonical_reference,
+        source=resource,
+        resource_types=resource_types,
+    )
 
 
 def iam_bindings(resource: NormalizedResource) -> list[dict[str, Any]]:

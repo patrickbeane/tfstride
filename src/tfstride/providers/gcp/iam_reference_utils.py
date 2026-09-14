@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from tfstride.models import NormalizedResource
-from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_utils import (
-    GCP_ROLE_REFERENCE_SUFFIXES,
-    gcp_reference_key,
-    normalize_gcp_project,
-)
+from tfstride.providers.gcp.custom_role_index import custom_role_reference_keys
+from tfstride.providers.gcp.resource_utils import normalize_gcp_project
 
 __all__ = [
     "custom_role_reference_keys",
@@ -14,24 +9,6 @@ __all__ = [
     "gcs_bucket_target_matches",
     "normalize_gcp_project",
 ]
-
-
-def custom_role_reference_keys(resource: NormalizedResource) -> set[str]:
-    facts = gcp_facts(resource)
-    references: set[str | None] = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-        f"{resource.address}.role_id",
-        resource.identifier,
-        facts.resource_name,
-        facts.custom_role_id,
-    }
-    if facts.project and facts.custom_role_id:
-        references.add(f"projects/{facts.project}/roles/{facts.custom_role_id}")
-    if facts.organization_id and facts.custom_role_id:
-        references.add(f"organizations/{facts.organization_id}/roles/{facts.custom_role_id}")
-    return {gcp_reference_key(reference.strip(), GCP_ROLE_REFERENCE_SUFFIXES) for reference in references if reference}
 
 
 def gcs_bucket_scope_name(value: object) -> str | None:

@@ -7,18 +7,18 @@ from typing import Any, Literal, TypedDict
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.kms_evidence import (
     GcpKmsGrantBasis,
     GcpKmsIamGrant,
     GcpKmsKeyRingIamGrant,
     GcpKmsScopeType,
 )
-from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
+from tfstride.providers.gcp.resource_decoration.iam import iam_bindings, resolve_resource_iam_target
 from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_index import GcpDecorationContext
+from tfstride.providers.gcp.resource_index import GcpDecorationContext, GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_types import (
-    GCP_CUSTOM_ROLE_RESOURCE_TYPES,
     GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
     GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
@@ -26,9 +26,9 @@ from tfstride.providers.gcp.resource_types import (
 )
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
-    GCP_ROLE_REFERENCE_SUFFIXES,
     binding_members,
     gcp_reference_key,
+    is_gcp_terraform_resource_address,
 )
 
 _PREDEFINED_KMS_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
@@ -126,13 +126,6 @@ class _RoleResolution:
     role_definition_address: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class _CustomRole:
-    resource: NormalizedResource
-    permissions: tuple[str, ...]
-    permissions_state: str
-
-
 class _ManagementSource(TypedDict):
     source: str
     scope_type: GcpKmsScopeType
@@ -172,7 +165,7 @@ class NormalizeKmsIamPostureStage:
                 | GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES
             )
         )
-        custom_roles = _custom_roles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         for key_ring in resources:
             if key_ring.resource_type != GcpResourceType.KMS_KEY_RING:
                 continue
@@ -205,7 +198,7 @@ class NormalizeKmsIamPostureStage:
 def _kms_key_ring_iam_posture(
     key_ring_resource: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpKmsKeyRingIamGrant], list[str]]:
     key_ring = _key_ring_resource_path(key_ring_resource)
@@ -352,7 +345,7 @@ def _kms_key_ring_iam_posture(
 def _kms_iam_posture(
     key: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpKmsIamGrant], list[str]]:
     key_path = _key_path(key)
@@ -498,6 +491,62 @@ def _kms_iam_posture(
     return grants, dedupe(uncertainties)
 
 
+def kms_key_ring_iam_target_applies_to_key(
+    iam_resource: NormalizedResource,
+    key: NormalizedResource,
+    index: GcpResourceIndex,
+) -> bool:
+    target_reference = gcp_facts(iam_resource).target_reference
+    if target_reference is None:
+        return False
+
+    resolution = resolve_resource_iam_target(
+        iam_resource,
+        index,
+        resource_types={GcpResourceType.KMS_KEY_RING},
+    )
+    if resolution.state == "ambiguous":
+        return False
+
+    key_path = _key_path(key)
+    key_ring = _key_ring(key_path, gcp_facts(key).kms_key_ring)
+    if key_ring is None:
+        return False
+
+    selected = resolution.selected_candidate
+    if selected is not None:
+        selected_references = _reference_keys(
+            selected.address,
+            selected.identifier,
+            _key_ring_resource_path(selected),
+            gcp_facts(selected).kms_key_ring,
+        )
+        key_references = _reference_keys(key_ring, gcp_facts(key).kms_key_ring)
+        return bool(selected_references.intersection(key_references))
+
+    target_key = gcp_reference_key(target_reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+    if not _is_exact_kms_key_ring_reference(target_key):
+        return False
+    return target_key in _reference_keys(key_ring, gcp_facts(key).kms_key_ring)
+
+
+def _reference_keys(*values: object) -> set[str]:
+    references: set[str] = set()
+    for value in values:
+        text = _known_string(value)
+        if text is not None:
+            references.add(gcp_reference_key(text, GCP_NETWORK_REFERENCE_SUFFIXES))
+    return references
+
+
+def _is_exact_kms_key_ring_reference(reference: str) -> bool:
+    if _KEY_RING_PATH_PATTERN.fullmatch(reference.rstrip("/")) is not None:
+        return True
+    return is_gcp_terraform_resource_address(reference) and (
+        reference.startswith("google_kms_key_ring.") or ".google_kms_key_ring." in reference
+    )
+
+
 def _applicable_scope(
     iam_resource: NormalizedResource,
     key: NormalizedResource,
@@ -519,32 +568,24 @@ def _applicable_scope(
     target_reference = facts.target_reference
     if target_reference is None:
         return None, None
-    target_key = gcp_reference_key(
-        target_reference,
-        GCP_NETWORK_REFERENCE_SUFFIXES,
-    )
     if iam_resource.resource_type in GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES:
-        key_ring_references: set[str] = {
-            gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-            for reference in (key_ring, gcp_facts(key).kms_key_ring)
-            if reference
-        }
-        return ("key_ring", key_ring) if target_key in key_ring_references else ("unrelated", None)
-
-    resolved = context.index.resources_by_reference.get(
-        target_key,
-        source=iam_resource,
-        resource_types={GcpResourceType.KMS_CRYPTO_KEY},
-    )
-    if resolved is not None:
         return (
-            ("crypto_key", key_path)
-            if resolved.address == key.address and resolved.resource_type == GcpResourceType.KMS_CRYPTO_KEY
+            ("key_ring", key_ring)
+            if kms_key_ring_iam_target_applies_to_key(iam_resource, key, context.index)
             else ("unrelated", None)
         )
+
+    resolution = resolve_resource_iam_target(
+        iam_resource,
+        context.index,
+        resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+    )
+    resolved = resolution.selected_candidate
+    if resolved is None:
+        return (None, None) if resolution.state == "ambiguous" else ("unrelated", None)
     return (
         ("crypto_key", key_path)
-        if target_key == gcp_reference_key(key_path, GCP_NETWORK_REFERENCE_SUFFIXES)
+        if resolved.address == key.address and resolved.resource_type == GcpResourceType.KMS_CRYPTO_KEY
         else ("unrelated", None)
     )
 
@@ -578,38 +619,24 @@ def _applicable_key_ring_scope(
     target_reference = facts.target_reference
     if target_reference is None:
         return None, None
-    target_key = gcp_reference_key(
-        target_reference,
-        GCP_NETWORK_REFERENCE_SUFFIXES,
-    )
-    resolved = context.index.resources_by_reference.get(
-        target_key,
-        source=iam_resource,
+    resolution = resolve_resource_iam_target(
+        iam_resource,
+        context.index,
         resource_types={GcpResourceType.KMS_KEY_RING},
     )
-    if resolved is not None:
-        return (
-            ("key_ring", key_ring)
-            if resolved.address == key_ring_resource.address and resolved.resource_type == GcpResourceType.KMS_KEY_RING
-            else ("unrelated", None)
-        )
-
-    references = {
-        gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
-        for reference in (
-            key_ring,
-            gcp_facts(key_ring_resource).kms_key_ring,
-            key_ring_resource.identifier,
-            key_ring_resource.address,
-        )
-        if reference
-    }
-    return ("key_ring", key_ring) if target_key in references else ("unrelated", None)
+    resolved = resolution.selected_candidate
+    if resolved is None:
+        return (None, None) if resolution.state == "ambiguous" else ("unrelated", None)
+    return (
+        ("key_ring", key_ring)
+        if resolved.address == key_ring_resource.address and resolved.resource_type == GcpResourceType.KMS_KEY_RING
+        else ("unrelated", None)
+    )
 
 
 def _resolve_role(
     role: str,
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
 ) -> _RoleResolution:
     predefined = _PREDEFINED_KMS_ROLE_PERMISSIONS.get(role)
     if predefined is not None:
@@ -618,23 +645,29 @@ def _resolve_role(
     if not _looks_like_custom_role(role):
         return _RoleResolution("predefined", "unmodeled", ())
 
-    custom = custom_roles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
+    resolution = custom_roles.resolve(role)
+    custom = resolution.selected_candidate
     if custom is None:
-        return _RoleResolution("custom", "external_or_unresolved", ())
-    if custom.permissions_state != "configured":
+        state = "ambiguous" if resolution.state == "ambiguous" else "external_or_unresolved"
+        return _RoleResolution("custom", state, ())
+
+    facts = gcp_facts(custom)
+    permissions_state = facts.custom_role_permissions_state or "unknown"
+    if permissions_state != "configured":
         return _RoleResolution(
             "custom",
-            custom.permissions_state or "unknown",
+            permissions_state,
             (),
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
-    kms_permissions = tuple(permission for permission in custom.permissions if permission.startswith("cloudkms."))
+    permissions = tuple(sorted(set(facts.custom_role_permissions)))
+    kms_permissions = tuple(permission for permission in permissions if permission.startswith("cloudkms."))
     return _RoleResolution(
         "custom",
         "resolved",
         kms_permissions,
-        custom_role_permissions=custom.permissions,
-        role_definition_address=custom.resource.address,
+        custom_role_permissions=permissions,
+        role_definition_address=custom.address,
     )
 
 
@@ -817,45 +850,6 @@ def _mark_key_ring_ambiguous(
         grant["management_state"] = "ambiguous"
         if grant["authorization_state"] != "unknown":
             grant["authorization_state"] = "ambiguous"
-
-
-def _custom_roles_by_reference(
-    resources: list[NormalizedResource],
-) -> Mapping[str, _CustomRole]:
-    result: dict[str, _CustomRole] = {}
-    for resource in resources:
-        if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        facts = gcp_facts(resource)
-        custom = _CustomRole(
-            resource=resource,
-            permissions=tuple(sorted(set(facts.custom_role_permissions))),
-            permissions_state=facts.custom_role_permissions_state or "unknown",
-        )
-        for reference in _custom_role_references(resource):
-            result.setdefault(
-                gcp_reference_key(reference, GCP_ROLE_REFERENCE_SUFFIXES),
-                custom,
-            )
-    return result
-
-
-def _custom_role_references(resource: NormalizedResource) -> set[str]:
-    facts = gcp_facts(resource)
-    references: set[str | None] = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-        f"{resource.address}.role_id",
-        resource.identifier,
-        facts.resource_name,
-        facts.custom_role_id,
-    }
-    if facts.project and facts.custom_role_id:
-        references.add(f"projects/{facts.project}/roles/{facts.custom_role_id}")
-    if facts.organization_id and facts.custom_role_id:
-        references.add(f"organizations/{facts.organization_id}/roles/{facts.custom_role_id}")
-    return {str(reference).strip() for reference in references if reference not in (None, "")}
 
 
 def _condition_state(binding: Mapping[str, Any]) -> str:

@@ -297,6 +297,80 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                 self.assertEqual(exact.state, "resolved")
                 self.assertIs(exact.selected_candidate, first_key)
 
+    def test_native_names_and_urls_ending_in_terraform_suffixes_remain_distinct(self) -> None:
+        plain_bucket = _gcp_resource(
+            "google_storage_bucket.plain",
+            GcpResourceType.STORAGE_BUCKET,
+            ResourceCategory.DATA,
+            identifier="logs",
+            metadata={GcpResourceMetadata.BUCKET_NAME: "logs"},
+        )
+        suffixed_bucket = _gcp_resource(
+            "google_storage_bucket.suffixed",
+            GcpResourceType.STORAGE_BUCKET,
+            ResourceCategory.DATA,
+            identifier="logs.name",
+            metadata={GcpResourceMetadata.BUCKET_NAME: "logs.name"},
+        )
+        plain_url = "https://www.googleapis.com/compute/v1/projects/demo/global/networks/main"
+        suffixed_url = f"{plain_url}.id"
+        plain_network = _gcp_resource(
+            "google_compute_network.plain",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier=plain_url,
+            metadata={
+                GcpResourceMetadata.NAME: "main",
+                GcpResourceMetadata.PROJECT: "demo",
+                GcpResourceMetadata.SELF_LINK: plain_url,
+            },
+        )
+        suffixed_network = _gcp_resource(
+            "google_compute_network.suffixed",
+            GcpResourceType.COMPUTE_NETWORK,
+            ResourceCategory.NETWORK,
+            identifier=suffixed_url,
+            metadata={
+                GcpResourceMetadata.NAME: "main-id",
+                GcpResourceMetadata.PROJECT: "demo",
+                GcpResourceMetadata.SELF_LINK: suffixed_url,
+            },
+        )
+
+        resources = [plain_bucket, suffixed_bucket, plain_network, suffixed_network]
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                references = GcpResourceIndexBuilder().build(ordered_resources).resources_by_reference
+
+                self.assertIs(
+                    references.get(
+                        "logs",
+                        resource_types={GcpResourceType.STORAGE_BUCKET},
+                    ),
+                    plain_bucket,
+                )
+                self.assertIs(
+                    references.get(
+                        "logs.name",
+                        resource_types={GcpResourceType.STORAGE_BUCKET},
+                    ),
+                    suffixed_bucket,
+                )
+                self.assertIs(
+                    references.get(
+                        plain_url,
+                        resource_types={GcpResourceType.COMPUTE_NETWORK},
+                    ),
+                    plain_network,
+                )
+                self.assertIs(
+                    references.get(
+                        suffixed_url,
+                        resource_types={GcpResourceType.COMPUTE_NETWORK},
+                    ),
+                    suffixed_network,
+                )
+
     def test_resolution_filters_by_type_project_and_location(self) -> None:
         primary_global = _gcp_resource(
             "google_kms_crypto_key.primary_global",

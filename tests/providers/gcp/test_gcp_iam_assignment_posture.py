@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.rule_support.iam import (
     _project_iam_custom_role,
     _project_iam_member,
@@ -10,6 +11,7 @@ from tests.providers.gcp.rule_support.iam import (
 from tfstride.identity import AssignmentScopeKind, PrincipalType, PrivilegeCategory, PrivilegeConfidence
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpIamAssignmentPostureTests(unittest.TestCase):
@@ -87,6 +89,47 @@ class GcpIamAssignmentPostureTests(unittest.TestCase):
         )
         self.assertEqual(grant.role_name, "projects/tfstride-demo/roles/deployAdmin")
         self.assertEqual(gcp_facts(binding).iam_assignment_posture_uncertainties, [])
+
+    def test_conflicting_duplicate_custom_roles_are_ambiguous_in_both_orders(self) -> None:
+        role = "projects/tfstride-demo/roles/conflicted"
+        privileged = _terraform_resource(
+            "google_project_iam_custom_role.privileged",
+            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
+            {
+                "project": "tfstride-demo",
+                "role_id": "conflicted",
+                "permissions": ["iam.serviceAccounts.actAs"],
+            },
+        )
+        benign = _terraform_resource(
+            "google_project_iam_custom_role.benign",
+            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
+            {
+                "project": "tfstride-demo",
+                "role_id": "conflicted",
+                "permissions": ["serviceusage.services.get"],
+            },
+        )
+        expected_uncertainty = (
+            "google_project_iam_member.binding: custom role "
+            "projects/tfstride-demo/roles/conflicted is ambiguous across "
+            "google_project_iam_custom_role.benign, google_project_iam_custom_role.privileged"
+        )
+
+        for case, definitions in {
+            "privileged first": [privileged, benign],
+            "benign first": [benign, privileged],
+        }.items():
+            with self.subTest(case=case):
+                inventory = GcpNormalizer().normalize([*definitions, _project_iam_member(role)])
+                binding = inventory.get_by_address("google_project_iam_member.binding")
+                assert binding is not None
+
+                self.assertEqual(gcp_facts(binding).privileged_access_grants, ())
+                self.assertEqual(
+                    gcp_facts(binding).iam_assignment_posture_uncertainties,
+                    [expected_uncertainty],
+                )
 
     def test_unresolved_custom_role_reference_is_preserved_without_grant(self) -> None:
         inventory = GcpNormalizer().normalize([_project_iam_member("projects/tfstride-demo/roles/missing")])

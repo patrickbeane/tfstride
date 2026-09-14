@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
-
 from tfstride.analysis.resource_concepts import (
     is_database_resource,
     is_key_management_resource,
@@ -11,10 +7,13 @@ from tfstride.analysis.resource_concepts import (
     is_secret_store_resource,
 )
 from tfstride.models import NormalizedResource
-from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
-
-GCP_CUSTOM_ROLE_RESOURCE_TYPES = frozenset({"google_project_iam_custom_role", "google_organization_iam_custom_role"})
+from tfstride.providers.gcp.custom_role_index import (
+    GcpCustomRoleIndex,
+    custom_role_permissions,
+)
+from tfstride.providers.gcp.custom_role_index import (
+    build_gcp_custom_role_index as build_gcp_custom_role_index,
+)
 
 _PRIVILEGE_ESCALATION_PERMISSIONS = frozenset(
     {
@@ -36,30 +35,6 @@ _PRIVILEGE_ESCALATION_PERMISSIONS = frozenset(
         "run.services.update",
     }
 )
-
-
-@dataclass(frozen=True, slots=True)
-class GcpCustomRoleIndex:
-    permissions_by_reference: Mapping[str, tuple[str, ...]]
-
-
-def build_gcp_custom_role_index(resources: Iterable[NormalizedResource]) -> GcpCustomRoleIndex:
-    permissions_by_reference: dict[str, tuple[str, ...]] = {}
-    for resource in resources:
-        if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        permissions = tuple(sorted(set(gcp_facts(resource).custom_role_permissions)))
-        if not permissions:
-            continue
-        for reference in _custom_role_references(resource):
-            permissions_by_reference.setdefault(gcp_reference_key(reference, GCP_ROLE_REFERENCE_SUFFIXES), permissions)
-    return GcpCustomRoleIndex(MappingProxyType(permissions_by_reference))
-
-
-def custom_role_permissions(role: str | None, custom_roles: GcpCustomRoleIndex) -> tuple[str, ...]:
-    if not role:
-        return ()
-    return custom_roles.permissions_by_reference.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES), ())
 
 
 def custom_role_privilege_risk(role: str | None, custom_roles: GcpCustomRoleIndex) -> str | None:
@@ -156,23 +131,6 @@ def custom_role_allows_data_store_access(
             },
         )
     return False
-
-
-def _custom_role_references(resource: NormalizedResource) -> set[str]:
-    facts = gcp_facts(resource)
-    references = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-        f"{resource.address}.role_id",
-        resource.identifier,
-        resource.name,
-        facts.resource_name,
-        facts.custom_role_id,
-    }
-    if facts.project and facts.custom_role_id:
-        references.add(f"projects/{facts.project}/roles/{facts.custom_role_id}")
-    return {str(reference).strip() for reference in references if reference not in (None, "")}
 
 
 def _privileged_permissions(permissions: tuple[str, ...]) -> tuple[str, ...]:
