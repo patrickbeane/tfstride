@@ -957,14 +957,18 @@ class GcpCloudRunLoggingSinkAuditTelemetryDisruptionPathTests(unittest.TestCase)
         assert normalized_unknown_role is not None
         self.assertIsNone(gcp_facts(normalized_unknown_role).custom_role_id)
         self.assertEqual(
-            unknown.cloud_run_logging_sink_audit_telemetry_disruption_paths,
-            [],
+            len(unknown.cloud_run_logging_sink_audit_telemetry_disruption_paths),
+            1,
         )
-        self.assertTrue(
-            any(
-                "exact identity is unresolved" in uncertainty
-                for uncertainty in (unknown.cloud_run_logging_sink_audit_telemetry_disruption_path_uncertainties)
-            )
+        self.assertEqual(
+            unknown.cloud_run_logging_sink_audit_telemetry_disruption_paths[0]["role_evidence"][
+                "role_definition_address"
+            ],
+            _CUSTOM_ROLE_ADDRESS,
+        )
+        self.assertEqual(
+            unknown.cloud_run_logging_sink_audit_telemetry_disruption_path_uncertainties,
+            [],
         )
 
         colliding_roles = (

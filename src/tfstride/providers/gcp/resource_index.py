@@ -26,6 +26,7 @@ from tfstride.providers.gcp.resource_types import (
 from tfstride.providers.gcp.resource_utils import (
     GCP_NETWORK_REFERENCE_SUFFIXES,
     gcp_reference_key,
+    is_gcp_terraform_resource_address,
     normalize_gcp_project,
 )
 from tfstride.providers.resource_reference_index import (
@@ -184,7 +185,7 @@ class GcpNetworkReferenceView:
             return None
         if source is not None and self.resolve(reference).state != "unresolved":
             return None
-        return gcp_network_reference_key(reference)
+        return _unmodeled_network_reference_key(reference, source)
 
     def get(
         self,
@@ -428,6 +429,24 @@ def gcp_network_reference_key(value: str) -> str:
 
 def _gcp_reference_key(reference: str) -> str:
     return gcp_reference_key(reference, GCP_NETWORK_REFERENCE_SUFFIXES)
+
+
+def _unmodeled_network_reference_key(
+    reference: str,
+    source: NormalizedResource | None,
+) -> str | None:
+    reference_key = _gcp_reference_key(reference)
+    if is_gcp_terraform_resource_address(reference_key):
+        return reference_key
+
+    explicit_project, _location = _scope_from_reference(reference_key)
+    project = normalize_gcp_project(explicit_project)
+    if project is None and source is not None:
+        project = _resource_project(source)
+    network_name = gcp_network_reference_key(reference_key)
+    if project is None or not network_name:
+        return None
+    return f"projects/{project}/global/networks/{network_name}"
 
 
 def _gcp_network_references(resource: NormalizedResource) -> tuple[str, ...]:

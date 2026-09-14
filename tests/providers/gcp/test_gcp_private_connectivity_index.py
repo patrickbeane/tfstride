@@ -38,28 +38,32 @@ def _network(
     return _resource("google_compute_network", terraform_name or name, values)
 
 
-def _cloud_sql(name: str, private_network: str | None) -> TerraformResource:
+def _cloud_sql(
+    name: str,
+    private_network: str | None,
+    *,
+    project: str | None = None,
+) -> TerraformResource:
     ip_configuration: dict[str, object] = {"ipv4_enabled": False}
     if private_network is not None:
         ip_configuration["private_network"] = private_network
-    return _resource(
-        "google_sql_database_instance",
-        name,
-        {
-            "name": name,
-            "settings": [
-                {
-                    "ip_configuration": [ip_configuration],
-                    "backup_configuration": [
-                        {
-                            "enabled": True,
-                            "point_in_time_recovery_enabled": True,
-                        }
-                    ],
-                }
-            ],
-        },
-    )
+    values: dict[str, object] = {
+        "name": name,
+        "settings": [
+            {
+                "ip_configuration": [ip_configuration],
+                "backup_configuration": [
+                    {
+                        "enabled": True,
+                        "point_in_time_recovery_enabled": True,
+                    }
+                ],
+            }
+        ],
+    }
+    if project is not None:
+        values["project"] = project
+    return _resource("google_sql_database_instance", name, values)
 
 
 def _inventory(*resources: TerraformResource) -> ResourceInventory:
@@ -240,6 +244,52 @@ class GcpPrivateConnectivityIndexTests(unittest.TestCase):
         self.assertEqual(attachment.nat_subnets, ("google_compute_subnetwork.psc_nat.id",))
         self.assertEqual(attachment.domain_names, ("sql.internal.example.com",))
         self.assertEqual(attachment.consumer_accept_list[0]["project_id_or_num"], "consumer")
+
+    def test_unmodeled_same_name_networks_do_not_share_private_connectivity_across_projects(
+        self,
+    ) -> None:
+        connection = _resource(
+            "google_service_networking_connection",
+            "private_services",
+            {
+                "network": "projects/primary/global/networks/shared",
+                "service": "servicenetworking.googleapis.com",
+                "reserved_peering_ranges": ["private-services-range"],
+            },
+        )
+        policy = _resource(
+            "google_network_connectivity_service_connection_policy",
+            "sql",
+            {
+                "name": "sql-policy",
+                "project": "primary",
+                "location": "us-central1",
+                "network": "shared",
+                "service_class": "gcp-cloud-sql",
+            },
+        )
+        primary_database = _cloud_sql("primary", "shared", project="primary")
+        foreign_database = _cloud_sql("foreign", "shared", project="foreign")
+
+        for resources in (
+            (connection, policy, primary_database, foreign_database),
+            (foreign_database, primary_database, policy, connection),
+        ):
+            inventory = _inventory(*resources)
+            primary_sql = inventory.get_by_address("google_sql_database_instance.primary")
+            foreign_sql = inventory.get_by_address("google_sql_database_instance.foreign")
+            self.assertIsNotNone(primary_sql)
+            self.assertIsNotNone(foreign_sql)
+
+            index = build_gcp_private_connectivity_index(inventory)
+
+            with self.subTest(order=[resource.address for resource in resources]):
+                primary_coverage = index.coverage_for_cloud_sql(primary_sql)
+                foreign_coverage = index.coverage_for_cloud_sql(foreign_sql)
+                self.assertTrue(primary_coverage.has_private_service_access)
+                self.assertTrue(primary_coverage.has_cloud_sql_psc_policy)
+                self.assertFalse(foreign_coverage.has_private_service_access)
+                self.assertFalse(foreign_coverage.has_cloud_sql_psc_policy)
 
     def test_ambiguous_network_alias_does_not_assign_private_connectivity_by_input_order(self) -> None:
         for networks in (

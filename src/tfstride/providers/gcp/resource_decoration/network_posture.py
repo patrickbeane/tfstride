@@ -11,7 +11,6 @@ from tfstride.providers.gcp.resource_index import (
     GcpDecorationContext,
     GcpResourceIndex,
     gcp_network_reference_key,
-    gcp_resource_references,
 )
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
 from tfstride.providers.gcp.resource_types import (
@@ -228,10 +227,15 @@ def _nat_applies_to_subnetwork(
             for network_reference in _router_nat_network_references(router_nat, index)
         )
 
-    subnetwork_references = set(gcp_resource_references(subnetwork))
     for nat_subnetwork in router_nat.get_metadata_field(GcpResourceMetadata.NAT_SUBNETWORKS):
         reference = nat_subnetwork.get("name") if isinstance(nat_subnetwork, dict) else None
-        if reference and gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES) in subnetwork_references:
+        if not reference:
+            continue
+        selected_subnetwork = index.subnetworks_by_reference.get(
+            gcp_reference_key(str(reference), GCP_NETWORK_REFERENCE_SUFFIXES),
+            source=router_nat,
+        )
+        if selected_subnetwork is not None and selected_subnetwork.address == subnetwork.address:
             return True
     return False
 

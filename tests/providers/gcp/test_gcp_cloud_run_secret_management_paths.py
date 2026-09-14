@@ -224,12 +224,13 @@ def _secret_binding(*, role: str) -> TerraformResource:
 def _custom_role(
     permissions: list[str],
     *,
+    name: str = "runtime_secret_lifecycle",
     permissions_unknown: bool = False,
 ) -> tuple[str, TerraformResource]:
     role = f"projects/{_PROJECT}/roles/runtimeSecretLifecycle"
     return role, _resource(
         GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
-        "runtime_secret_lifecycle",
+        name,
         {
             "id": role,
             "name": role,
@@ -507,6 +508,56 @@ class GcpCloudRunSecretManagementPathTests(unittest.TestCase):
         )
         assert path["secret_version"] is not None
         self.assertEqual(path["secret_version"]["lifecycle_state"], "disabled")
+
+    def test_conflicting_custom_roles_do_not_create_management_paths_in_either_order(self) -> None:
+        role, privileged = _custom_role(
+            ["secretmanager.versions.destroy"],
+            name="privileged",
+        )
+        _, benign = _custom_role(
+            ["secretmanager.versions.get"],
+            name="benign",
+        )
+        snapshots: list[tuple[object, ...]] = []
+
+        for case, definitions in {
+            "privileged first": [privileged, benign],
+            "benign first": [benign, privileged],
+        }.items():
+            with self.subTest(case=case):
+                inventory = _normalize(
+                    [
+                        _cloud_run(),
+                        _secret(),
+                        _version(),
+                        *definitions,
+                        _secret_member(role=role),
+                    ]
+                )
+                facts = _workload_facts(inventory)
+                secret_resource = inventory.get_by_address(_SECRET_ADDRESS)
+                assert secret_resource is not None
+                grants = gcp_facts(secret_resource).secret_manager_iam_grants
+
+                self.assertEqual(facts.cloud_run_secret_management_paths, [])
+                self.assertEqual(len(grants), 1)
+                self.assertEqual(grants[0]["role_resolution_state"], "ambiguous")
+                self.assertEqual(grants[0]["modeled_secret_permissions"], [])
+                self.assertNotIn("role_definition_address", grants[0])
+                self.assertTrue(
+                    any(
+                        "Secret Manager role permissions are unresolved" in uncertainty
+                        for uncertainty in facts.cloud_run_secret_management_path_uncertainties
+                    )
+                )
+                snapshots.append(
+                    (
+                        grants[0],
+                        tuple(facts.cloud_run_secret_management_path_uncertainties),
+                    )
+                )
+
+        self.assertEqual(snapshots[0], snapshots[1])
 
     def test_unknown_version_lifecycle_remains_uncertain(self) -> None:
         role, custom_role = _custom_role(["secretmanager.versions.destroy"])

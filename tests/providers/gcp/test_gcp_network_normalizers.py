@@ -373,6 +373,7 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
                 "google_network_connectivity_service_connection_policy",
                 {
                     "name": "sql-policy",
+                    "project": "demo",
                     "location": "us-central1",
                     "network": "google_compute_network.main.id",
                     "service_class": "gcp-cloud-sql",
@@ -390,6 +391,10 @@ class GcpNetworkNormalizerTests(GcpNormalizerTestCase):
         self.assertEqual(normalized.category, ResourceCategory.NETWORK)
         self.assertEqual(normalized.vpc_id, "google_compute_network.main.id")
         self.assertEqual(normalized.subnet_ids, ("google_compute_subnetwork.psc.id",))
+        self.assertEqual(
+            normalized.get_metadata_field(GcpResourceMetadata.PROJECT),
+            "demo",
+        )
         self.assertEqual(facts.psc_service_class, "gcp-cloud-sql")
         self.assertEqual(facts.psc_config, {"subnetworks": ["google_compute_subnetwork.psc.id"], "limit": 8})
         self.assertEqual(facts.private_connectivity_subnetworks, ["google_compute_subnetwork.psc.id"])

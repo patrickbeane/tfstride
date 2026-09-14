@@ -401,6 +401,106 @@ class GcpResourceDecorationStageTests(unittest.TestCase):
         self.assertTrue(matching_instance.has_public_route)
         self.assertFalse(unmatched_instance.has_public_route)
 
+    def test_network_posture_does_not_join_unmodeled_same_name_networks_across_projects(
+        self,
+    ) -> None:
+        for reverse_order in (False, True):
+            primary_subnetwork = _gcp_resource(
+                "google_compute_subnetwork.primary",
+                GcpResourceType.COMPUTE_SUBNETWORK,
+                ResourceCategory.NETWORK,
+                identifier="projects/primary/regions/us-central1/subnetworks/app",
+                vpc_id="shared",
+                metadata={
+                    GcpResourceMetadata.NAME: "app",
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.REGION: "us-central1",
+                },
+            )
+            foreign_subnetwork = _gcp_resource(
+                "google_compute_subnetwork.foreign",
+                GcpResourceType.COMPUTE_SUBNETWORK,
+                ResourceCategory.NETWORK,
+                identifier="projects/foreign/regions/us-central1/subnetworks/app",
+                vpc_id="shared",
+                metadata={
+                    GcpResourceMetadata.NAME: "app",
+                    GcpResourceMetadata.PROJECT: "foreign",
+                    GcpResourceMetadata.REGION: "us-central1",
+                },
+            )
+            primary_route = _gcp_resource(
+                "google_compute_route.primary_internet",
+                GcpResourceType.COMPUTE_ROUTE,
+                ResourceCategory.NETWORK,
+                vpc_id="shared",
+                metadata={
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.ROUTE_DEST_RANGE: "0.0.0.0/0",
+                    GcpResourceMetadata.ROUTE_NEXT_HOP_GATEWAY: "default-internet-gateway",
+                },
+            )
+            resources = [primary_route, primary_subnetwork, foreign_subnetwork]
+            if reverse_order:
+                resources.reverse()
+
+            DeriveNetworkPostureStage().apply(resources, _context(resources))
+
+            with self.subTest(reverse_order=reverse_order):
+                self.assertTrue(primary_subnetwork.has_public_route)
+                self.assertTrue(primary_subnetwork.is_public_subnet)
+                self.assertFalse(foreign_subnetwork.has_public_route)
+                self.assertFalse(foreign_subnetwork.is_public_subnet)
+
+    def test_explicit_router_nat_targets_only_the_same_project_subnetwork(
+        self,
+    ) -> None:
+        for reverse_order in (False, True):
+            primary_subnetwork = _gcp_resource(
+                "google_compute_subnetwork.primary",
+                GcpResourceType.COMPUTE_SUBNETWORK,
+                ResourceCategory.NETWORK,
+                identifier="projects/primary/regions/us-central1/subnetworks/app",
+                vpc_id="shared",
+                metadata={
+                    GcpResourceMetadata.NAME: "app",
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.REGION: "us-central1",
+                },
+            )
+            foreign_subnetwork = _gcp_resource(
+                "google_compute_subnetwork.foreign",
+                GcpResourceType.COMPUTE_SUBNETWORK,
+                ResourceCategory.NETWORK,
+                identifier="projects/foreign/regions/us-central1/subnetworks/app",
+                vpc_id="shared",
+                metadata={
+                    GcpResourceMetadata.NAME: "app",
+                    GcpResourceMetadata.PROJECT: "foreign",
+                    GcpResourceMetadata.REGION: "us-central1",
+                },
+            )
+            primary_nat = _gcp_resource(
+                "google_compute_router_nat.primary",
+                GcpResourceType.COMPUTE_ROUTER_NAT,
+                ResourceCategory.NETWORK,
+                metadata={
+                    GcpResourceMetadata.PROJECT: "primary",
+                    GcpResourceMetadata.REGION: "us-central1",
+                    "source_subnetwork_ip_ranges_to_nat": "LIST_OF_SUBNETWORKS",
+                    GcpResourceMetadata.NAT_SUBNETWORKS: [{"name": "app"}],
+                },
+            )
+            resources = [primary_nat, primary_subnetwork, foreign_subnetwork]
+            if reverse_order:
+                resources.reverse()
+
+            DeriveNetworkPostureStage().apply(resources, _context(resources))
+
+            with self.subTest(reverse_order=reverse_order):
+                self.assertTrue(primary_subnetwork.has_nat_gateway_egress)
+                self.assertFalse(foreign_subnetwork.has_nat_gateway_egress)
+
     def test_network_posture_stage_distinguishes_all_subnet_and_explicit_nat_modes(self) -> None:
         all_subnet_app = _subnetwork("google_compute_subnetwork.app")
         all_subnet_data = _subnetwork("google_compute_subnetwork.data")

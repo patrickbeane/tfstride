@@ -183,7 +183,7 @@ class GcpPublicCloudRunLoggingSinkDisruptionRuleTests(unittest.TestCase):
 
         self.assertEqual(_evaluate_inventory(inventory), [])
 
-    def test_unresolved_current_custom_role_identity_suppresses_stale_candidate(
+    def test_current_custom_role_uses_remaining_strong_identity_and_rejects_unresolved_identity(
         self,
     ) -> None:
         inventory, findings = _evaluate(_resources())
@@ -191,7 +191,16 @@ class GcpPublicCloudRunLoggingSinkDisruptionRuleTests(unittest.TestCase):
 
         role = inventory.get_by_address(_CUSTOM_ROLE_ADDRESS)
         assert role is not None
-        gcp_facts(role).set(GcpResourceMetadata.CUSTOM_ROLE_ID, None)
+        role_facts = gcp_facts(role)
+        role_facts.set(GcpResourceMetadata.CUSTOM_ROLE_ID, None)
+
+        self.assertEqual(
+            [finding.rule_id for finding in _evaluate_inventory(inventory)],
+            [_RULE_ID],
+        )
+
+        role.identifier = None
+        role_facts.set(GcpResourceMetadata.NAME, None)
 
         self.assertEqual(_evaluate_inventory(inventory), [])
 

@@ -12,8 +12,8 @@ from tfstride.providers.coercion import (
     dedupe,
     dedupe_strings,
 )
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.iam_reference_utils import (
-    custom_role_reference_keys,
     gcs_bucket_scope_name,
     gcs_bucket_target_matches,
     normalize_gcp_project,
@@ -32,15 +32,12 @@ from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_RUN_RESOURCE_TYPES,
-    GCP_CUSTOM_ROLE_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
 from tfstride.providers.gcp.resource_utils import (
-    GCP_ROLE_REFERENCE_SUFFIXES,
     binding_members,
-    gcp_reference_key,
 )
 
 _DELETE_PERMISSION = "storage.objects.delete"
@@ -79,15 +76,6 @@ _QUIET_PREDEFINED_ROLES = frozenset(
 _SoftDeleteState = Literal["enabled", "disabled", "unknown", "not_observed"]
 _ScopeState = Literal["applicable", "unrelated", "unresolved"]
 _BUCKET_SCOPE_TYPE: Literal["bucket"] = "bucket"
-
-
-@dataclass(frozen=True, slots=True)
-class _CustomRole:
-    resource: NormalizedResource
-    permissions: tuple[str, ...]
-    permissions_state: str
-    stage: str | None
-    deleted: bool | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +131,7 @@ class ModelCloudRunGcsObjectDeletionPathsStage:
         buckets = tuple(resource for resource in resources if resource.resource_type == GcpResourceType.STORAGE_BUCKET)
         iam_resources = tuple(resource for resource in resources if resource.resource_type in _IAM_RESOURCE_TYPES)
         resources_by_address = {resource.address: resource for resource in resources}
-        custom_roles = _custom_roles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
@@ -165,7 +153,7 @@ def _cloud_run_gcs_object_deletion_paths(
     buckets: Sequence[NormalizedResource],
     iam_resources: Sequence[NormalizedResource],
     resources_by_address: Mapping[str, NormalizedResource],
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpCloudRunGcsObjectDeletionPath], list[str]]:
     workload_facts = gcp_facts(workload)
@@ -235,7 +223,7 @@ def _bucket_grant_candidates(
     service_account_member: str,
     iam_resources: Sequence[NormalizedResource],
     resources_by_address: Mapping[str, NormalizedResource],
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[_GrantCandidate], list[str]]:
     candidates: list[_GrantCandidate] = []
@@ -455,7 +443,7 @@ def _source_may_affect_runtime_deletion(
     source: NormalizedResource,
     bindings: Sequence[Mapping[str, object]],
     service_account_member: str,
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     scope_type: GcpGcsObjectDeletionScopeType,
 ) -> bool:
     if source.resource_type.endswith("_iam_policy") and gcp_facts(source).iam_policy_data_state != "configured":
@@ -527,7 +515,7 @@ def _applicable_scope(
 
 def _resolve_role(
     role: str,
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     *,
     scope_type: GcpGcsObjectDeletionScopeType,
 ) -> _RoleResolution:
@@ -544,61 +532,66 @@ def _resolve_role(
     if not _looks_like_custom_role(role):
         return _RoleResolution("predefined", "unmodeled", False)
 
-    custom = custom_roles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
+    resolution = custom_roles.resolve(role)
+    custom = resolution.selected_candidate
     if custom is None:
-        return _RoleResolution("custom", "external_or_unresolved", False)
+        state = "ambiguous" if resolution.state == "ambiguous" else "external_or_unresolved"
+        return _RoleResolution("custom", state, False)
 
-    if custom.deleted is True:
+    facts = gcp_facts(custom)
+    permissions = tuple(sorted(set(facts.custom_role_permissions)))
+    if facts.custom_role_deleted is True:
         return _RoleResolution(
             "custom",
             "resolved",
             False,
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
-    if custom.deleted is None:
+    if facts.custom_role_deleted is None:
         return _RoleResolution(
             "custom",
             "unknown_deleted_state",
             False,
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
 
-    stage = custom.stage.upper() if custom.stage is not None else None
+    stage = facts.custom_role_stage.upper() if facts.custom_role_stage is not None else None
     if stage is None:
         return _RoleResolution(
             "custom",
             "unknown_stage",
             False,
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
     if stage == "DISABLED":
         return _RoleResolution(
             "custom",
             "resolved",
             False,
-            custom_role_permissions=custom.permissions,
-            role_definition_address=custom.resource.address,
+            custom_role_permissions=permissions,
+            role_definition_address=custom.address,
         )
     if stage not in _ACTIVE_CUSTOM_ROLE_STAGES:
         return _RoleResolution(
             "custom",
             "unsupported_stage",
             False,
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
-    if custom.permissions_state != "configured":
+    permissions_state = facts.custom_role_permissions_state or "unknown"
+    if permissions_state != "configured":
         return _RoleResolution(
             "custom",
-            custom.permissions_state or "unknown",
+            permissions_state,
             False,
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
     return _RoleResolution(
         "custom",
         "resolved",
-        _permissions_grant_delete(custom.permissions),
-        custom_role_permissions=custom.permissions,
-        role_definition_address=custom.resource.address,
+        _permissions_grant_delete(permissions),
+        custom_role_permissions=permissions,
+        role_definition_address=custom.address,
     )
 
 
@@ -705,26 +698,6 @@ def _recovery_evidence(
         "uncertainties": dedupe(uncertainties),
     }
     return lifecycle_state, evidence
-
-
-def _custom_roles_by_reference(
-    resources: Sequence[NormalizedResource],
-) -> Mapping[str, _CustomRole]:
-    result: dict[str, _CustomRole] = {}
-    for resource in resources:
-        if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        facts = gcp_facts(resource)
-        custom = _CustomRole(
-            resource,
-            tuple(sorted(set(facts.custom_role_permissions))),
-            facts.custom_role_permissions_state or "unknown",
-            facts.custom_role_stage,
-            facts.custom_role_deleted,
-        )
-        for reference in custom_role_reference_keys(resource):
-            result.setdefault(reference, custom)
-    return result
 
 
 def _permissions_grant_delete(permissions: Sequence[str]) -> bool:

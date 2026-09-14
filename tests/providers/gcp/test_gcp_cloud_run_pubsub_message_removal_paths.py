@@ -108,15 +108,17 @@ def _project_custom_role(
     *,
     project: str,
     role_id: str = "pubsubAck",
+    address: str = "google_project_iam_custom_role.pubsub_ack",
+    permissions: list[str] | None = None,
 ) -> object:
     return _terraform_resource(
-        "google_project_iam_custom_role.pubsub_ack",
+        address,
         GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
         {
             "project": project,
             "role_id": role_id,
             "name": f"projects/{project}/roles/{role_id}",
-            "permissions": ["pubsub.subscriptions.consume"],
+            "permissions": permissions or ["pubsub.subscriptions.consume"],
         },
     )
 
@@ -468,6 +470,45 @@ class GcpCloudRunPubsubMessageRemovalPathTests(unittest.TestCase):
         self.assertTrue(
             any("ambiguous" in uncertainty for uncertainty in facts.cloud_run_pubsub_message_removal_path_uncertainties)
         )
+
+    def test_conflicting_custom_roles_do_not_create_message_removal_paths_in_either_order(self) -> None:
+        role_name = f"projects/{_PROJECT}/roles/pubsubAck"
+        privileged = _project_custom_role(
+            project=_PROJECT,
+            address="google_project_iam_custom_role.privileged",
+            permissions=["pubsub.subscriptions.consume"],
+        )
+        benign = _project_custom_role(
+            project=_PROJECT,
+            address="google_project_iam_custom_role.benign",
+            permissions=["pubsub.subscriptions.get"],
+        )
+        snapshots: list[tuple[str, ...]] = []
+
+        for case, definitions in {
+            "privileged first": [privileged, benign],
+            "benign first": [benign, privileged],
+        }.items():
+            with self.subTest(case=case):
+                facts = _workload_facts(
+                    [
+                        _cloud_run(),
+                        _topic(),
+                        _subscription(),
+                        *definitions,
+                        _subscription_iam_member(role=role_name),
+                    ]
+                )
+                self.assertEqual(facts.cloud_run_pubsub_message_removal_paths, [])
+                self.assertTrue(
+                    any(
+                        "ambiguous across multiple role definitions" in uncertainty
+                        for uncertainty in facts.cloud_run_pubsub_message_removal_path_uncertainties
+                    )
+                )
+                snapshots.append(tuple(facts.cloud_run_pubsub_message_removal_path_uncertainties))
+
+        self.assertEqual(snapshots[0], snapshots[1])
 
     def test_cross_project_project_custom_role_is_not_grantable(self) -> None:
         topic, subscription = _cross_project_topic_and_subscription()

@@ -18,12 +18,11 @@ from tfstride.providers.gcp.cloud_run_public_invocation import (
     current_cloud_run_public_exposure_reasons,
     current_cloud_run_public_invokers,
 )
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.messaging_topology_destruction_evidence import (
     GcpPubsubTopologyDestructionOperation,
 )
 from tfstride.providers.gcp.resource_decoration.cloud_run_pubsub_topology_destruction_paths import (
-    _custom_role_lifecycles_by_reference,
-    _CustomRoleLifecycle,
     _iam_manager_ambiguities,
     _iam_resource_types,
     _iam_scope,
@@ -95,7 +94,7 @@ class GcpCloudRunPubsubTopologyDisruptionRuleDetectors:
         resources = list(context.inventory.resources)
         decoration_context = GcpDecorationContext(GcpResourceIndexBuilder().build(resources))
         targets, _target_uncertainties = _topology_targets(resources, decoration_context)
-        custom_roles = _custom_role_lifecycles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
         findings: list[Finding] = []
 
@@ -199,7 +198,7 @@ def _is_current_topology_path(
     resources: Sequence[NormalizedResource],
     targets: Sequence[_TopologyTarget],
     decoration_context: GcpDecorationContext,
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
 ) -> bool:
     raw_kind = _known_string(path.get("messaging_resource_kind"))

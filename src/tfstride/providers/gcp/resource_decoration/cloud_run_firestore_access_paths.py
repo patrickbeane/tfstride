@@ -3,23 +3,19 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
-from tfstride.providers.gcp.iam_reference_utils import custom_role_reference_keys
+from tfstride.providers.gcp.custom_role_index import (
+    GcpCustomRoleIndex,
+    build_gcp_custom_role_index,
+    custom_role_permissions,
+)
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
-from tfstride.providers.gcp.resource_utils import (
-    GCP_BASIC_IAM_ROLES,
-    GCP_ROLE_REFERENCE_SUFFIXES,
-    binding_members,
-    gcp_reference_key,
-)
-
-if TYPE_CHECKING:
-    from tfstride.providers.gcp.custom_roles import GcpCustomRoleIndex
+from tfstride.providers.gcp.resource_utils import GCP_BASIC_IAM_ROLES, binding_members
 
 _ACTIVE_CUSTOM_ROLE_STAGES = frozenset(
     {
@@ -28,12 +24,6 @@ _ACTIVE_CUSTOM_ROLE_STAGES = frozenset(
         "DEPRECATED",
         "EAP",
         "GA",
-    }
-)
-_CUSTOM_ROLE_RESOURCE_TYPES = frozenset(
-    {
-        GcpResourceType.ORGANIZATION_IAM_CUSTOM_ROLE,
-        GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
     }
 )
 _ACCESS_CLASS_ORDER = (
@@ -147,13 +137,6 @@ class _FirestoreRoleAccess:
     custom_role_permissions: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True)
-class _CustomRoleLifecycle:
-    resource_address: str
-    stage: str | None
-    deleted: bool | None
-
-
 class ModelCloudRunFirestoreAccessPathsStage:
     """Model IAM-authorized Cloud Run server/API access to Firestore.
 
@@ -168,12 +151,8 @@ class ModelCloudRunFirestoreAccessPathsStage:
         resources: list[NormalizedResource],
         context: GcpDecorationContext,
     ) -> None:
-        # Delay this provider-local import to keep normalizer/plugin initialization acyclic.
-        from tfstride.providers.gcp.custom_roles import build_gcp_custom_role_index
-
         del context
         custom_roles = build_gcp_custom_role_index(resources)
-        custom_role_lifecycles = _custom_role_lifecycles_by_reference(resources)
         databases = tuple(
             resource for resource in resources if resource.resource_type == GcpResourceType.FIRESTORE_DATABASE
         )
@@ -184,7 +163,6 @@ class ModelCloudRunFirestoreAccessPathsStage:
                 workload,
                 databases,
                 custom_roles,
-                custom_role_lifecycles,
             )
             facts = gcp_facts(workload)
             facts.set_cloud_run_firestore_access_paths(paths)
@@ -195,7 +173,6 @@ def _cloud_run_firestore_access_paths(
     workload: NormalizedResource,
     databases: tuple[NormalizedResource, ...],
     custom_roles: GcpCustomRoleIndex,
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
 ) -> tuple[list[dict[str, Any]], list[str]]:
     workload_facts = gcp_facts(workload)
     service_account_member = workload_facts.service_account_member
@@ -224,7 +201,7 @@ def _cloud_run_firestore_access_paths(
 
             lifecycle_issue = _custom_role_lifecycle_issue(
                 role,
-                custom_role_lifecycles,
+                custom_roles,
             )
             if lifecycle_issue is not None:
                 uncertainties.append(
@@ -304,45 +281,33 @@ def _cloud_run_firestore_access_paths(
     return paths, dedupe(uncertainties)
 
 
-def _custom_role_lifecycles_by_reference(
-    resources: list[NormalizedResource],
-) -> Mapping[str, _CustomRoleLifecycle]:
-    lifecycles: dict[str, _CustomRoleLifecycle] = {}
-    for resource in resources:
-        if resource.resource_type not in _CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        facts = gcp_facts(resource)
-        lifecycle = _CustomRoleLifecycle(
-            resource.address,
-            facts.custom_role_stage,
-            facts.custom_role_deleted,
-        )
-        for reference in custom_role_reference_keys(resource):
-            lifecycles.setdefault(reference, lifecycle)
-    return lifecycles
-
-
 def _custom_role_lifecycle_issue(
     role: str,
-    lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> str | None:
     if not _looks_like_custom_role(role):
         return None
-    lifecycle = lifecycles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
-    if lifecycle is None:
+    resolution = custom_roles.resolve(role)
+    if resolution.state == "ambiguous":
+        addresses = ", ".join(candidate.address for candidate in resolution.candidates)
+        return f"is ambiguous across {addresses} and does not grant Firestore permissions"
+    resource = resolution.selected_candidate
+    if resource is None:
         return None
-    if lifecycle.deleted is True:
-        return f"is deleted ({lifecycle.resource_address}) and does not grant Firestore permissions"
-    if lifecycle.deleted is None:
-        return f"has unresolved deletion lifecycle ({lifecycle.resource_address})"
 
-    stage = lifecycle.stage.upper() if lifecycle.stage is not None else None
+    facts = gcp_facts(resource)
+    if facts.custom_role_deleted is True:
+        return f"is deleted ({resource.address}) and does not grant Firestore permissions"
+    if facts.custom_role_deleted is None:
+        return f"has unresolved deletion lifecycle ({resource.address})"
+
+    stage = facts.custom_role_stage.upper() if facts.custom_role_stage is not None else None
     if stage is None:
-        return f"has unresolved lifecycle stage ({lifecycle.resource_address})"
+        return f"has unresolved lifecycle stage ({resource.address})"
     if stage == "DISABLED":
-        return f"is disabled ({lifecycle.resource_address}) and does not grant Firestore permissions"
+        return f"is disabled ({resource.address}) and does not grant Firestore permissions"
     if stage not in _ACTIVE_CUSTOM_ROLE_STAGES:
-        return f"has unsupported lifecycle stage {stage} ({lifecycle.resource_address})"
+        return f"has unsupported lifecycle stage {stage} ({resource.address})"
     return None
 
 
@@ -360,8 +325,8 @@ def _role_access(
             matched_permissions,
         )
 
-    permissions = custom_roles.permissions_by_reference.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
-    if permissions is None:
+    permissions = custom_role_permissions(role, custom_roles)
+    if not permissions:
         return None
     matched_permissions = tuple(sorted(permission for permission in permissions if _permission_classes(permission)))
     if not matched_permissions:
@@ -402,7 +367,7 @@ def _custom_role_is_resolved(
     role: str,
     custom_roles: GcpCustomRoleIndex,
 ) -> bool:
-    return gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES) in custom_roles.permissions_by_reference
+    return bool(custom_role_permissions(role, custom_roles))
 
 
 def _grant_is_exact_for_database(

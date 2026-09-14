@@ -18,9 +18,9 @@ from tfstride.providers.gcp.cloud_run_public_invocation import (
     current_cloud_run_public_exposure_reasons,
     current_cloud_run_public_invokers,
 )
+from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
 from tfstride.providers.gcp.iam_reference_utils import custom_role_reference_keys
 from tfstride.providers.gcp.resource_decoration.cloud_run_pubsub_message_removal_paths import (
-    _custom_role_lifecycles_by_reference,
     _delivery_evidence,
     _iam_manager_ambiguities,
     _iam_scope,
@@ -564,7 +564,7 @@ def _is_current_message_removal_path(
 
     current_resources = list(context.inventory.resources)
     decoration_context = GcpDecorationContext(GcpResourceIndexBuilder().build(current_resources))
-    lifecycles = _custom_role_lifecycles_by_reference(current_resources)
+    lifecycles = build_gcp_custom_role_index(current_resources)
     project_organizations = _project_organizations(current_resources)
     current_role_access, role_scope_compatibility = _role_access(
         role,
@@ -638,7 +638,7 @@ def _current_pubsub_iam_manager_is_ambiguous(
         for resource in resources
         if resource.resource_type in (GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES)
     )
-    lifecycles = _custom_role_lifecycles_by_reference(resources)
+    lifecycles = build_gcp_custom_role_index(resources)
     ambiguous_scopes, ambiguous_roles, _ = _iam_manager_ambiguities(
         subscription,
         subscription_project,

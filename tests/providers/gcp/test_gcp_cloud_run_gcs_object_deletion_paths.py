@@ -161,6 +161,7 @@ def _project_member(
 def _custom_role(
     *,
     role_id: str = "objectDeleter",
+    address: str | None = None,
     permissions: list[str] | None = None,
     stage: str | None = None,
     deleted: bool | None = None,
@@ -186,7 +187,7 @@ def _custom_role(
     if unknown_deleted:
         unknown_values["deleted"] = True
     return _terraform_resource(
-        f"google_project_iam_custom_role.{role_id}",
+        address or f"google_project_iam_custom_role.{role_id}",
         GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
         values,
         unknown_values=unknown_values,
@@ -360,6 +361,42 @@ class GcpCloudRunGcsObjectDeletionPathTests(unittest.TestCase):
                     "google_project_iam_custom_role.objectDeleter",
                 ],
             )
+
+    def test_conflicting_custom_roles_do_not_create_deletion_paths_in_either_order(self) -> None:
+        role = f"projects/{_PROJECT}/roles/objectDeleter"
+        privileged = _custom_role(
+            address="google_project_iam_custom_role.privileged",
+            permissions=["storage.objects.delete"],
+        )
+        benign = _custom_role(
+            address="google_project_iam_custom_role.benign",
+            permissions=["storage.objects.get"],
+        )
+        snapshots: list[tuple[str, ...]] = []
+
+        for case, definitions in {
+            "privileged first": [privileged, benign],
+            "benign first": [benign, privileged],
+        }.items():
+            with self.subTest(case=case):
+                _, facts = _facts(
+                    [
+                        _cloud_run(),
+                        _bucket(),
+                        *definitions,
+                        _bucket_member(role=role),
+                    ]
+                )
+                self.assertEqual(facts.cloud_run_gcs_object_deletion_paths, [])
+                self.assertTrue(
+                    any(
+                        "ambiguous" in uncertainty
+                        for uncertainty in facts.cloud_run_gcs_object_deletion_path_uncertainties
+                    )
+                )
+                snapshots.append(tuple(facts.cloud_run_gcs_object_deletion_path_uncertainties))
+
+        self.assertEqual(snapshots[0], snapshots[1])
 
     def test_disabled_and_unknown_custom_role_stages_do_not_create_paths(self) -> None:
         role = f"projects/{_PROJECT}/roles/objectDeleter"

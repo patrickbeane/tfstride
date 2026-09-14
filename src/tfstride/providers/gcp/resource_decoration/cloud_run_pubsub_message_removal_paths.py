@@ -12,7 +12,7 @@ from tfstride.providers.coercion import (
     STATE_UNKNOWN,
     dedupe,
 )
-from tfstride.providers.gcp.iam_reference_utils import custom_role_reference_keys
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.message_removal_evidence import (
     GcpCloudRunPubsubMessageRemovalPath,
     GcpPubsubAcknowledgedMessageReplayState,
@@ -98,7 +98,7 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
         resources: list[NormalizedResource],
         context: GcpDecorationContext,
     ) -> None:
-        custom_role_lifecycles = _custom_role_lifecycles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
         subscriptions = tuple(
             resource for resource in resources if resource.resource_type == GcpResourceType.PUBSUB_SUBSCRIPTION
@@ -116,7 +116,7 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
                 subscriptions,
                 iam_resources,
                 context,
-                custom_role_lifecycles,
+                custom_roles,
                 project_organizations,
             )
             facts = gcp_facts(workload)
@@ -129,7 +129,7 @@ def _cloud_run_pubsub_message_removal_paths(
     subscriptions: Sequence[NormalizedResource],
     iam_resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
 ) -> tuple[list[GcpCloudRunPubsubMessageRemovalPath], list[str]]:
     workload_facts = gcp_facts(workload)
@@ -170,7 +170,7 @@ def _cloud_run_pubsub_message_removal_paths(
             subscription_project,
             iam_resources,
             context,
-            custom_role_lifecycles,
+            custom_roles,
         )
         uncertainties.extend(
             f"{workload.address}: {message} for {subscription.address}" for message in manager_uncertainties
@@ -223,12 +223,17 @@ def _cloud_run_pubsub_message_removal_paths(
                     continue
                 role_access, compatibility_state = _role_access(
                     role,
-                    custom_role_lifecycles,
+                    custom_roles,
                     subscription_project,
                     project_organizations,
                 )
                 if role_access is None:
-                    if compatibility_state == "incompatible":
+                    if compatibility_state == "ambiguous":
+                        uncertainties.append(
+                            f"{workload.address}: {source} custom IAM role {role} is ambiguous across "
+                            "multiple role definitions"
+                        )
+                    elif compatibility_state == "incompatible":
                         uncertainties.append(
                             f"{workload.address}: {source} custom IAM role {role} is not grantable "
                             f"in consumer project {subscription_project}"
@@ -244,7 +249,7 @@ def _cloud_run_pubsub_message_removal_paths(
                             "an active Pub/Sub acknowledgement permission"
                         )
                     continue
-                role_key = _role_reconciliation_key(role, custom_role_lifecycles)
+                role_key = _role_reconciliation_key(role, custom_roles)
                 if (scope_type, scope) in ambiguous_scopes or (scope_type, scope, role_key) in ambiguous_roles:
                     continue
                 fingerprint = (
@@ -304,7 +309,7 @@ def _iam_manager_ambiguities(
     project: str,
     iam_resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[
     set[tuple[Literal["project", "subscription"], str]],
     set[tuple[Literal["project", "subscription"], str, str]],
@@ -321,7 +326,7 @@ def _iam_manager_ambiguities(
         )
         management_mode = _management_mode(iam_resource)
         bindings = iam_bindings(iam_resource)
-        roles = _manager_role_keys(bindings, custom_role_lifecycles)
+        roles = _manager_role_keys(bindings, custom_roles)
         if scope_type is None or scope is None:
             potential_scope = _potential_unresolved_manager_scope(
                 iam_resource,
@@ -423,12 +428,12 @@ def _iam_manager_ambiguities(
 
 def _manager_role_keys(
     bindings: Sequence[Mapping[str, Any]],
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[str, ...]:
     return tuple(
         sorted(
             {
-                _role_reconciliation_key(role, custom_role_lifecycles)
+                _role_reconciliation_key(role, custom_roles)
                 for binding in bindings
                 if binding.get("role_state") != "unknown" and (role := _known_string(binding.get("role"))) is not None
             }
@@ -459,12 +464,15 @@ def _potential_unresolved_manager_scope(
 
 def _role_reconciliation_key(
     role: str,
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> str:
     normalized = gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES)
-    lifecycle = custom_role_lifecycles.get(normalized)
-    if lifecycle is not None:
-        return f"custom:{lifecycle.resource_address}"
+    resolution = custom_roles.resolve(role)
+    role_definition = resolution.selected_candidate
+    if role_definition is not None:
+        return f"custom:{role_definition.address}"
+    if resolution.state == "ambiguous":
+        return f"ambiguous-custom:{normalized}"
     return f"role:{normalized}"
 
 
@@ -515,17 +523,24 @@ def _binding_member_applies(binding: Mapping[str, Any], member: str) -> bool:
 
 def _role_access(
     role: str,
-    lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
     consumer_project: str,
     project_organizations: Mapping[str, str],
-) -> tuple[_RoleAccess | None, Literal["incompatible", "unknown"] | None]:
+) -> tuple[_RoleAccess | None, Literal["ambiguous", "incompatible", "unknown"] | None]:
     built_in_kind = _BUILT_IN_SUBSCRIPTION_ROLES.get(role)
     if built_in_kind is not None:
         return _RoleAccess(built_in_kind, (), None, None, None, "not_applicable"), None
     if not _looks_like_custom_role(role):
         return None, None
-    lifecycle = lifecycles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
-    if lifecycle is None or lifecycle.deleted is not False or lifecycle.stage is None:
+
+    resolution = custom_roles.resolve(role)
+    if resolution.state == "ambiguous":
+        return None, "ambiguous"
+    role_definition = resolution.selected_candidate
+    if role_definition is None:
+        return None, None
+    lifecycle = _custom_role_lifecycle(role_definition)
+    if lifecycle.deleted is not False or lifecycle.stage is None:
         return None, None
     stage = lifecycle.stage.upper()
     if stage not in _ACTIVE_CUSTOM_ROLE_STAGES:
@@ -721,28 +736,16 @@ def _project_organizations(resources: Sequence[NormalizedResource]) -> Mapping[s
     return organizations
 
 
-def _custom_role_lifecycles_by_reference(
-    resources: Sequence[NormalizedResource],
-) -> Mapping[str, _CustomRoleLifecycle]:
-    lifecycles: dict[str, _CustomRoleLifecycle] = {}
-    for resource in resources:
-        if resource.resource_type not in {
-            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
-            GcpResourceType.ORGANIZATION_IAM_CUSTOM_ROLE,
-        }:
-            continue
-        facts = gcp_facts(resource)
-        lifecycle = _CustomRoleLifecycle(
-            resource.address,
-            _normalize_project(facts.project),
-            _normalize_organization(facts.organization_id),
-            facts.custom_role_stage,
-            facts.custom_role_deleted,
-            tuple(sorted(set(facts.custom_role_permissions))),
-        )
-        for reference in custom_role_reference_keys(resource):
-            lifecycles.setdefault(reference, lifecycle)
-    return lifecycles
+def _custom_role_lifecycle(resource: NormalizedResource) -> _CustomRoleLifecycle:
+    facts = gcp_facts(resource)
+    return _CustomRoleLifecycle(
+        resource.address,
+        _normalize_project(facts.project),
+        _normalize_organization(facts.organization_id),
+        facts.custom_role_stage,
+        facts.custom_role_deleted,
+        tuple(sorted(set(facts.custom_role_permissions))),
+    )
 
 
 def _topic_reference(topic: NormalizedResource) -> str:

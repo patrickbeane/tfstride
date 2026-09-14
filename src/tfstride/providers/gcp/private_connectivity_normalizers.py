@@ -121,6 +121,7 @@ def normalize_network_connectivity_service_connection_policy(resource: Terraform
     unknown_values = resource.unknown_values
     uncertainties: list[str] = []
     name = known_string(values, unknown_values, "name", uncertainties)
+    project = known_string(values, unknown_values, "project", uncertainties)
     network = known_string(values, unknown_values, "network", uncertainties)
     service_class = known_string(values, unknown_values, "service_class", uncertainties)
     region = known_string(values, unknown_values, "location", uncertainties, path="location")
@@ -137,6 +138,7 @@ def normalize_network_connectivity_service_connection_policy(resource: Terraform
         subnet_ids=tuple(psc_subnetworks),
         metadata={
             GcpResourceMetadata.NAME: name or resource.name,
+            GcpResourceMetadata.PROJECT: project,
             GcpResourceMetadata.REGION: region,
             GcpResourceMetadata.NETWORK: network,
             GcpResourceMetadata.PSC_SERVICE_CLASS: service_class,

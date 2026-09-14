@@ -6,8 +6,8 @@ from typing import Any, Literal, cast
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.iam_reference_utils import (
-    custom_role_reference_keys,
     normalize_gcp_project,
 )
 from tfstride.providers.gcp.messaging_topology_destruction_evidence import (
@@ -100,7 +100,7 @@ class ModelCloudRunPubsubTopologyDestructionPathsStage:
         context: GcpDecorationContext,
     ) -> None:
         targets, target_uncertainties = _topology_targets(resources, context)
-        custom_roles = _custom_role_lifecycles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
         iam_resources = tuple(
             resource
@@ -135,7 +135,7 @@ def _cloud_run_pubsub_topology_destruction_paths(
     targets: Sequence[_TopologyTarget],
     iam_resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
 ) -> tuple[list[GcpCloudRunPubsubTopologyDestructionPath], list[str]]:
     workload_facts = gcp_facts(workload)
@@ -363,7 +363,7 @@ def _iam_manager_ambiguities(
     target: _TopologyTarget,
     iam_resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[
     set[tuple[_ScopeType, str]],
     set[tuple[_ScopeType, str, str]],
@@ -532,7 +532,7 @@ def _role_evidence(
     operation: GcpPubsubTopologyDestructionOperation,
     target_project: str,
     scope_type: _ScopeType,
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
 ) -> tuple[GcpPubsubTopologyRoleEvidence | None, str | None]:
     built_in_kind = _BUILT_IN_DELETE_ROLES.get(role)
@@ -550,9 +550,14 @@ def _role_evidence(
         return evidence, None
     if not _looks_like_custom_role(role):
         return None, None
-    lifecycle = custom_roles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
-    if lifecycle is None:
+    resolution = custom_roles.resolve(role)
+    if resolution.state == "ambiguous":
+        addresses = ", ".join(candidate.address for candidate in resolution.candidates)
+        return None, f"custom IAM role {role} is ambiguous across {addresses}"
+    role_definition = resolution.selected_candidate
+    if role_definition is None:
         return None, f"custom IAM role {role} is unresolved"
+    lifecycle = _custom_role_lifecycle(role_definition)
     if lifecycle.deleted is True:
         return None, None
     if lifecycle.deleted is None:
@@ -694,29 +699,17 @@ def _topology_destruction_path(
     return cast(GcpCloudRunPubsubTopologyDestructionPath, common)
 
 
-def _custom_role_lifecycles_by_reference(
-    resources: Sequence[NormalizedResource],
-) -> Mapping[str, _CustomRoleLifecycle]:
-    lifecycles: dict[str, _CustomRoleLifecycle] = {}
-    for resource in resources:
-        if resource.resource_type not in {
-            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
-            GcpResourceType.ORGANIZATION_IAM_CUSTOM_ROLE,
-        }:
-            continue
-        facts = gcp_facts(resource)
-        lifecycle = _CustomRoleLifecycle(
-            resource.address,
-            normalize_gcp_project(facts.project),
-            _normalize_organization(facts.organization_id),
-            facts.custom_role_stage,
-            facts.custom_role_deleted,
-            tuple(sorted(set(facts.custom_role_permissions))),
-            facts.custom_role_permissions_state,
-        )
-        for reference in custom_role_reference_keys(resource):
-            lifecycles.setdefault(reference, lifecycle)
-    return lifecycles
+def _custom_role_lifecycle(resource: NormalizedResource) -> _CustomRoleLifecycle:
+    facts = gcp_facts(resource)
+    return _CustomRoleLifecycle(
+        resource.address,
+        normalize_gcp_project(facts.project),
+        _normalize_organization(facts.organization_id),
+        facts.custom_role_stage,
+        facts.custom_role_deleted,
+        tuple(sorted(set(facts.custom_role_permissions))),
+        facts.custom_role_permissions_state,
+    )
 
 
 def _project_organizations(
@@ -736,18 +729,21 @@ def _project_organizations(
 
 def _role_reconciliation_key(
     role: str,
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> str:
     normalized = gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES)
-    lifecycle = custom_roles.get(normalized)
-    if lifecycle is not None:
-        return f"custom:{lifecycle.resource_address}"
+    resolution = custom_roles.resolve(role)
+    role_definition = resolution.selected_candidate
+    if role_definition is not None:
+        return f"custom:{role_definition.address}"
+    if resolution.state == "ambiguous":
+        return f"ambiguous-custom:{normalized}"
     return f"role:{normalized}"
 
 
 def _manager_role_keys(
     bindings: Sequence[Mapping[str, Any]],
-    custom_roles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[str, ...]:
     return tuple(
         sorted(

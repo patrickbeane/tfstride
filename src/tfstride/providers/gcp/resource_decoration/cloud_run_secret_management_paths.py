@@ -7,19 +7,18 @@ from typing import Any, Literal, TypedDict, TypeGuard
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_RUN_RESOURCE_TYPES,
-    GCP_CUSTOM_ROLE_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_SECRET_MANAGER_SECRET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
 from tfstride.providers.gcp.resource_utils import (
-    GCP_ROLE_REFERENCE_SUFFIXES,
     binding_members,
     gcp_reference_key,
 )
@@ -96,13 +95,6 @@ class _RoleResolution:
     role_definition_address: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class _CustomRole:
-    resource: NormalizedResource
-    permissions: tuple[str, ...]
-    permissions_state: str
-
-
 class _ManagementSource(TypedDict):
     source: str
     scope_type: GcpSecretManagerScopeType
@@ -144,7 +136,7 @@ class NormalizeSecretManagerIamPostureStage:
         context: GcpDecorationContext,
     ) -> None:
         iam_resources = tuple(resource for resource in resources if resource.resource_type in _IAM_RESOURCE_TYPES)
-        custom_roles = _custom_roles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         for secret in resources:
             if secret.resource_type != GcpResourceType.SECRET_MANAGER_SECRET:
                 continue
@@ -272,7 +264,7 @@ def _resolve_version_parent(
 def _secret_iam_posture(
     secret: NormalizedResource,
     iam_resources: Sequence[NormalizedResource],
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpSecretManagerIamGrant], list[str]]:
     secret_path = _secret_resource_name(secret)
@@ -821,7 +813,7 @@ def _applicable_scope(
 
 def _resolve_role(
     role: str,
-    custom_roles: Mapping[str, _CustomRole],
+    custom_roles: GcpCustomRoleIndex,
 ) -> _RoleResolution:
     predefined = _PREDEFINED_ROLE_PERMISSIONS.get(role)
     if predefined is not None:
@@ -831,23 +823,29 @@ def _resolve_role(
     if not _looks_like_custom_role(role):
         return _RoleResolution("predefined", "unmodeled", ())
 
-    custom = custom_roles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
+    resolution = custom_roles.resolve(role)
+    custom = resolution.selected_candidate
     if custom is None:
-        return _RoleResolution("custom", "external_or_unresolved", ())
-    if custom.permissions_state != "configured":
+        state = "ambiguous" if resolution.state == "ambiguous" else "external_or_unresolved"
+        return _RoleResolution("custom", state, ())
+
+    facts = gcp_facts(custom)
+    permissions_state = facts.custom_role_permissions_state or "unknown"
+    if permissions_state != "configured":
         return _RoleResolution(
             "custom",
-            custom.permissions_state or "unknown",
+            permissions_state,
             (),
-            role_definition_address=custom.resource.address,
+            role_definition_address=custom.address,
         )
-    permissions = tuple(_management_permissions(custom.permissions))
+    custom_permissions = tuple(sorted(set(facts.custom_role_permissions)))
+    permissions = tuple(_management_permissions(custom_permissions))
     return _RoleResolution(
         "custom",
         "resolved",
         permissions,
-        custom_role_permissions=custom.permissions,
-        role_definition_address=custom.resource.address,
+        custom_role_permissions=custom_permissions,
+        role_definition_address=custom.address,
     )
 
 
@@ -915,44 +913,6 @@ def _mark_ambiguous(
         grant["management_state"] = "ambiguous"
         if grant["authorization_state"] != "unknown":
             grant["authorization_state"] = "ambiguous"
-
-
-def _custom_roles_by_reference(
-    resources: Sequence[NormalizedResource],
-) -> Mapping[str, _CustomRole]:
-    result: dict[str, _CustomRole] = {}
-    for resource in resources:
-        if resource.resource_type not in GCP_CUSTOM_ROLE_RESOURCE_TYPES:
-            continue
-        facts = gcp_facts(resource)
-        custom = _CustomRole(
-            resource=resource,
-            permissions=tuple(sorted(set(facts.custom_role_permissions))),
-            permissions_state=facts.custom_role_permissions_state or "unknown",
-        )
-        references: set[str | None] = {
-            resource.address,
-            f"{resource.address}.id",
-            f"{resource.address}.name",
-            f"{resource.address}.role_id",
-            resource.identifier,
-            facts.resource_name,
-            facts.custom_role_id,
-        }
-        if facts.project and facts.custom_role_id:
-            references.add(f"projects/{facts.project}/roles/{facts.custom_role_id}")
-        if facts.organization_id and facts.custom_role_id:
-            references.add(f"organizations/{facts.organization_id}/roles/{facts.custom_role_id}")
-        for reference in references:
-            if reference:
-                result.setdefault(
-                    gcp_reference_key(
-                        reference.strip(),
-                        GCP_ROLE_REFERENCE_SUFFIXES,
-                    ),
-                    custom,
-                )
-    return result
 
 
 def _secret_resource_name(secret: NormalizedResource) -> str | None:

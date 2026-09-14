@@ -371,6 +371,53 @@ class GcpResourceDecoratorTests(unittest.TestCase):
                     suffixed_network,
                 )
 
+    def test_unmodeled_network_fallback_is_project_scoped(self) -> None:
+        primary_source = _gcp_resource(
+            "google_compute_route.primary",
+            GcpResourceType.COMPUTE_ROUTE,
+            ResourceCategory.NETWORK,
+            metadata={GcpResourceMetadata.PROJECT: "primary"},
+        )
+        foreign_source = _gcp_resource(
+            "google_compute_route.foreign",
+            GcpResourceType.COMPUTE_ROUTE,
+            ResourceCategory.NETWORK,
+            metadata={GcpResourceMetadata.PROJECT: "foreign"},
+        )
+        unknown_source = _gcp_resource(
+            "google_compute_route.unknown",
+            GcpResourceType.COMPUTE_ROUTE,
+            ResourceCategory.NETWORK,
+        )
+        references = (
+            GcpResourceIndexBuilder().build([primary_source, foreign_source, unknown_source]).network_references
+        )
+
+        self.assertEqual(
+            references.canonical_reference("shared", source=primary_source),
+            "projects/primary/global/networks/shared",
+        )
+        self.assertEqual(
+            references.canonical_reference("shared", source=foreign_source),
+            "projects/foreign/global/networks/shared",
+        )
+        self.assertEqual(
+            references.canonical_reference(
+                "projects/primary/global/networks/shared",
+                source=foreign_source,
+            ),
+            "projects/primary/global/networks/shared",
+        )
+        self.assertEqual(
+            references.canonical_reference(
+                "google_compute_network.shared.id",
+                source=foreign_source,
+            ),
+            "google_compute_network.shared",
+        )
+        self.assertIsNone(references.canonical_reference("shared", source=unknown_source))
+        self.assertIsNone(references.canonical_reference("shared"))
+
     def test_resolution_filters_by_type_project_and_location(self) -> None:
         primary_global = _gcp_resource(
             "google_kms_crypto_key.primary_global",

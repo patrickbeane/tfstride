@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Literal, cast
 
 from tfstride.models import NormalizedResource
@@ -13,11 +12,10 @@ from tfstride.providers.coercion import (
     dedupe,
     dedupe_strings,
 )
-from tfstride.providers.gcp.iam_reference_utils import custom_role_reference_keys
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
-from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, gcp_reference_key
 from tfstride.providers.gcp.structured_data_deletion_evidence import (
     GcpCloudRunFirestoreDeletionPath,
     GcpFirestoreActiveCustomRoleStage,
@@ -28,13 +26,6 @@ from tfstride.providers.gcp.structured_data_deletion_evidence import (
 _ENTITY_DELETE = "datastore.entities.delete"
 _BULK_DELETE = "datastore.databases.bulkDelete"
 _ACTIVE_CUSTOM_ROLE_STAGES = frozenset({"ALPHA", "BETA", "DEPRECATED", "EAP", "GA"})
-
-
-@dataclass(frozen=True, slots=True)
-class _CustomRoleLifecycle:
-    resource_address: str
-    stage: str | None
-    deleted: bool | None
 
 
 class ModelCloudRunFirestoreEntityDeletionPathsStage:
@@ -53,14 +44,14 @@ class ModelCloudRunFirestoreEntityDeletionPathsStage:
             for resource in resources
             if resource.resource_type == GcpResourceType.FIRESTORE_DATABASE
         }
-        custom_role_lifecycles = _custom_role_lifecycles_by_reference(resources)
+        custom_roles = build_gcp_custom_role_index(resources)
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
             paths, uncertainties = _cloud_run_firestore_entity_deletion_paths(
                 workload,
                 databases,
-                custom_role_lifecycles,
+                custom_roles,
             )
             facts = gcp_facts(workload)
             facts.set_cloud_run_firestore_entity_deletion_paths(paths)
@@ -70,7 +61,7 @@ class ModelCloudRunFirestoreEntityDeletionPathsStage:
 def _cloud_run_firestore_entity_deletion_paths(
     workload: NormalizedResource,
     databases: Mapping[str, NormalizedResource],
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[list[GcpCloudRunFirestoreDeletionPath], list[str]]:
     workload_facts = gcp_facts(workload)
     paths: list[GcpCloudRunFirestoreDeletionPath] = []
@@ -88,7 +79,7 @@ def _cloud_run_firestore_entity_deletion_paths(
             workload,
             database,
             access_path,
-            custom_role_lifecycles,
+            custom_roles,
         )
         if common is None:
             uncertainties.append(f"{workload.address}: Firestore access path has incomplete deletion evidence")
@@ -134,7 +125,7 @@ def _common_path_evidence(
     workload: NormalizedResource,
     database: NormalizedResource,
     access_path: Mapping[str, object],
-    custom_role_lifecycles: Mapping[str, _CustomRoleLifecycle],
+    custom_roles: GcpCustomRoleIndex,
 ) -> dict[str, object] | None:
     database_facts = gcp_facts(database)
     service_account_email = _known_string(access_path.get("service_account_email"))
@@ -203,13 +194,17 @@ def _common_path_evidence(
     custom_role_stage: GcpFirestoreActiveCustomRoleStage | None = None
     custom_role_deleted: Literal[False] | None = None
     if role_kind == "custom":
-        lifecycle = custom_role_lifecycles.get(gcp_reference_key(role, GCP_ROLE_REFERENCE_SUFFIXES))
-        if lifecycle is None or lifecycle.deleted is not False or lifecycle.stage is None:
+        resolution = custom_roles.resolve(role)
+        role_definition = resolution.selected_candidate
+        if role_definition is None:
             return None
-        stage = lifecycle.stage.upper()
+        role_facts = gcp_facts(role_definition)
+        if role_facts.custom_role_deleted is not False or role_facts.custom_role_stage is None:
+            return None
+        stage = role_facts.custom_role_stage.upper()
         if stage not in _ACTIVE_CUSTOM_ROLE_STAGES:
             return None
-        role_definition_address = lifecycle.resource_address
+        role_definition_address = role_definition.address
         custom_role_stage = cast(GcpFirestoreActiveCustomRoleStage, stage)
         custom_role_deleted = False
 
@@ -325,27 +320,6 @@ def _recovery_evidence(
         "historical_version_retention_state": "unknown",
         "uncertainties": dedupe(uncertainties),
     }
-
-
-def _custom_role_lifecycles_by_reference(
-    resources: Sequence[NormalizedResource],
-) -> Mapping[str, _CustomRoleLifecycle]:
-    lifecycles: dict[str, _CustomRoleLifecycle] = {}
-    for resource in resources:
-        if resource.resource_type not in {
-            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
-            GcpResourceType.ORGANIZATION_IAM_CUSTOM_ROLE,
-        }:
-            continue
-        facts = gcp_facts(resource)
-        lifecycle = _CustomRoleLifecycle(
-            resource.address,
-            facts.custom_role_stage,
-            facts.custom_role_deleted,
-        )
-        for reference in custom_role_reference_keys(resource):
-            lifecycles.setdefault(reference, lifecycle)
-    return lifecycles
 
 
 def _permission_allows(permissions: Sequence[str], operation: str) -> bool:
