@@ -12,6 +12,9 @@ from tfstride.models import (
     SecurityGroupRule,
 )
 from tfstride.providers.aws.resource_decoration.iam import MergeRolePolicyResourcesStage
+from tfstride.providers.aws.resource_decoration.resource_policies import (
+    ApplyS3PublicAccessBlocksStage,
+)
 from tfstride.providers.aws.resource_decoration_stages import default_aws_decoration_stages
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import aws_facts
@@ -148,6 +151,49 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
                 self.assertIs(index.buckets.get("aws_s3_bucket.first"), first_bucket)
                 self.assertIs(index.buckets.get("aws_s3_bucket.second"), second_bucket)
 
+    def test_duplicate_strong_identity_remains_ambiguous_in_matching_source_configuration(
+        self,
+    ) -> None:
+        duplicate_arn = "arn:aws:s3:::logs"
+        primary_bucket = _resource(
+            address="aws_s3_bucket.primary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="primary-logs",
+            arn=duplicate_arn,
+            provider_config_key="aws.primary",
+        )
+        secondary_bucket = _resource(
+            address="aws_s3_bucket.secondary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="secondary-logs",
+            arn=duplicate_arn,
+            provider_config_key="aws.secondary",
+        )
+        primary_source = _resource(
+            address="aws_s3_bucket_public_access_block.logs",
+            resource_type="aws_s3_bucket_public_access_block",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.primary",
+        )
+
+        for resources in (
+            [primary_bucket, secondary_bucket],
+            [secondary_bucket, primary_bucket],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                resolution = (
+                    AwsResourceIndexBuilder().build(resources).buckets.resolve(duplicate_arn, source=primary_source)
+                )
+
+                self.assertEqual(resolution.state, "ambiguous")
+                self.assertEqual(
+                    resolution.candidates,
+                    (primary_bucket, secondary_bucket),
+                )
+                self.assertIsNone(resolution.selected_candidate)
+
     def test_exact_address_precedes_a_colliding_native_alias(self) -> None:
         exact_bucket = _resource(
             address="aws_s3_bucket.exact",
@@ -264,6 +310,67 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         self.assertEqual(weak_cross_config.candidates, ())
         self.assertEqual(strong_cross_config.state, "resolved")
         self.assertIs(strong_cross_config.selected_candidate, unique_secondary_bucket)
+
+    def test_weak_reference_scope_contract_fails_closed_on_unknown_candidates(self) -> None:
+        local = _resource(
+            address="aws_s3_bucket.local",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            provider_config_key="aws.primary",
+        )
+        foreign = _resource(
+            address="aws_s3_bucket.foreign",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            provider_config_key="aws.secondary",
+        )
+        unknown = _resource(
+            address="aws_s3_bucket.unknown",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+        )
+        source = _resource(
+            address="aws_s3_bucket_policy.source",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key="aws.primary",
+        )
+        cases = (
+            ("known-local", (local,), "resolved", (local,)),
+            ("known-local-and-known-foreign", (local, foreign), "resolved", (local,)),
+            ("known-local-and-unknown", (local, unknown), "ambiguous", (local, unknown)),
+            (
+                "known-local-known-foreign-and-unknown",
+                (local, foreign, unknown),
+                "ambiguous",
+                (local, unknown),
+            ),
+            ("known-foreign", (foreign,), "unresolved", ()),
+            ("unknown", (unknown,), "unresolved", ()),
+            ("known-foreign-and-unknown", (foreign, unknown), "unresolved", ()),
+        )
+
+        for name, candidates, expected_state, expected_candidates in cases:
+            for ordered_candidates in (candidates, tuple(reversed(candidates))):
+                with self.subTest(
+                    case=name,
+                    order=[candidate.address for candidate in ordered_candidates],
+                ):
+                    resolution = (
+                        AwsResourceIndexBuilder()
+                        .build(list(ordered_candidates))
+                        .buckets.resolve("shared", source=source)
+                    )
+
+                    self.assertEqual(resolution.state, expected_state)
+                    self.assertEqual(resolution.candidates, expected_candidates)
+
+        exact = AwsResourceIndexBuilder().build([unknown]).buckets.resolve(unknown.address, source=source)
+        self.assertEqual(exact.state, "resolved")
+        self.assertIs(exact.selected_candidate, unknown)
 
     def test_strong_reference_precedes_a_same_config_weak_alias(self) -> None:
         foreign_key = _resource(
@@ -756,6 +863,45 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "restrict_public_buckets": True,
             },
         )
+
+    def test_ambiguous_bucket_arn_does_not_apply_a_public_access_block(self) -> None:
+        duplicate_arn = "arn:aws:s3:::logs"
+        primary_bucket = _resource(
+            address="aws_s3_bucket.primary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="primary-logs",
+            arn=duplicate_arn,
+            provider_config_key="aws.primary",
+        )
+        secondary_bucket = _resource(
+            address="aws_s3_bucket.secondary",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="secondary-logs",
+            arn=duplicate_arn,
+            provider_config_key="aws.secondary",
+        )
+        access_block = _resource(
+            address="aws_s3_bucket_public_access_block.logs",
+            resource_type="aws_s3_bucket_public_access_block",
+            category=ResourceCategory.DATA,
+            metadata={
+                "bucket": duplicate_arn,
+                "block_public_acls": True,
+                "block_public_policy": True,
+                "ignore_public_acls": True,
+                "restrict_public_buckets": True,
+            },
+            provider_config_key="aws.primary",
+        )
+
+        AwsResourceDecorator(stages=(ApplyS3PublicAccessBlocksStage(),)).decorate(
+            [primary_bucket, secondary_bucket, access_block]
+        )
+
+        self.assertIsNone(aws_facts(primary_bucket).public_access_block)
+        self.assertIsNone(aws_facts(secondary_bucket).public_access_block)
 
     def test_ecs_services_inherit_task_definition_roles_and_runtime_metadata(self) -> None:
         task_role = _resource(

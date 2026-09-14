@@ -493,28 +493,26 @@ def _candidates_in_scope(
 ) -> tuple[NormalizedResource, ...]:
     if expected_scope is None:
         return candidates
-    scoped = tuple(candidate for candidate in candidates if scope_for_resource(candidate) == expected_scope)
-    if scoped:
-        return scoped
-    if any(scope_for_resource(candidate) is not None for candidate in candidates):
+    candidates_with_scope = tuple((candidate, scope_for_resource(candidate)) for candidate in candidates)
+    if not any(scope == expected_scope for _candidate, scope in candidates_with_scope):
         return ()
-    return candidates
+    return tuple(candidate for candidate, scope in candidates_with_scope if scope is None or scope == expected_scope)
 
 
 def _candidates_in_location_scope(
     candidates: tuple[NormalizedResource, ...],
     expected_location: str,
 ) -> tuple[NormalizedResource, ...]:
-    scoped = tuple(
-        candidate
-        for candidate in candidates
-        if _locations_are_compatible(_resource_location(candidate), expected_location)
-    )
-    if scoped:
-        return scoped
-    if any(_resource_location(candidate) is not None for candidate in candidates):
+    candidates_with_location = tuple((candidate, _resource_location(candidate)) for candidate in candidates)
+    if not any(
+        _locations_are_compatible(location, expected_location) for _candidate, location in candidates_with_location
+    ):
         return ()
-    return candidates
+    return tuple(
+        candidate
+        for candidate, location in candidates_with_location
+        if location is None or _locations_are_compatible(location, expected_location)
+    )
 
 
 def _locations_are_compatible(left: str | None, right: str | None) -> bool:

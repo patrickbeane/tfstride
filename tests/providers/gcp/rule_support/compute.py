@@ -12,7 +12,7 @@ def _compute_network() -> TerraformResource:
         resource_type="google_compute_network",
         name="main",
         provider_name="registry.terraform.io/hashicorp/google",
-        values={"name": "tfstride-main", "id": "google_compute_network.main"},
+        values={"name": "tfstride-main", "id": "google_compute_network.main", "project": "tfstride-demo"},
     )
 
 

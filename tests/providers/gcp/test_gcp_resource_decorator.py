@@ -416,6 +416,90 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertEqual(strong_cross_project.state, "resolved")
         self.assertIs(strong_cross_project.selected_candidate, foreign_unique)
 
+    def test_weak_reference_scope_contract_fails_closed_on_unknown_candidates(self) -> None:
+        local = _gcp_resource(
+            "google_kms_crypto_key.local",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/primary/locations/global/keyRings/app/cryptoKeys/local",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "global",
+            },
+        )
+        foreign = _gcp_resource(
+            "google_kms_crypto_key.foreign",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/primary/locations/us-central1/keyRings/app/cryptoKeys/foreign",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "us-central1",
+            },
+        )
+        unknown = _gcp_resource(
+            "google_kms_crypto_key.unknown",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            metadata={GcpResourceMetadata.NAME: "shared"},
+        )
+        source = _gcp_resource(
+            "google_kms_crypto_key_version.source",
+            GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+            ResourceCategory.DATA,
+            metadata={
+                GcpResourceMetadata.PROJECT: "primary",
+                GcpResourceMetadata.REGION: "global",
+            },
+        )
+        cases = (
+            ("known-local", (local,), "resolved", (local,)),
+            ("known-local-and-known-foreign", (local, foreign), "resolved", (local,)),
+            ("known-local-and-unknown", (local, unknown), "ambiguous", (local, unknown)),
+            (
+                "known-local-known-foreign-and-unknown",
+                (local, foreign, unknown),
+                "ambiguous",
+                (local, unknown),
+            ),
+            ("known-foreign", (foreign,), "unresolved", ()),
+            ("unknown", (unknown,), "unresolved", ()),
+            ("known-foreign-and-unknown", (foreign, unknown), "unresolved", ()),
+        )
+
+        for name, candidates, expected_state, expected_candidates in cases:
+            for ordered_candidates in (candidates, tuple(reversed(candidates))):
+                with self.subTest(
+                    case=name,
+                    order=[candidate.address for candidate in ordered_candidates],
+                ):
+                    resolution = (
+                        GcpResourceIndexBuilder()
+                        .build(list(ordered_candidates))
+                        .resources_by_reference.resolve(
+                            "shared",
+                            source=source,
+                            resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                        )
+                    )
+
+                    self.assertEqual(resolution.state, expected_state)
+                    self.assertEqual(resolution.candidates, expected_candidates)
+
+        exact = (
+            GcpResourceIndexBuilder()
+            .build([unknown])
+            .resources_by_reference.resolve(
+                unknown.address,
+                source=source,
+                resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+            )
+        )
+        self.assertEqual(exact.state, "resolved")
+        self.assertIs(exact.selected_candidate, unknown)
+
     def test_specialized_network_views_resolve_with_gcp_scope(self) -> None:
         primary_network = _gcp_resource(
             "google_compute_network.primary",

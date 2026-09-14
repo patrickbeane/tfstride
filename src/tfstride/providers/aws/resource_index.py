@@ -60,20 +60,23 @@ class AwsResourceReferenceView:
             for candidate in resolution.candidates
             if reference is not None and _aws_reference_is_strong_for_candidate(reference, candidate)
         )
-        candidates = strong_candidates or resolution.candidates
+        if strong_candidates:
+            return ResourceReferenceResolution(candidates=strong_candidates)
 
+        candidates = resolution.candidates
         provider_config_key = source.provider_config_key if source is not None else None
         if provider_config_key is None:
             return ResourceReferenceResolution(candidates=candidates)
 
-        scoped_candidates = tuple(
+        local_candidates = tuple(
             candidate for candidate in candidates if candidate.provider_config_key == provider_config_key
         )
-        if scoped_candidates:
-            return ResourceReferenceResolution(candidates=scoped_candidates)
-        if strong_candidates:
-            return ResourceReferenceResolution(candidates=strong_candidates)
-        return ResourceReferenceResolution(candidates=())
+        if not local_candidates:
+            return ResourceReferenceResolution(candidates=())
+        scoped_candidates = tuple(
+            candidate for candidate in candidates if candidate.provider_config_key in {None, provider_config_key}
+        )
+        return ResourceReferenceResolution(candidates=scoped_candidates)
 
     def get(
         self,

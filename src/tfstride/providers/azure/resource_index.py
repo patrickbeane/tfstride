@@ -202,12 +202,10 @@ def _candidates_in_scope(
 ) -> tuple[NormalizedResource, ...]:
     if expected_scope is None:
         return candidates
-    scoped = tuple(candidate for candidate in candidates if scope_for_resource(candidate) == expected_scope)
-    if scoped:
-        return scoped
-    if any(scope_for_resource(candidate) is not None for candidate in candidates):
+    candidates_with_scope = tuple((candidate, scope_for_resource(candidate)) for candidate in candidates)
+    if not any(scope == expected_scope for _candidate, scope in candidates_with_scope):
         return ()
-    return candidates
+    return tuple(candidate for candidate, scope in candidates_with_scope if scope is None or scope == expected_scope)
 
 
 def _resource_arm_scope(

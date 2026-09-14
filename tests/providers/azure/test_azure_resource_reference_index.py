@@ -249,6 +249,87 @@ class AzureResourceReferenceIndexTests(unittest.TestCase):
         self.assertEqual(strong_cross_scope.state, "resolved")
         self.assertIs(strong_cross_scope.selected_candidate, foreign_unique)
 
+    def test_weak_reference_scope_contract_fails_closed_on_unknown_candidates(self) -> None:
+        local = _resource(
+            "azurerm_storage_account.local",
+            AzureResourceType.STORAGE_ACCOUNT,
+            identifier=_arm_id(
+                "sub-0001",
+                "application",
+                "Microsoft.Storage/storageAccounts/local",
+            ),
+            metadata={AzureResourceMetadata.NAME: "shared"},
+        )
+        foreign = _resource(
+            "azurerm_storage_account.foreign",
+            AzureResourceType.STORAGE_ACCOUNT,
+            identifier=_arm_id(
+                "sub-0001",
+                "secondary",
+                "Microsoft.Storage/storageAccounts/foreign",
+            ),
+            metadata={AzureResourceMetadata.NAME: "shared"},
+        )
+        unknown = _resource(
+            "azurerm_storage_account.unknown",
+            AzureResourceType.STORAGE_ACCOUNT,
+            metadata={AzureResourceMetadata.NAME: "shared"},
+        )
+        source = _resource(
+            "azurerm_storage_container.source",
+            AzureResourceType.STORAGE_CONTAINER,
+            identifier=_arm_id(
+                "sub-0001",
+                "application",
+                "Microsoft.Storage/storageAccounts/source/blobServices/default/containers/source",
+            ),
+        )
+        cases = (
+            ("known-local", (local,), "resolved", (local,)),
+            ("known-local-and-known-foreign", (local, foreign), "resolved", (local,)),
+            ("known-local-and-unknown", (local, unknown), "ambiguous", (local, unknown)),
+            (
+                "known-local-known-foreign-and-unknown",
+                (local, foreign, unknown),
+                "ambiguous",
+                (local, unknown),
+            ),
+            ("known-foreign", (foreign,), "unresolved", ()),
+            ("unknown", (unknown,), "unresolved", ()),
+            ("known-foreign-and-unknown", (foreign, unknown), "unresolved", ()),
+        )
+
+        for name, candidates, expected_state, expected_candidates in cases:
+            for ordered_candidates in (candidates, tuple(reversed(candidates))):
+                with self.subTest(
+                    case=name,
+                    order=[candidate.address for candidate in ordered_candidates],
+                ):
+                    resolution = (
+                        AzureResourceIndexBuilder()
+                        .build(list(ordered_candidates))
+                        .resources_by_reference.resolve(
+                            "shared",
+                            source=source,
+                            resource_types={AzureResourceType.STORAGE_ACCOUNT},
+                        )
+                    )
+
+                    self.assertEqual(resolution.state, expected_state)
+                    self.assertEqual(resolution.candidates, expected_candidates)
+
+        exact = (
+            AzureResourceIndexBuilder()
+            .build([unknown])
+            .resources_by_reference.resolve(
+                unknown.address,
+                source=source,
+                resource_types={AzureResourceType.STORAGE_ACCOUNT},
+            )
+        )
+        self.assertEqual(exact.state, "resolved")
+        self.assertIs(exact.selected_candidate, unknown)
+
     def test_ambiguous_storage_reference_does_not_decorate_an_arbitrary_account(self) -> None:
         def snapshot(reverse: bool) -> tuple[str | None, tuple[str, ...]]:
             accounts = [
