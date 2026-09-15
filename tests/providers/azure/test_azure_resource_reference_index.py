@@ -80,7 +80,8 @@ class AzureResourceReferenceIndexTests(unittest.TestCase):
                         resource_types={AzureResourceType.STORAGE_ACCOUNT},
                     )
                 )
-                self.assertIs(references.get(first_account.address.upper()), first_account)
+                self.assertIsNone(references.get(first_account.address.upper()))
+                self.assertIs(references.get(first_account.address), first_account)
                 self.assertIs(references.get(second_account.address), second_account)
 
     def test_exact_address_precedes_a_colliding_native_alias(self) -> None:
@@ -114,13 +115,90 @@ class AzureResourceReferenceIndexTests(unittest.TestCase):
                     AzureResourceIndexBuilder()
                     .build(resources)
                     .resources_by_reference.resolve(
-                        f"${{{exact_account.address.upper()}.id}}",
+                        f"${{{exact_account.address}.id}}",
                         resource_types={AzureResourceType.STORAGE_ACCOUNT},
                     )
                 )
 
                 self.assertEqual(resolution.state, "resolved")
                 self.assertIs(resolution.selected_candidate, exact_account)
+
+    def test_case_distinct_terraform_addresses_resolve_independently(self) -> None:
+        upper_label = _resource(
+            "azurerm_storage_account.Foo",
+            AzureResourceType.STORAGE_ACCOUNT,
+            identifier=_arm_id(
+                "sub-0001",
+                "application",
+                "Microsoft.Storage/storageAccounts/upperlabel",
+            ),
+        )
+        lower_label = _resource(
+            "azurerm_storage_account.foo",
+            AzureResourceType.STORAGE_ACCOUNT,
+            identifier=_arm_id(
+                "sub-0001",
+                "application",
+                "Microsoft.Storage/storageAccounts/lowerlabel",
+            ),
+        )
+
+        for resources in (
+            [upper_label, lower_label],
+            [lower_label, upper_label],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                references = AzureResourceIndexBuilder().build(resources).resources_by_reference
+
+                self.assertIs(references.get(upper_label.address), upper_label)
+                self.assertIs(references.get(lower_label.address), lower_label)
+                self.assertIs(
+                    references.get(f"${{{upper_label.address}.id}}"),
+                    upper_label,
+                )
+                self.assertIsNone(references.get("azurerm_storage_account.FOO"))
+
+    def test_arm_ids_ending_in_terraform_suffixes_remain_distinct(self) -> None:
+        plain_id = _arm_id(
+            "sub-0001",
+            "application",
+            "Microsoft.Network/privateDnsZones/example",
+        )
+        suffixed_id = f"{plain_id}.id"
+        plain_zone = _resource(
+            "azurerm_private_dns_zone.plain",
+            AzureResourceType.PRIVATE_DNS_ZONE,
+            identifier=plain_id,
+            metadata={AzureResourceMetadata.NAME: "example"},
+        )
+        suffixed_zone = _resource(
+            "azurerm_private_dns_zone.suffixed",
+            AzureResourceType.PRIVATE_DNS_ZONE,
+            identifier=suffixed_id,
+            metadata={AzureResourceMetadata.NAME: "example.id"},
+        )
+
+        for resources in (
+            [plain_zone, suffixed_zone],
+            [suffixed_zone, plain_zone],
+        ):
+            with self.subTest(order=[resource.address for resource in resources]):
+                references = AzureResourceIndexBuilder().build(resources).resources_by_reference
+
+                self.assertIs(
+                    references.get(
+                        plain_id.upper(),
+                        resource_types={AzureResourceType.PRIVATE_DNS_ZONE},
+                    ),
+                    plain_zone,
+                )
+                self.assertIs(
+                    references.get(
+                        suffixed_id.upper(),
+                        resource_types={AzureResourceType.PRIVATE_DNS_ZONE},
+                    ),
+                    suffixed_zone,
+                )
 
     def test_resolution_filters_by_type_subscription_and_resource_group(self) -> None:
         primary_account = _resource(

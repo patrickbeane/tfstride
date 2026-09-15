@@ -19,22 +19,62 @@ from tfstride.providers.azure.resource_utils import (
 
 
 class AzureResourceUtilsTests(unittest.TestCase):
-    def test_reference_keys_normalize_terraform_expressions_and_suffixes(self) -> None:
-        self.assertEqual(azure_reference_key("${azurerm_subnet.app.id}"), "azurerm_subnet.app")
-        self.assertEqual(azure_reference_key("azurerm_virtual_network.main.name"), "azurerm_virtual_network.main")
-        self.assertEqual(
-            azure_reference_key("azurerm_key_vault_key.signing.versionless_id"),
-            "azurerm_key_vault_key.signing",
-        )
-        self.assertEqual(
-            azure_reference_key("azurerm_key_vault_key.signing.resource_id"),
-            "azurerm_key_vault_key.signing",
-        )
-        self.assertEqual(
-            azure_reference_key(
-                "/subscriptions/EXAMPLE/resourceGroups/App/providers/Microsoft.Network/virtualNetworks/Main"
+    def test_reference_keys_normalize_only_terraform_traversal_suffixes(self) -> None:
+        cases = (
+            ("${azurerm_subnet.app.id}", "azurerm_subnet.app"),
+            (
+                "azurerm_virtual_network.Main.name",
+                "azurerm_virtual_network.Main",
             ),
-            "/subscriptions/example/resourcegroups/app/providers/microsoft.network/virtualnetworks/main",
+            (
+                "azurerm_key_vault_key.signing.versionless_id",
+                "azurerm_key_vault_key.signing",
+            ),
+            (
+                "azurerm_key_vault_key.signing.resource_id",
+                "azurerm_key_vault_key.signing",
+            ),
+            (
+                'module.network["primary"].azurerm_virtual_network.Main.id',
+                'module.network["primary"].azurerm_virtual_network.Main',
+            ),
+            (
+                'data.azurerm_subnet.app["primary"].resource_manager_id',
+                'data.azurerm_subnet.app["primary"]',
+            ),
+        )
+
+        for reference, expected in cases:
+            with self.subTest(reference=reference):
+                self.assertEqual(azure_reference_key(reference), expected)
+
+    def test_reference_keys_keep_terraform_addresses_case_sensitive(self) -> None:
+        self.assertEqual(
+            azure_reference_key("azurerm_storage_account.Foo"),
+            "azurerm_storage_account.Foo",
+        )
+        self.assertEqual(
+            azure_reference_key("azurerm_storage_account.foo"),
+            "azurerm_storage_account.foo",
+        )
+        self.assertNotEqual(
+            azure_reference_key("azurerm_storage_account.Foo"),
+            azure_reference_key("azurerm_storage_account.foo"),
+        )
+        self.assertEqual(
+            azure_reference_key("AZURERM_STORAGE_ACCOUNT.FOO"),
+            "AZURERM_STORAGE_ACCOUNT.FOO",
+        )
+
+    def test_reference_keys_casefold_native_identities_without_stripping_suffixes(self) -> None:
+        arm_id = "/subscriptions/EXAMPLE/resourceGroups/App/providers/Microsoft.Network/privateDnsZones/Example.ID"
+        absolute_uri = "HTTPS://Example.Vault.Azure.Net/secrets/Signing.Name"
+
+        self.assertEqual(azure_reference_key(arm_id), arm_id.casefold())
+        self.assertEqual(azure_reference_key(absolute_uri), absolute_uri.casefold())
+        self.assertEqual(
+            azure_reference_key("azurerm_storage_account.id"),
+            "azurerm_storage_account.id",
         )
 
     def test_resource_references_include_address_identifier_and_name(self) -> None:

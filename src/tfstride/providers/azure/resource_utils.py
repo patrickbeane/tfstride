@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -34,19 +35,35 @@ _AZURE_REFERENCE_SUFFIXES = (
     ".name",
 )
 
+_TERRAFORM_IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
+_TERRAFORM_INSTANCE_KEY = r'(?:\[(?:\d+|"(?:[^"\\]|\\.)*")\])?'
+_TERRAFORM_MODULE_INSTANCE = rf"module\.{_TERRAFORM_IDENTIFIER}{_TERRAFORM_INSTANCE_KEY}\."
+_TERRAFORM_AZURE_RESOURCE_ADDRESS_PATTERN = re.compile(
+    rf"^(?:{_TERRAFORM_MODULE_INSTANCE})*"
+    rf"(?:data\.)?(?:azurerm|azuread|azapi)_{_TERRAFORM_IDENTIFIER}\."
+    rf"{_TERRAFORM_IDENTIFIER}{_TERRAFORM_INSTANCE_KEY}$",
+    re.IGNORECASE,
+)
+
 
 def azure_reference_key(value: str | None) -> str:
+    """Canonicalize Terraform traversals separately from Azure-native identities."""
+
     if value is None:
         return ""
     text = str(value).strip()
-    if text.startswith("${") and text.endswith("}"):
-        text = text[2:-1].strip()
-    lowered = text.lower()
+    traversal = text
+    if traversal.startswith("${") and traversal.endswith("}"):
+        traversal = traversal[2:-1].strip()
     for suffix in _AZURE_REFERENCE_SUFFIXES:
-        if lowered.endswith(suffix):
-            lowered = lowered[: -len(suffix)]
-            break
-    return lowered
+        if not traversal.endswith(suffix):
+            continue
+        resource_address = traversal[: -len(suffix)]
+        if _TERRAFORM_AZURE_RESOURCE_ADDRESS_PATTERN.fullmatch(resource_address):
+            return resource_address
+    if _TERRAFORM_AZURE_RESOURCE_ADDRESS_PATTERN.fullmatch(traversal):
+        return traversal
+    return text.casefold()
 
 
 def azure_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
