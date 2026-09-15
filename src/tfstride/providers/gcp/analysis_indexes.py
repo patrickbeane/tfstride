@@ -36,9 +36,10 @@ def build_gcp_analysis_indexes(inventory: ResourceInventory) -> GcpAnalysisIndex
 
 
 def gcp_analysis_indexes(indexes: AnalysisIndexes) -> GcpAnalysisIndexes:
-    if indexes.provider_extension is None:
+    extension = indexes.provider_extension
+    if not isinstance(extension, GcpAnalysisIndexes):
         return _EMPTY_GCP_ANALYSIS_INDEXES
-    return indexes.require_provider_extension(GcpAnalysisIndexes)
+    return extension
 
 
 def gcp_iam_inheritance_index(indexes: AnalysisIndexes) -> GcpIamInheritanceIndex:

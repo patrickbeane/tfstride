@@ -15,6 +15,13 @@ if TYPE_CHECKING:
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
     from tfstride.models import Observation, ResourceInventory
+    from tfstride.providers.aws.analysis_indexes import AwsAnalysisIndexes
+
+
+def _aws_analysis_indexes(inventory: ResourceInventory) -> AwsAnalysisIndexes:
+    from tfstride.providers.aws.analysis_indexes import build_aws_analysis_indexes
+
+    return build_aws_analysis_indexes(inventory)
 
 
 def _aws_rule_metadata() -> tuple[RuleMetadata, ...]:
@@ -54,4 +61,5 @@ def aws_provider_plugin() -> ProviderPlugin:
         rule_contribution_factory=_aws_rule_contribution,
         boundary_contributor_factory=_aws_boundary_contributor,
         observation_factory=_aws_observation_factory,
+        analysis_index_factory=_aws_analysis_indexes,
     )

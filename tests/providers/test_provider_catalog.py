@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.app import TfStride
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory
+from tfstride.providers.aws.analysis_indexes import AwsAnalysisIndexes
 from tfstride.providers.aws.boundaries import AwsBoundaryContributor
 from tfstride.providers.aws.limitations import AWS_LIMITATIONS
 from tfstride.providers.aws.metadata import AwsResourceMetadata
@@ -113,7 +114,10 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(gcp_plugin.create_resource_decorator(), GcpResourceDecorator)
         self.assertEqual(gcp_plugin.create_rule_metadata(), GCP_RULE_METADATA)
         self.assertIsInstance(aws_plugin.create_boundary_contributor(), AwsBoundaryContributor)
-        self.assertIsNone(aws_plugin.create_analysis_index_extension(ResourceInventory(provider="aws", resources=[])))
+        self.assertIsInstance(
+            aws_plugin.create_analysis_index_extension(ResourceInventory(provider="aws", resources=[])),
+            AwsAnalysisIndexes,
+        )
         self.assertIsInstance(gcp_plugin.create_boundary_contributor(), GcpBoundaryContributor)
         self.assertIsInstance(
             gcp_plugin.create_analysis_index_extension(ResourceInventory(provider="gcp", resources=[])),
@@ -155,10 +159,14 @@ class ProviderCatalogTests(unittest.TestCase):
     def test_default_analysis_index_factories_register_provider_extensions(self) -> None:
         factories = default_provider_analysis_index_factories_by_provider()
 
-        self.assertEqual(tuple(factories), ("gcp",))
+        self.assertEqual(tuple(factories), ("aws", "gcp"))
+        self.assertIs(default_provider_analysis_index_factory(" AWS "), factories["aws"])
         self.assertIs(default_provider_analysis_index_factory(" GCP "), factories["gcp"])
-        self.assertIsNone(default_provider_analysis_index_factory("aws"))
         self.assertIsNone(default_provider_analysis_index_factory("azure"))
+        self.assertIsInstance(
+            factories["aws"](ResourceInventory(provider="aws", resources=[])),
+            AwsAnalysisIndexes,
+        )
         self.assertIsInstance(
             factories["gcp"](ResourceInventory(provider="gcp", resources=[])),
             GcpAnalysisIndexes,

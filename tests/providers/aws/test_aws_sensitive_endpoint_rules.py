@@ -22,6 +22,7 @@ def _resource(
     values: dict[str, Any],
     *,
     unknown_values: dict[str, Any] | None = None,
+    provider_config_key: str | None = None,
 ) -> TerraformResource:
     return TerraformResource(
         address=address,
@@ -30,11 +31,12 @@ def _resource(
         name=address.rsplit(".", 1)[-1],
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
+        provider_config_key=provider_config_key,
         unknown_values=unknown_values or {},
     )
 
 
-def _subnet() -> TerraformResource:
+def _subnet(*, provider_config_key: str | None = None) -> TerraformResource:
     return _resource(
         "aws_subnet.app",
         "aws_subnet",
@@ -43,10 +45,15 @@ def _subnet() -> TerraformResource:
             "vpc_id": "vpc-app",
             "cidr_block": "10.0.1.0/24",
         },
+        provider_config_key=provider_config_key,
     )
 
 
-def _lambda_function(*, vpc_enabled: bool = True) -> TerraformResource:
+def _lambda_function(
+    *,
+    vpc_enabled: bool = True,
+    provider_config_key: str | None = None,
+) -> TerraformResource:
     values: dict[str, Any] = {
         "id": "worker",
         "function_name": "worker",
@@ -55,10 +62,20 @@ def _lambda_function(*, vpc_enabled: bool = True) -> TerraformResource:
     }
     if vpc_enabled:
         values["vpc_config"] = [{"subnet_ids": ["subnet-app"], "security_group_ids": ["sg-app"]}]
-    return _resource("aws_lambda_function.worker", "aws_lambda_function", values)
+    return _resource(
+        "aws_lambda_function.worker",
+        "aws_lambda_function",
+        values,
+        provider_config_key=provider_config_key,
+    )
 
 
-def _role(actions: list[str], *, resources: list[str] | None = None) -> TerraformResource:
+def _role(
+    actions: list[str],
+    *,
+    resources: list[str] | None = None,
+    provider_config_key: str | None = None,
+) -> TerraformResource:
     policy = {
         "Statement": [
             {
@@ -77,6 +94,7 @@ def _role(actions: list[str], *, resources: list[str] | None = None) -> Terrafor
             "assume_role_policy": json.dumps({"Statement": []}),
             "inline_policy": [{"name": "service-access", "policy": json.dumps(policy)}],
         },
+        provider_config_key=provider_config_key,
     )
 
 
@@ -86,6 +104,7 @@ def _vpc_endpoint(
     *,
     endpoint_type: str = "Interface",
     unknown_service_name: bool = False,
+    provider_config_key: str | None = None,
 ) -> TerraformResource:
     values: dict[str, Any] = {
         "id": f"vpce-{name}",
@@ -102,6 +121,7 @@ def _vpc_endpoint(
         "aws_vpc_endpoint",
         values,
         unknown_values={"service_name": True} if unknown_service_name else None,
+        provider_config_key=provider_config_key,
     )
 
 
@@ -278,6 +298,63 @@ class AwsSensitiveEndpointRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+    def test_foreign_provider_endpoint_does_not_cover_or_obscure_the_workload_vpc(self) -> None:
+        foreign_endpoints = (
+            _vpc_endpoint(
+                "foreign",
+                "com.amazonaws.us-east-1.secretsmanager",
+                provider_config_key="aws.secondary",
+            ),
+            _vpc_endpoint(
+                "foreign_computed",
+                None,
+                unknown_service_name=True,
+                provider_config_key="aws.secondary",
+            ),
+        )
+
+        for foreign_endpoint in foreign_endpoints:
+            with self.subTest(endpoint=foreign_endpoint.address):
+                findings = _findings(
+                    [
+                        _subnet(provider_config_key="aws.primary"),
+                        _lambda_function(provider_config_key="aws.primary"),
+                        _role(
+                            ["secretsmanager:GetSecretValue"],
+                            provider_config_key="aws.primary",
+                        ),
+                        foreign_endpoint,
+                    ],
+                    _SECRETS_RULE,
+                )
+
+                self.assertEqual(
+                    [finding.rule_id for finding in findings],
+                    [_SECRETS_RULE],
+                )
+
+    def test_local_or_unknown_provider_endpoint_prevents_a_false_missing_claim(self) -> None:
+        for provider_config_key in ("aws.primary", None):
+            with self.subTest(provider_config_key=provider_config_key):
+                findings = _findings(
+                    [
+                        _subnet(provider_config_key="aws.primary"),
+                        _lambda_function(provider_config_key="aws.primary"),
+                        _role(
+                            ["secretsmanager:GetSecretValue"],
+                            provider_config_key="aws.primary",
+                        ),
+                        _vpc_endpoint(
+                            "potentially_local",
+                            "com.amazonaws.us-east-1.secretsmanager",
+                            provider_config_key=provider_config_key,
+                        ),
+                    ],
+                    _SECRETS_RULE,
+                )
+
+                self.assertEqual(findings, [])
 
     def test_global_wildcard_permission_is_not_treated_as_deterministic_service_dependency(self) -> None:
         findings = _findings(

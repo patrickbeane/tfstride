@@ -11,6 +11,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.aws.resource_utils import AwsScopedReferenceKey, aws_scoped_reference_key
 
 _AWS_VPC = "aws_vpc"
 _AWS_FLOW_LOG = "aws_flow_log"
@@ -36,10 +37,22 @@ class AwsNetworkTelemetryRuleDetectors:
         findings: list[Finding] = []
         for vpc in context.inventory.by_type(_AWS_VPC):
             vpc_id = _vpc_identifier(vpc)
-            if not vpc_id or vpc_id in resolved_vpc_flow_logs:
+            scoped_vpc_key = aws_scoped_reference_key(vpc.provider_config_key, vpc_id)
+            if scoped_vpc_key is None or scoped_vpc_key in resolved_vpc_flow_logs:
                 continue
-            if unresolved_flow_logs:
+            if _has_uncertain_resolved_vpc_flow_log(
+                resolved_vpc_flow_logs,
+                scoped_vpc_key,
+            ):
                 continue
+            if _has_potential_unresolved_target_flow_log(
+                unresolved_flow_logs,
+                vpc.provider_config_key,
+            ):
+                continue
+            scoped_flow_logs = [
+                flow_log for flow_log in flow_logs if flow_log.provider_config_key == vpc.provider_config_key
+            ]
 
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -61,7 +74,7 @@ class AwsNetworkTelemetryRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_vpc", _vpc_target_evidence(vpc)),
-                        evidence_item("flow_log_coverage", _missing_vpc_flow_log_evidence(vpc_id, flow_logs)),
+                        evidence_item("flow_log_coverage", _missing_vpc_flow_log_evidence(vpc_id, scoped_flow_logs)),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -160,18 +173,27 @@ class AwsNetworkTelemetryRuleDetectors:
         return findings
 
 
-def _resolved_vpc_flow_logs(flow_logs: Iterable[NormalizedResource]) -> dict[str, list[NormalizedResource]]:
-    resolved: dict[str, list[NormalizedResource]] = {}
+def _resolved_vpc_flow_logs(
+    flow_logs: Iterable[NormalizedResource],
+) -> dict[AwsScopedReferenceKey, list[NormalizedResource]]:
+    resolved: dict[AwsScopedReferenceKey, list[NormalizedResource]] = {}
     for flow_log in flow_logs:
         facts = aws_facts(flow_log)
-        if facts.flow_log_target_type != "vpc" or not facts.flow_log_target_id:
+        if facts.flow_log_target_type != "vpc":
             continue
-        resolved.setdefault(facts.flow_log_target_id, []).append(flow_log)
+        scoped_vpc_key = aws_scoped_reference_key(
+            flow_log.provider_config_key,
+            facts.flow_log_target_id,
+        )
+        if scoped_vpc_key is not None:
+            resolved.setdefault(scoped_vpc_key, []).append(flow_log)
     return resolved
 
 
-def _unresolved_target_flow_logs(flow_logs: Iterable[NormalizedResource]) -> list[NormalizedResource]:
-    unresolved: list[NormalizedResource] = []
+def _unresolved_target_flow_logs(
+    flow_logs: Iterable[NormalizedResource],
+) -> dict[str | None, list[NormalizedResource]]:
+    unresolved: dict[str | None, list[NormalizedResource]] = {}
     for flow_log in flow_logs:
         facts = aws_facts(flow_log)
         if facts.flow_log_target_type or facts.flow_log_target_id:
@@ -184,8 +206,30 @@ def _unresolved_target_flow_logs(flow_logs: Iterable[NormalizedResource]) -> lis
             "transit_gateway_id",
             "transit_gateway_attachment_id",
         ):
-            unresolved.append(flow_log)
+            unresolved.setdefault(flow_log.provider_config_key, []).append(flow_log)
     return unresolved
+
+
+def _has_uncertain_resolved_vpc_flow_log(
+    resolved: dict[AwsScopedReferenceKey, list[NormalizedResource]],
+    scoped_vpc_key: AwsScopedReferenceKey,
+) -> bool:
+    provider_config_key, vpc_id = scoped_vpc_key
+    if provider_config_key is None:
+        return any(
+            candidate_provider_config_key is not None and candidate_vpc_id == vpc_id
+            for candidate_provider_config_key, candidate_vpc_id in resolved
+        )
+    return (None, vpc_id) in resolved
+
+
+def _has_potential_unresolved_target_flow_log(
+    unresolved: dict[str | None, list[NormalizedResource]],
+    provider_config_key: str | None,
+) -> bool:
+    if provider_config_key is None:
+        return any(unresolved.values())
+    return bool(unresolved.get(provider_config_key) or unresolved.get(None))
 
 
 def _vpc_identifier(vpc: NormalizedResource) -> str | None:

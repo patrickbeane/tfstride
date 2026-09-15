@@ -5,6 +5,8 @@ from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import (
+    AwsScopedReferenceKey,
+    aws_scoped_reference_key,
     route_table_has_internet_route,
     route_table_has_nat_gateway_route,
 )
@@ -32,7 +34,7 @@ class DeriveSubnetPostureStage:
                 (str(route_table_id), association_resource)
             )
 
-        public_subnet_ids: set[str] = set()
+        public_subnet_ids: set[AwsScopedReferenceKey] = set()
         for subnet in context.index.subnets.resources:
             route_table_references = subnet_route_table_references.get(subnet.address, [])
             associated_route_table_ids = [route_table_id for route_table_id, _association in route_table_references]
@@ -54,6 +56,7 @@ class DeriveSubnetPostureStage:
                 route_table_has_nat_gateway_route(
                     aws_facts(route_table).routes,
                     context.index.nat_gateway_ids,
+                    provider_config_key=route_table.provider_config_key,
                 )
                 for route_table in associated_route_tables
             )
@@ -63,10 +66,12 @@ class DeriveSubnetPostureStage:
                 is_public = has_public_route
             else:
                 # Fall back to the original heuristic when route table associations are absent.
-                is_public = aws_facts(
-                    subnet
-                ).map_public_ip_on_launch and subnet.vpc_id in context.index.vpcs_with_igw.intersection(
-                    context.index.vpcs_with_public_routes
+                scoped_vpc_key = aws_scoped_reference_key(
+                    subnet.provider_config_key,
+                    subnet.vpc_id,
+                )
+                is_public = aws_facts(subnet).map_public_ip_on_launch and scoped_vpc_key in (
+                    context.index.vpcs_with_igw.intersection(context.index.vpcs_with_public_routes)
                 )
                 has_nat_route = False
             aws_mutations(subnet).set_subnet_posture(
@@ -75,8 +80,12 @@ class DeriveSubnetPostureStage:
                 has_public_route=has_public_route,
                 has_nat_gateway_egress=has_nat_route,
             )
-            if is_public and subnet.identifier:
-                public_subnet_ids.add(subnet.identifier)
+            scoped_subnet_key = aws_scoped_reference_key(
+                subnet.provider_config_key,
+                subnet.identifier,
+            )
+            if is_public and scoped_subnet_key is not None:
+                public_subnet_ids.add(scoped_subnet_key)
         context.public_subnet_ids = public_subnet_ids
 
 

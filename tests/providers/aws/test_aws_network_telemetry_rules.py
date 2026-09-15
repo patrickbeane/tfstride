@@ -21,6 +21,7 @@ def _resource(
     values: dict[str, Any],
     *,
     unknown_values: dict[str, Any] | None = None,
+    provider_config_key: str | None = None,
 ) -> TerraformResource:
     return TerraformResource(
         address=address,
@@ -29,11 +30,17 @@ def _resource(
         name=address.rsplit(".", 1)[-1],
         provider_name="registry.terraform.io/hashicorp/aws",
         values=values,
+        provider_config_key=provider_config_key,
         unknown_values=unknown_values or {},
     )
 
 
-def _vpc(*, name: str = "app", vpc_id: str = "vpc-app") -> TerraformResource:
+def _vpc(
+    *,
+    name: str = "app",
+    vpc_id: str = "vpc-app",
+    provider_config_key: str | None = None,
+) -> TerraformResource:
     return _resource(
         f"aws_vpc.{name}",
         "aws_vpc",
@@ -41,6 +48,7 @@ def _vpc(*, name: str = "app", vpc_id: str = "vpc-app") -> TerraformResource:
             "id": vpc_id,
             "cidr_block": "10.0.0.0/16",
         },
+        provider_config_key=provider_config_key,
     )
 
 
@@ -55,6 +63,7 @@ def _flow_log(
     destination: object = _MISSING,
     log_group_name: object = "/aws/vpc-flow-logs/app",
     unknown_values: dict[str, Any] | None = None,
+    provider_config_key: str | None = None,
 ) -> TerraformResource:
     values: dict[str, Any] = {
         "id": flow_log_id,
@@ -77,6 +86,7 @@ def _flow_log(
         "aws_flow_log",
         values,
         unknown_values=unknown_values,
+        provider_config_key=provider_config_key,
     )
 
 
@@ -115,6 +125,45 @@ class AwsNetworkTelemetryRuleTests(unittest.TestCase):
             _findings([_vpc(), _flow_log()], *_ALL_RULE_IDS),
             [],
         )
+
+    def test_foreign_provider_flow_log_does_not_cover_or_obscure_a_local_vpc(self) -> None:
+        secondary_flow_logs = (
+            _flow_log(
+                name="secondary",
+                vpc_id="vpc-shared",
+                provider_config_key="aws.secondary",
+            ),
+            _flow_log(
+                name="secondary_computed",
+                vpc_id=_MISSING,
+                unknown_values={"vpc_id": True},
+                provider_config_key="aws.secondary",
+            ),
+        )
+
+        for secondary_flow_log in secondary_flow_logs:
+            with self.subTest(flow_log=secondary_flow_log.address):
+                findings = _findings(
+                    [
+                        _vpc(
+                            name="primary",
+                            vpc_id="vpc-shared",
+                            provider_config_key="aws.primary",
+                        ),
+                        _vpc(
+                            name="secondary",
+                            vpc_id="vpc-shared",
+                            provider_config_key="aws.secondary",
+                        ),
+                        secondary_flow_log,
+                    ],
+                    _MISSING_VPC_FLOW_LOG_RULE,
+                )
+
+                self.assertEqual(
+                    [finding.affected_resources for finding in findings],
+                    [["aws_vpc.primary"]],
+                )
 
     def test_subnet_flow_log_does_not_count_as_vpc_level_coverage(self) -> None:
         findings = _findings(

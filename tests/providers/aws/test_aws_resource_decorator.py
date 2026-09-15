@@ -99,8 +99,8 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         self.assertIs(index.buckets.get("aws_s3_bucket.logs"), bucket)
         self.assertIs(index.buckets.get("arn:aws:s3:::logs"), bucket)
         self.assertIs(index.secrets.get("app"), secret)
-        self.assertEqual(index.vpcs_with_public_routes, {"vpc-app"})
-        self.assertEqual(index.nat_gateway_ids, {"nat-private"})
+        self.assertEqual(index.vpcs_with_public_routes, {(None, "vpc-app")})
+        self.assertEqual(index.nat_gateway_ids, {(None, "nat-private")})
 
     def test_native_alias_collisions_are_deterministic_and_fail_closed(self) -> None:
         first_bucket = _resource(

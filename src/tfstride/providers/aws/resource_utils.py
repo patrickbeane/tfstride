@@ -2,6 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
+AwsScopedReferenceKey = tuple[str | None, str]
+
+
+def aws_scoped_reference_key(
+    provider_config_key: str | None,
+    reference: object,
+) -> AwsScopedReferenceKey | None:
+    if not isinstance(reference, str):
+        return None
+    normalized_reference = reference.strip()
+    if not normalized_reference:
+        return None
+    return provider_config_key, normalized_reference
+
 
 def bucket_public_exposure_reasons(
     bucket_acl: str,
@@ -38,15 +52,20 @@ def route_table_has_internet_route(routes: list[dict[str, Any]]) -> bool:
     return False
 
 
-def route_table_has_nat_gateway_route(routes: list[dict[str, Any]], nat_gateway_ids: set[str]) -> bool:
+def route_table_has_nat_gateway_route(
+    routes: list[dict[str, Any]],
+    nat_gateway_ids: set[AwsScopedReferenceKey],
+    *,
+    provider_config_key: str | None,
+) -> bool:
     for route in routes:
         destination = route.get("cidr_block") or route.get("destination_cidr_block")
         nat_gateway_id = route.get("nat_gateway_id")
         gateway_id = route.get("gateway_id")
         if destination != "0.0.0.0/0":
             continue
-        if isinstance(nat_gateway_id, str) and nat_gateway_id in nat_gateway_ids:
+        if aws_scoped_reference_key(provider_config_key, nat_gateway_id) in nat_gateway_ids:
             return True
-        if isinstance(gateway_id, str) and gateway_id in nat_gateway_ids:
+        if aws_scoped_reference_key(provider_config_key, gateway_id) in nat_gateway_ids:
             return True
     return False

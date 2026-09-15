@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_utils import (
+    AwsScopedReferenceKey,
+    aws_scoped_reference_key,
     ecs_task_definition_identifier,
     route_table_has_internet_route,
 )
@@ -89,6 +91,30 @@ class AwsResourceReferenceView:
         return selected if selected is not None else default
 
 
+AwsReferenceRelationshipKey = tuple[str, str | None, str]
+
+
+def aws_reference_relationship_key(
+    view: AwsResourceReferenceView,
+    reference: str | None,
+    *,
+    source: NormalizedResource,
+) -> AwsReferenceRelationshipKey | None:
+    """Canonicalize a relationship reference without reviving ambiguity."""
+
+    resolution = view.resolve(reference, source=source)
+    if resolution.state == "ambiguous":
+        return None
+    candidate = resolution.selected_candidate
+    if candidate is not None:
+        return "resource", candidate.provider_config_key, candidate.address
+    scoped_reference = aws_scoped_reference_key(source.provider_config_key, reference)
+    if scoped_reference is None:
+        return None
+    provider_config_key, value = scoped_reference
+    return "reference", provider_config_key, value
+
+
 @dataclass(slots=True)
 class AwsResourceIndex:
     subnets: AwsResourceReferenceView
@@ -114,16 +140,16 @@ class AwsResourceIndex:
     oidc_provider_index: AwsResourceReferenceView
     api_gateway_rest_apis: AwsResourceReferenceView
     apigatewayv2_apis: AwsResourceReferenceView
-    vpcs_with_igw: set[str]
-    vpcs_with_public_routes: set[str]
-    nat_gateway_ids: set[str]
+    vpcs_with_igw: set[AwsScopedReferenceKey]
+    vpcs_with_public_routes: set[AwsScopedReferenceKey]
+    nat_gateway_ids: set[AwsScopedReferenceKey]
     resources_by_address: dict[str, NormalizedResource]
 
 
 @dataclass(slots=True)
 class AwsDecorationContext:
     index: AwsResourceIndex
-    public_subnet_ids: set[str] = field(default_factory=set)
+    public_subnet_ids: set[AwsScopedReferenceKey] = field(default_factory=set)
 
 
 class AwsResourceIndexBuilder:
@@ -131,23 +157,29 @@ class AwsResourceIndexBuilder:
         resource_tuple = tuple(resources)
         resources_by_address: dict[str, NormalizedResource] = {}
         resources_by_type: dict[str, list[NormalizedResource]] = {}
-        vpcs_with_igw: set[str] = set()
-        vpcs_with_public_routes: set[str] = set()
-        nat_gateway_ids: set[str] = set()
+        vpcs_with_igw: set[AwsScopedReferenceKey] = set()
+        vpcs_with_public_routes: set[AwsScopedReferenceKey] = set()
+        nat_gateway_ids: set[AwsScopedReferenceKey] = set()
 
         for resource in resource_tuple:
             resources_by_address.setdefault(resource.address, resource)
             resources_by_type.setdefault(resource.resource_type, []).append(resource)
             facts = aws_facts(resource)
             if resource.resource_type == "aws_route_table":
-                if resource.vpc_id and route_table_has_internet_route(facts.routes):
-                    vpcs_with_public_routes.add(resource.vpc_id)
+                scoped_vpc_key = aws_scoped_reference_key(resource.provider_config_key, resource.vpc_id)
+                if scoped_vpc_key is not None and route_table_has_internet_route(facts.routes):
+                    vpcs_with_public_routes.add(scoped_vpc_key)
             elif resource.resource_type == "aws_internet_gateway":
-                if resource.vpc_id:
-                    vpcs_with_igw.add(resource.vpc_id)
+                scoped_vpc_key = aws_scoped_reference_key(resource.provider_config_key, resource.vpc_id)
+                if scoped_vpc_key is not None:
+                    vpcs_with_igw.add(scoped_vpc_key)
             elif resource.resource_type == "aws_nat_gateway":
-                if resource.identifier:
-                    nat_gateway_ids.add(resource.identifier)
+                scoped_nat_gateway_key = aws_scoped_reference_key(
+                    resource.provider_config_key,
+                    resource.identifier,
+                )
+                if scoped_nat_gateway_key is not None:
+                    nat_gateway_ids.add(scoped_nat_gateway_key)
 
         reference_index = build_resource_reference_index(
             resource_tuple,

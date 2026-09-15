@@ -14,6 +14,7 @@ from tfstride.analysis.resource_concepts import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import subnet_posture
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.resource_helpers import describe_security_group_rule
 
@@ -34,10 +35,11 @@ class AwsPostureRuleDetectors:
         inventory = context.inventory
         indexes = context.analysis_indexes
         assert indexes is not None
+        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
         for resource in inventory.by_type(*PUBLIC_COMPUTE_RESOURCE_TYPES):
             if not resource.public_exposure:
                 continue
-            attached_groups = indexes.attached_security_groups(resource)
+            attached_groups = security_group_relationships.attached_security_groups(resource)
             risky_rules = [
                 (security_group, rule)
                 for security_group in attached_groups

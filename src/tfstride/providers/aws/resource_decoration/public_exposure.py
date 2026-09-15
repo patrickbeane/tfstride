@@ -4,6 +4,7 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.resource_mutations import aws_mutations
+from tfstride.providers.aws.resource_utils import aws_scoped_reference_key
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -37,7 +38,10 @@ class DerivePublicExposureStage:
             )
             if resource.resource_type != "aws_subnet":
                 mutations.set_in_public_subnet(
-                    any(subnet_id in context.public_subnet_ids for subnet_id in resource.subnet_ids)
+                    any(
+                        aws_scoped_reference_key(resource.provider_config_key, subnet_id) in context.public_subnet_ids
+                        for subnet_id in resource.subnet_ids
+                    )
                     if resource.subnet_ids
                     else resource.in_public_subnet
                 )

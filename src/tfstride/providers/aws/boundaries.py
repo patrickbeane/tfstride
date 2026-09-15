@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import TypeVar
 
 from tfstride.analysis.boundaries.shared import contribute_control_to_workload_boundary
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
-from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -18,6 +18,10 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
+from tfstride.providers.aws.analysis_indexes import (
+    AwsSecurityGroupRelationships,
+    aws_analysis_indexes,
+)
 from tfstride.providers.aws.policy_conditions import (
     PrincipalAssessment,
     federated_provider_description,
@@ -25,6 +29,10 @@ from tfstride.providers.aws.policy_conditions import (
     trust_statement_principal_assessments,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsReferenceRelationshipKey
+from tfstride.providers.aws.resource_utils import AwsScopedReferenceKey, aws_scoped_reference_key
+
+_Key = TypeVar("_Key")
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,9 +42,12 @@ class _AwsDataStoreCandidateIndex:
     secret_stores: tuple[NormalizedResource, ...]
     databases: tuple[NormalizedResource, ...]
     direct_internet_databases: tuple[NormalizedResource, ...]
-    databases_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
-    databases_missing_security_groups_by_vpc: Mapping[str, tuple[NormalizedResource, ...]]
-    databases_by_trusted_workload_security_group: Mapping[str, tuple[NormalizedResource, ...]]
+    databases_by_vpc: Mapping[AwsScopedReferenceKey, tuple[NormalizedResource, ...]]
+    databases_missing_security_groups_by_vpc: Mapping[AwsScopedReferenceKey, tuple[NormalizedResource, ...]]
+    databases_by_trusted_workload_security_group: Mapping[
+        AwsReferenceRelationshipKey,
+        tuple[NormalizedResource, ...],
+    ]
 
 
 class AwsBoundaryContributor:
@@ -47,20 +58,25 @@ class AwsBoundaryContributor:
         inventory = context.inventory
         resources = inventory.resources
         indexes = context.indexes
+        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
 
-        data_store_candidates = _build_data_store_candidate_index(resources, indexes)
+        data_store_candidates = _build_data_store_candidate_index(
+            resources,
+            security_group_relationships,
+        )
         for workload in inventory.by_type(*WORKLOAD_RESOURCE_TYPES):
             attached_role = resolve_workload_role(workload, indexes.role_index)
             for data_store in _candidate_data_stores_for_workload(
                 workload,
                 attached_role,
                 data_store_candidates,
+                security_group_relationships,
             ):
                 reachability_rationale = _workload_reaches_data_store(
                     workload,
                     data_store,
                     attached_role,
-                    indexes,
+                    security_group_relationships,
                 )
                 if reachability_rationale:
                     context.add_boundary(
@@ -117,32 +133,42 @@ class AwsBoundaryContributor:
 
 def _build_data_store_candidate_index(
     resources: Sequence[NormalizedResource],
-    indexes: AnalysisIndexes,
+    security_group_relationships: AwsSecurityGroupRelationships,
 ) -> _AwsDataStoreCandidateIndex:
     data_stores = [resource for resource in resources if resource.resource_type in DATA_STORE_RESOURCE_TYPES]
     direct_internet_databases: list[NormalizedResource] = []
     databases: list[NormalizedResource] = []
     object_storage: list[NormalizedResource] = []
     secret_stores: list[NormalizedResource] = []
-    databases_by_vpc: dict[str, list[NormalizedResource]] = {}
-    databases_missing_security_groups_by_vpc: dict[str, list[NormalizedResource]] = {}
-    databases_by_trusted_workload_security_group: dict[str, list[NormalizedResource]] = {}
+    databases_by_vpc: dict[AwsScopedReferenceKey, list[NormalizedResource]] = {}
+    databases_missing_security_groups_by_vpc: dict[AwsScopedReferenceKey, list[NormalizedResource]] = {}
+    databases_by_trusted_workload_security_group: dict[
+        AwsReferenceRelationshipKey,
+        list[NormalizedResource],
+    ] = {}
 
     for data_store in data_stores:
         if is_database_resource(data_store):
             databases.append(data_store)
             if data_store.direct_internet_reachable:
                 direct_internet_databases.append(data_store)
-            if data_store.vpc_id:
-                databases_by_vpc.setdefault(data_store.vpc_id, []).append(data_store)
+            scoped_vpc_key = aws_scoped_reference_key(
+                data_store.provider_config_key,
+                data_store.vpc_id,
+            )
+            if scoped_vpc_key is not None:
+                databases_by_vpc.setdefault(scoped_vpc_key, []).append(data_store)
                 if not data_store.security_group_ids:
                     databases_missing_security_groups_by_vpc.setdefault(
-                        data_store.vpc_id,
+                        scoped_vpc_key,
                         [],
                     ).append(data_store)
-            for trusted_group_id in _trusted_workload_security_group_ids(data_store, indexes):
+            for trusted_group_key in _trusted_workload_security_group_keys(
+                data_store,
+                security_group_relationships,
+            ):
                 databases_by_trusted_workload_security_group.setdefault(
-                    trusted_group_id,
+                    trusted_group_key,
                     [],
                 ).append(data_store)
         elif is_object_storage_resource(data_store):
@@ -170,6 +196,7 @@ def _candidate_data_stores_for_workload(
     workload: NormalizedResource,
     attached_role: NormalizedResource | None,
     index: _AwsDataStoreCandidateIndex,
+    security_group_relationships: AwsSecurityGroupRelationships,
 ) -> tuple[NormalizedResource, ...]:
     candidates: dict[int, NormalizedResource] = {}
 
@@ -178,14 +205,20 @@ def _candidate_data_stores_for_workload(
             candidates.setdefault(id(data_store), data_store)
 
     for security_group_id in workload.security_group_ids:
-        add_many(index.databases_by_trusted_workload_security_group.get(security_group_id, ()))
+        security_group_key = security_group_relationships.reference_key(
+            security_group_id,
+            source=workload,
+        )
+        if security_group_key is not None:
+            add_many(index.databases_by_trusted_workload_security_group.get(security_group_key, ()))
     if _workload_has_general_egress_path(workload):
         add_many(index.direct_internet_databases)
-    if workload.vpc_id:
+    scoped_vpc_key = aws_scoped_reference_key(workload.provider_config_key, workload.vpc_id)
+    if scoped_vpc_key is not None:
         if workload.security_group_ids:
-            add_many(index.databases_missing_security_groups_by_vpc.get(workload.vpc_id, ()))
+            add_many(index.databases_missing_security_groups_by_vpc.get(scoped_vpc_key, ()))
         else:
-            add_many(index.databases_by_vpc.get(workload.vpc_id, ()))
+            add_many(index.databases_by_vpc.get(scoped_vpc_key, ()))
     if attached_role is not None:
         if _role_allows_object_storage_access(attached_role):
             add_many(index.object_storage)
@@ -200,24 +233,25 @@ def _candidate_data_stores_for_workload(
     )
 
 
-def _trusted_workload_security_group_ids(
+def _trusted_workload_security_group_keys(
     data_store: NormalizedResource,
-    indexes: AnalysisIndexes,
-) -> set[str]:
-    trusted_group_ids: set[str] = set()
-    for security_group_id in data_store.security_group_ids:
-        security_group = indexes.security_groups_by_reference.unique_candidate(security_group_id)
-        if security_group is None:
-            continue
+    relationships: AwsSecurityGroupRelationships,
+) -> set[AwsReferenceRelationshipKey]:
+    trusted_group_keys: set[AwsReferenceRelationshipKey] = set()
+    for security_group in relationships.attached_security_groups(data_store):
         for rule in security_group.network_rules:
-            if rule.direction == "ingress":
-                trusted_group_ids.update(rule.referenced_security_group_ids)
-    return trusted_group_ids
+            if rule.direction != "ingress":
+                continue
+            for reference in rule.referenced_security_group_ids:
+                key = relationships.reference_key(reference, source=security_group)
+                if key is not None:
+                    trusted_group_keys.add(key)
+    return trusted_group_keys
 
 
 def _freeze_resource_groups_by_key(
-    grouped: dict[str, list[NormalizedResource]],
-) -> Mapping[str, tuple[NormalizedResource, ...]]:
+    grouped: dict[_Key, list[NormalizedResource]],
+) -> Mapping[_Key, tuple[NormalizedResource, ...]]:
     return {key: tuple(resources) for key, resources in grouped.items()}
 
 
@@ -239,10 +273,14 @@ def _workload_reaches_data_store(
     workload: NormalizedResource,
     data_store: NormalizedResource,
     attached_role: NormalizedResource | None,
-    indexes: AnalysisIndexes,
+    security_group_relationships: AwsSecurityGroupRelationships,
 ) -> str | None:
     if is_database_resource(data_store):
-        return _database_reachability_rationale(workload, data_store, indexes)
+        return _database_reachability_rationale(
+            workload,
+            data_store,
+            security_group_relationships,
+        )
     if is_object_storage_resource(data_store):
         if attached_role is None:
             return None
@@ -287,13 +325,19 @@ def _workload_reaches_data_store(
 def _database_reachability_rationale(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    indexes: AnalysisIndexes,
+    security_group_relationships: AwsSecurityGroupRelationships,
 ) -> str | None:
-    if workload.vpc_id and data_store.vpc_id and workload.vpc_id != data_store.vpc_id:
+    workload_vpc_key = aws_scoped_reference_key(workload.provider_config_key, workload.vpc_id)
+    data_store_vpc_key = aws_scoped_reference_key(data_store.provider_config_key, data_store.vpc_id)
+    if workload_vpc_key is not None and data_store_vpc_key is not None and workload_vpc_key != data_store_vpc_key:
         if not data_store.direct_internet_reachable:
             return None
 
-    if _database_allows_workload_security_group(workload, data_store, indexes):
+    if _database_allows_workload_security_group(
+        workload,
+        data_store,
+        security_group_relationships,
+    ):
         return (
             "Application or function workloads cross into a higher-sensitivity data plane when "
             "database ingress security groups explicitly trust the workload security group."
@@ -305,8 +349,10 @@ def _database_reachability_rationale(
             "a directly internet-reachable database is reachable from a workload subnet with general egress."
         )
 
-    if (not workload.security_group_ids or not data_store.security_group_ids) and (
-        workload.vpc_id and data_store.vpc_id and workload.vpc_id == data_store.vpc_id
+    if (
+        (not workload.security_group_ids or not data_store.security_group_ids)
+        and workload_vpc_key is not None
+        and workload_vpc_key == data_store_vpc_key
     ):
         return (
             "Application or function workloads cross into a higher-sensitivity data plane when "
@@ -318,19 +364,27 @@ def _database_reachability_rationale(
 def _database_allows_workload_security_group(
     workload: NormalizedResource,
     data_store: NormalizedResource,
-    indexes: AnalysisIndexes,
+    relationships: AwsSecurityGroupRelationships,
 ) -> bool:
     if not workload.security_group_ids or not data_store.security_group_ids:
         return False
-    workload_group_ids = set(workload.security_group_ids)
-    for security_group_id in data_store.security_group_ids:
-        security_group = indexes.security_groups_by_reference.unique_candidate(security_group_id)
-        if security_group is None:
-            continue
+    workload_group_keys = {
+        key
+        for reference in workload.security_group_ids
+        if (key := relationships.reference_key(reference, source=workload)) is not None
+    }
+    if not workload_group_keys:
+        return False
+    for security_group in relationships.attached_security_groups(data_store):
         for rule in security_group.network_rules:
             if rule.direction != "ingress":
                 continue
-            if workload_group_ids.intersection(rule.referenced_security_group_ids):
+            trusted_group_keys = {
+                key
+                for reference in rule.referenced_security_group_ids
+                if (key := relationships.reference_key(reference, source=security_group)) is not None
+            }
+            if workload_group_keys.intersection(trusted_group_keys):
                 return True
     return False
 

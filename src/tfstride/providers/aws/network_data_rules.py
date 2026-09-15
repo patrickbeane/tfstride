@@ -10,6 +10,10 @@ from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
 from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityGroupRule
+from tfstride.providers.aws.analysis_indexes import (
+    AwsSecurityGroupRelationships,
+    aws_analysis_indexes,
+)
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -30,9 +34,9 @@ class AwsNetworkDataRuleDetectors:
         boundary_index = context.boundary_index
         indexes = context.analysis_indexes
         assert indexes is not None
-        public_workloads_by_security_group = indexes.public_workloads_by_security_group
+        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
         for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
-            attached_groups = indexes.attached_security_groups(database)
+            attached_groups = security_group_relationships.attached_security_groups(database)
             internet_rules = [
                 (security_group, rule)
                 for security_group in attached_groups
@@ -44,13 +48,10 @@ class AwsNetworkDataRuleDetectors:
                 for rule in security_group.network_rules:
                     if rule.direction != "ingress":
                         continue
-                    matched_workloads = sorted(
-                        {
-                            workload.address: workload
-                            for security_group_id in rule.referenced_security_group_ids
-                            for workload in public_workloads_by_security_group.get(security_group_id, ())
-                        }.values(),
-                        key=lambda workload: workload.address,
+                    matched_workloads = _public_resources_allowed_by_rule(
+                        security_group_relationships,
+                        security_group,
+                        rule,
                     )
                     if matched_workloads:
                         public_tier_rules.append((security_group, rule, matched_workloads))
@@ -150,7 +151,7 @@ class AwsNetworkDataRuleDetectors:
         boundary_index = context.boundary_index
         indexes = context.analysis_indexes
         assert indexes is not None
-        public_security_group_map = indexes.public_workloads_by_security_group
+        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
         public_private_boundary = next(
             (
                 boundary
@@ -160,21 +161,27 @@ class AwsNetworkDataRuleDetectors:
             None,
         )
         for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
-            for security_group in indexes.attached_security_groups(database):
-                risky_rules = [
-                    rule
+            for security_group in security_group_relationships.attached_security_groups(database):
+                risky_rules_with_workloads = [
+                    (rule, matched_workloads)
                     for rule in security_group.network_rules
                     if rule.direction == "ingress"
-                    and set(rule.referenced_security_group_ids).intersection(public_security_group_map)
+                    and (
+                        matched_workloads := _public_resources_allowed_by_rule(
+                            security_group_relationships,
+                            security_group,
+                            rule,
+                        )
+                    )
                 ]
-                if not risky_rules:
+                if not risky_rules_with_workloads:
                     continue
+                risky_rules = [rule for rule, _ in risky_rules_with_workloads]
                 exposed_workloads = sorted(
                     {
                         workload.address
-                        for rule in risky_rules
-                        for security_group_id in rule.referenced_security_group_ids
-                        for workload in public_security_group_map.get(security_group_id, ())
+                        for _, matched_workloads in risky_rules_with_workloads
+                        for workload in matched_workloads
                     }
                 )
                 severity_reasoning = build_severity_reasoning(
@@ -202,8 +209,8 @@ class AwsNetworkDataRuleDetectors:
                             evidence_item(
                                 "network_path",
                                 [
-                                    f"{security_group.address} allows {', '.join(rule.referenced_security_group_ids)} attached to {', '.join(sorted({workload.address for security_group_id in rule.referenced_security_group_ids for workload in public_security_group_map.get(security_group_id, ())}))}"
-                                    for rule in risky_rules
+                                    f"{security_group.address} allows {', '.join(rule.referenced_security_group_ids)} attached to {', '.join(workload.address for workload in matched_workloads)}"
+                                    for rule, matched_workloads in risky_rules_with_workloads
                                 ],
                             ),
                             evidence_item(
@@ -222,3 +229,22 @@ class AwsNetworkDataRuleDetectors:
                     )
                 )
         return findings
+
+
+def _public_resources_allowed_by_rule(
+    relationships: AwsSecurityGroupRelationships,
+    security_group: NormalizedResource,
+    rule: SecurityGroupRule,
+) -> list[NormalizedResource]:
+    return sorted(
+        {
+            resource.address: resource
+            for reference in rule.referenced_security_group_ids
+            for resource in relationships.resources_attached_to(
+                reference,
+                source=security_group,
+                public_only=True,
+            )
+        }.values(),
+        key=lambda resource: resource.address,
+    )

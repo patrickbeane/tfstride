@@ -6,7 +6,6 @@ from tfstride.analysis.finding_helpers import (
     collect_evidence,
     evidence_item,
 )
-from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.resource_concepts import (
     IDENTITY_ROLE_RESOURCE_TYPES,
     SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES,
@@ -22,6 +21,10 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
     TrustBoundary,
+)
+from tfstride.providers.aws.analysis_indexes import (
+    AwsSecurityGroupRelationships,
+    aws_analysis_indexes,
 )
 from tfstride.providers.aws.policy_conditions import (
     describe_trust_narrowing_for_principal,
@@ -46,7 +49,8 @@ class AwsPathChainRuleDetectors:
         boundary_index = context.boundary_index
         indexes = context.analysis_indexes
         assert indexes is not None
-        trusted_workload_hops = _trusted_workload_hops(inventory, indexes)
+        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
+        trusted_workload_hops = _trusted_workload_hops(inventory, security_group_relationships)
         private_data_paths = _private_workload_data_paths(boundary_index, inventory)
         seen: set[tuple[str, ...]] = set()
 
@@ -209,11 +213,11 @@ class AwsPathChainRuleDetectors:
 
 def _trusted_workload_hops(
     inventory: ResourceInventory,
-    indexes: AnalysisIndexes,
+    security_group_relationships: AwsSecurityGroupRelationships,
 ) -> dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]]:
     trusted_hops: dict[str, list[tuple[NormalizedResource, NormalizedResource, SecurityGroupRule]]] = {}
     for workload in inventory.by_type(*SECURITY_GROUP_BACKED_WORKLOAD_RESOURCE_TYPES):
-        for security_group in indexes.attached_security_groups(workload):
+        for security_group in security_group_relationships.attached_security_groups(workload):
             for rule in security_group.network_rules:
                 if rule.direction != "ingress" or not rule.referenced_security_group_ids:
                     continue
@@ -221,7 +225,10 @@ def _trusted_workload_hops(
                     {
                         source.address: source
                         for security_group_id in rule.referenced_security_group_ids
-                        for source in indexes.resources_by_security_group.get(security_group_id, ())
+                        for source in security_group_relationships.resources_attached_to(
+                            security_group_id,
+                            source=security_group,
+                        )
                         if source.address != workload.address
                     }.values(),
                     key=lambda source: source.address,

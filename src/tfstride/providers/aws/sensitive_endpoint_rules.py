@@ -27,7 +27,7 @@ class _SensitiveEndpointService:
     display_name: str
     expected_endpoint: str
     action_patterns: tuple[str, ...]
-    has_endpoint: Callable[[AwsVpcEndpointIndex, str | None], bool]
+    has_endpoint: Callable[[AwsVpcEndpointIndex, str | None, NormalizedResource], bool]
     posture_description: str
 
 
@@ -42,7 +42,10 @@ _SERVICE_BY_RULE_ID = {
             "secretsmanager:Get*",
             "secretsmanager:*",
         ),
-        has_endpoint=lambda index, vpc_id: index.has_secrets_manager_interface_endpoint(vpc_id),
+        has_endpoint=lambda index, vpc_id, source: index.has_secrets_manager_interface_endpoint(
+            vpc_id,
+            source=source,
+        ),
         posture_description="Secrets Manager secret retrieval",
     ),
     "aws-workload-kms-vpc-endpoint-missing": _SensitiveEndpointService(
@@ -57,7 +60,10 @@ _SERVICE_BY_RULE_ID = {
             "kms:ReEncrypt*",
             "kms:*",
         ),
-        has_endpoint=lambda index, vpc_id: index.has_kms_endpoint(vpc_id),
+        has_endpoint=lambda index, vpc_id, source: index.has_kms_endpoint(
+            vpc_id,
+            source=source,
+        ),
         posture_description="KMS cryptographic key access",
     ),
     "aws-workload-s3-vpc-endpoint-missing": _SensitiveEndpointService(
@@ -65,7 +71,10 @@ _SERVICE_BY_RULE_ID = {
         display_name="S3",
         expected_endpoint="gateway_or_interface",
         action_patterns=("s3:*",),
-        has_endpoint=lambda index, vpc_id: index.has_s3_endpoint(vpc_id),
+        has_endpoint=lambda index, vpc_id, source: index.has_s3_endpoint(
+            vpc_id,
+            source=source,
+        ),
         posture_description="S3 data-plane access",
     ),
 }
@@ -181,9 +190,14 @@ class AwsSensitiveEndpointRuleDetectors:
             dependency = _service_dependency(role, service)
             if dependency is None:
                 continue
-            if service.has_endpoint(endpoint_index, workload.vpc_id):
+            if service.has_endpoint(endpoint_index, workload.vpc_id, workload):
                 continue
-            if _has_unresolved_service_endpoint(endpoint_index, workload.vpc_id):
+            if _has_uncertain_service_endpoint(
+                endpoint_index,
+                workload.vpc_id,
+                service,
+                source=workload,
+            ):
                 continue
 
             severity_reasoning = build_severity_reasoning(
@@ -205,7 +219,12 @@ class AwsSensitiveEndpointRuleDetectors:
                         evidence_item("sensitive_service_dependency", _dependency_evidence(role, service, dependency)),
                         evidence_item(
                             "vpc_endpoint_coverage",
-                            _endpoint_coverage_evidence(endpoint_index, workload.vpc_id, service),
+                            _endpoint_coverage_evidence(
+                                endpoint_index,
+                                workload.vpc_id,
+                                service,
+                                source=workload,
+                            ),
                         ),
                         evidence_item(
                             "policy_statements",
@@ -347,10 +366,25 @@ def _action_matches_service(action: str, service: _SensitiveEndpointService) -> 
     )
 
 
-def _has_unresolved_service_endpoint(endpoint_index: AwsVpcEndpointIndex, vpc_id: str | None) -> bool:
+def _has_uncertain_service_endpoint(
+    endpoint_index: AwsVpcEndpointIndex,
+    vpc_id: str | None,
+    service: _SensitiveEndpointService,
+    *,
+    source: NormalizedResource,
+) -> bool:
     if not vpc_id:
         return False
-    return any(endpoint.vpc_id == vpc_id for endpoint in endpoint_index.unresolved_service_name_endpoints)
+    endpoint_type = None if service.key == "s3" else service.expected_endpoint
+    return endpoint_index.has_uncertain_coverage(
+        vpc_id,
+        service.key,
+        source=source,
+        endpoint_type=endpoint_type,
+    ) or endpoint_index.has_unresolved_service_name_endpoint(
+        vpc_id,
+        source=source,
+    )
 
 
 def _rationale(
@@ -424,9 +458,11 @@ def _endpoint_coverage_evidence(
     endpoint_index: AwsVpcEndpointIndex,
     vpc_id: str | None,
     service: _SensitiveEndpointService,
+    *,
+    source: NormalizedResource,
 ) -> list[str]:
     existing_endpoint_addresses = tuple(
-        endpoint.endpoint_address for endpoint in endpoint_index.endpoints_for_vpc(vpc_id)
+        endpoint.endpoint_address for endpoint in endpoint_index.endpoints_for_vpc(vpc_id, source=source)
     )
     values = [
         f"vpc_id={vpc_id}",

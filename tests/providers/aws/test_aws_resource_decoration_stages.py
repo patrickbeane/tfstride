@@ -53,6 +53,7 @@ def _resource(
     policy_statements: list[IAMPolicyStatement] | None = None,
     public_access_configured: bool = False,
     public_exposure: bool = False,
+    provider_config_key: str | None = None,
     metadata: dict | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
@@ -70,6 +71,7 @@ def _resource(
         policy_statements=policy_statements or [],
         public_access_configured=public_access_configured,
         public_exposure=public_exposure,
+        provider_config_key=provider_config_key,
         metadata=metadata or {},
     )
 
@@ -220,7 +222,119 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertFalse(private_subnet.has_public_route)
         self.assertTrue(private_subnet.has_nat_gateway_egress)
         self.assertEqual(private_subnet.metadata["route_table_ids"], ["rtb-private"])
-        self.assertEqual(context.public_subnet_ids, {"subnet-public"})
+        self.assertEqual(context.public_subnet_ids, {(None, "subnet-public")})
+
+    def test_network_posture_does_not_cross_provider_configurations(self) -> None:
+        primary_subnet = _resource(
+            "aws_subnet.primary",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-shared",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.primary",
+            metadata={"map_public_ip_on_launch": True},
+        )
+        secondary_subnet = _resource(
+            "aws_subnet.secondary",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-shared",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.secondary",
+            metadata={"map_public_ip_on_launch": True},
+        )
+        secondary_internet_gateway = _resource(
+            "aws_internet_gateway.secondary",
+            "aws_internet_gateway",
+            ResourceCategory.NETWORK,
+            identifier="igw-shared",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.secondary",
+        )
+        secondary_public_route_table = _resource(
+            "aws_route_table.secondary_public",
+            "aws_route_table",
+            ResourceCategory.NETWORK,
+            identifier="rtb-secondary-public",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.secondary",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "gateway_id": "igw-shared",
+                    }
+                ]
+            },
+        )
+        primary_nat_subnet = _resource(
+            "aws_subnet.primary_nat",
+            "aws_subnet",
+            ResourceCategory.NETWORK,
+            identifier="subnet-primary-nat",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.primary",
+        )
+        primary_nat_route_table = _resource(
+            "aws_route_table.primary_nat",
+            "aws_route_table",
+            ResourceCategory.NETWORK,
+            identifier="rtb-primary-nat",
+            vpc_id="vpc-shared",
+            provider_config_key="aws.primary",
+            metadata={
+                "routes": [
+                    {
+                        "destination_cidr_block": "0.0.0.0/0",
+                        "nat_gateway_id": "nat-shared",
+                    }
+                ]
+            },
+        )
+        primary_nat_association = _resource(
+            "aws_route_table_association.primary_nat",
+            "aws_route_table_association",
+            ResourceCategory.NETWORK,
+            provider_config_key="aws.primary",
+            metadata={
+                "subnet_id": "subnet-primary-nat",
+                "route_table_id": "rtb-primary-nat",
+            },
+        )
+        secondary_nat_gateway = _resource(
+            "aws_nat_gateway.secondary",
+            "aws_nat_gateway",
+            ResourceCategory.NETWORK,
+            identifier="nat-shared",
+            provider_config_key="aws.secondary",
+        )
+        primary_workload = _resource(
+            "aws_instance.primary",
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            subnet_ids=("subnet-shared",),
+            provider_config_key="aws.primary",
+        )
+        resources = [
+            primary_subnet,
+            secondary_subnet,
+            secondary_internet_gateway,
+            secondary_public_route_table,
+            primary_nat_subnet,
+            primary_nat_route_table,
+            primary_nat_association,
+            secondary_nat_gateway,
+            primary_workload,
+        ]
+        context = _context(resources)
+
+        DeriveSubnetPostureStage().apply(resources, context)
+        DerivePublicExposureStage().apply(resources, context)
+
+        self.assertFalse(primary_subnet.is_public_subnet)
+        self.assertTrue(secondary_subnet.is_public_subnet)
+        self.assertFalse(primary_nat_subnet.has_nat_gateway_egress)
+        self.assertFalse(primary_workload.in_public_subnet)
 
     def test_vpc_inference_stage_uses_subnet_then_security_group_references(self) -> None:
         subnet = _resource(
@@ -281,7 +395,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [security_group, subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {"subnet-public"}
+        context.public_subnet_ids = {(None, "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 
@@ -348,7 +462,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         DeriveSubnetPostureStage().apply(resources, context)
         DerivePublicExposureStage().apply(resources, context)
 
-        self.assertEqual(context.public_subnet_ids, {"subnet-public"})
+        self.assertEqual(context.public_subnet_ids, {(None, "subnet-public")})
         self.assertTrue(subnet.is_public_subnet)
         self.assertTrue(instance.in_public_subnet)
         self.assertTrue(instance.internet_ingress_capable)
@@ -478,7 +592,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [security_group, subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {"subnet-public"}
+        context.public_subnet_ids = {(None, "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 
@@ -504,7 +618,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {"subnet-public"}
+        context.public_subnet_ids = {(None, "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 
