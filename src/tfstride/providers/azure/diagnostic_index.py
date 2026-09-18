@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_index import (
+    AzureResourceIndexBuilder,
+    AzureResourceReferenceView,
+)
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
 from tfstride.providers.coercion import dedupe_strings
@@ -44,6 +48,7 @@ class AzureDiagnosticSettingTarget:
     eventhub_authorization_rule_id: str | None = None
     eventhub_name: str | None = None
     marketplace_partner_resource_id: str | None = None
+    target_resource_address: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +109,8 @@ class AzureDiagnosticSettingIndex:
         seen: set[tuple[str, str]] = set()
         for target_key in _target_resource_keys(resource):
             for setting in self.settings_by_target_key.get(target_key, ()):
+                if setting.target_resource_address != resource.address:
+                    continue
                 dedupe_key = (setting.diagnostic_setting_address, setting.target_resource_id)
                 if dedupe_key in seen:
                     continue
@@ -116,7 +123,10 @@ def build_azure_diagnostic_setting_index(
     source: ResourceInventory | Iterable[NormalizedResource],
 ) -> AzureDiagnosticSettingIndex:
     resources = tuple(source.resources if isinstance(source, ResourceInventory) else source)
-    target_keys_by_lookup_key = _target_keys_by_lookup_key(resources)
+    resource_references = AzureResourceIndexBuilder().build(list(resources)).resources_by_reference
+    target_resource_types = frozenset(
+        resource.resource_type for resource in resources if resource.resource_type != _AZURE_DIAGNOSTIC_SETTING
+    )
     pending_settings_by_key: dict[str, list[AzureDiagnosticSettingTarget]] = {}
     unresolved_targets: list[AzureUnresolvedDiagnosticSettingTarget] = []
 
@@ -127,12 +137,21 @@ def build_azure_diagnostic_setting_index(
         if setting is None:
             unresolved_targets.append(_unresolved_diagnostic_setting_target(resource, target_resource_id=None))
             continue
-        lookup_key = azure_reference_key(setting.target_resource_id)
-        target_key = target_keys_by_lookup_key.get(lookup_key)
-        if target_key:
-            pending_settings_by_key.setdefault(target_key, []).append(setting)
-        else:
-            unresolved_targets.append(_unresolved_diagnostic_setting_target(resource, setting.target_resource_id))
+        target = _resolve_diagnostic_target(
+            resource,
+            setting.target_resource_id,
+            resource_references,
+            target_resource_types,
+        )
+        if target is not None:
+            target_key = _primary_target_resource_key(target)
+            resolved_setting = replace(
+                setting,
+                target_resource_address=target.address,
+            )
+            pending_settings_by_key.setdefault(target_key, []).append(resolved_setting)
+            continue
+        unresolved_targets.append(_unresolved_diagnostic_setting_target(resource, setting.target_resource_id))
 
     return AzureDiagnosticSettingIndex(
         settings_by_target_key=MappingProxyType(
@@ -142,15 +161,22 @@ def build_azure_diagnostic_setting_index(
     )
 
 
-def _target_keys_by_lookup_key(resources: Iterable[NormalizedResource]) -> dict[str, str]:
-    target_keys_by_lookup_key: dict[str, str] = {}
-    for resource in resources:
-        if resource.resource_type == _AZURE_DIAGNOSTIC_SETTING:
-            continue
-        primary_key = _primary_target_resource_key(resource)
-        for target_key in _target_resource_keys(resource):
-            target_keys_by_lookup_key.setdefault(target_key, primary_key)
-    return target_keys_by_lookup_key
+def _resolve_diagnostic_target(
+    diagnostic_setting: NormalizedResource,
+    reference: str,
+    resource_references: AzureResourceReferenceView,
+    target_resource_types: frozenset[str],
+) -> NormalizedResource | None:
+    reference_key = azure_reference_key(reference)
+    resolution = resource_references.resolve(
+        reference,
+        source=diagnostic_setting,
+        resource_types=target_resource_types,
+    )
+    candidates = tuple(
+        candidate for candidate in resolution.candidates if reference_key in _target_resource_keys(candidate)
+    )
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _primary_target_resource_key(resource: NormalizedResource) -> str:

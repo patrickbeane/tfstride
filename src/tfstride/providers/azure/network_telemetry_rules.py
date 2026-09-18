@@ -7,6 +7,10 @@ from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
+from tfstride.providers.azure.resource_index import (
+    AzureResourceIndexBuilder,
+    AzureResourceReferenceView,
+)
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.coercion import STATE_ENABLED, STATE_UNKNOWN
 
@@ -26,12 +30,18 @@ class AzureNetworkTelemetryRuleDetectors:
             return []
 
         flow_logs = context.inventory.by_type(AzureResourceType.NETWORK_WATCHER_FLOW_LOG)
-        resolved_flow_logs = _resolved_nsg_flow_logs(flow_logs)
+        resource_references = (
+            AzureResourceIndexBuilder().build(list(context.inventory.resources)).resources_by_reference
+        )
+        resolved_flow_logs = _resolved_nsg_flow_logs(
+            flow_logs,
+            resource_references,
+        )
         unresolved_flow_logs = _unresolved_target_flow_logs(flow_logs)
         findings: list[Finding] = []
         for network_security_group in context.inventory.by_type(AzureResourceType.NETWORK_SECURITY_GROUP):
             nsg_ids = _network_security_group_identifiers(network_security_group)
-            if not nsg_ids or nsg_ids & resolved_flow_logs.keys():
+            if not nsg_ids or network_security_group.address in resolved_flow_logs:
                 continue
             if unresolved_flow_logs:
                 continue
@@ -189,13 +199,23 @@ class AzureNetworkTelemetryRuleDetectors:
         return findings
 
 
-def _resolved_nsg_flow_logs(flow_logs: Iterable[NormalizedResource]) -> dict[str, list[NormalizedResource]]:
+def _resolved_nsg_flow_logs(
+    flow_logs: Iterable[NormalizedResource],
+    resource_references: AzureResourceReferenceView,
+) -> dict[str, list[NormalizedResource]]:
     resolved: dict[str, list[NormalizedResource]] = {}
     for flow_log in flow_logs:
         target_id = azure_facts(flow_log).network_flow_log_target_resource_id
         if not target_id:
             continue
-        resolved.setdefault(_normalized_reference(target_id), []).append(flow_log)
+        target = resource_references.get(
+            target_id,
+            source=flow_log,
+            resource_types={AzureResourceType.NETWORK_SECURITY_GROUP},
+        )
+        if target is None:
+            continue
+        resolved.setdefault(target.address, []).append(flow_log)
     return resolved
 
 

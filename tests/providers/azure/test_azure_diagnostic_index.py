@@ -210,6 +210,75 @@ class AzureDiagnosticSettingIndexTests(unittest.TestCase):
             ),
         )
 
+    def test_exact_terraform_target_selects_one_duplicate_arm_resource_by_input_order(
+        self,
+    ) -> None:
+        first_account = _storage_account(
+            name="first",
+            storage_id=_STORAGE_ID,
+            account_name="first",
+        )
+        second_account = _storage_account(
+            name="second",
+            storage_id=_STORAGE_ID,
+            account_name="second",
+        )
+
+        for accounts in (
+            (first_account, second_account),
+            (second_account, first_account),
+        ):
+            inventory = _normalized(
+                *accounts,
+                _diagnostic_setting("first_audit", f"{first_account.address}.id"),
+            )
+            first = inventory.get_by_address(first_account.address)
+            second = inventory.get_by_address(second_account.address)
+            assert first is not None
+            assert second is not None
+
+            index = build_azure_diagnostic_setting_index(inventory)
+
+            with self.subTest(order=[account.address for account in accounts]):
+                self.assertTrue(index.coverage_for(first).has_diagnostic_settings)
+                self.assertFalse(index.coverage_for(second).has_diagnostic_settings)
+                self.assertEqual(index.unresolved_targets, ())
+
+    def test_duplicate_arm_targets_do_not_receive_diagnostic_coverage_by_input_order(
+        self,
+    ) -> None:
+        first_account = _storage_account(
+            name="first",
+            storage_id=_STORAGE_ID,
+            account_name="first",
+        )
+        second_account = _storage_account(
+            name="second",
+            storage_id=_STORAGE_ID,
+            account_name="second",
+        )
+
+        for accounts in (
+            (first_account, second_account),
+            (second_account, first_account),
+        ):
+            inventory = _normalized(
+                *accounts,
+                _diagnostic_setting("shared_audit", _STORAGE_ID),
+            )
+            first = inventory.get_by_address(first_account.address)
+            second = inventory.get_by_address(second_account.address)
+            assert first is not None
+            assert second is not None
+
+            index = build_azure_diagnostic_setting_index(inventory)
+
+            with self.subTest(order=[account.address for account in accounts]):
+                self.assertFalse(index.coverage_for(first).has_diagnostic_settings)
+                self.assertFalse(index.coverage_for(second).has_diagnostic_settings)
+                self.assertEqual(len(index.unresolved_targets), 1)
+                self.assertEqual(index.unresolved_targets[0].target_resource_id, _STORAGE_ID)
+
     def test_unresolved_target_is_retained_without_suppressing_real_resources(self) -> None:
         inventory = _normalized(
             _storage_account(account_name="shared"),

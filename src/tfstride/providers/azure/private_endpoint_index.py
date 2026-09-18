@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_index import (
+    AzureResourceIndexBuilder,
+    AzureResourceReferenceView,
+)
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, compact_strings
 from tfstride.providers.coercion import dedupe_strings
@@ -109,6 +113,8 @@ class AzurePrivateEndpointIndex:
         seen: set[tuple[str, str | None, str | None, str | None]] = set()
         for target_key in _target_resource_keys(resource):
             for connection in self.connections_by_target_key.get(target_key, ()):
+                if connection.target_resource_address != resource.address:
+                    continue
                 dedupe_key = (
                     connection.private_endpoint_address,
                     connection.target_resource_address,
@@ -126,7 +132,7 @@ def build_azure_private_endpoint_index(
     source: ResourceInventory | Iterable[NormalizedResource],
 ) -> AzurePrivateEndpointIndex:
     resources = tuple(source.resources if isinstance(source, ResourceInventory) else source)
-    target_keys_by_lookup_key = _supported_target_keys_by_lookup_key(resources)
+    resource_references = AzureResourceIndexBuilder().build(list(resources)).resources_by_reference
     pending_connections_by_key: dict[str, list[AzurePrivateEndpointConnection]] = {}
     unresolved_targets: list[AzureUnresolvedPrivateEndpointTarget] = []
 
@@ -134,23 +140,27 @@ def build_azure_private_endpoint_index(
         if private_endpoint.resource_type != AzureResourceType.PRIVATE_ENDPOINT:
             continue
         for connection in _private_endpoint_connections(private_endpoint):
-            target_keys = {
-                target_keys_by_lookup_key[lookup_key]
-                for lookup_key in _connection_target_lookup_keys(connection)
-                if lookup_key in target_keys_by_lookup_key
-            }
-            if len(target_keys) == 1:
-                target_key = next(iter(target_keys))
-                pending_connections_by_key.setdefault(target_key, []).append(connection)
-            else:
-                unresolved_targets.append(
-                    AzureUnresolvedPrivateEndpointTarget(
-                        private_endpoint_address=connection.private_endpoint_address,
-                        target_resource_id=connection.target_resource_id,
-                        subresource_names=connection.subresource_names,
-                        service_connection_name=connection.service_connection_name,
-                    )
+            target = _resolve_connection_target(
+                private_endpoint,
+                connection,
+                resource_references,
+            )
+            if target is not None:
+                target_key = _primary_target_resource_key(target)
+                resolved_connection = replace(
+                    connection,
+                    target_resource_address=target.address,
                 )
+                pending_connections_by_key.setdefault(target_key, []).append(resolved_connection)
+                continue
+            unresolved_targets.append(
+                AzureUnresolvedPrivateEndpointTarget(
+                    private_endpoint_address=connection.private_endpoint_address,
+                    target_resource_id=connection.target_resource_id,
+                    subresource_names=connection.subresource_names,
+                    service_connection_name=connection.service_connection_name,
+                )
+            )
 
     return AzurePrivateEndpointIndex(
         connections_by_target_key=MappingProxyType(
@@ -158,19 +168,6 @@ def build_azure_private_endpoint_index(
         ),
         unresolved_targets=tuple(unresolved_targets),
     )
-
-
-def _supported_target_keys_by_lookup_key(
-    resources: Iterable[NormalizedResource],
-) -> dict[str, str]:
-    target_keys_by_lookup_key: dict[str, str] = {}
-    for resource in resources:
-        if resource.resource_type not in _SUPPORTED_PRIVATE_ENDPOINT_TARGET_TYPES:
-            continue
-        primary_key = _primary_target_resource_key(resource)
-        for target_key in _target_resource_keys(resource):
-            target_keys_by_lookup_key.setdefault(target_key, primary_key)
-    return target_keys_by_lookup_key
 
 
 def _primary_target_resource_key(resource: NormalizedResource) -> str:
@@ -250,11 +247,42 @@ def _connection_target_resource_id(record: dict[str, object]) -> str | None:
     return _optional_string(record.get("private_connection_resource_id"))
 
 
-def _connection_target_lookup_keys(connection: AzurePrivateEndpointConnection) -> tuple[str, ...]:
+def _resolve_connection_target(
+    private_endpoint: NormalizedResource,
+    connection: AzurePrivateEndpointConnection,
+    resource_references: AzureResourceReferenceView,
+) -> NormalizedResource | None:
+    matching_targets: dict[str, NormalizedResource] | None = None
+    for reference in _connection_target_references(connection):
+        reference_key = azure_reference_key(reference)
+        resolution = resource_references.resolve(
+            reference,
+            source=private_endpoint,
+            resource_types=_SUPPORTED_PRIVATE_ENDPOINT_TARGET_TYPES,
+        )
+        candidates = {
+            candidate.address: candidate
+            for candidate in resolution.candidates
+            if reference_key in _target_resource_keys(candidate)
+        }
+        if not candidates:
+            continue
+        if matching_targets is None:
+            matching_targets = candidates
+            continue
+        matching_targets = {address: target for address, target in matching_targets.items() if address in candidates}
+    if matching_targets is None or len(matching_targets) != 1:
+        return None
+    return next(iter(matching_targets.values()))
+
+
+def _connection_target_references(
+    connection: AzurePrivateEndpointConnection,
+) -> tuple[str, ...]:
     values: list[str | None] = [connection.target_resource_id]
     if connection.target_resource_address:
         values.append(f"{connection.target_resource_address}.id")
-    return tuple(azure_reference_key(value) for value in compact_strings(values))
+    return tuple(compact_strings(values))
 
 
 def _string_values(value: object) -> list[str]:

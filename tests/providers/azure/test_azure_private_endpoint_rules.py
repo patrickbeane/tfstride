@@ -152,37 +152,66 @@ def _private_endpoint(
     )
 
 
-def _virtual_network(name: str) -> TerraformResource:
+def _virtual_network(
+    name: str,
+    *,
+    terraform_name: str | None = None,
+    subscription: str = "sub-0001",
+    resource_group: str = "app",
+) -> TerraformResource:
     return _resource(
         AzureResourceType.VIRTUAL_NETWORK,
-        name,
+        terraform_name or name,
         {
-            "id": f"/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Network/virtualNetworks/{name}",
+            "id": (
+                f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/"
+                f"Microsoft.Network/virtualNetworks/{name}"
+            ),
             "name": name,
             "address_space": ["10.0.0.0/16"],
         },
     )
 
 
-def _subnet(name: str, virtual_network_name: str) -> TerraformResource:
+def _subnet(
+    name: str,
+    virtual_network_name: str,
+    *,
+    subscription: str = "sub-0001",
+    resource_group: str = "app",
+    virtual_network_reference: str | None = None,
+) -> TerraformResource:
     return _resource(
         AzureResourceType.SUBNET,
         name,
         {
-            "id": f"/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Network/virtualNetworks/{virtual_network_name}/subnets/{name}",
+            "id": (
+                f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/"
+                f"Microsoft.Network/virtualNetworks/{virtual_network_name}/subnets/{name}"
+            ),
             "name": name,
-            "virtual_network_name": f"azurerm_virtual_network.{virtual_network_name}.name",
+            "virtual_network_name": (
+                virtual_network_reference or f"azurerm_virtual_network.{virtual_network_name}.name"
+            ),
             "address_prefixes": ["10.0.1.0/24"],
         },
     )
 
 
-def _private_dns_zone(name: str, zone_name: str) -> TerraformResource:
+def _private_dns_zone(
+    name: str,
+    zone_name: str,
+    *,
+    subscription: str = "sub-0001",
+) -> TerraformResource:
     return _resource(
         AzureResourceType.PRIVATE_DNS_ZONE,
         name,
         {
-            "id": f"/subscriptions/sub-0001/resourceGroups/dns/providers/Microsoft.Network/privateDnsZones/{zone_name}",
+            "id": (
+                f"/subscriptions/{subscription}/resourceGroups/dns/providers/"
+                f"Microsoft.Network/privateDnsZones/{zone_name}"
+            ),
             "name": zone_name,
         },
     )
@@ -193,12 +222,17 @@ def _private_dns_zone_virtual_network_link(
     *,
     zone_reference: str,
     virtual_network_reference: str,
+    subscription: str = "sub-0001",
+    resource_group: str = "dns",
 ) -> TerraformResource:
     return _resource(
         AzureResourceType.PRIVATE_DNS_ZONE_VIRTUAL_NETWORK_LINK,
         name,
         {
-            "id": f"/subscriptions/sub-0001/resourceGroups/dns/providers/Microsoft.Network/privateDnsZones/links/{name}",
+            "id": (
+                f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/"
+                f"Microsoft.Network/privateDnsZones/links/{name}"
+            ),
             "name": name,
             "private_dns_zone_name": zone_reference,
             "virtual_network_id": virtual_network_reference,
@@ -496,7 +530,7 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
 
                 self.assertEqual(resolution.state, "ambiguous")
                 self.assertEqual(resolution.candidates, (first, second))
-                self.assertIsNone(reference_index.unique_candidate(shared_id))
+                self.assertIsNone(resolution.selected_candidate)
 
     def test_private_dns_reference_helper_filters_type_before_ambiguity(self) -> None:
         zone = _private_dns_zone("shared", "privatelink.shared.example")
@@ -525,6 +559,105 @@ class AzurePrivateEndpointPostureRuleTests(unittest.TestCase):
             ),
             normalized_zone,
         )
+
+    def test_foreign_subscription_weak_dns_zone_link_does_not_create_relationship(
+        self,
+    ) -> None:
+        foreign_zone = _private_dns_zone(
+            "sql",
+            "privatelink.database.windows.net",
+            subscription="sub-0002",
+        )
+        local_link = _private_dns_zone_virtual_network_link(
+            "sql_shared",
+            zone_reference="privatelink.database.windows.net",
+            virtual_network_reference="azurerm_virtual_network.shared.id",
+        )
+        resources = [
+            _mssql_server(public_network=False),
+            _virtual_network("main"),
+            _virtual_network("shared"),
+            _subnet("data", "main"),
+            foreign_zone,
+            local_link,
+            _private_endpoint(
+                "sql",
+                _MSSQL_ID,
+                subresources=("sqlServer",),
+                dns_zone_ids=(f"{foreign_zone.address}.id",),
+                subnet_id="azurerm_subnet.data.id",
+            ),
+        ]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-private-endpoint-dns-posture-incomplete",
+                )
+
+                self.assertEqual(findings, [])
+
+    def test_same_name_vnets_across_subscriptions_match_only_in_link_scope(self) -> None:
+        for link_subscription, expected_rule_ids in (
+            ("sub-0001", []),
+            ("sub-0002", ["azure-private-endpoint-dns-posture-incomplete"]),
+        ):
+            resources = [
+                _mssql_server(public_network=False),
+                _virtual_network(
+                    "shared",
+                    terraform_name="local",
+                    subscription="sub-0001",
+                    resource_group="dns",
+                ),
+                _virtual_network(
+                    "shared",
+                    terraform_name="foreign",
+                    subscription="sub-0002",
+                    resource_group="dns",
+                ),
+                _subnet(
+                    "data",
+                    "shared",
+                    subscription="sub-0001",
+                    resource_group="dns",
+                    virtual_network_reference="shared",
+                ),
+                _private_dns_zone(
+                    "sql",
+                    "privatelink.database.windows.net",
+                    subscription=link_subscription,
+                ),
+                _private_dns_zone_virtual_network_link(
+                    "sql_shared",
+                    zone_reference="azurerm_private_dns_zone.sql.name",
+                    virtual_network_reference="shared",
+                    subscription=link_subscription,
+                ),
+                _private_endpoint(
+                    "sql",
+                    _MSSQL_ID,
+                    subresources=("sqlServer",),
+                    dns_zone_ids=("azurerm_private_dns_zone.sql.id",),
+                    subnet_id="azurerm_subnet.data.id",
+                ),
+            ]
+
+            for ordered_resources in (resources, list(reversed(resources))):
+                with self.subTest(
+                    link_subscription=link_subscription,
+                    order=[resource.address for resource in ordered_resources],
+                ):
+                    findings = _evaluate(
+                        ordered_resources,
+                        "azure-private-endpoint-dns-posture-incomplete",
+                    )
+
+                    self.assertEqual(
+                        [finding.rule_id for finding in findings],
+                        expected_rule_ids,
+                    )
 
     def test_private_endpoint_dns_zone_link_to_different_vnet_is_detected(self) -> None:
         findings = _evaluate(

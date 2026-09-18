@@ -3,10 +3,12 @@ from __future__ import annotations
 import unittest
 
 from tfstride.models import TerraformResource
+from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import AzureNormalizer
 from tfstride.providers.azure.private_endpoint_index import (
     build_azure_private_endpoint_index,
 )
+from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import AzureResourceType
 
 _STORAGE_ID = "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/logs"
@@ -502,6 +504,81 @@ class AzurePrivateEndpointIndexTests(unittest.TestCase):
         self.assertFalse(index.coverage_for(storage).has_private_endpoint)
         self.assertEqual(len(index.unresolved_targets), 1)
         self.assertEqual(index.unresolved_targets[0].target_resource_id, "shared")
+
+    def test_exact_terraform_target_disambiguates_duplicate_arm_identity_by_input_order(
+        self,
+    ) -> None:
+        first_account = _storage_account(
+            name="first",
+            storage_id=_STORAGE_ID,
+            account_name="first",
+        )
+        second_account = _storage_account(
+            name="second",
+            storage_id=_STORAGE_ID,
+            account_name="second",
+        )
+
+        for accounts in (
+            (first_account, second_account),
+            (second_account, first_account),
+        ):
+            inventory = _normalized(
+                *accounts,
+                _private_endpoint("first", _STORAGE_ID),
+            )
+            first = inventory.get_by_address(first_account.address)
+            second = inventory.get_by_address(second_account.address)
+            endpoint = inventory.get_by_address("azurerm_private_endpoint.first")
+            assert first is not None
+            assert second is not None
+            assert endpoint is not None
+            endpoint_facts = azure_facts(endpoint)
+            connections = [dict(connection) for connection in endpoint_facts.private_service_connections]
+            connections[0]["resolved_target_resource_address"] = first.address
+            endpoint_facts.set(AzureResourceMetadata.PRIVATE_SERVICE_CONNECTIONS, connections)
+
+            index = build_azure_private_endpoint_index(inventory)
+
+            with self.subTest(order=[account.address for account in accounts]):
+                self.assertTrue(index.coverage_for(first).has_private_endpoint)
+                self.assertFalse(index.coverage_for(second).has_private_endpoint)
+                self.assertEqual(index.unresolved_targets, ())
+
+    def test_duplicate_arm_targets_do_not_receive_private_endpoint_coverage_by_input_order(
+        self,
+    ) -> None:
+        first_account = _storage_account(
+            name="first",
+            storage_id=_STORAGE_ID,
+            account_name="first",
+        )
+        second_account = _storage_account(
+            name="second",
+            storage_id=_STORAGE_ID,
+            account_name="second",
+        )
+
+        for accounts in (
+            (first_account, second_account),
+            (second_account, first_account),
+        ):
+            inventory = _normalized(
+                *accounts,
+                _private_endpoint("shared", _STORAGE_ID),
+            )
+            first = inventory.get_by_address(first_account.address)
+            second = inventory.get_by_address(second_account.address)
+            assert first is not None
+            assert second is not None
+
+            index = build_azure_private_endpoint_index(inventory)
+
+            with self.subTest(order=[account.address for account in accounts]):
+                self.assertFalse(index.coverage_for(first).has_private_endpoint)
+                self.assertFalse(index.coverage_for(second).has_private_endpoint)
+                self.assertEqual(len(index.unresolved_targets), 1)
+                self.assertEqual(index.unresolved_targets[0].target_resource_id, _STORAGE_ID)
 
     def test_multiple_private_endpoints_targeting_same_resource_are_preserved(self) -> None:
         inventory = _normalized(

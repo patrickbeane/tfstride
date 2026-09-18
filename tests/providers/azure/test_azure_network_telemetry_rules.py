@@ -23,6 +23,9 @@ _ALL_RULE_IDS = (
 _MISSING = object()
 
 
+_NSG_ID = "/subscriptions/example/resourceGroups/rg-network/providers/Microsoft.Network/networkSecurityGroups/shared"
+
+
 def _flatten(rule_groups: tuple[tuple[str, ...], ...]) -> frozenset[str]:
     return frozenset(rule_id for rule_group in rule_groups for rule_id in rule_group)
 
@@ -124,6 +127,35 @@ class AzureNetworkTelemetryRuleTests(unittest.TestCase):
         findings = _findings([_network_security_group(), _flow_log()], *_ALL_RULE_IDS)
 
         self.assertEqual(findings, [])
+
+    def test_duplicate_arm_nsg_targets_do_not_receive_flow_log_coverage_by_input_order(
+        self,
+    ) -> None:
+        first_nsg = _network_security_group(name="first", nsg_id=_NSG_ID)
+        second_nsg = _network_security_group(name="second", nsg_id=_NSG_ID)
+
+        for network_security_groups in (
+            (first_nsg, second_nsg),
+            (second_nsg, first_nsg),
+        ):
+            findings = _findings(
+                [
+                    *network_security_groups,
+                    _flow_log(name="shared", target_id=_NSG_ID),
+                ],
+                _MISSING_FLOW_LOG_RULE,
+            )
+
+            with self.subTest(
+                order=[network_security_group.address for network_security_group in network_security_groups]
+            ):
+                self.assertEqual(
+                    sorted(finding.affected_resources for finding in findings),
+                    [
+                        ["azurerm_network_security_group.first"],
+                        ["azurerm_network_security_group.second"],
+                    ],
+                )
 
     def test_unresolved_flow_log_target_suppresses_missing_nsg_finding(self) -> None:
         findings = _findings(
