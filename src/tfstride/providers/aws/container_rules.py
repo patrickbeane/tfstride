@@ -9,6 +9,10 @@ from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 _AWS_ECR_REPOSITORY = "aws_ecr_repository"
 _AWS_WORKLOAD_RESOURCE_TYPES = ("aws_ecs_task_definition", "aws_lambda_function")
@@ -72,7 +76,7 @@ class AwsContainerDeploymentRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
-        repositories_by_url = _ecr_repositories_by_url(context)
+        repository_index = _ecr_repository_index(context)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*_AWS_WORKLOAD_RESOURCE_TYPES):
             facts = aws_facts(workload)
@@ -80,40 +84,45 @@ class AwsContainerDeploymentRuleDetectors:
                 if not _is_resolved_tagged_ecr_reference(image_reference):
                     continue
                 repository_url = image_reference["ecr_repository_url"]
-                for repository in repositories_by_url.get(repository_url, ()):  # exact URL match only
-                    repository_facts = aws_facts(repository)
-                    if _ecr_tag_is_mutable(repository_facts, image_reference["tag"]) is not True:
-                        continue
+                repository = repository_index.unique_candidate(repository_url)
+                if repository is None:
+                    continue
+                repository_facts = aws_facts(repository)
+                if _ecr_tag_is_mutable(repository_facts, image_reference["tag"]) is not True:
+                    continue
 
-                    severity_reasoning = build_severity_reasoning(
-                        internet_exposure=False,
-                        privilege_breadth=0,
-                        data_sensitivity=1,
-                        lateral_movement=1,
-                        blast_radius=1,
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=0,
+                    data_sensitivity=1,
+                    lateral_movement=1,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[workload.address, repository.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{workload.display_name} deploys the ECR image "
+                            f"{image_reference.get('raw')} from {repository.display_name}, and the exact "
+                            "repository policy permits this tag to be mutable. A later image push can change "
+                            "the artifact selected by a future deployment; use an immutable tag policy or a "
+                            "digest-pinned reference."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_resource", _target_resource_evidence(workload)),
+                            evidence_item("image_reference", _image_reference_evidence(image_reference)),
+                            evidence_item("ecr_repository", _ecr_repository_evidence(repository, repository_facts)),
+                        ),
+                        severity_reasoning=severity_reasoning,
                     )
-                    findings.append(
-                        self._finding_factory.build(
-                            rule_id=rule_id,
-                            severity=severity_reasoning.severity,
-                            affected_resources=[workload.address, repository.address],
-                            trust_boundary_id=None,
-                            rationale=(
-                                f"{workload.display_name} deploys the ECR image "
-                                f"{image_reference.get('raw')} from {repository.display_name}, and the exact "
-                                "repository policy permits this tag to be mutable. A later image push can change "
-                                "the artifact selected by a future deployment; use an immutable tag policy or a "
-                                "digest-pinned reference."
-                            ),
-                            evidence=collect_evidence(
-                                evidence_item("target_resource", _target_resource_evidence(workload)),
-                                evidence_item("image_reference", _image_reference_evidence(image_reference)),
-                                evidence_item("ecr_repository", _ecr_repository_evidence(repository, repository_facts)),
-                            ),
-                            severity_reasoning=severity_reasoning,
-                        )
-                    )
-        return findings
+                )
+        return sorted(
+            findings,
+            key=lambda finding: (tuple(finding.affected_resources), finding.rationale),
+        )
 
     def detect_ecr_self_modification_path(
         self,
@@ -182,13 +191,11 @@ class AwsContainerDeploymentRuleDetectors:
         return findings
 
 
-def _ecr_repositories_by_url(context: RuleEvaluationContext) -> dict[str, list[NormalizedResource]]:
-    repositories_by_url: dict[str, list[NormalizedResource]] = {}
-    for repository in context.inventory.by_type(_AWS_ECR_REPOSITORY):
-        repository_url = aws_facts(repository).ecr_repository_url
-        if repository_url:
-            repositories_by_url.setdefault(repository_url, []).append(repository)
-    return repositories_by_url
+def _ecr_repository_index(context: RuleEvaluationContext) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        context.inventory.by_type(_AWS_ECR_REPOSITORY),
+        references_for_resource=lambda repository: (aws_facts(repository).ecr_repository_url,),
+    )
 
 
 def _resource_by_address(

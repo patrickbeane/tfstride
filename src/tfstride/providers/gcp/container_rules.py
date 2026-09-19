@@ -10,6 +10,10 @@ from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.coercion import STATE_DISABLED
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES
+from tfstride.providers.resource_reference_index import (
+    ResourceReferenceIndex,
+    build_resource_reference_index,
+)
 
 
 class GcpContainerDeploymentRuleDetectors:
@@ -67,7 +71,7 @@ class GcpContainerDeploymentRuleDetectors:
         if context.inventory.provider != "gcp":
             return []
 
-        repositories_by_path = _artifact_registry_repositories_by_path(context)
+        repository_index = _artifact_registry_repository_index(context)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             facts = gcp_facts(workload)
@@ -76,43 +80,48 @@ class GcpContainerDeploymentRuleDetectors:
                     continue
 
                 repository_path = image_reference["artifact_registry_repository_path"]
-                for repository in repositories_by_path.get(repository_path, ()):
-                    repository_facts = gcp_facts(repository)
-                    if not _artifact_registry_repository_allows_mutable_tags(repository_facts):
-                        continue
+                repository = repository_index.unique_candidate(repository_path)
+                if repository is None:
+                    continue
+                repository_facts = gcp_facts(repository)
+                if not _artifact_registry_repository_allows_mutable_tags(repository_facts):
+                    continue
 
-                    severity_reasoning = build_severity_reasoning(
-                        internet_exposure=False,
-                        privilege_breadth=0,
-                        data_sensitivity=1,
-                        lateral_movement=1,
-                        blast_radius=1,
-                    )
-                    findings.append(
-                        self._finding_factory.build(
-                            rule_id=rule_id,
-                            severity=severity_reasoning.severity,
-                            affected_resources=[workload.address, repository.address],
-                            trust_boundary_id=None,
-                            rationale=(
-                                f"{workload.display_name} deploys the Artifact Registry image "
-                                f"{image_reference.get('raw')} from {repository.display_name}, and the exact "
-                                "Docker repository permits this tag to be mutable. A later image push can change "
-                                "the artifact selected by a future deployment; use immutable tags or a "
-                                "digest-pinned reference."
+                severity_reasoning = build_severity_reasoning(
+                    internet_exposure=False,
+                    privilege_breadth=0,
+                    data_sensitivity=1,
+                    lateral_movement=1,
+                    blast_radius=1,
+                )
+                findings.append(
+                    self._finding_factory.build(
+                        rule_id=rule_id,
+                        severity=severity_reasoning.severity,
+                        affected_resources=[workload.address, repository.address],
+                        trust_boundary_id=None,
+                        rationale=(
+                            f"{workload.display_name} deploys the Artifact Registry image "
+                            f"{image_reference.get('raw')} from {repository.display_name}, and the exact "
+                            "Docker repository permits this tag to be mutable. A later image push can change "
+                            "the artifact selected by a future deployment; use immutable tags or a "
+                            "digest-pinned reference."
+                        ),
+                        evidence=collect_evidence(
+                            evidence_item("target_resource", _target_resource_evidence(workload)),
+                            evidence_item("image_reference", _image_reference_evidence(image_reference)),
+                            evidence_item(
+                                "artifact_registry_repository",
+                                _artifact_registry_repository_evidence(repository, repository_facts),
                             ),
-                            evidence=collect_evidence(
-                                evidence_item("target_resource", _target_resource_evidence(workload)),
-                                evidence_item("image_reference", _image_reference_evidence(image_reference)),
-                                evidence_item(
-                                    "artifact_registry_repository",
-                                    _artifact_registry_repository_evidence(repository, repository_facts),
-                                ),
-                            ),
-                            severity_reasoning=severity_reasoning,
-                        )
+                        ),
+                        severity_reasoning=severity_reasoning,
                     )
-        return findings
+                )
+        return sorted(
+            findings,
+            key=lambda finding: (tuple(finding.affected_resources), finding.rationale),
+        )
 
     def detect_cloud_run_artifact_registry_self_modification_path(
         self,
@@ -188,15 +197,13 @@ class GcpContainerDeploymentRuleDetectors:
         return findings
 
 
-def _artifact_registry_repositories_by_path(
+def _artifact_registry_repository_index(
     context: RuleEvaluationContext,
-) -> dict[str, list[NormalizedResource]]:
-    repositories_by_path: dict[str, list[NormalizedResource]] = {}
-    for repository in context.inventory.by_type("google_artifact_registry_repository"):
-        repository_path = gcp_facts(repository).artifact_registry_repository_path
-        if repository_path:
-            repositories_by_path.setdefault(repository_path, []).append(repository)
-    return repositories_by_path
+) -> ResourceReferenceIndex:
+    return build_resource_reference_index(
+        context.inventory.by_type("google_artifact_registry_repository"),
+        references_for_resource=lambda repository: (gcp_facts(repository).artifact_registry_repository_path,),
+    )
 
 
 def _resource_by_address(

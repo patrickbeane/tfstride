@@ -38,13 +38,14 @@ def _resource(
 def _ecs_task_definition(
     image: str | None,
     *,
+    name: str = "orders",
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
-    values: dict[str, Any] = {"family": "orders", "revision": 4}
+    values: dict[str, Any] = {"family": name, "revision": 4}
     if image is not None:
         values["container_definitions"] = json.dumps([{"name": "orders", "image": image}])
     return _resource(
-        "aws_ecs_task_definition.orders",
+        f"aws_ecs_task_definition.{name}",
         "aws_ecs_task_definition",
         values,
         unknown_values=unknown_values,
@@ -69,14 +70,16 @@ def _lambda_function(
 
 def _ecr_repository(
     *,
+    name: str = "orders",
+    address_name: str | None = None,
     repository_url: str = _ECR_URL,
     mutability: str | None = "MUTABLE",
     filters: list[dict[str, str]] | None = None,
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     values: dict[str, Any] = {
-        "id": "orders",
-        "name": "orders",
+        "id": name,
+        "name": name,
         "repository_url": repository_url,
     }
     if mutability is not None:
@@ -84,7 +87,7 @@ def _ecr_repository(
     if filters is not None:
         values["image_tag_mutability_exclusion_filter"] = filters
     return _resource(
-        "aws_ecr_repository.orders",
+        f"aws_ecr_repository.{address_name or name}",
         "aws_ecr_repository",
         values,
         unknown_values=unknown_values,
@@ -184,6 +187,42 @@ class AwsContainerDeploymentRuleTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_duplicate_exact_ecr_repository_identity_is_ambiguous_by_input_order(self) -> None:
+        mutable = _ecr_repository(address_name="mutable", mutability="MUTABLE")
+        immutable = _ecr_repository(address_name="immutable", mutability="IMMUTABLE")
+
+        for repositories in ((mutable, immutable), (immutable, mutable)):
+            findings = _evaluate(
+                [_ecs_task_definition(f"{_ECR_URL}:stable"), *repositories],
+                _MUTABLE_ECR_RULE,
+            )
+
+            with self.subTest(order=[repository.address for repository in repositories]):
+                self.assertEqual(findings, [])
+
+    def test_mutable_ecr_findings_have_stable_output_order(self) -> None:
+        payments_url = "111122223333.dkr.ecr.us-east-1.amazonaws.com/payments"
+        orders_workload = _ecs_task_definition(f"{_ECR_URL}:stable")
+        payments_workload = _ecs_task_definition(f"{payments_url}:stable", name="payments")
+        orders_repository = _ecr_repository()
+        payments_repository = _ecr_repository(name="payments", repository_url=payments_url)
+        expected = [
+            ["aws_ecs_task_definition.orders", "aws_ecr_repository.orders"],
+            ["aws_ecs_task_definition.payments", "aws_ecr_repository.payments"],
+        ]
+
+        for resources in (
+            [orders_workload, orders_repository, payments_workload, payments_repository],
+            [payments_repository, payments_workload, orders_repository, orders_workload],
+        ):
+            findings = _evaluate(resources, _MUTABLE_ECR_RULE)
+
+            with self.subTest(order=[resource.address for resource in resources]):
+                self.assertEqual(
+                    [finding.affected_resources for finding in findings],
+                    expected,
+                )
 
     def test_immutable_ecr_repository_is_quiet_for_mutable_tag_rule(self) -> None:
         findings = _evaluate(

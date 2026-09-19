@@ -21,13 +21,14 @@ _DIGEST = "sha256:" + "a" * 64
 def _cloud_run_service(
     image: object = _IMAGE,
     *,
+    name: str = "api",
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     return _terraform_resource(
-        "google_cloud_run_v2_service.api",
+        f"google_cloud_run_v2_service.{name}",
         "google_cloud_run_v2_service",
         {
-            "name": "api",
+            "name": name,
             "project": "tfstride-demo",
             "location": "us-central1",
             "template": [{"containers": [{"image": image}]}],
@@ -39,11 +40,12 @@ def _cloud_run_service(
 def _artifact_registry_repository(
     *,
     repository_id: str = "images",
+    address_name: str | None = None,
     immutable_tags: object = False,
     unknown_values: dict[str, Any] | None = None,
 ) -> TerraformResource:
     return _terraform_resource(
-        f"google_artifact_registry_repository.{repository_id}",
+        f"google_artifact_registry_repository.{address_name or repository_id}",
         "google_artifact_registry_repository",
         {
             "name": f"projects/tfstride-demo/locations/us-central1/repositories/{repository_id}",
@@ -126,6 +128,42 @@ class GcpContainerRuleTests(unittest.TestCase):
                 "docker_immutable_tags=false",
             ],
         )
+
+    def test_duplicate_exact_artifact_registry_identity_is_ambiguous_by_input_order(self) -> None:
+        mutable = _artifact_registry_repository(address_name="mutable", immutable_tags=False)
+        immutable = _artifact_registry_repository(address_name="immutable", immutable_tags=True)
+
+        for repositories in ((mutable, immutable), (immutable, mutable)):
+            findings = _evaluate(
+                [_cloud_run_service(), *repositories],
+                _MUTABLE_TAG_RULE,
+            )
+
+            with self.subTest(order=[repository.address for repository in repositories]):
+                self.assertEqual(findings, [])
+
+    def test_artifact_registry_mutable_tag_findings_have_stable_output_order(self) -> None:
+        jobs_image = "us-central1-docker.pkg.dev/tfstride-demo/jobs/worker:stable"
+        api_workload = _cloud_run_service()
+        worker_workload = _cloud_run_service(jobs_image, name="worker")
+        images_repository = _artifact_registry_repository()
+        jobs_repository = _artifact_registry_repository(repository_id="jobs")
+        expected = [
+            ["google_cloud_run_v2_service.api", "google_artifact_registry_repository.images"],
+            ["google_cloud_run_v2_service.worker", "google_artifact_registry_repository.jobs"],
+        ]
+
+        for resources in (
+            [api_workload, images_repository, worker_workload, jobs_repository],
+            [jobs_repository, worker_workload, images_repository, api_workload],
+        ):
+            findings = _evaluate(resources, _MUTABLE_TAG_RULE)
+
+            with self.subTest(order=[resource.address for resource in resources]):
+                self.assertEqual(
+                    [finding.affected_resources for finding in findings],
+                    expected,
+                )
 
     def test_immutable_or_unmatched_artifact_registry_repository_is_quiet(self) -> None:
         self.assertEqual(
