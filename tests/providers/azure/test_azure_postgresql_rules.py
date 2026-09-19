@@ -33,11 +33,12 @@ def _resource(
 def _server(
     *,
     name: str = "pgserver",
+    server_id: str | None = None,
     public_network: bool = True,
     geo_backup: bool | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
-        "id": f"/subscriptions/example/providers/Microsoft.DBforPostgreSQL/flexibleServers/{name}",
+        "id": server_id or f"/subscriptions/example/providers/Microsoft.DBforPostgreSQL/flexibleServers/{name}",
         "name": name,
         "location": "eastus",
         "public_network_access_enabled": public_network,
@@ -70,12 +71,13 @@ def _firewall_rule(
 def _configuration(
     *,
     name: str,
+    address_name: str | None = None,
     server_id: str = _PG_SERVER_ID,
     value: str = "",
 ) -> TerraformResource:
     return _resource(
         AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION,
-        name,
+        address_name or name,
         {
             "id": f"/subscriptions/example/providers/Microsoft.DBforPostgreSQL/flexibleServers/pgserver/configurations/{name}",
             "name": name,
@@ -164,6 +166,41 @@ class AzurePostgresqlFirewallRuleTests(unittest.TestCase):
         self.assertEqual(findings[0].rule_id, "azure-postgresql-firewall-broad-public-access")
         self.assertIn("azurerm_postgresql_flexible_server.pgserver", findings[0].affected_resources)
         self.assertIn("azurerm_postgresql_flexible_server_firewall_rule.wide", findings[0].affected_resources)
+
+    def test_ambiguous_server_id_does_not_attach_arbitrary_server(self) -> None:
+        first = _server(name="first", server_id=_PG_SERVER_ID)
+        second = _server(name="second", server_id=_PG_SERVER_ID)
+        firewall_rule = _firewall_rule(server_id=_PG_SERVER_ID.upper())
+        resources = [first, second, firewall_rule]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-postgresql-firewall-broad-public-access",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].affected_resources, [firewall_rule.address])
+
+    def test_exact_terraform_server_reference_wins_over_arm_collision(self) -> None:
+        first = _server(name="first", server_id=_PG_SERVER_ID)
+        second = _server(name="second", server_id=_PG_SERVER_ID)
+        firewall_rule = _firewall_rule(server_id=f"{first.address}.id")
+        resources = [first, second, firewall_rule]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-postgresql-firewall-broad-public-access",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(
+                    findings[0].affected_resources,
+                    [first.address, firewall_rule.address],
+                )
 
     def test_narrow_firewall_rule_stays_quiet(self) -> None:
         findings = _evaluate(
@@ -353,6 +390,131 @@ class AzurePostgresqlWeakTlsTests(unittest.TestCase):
         )
 
         self.assertEqual(len(findings), 1)
+
+    def test_ambiguous_arm_configuration_target_stays_quiet_in_both_orders(self) -> None:
+        first = _server(name="first", server_id=_PG_SERVER_ID)
+        second = _server(name="second", server_id=_PG_SERVER_ID)
+        configuration = _configuration(
+            name="require_secure_transport",
+            server_id=_PG_SERVER_ID.upper(),
+            value="OFF",
+        )
+        resources = [first, second, configuration]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-postgresql-weak-tls-or-ssl",
+                )
+
+                self.assertEqual(findings, [])
+
+    def test_exact_terraform_configuration_target_wins_over_arm_collision(self) -> None:
+        first = _server(name="first", server_id=_PG_SERVER_ID)
+        second = _server(name="second", server_id=_PG_SERVER_ID)
+        configuration = _configuration(
+            name="require_secure_transport",
+            server_id=f"{first.address}.id",
+            value="OFF",
+        )
+        resources = [first, second, configuration]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-postgresql-weak-tls-or-ssl",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].affected_resources, [first.address])
+
+    def test_unique_arm_configuration_target_resolves_in_both_orders(self) -> None:
+        server = _server()
+        configuration = _configuration(
+            name="require_secure_transport",
+            server_id=_PG_SERVER_ID.upper(),
+            value="OFF",
+        )
+        resources = [server, configuration]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-postgresql-weak-tls-or-ssl",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].affected_resources, [server.address])
+
+    def test_conflicting_require_secure_transport_values_are_ambiguous_by_input_order(self) -> None:
+        exact_off = _configuration(
+            name="require_secure_transport",
+            address_name="exact_off",
+            value="OFF",
+        )
+        exact_on = _configuration(
+            name="require_secure_transport",
+            address_name="exact_on",
+            value="ON",
+        )
+        case_variant_off = _configuration(
+            name="require_secure_transport",
+            address_name="case_variant_off",
+            value="OFF",
+        )
+        case_variant_on = _configuration(
+            name="REQUIRE_SECURE_TRANSPORT",
+            address_name="case_variant_on",
+            server_id=_PG_SERVER_ID.upper(),
+            value="ON",
+        )
+
+        for key_style, configurations in (
+            ("exact", (exact_off, exact_on)),
+            ("case_variant", (case_variant_off, case_variant_on)),
+        ):
+            for ordered_configurations in (configurations, tuple(reversed(configurations))):
+                findings = _evaluate(
+                    [_server(), *ordered_configurations],
+                    "azure-postgresql-weak-tls-or-ssl",
+                )
+
+                with self.subTest(
+                    key_style=key_style,
+                    order=[configuration.address for configuration in ordered_configurations],
+                ):
+                    self.assertEqual(findings, [])
+
+    def test_equivalent_configuration_values_resolve_case_insensitively_by_input_order(self) -> None:
+        uppercase = _configuration(
+            name="REQUIRE_SECURE_TRANSPORT",
+            address_name="uppercase",
+            server_id=_PG_SERVER_ID.upper(),
+            value="OFF",
+        )
+        lowercase = _configuration(
+            name="require_secure_transport",
+            address_name="lowercase",
+            server_id=_PG_SERVER_ID.upper(),
+            value="off",
+        )
+
+        for configurations in ((uppercase, lowercase), (lowercase, uppercase)):
+            findings = _evaluate(
+                [_server(), *configurations],
+                "azure-postgresql-weak-tls-or-ssl",
+            )
+
+            with self.subTest(order=[configuration.address for configuration in configurations]):
+                self.assertEqual(len(findings), 1)
+                evidence = {item.key: item.values for item in findings[0].evidence}
+                self.assertEqual(
+                    evidence["transport_posture"],
+                    ["require_secure_transport is OFF"],
+                )
 
     def test_require_secure_transport_enabled_stays_quiet(self) -> None:
         findings = _evaluate(

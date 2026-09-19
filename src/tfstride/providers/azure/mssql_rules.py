@@ -10,6 +10,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_index import AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import tls_version_below_1_2
 from tfstride.providers.coercion import STATE_DISABLED
@@ -81,7 +82,7 @@ class AzureMssqlRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        servers_by_id = _servers_by_id(context.inventory)
+        resource_index = AzureResourceIndexBuilder().build(list(context.inventory.resources))
         for rule in context.inventory.by_type(AzureResourceType.MSSQL_FIREWALL_RULE):
             facts = azure_facts(rule)
             start_ip = facts.mssql_firewall_start_ip
@@ -91,7 +92,12 @@ class AzureMssqlRuleDetectors:
             if (start_ip.strip(), end_ip.strip()) not in _BROAD_IP_RANGES:
                 continue
             server_id = facts.mssql_server_id
-            server_address = servers_by_id.get(server_id)
+            server = resource_index.resolve(
+                server_id,
+                source=rule,
+                resource_types={AzureResourceType.MSSQL_SERVER},
+            )
+            server_address = server.address if server is not None else None
             affected = dedupe_addresses([server_address, rule.address] if server_address else [rule.address])
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
@@ -174,14 +180,19 @@ class AzureMssqlRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        servers_by_id = _servers_by_id(context.inventory)
+        resource_index = AzureResourceIndexBuilder().build(list(context.inventory.resources))
         for policy in context.inventory.by_type(AzureResourceType.MSSQL_SERVER_SECURITY_ALERT_POLICY):
             facts = azure_facts(policy)
             state = facts.mssql_security_alert_state
             if state is None or state.strip().lower() != _ALERT_DISABLED:
                 continue
             server_id = facts.mssql_server_id
-            server_address = servers_by_id.get(server_id)
+            server = resource_index.resolve(
+                server_id,
+                source=policy,
+                resource_types={AzureResourceType.MSSQL_SERVER},
+            )
+            server_address = server.address if server is not None else None
             affected = dedupe_addresses([server_address, policy.address] if server_address else [policy.address])
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=False,
@@ -343,16 +354,6 @@ class AzureMssqlRuleDetectors:
                 )
             )
         return findings
-
-
-def _servers_by_id(inventory) -> dict[str, str]:
-    servers: dict[str, str] = {}
-    for server in inventory.by_type(AzureResourceType.MSSQL_SERVER):
-        facts = azure_facts(server)
-        server_id = facts.mssql_server_id
-        if server_id:
-            servers[server_id] = server.address
-    return servers
 
 
 def _mssql_database_target_evidence(database, facts) -> list[str]:

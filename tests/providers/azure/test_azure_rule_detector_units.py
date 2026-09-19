@@ -38,6 +38,7 @@ def _resource(
     name: str,
     *,
     category: ResourceCategory,
+    identifier: str | None = None,
     metadata: dict | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
@@ -46,6 +47,7 @@ def _resource(
         resource_type=resource_type,
         name=name,
         category=category,
+        identifier=identifier,
         metadata=metadata or {},
     )
 
@@ -111,6 +113,7 @@ class AzureMssqlRuleDetectorUnitTests(unittest.TestCase):
             AzureResourceType.MSSQL_SERVER,
             "sqlserver",
             category=ResourceCategory.DATA,
+            identifier=_MSSQL_ID,
             metadata={AzureResourceMetadata.MSSQL_SERVER_ID: _MSSQL_ID},
         )
         firewall_rule = _resource(
@@ -143,6 +146,7 @@ class AzurePostgresqlRuleDetectorUnitTests(unittest.TestCase):
             AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER,
             "postgres",
             category=ResourceCategory.DATA,
+            identifier=_POSTGRESQL_ID,
             metadata={AzureResourceMetadata.POSTGRESQL_SERVER_ID: _POSTGRESQL_ID},
         )
         config = _resource(

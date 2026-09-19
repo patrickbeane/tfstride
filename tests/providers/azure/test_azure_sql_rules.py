@@ -33,11 +33,12 @@ def _resource(
 def _server(
     *,
     name: str = "sqlserver",
+    server_id: str | None = None,
     public_network: bool = True,
     tls_version: str | None = None,
 ) -> TerraformResource:
     values: dict[str, object] = {
-        "id": f"/subscriptions/example/providers/Microsoft.Sql/servers/{name}",
+        "id": server_id or f"/subscriptions/example/providers/Microsoft.Sql/servers/{name}",
         "name": name,
         "location": "eastus",
         "public_network_access_enabled": public_network,
@@ -213,6 +214,41 @@ class AzureSqlFirewallRuleTests(unittest.TestCase):
         self.assertIn("azurerm_mssql_server.sqlserver", findings[0].affected_resources)
         self.assertIn("azurerm_mssql_firewall_rule.wide", findings[0].affected_resources)
 
+    def test_ambiguous_server_id_does_not_attach_arbitrary_server(self) -> None:
+        first = _server(name="first", server_id=_SERVER_ID)
+        second = _server(name="second", server_id=_SERVER_ID)
+        firewall_rule = _firewall_rule(server_id=_SERVER_ID.upper())
+        resources = [first, second, firewall_rule]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-sql-firewall-broad-public-access",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].affected_resources, [firewall_rule.address])
+
+    def test_exact_terraform_server_reference_wins_over_arm_collision(self) -> None:
+        first = _server(name="first", server_id=_SERVER_ID)
+        second = _server(name="second", server_id=_SERVER_ID)
+        firewall_rule = _firewall_rule(server_id=f"{first.address}.id")
+        resources = [first, second, firewall_rule]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-sql-firewall-broad-public-access",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(
+                    findings[0].affected_resources,
+                    [first.address, firewall_rule.address],
+                )
+
     def test_narrow_firewall_rule_stays_quiet(self) -> None:
         findings = _evaluate(
             [_server(), _firewall_rule(start_ip="198.51.100.0", end_ip="198.51.100.255")],
@@ -304,6 +340,41 @@ class AzureSqlSecurityAlertPolicyTests(unittest.TestCase):
         self.assertEqual(findings[0].rule_id, "azure-sql-security-alert-policy-disabled")
         self.assertIn("azurerm_mssql_server.sqlserver", findings[0].affected_resources)
         self.assertIn("azurerm_mssql_server_security_alert_policy.Default", findings[0].affected_resources)
+
+    def test_ambiguous_server_id_does_not_attach_arbitrary_server(self) -> None:
+        first = _server(name="first", server_id=_SERVER_ID)
+        second = _server(name="second", server_id=_SERVER_ID)
+        policy = _security_alert_policy(server_id=_SERVER_ID.upper(), state="Disabled")
+        resources = [first, second, policy]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-sql-security-alert-policy-disabled",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].affected_resources, [policy.address])
+
+    def test_exact_terraform_server_reference_wins_over_arm_collision(self) -> None:
+        first = _server(name="first", server_id=_SERVER_ID)
+        second = _server(name="second", server_id=_SERVER_ID)
+        policy = _security_alert_policy(server_id=f"{first.address}.id", state="Disabled")
+        resources = [first, second, policy]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                findings = _evaluate(
+                    ordered_resources,
+                    "azure-sql-security-alert-policy-disabled",
+                )
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(
+                    findings[0].affected_resources,
+                    [first.address, policy.address],
+                )
 
     def test_enabled_alert_policy_stays_quiet(self) -> None:
         findings = _evaluate(

@@ -10,6 +10,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_index import AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import tls_version_below_1_2
 
@@ -76,7 +77,7 @@ class AzurePostgresqlRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        servers_by_id = _servers_by_id(context.inventory)
+        resource_index = AzureResourceIndexBuilder().build(list(context.inventory.resources))
         for rule in context.inventory.by_type(AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_FIREWALL_RULE):
             facts = azure_facts(rule)
             start_ip = facts.postgresql_firewall_start_ip
@@ -86,7 +87,12 @@ class AzurePostgresqlRuleDetectors:
             if (start_ip.strip(), end_ip.strip()) not in _BROAD_IP_RANGES:
                 continue
             server_id = facts.postgresql_server_id
-            server_address = servers_by_id.get(server_id)
+            server = resource_index.resolve(
+                server_id,
+                source=rule,
+                resource_types={AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER},
+            )
+            server_address = server.address if server is not None else None
             affected = dedupe_addresses([server_address, rule.address] if server_address else [rule.address])
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
@@ -132,11 +138,10 @@ class AzurePostgresqlRuleDetectors:
         findings: list[Finding] = []
         configs_by_server = _configs_by_server(context.inventory)
         for server in context.inventory.by_type(AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER):
-            facts = azure_facts(server)
             evidence_parts: list[str] = []
             weak = False
 
-            server_configs = configs_by_server.get(facts.postgresql_server_id, {})
+            server_configs = configs_by_server.get(server.address, {})
             ssl_version = server_configs.get("ssl_min_protocol_version")
             if ssl_version is not None and tls_version_below_1_2(ssl_version):
                 weak = True
@@ -216,23 +221,37 @@ class AzurePostgresqlRuleDetectors:
         return findings
 
 
-def _servers_by_id(inventory) -> dict[str, str]:
-    servers: dict[str, str] = {}
-    for server in inventory.by_type(AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER):
-        facts = azure_facts(server)
-        server_id = facts.postgresql_server_id
-        if server_id:
-            servers[server_id] = server.address
-    return servers
-
-
 def _configs_by_server(inventory) -> dict[str, dict[str, str]]:
-    configs: dict[str, dict[str, str]] = {}
+    resources_by_reference = AzureResourceIndexBuilder().build(list(inventory.resources)).resources_by_reference
+    grouped_values: dict[tuple[str, str], list[str | None]] = {}
     for config in inventory.by_type(AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER_CONFIGURATION):
         facts = azure_facts(config)
-        server_id = facts.postgresql_config_server_id
-        name = facts.postgresql_config_name
-        value = facts.postgresql_config_value
-        if server_id and name:
-            configs.setdefault(server_id, {})[name] = value or ""
+        server = resources_by_reference.resolve(
+            facts.postgresql_config_server_id,
+            source=config,
+            resource_types={AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER},
+        ).selected_candidate
+        name_key = _postgresql_configuration_name_key(facts.postgresql_config_name)
+        if server is not None and name_key:
+            grouped_values.setdefault((server.address, name_key), []).append(facts.postgresql_config_value)
+
+    configs: dict[str, dict[str, str]] = {}
+    for (server_key, name_key), values in sorted(grouped_values.items()):
+        value = _unique_equivalent_configuration_value(values)
+        if value is None:
+            continue
+        configs.setdefault(server_key, {})[name_key] = value
     return configs
+
+
+def _postgresql_configuration_name_key(name: str | None) -> str:
+    return name.strip().casefold() if name else ""
+
+
+def _unique_equivalent_configuration_value(values: list[str | None]) -> str | None:
+    known_values = [value for value in values if value is not None]
+    if not known_values or len(known_values) != len(values):
+        return None
+    if len({value.strip().casefold() for value in known_values}) != 1:
+        return None
+    return min(known_values, key=lambda value: (value.strip().casefold(), value))
