@@ -180,18 +180,33 @@ def _scope_candidates(
     if source is None:
         return candidates
     subscription, resource_group = _resource_arm_scope(source)
-    scoped = _candidates_in_scope(
-        candidates,
-        expected_scope=subscription,
-        scope_for_resource=lambda resource: _resource_arm_scope(resource)[0],
-    )
+    if subscription is None:
+        if any(_resource_arm_scope(candidate)[0] is not None for candidate in candidates):
+            return _ambiguity_only(candidates)
+        scoped = candidates
+    else:
+        scoped = _candidates_in_scope(
+            candidates,
+            expected_scope=subscription,
+            scope_for_resource=lambda resource: _resource_arm_scope(resource)[0],
+        )
     if not scoped:
         return ()
+    if resource_group is None and any(_resource_arm_scope(candidate)[1] is not None for candidate in scoped):
+        return _ambiguity_only(scoped)
     return _candidates_in_scope(
         scoped,
         expected_scope=resource_group,
         scope_for_resource=lambda resource: _resource_arm_scope(resource)[1],
     )
+
+
+def _ambiguity_only(
+    candidates: tuple[NormalizedResource, ...],
+) -> tuple[NormalizedResource, ...]:
+    """Retain collision evidence without resolving a weak reference."""
+
+    return candidates if len(candidates) > 1 else ()
 
 
 def _candidates_in_scope(

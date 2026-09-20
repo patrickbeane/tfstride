@@ -495,14 +495,32 @@ def _scope_candidates_for_values(
 ) -> tuple[NormalizedResource, ...]:
     if not candidates:
         return candidates
-    scoped = _candidates_in_scope(candidates, project, _resource_project)
+    if project is None:
+        if any(_resource_project(candidate) is not None for candidate in candidates):
+            return _ambiguity_only(candidates)
+        scoped = candidates
+    else:
+        scoped = _candidates_in_scope(candidates, project, _resource_project)
     if not scoped:
         return ()
-    if location is None or not all(
+    all_candidates_are_location_scoped = all(
         candidate.resource_type in _GCP_LOCATION_SCOPED_RESOURCE_TYPES for candidate in scoped
-    ):
+    )
+    if location is None and all_candidates_are_location_scoped:
+        if all(_resource_location(candidate) is None for candidate in scoped):
+            return scoped
+        return _ambiguity_only(scoped)
+    if location is None or not all_candidates_are_location_scoped:
         return scoped
     return _candidates_in_location_scope(scoped, location)
+
+
+def _ambiguity_only(
+    candidates: tuple[NormalizedResource, ...],
+) -> tuple[NormalizedResource, ...]:
+    """Retain collision evidence without resolving a weak reference."""
+
+    return candidates if len(candidates) > 1 else ()
 
 
 def _candidates_in_scope(

@@ -34,7 +34,7 @@ def _resource(
     public_access_configured: bool = False,
     public_exposure: bool = False,
     vpc_id: str | None = None,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
 ) -> NormalizedResource:
     return NormalizedResource(
         address=address,
@@ -99,8 +99,8 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         self.assertIs(index.buckets.get("aws_s3_bucket.logs"), bucket)
         self.assertIs(index.buckets.get("arn:aws:s3:::logs"), bucket)
         self.assertIs(index.secrets.get("app"), secret)
-        self.assertEqual(index.vpcs_with_public_routes, {(None, "vpc-app")})
-        self.assertEqual(index.nat_gateway_ids, {(None, "nat-private")})
+        self.assertEqual(index.vpcs_with_public_routes, {("aws.default", "vpc-app")})
+        self.assertEqual(index.nat_gateway_ids, {("aws.default", "nat-private")})
 
     def test_native_alias_collisions_are_deterministic_and_fail_closed(self) -> None:
         first_bucket = _resource(
@@ -331,6 +331,7 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
             resource_type="aws_s3_bucket",
             category=ResourceCategory.DATA,
             identifier="shared",
+            provider_config_key=None,
         )
         source = _resource(
             address="aws_s3_bucket_policy.source",
@@ -371,6 +372,28 @@ class AwsResourceIndexBuilderTests(unittest.TestCase):
         exact = AwsResourceIndexBuilder().build([unknown]).buckets.resolve(unknown.address, source=source)
         self.assertEqual(exact.state, "resolved")
         self.assertIs(exact.selected_candidate, unknown)
+
+    def test_weak_reference_with_unknown_source_scope_fails_closed(self) -> None:
+        bucket = _resource(
+            address="aws_s3_bucket.foreign",
+            resource_type="aws_s3_bucket",
+            category=ResourceCategory.DATA,
+            identifier="shared",
+            arn="arn:aws:s3:::shared",
+            provider_config_key="aws.foreign",
+        )
+        source = _resource(
+            address="aws_s3_bucket_policy.unknown_scope",
+            resource_type="aws_s3_bucket_policy",
+            category=ResourceCategory.DATA,
+            provider_config_key=None,
+        )
+        references = AwsResourceIndexBuilder().build([bucket]).buckets
+
+        self.assertIs(references.resolve("shared").selected_candidate, bucket)
+        self.assertEqual(references.resolve("shared", source=source).state, "unresolved")
+        self.assertIs(references.resolve(bucket.address, source=source).selected_candidate, bucket)
+        self.assertIs(references.resolve(bucket.arn, source=source).selected_candidate, bucket)
 
     def test_strong_reference_precedes_a_same_config_weak_alias(self) -> None:
         foreign_key = _resource(

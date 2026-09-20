@@ -17,6 +17,7 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
+from tfstride.providers.aws.analysis_indexes import build_aws_analysis_indexes
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_decoration.ecs import MarkEcsLoadBalancerExposureStage
 from tfstride.providers.aws.resource_decoration.ecs_secret_access_paths import (
@@ -347,6 +348,47 @@ class AwsScopedSecurityGroupAndWorkloadJoinTests(unittest.TestCase):
                     "aws-public-compute-broad-ingress",
                 )
 
+                self.assertEqual(findings, [])
+
+    def test_public_compute_with_unknown_source_scope_does_not_attach_foreign_security_group(self) -> None:
+        foreign_group = _resource(
+            "aws_security_group.foreign_admin",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            provider_config_key=_FOREIGN,
+            identifier="sg-admin",
+            network_rules=[_public_ingress_rule()],
+        )
+        unknown_scope_workload = replace(
+            _resource(
+                "aws_instance.unknown_scope",
+                "aws_instance",
+                ResourceCategory.COMPUTE,
+                provider_config_key=_LOCAL,
+                security_group_ids=("sg-admin",),
+                public_exposure=True,
+            ),
+            provider_config_key=None,
+        )
+        resources = [foreign_group, unknown_scope_workload]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                inventory = ResourceInventory(provider="aws", resources=ordered_resources)
+                relationships = build_aws_analysis_indexes(inventory).security_group_relationships
+                findings = _evaluate(
+                    inventory,
+                    [],
+                    "aws-public-compute-broad-ingress",
+                )
+
+                self.assertEqual(relationships.attached_security_groups(unknown_scope_workload), ())
+                self.assertIsNone(
+                    relationships.reference_key(
+                        "sg-admin",
+                        source=unknown_scope_workload,
+                    )
+                )
                 self.assertEqual(findings, [])
 
     def test_ecs_security_group_alias_does_not_cross_provider_configs(self) -> None:

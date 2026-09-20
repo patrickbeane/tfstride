@@ -65,6 +65,7 @@ def _versioning(status: str | None, *, unknown: bool = False) -> TerraformResour
         resource_type="aws_s3_bucket_versioning",
         name="orders",
         provider_name="registry.terraform.io/hashicorp/aws",
+        provider_config_key="aws",
         values=values,
         unknown_values=({"versioning_configuration": [{"status": True}]} if unknown else {}),
     )
@@ -77,6 +78,7 @@ def _object_lock(mode: str = "GOVERNANCE") -> TerraformResource:
         resource_type="aws_s3_bucket_object_lock_configuration",
         name="orders",
         provider_name="registry.terraform.io/hashicorp/aws",
+        provider_config_key="aws",
         values={
             "bucket": "orders-data",
             "object_lock_enabled": "Enabled",

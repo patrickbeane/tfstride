@@ -343,6 +343,7 @@ def _gcp_public_invoker() -> TerraformResource:
         "public_invoker",
         {
             "name": "orders",
+            "project": _GCP_PROJECT,
             "location": "us-central1",
             "role": "roles/run.invoker",
             "member": "allUsers",

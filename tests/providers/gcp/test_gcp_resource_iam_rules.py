@@ -107,6 +107,40 @@ class GcpResourceIamRuleTests(unittest.TestCase):
             ],
         )
 
+    def test_sensitive_iam_weak_target_with_unknown_source_project_stays_unresolved(self) -> None:
+        resources = [
+            _terraform_resource(
+                "google_secret_manager_secret.foreign",
+                GcpResourceType.SECRET_MANAGER_SECRET,
+                {
+                    "secret_id": "shared",
+                    "id": "projects/project-b/secrets/shared",
+                    "project": "project-b",
+                    "replication": [{"auto": []}],
+                },
+            ),
+            _terraform_resource(
+                "google_secret_manager_secret_iam_member.unknown_scope",
+                GcpResourceType.SECRET_MANAGER_SECRET_IAM_MEMBER,
+                {
+                    "secret_id": "shared",
+                    "role": "roles/secretmanager.secretAccessor",
+                    "member": "allUsers",
+                },
+            ),
+        ]
+
+        for ordered_resources in (resources, list(reversed(resources))):
+            with self.subTest(order=[resource.address for resource in ordered_resources]):
+                inventory = GcpNormalizer().normalize(ordered_resources)
+                findings = StrideRuleEngine().evaluate(
+                    inventory,
+                    [],
+                    rule_policy=RulePolicy(enabled_rule_ids=frozenset({"gcp-sensitive-resource-iam-external-access"})),
+                )
+
+                self.assertEqual(findings, [])
+
     def test_sensitive_kms_foreign_service_account_binding_is_detected(self) -> None:
         inventory = GcpNormalizer().normalize([_kms_crypto_key(), _kms_crypto_key_iam_member()])
 

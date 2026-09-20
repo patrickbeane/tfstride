@@ -173,6 +173,10 @@ def _azure_storage_container(account_reference: str) -> NormalizedResource:
         resource_type=AzureResourceType.STORAGE_CONTAINER,
         name="objects",
         category=ResourceCategory.DATA,
+        identifier=(
+            "/subscriptions/sub-0001/resourceGroups/application/providers/"
+            "Microsoft.Storage/storageAccounts/tfstridelogs/blobServices/default/containers/objects"
+        ),
         metadata={
             AzureResourceMetadata.STORAGE_ACCOUNT_REFERENCE: account_reference,
             AzureResourceMetadata.CONTAINER_ACCESS_TYPE: "blob",

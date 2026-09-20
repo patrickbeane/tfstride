@@ -32,7 +32,7 @@ _RULE_ID = "aws-public-ecs-cloudtrail-disruption"
 def _runtime_resources(
     actions: str | list[str],
 ) -> list[TerraformResource]:
-    return [
+    resources = [
         *_public_edge(),
         _caller_identity(),
         _trail(),
@@ -40,6 +40,9 @@ def _runtime_resources(
         _task_definition(execution_role_arn=None),
         _service(),
     ]
+    for resource in resources:
+        resource.provider_config_key = "aws"
+    return resources
 
 
 def _evaluate(resources: list[TerraformResource]):

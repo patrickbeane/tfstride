@@ -37,7 +37,7 @@ def _gcp_resource(address: str, resource_type: str, values: dict[str, object]) -
         resource_type=resource_type,
         name=address.rsplit(".", 1)[-1],
         provider_name="registry.terraform.io/hashicorp/google",
-        values=values,
+        values={"project": "tfstride-demo", **values},
     )
 
 

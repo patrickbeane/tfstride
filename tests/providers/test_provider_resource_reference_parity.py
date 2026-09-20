@@ -528,7 +528,7 @@ class ProviderResourceReferenceParityTests(unittest.TestCase):
         for provider in _PROVIDERS:
             for order in permutations(_UNIQUE_TYPED_RESOURCE_KEYS):
                 with self.subTest(provider=provider, order=order):
-                    resources = _resources_for(provider, scoped=False)
+                    resources = _resources_for(provider, scoped=True)
                     resolution = _resolve(
                         provider,
                         [resources[key] for key in order],

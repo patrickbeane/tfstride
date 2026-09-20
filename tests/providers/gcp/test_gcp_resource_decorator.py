@@ -621,6 +621,54 @@ class GcpResourceDecoratorTests(unittest.TestCase):
         self.assertEqual(exact.state, "resolved")
         self.assertIs(exact.selected_candidate, unknown)
 
+    def test_weak_reference_with_unknown_source_scope_fails_closed(self) -> None:
+        key = _gcp_resource(
+            "google_kms_crypto_key.foreign",
+            GcpResourceType.KMS_CRYPTO_KEY,
+            ResourceCategory.DATA,
+            identifier="projects/foreign/locations/global/keyRings/app/cryptoKeys/shared",
+            metadata={
+                GcpResourceMetadata.NAME: "shared",
+                GcpResourceMetadata.PROJECT: "foreign",
+                GcpResourceMetadata.REGION: "global",
+                GcpResourceMetadata.KMS_KEY_RING: "projects/foreign/locations/global/keyRings/app",
+            },
+        )
+        unknown_source = _gcp_resource(
+            "google_kms_crypto_key_version.unknown_scope",
+            GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+            ResourceCategory.DATA,
+        )
+        project_only_source = _gcp_resource(
+            "google_kms_crypto_key_version.project_only",
+            GcpResourceType.KMS_CRYPTO_KEY_VERSION,
+            ResourceCategory.DATA,
+            metadata={GcpResourceMetadata.PROJECT: "foreign"},
+        )
+        references = GcpResourceIndexBuilder().build([key]).resources_by_reference
+
+        self.assertIs(
+            references.resolve("shared", resource_types={GcpResourceType.KMS_CRYPTO_KEY}).selected_candidate,
+            key,
+        )
+        for source in (unknown_source, project_only_source):
+            with self.subTest(source=source.address):
+                weak = references.resolve(
+                    "shared",
+                    source=source,
+                    resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                )
+                self.assertEqual(weak.state, "unresolved")
+
+        for reference in (key.address, key.identifier):
+            with self.subTest(reference=reference):
+                strong = references.resolve(
+                    reference,
+                    source=unknown_source,
+                    resource_types={GcpResourceType.KMS_CRYPTO_KEY},
+                )
+                self.assertIs(strong.selected_candidate, key)
+
     def test_specialized_network_views_resolve_with_gcp_scope(self) -> None:
         primary_network = _gcp_resource(
             "google_compute_network.primary",

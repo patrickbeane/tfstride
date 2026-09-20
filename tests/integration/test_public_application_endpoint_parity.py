@@ -90,6 +90,7 @@ def _cloud_run_service_iam_member(member: str = "allUsers") -> TerraformResource
         "google_cloud_run_v2_service_iam_member",
         {
             "name": "tfstride-api",
+            "project": "tfstride-demo",
             "location": "us-central1",
             "role": "roles/run.invoker",
             "member": member,
@@ -118,6 +119,7 @@ def _cloud_function_iam_member(member: str = "allUsers") -> TerraformResource:
         "google_cloudfunctions_function_iam_member",
         {
             "cloud_function": "tfstride-fn",
+            "project": "tfstride-demo",
             "region": "us-central1",
             "role": "roles/cloudfunctions.invoker",
             "member": member,

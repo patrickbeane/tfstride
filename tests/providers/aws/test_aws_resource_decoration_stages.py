@@ -53,7 +53,7 @@ def _resource(
     policy_statements: list[IAMPolicyStatement] | None = None,
     public_access_configured: bool = False,
     public_exposure: bool = False,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
     metadata: dict | None = None,
 ) -> NormalizedResource:
     return NormalizedResource(
@@ -222,7 +222,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         self.assertFalse(private_subnet.has_public_route)
         self.assertTrue(private_subnet.has_nat_gateway_egress)
         self.assertEqual(private_subnet.metadata["route_table_ids"], ["rtb-private"])
-        self.assertEqual(context.public_subnet_ids, {(None, "subnet-public")})
+        self.assertEqual(context.public_subnet_ids, {("aws.default", "subnet-public")})
 
     def test_network_posture_does_not_cross_provider_configurations(self) -> None:
         primary_subnet = _resource(
@@ -395,7 +395,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [security_group, subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {(None, "subnet-public")}
+        context.public_subnet_ids = {("aws.default", "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 
@@ -462,7 +462,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         DeriveSubnetPostureStage().apply(resources, context)
         DerivePublicExposureStage().apply(resources, context)
 
-        self.assertEqual(context.public_subnet_ids, {(None, "subnet-public")})
+        self.assertEqual(context.public_subnet_ids, {("aws.default", "subnet-public")})
         self.assertTrue(subnet.is_public_subnet)
         self.assertTrue(instance.in_public_subnet)
         self.assertTrue(instance.internet_ingress_capable)
@@ -592,7 +592,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [security_group, subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {(None, "subnet-public")}
+        context.public_subnet_ids = {("aws.default", "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 
@@ -618,7 +618,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
         )
         resources = [subnet, instance]
         context = _context(resources)
-        context.public_subnet_ids = {(None, "subnet-public")}
+        context.public_subnet_ids = {("aws.default", "subnet-public")}
 
         DerivePublicExposureStage().apply(resources, context)
 

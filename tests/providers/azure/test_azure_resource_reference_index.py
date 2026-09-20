@@ -408,6 +408,50 @@ class AzureResourceReferenceIndexTests(unittest.TestCase):
         self.assertEqual(exact.state, "resolved")
         self.assertIs(exact.selected_candidate, unknown)
 
+    def test_weak_reference_with_unknown_source_scope_fails_closed(self) -> None:
+        account = _resource(
+            "azurerm_storage_account.foreign",
+            AzureResourceType.STORAGE_ACCOUNT,
+            identifier=_arm_id(
+                "sub-0002",
+                "application",
+                "Microsoft.Storage/storageAccounts/shared",
+            ),
+            metadata={AzureResourceMetadata.NAME: "shared"},
+        )
+        unknown_source = _resource(
+            "azurerm_storage_container.unknown_scope",
+            AzureResourceType.STORAGE_CONTAINER,
+        )
+        subscription_only_source = _resource(
+            "azurerm_role_definition.subscription_scope",
+            AzureResourceType.ROLE_DEFINITION,
+            identifier=("/subscriptions/sub-0002/providers/Microsoft.Authorization/roleDefinitions/source"),
+        )
+        references = AzureResourceIndexBuilder().build([account]).resources_by_reference
+
+        self.assertIs(
+            references.resolve("shared", resource_types={AzureResourceType.STORAGE_ACCOUNT}).selected_candidate,
+            account,
+        )
+        for source in (unknown_source, subscription_only_source):
+            with self.subTest(source=source.address):
+                weak = references.resolve(
+                    "shared",
+                    source=source,
+                    resource_types={AzureResourceType.STORAGE_ACCOUNT},
+                )
+                self.assertEqual(weak.state, "unresolved")
+
+        for reference in (account.address, account.identifier.upper()):
+            with self.subTest(reference=reference):
+                strong = references.resolve(
+                    reference,
+                    source=unknown_source,
+                    resource_types={AzureResourceType.STORAGE_ACCOUNT},
+                )
+                self.assertIs(strong.selected_candidate, account)
+
     def test_ambiguous_storage_reference_does_not_decorate_an_arbitrary_account(self) -> None:
         def snapshot(reverse: bool) -> tuple[str | None, tuple[str, ...]]:
             accounts = [

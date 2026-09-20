@@ -48,6 +48,7 @@ def _public_invoker(
 ) -> TerraformResource:
     values: dict[str, object] = {
         "name": "orders",
+        "project": "tfstride-demo",
         "location": "us-central1",
         "role": role,
         "member": member,

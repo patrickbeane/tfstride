@@ -512,6 +512,7 @@
           "provider_name": "registry.terraform.io/hashicorp/google",
           "values": {
             "name": "tfstride-api",
+            "project": "tfstride-demo",
             "location": "us-central1",
             "role": "roles/run.invoker",
             "member": "allUsers"
@@ -540,6 +541,7 @@
           "provider_name": "registry.terraform.io/hashicorp/google",
           "values": {
             "cloud_function": "tfstride-worker",
+            "project": "tfstride-demo",
             "region": "us-central1",
             "role": "roles/cloudfunctions.invoker",
             "member": "allAuthenticatedUsers"

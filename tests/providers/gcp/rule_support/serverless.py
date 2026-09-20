@@ -62,6 +62,7 @@ def _cloud_run_service_iam_member(
         provider_name="registry.terraform.io/hashicorp/google",
         values={
             "name": "tfstride-api",
+            "project": "tfstride-demo",
             "location": "us-central1",
             "role": role,
             "member": member,
@@ -104,6 +105,7 @@ def _cloudfunctions_function_iam_member(
         provider_name="registry.terraform.io/hashicorp/google",
         values={
             "cloud_function": "tfstride-fn",
+            "project": "tfstride-demo",
             "region": "us-central1",
             "role": role,
             "member": member,
@@ -144,6 +146,7 @@ def _cloudfunctions2_function_iam_binding(
         provider_name="registry.terraform.io/hashicorp/google",
         values={
             "cloud_function": "tfstride-fn2",
+            "project": "tfstride-demo",
             "location": "us-central1",
             "role": role,
             "members": members or ["allAuthenticatedUsers"],

@@ -22,7 +22,7 @@ def _resource(
     values: dict[str, Any],
     *,
     unknown_values: dict[str, Any] | None = None,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
 ) -> TerraformResource:
     return TerraformResource(
         address=address,
@@ -36,7 +36,7 @@ def _resource(
     )
 
 
-def _subnet(*, provider_config_key: str | None = None) -> TerraformResource:
+def _subnet(*, provider_config_key: str | None = "aws.default") -> TerraformResource:
     return _resource(
         "aws_subnet.app",
         "aws_subnet",
@@ -52,7 +52,7 @@ def _subnet(*, provider_config_key: str | None = None) -> TerraformResource:
 def _lambda_function(
     *,
     vpc_enabled: bool = True,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
 ) -> TerraformResource:
     values: dict[str, Any] = {
         "id": "worker",
@@ -74,7 +74,7 @@ def _role(
     actions: list[str],
     *,
     resources: list[str] | None = None,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
 ) -> TerraformResource:
     policy = {
         "Statement": [
@@ -104,7 +104,7 @@ def _vpc_endpoint(
     *,
     endpoint_type: str = "Interface",
     unknown_service_name: bool = False,
-    provider_config_key: str | None = None,
+    provider_config_key: str | None = "aws.default",
 ) -> TerraformResource:
     values: dict[str, Any] = {
         "id": f"vpce-{name}",

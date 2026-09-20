@@ -66,9 +66,13 @@ class AwsResourceReferenceView:
             return ResourceReferenceResolution(candidates=strong_candidates)
 
         candidates = resolution.candidates
-        provider_config_key = source.provider_config_key if source is not None else None
-        if provider_config_key is None:
+        if source is None:
             return ResourceReferenceResolution(candidates=candidates)
+        provider_config_key = source.provider_config_key
+        if provider_config_key is None:
+            if all(candidate.provider_config_key is None for candidate in candidates):
+                return ResourceReferenceResolution(candidates=candidates)
+            return ResourceReferenceResolution(candidates=_ambiguity_only(candidates))
 
         local_candidates = tuple(
             candidate for candidate in candidates if candidate.provider_config_key == provider_config_key
@@ -94,6 +98,14 @@ class AwsResourceReferenceView:
 AwsReferenceRelationshipKey = tuple[str, str | None, str]
 
 
+def _ambiguity_only(
+    candidates: tuple[NormalizedResource, ...],
+) -> tuple[NormalizedResource, ...]:
+    """Retain collision evidence without resolving a weak reference."""
+
+    return candidates if len(candidates) > 1 else ()
+
+
 def aws_reference_relationship_key(
     view: AwsResourceReferenceView,
     reference: str | None,
@@ -108,6 +120,8 @@ def aws_reference_relationship_key(
     candidate = resolution.selected_candidate
     if candidate is not None:
         return "resource", candidate.provider_config_key, candidate.address
+    if source.provider_config_key is None and view.resolve(reference).candidates:
+        return None
     scoped_reference = aws_scoped_reference_key(source.provider_config_key, reference)
     if scoped_reference is None:
         return None

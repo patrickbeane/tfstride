@@ -265,7 +265,7 @@ def _aws_resources(
     if multi_target:
         trails.append(_aws_trail("security", _AWS_SECURITY_TRAIL_ARN))
         trail_arns.append(_AWS_SECURITY_TRAIL_ARN)
-    return [
+    resources = [
         *aws_public_edge(internal=not public),
         aws_caller_identity(),
         *trails,
@@ -281,6 +281,9 @@ def _aws_resources(
         aws_task_definition(execution_role_arn=None),
         aws_service(),
     ]
+    for resource in resources:
+        resource.provider_config_key = "aws"
+    return resources
 
 
 def _gcp_resources(
