@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from unittest.mock import Mock, patch
 
 from tfstride.analysis import indexes as analysis_indexes_module
 from tfstride.analysis.indexes import AnalysisIndexExtensionError, build_analysis_indexes
@@ -194,15 +195,46 @@ class AnalysisIndexTests(unittest.TestCase):
         self.assertIsInstance(extension.iam_inheritance, GcpIamInheritanceIndex)
         self.assertIsInstance(extension.org_policy_guardrails, GcpOrgPolicyGuardrailIndex)
 
+    def test_none_provider_extension_factory_keeps_catalog_default(self) -> None:
+        indexes = build_analysis_indexes(
+            ResourceInventory(provider="gcp", resources=[]),
+            provider_extension_factory=None,
+        )
+
+        self.assertIsInstance(indexes.provider_extension, GcpAnalysisIndexes)
+
+    def test_explicit_factory_can_omit_provider_extension(self) -> None:
+        role = _resource(
+            address="aws_iam_role.app",
+            resource_type="aws_iam_role",
+            category=ResourceCategory.IAM,
+        )
+        inventory = ResourceInventory(provider="aws", resources=[role])
+        factory = Mock(return_value=None)
+
+        with patch(
+            "tfstride.analysis.indexes._default_provider_extension_factory",
+            side_effect=AssertionError("An explicit factory must not fall back to the catalog."),
+        ):
+            indexes = build_analysis_indexes(inventory, provider_extension_factory=factory)
+
+        factory.assert_called_once_with(inventory)
+        self.assertIsNone(indexes.provider_extension)
+        self.assertIs(indexes.role_index.unique_candidate(role.address), role)
+
     def test_provider_extension_factory_receives_inventory(self) -> None:
-        inventory = ResourceInventory(provider="custom", resources=[])
+        inventory = ResourceInventory(provider="gcp", resources=[])
         extension = object()
         calls: list[ResourceInventory] = []
 
-        indexes = build_analysis_indexes(
-            inventory,
-            provider_extension_factory=lambda value: calls.append(value) or extension,
-        )
+        with patch(
+            "tfstride.analysis.indexes._default_provider_extension_factory",
+            side_effect=AssertionError("An explicit factory must override the catalog."),
+        ):
+            indexes = build_analysis_indexes(
+                inventory,
+                provider_extension_factory=lambda value: calls.append(value) or extension,
+            )
 
         self.assertEqual(calls, [inventory])
         self.assertIs(indexes.provider_extension, extension)

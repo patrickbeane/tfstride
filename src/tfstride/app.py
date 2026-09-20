@@ -6,13 +6,14 @@ from pathlib import Path
 from tfstride.analysis.boundaries import default_boundary_contributors, detect_trust_boundaries
 from tfstride.analysis.boundaries.types import BoundaryContributor
 from tfstride.analysis.coverage import build_analysis_coverage
-from tfstride.analysis.indexes import build_analysis_indexes
+from tfstride.analysis.indexes import AnalysisIndexExtensionFactory, build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import AnalysisResult, Observation, ResourceInventory, TerraformResource
 from tfstride.providers.catalog import (
     DEFAULT_PROVIDER,
+    default_provider_analysis_index_factories_by_provider,
     default_provider_boundary_contributor_factories_by_provider,
     default_provider_limitations,
     default_provider_observation_factories_by_provider,
@@ -44,7 +45,14 @@ class TfStride:
             Mapping[str, Iterable[ProviderBoundaryContributorFactory]] | None
         ) = None,
         provider_observation_factories: Mapping[str, Iterable[ProviderObservationFactory]] | None = None,
+        provider_analysis_index_factories: Mapping[str, AnalysisIndexExtensionFactory | None] | None = None,
     ) -> None:
+        """Configure provider hooks for Terraform plan analysis.
+
+        Omitting provider_analysis_index_factories uses the catalog defaults.
+        A supplied mapping replaces those defaults; missing providers and
+        None entries attach no provider analysis-index extension.
+        """
         self._provider_registry = provider_registry or default_provider_registry()
         self._provider = _normalize_requested_provider(provider)
         self._provider_limitations = _normalize_provider_limitations(
@@ -59,6 +67,11 @@ class TfStride:
             provider_observation_factories
             if provider_observation_factories is not None
             else default_provider_observation_factories_by_provider()
+        )
+        self._provider_analysis_index_factories = _normalize_provider_analysis_index_factories(
+            provider_analysis_index_factories
+            if provider_analysis_index_factories is not None
+            else default_provider_analysis_index_factories_by_provider()
         )
         self._rule_engine = StrideRuleEngine()
         self._rule_policy = rule_policy
@@ -79,7 +92,10 @@ class TfStride:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self._normalize_resources(terraform_plan.resources)
         rule_set = self._rule_engine.rule_set_for(inventory.provider)
-        analysis_indexes = build_analysis_indexes(inventory)
+        analysis_indexes = build_analysis_indexes(
+            inventory,
+            provider_extension_factory=self._analysis_index_factory_for_provider(inventory.provider),
+        )
         trust_boundaries = detect_trust_boundaries(
             inventory,
             indexes=analysis_indexes,
@@ -121,6 +137,11 @@ class TfStride:
         if self._provider is not None:
             return self._provider_registry.normalize(self._provider, resources)
         return self._provider_registry.normalize_detected(resources, default_provider=DEFAULT_PROVIDER)
+
+    def _analysis_index_factory_for_provider(self, provider: str) -> AnalysisIndexExtensionFactory:
+        factory = self._provider_analysis_index_factories.get(normalize_provider_name(provider))
+        # A None factory would trigger the standalone builder's catalog fallback.
+        return factory if factory is not None else _no_analysis_index_extension
 
     def _boundary_contributors_for_provider(self, provider: str) -> tuple[BoundaryContributor, ...]:
         provider_name = normalize_provider_name(provider)
@@ -180,6 +201,22 @@ def _normalize_provider_observation_factories(
             continue
         normalized[provider_name] = tuple(factories)
     return normalized
+
+
+def _normalize_provider_analysis_index_factories(
+    provider_analysis_index_factories: Mapping[str, AnalysisIndexExtensionFactory | None],
+) -> dict[str, AnalysisIndexExtensionFactory | None]:
+    normalized: dict[str, AnalysisIndexExtensionFactory | None] = {}
+    for provider, factory in provider_analysis_index_factories.items():
+        provider_name = normalize_provider_name(provider)
+        if not provider_name:
+            continue
+        normalized[provider_name] = factory
+    return normalized
+
+
+def _no_analysis_index_extension(_inventory: ResourceInventory) -> None:
+    return None
 
 
 def _limitations_for_provider(

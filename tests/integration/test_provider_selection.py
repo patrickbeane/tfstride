@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from tests.integration.analysis_support import (
     AZURE_FIXTURE_PATH,
@@ -13,7 +13,7 @@ from tests.integration.analysis_support import (
 )
 from tfstride.analysis.boundaries import detect_trust_boundaries
 from tfstride.analysis.coverage import build_analysis_coverage
-from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
+from tfstride.analysis.indexes import AnalysisIndexes, AnalysisIndexExtensionFactory, build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.models import (
@@ -23,6 +23,7 @@ from tfstride.models import (
     TerraformResource,
 )
 from tfstride.providers.base import ProviderNormalizer
+from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes, build_gcp_analysis_indexes
 from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry, ProviderSelectionError
 
 
@@ -72,11 +73,15 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
             events.append("normalization_complete")
             return inventory
 
-        def record_index_build(inventory: ResourceInventory) -> AnalysisIndexes:
+        def record_index_build(
+            inventory: ResourceInventory,
+            *,
+            provider_extension_factory: AnalysisIndexExtensionFactory | None = None,
+        ) -> AnalysisIndexes:
             self.assertEqual(events, ["normalization_complete"])
             self.assertIs(inventory, normalized_inventories[0])
             events.append("analysis_index_build")
-            indexes = build_analysis_indexes(inventory)
+            indexes = build_analysis_indexes(inventory, provider_extension_factory=provider_extension_factory)
             built_indexes.append(indexes)
             return indexes
 
@@ -87,6 +92,10 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
             patch("tfstride.analysis.boundaries.core.build_analysis_indexes", build_indexes),
             patch("tfstride.analysis.stride_rules.build_analysis_indexes", build_indexes),
             patch("tfstride.analysis.rule_definitions.build_analysis_indexes", build_indexes),
+            patch(
+                "tfstride.analysis.indexes._default_provider_extension_factory",
+                side_effect=AssertionError("Application index factories must be selected explicitly."),
+            ),
             patch(
                 "tfstride.app.detect_trust_boundaries",
                 wraps=detect_trust_boundaries,
@@ -111,6 +120,87 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertIs(detect_boundaries.call_args.kwargs["indexes"], built_indexes[0])
         self.assertIs(evaluate.call_args.kwargs["analysis_indexes"], built_indexes[0])
         self.assertIs(evaluate.call_args.args[1], result.trust_boundaries)
+
+    def test_analysis_selects_index_factory_for_normalized_provider(self) -> None:
+        extensions: list[GcpAnalysisIndexes] = []
+
+        def build_custom_indexes(inventory: ResourceInventory) -> GcpAnalysisIndexes:
+            extension = build_gcp_analysis_indexes(inventory)
+            extensions.append(extension)
+            return extension
+
+        unused_factory = Mock(side_effect=AssertionError("Factory selected for the wrong provider."))
+        for requested_provider, fixture_path in (
+            (None, GCP_FIXTURE_PATH),
+            (" GCP ", FIXTURE_PATH),
+        ):
+            with self.subTest(requested_provider=requested_provider):
+                index_factory = Mock(side_effect=build_custom_indexes)
+                engine = TfStride(
+                    provider=requested_provider,
+                    provider_analysis_index_factories={
+                        " AWS ": unused_factory,
+                        " GCP ": index_factory,
+                    },
+                )
+
+                with (
+                    patch(
+                        "tfstride.analysis.indexes._default_provider_extension_factory",
+                        side_effect=AssertionError("Configured factories must not fall back to the catalog."),
+                    ),
+                    patch(
+                        "tfstride.app.detect_trust_boundaries",
+                        wraps=detect_trust_boundaries,
+                    ) as detect_boundaries,
+                    patch.object(
+                        engine._rule_engine,
+                        "evaluate",
+                        wraps=engine._rule_engine.evaluate,
+                    ) as evaluate,
+                ):
+                    result = engine.analyze_plan(fixture_path)
+
+                self.assertEqual(result.inventory.provider, "gcp")
+                index_factory.assert_called_once()
+                self.assertIs(index_factory.call_args.args[0], result.inventory)
+                unused_factory.assert_not_called()
+                boundary_indexes = detect_boundaries.call_args.kwargs["indexes"]
+                rule_indexes = evaluate.call_args.kwargs["analysis_indexes"]
+                self.assertIs(boundary_indexes, rule_indexes)
+                self.assertIs(rule_indexes.provider_extension, extensions[-1])
+
+    def test_analysis_factory_mapping_can_omit_provider_extensions(self) -> None:
+        unused_factory = Mock(side_effect=AssertionError("Factory selected for the wrong provider."))
+        for factories in ({}, {" GCP ": None}, {"aws": unused_factory}):
+            with self.subTest(factories=factories):
+                engine = TfStride(provider_analysis_index_factories=factories)
+
+                with (
+                    patch(
+                        "tfstride.analysis.indexes._default_provider_extension_factory",
+                        side_effect=AssertionError("An absent extension must not fall back to the catalog."),
+                    ),
+                    patch.object(
+                        engine._rule_engine,
+                        "evaluate",
+                        wraps=engine._rule_engine.evaluate,
+                    ) as evaluate,
+                ):
+                    result = engine.analyze_plan(GCP_FIXTURE_PATH)
+
+                self.assertEqual(result.inventory.provider, "gcp")
+                self.assertIsNone(evaluate.call_args.kwargs["analysis_indexes"].provider_extension)
+                unused_factory.assert_not_called()
+
+    def test_analysis_propagates_configured_index_factory_failure(self) -> None:
+        index_factory = Mock(side_effect=RuntimeError("index factory failed"))
+        engine = TfStride(provider_analysis_index_factories={"gcp": index_factory})
+
+        with self.assertRaisesRegex(RuntimeError, "index factory failed"):
+            engine.analyze_plan(GCP_FIXTURE_PATH)
+
+        index_factory.assert_called_once()
 
     def test_analysis_uses_same_active_registry_for_evaluation_and_coverage(self) -> None:
         engine = TfStride()

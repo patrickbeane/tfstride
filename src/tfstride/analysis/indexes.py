@@ -53,6 +53,11 @@ def build_analysis_indexes(
     *,
     provider_extension_factory: AnalysisIndexExtensionFactory | None = None,
 ) -> AnalysisIndexes:
+    """Build shared indexes and a provider extension from the completed inventory.
+
+    An omitted or None factory selects the provider's catalog default. An
+    explicit factory returning None builds indexes without a provider extension.
+    """
     role_index = build_resource_reference_index(
         inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES),
         references_for_resource=_analysis_resource_references,
