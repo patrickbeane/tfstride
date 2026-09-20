@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from tests.integration.analysis_support import (
+    AZURE_FIXTURE_PATH,
     AZURE_SAFE_FIXTURE_PATH,
     FIXTURE_PATH,
+    GCP_FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
+from tfstride.analysis.boundaries import detect_trust_boundaries
 from tfstride.analysis.coverage import build_analysis_coverage
+from tfstride.analysis.indexes import AnalysisIndexes, build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.models import (
@@ -43,6 +48,69 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertEqual(result.inventory.provider, "aws")
         self.assertEqual(result.inventory.resources, ())
         self.assertEqual(result.findings, [])
+
+    def test_analysis_builds_indexes_once_after_normalization_and_shares_them(self) -> None:
+        for provider, fixture_path in (
+            ("aws", FIXTURE_PATH),
+            ("gcp", GCP_FIXTURE_PATH),
+            ("azure", AZURE_FIXTURE_PATH),
+        ):
+            with self.subTest(provider=provider):
+                self._assert_analysis_preparation_lifecycle(provider, fixture_path)
+
+    def _assert_analysis_preparation_lifecycle(self, provider: str, fixture_path: Path) -> None:
+        engine = TfStride()
+        normalizer = engine.provider_registry.get(provider)
+        normalize_resources = normalizer.normalize
+        events: list[str] = []
+        normalized_inventories: list[ResourceInventory] = []
+        built_indexes: list[AnalysisIndexes] = []
+
+        def record_normalization(resources: list[TerraformResource]) -> ResourceInventory:
+            inventory = normalize_resources(resources)
+            normalized_inventories.append(inventory)
+            events.append("normalization_complete")
+            return inventory
+
+        def record_index_build(inventory: ResourceInventory) -> AnalysisIndexes:
+            self.assertEqual(events, ["normalization_complete"])
+            self.assertIs(inventory, normalized_inventories[0])
+            events.append("analysis_index_build")
+            indexes = build_analysis_indexes(inventory)
+            built_indexes.append(indexes)
+            return indexes
+
+        with (
+            patch.object(normalizer, "normalize", side_effect=record_normalization) as normalize,
+            patch("tfstride.app.build_analysis_indexes", side_effect=record_index_build) as build_indexes,
+            # Count fallback builds in consumers as part of the same application run.
+            patch("tfstride.analysis.boundaries.core.build_analysis_indexes", build_indexes),
+            patch("tfstride.analysis.stride_rules.build_analysis_indexes", build_indexes),
+            patch("tfstride.analysis.rule_definitions.build_analysis_indexes", build_indexes),
+            patch(
+                "tfstride.app.detect_trust_boundaries",
+                wraps=detect_trust_boundaries,
+            ) as detect_boundaries,
+            patch.object(
+                engine._rule_engine,
+                "evaluate",
+                wraps=engine._rule_engine.evaluate,
+            ) as evaluate,
+        ):
+            result = engine.analyze_plan(fixture_path)
+
+        normalize.assert_called_once()
+        build_indexes.assert_called_once()
+        detect_boundaries.assert_called_once()
+        evaluate.assert_called_once()
+        self.assertEqual(events, ["normalization_complete", "analysis_index_build"])
+        self.assertEqual(result.inventory.provider, provider)
+        self.assertIs(result.inventory, normalized_inventories[0])
+        self.assertIs(detect_boundaries.call_args.args[0], result.inventory)
+        self.assertIs(evaluate.call_args.args[0], result.inventory)
+        self.assertIs(detect_boundaries.call_args.kwargs["indexes"], built_indexes[0])
+        self.assertIs(evaluate.call_args.kwargs["analysis_indexes"], built_indexes[0])
+        self.assertIs(evaluate.call_args.args[1], result.trust_boundaries)
 
     def test_analysis_uses_same_active_registry_for_evaluation_and_coverage(self) -> None:
         engine = TfStride()
