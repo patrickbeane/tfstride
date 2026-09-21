@@ -14,6 +14,7 @@ from tests.integration.analysis_support import (
 from tfstride.analysis.boundaries import detect_trust_boundaries
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.indexes import AnalysisIndexes, AnalysisIndexExtensionFactory, build_analysis_indexes
+from tfstride.analysis.preparation import PreparedAnalysis, prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.app import TfStride
 from tfstride.models import (
@@ -22,6 +23,7 @@ from tfstride.models import (
     ResourceInventory,
     TerraformResource,
 )
+from tfstride.providers.aws.analysis_indexes import AwsAnalysisIndexes
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes, build_gcp_analysis_indexes
 from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry, ProviderSelectionError
@@ -87,7 +89,9 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
 
         with (
             patch.object(normalizer, "normalize", side_effect=record_normalization) as normalize,
-            patch("tfstride.app.build_analysis_indexes", side_effect=record_index_build) as build_indexes,
+            patch(
+                "tfstride.analysis.preparation.build_analysis_indexes", side_effect=record_index_build
+            ) as build_indexes,
             # Count fallback builds in consumers as part of the same application run.
             patch("tfstride.analysis.boundaries.core.build_analysis_indexes", build_indexes),
             patch("tfstride.analysis.stride_rules.build_analysis_indexes", build_indexes),
@@ -97,7 +101,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                 side_effect=AssertionError("Application index factories must be selected explicitly."),
             ),
             patch(
-                "tfstride.app.detect_trust_boundaries",
+                "tfstride.analysis.preparation.detect_trust_boundaries",
                 wraps=detect_trust_boundaries,
             ) as detect_boundaries,
             patch.object(
@@ -120,6 +124,63 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
         self.assertIs(detect_boundaries.call_args.kwargs["indexes"], built_indexes[0])
         self.assertIs(evaluate.call_args.kwargs["analysis_indexes"], built_indexes[0])
         self.assertIs(evaluate.call_args.args[1], result.trust_boundaries)
+
+    def test_repeated_analysis_prepares_fresh_state_across_providers(self) -> None:
+        engine = TfStride()
+        prepared_runs: list[PreparedAnalysis] = []
+        cases = (
+            ("aws", FIXTURE_PATH),
+            ("gcp", GCP_FIXTURE_PATH),
+            ("azure", AZURE_FIXTURE_PATH),
+            ("aws", FIXTURE_PATH),
+        )
+
+        def record_preparation(*args, **kwargs) -> PreparedAnalysis:
+            prepared = prepare_analysis(*args, **kwargs)
+            prepared_runs.append(prepared)
+            return prepared
+
+        with (
+            patch("tfstride.app.prepare_analysis", side_effect=record_preparation) as prepare,
+            patch.object(engine._rule_engine, "evaluate", wraps=engine._rule_engine.evaluate) as evaluate,
+        ):
+            results = [engine.analyze_plan(fixture_path) for _, fixture_path in cases]
+
+        self.assertEqual(prepare.call_count, len(cases))
+        self.assertEqual(len({id(prepared) for prepared in prepared_runs}), len(cases))
+        self.assertEqual(len({id(prepared.indexes) for prepared in prepared_runs}), len(cases))
+        self.assertEqual(len({id(prepared.indexes.role_index) for prepared in prepared_runs}), len(cases))
+        self.assertEqual(len({id(prepared.boundaries) for prepared in prepared_runs}), len(cases))
+        for (provider, _), prepared, result, evaluation in zip(
+            cases, prepared_runs, results, evaluate.call_args_list, strict=True
+        ):
+            with self.subTest(provider=provider):
+                self.assertEqual(prepared.inventory.provider, provider)
+                self.assertEqual(prepared.rule_set.provider, provider)
+                self.assertIs(prepared.inventory, result.inventory)
+                self.assertIs(prepared.boundaries, result.trust_boundaries)
+                self.assertIs(evaluation.kwargs["analysis_indexes"], prepared.indexes)
+                self.assertIs(evaluation.kwargs["rule_set"], prepared.rule_set)
+                self.assertTrue(
+                    all(
+                        resource.provider == provider
+                        for candidates in prepared.indexes.role_index.resources_by_reference.values()
+                        for resource in candidates
+                    )
+                )
+                self.assertTrue(
+                    all(rule_id.startswith(f"{provider}-") for rule_id in result.analysis_coverage.rules.enabled_rules)
+                )
+
+        self.assertIsInstance(prepared_runs[0].indexes.provider_extension, AwsAnalysisIndexes)
+        self.assertIsInstance(prepared_runs[1].indexes.provider_extension, GcpAnalysisIndexes)
+        self.assertIsNone(prepared_runs[2].indexes.provider_extension)
+        self.assertIsInstance(prepared_runs[3].indexes.provider_extension, AwsAnalysisIndexes)
+        self.assertIsNot(prepared_runs[0].indexes.provider_extension, prepared_runs[3].indexes.provider_extension)
+        self.assertIs(prepared_runs[0].rule_set, prepared_runs[3].rule_set)
+        self.assertEqual(results[0].findings, results[3].findings)
+        self.assertEqual(results[0].trust_boundaries, results[3].trust_boundaries)
+        self.assertEqual(results[0].analysis_coverage, results[3].analysis_coverage)
 
     def test_analysis_selects_index_factory_for_normalized_provider(self) -> None:
         extensions: list[GcpAnalysisIndexes] = []
@@ -150,7 +211,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                         side_effect=AssertionError("Configured factories must not fall back to the catalog."),
                     ),
                     patch(
-                        "tfstride.app.detect_trust_boundaries",
+                        "tfstride.analysis.preparation.detect_trust_boundaries",
                         wraps=detect_trust_boundaries,
                     ) as detect_boundaries,
                     patch.object(

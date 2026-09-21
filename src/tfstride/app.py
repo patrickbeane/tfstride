@@ -3,10 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from tfstride.analysis.boundaries import default_boundary_contributors, detect_trust_boundaries
-from tfstride.analysis.boundaries.types import BoundaryContributor
 from tfstride.analysis.coverage import build_analysis_coverage
-from tfstride.analysis.indexes import AnalysisIndexExtensionFactory, build_analysis_indexes
+from tfstride.analysis.indexes import AnalysisIndexExtensionFactory
+from tfstride.analysis.preparation import prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.input.terraform_plan import load_terraform_plan
@@ -91,29 +90,25 @@ class TfStride:
     def analyze_plan(self, plan_path: str | Path, title: str = "tfSTRIDE Threat Model Report") -> AnalysisResult:
         terraform_plan = load_terraform_plan(plan_path)
         inventory = self._normalize_resources(terraform_plan.resources)
-        rule_set = self._rule_engine.rule_set_for(inventory.provider)
-        analysis_indexes = build_analysis_indexes(
+        prepared = prepare_analysis(
             inventory,
+            rule_set=self._rule_engine.rule_set_for(inventory.provider),
             provider_extension_factory=self._analysis_index_factory_for_provider(inventory.provider),
-        )
-        trust_boundaries = detect_trust_boundaries(
-            inventory,
-            indexes=analysis_indexes,
-            contributors=default_boundary_contributors(
-                provider_contributors=self._boundary_contributors_for_provider(inventory.provider),
+            provider_boundary_contributor_factories=self._boundary_contributor_factories_for_provider(
+                inventory.provider
             ),
         )
         findings = apply_severity_overrides(
             self._rule_engine.evaluate(
-                inventory,
-                trust_boundaries,
-                analysis_indexes=analysis_indexes,
+                prepared.inventory,
+                prepared.boundaries,
+                analysis_indexes=prepared.indexes,
                 rule_policy=self._rule_policy,
-                rule_set=rule_set,
+                rule_set=prepared.rule_set,
             ),
             self._rule_policy,
         )
-        observations = self._observations_for_provider(inventory)
+        observations = self._observations_for_provider(prepared.inventory)
         observations.sort(
             key=lambda observation: ((observation.category or ""), observation.title, observation.observation_id)
         )
@@ -121,16 +116,16 @@ class TfStride:
             title=title,
             analyzed_file=Path(terraform_plan.source_path).name,
             analyzed_path=str(terraform_plan.source_path),
-            inventory=inventory,
-            trust_boundaries=trust_boundaries,
+            inventory=prepared.inventory,
+            trust_boundaries=prepared.boundaries,
             findings=findings,
             observations=observations,
             analysis_coverage=build_analysis_coverage(
-                inventory,
-                rule_registry=rule_set.registry,
+                prepared.inventory,
+                rule_registry=prepared.rule_set.registry,
                 rule_policy=self._rule_policy,
             ),
-            limitations=_limitations_for_provider(inventory.provider, self._provider_limitations),
+            limitations=_limitations_for_provider(prepared.inventory.provider, self._provider_limitations),
         )
 
     def _normalize_resources(self, resources: list[TerraformResource]) -> ResourceInventory:
@@ -143,9 +138,10 @@ class TfStride:
         # A None factory would trigger the standalone builder's catalog fallback.
         return factory if factory is not None else _no_analysis_index_extension
 
-    def _boundary_contributors_for_provider(self, provider: str) -> tuple[BoundaryContributor, ...]:
-        provider_name = normalize_provider_name(provider)
-        return tuple(factory() for factory in self._provider_boundary_contributor_factories.get(provider_name, ()))
+    def _boundary_contributor_factories_for_provider(
+        self, provider: str
+    ) -> tuple[ProviderBoundaryContributorFactory, ...]:
+        return self._provider_boundary_contributor_factories.get(normalize_provider_name(provider), ())
 
     def _observations_for_provider(self, inventory: ResourceInventory) -> list[Observation]:
         provider_name = normalize_provider_name(inventory.provider)
