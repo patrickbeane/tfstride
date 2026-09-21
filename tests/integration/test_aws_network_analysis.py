@@ -6,6 +6,7 @@ import unittest
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.integration.analysis_support import (
     ALB_EC2_RDS_FIXTURE_PATH,
@@ -16,7 +17,11 @@ from tests.integration.analysis_support import (
     SAFE_FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
+from tfstride.analysis.rule_registry import RulePolicy
+from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.app import TfStride
+from tfstride.filtering import finding_fingerprint
+from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import (
     BoundaryType,
     Severity,
@@ -233,6 +238,51 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
             (boundary.boundary_type, boundary.source, boundary.target),
             (BoundaryType.WORKLOAD_TO_DATA_STORE, "aws_instance.admin", "aws_db_instance.customer"),
         )
+
+    def test_nightmare_segmentation_fingerprint_is_stable_across_resource_and_boundary_orders(self) -> None:
+        plan = load_terraform_plan(NIGHTMARE_FIXTURE_PATH)
+        expected = next(
+            finding
+            for finding in self.engine.analyze_plan(NIGHTMARE_FIXTURE_PATH).findings
+            if finding.rule_id == "aws-missing-tier-segmentation"
+        )
+        self.assertEqual(
+            expected.trust_boundary_id,
+            "workload-to-data-store:aws_instance.admin->aws_db_instance.customer",
+        )
+        expected_fingerprint = finding_fingerprint(expected)
+        rule_engine = StrideRuleEngine()
+        policy = RulePolicy(enabled_rule_ids=frozenset({"aws-missing-tier-segmentation"}))
+
+        # Reorder parsed resources so their configuration-reference bindings stay intact.
+        resource_orders = (
+            plan.resources,
+            list(reversed(plan.resources)),
+            sorted(plan.resources, key=lambda resource: resource.address),
+        )
+        for resources in resource_orders:
+            with patch("tfstride.app.load_terraform_plan", return_value=replace(plan, resources=resources)):
+                result = self.engine.analyze_plan(NIGHTMARE_FIXTURE_PATH)
+            segmentation_findings = [
+                finding for finding in result.findings if finding.rule_id == "aws-missing-tier-segmentation"
+            ]
+            with self.subTest(resources=tuple(resource.address for resource in resources)):
+                self.assertEqual(segmentation_findings, [expected])
+                self.assertEqual(finding_fingerprint(segmentation_findings[0]), expected_fingerprint)
+
+            boundary_orders = (
+                result.trust_boundaries,
+                list(reversed(result.trust_boundaries)),
+                sorted(result.trust_boundaries, key=lambda boundary: boundary.identifier),
+            )
+            for boundaries in boundary_orders:
+                with self.subTest(
+                    resources=tuple(resource.address for resource in resources),
+                    boundaries=tuple(boundary.identifier for boundary in boundaries),
+                ):
+                    findings = rule_engine.evaluate(result.inventory, boundaries, rule_policy=policy)
+                    self.assertEqual(findings, [expected])
+                    self.assertEqual(finding_fingerprint(findings[0]), expected_fingerprint)
 
     def test_segmentation_finding_is_preserved_without_a_matching_data_boundary(self) -> None:
         result = TfStride(provider_boundary_contributor_factories={}).analyze_plan(FIXTURE_PATH)
