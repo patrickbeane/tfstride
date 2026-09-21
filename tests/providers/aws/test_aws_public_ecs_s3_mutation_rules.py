@@ -7,6 +7,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _EXECUTION_ROLE_ARN,
     _TASK_ROLE_ARN,
     _bucket,
+    _incomplete_role_policy_cases,
     _resource,
     _role,
     _role_policy_attachment,
@@ -18,6 +19,7 @@ from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 
 _RULE_ID = "aws-public-ecs-s3-mutation-access"
@@ -66,6 +68,20 @@ def _evaluate(resources: list[TerraformResource]):
 
 
 class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
+    def test_incomplete_policy_evidence_does_not_emit_a_mutation_finding(self) -> None:
+        for label, policy_resources in _incomplete_role_policy_cases().items():
+            with self.subTest(label=label):
+                inventory, _, findings = _evaluate(
+                    [_load_balancer(), _bucket(), *policy_resources, _task_definition(), _service()]
+                )
+                service = inventory.get_by_address("aws_ecs_service.orders")
+                assert service is not None
+                facts = aws_facts(service)
+                self.assertEqual(facts.internet_facing_load_balancer_addresses, ["aws_lb.public"])
+                self.assertEqual(len(facts.ecs_s3_access_paths), 1)
+                self.assertEqual([finding.rule_id for finding in findings], [])
+                self.assertEqual(facts.ecs_s3_access_paths[0]["access_state"], "unknown")
+
     def test_rule_id_is_registered(self) -> None:
         registered = {rule_id for group in AWS_RULE_GROUP_IDS for rule_id in group}
 

@@ -136,6 +136,56 @@ def _normalize(resources: list[TerraformResource]):
     return AwsNormalizer().normalize(resources)
 
 
+def _incomplete_role_policy_cases() -> dict[str, list[TerraformResource]]:
+    grant = _statement("Allow", "s3:PutObject", f"{_BUCKET_ARN}/*")
+    cases: dict[str, list[TerraformResource]] = {}
+    for label, unsupported_statement in (
+        (
+            "NotAction",
+            {"Effect": "Deny", "NotAction": "s3:GetObject", "Resource": f"{_BUCKET_ARN}/*"},
+        ),
+        (
+            "NotResource",
+            {"Effect": "Deny", "Action": "s3:PutObject", "NotResource": f"{_ARCHIVE_BUCKET_ARN}/*"},
+        ),
+    ):
+        cases[label] = [_role("orders_task", _TASK_ROLE_ARN, [grant, unsupported_statement])]
+
+    unknown_inline_role = _role("orders_task", _TASK_ROLE_ARN, [grant])
+    unknown_inline_role.values["inline_policy"].append({"name": "unknown", "policy": None})
+    unknown_inline_role.unknown_values = {"inline_policy": [{}, {"policy": True}]}
+    cases["unknown inline policy document"] = [unknown_inline_role]
+
+    unknown_role_policy = _resource("aws_iam_role_policy", "unknown", {"role": "orders_task", "policy": None})
+    unknown_role_policy.unknown_values = {"policy": True}
+    cases["unknown standalone inline policy"] = [
+        _role("orders_task", _TASK_ROLE_ARN, [grant]),
+        unknown_role_policy,
+    ]
+
+    policy_arn = f"arn:aws:iam::{_ACCOUNT_ID}:policy/storage-access"
+    unknown_managed_policy = _resource("aws_iam_policy", "unknown", {"arn": policy_arn, "policy": None})
+    unknown_managed_policy.unknown_values = {"policy": True}
+    cases["resolved attachment with unknown policy"] = [
+        _role("orders_task", _TASK_ROLE_ARN, [grant]),
+        unknown_managed_policy,
+        _role_policy_attachment(_TASK_ROLE_ARN, policy_arn),
+    ]
+
+    unknown_inline_block_role = _role("orders_task", _TASK_ROLE_ARN)
+    unknown_inline_block_role.unknown_values = {"inline_policy": True}
+    cases["unknown inline policy block with known attached grant"] = [
+        unknown_inline_block_role,
+        _resource(
+            "aws_iam_policy",
+            "storage_access",
+            {"arn": policy_arn, "policy": json.dumps({"Statement": [grant]})},
+        ),
+        _role_policy_attachment(_TASK_ROLE_ARN, policy_arn),
+    ]
+    return cases
+
+
 class AwsEcsS3AccessPathTests(unittest.TestCase):
     def test_exact_task_role_grants_are_classified_and_projected_onto_service(self) -> None:
         inventory = _normalize(
@@ -175,6 +225,8 @@ class AwsEcsS3AccessPathTests(unittest.TestCase):
         self.assertEqual(service_path["role_address"], "aws_iam_role.orders_task")
         self.assertEqual(service_path["role_arn"], _TASK_ROLE_ARN)
         self.assertEqual(service_path["access_state"], "allowed")
+        self.assertTrue(task_path["role_policy_complete"])
+        self.assertTrue(service_path["role_policy_complete"])
         self.assertEqual(
             service_path["access_classes"],
             ["read", "write", "delete", "administrative"],
@@ -198,7 +250,7 @@ class AwsEcsS3AccessPathTests(unittest.TestCase):
         inventory = _normalize(
             [
                 _bucket(),
-                _role("orders_task", _TASK_ROLE_ARN, []),
+                _role("orders_task", _TASK_ROLE_ARN),
                 _role(
                     "orders_execution",
                     _EXECUTION_ROLE_ARN,
@@ -338,6 +390,33 @@ class AwsEcsS3AccessPathTests(unittest.TestCase):
         self.assertTrue(path["explicit_deny"])
         self.assertTrue(path["conditional_evaluation_required"])
 
+    def test_incomplete_policy_evidence_keeps_task_and_service_access_uncertain(self) -> None:
+        for label, policy_resources in _incomplete_role_policy_cases().items():
+            with self.subTest(label=label):
+                inventory = _normalize([_bucket(), *policy_resources, _task_definition(), _service()])
+                role = inventory.get_by_address("aws_iam_role.orders_task")
+                assert role is not None
+                role_facts = aws_facts(role)
+                self.assertEqual(role_facts.iam_policy_completeness_state, "unknown")
+                self.assertEqual(role_facts.unresolved_attached_policy_arns, [])
+                self.assertTrue(role_facts.iam_policy_posture_uncertainties)
+
+                for address in ("aws_ecs_task_definition.orders", "aws_ecs_service.orders"):
+                    resource = inventory.get_by_address(address)
+                    assert resource is not None
+                    facts = aws_facts(resource)
+                    self.assertEqual(len(facts.ecs_s3_access_paths), 1)
+                    path = facts.ecs_s3_access_paths[0]
+                    self.assertEqual(path["modeled_access_state"], "allowed")
+                    self.assertEqual(path["access_state"], "unknown")
+                    self.assertFalse(path["role_policy_complete"])
+                    self.assertEqual(path["matched_actions"], ["s3:PutObject"])
+                    for reason in role_facts.iam_policy_posture_uncertainties:
+                        self.assertIn(
+                            f"aws_ecs_task_definition.orders: {role.address}: {reason}",
+                            facts.ecs_s3_access_path_uncertainties,
+                        )
+
     def test_unresolved_attached_policy_keeps_modeled_access_uncertain(self) -> None:
         policy_arn = "arn:aws:iam::aws:policy/ExternalS3Access"
         inventory = _normalize(
@@ -362,7 +441,11 @@ class AwsEcsS3AccessPathTests(unittest.TestCase):
         self.assertFalse(path["role_policy_complete"])
         self.assertEqual(
             facts.ecs_s3_access_path_uncertainties,
-            [f"aws_ecs_task_definition.orders: aws_iam_role.orders_task has unresolved attached policy {policy_arn}"],
+            [
+                f"aws_ecs_task_definition.orders: aws_iam_role.orders_task has unresolved attached policy {policy_arn}",
+                f"aws_ecs_task_definition.orders: aws_iam_role.orders_task: "
+                f"attached policy {policy_arn} is not modeled in the plan",
+            ],
         )
 
     def test_unresolved_role_and_non_exact_resources_do_not_invent_paths(self) -> None:

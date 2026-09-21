@@ -169,10 +169,18 @@ def _ecs_s3_access_paths(
         )
 
     role_facts = aws_facts(task_role)
+    role_policy_complete = (
+        role_facts.iam_policy_completeness_state == "complete" and not role_facts.unresolved_attached_policy_arns
+    )
     uncertainties = [
         f"{task_definition.address}: {task_role.address} has unresolved attached policy {policy_arn}"
         for policy_arn in role_facts.unresolved_attached_policy_arns
     ]
+    if role_facts.iam_policy_completeness_state != "complete":
+        uncertainties.extend(
+            f"{task_definition.address}: {task_role.address}: {reason}"
+            for reason in (role_facts.iam_policy_posture_uncertainties or ["identity-policy evidence is incomplete"])
+        )
     target_buckets, target_uncertainties = _target_buckets(task_role, context)
     uncertainties.extend(f"{task_definition.address}: {message}" for message in target_uncertainties)
 
@@ -199,7 +207,7 @@ def _ecs_s3_access_paths(
                 task_role,
                 statement_records,
                 assessment,
-                role_policy_complete=not role_facts.unresolved_attached_policy_arns,
+                role_policy_complete=role_policy_complete,
             )
         )
 
