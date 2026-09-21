@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
@@ -7,9 +9,9 @@ from tfstride.analysis.finding_helpers import (
     evidence_item,
 )
 from tfstride.analysis.resource_concepts import DATABASE_RESOURCE_TYPES
-from tfstride.analysis.rule_definitions import RuleEvaluationContext
+from tfstride.analysis.rule_definitions import BoundaryIndex, RuleEvaluationContext
 from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
-from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityGroupRule
+from tfstride.models import BoundaryType, Finding, NormalizedResource, SecurityGroupRule, TrustBoundary
 from tfstride.providers.aws.analysis_indexes import (
     AwsSecurityGroupRelationships,
     aws_analysis_indexes,
@@ -229,6 +231,23 @@ class AwsNetworkDataRuleDetectors:
                     )
                 )
         return findings
+
+
+def _select_workload_to_database_boundary(
+    boundary_index: BoundaryIndex,
+    database_address: str,
+    workload_addresses: Iterable[str],
+) -> TrustBoundary | None:
+    """Select an existing data-store edge for already-matched workload addresses.
+
+    The lexicographically first workload with an exact edge to the database
+    supplies the representative boundary.
+    """
+    for workload_address in sorted(set(workload_addresses)):
+        boundary = boundary_index.get((BoundaryType.WORKLOAD_TO_DATA_STORE, workload_address, database_address))
+        if boundary is not None:
+            return boundary
+    return None
 
 
 def _public_resources_allowed_by_rule(
