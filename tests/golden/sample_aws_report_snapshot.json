@@ -490,7 +490,7 @@
         "aws_lb.web",
         "aws_security_group.db"
       ],
-      "trust_boundary_id": "public-subnet-to-private-subnet:aws_subnet.public_app->aws_subnet.private_data"
+      "trust_boundary_id": "workload-to-data-store:aws_instance.app->aws_db_instance.app"
     },
     {
       "rule_id": "aws-workload-role-sensitive-permissions",

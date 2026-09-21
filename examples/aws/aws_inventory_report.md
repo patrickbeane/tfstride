@@ -148,7 +148,7 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 
 - STRIDE category: Tampering
 - Affected resources: `aws_db_instance.app`, `aws_instance.app`, `aws_lb.web`, `aws_security_group.db`
-- Trust boundary: `public-subnet-to-private-subnet:aws_subnet.public_app->aws_subnet.private_data`
+- Trust boundary: `workload-to-data-store:aws_instance.app->aws_db_instance.app`
 - Severity reasoning: internet_exposure +2, privilege_breadth +0, data_sensitivity +2, lateral_movement +2, blast_radius +1, final_score 7 => high
 - Rationale: aws_db_instance.app accepts traffic from security groups attached to internet-facing workloads. A compromise of the public tier can therefore move laterally into the private data tier.
 - Recommended mitigation: Introduce tighter tier segmentation with dedicated security groups, narrow ingress to specific services and ports, and keep the data tier reachable only through controlled application paths.

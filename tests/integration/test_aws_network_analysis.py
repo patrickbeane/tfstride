@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 from tests.integration.analysis_support import (
@@ -11,9 +12,11 @@ from tests.integration.analysis_support import (
     ECS_FARGATE_FIXTURE_PATH,
     FIXTURE_PATH,
     LAMBDA_DEPLOY_ROLE_FIXTURE_PATH,
+    NIGHTMARE_FIXTURE_PATH,
     SAFE_FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
+from tfstride.app import TfStride
 from tfstride.models import (
     BoundaryType,
     Severity,
@@ -205,6 +208,46 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
         self.assertFalse(mixed_db.public_exposure)
         self.assertTrue(mixed_db.metadata.get("internet_ingress_capable"))
         self.assertEqual(internet_boundaries_to_db, [])
+
+    def test_nightmare_segmentation_finding_uses_matching_workload_to_database_boundary(self) -> None:
+        result = self.engine.analyze_plan(NIGHTMARE_FIXTURE_PATH)
+        findings = [finding for finding in result.findings if finding.rule_id == "aws-missing-tier-segmentation"]
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(finding.severity, Severity.HIGH)
+        self.assertEqual(
+            finding.affected_resources,
+            [
+                "aws_db_instance.customer",
+                "aws_instance.admin",
+                "aws_instance.frontend",
+                "aws_lb.web",
+                "aws_security_group.db",
+            ],
+        )
+        boundary = next(
+            boundary for boundary in result.trust_boundaries if boundary.identifier == finding.trust_boundary_id
+        )
+        self.assertEqual(
+            (boundary.boundary_type, boundary.source, boundary.target),
+            (BoundaryType.WORKLOAD_TO_DATA_STORE, "aws_instance.admin", "aws_db_instance.customer"),
+        )
+
+    def test_segmentation_finding_is_preserved_without_a_matching_data_boundary(self) -> None:
+        result = TfStride(provider_boundary_contributor_factories={}).analyze_plan(FIXTURE_PATH)
+        boundary_types = {boundary.boundary_type for boundary in result.trust_boundaries}
+        self.assertIn(BoundaryType.PUBLIC_TO_PRIVATE, boundary_types)
+        self.assertNotIn(BoundaryType.WORKLOAD_TO_DATA_STORE, boundary_types)
+
+        expected_findings = [
+            replace(finding, trust_boundary_id=None)
+            for finding in self.result.findings
+            if finding.rule_id == "aws-missing-tier-segmentation"
+        ]
+        self.assertEqual(len(expected_findings), 1)
+        findings = [finding for finding in result.findings if finding.rule_id == "aws-missing-tier-segmentation"]
+        self.assertEqual(findings, expected_findings)
 
     def test_realistic_alb_ec2_rds_fixture_surfaces_transitive_data_path(self) -> None:
         result = self.engine.analyze_plan(ALB_EC2_RDS_FIXTURE_PATH)

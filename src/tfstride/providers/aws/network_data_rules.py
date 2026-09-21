@@ -154,14 +154,6 @@ class AwsNetworkDataRuleDetectors:
         indexes = context.analysis_indexes
         assert indexes is not None
         security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
-        public_private_boundary = next(
-            (
-                boundary
-                for boundary in boundary_index.values()
-                if boundary.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE
-            ),
-            None,
-        )
         for database in inventory.by_type(*DATABASE_RESOURCE_TYPES):
             for security_group in security_group_relationships.attached_security_groups(database):
                 risky_rules_with_workloads = [
@@ -186,6 +178,11 @@ class AwsNetworkDataRuleDetectors:
                         for workload in matched_workloads
                     }
                 )
+                boundary = _select_workload_to_database_boundary(
+                    boundary_index,
+                    database.address,
+                    exposed_workloads,
+                )
                 severity_reasoning = build_severity_reasoning(
                     internet_exposure=True,
                     privilege_breadth=0,
@@ -198,7 +195,7 @@ class AwsNetworkDataRuleDetectors:
                         rule_id=rule_id,
                         severity=severity_reasoning.severity,
                         affected_resources=[database.address, *exposed_workloads, security_group.address],
-                        trust_boundary_id=public_private_boundary.identifier if public_private_boundary else None,
+                        trust_boundary_id=boundary.identifier if boundary else None,
                         rationale=(
                             f"{database.display_name} accepts traffic from security groups attached to internet-facing "
                             "workloads. A compromise of the public tier can therefore move laterally into the private data tier."
