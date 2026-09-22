@@ -62,9 +62,15 @@ class GcpResourceMutations:
         *,
         internet_ingress_reasons: Sequence[str],
         firewall_addresses: Sequence[str],
+        uncertainties: Sequence[str] = (),
     ) -> None:
         self.resource.internet_ingress_capable = bool(internet_ingress_reasons)
         self.resource.internet_ingress_reasons = list(internet_ingress_reasons)
+        gcp_facts(self.resource).set(GcpResourceMetadata.INTERNET_INGRESS_UNCERTAINTIES, list(uncertainties))
+        gcp_facts(self.resource).set(
+            GcpResourceMetadata.INTERNET_INGRESS_STATE,
+            "allowed" if internet_ingress_reasons else "unknown" if uncertainties else "not_established",
+        )
         gcp_facts(self.resource).set(
             GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS,
             list(firewall_addresses),

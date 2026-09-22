@@ -14,6 +14,7 @@ class FirewallIngressSource:
 @dataclass(frozen=True, slots=True)
 class FirewallIngressDecision:
     sources: tuple[FirewallIngressSource, ...]
+    uncertainties: tuple[str, ...] = ()
 
     @property
     def has_internet_ingress(self) -> bool:

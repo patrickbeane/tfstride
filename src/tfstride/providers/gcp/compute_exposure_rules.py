@@ -650,6 +650,7 @@ def _risky_public_firewall_rules(
             if (
                 rule.direction == "ingress"
                 and rule.allows_internet()
+                and describe_security_group_rule(firewall, rule) in instance.internet_ingress_reasons
                 and (rule.is_administrative_access() or rule.is_all_ports())
             ):
                 risky_rules.append((firewall, rule))

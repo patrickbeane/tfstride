@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from tfstride.models import NormalizedResource, SecurityGroupRule
+from tfstride.providers.gcp.attributes import GcpAttr
+from tfstride.providers.gcp.firewall_matches import firewall_match_network_rules, normalize_firewall_matches
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.firewall_decisions import (
     FirewallIngressDecision,
@@ -13,18 +13,23 @@ from tfstride.providers.gcp.resource_decoration.firewall_policy_exposure import 
 )
 from tfstride.providers.gcp.resource_decoration.firewall_rules import (
     firewall_rules_overlap,
-    parse_firewall_port_range,
     priority_value,
 )
 from tfstride.providers.gcp.resource_decoration.firewall_targets import (
     instance_service_account_keys,
     service_account_reference_keys,
 )
+from tfstride.providers.gcp.resource_decoration.firewall_uncertainty import (
+    firewall_field_is_uncertain,
+    uncertain_firewall_matches,
+    uncertain_match_can_override,
+)
 from tfstride.providers.gcp.resource_decoration.network_posture import (
     resource_has_network_reference,
 )
 from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
+from tfstride.providers.gcp.resource_types import GcpResourceType
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -33,6 +38,7 @@ def derive_public_compute_exposure(resource: NormalizedResource, index: GcpResou
     gcp_mutations(resource).set_compute_internet_ingress(
         internet_ingress_reasons=ingress_decision.internet_ingress_reasons,
         firewall_addresses=ingress_decision.firewall_addresses,
+        uncertainties=ingress_decision.uncertainties,
     )
 
     public_exposure = bool(resource.public_access_configured and ingress_decision.has_internet_ingress)
@@ -51,9 +57,58 @@ def _compute_internet_ingress_decision(
     index: GcpResourceIndex,
 ) -> FirewallIngressDecision:
     policy_decision = firewall_policy_ingress_decision(resource, index)
-    if not policy_decision.continues_to_compute_firewalls:
-        return FirewallIngressDecision(sources=policy_decision.sources)
-    return FirewallIngressDecision(sources=(*_compute_firewall_ingress_sources(resource, index),))
+    sources = (
+        policy_decision.sources
+        if not policy_decision.continues_to_compute_firewalls
+        else _compute_firewall_ingress_sources(resource, index)
+    )
+    policy_uncertainties = policy_decision.uncertain_matches
+    compute_uncertainties = tuple(
+        (firewall, match)
+        for firewall in index.firewalls
+        if _firewall_applies_to_instance(firewall, resource, index)
+        for match in uncertain_firewall_matches(firewall)
+    )
+    uncertainties = tuple(
+        sorted(
+            {
+                f"{firewall.address}: {reason}"
+                for firewall, match in (*policy_uncertainties, *compute_uncertainties)
+                for reason in match["uncertainties"]
+            }
+        )
+    )
+    effective_sources: list[FirewallIngressSource] = []
+    for source in sources:
+        is_policy = source.resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE
+        constraints = policy_uncertainties if is_policy else (*policy_uncertainties, *compute_uncertainties)
+        reasons: list[str] = []
+        for rule in source.resource.network_rules:
+            description = describe_security_group_rule(source.resource, rule)
+            if description not in source.internet_ingress_reasons:
+                continue
+            if any(
+                uncertain_match_can_override(
+                    match,
+                    source.resource,
+                    rule,
+                    same_policy=bool(
+                        is_policy
+                        and source.resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
+                        and source.resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
+                        == firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
+                    ),
+                    policy_constraint=firewall.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE,
+                )
+                for firewall, match in constraints
+            ):
+                continue
+            reasons.append(description)
+        if reasons:
+            effective_sources.append(
+                FirewallIngressSource(resource=source.resource, internet_ingress_reasons=tuple(reasons))
+            )
+    return FirewallIngressDecision(sources=tuple(effective_sources), uncertainties=uncertainties)
 
 
 def _compute_firewall_ingress_sources(
@@ -138,18 +193,22 @@ def _firewall_applies_to_instance(
     instance: NormalizedResource,
     index: GcpResourceIndex,
 ) -> bool:
-    if firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DISABLED):
+    if firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DISABLED) and not firewall_field_is_uncertain(
+        firewall, "disabled"
+    ):
         return False
     firewall_direction = (
         str(firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION) or "ingress").strip().lower()
     )
-    if firewall_direction != "ingress":
+    if firewall_direction != "ingress" and not firewall_field_is_uncertain(firewall, "direction"):
         return False
-    if not resource_has_network_reference(instance, firewall.vpc_id, index):
+    if not firewall_field_is_uncertain(firewall, "network") and not resource_has_network_reference(
+        instance, firewall.vpc_id, index
+    ):
         return False
 
     target_tags = set(firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_TAGS))
-    if target_tags:
+    if target_tags and not firewall_field_is_uncertain(firewall, "target_tags"):
         instance_tags = set(instance.get_metadata_field(GcpResourceMetadata.NETWORK_TAGS))
         if not target_tags.intersection(instance_tags):
             return False
@@ -157,7 +216,7 @@ def _firewall_applies_to_instance(
     target_service_accounts = service_account_reference_keys(
         firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_TARGET_SERVICE_ACCOUNTS)
     )
-    if target_service_accounts:
+    if target_service_accounts and not firewall_field_is_uncertain(firewall, "target_service_accounts"):
         instance_service_accounts = instance_service_account_keys(instance)
         if not target_service_accounts.intersection(instance_service_accounts):
             return False
@@ -171,68 +230,29 @@ def _compute_firewall_internet_ingress_rules(
     return tuple(rule for rule in firewall.network_rules if rule.direction == "ingress" and rule.allows_internet())
 
 
-def _compute_firewall_internet_deny_rules(
-    firewall: NormalizedResource,
-) -> tuple[SecurityGroupRule, ...]:
+def _compute_firewall_internet_deny_rules(firewall: NormalizedResource) -> tuple[SecurityGroupRule, ...]:
+    if firewall.has_metadata_field(GcpResourceMetadata.FIREWALL_MATCHES):
+        matches = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_MATCHES)
+    else:
+        # Compatibility for callers constructing normalized resources directly.
+        matches = normalize_firewall_matches(
+            {
+                GcpAttr.DIRECTION.key: firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION),
+                "source_ranges": firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_RANGES),
+                "source_tags": firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_TAGS),
+                "source_service_accounts": firewall.get_metadata_field(
+                    GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS
+                ),
+                "deny": firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DENY),
+            }
+        )
     return tuple(
         rule
-        for rule in _metadata_firewall_rules(
-            firewall,
-            GcpResourceMetadata.FIREWALL_DENY,
-        )
+        for match in matches
+        if match["action"] == "deny"
+        for rule in firewall_match_network_rules(match)
         if rule.direction == "ingress" and rule.allows_internet()
     )
-
-
-def _metadata_firewall_rules(
-    firewall: NormalizedResource,
-    metadata_field: object,
-) -> tuple[SecurityGroupRule, ...]:
-    direction = str(firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DIRECTION) or "ingress").strip().lower()
-    cidr_blocks = _firewall_cidr_blocks(firewall, direction)
-    rules: list[SecurityGroupRule] = []
-    for rule_block in firewall.get_metadata_field(metadata_field):
-        if not isinstance(rule_block, Mapping):
-            continue
-        protocol = str(rule_block.get("protocol") or "-1")
-        ports = rule_block.get("ports")
-        if not ports:
-            rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
-            continue
-        for port in ports if isinstance(ports, list) else [ports]:
-            from_port, to_port = parse_firewall_port_range(port)
-            rules.append(_firewall_rule(direction, protocol, from_port, to_port, cidr_blocks))
-    return tuple(rules)
-
-
-def _firewall_rule(
-    direction: str,
-    protocol: str,
-    from_port: int | None,
-    to_port: int | None,
-    cidr_blocks: list[str],
-) -> SecurityGroupRule:
-    return SecurityGroupRule(
-        direction=direction,
-        protocol="-1" if protocol.lower() in {"all", "-1"} else protocol,
-        from_port=from_port,
-        to_port=to_port,
-        cidr_blocks=list(cidr_blocks),
-    )
-
-
-def _firewall_cidr_blocks(firewall: NormalizedResource, direction: str) -> list[str]:
-    source_ranges = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_RANGES)
-    destination_ranges = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_DESTINATION_RANGES)
-    if direction == "egress" and destination_ranges:
-        return destination_ranges
-    if source_ranges:
-        return source_ranges
-    source_tags = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_TAGS)
-    source_service_accounts = firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_SOURCE_SERVICE_ACCOUNTS)
-    if direction == "ingress" and not source_tags and not source_service_accounts:
-        return ["0.0.0.0/0"]
-    return []
 
 
 def _compute_firewall_priority(firewall: NormalizedResource) -> int:

@@ -1,18 +1,9 @@
 from __future__ import annotations
 
+from ipaddress import ip_network
+
 from tfstride.models import SecurityGroupRule
-from tfstride.providers.coercion import as_optional_int
-
-
-def parse_firewall_port_range(value: object) -> tuple[int | None, int | None]:
-    text = str(value).strip()
-    if not text:
-        return (None, None)
-    if "-" not in text:
-        port = as_optional_int(text)
-        return (port, port)
-    start, end = text.split("-", 1)
-    return (as_optional_int(start.strip()), as_optional_int(end.strip()))
+from tfstride.providers.gcp.firewall_matches import normalize_firewall_protocol
 
 
 def priority_value(value: object, *, default: int = 1000) -> int:
@@ -29,6 +20,18 @@ def priority_value(value: object, *, default: int = 1000) -> int:
 def firewall_rules_overlap(left: SecurityGroupRule, right: SecurityGroupRule) -> bool:
     if not _firewall_protocols_overlap(left.protocol, right.protocol):
         return False
+    left_sources = [*left.cidr_blocks, *left.ipv6_cidr_blocks]
+    right_sources = [*right.cidr_blocks, *right.ipv6_cidr_blocks]
+    if (
+        left_sources
+        and right_sources
+        and not any(
+            ip_network(source, strict=False).overlaps(ip_network(target, strict=False))
+            for source in left_sources
+            for target in right_sources
+        )
+    ):
+        return False
     left_ports = _firewall_port_range(left)
     right_ports = _firewall_port_range(right)
     if left_ports is None or right_ports is None:
@@ -39,9 +42,15 @@ def firewall_rules_overlap(left: SecurityGroupRule, right: SecurityGroupRule) ->
 
 
 def _firewall_protocols_overlap(left: str, right: str) -> bool:
-    left_protocol = left.lower()
-    right_protocol = right.lower()
-    return left_protocol == "-1" or right_protocol == "-1" or left_protocol == right_protocol
+    left_protocol = normalize_firewall_protocol(left)
+    right_protocol = normalize_firewall_protocol(right)
+    return (
+        left_protocol is None
+        or right_protocol is None
+        or left_protocol == "-1"
+        or right_protocol == "-1"
+        or left_protocol == right_protocol
+    )
 
 
 def _firewall_port_range(rule: SecurityGroupRule) -> tuple[int, int] | None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from tfstride.models import NormalizedResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 
@@ -13,7 +15,7 @@ def instance_service_account_keys(instance: NormalizedResource) -> set[str]:
     return keys
 
 
-def service_account_reference_keys(values: list[object]) -> set[str]:
+def service_account_reference_keys(values: Sequence[object]) -> set[str]:
     keys: set[str] = set()
     for value in values:
         if value in (None, "", "default"):

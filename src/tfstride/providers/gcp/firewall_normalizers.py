@@ -4,7 +4,8 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
-from tfstride.providers.gcp.coercion import as_optional_int, first_item
+from tfstride.providers.gcp.coercion import first_item
+from tfstride.providers.gcp.firewall_matches import firewall_match_network_rules, normalize_firewall_matches
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizer_utils import _gcp_values
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
@@ -13,6 +14,7 @@ from tfstride.providers.gcp.resource_utils import first_non_empty, resource_iden
 
 def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
+    matches = normalize_firewall_matches(resource.values, resource.unknown_values)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -21,8 +23,11 @@ def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResourc
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
         vpc_id=values.get(GcpAttr.NETWORK),
-        network_rules=parse_firewall_allow_rules(values),
+        network_rules=tuple(
+            rule for match in matches if match["action"] == "allow" for rule in firewall_match_network_rules(match)
+        ),
         metadata={
+            GcpResourceMetadata.FIREWALL_MATCHES: matches,
             GcpResourceMetadata.NAME: resource_name(resource),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
             GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
@@ -67,6 +72,7 @@ def normalize_compute_firewall_policy(resource: TerraformResource) -> Normalized
 def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> NormalizedResource:
     values = GcpValues(resource.values)
     match = _firewall_policy_match(values)
+    matches = normalize_firewall_matches(resource.values, resource.unknown_values, policy=True)
     return NormalizedResource(
         address=resource.address,
         provider=GCP_PROVIDER,
@@ -74,8 +80,9 @@ def normalize_compute_firewall_policy_rule(resource: TerraformResource) -> Norma
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=_firewall_policy_rule_identifier(resource),
-        network_rules=parse_firewall_policy_rules(values),
+        network_rules=tuple(rule for match_record in matches for rule in firewall_match_network_rules(match_record)),
         metadata={
+            GcpResourceMetadata.FIREWALL_MATCHES: matches,
             GcpResourceMetadata.NAME: first_non_empty(values.get(GcpAttr.NAME)),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
             GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: values.get(GcpAttr.FIREWALL_POLICY),
@@ -116,21 +123,12 @@ def normalize_compute_firewall_policy_association(resource: TerraformResource) -
 
 
 def parse_firewall_allow_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:
-    gcp_values = _gcp_values(values)
-    direction = str(gcp_values.get(GcpAttr.DIRECTION) or "INGRESS").strip().lower()
-    cidr_blocks = _firewall_cidr_blocks(gcp_values, direction)
-    rules: list[SecurityGroupRule] = []
-    for allow in gcp_values.get(GcpAttr.ALLOW):
-        allow_values = GcpValues(allow)
-        protocol = str(allow_values.get(GcpAttr.PROTOCOL) or "-1")
-        ports = allow_values.get(GcpAttr.PORTS)
-        if not ports:
-            rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
-            continue
-        for port in ports:
-            from_port, to_port = _parse_port_range(port)
-            rules.append(_firewall_rule(direction, protocol, from_port, to_port, cidr_blocks))
-    return rules
+    return [
+        rule
+        for match in normalize_firewall_matches(_gcp_values(values).values)
+        if match["action"] == "allow"
+        for rule in firewall_match_network_rules(match)
+    ]
 
 
 def parse_firewall_policy_allow_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:
@@ -140,25 +138,12 @@ def parse_firewall_policy_allow_rules(values: dict[str, Any] | GcpValues) -> lis
     return parse_firewall_policy_rules(gcp_values)
 
 
-def parse_firewall_policy_rules(
-    values: dict[str, Any] | GcpValues,
-) -> list[SecurityGroupRule]:
-    gcp_values = _gcp_values(values)
-    match = _firewall_policy_match(gcp_values)
-    direction = _firewall_policy_direction(gcp_values)
-    cidr_blocks = _firewall_policy_cidr_blocks(match, direction)
-    rules: list[SecurityGroupRule] = []
-    for layer4_config in _firewall_policy_layer4_configs(match):
-        layer4_values = GcpValues(layer4_config)
-        protocol = str(layer4_values.get(GcpAttr.IP_PROTOCOL) or layer4_values.get(GcpAttr.PROTOCOL) or "-1")
-        ports = layer4_values.get(GcpAttr.PORTS)
-        if not ports:
-            rules.append(_firewall_rule(direction, protocol, None, None, cidr_blocks))
-            continue
-        for port in ports:
-            from_port, to_port = _parse_port_range(port)
-            rules.append(_firewall_rule(direction, protocol, from_port, to_port, cidr_blocks))
-    return rules
+def parse_firewall_policy_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:
+    return [
+        rule
+        for match in normalize_firewall_matches(_gcp_values(values).values, policy=True)
+        for rule in firewall_match_network_rules(match)
+    ]
 
 
 def _firewall_policy_rule_identifier(resource: TerraformResource) -> str | None:
@@ -178,11 +163,6 @@ def _firewall_policy_direction(values: GcpValues) -> str:
     return str(values.get(GcpAttr.DIRECTION) or "INGRESS").strip().lower()
 
 
-def _firewall_policy_layer4_configs(match: dict[str, Any]) -> list[dict[str, Any]]:
-    match_values = GcpValues(match)
-    return match_values.get(GcpAttr.LAYER4_CONFIGS) or match_values.get(GcpAttr.LAYER4_CONFIG)
-
-
 def _firewall_policy_source_ranges(match: dict[str, Any]) -> list[str]:
     match_values = GcpValues(match)
     return match_values.get(GcpAttr.SRC_IP_RANGES) or match_values.get(GcpAttr.SRC_IP_RANGE)
@@ -191,68 +171,3 @@ def _firewall_policy_source_ranges(match: dict[str, Any]) -> list[str]:
 def _firewall_policy_destination_ranges(match: dict[str, Any]) -> list[str]:
     match_values = GcpValues(match)
     return match_values.get(GcpAttr.DEST_IP_RANGES) or match_values.get(GcpAttr.DEST_IP_RANGE)
-
-
-def _firewall_policy_cidr_blocks(match: dict[str, Any], direction: str) -> list[str]:
-    destination_ranges = _firewall_policy_destination_ranges(match)
-    if direction == "egress" and destination_ranges:
-        return destination_ranges
-    source_ranges = _firewall_policy_source_ranges(match)
-    if source_ranges:
-        return source_ranges
-    if direction == "ingress" and not _firewall_policy_has_non_cidr_source(match):
-        return ["0.0.0.0/0"]
-    return []
-
-
-def _firewall_policy_has_non_cidr_source(match: dict[str, Any]) -> bool:
-    match_values = GcpValues(match)
-    source_scoped_fields = (
-        GcpAttr.SRC_ADDRESS_GROUPS,
-        GcpAttr.SRC_FQDNS,
-        GcpAttr.SRC_REGION_CODES,
-        GcpAttr.SRC_SECURE_TAGS,
-        GcpAttr.SRC_THREAT_INTELLIGENCES,
-    )
-    return any(match_values.get(field) for field in source_scoped_fields)
-
-
-def _firewall_rule(
-    direction: str,
-    protocol: str,
-    from_port: int | None,
-    to_port: int | None,
-    cidr_blocks: list[str],
-) -> SecurityGroupRule:
-    return SecurityGroupRule(
-        direction=direction,
-        protocol="-1" if protocol.lower() in {"all", "-1"} else protocol,
-        from_port=from_port,
-        to_port=to_port,
-        cidr_blocks=list(cidr_blocks),
-    )
-
-
-def _firewall_cidr_blocks(values: GcpValues, direction: str) -> list[str]:
-    source_ranges = values.get(GcpAttr.SOURCE_RANGES)
-    destination_ranges = values.get(GcpAttr.DESTINATION_RANGES)
-    if direction == "egress" and destination_ranges:
-        return destination_ranges
-    if source_ranges:
-        return source_ranges
-    source_tags = values.get(GcpAttr.SOURCE_TAGS)
-    source_service_accounts = values.get(GcpAttr.SOURCE_SERVICE_ACCOUNTS)
-    if direction == "ingress" and not source_tags and not source_service_accounts:
-        return ["0.0.0.0/0"]
-    return []
-
-
-def _parse_port_range(value: Any) -> tuple[int | None, int | None]:
-    text = str(value).strip()
-    if not text:
-        return (None, None)
-    if "-" not in text:
-        port = as_optional_int(text)
-        return (port, port)
-    start, end = text.split("-", 1)
-    return (as_optional_int(start.strip()), as_optional_int(end.strip()))

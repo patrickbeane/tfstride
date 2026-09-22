@@ -4,12 +4,17 @@ from dataclasses import dataclass
 from enum import Enum
 
 from tfstride.models import NormalizedResource, SecurityGroupRule
+from tfstride.providers.gcp.firewall_matches import GcpFirewallMatch
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.firewall_decisions import FirewallIngressSource
 from tfstride.providers.gcp.resource_decoration.firewall_rules import priority_value
 from tfstride.providers.gcp.resource_decoration.firewall_targets import (
     instance_service_account_keys,
     service_account_reference_keys,
+)
+from tfstride.providers.gcp.resource_decoration.firewall_uncertainty import (
+    firewall_field_is_uncertain,
+    uncertain_firewall_matches,
 )
 from tfstride.providers.gcp.resource_decoration.network_posture import (
     resource_has_network_reference,
@@ -51,6 +56,14 @@ class _FirewallPolicyIngressCandidate:
 @dataclass(frozen=True, slots=True)
 class _FirewallPolicyIngressDecision:
     candidates: tuple[_FirewallPolicyIngressCandidate, ...]
+
+    @property
+    def uncertain_matches(self) -> tuple[tuple[NormalizedResource, GcpFirewallMatch], ...]:
+        return tuple(
+            (candidate.policy_rule, match)
+            for candidate in self.candidates
+            for match in uncertain_firewall_matches(candidate.policy_rule)
+        )
 
     @property
     def terminal_candidate(self) -> _FirewallPolicyIngressCandidate | None:
@@ -163,30 +176,46 @@ def _firewall_policy_rule_targets_instance(
     instance: NormalizedResource,
     index: GcpResourceIndex,
 ) -> bool:
-    if policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED):
+    if policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DISABLED) and not firewall_field_is_uncertain(
+        policy_rule, "disabled"
+    ):
         return False
     policy_direction = (
         str(policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_DIRECTION) or "").strip().lower()
     )
-    if policy_direction != "ingress":
+    if policy_direction != "ingress" and not firewall_field_is_uncertain(policy_rule, "direction"):
         return False
 
     target_resources = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_RESOURCES)
     target_resource_applies = bool(target_resources) and any(
         resource_has_network_reference(instance, target_resource, index) for target_resource in target_resources
     )
-    if target_resources and not target_resource_applies:
+    if (
+        target_resources
+        and not target_resource_applies
+        and not firewall_field_is_uncertain(policy_rule, "target_resources")
+    ):
         return False
 
     target_service_accounts = service_account_reference_keys(
         policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_TARGET_SERVICE_ACCOUNTS)
     )
-    if target_service_accounts and not target_service_accounts.intersection(instance_service_account_keys(instance)):
+    if (
+        target_service_accounts
+        and not target_service_accounts.intersection(instance_service_account_keys(instance))
+        and not firewall_field_is_uncertain(policy_rule, "target_service_accounts")
+    ):
         return False
 
+    if firewall_field_is_uncertain(policy_rule, "firewall_policy"):
+        return True
     associations = _firewall_policy_associations_for_rule(policy_rule, index)
     if not associations:
-        return target_resource_applies
+        return (
+            target_resource_applies
+            or firewall_field_is_uncertain(policy_rule, "firewall_policy")
+            or firewall_field_is_uncertain(policy_rule, "target_resources")
+        )
     return any(
         _firewall_policy_association_applies_to_instance(association, instance, index) for association in associations
     )
