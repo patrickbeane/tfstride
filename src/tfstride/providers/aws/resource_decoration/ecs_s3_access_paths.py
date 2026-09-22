@@ -12,9 +12,15 @@ from tfstride.providers.aws.protected_data_evidence import (
     AwsS3PolicyConditionEvidence,
     AwsS3PolicyStatementEvidence,
     AwsS3ResourceScope,
+    AwsS3ScopeEvaluation,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_object_scopes import (
+    object_scope_contains,
+    object_scope_from_resource,
+    object_scopes_overlap,
+)
 from tfstride.providers.coercion import dedupe
 
 _ECS_TASK_DEFINITION = "aws_ecs_task_definition"
@@ -90,6 +96,7 @@ class _S3AccessAssessment(TypedDict):
     denied_actions: list[str]
     unknown_actions: list[str]
     conditional_actions: list[str]
+    scope_evaluations: list[AwsS3ScopeEvaluation]
 
 
 class ModelEcsS3AccessPathsStage:
@@ -194,7 +201,18 @@ def _ecs_s3_access_paths(
         statement_records = _matching_statement_records(task_role.policy_statements, bucket.arn)
         if not statement_records:
             continue
-        assessment = _assess_actions(statement_records)
+        assessment = _assess_actions(statement_records, bucket.arn)
+        for evaluation in assessment["scope_evaluations"]:
+            if evaluation["reason"] == "partial_deny":
+                reason = "allow scope is narrowed by an explicit deny; the residual object scope is not representable"
+            elif evaluation["reason"] == "unsupported_resource_scope":
+                reason = "allow or overlapping deny resource scope is not representable"
+            else:
+                continue
+            uncertainties.append(
+                f"{task_definition.address}: {task_role.address} targeting {bucket.address} "
+                f"{evaluation['action']} on {evaluation['resource']}: {reason}"
+            )
         if assessment["conditional_actions"]:
             uncertainties.append(
                 f"{task_definition.address}: {task_role.address} targeting {bucket.address} has conditional "
@@ -226,6 +244,9 @@ def _target_buckets(
         for resource in statement.resources:
             bucket_arn = _exact_bucket_arn(resource)
             if bucket_arn is None:
+                # Broad denies constrain already resolved targets; they do not discover new grants.
+                if statement.effect.strip().lower() == "deny" and _has_wildcard(resource):
+                    continue
                 uncertainties.append(
                     f"{role.address} S3 policy resource {resource!r} does not identify an exact bucket"
                 )
@@ -310,10 +331,38 @@ def _matching_resources(
     bucket_arn: str,
     resource_kind: Literal["bucket_level", "object_level"],
 ) -> set[str]:
-    if resource_kind == "bucket_level":
-        return {resource for resource in statement.resources if resource == bucket_arn}
-    prefix = bucket_arn + "/"
-    return {resource for resource in statement.resources if resource.startswith(prefix)}
+    return {
+        resource
+        for resource in statement.resources
+        if _resource_for_bucket(resource, bucket_arn, resource_kind, deny=statement.effect.strip().lower() == "deny")
+        is not None
+    }
+
+
+def _resource_for_bucket(
+    resource: str,
+    bucket_arn: str,
+    resource_kind: Literal["bucket_level", "object_level"],
+    *,
+    deny: bool,
+) -> str | None:
+    if resource == bucket_arn:
+        return resource if resource_kind == "bucket_level" else None
+    if resource.startswith(bucket_arn + "/"):
+        return resource if resource_kind == "object_level" else None
+    if not deny:
+        return None
+    if resource == "*":
+        return bucket_arn if resource_kind == "bucket_level" else bucket_arn + "/*"
+
+    # Wildcards in the bucket selector can span object-key separators too.
+    # Retain potential matches as uncertainty instead of treating them as an exact namespace.
+    literal_prefix = resource.split("*", 1)[0].split("?", 1)[0]
+    if _has_wildcard(resource) and (
+        bucket_arn.startswith(literal_prefix) or literal_prefix.startswith(bucket_arn + "/")
+    ):
+        return resource
+    return None
 
 
 def _condition_record(condition: IAMPolicyCondition) -> AwsS3PolicyConditionEvidence:
@@ -324,35 +373,132 @@ def _condition_record(condition: IAMPolicyCondition) -> AwsS3PolicyConditionEvid
     }
 
 
-def _assess_actions(records: list[AwsS3PolicyStatementEvidence]) -> _S3AccessAssessment:
+def _assess_actions(
+    records: list[AwsS3PolicyStatementEvidence],
+    bucket_arn: str,
+) -> _S3AccessAssessment:
     allowed: list[str] = []
     denied: list[str] = []
     unknown: list[str] = []
     conditional: list[str] = []
+    evaluations: list[AwsS3ScopeEvaluation] = []
     for action in _S3_ACTIONS:
         matching = [record for record in records if action.name in record["matched_actions"]]
         if not matching:
             continue
-        unconditional_deny = any(record["effect"] == "deny" and not record["conditional"] for record in matching)
-        conditional_deny = any(record["effect"] == "deny" and record["conditional"] for record in matching)
-        unconditional_allow = any(record["effect"] == "allow" and not record["conditional"] for record in matching)
-        conditional_allow = any(record["effect"] == "allow" and record["conditional"] for record in matching)
-        if conditional_deny or conditional_allow:
+        allow_scopes: dict[str, list[AwsS3PolicyStatementEvidence]] = {}
+        deny_scopes: list[tuple[str, bool]] = []
+        for record in matching:
+            for resource in record["matching_resources"]:
+                if (
+                    _resource_for_bucket(resource, bucket_arn, action.resource_kind, deny=record["effect"] == "deny")
+                    is None
+                ):
+                    continue
+                if record["effect"] == "allow":
+                    allow_scopes.setdefault(resource, []).append(record)
+                else:
+                    deny_scopes.append((resource, record["conditional"]))
+        action_evaluations = [
+            _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
+            for resource, allows in sorted(allow_scopes.items())
+        ]
+        evaluations.extend(action_evaluations)
+        if any(evaluation["conditional_evaluation_required"] for evaluation in action_evaluations):
             conditional.append(action.name)
-        if unconditional_deny:
-            denied.append(action.name)
-        elif conditional_deny:
-            unknown.append(action.name)
-        elif unconditional_allow:
+
+        # Action summaries mean that at least one complete allow scope survives.
+        # Denied/uncertain namespaces remain visible in the individual evaluations.
+        states = {evaluation["modeled_access_state"] for evaluation in action_evaluations}
+        if "allowed" in states:
             allowed.append(action.name)
-        elif conditional_allow:
+        elif "unknown" in states:
             unknown.append(action.name)
+        elif "denied" in states:
+            denied.append(action.name)
+        elif deny_scopes:
+            # Preserve deny-only evidence without turning it into an allow candidate.
+            if any(not is_conditional for _, is_conditional in deny_scopes):
+                denied.append(action.name)
+            else:
+                unknown.append(action.name)
+            if any(is_conditional for _, is_conditional in deny_scopes):
+                conditional.append(action.name)
     return {
         "allowed_actions": allowed,
         "denied_actions": denied,
         "unknown_actions": unknown,
         "conditional_actions": conditional,
+        "scope_evaluations": evaluations,
     }
+
+
+def _evaluate_scope(
+    action: _S3Action,
+    resource: str,
+    allows: list[AwsS3PolicyStatementEvidence],
+    denies: list[tuple[str, bool]],
+    bucket_arn: str,
+) -> AwsS3ScopeEvaluation:
+    overlaps = [
+        (deny_resource, is_conditional, relationship)
+        for deny_resource, is_conditional in denies
+        if (relationship := _deny_relationship(deny_resource, resource, bucket_arn, action.resource_kind)) != "disjoint"
+    ]
+    conditional_denies = sorted({deny_resource for deny_resource, conditional, _ in overlaps if conditional})
+    unconditional_relations = {relationship for _, conditional, relationship in overlaps if not conditional}
+    result: AwsS3ScopeEvaluation = {
+        "action": action.name,
+        "resource": resource,
+        "modeled_access_state": "unknown",
+        "reason": "conditional_allow",
+        "overlapping_deny_resources": sorted({deny_resource for deny_resource, _, _ in overlaps}),
+        "conditional_deny_resources": conditional_denies,
+        "conditional_evaluation_required": bool(conditional_denies) or any(record["conditional"] for record in allows),
+    }
+    if "covers" in unconditional_relations:
+        result.update(modeled_access_state="denied", reason="explicit_deny")
+    elif (
+        "${" in resource
+        or (action.resource_kind == "object_level" and object_scope_from_resource(resource, bucket_arn) is None)
+        or any(relationship == "unknown" for _, _, relationship in overlaps)
+    ):
+        result["reason"] = "unsupported_resource_scope"
+    elif "partial" in unconditional_relations:
+        result["reason"] = "partial_deny"
+    elif conditional_denies:
+        result["reason"] = "conditional_deny"
+    elif any(not record["conditional"] for record in allows):
+        result.update(modeled_access_state="allowed", reason="unconditional_allow")
+    return result
+
+
+def _deny_relationship(
+    deny_resource: str,
+    allow_resource: str,
+    bucket_arn: str,
+    resource_kind: Literal["bucket_level", "object_level"],
+) -> Literal["covers", "partial", "disjoint", "unknown"]:
+    if deny_resource == "*":
+        return "covers"
+    resolved_deny = _resource_for_bucket(deny_resource, bucket_arn, resource_kind, deny=True)
+    if resolved_deny is None:
+        return "disjoint"
+    if "${" in resolved_deny or "${" in allow_resource:
+        return "unknown"
+    if resolved_deny == allow_resource:
+        return "covers"
+    if resource_kind == "bucket_level":
+        return "covers" if resolved_deny == bucket_arn else "unknown"
+    if resolved_deny == bucket_arn + "/*":
+        return "covers"
+    deny_scope = object_scope_from_resource(resolved_deny, bucket_arn)
+    allow_scope = object_scope_from_resource(allow_resource, bucket_arn)
+    if deny_scope is None or allow_scope is None:
+        return "unknown"
+    if object_scope_contains(deny_scope, allow_scope):
+        return "covers"
+    return "partial" if object_scopes_overlap(deny_scope, allow_scope) else "disjoint"
 
 
 def _access_path_record(
@@ -398,6 +544,7 @@ def _access_path_record(
         "deny_policy_resources": _statement_values(deny_records, "matching_resources"),
         "resource_scopes": _statement_resource_scopes(allow_records),
         "policy_statements": statement_records,
+        "scope_evaluations": assessment["scope_evaluations"],
     }
 
 
@@ -440,11 +587,13 @@ def _statement_resource_scopes(
 
 def _resource_scopes(resources: set[str], bucket_arn: str) -> list[AwsS3ResourceScope]:
     scopes = {_resource_scope(resource, bucket_arn) for resource in resources}
-    order = ("exact_bucket", "all_bucket_objects", "object_prefix", "exact_object")
+    order = ("all_resources", "exact_bucket", "all_bucket_objects", "object_prefix", "exact_object")
     return [scope for scope in order if scope in scopes]
 
 
 def _resource_scope(resource: str, bucket_arn: str) -> AwsS3ResourceScope:
+    if resource == "*" or not (resource == bucket_arn or resource.startswith(bucket_arn + "/")):
+        return "all_resources"
     if resource == bucket_arn:
         return "exact_bucket"
     object_path = resource[len(bucket_arn) + 1 :]

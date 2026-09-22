@@ -24,6 +24,21 @@ from tfstride.providers.aws.object_storage_deletion_evidence import (
 from tfstride.providers.aws.policy_documents import policy_statement_is_fully_representable
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_object_scopes import (
+    S3ObjectScope as _ObjectScope,
+)
+from tfstride.providers.aws.s3_object_scopes import (
+    object_scope_contains as _scope_contains,
+)
+from tfstride.providers.aws.s3_object_scopes import (
+    object_scope_from_resource as _scope_from_resource,
+)
+from tfstride.providers.aws.s3_object_scopes import (
+    object_scope_intersection as _scope_intersection,
+)
+from tfstride.providers.aws.s3_object_scopes import (
+    object_scopes_overlap as _scopes_overlap,
+)
 from tfstride.providers.coercion import STATE_DISABLED, dedupe
 from tfstride.resource_helpers import parse_aws_account_id
 
@@ -46,21 +61,6 @@ _AUTHORIZATION_BASIS_ORDER: tuple[AwsS3ObjectDeletionAuthorizationBasis, ...] = 
     "bucket_policy_direct",
     "cross_account_identity_and_bucket_policy",
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _ObjectScope:
-    bucket_arn: str
-    kind: _ScopeKind
-    key: str | None
-
-    @property
-    def resource(self) -> str:
-        if self.kind == "all":
-            return f"{self.bucket_arn}/*"
-        assert self.key is not None
-        suffix = "*" if self.kind == "prefix" else ""
-        return f"{self.bucket_arn}/{self.key}{suffix}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -798,25 +798,6 @@ def _matching_actions(
     return matches
 
 
-def _scope_from_resource(resource: str, bucket_arn: str) -> _ObjectScope | None:
-    prefix = f"{bucket_arn}/"
-    if not resource.startswith(prefix):
-        return None
-    object_pattern = resource[len(prefix) :]
-    if not object_pattern:
-        return None
-    if object_pattern == "*":
-        return _ObjectScope(bucket_arn, "all", None)
-    if "?" in object_pattern or "*" in object_pattern[:-1]:
-        return None
-    if object_pattern.endswith("*"):
-        bounded_prefix = object_pattern[:-1]
-        if not bounded_prefix:
-            return _ObjectScope(bucket_arn, "all", None)
-        return _ObjectScope(bucket_arn, "prefix", bounded_prefix)
-    return _ObjectScope(bucket_arn, "exact", object_pattern)
-
-
 def _resource_may_target_bucket(resource: str, bucket_arn: str) -> bool:
     if resource == "*":
         return True
@@ -830,37 +811,6 @@ def _resource_may_target_bucket(resource: str, bucket_arn: str) -> bool:
     bucket_pattern, _ = resource_path.split("/", 1)
     bucket_name = bucket_arn.split(marker, 1)[1]
     return bool(bucket_pattern and fnmatchcase(bucket_name, bucket_pattern))
-
-
-def _scope_intersection(left: _ObjectScope, right: _ObjectScope) -> _ObjectScope | None:
-    if left.bucket_arn != right.bucket_arn:
-        return None
-    if left.kind == "all":
-        return right
-    if right.kind == "all":
-        return left
-    assert left.key is not None
-    assert right.key is not None
-    if left.kind == "exact" and right.kind == "exact":
-        return left if left.key == right.key else None
-    if left.kind == "exact" and right.kind == "prefix":
-        return left if left.key.startswith(right.key) else None
-    if left.kind == "prefix" and right.kind == "exact":
-        return right if right.key.startswith(left.key) else None
-    if left.key.startswith(right.key):
-        return left
-    if right.key.startswith(left.key):
-        return right
-    return None
-
-
-def _scopes_overlap(left: _ObjectScope, right: _ObjectScope) -> bool:
-    return _scope_intersection(left, right) is not None
-
-
-def _scope_contains(container: _ObjectScope, target: _ObjectScope) -> bool:
-    intersection = _scope_intersection(container, target)
-    return intersection == target
 
 
 def _bypass_authorization_for_scope(

@@ -381,6 +381,30 @@ class AwsEcsS3ProtectedDataConvergenceTests(unittest.TestCase):
                     [],
                 )
 
+    def test_s3_deny_scopes_constrain_payload_read_convergence(self) -> None:
+        for deny_resource, expected_count in (
+            ("*", 0),
+            (f"{_AWS_BUCKET_ARN}/private/*", 1),
+            (f"{_AWS_BUCKET_ARN}/public/private/*", 0),
+        ):
+            with self.subTest(deny_resource=deny_resource):
+                resources = _aws_resources()
+                role = next(resource for resource in resources if resource.address == "aws_iam_role.orders_task")
+                inline_policy, document, statements = _inline_policy_document(role)
+                read_allow = next(statement for statement in statements if statement.get("Action") == "s3:GetObject")
+                read_allow["Resource"] = f"{_AWS_BUCKET_ARN}/public/*"
+                statements.append(
+                    {
+                        "Effect": "Deny",
+                        "Action": "s3:GetObject",
+                        "Resource": deny_resource,
+                    }
+                )
+                inline_policy["policy"] = json.dumps(document)
+                inventory = _normalize(resources)
+                facts = aws_facts(_resource(inventory, "aws_ecs_service.orders"))
+                self.assertEqual(len(facts.ecs_s3_protected_data_convergences), expected_count)
+
     def test_unrelated_s3_deny_and_condition_do_not_suppress_exact_read(
         self,
     ) -> None:

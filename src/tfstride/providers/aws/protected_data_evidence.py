@@ -8,11 +8,31 @@ from tfstride.providers.aws.kms_evidence import AwsEcsKmsOperationPath
 AwsS3AccessClass = Literal["read", "write", "delete", "administrative"]
 AwsS3AccessState = Literal["allowed", "denied", "unknown", "not_modeled"]
 AwsS3ResourceScope = Literal[
+    "all_resources",
     "exact_bucket",
     "all_bucket_objects",
     "object_prefix",
     "exact_object",
 ]
+
+
+class AwsS3ScopeEvaluation(TypedDict):
+    """Modeled authorization for one action and one original allow resource scope."""
+
+    action: str
+    resource: str
+    modeled_access_state: AwsS3AccessState
+    reason: Literal[
+        "unconditional_allow",
+        "explicit_deny",
+        "conditional_allow",
+        "conditional_deny",
+        "partial_deny",
+        "unsupported_resource_scope",
+    ]
+    overlapping_deny_resources: list[str]
+    conditional_deny_resources: list[str]
+    conditional_evaluation_required: bool
 
 
 class AwsS3PolicyConditionEvidence(TypedDict):
@@ -62,6 +82,7 @@ class AwsEcsS3AccessPath(TypedDict):
     deny_policy_resources: list[str]
     resource_scopes: list[AwsS3ResourceScope]
     policy_statements: list[AwsS3PolicyStatementEvidence]
+    scope_evaluations: list[AwsS3ScopeEvaluation]
     task_definition_address: NotRequired[str]
     task_definition_arn: NotRequired[str | None]
     internet_facing_load_balancers: NotRequired[list[str]]

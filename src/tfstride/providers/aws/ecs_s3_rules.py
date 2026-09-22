@@ -196,12 +196,31 @@ def _mutation_path_evidence(paths: list[dict[str, Any]]) -> list[str]:
                     f"actions={','.join(_mutation_actions(path))}",
                     f"resource_scopes={','.join(_string_values(path.get('resource_scopes')))}",
                     f"policy_resources={','.join(_string_values(path.get('policy_resources')))}",
+                    f"authorized_scopes={','.join(_authorized_scope_evidence(path))}",
                     f"denied_actions={','.join(_string_values(path.get('denied_actions'))) or 'none'}",
                     "access_state=allowed",
                     "mutation_evaluation=unconditional_identity_policy_allow",
                 )
             )
             for path in paths
+        }
+    )
+
+
+def _authorized_scope_evidence(path: Mapping[str, Any]) -> list[str]:
+    scopes = path.get("scope_evaluations")
+    if not isinstance(scopes, list):
+        return []
+    mutation_actions = set(_mutation_actions(path))
+    return sorted(
+        {
+            f"{scope['action']} on {scope['resource']}"
+            for scope in scopes
+            if isinstance(scope, Mapping)
+            and scope.get("modeled_access_state") == "allowed"
+            and isinstance(scope.get("action"), str)
+            and scope["action"] in mutation_actions
+            and isinstance(scope.get("resource"), str)
         }
     )
 
