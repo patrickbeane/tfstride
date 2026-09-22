@@ -3,6 +3,7 @@ from __future__ import annotations
 from tfstride.providers.gcp.audit_telemetry_disruption_evidence import (
     GcpCloudRunLoggingSinkAuditTelemetryDisruptionPath,
 )
+from tfstride.providers.gcp.firewall_ingress_evidence import GcpEffectiveFirewallIngress
 from tfstride.providers.gcp.firewall_matches import GcpFirewallMatch
 from tfstride.providers.gcp.kms_dependency_evidence import GcpKmsEncryptionDependency
 from tfstride.providers.gcp.kms_evidence import (
@@ -453,6 +454,7 @@ class GcpResourceMetadata:
     INTERNET_INGRESS_UNCERTAINTIES = StringListMetadataField("internet_ingress_uncertainties")
     INTERNET_INGRESS_STATE = OptionalStringMetadataField("internet_ingress_state")
     FIREWALL_MATCHES = RecordListMetadataField[GcpFirewallMatch]("firewall_matches")
+    EFFECTIVE_FIREWALL_INGRESS = RecordListMetadataField[GcpEffectiveFirewallIngress]("effective_firewall_ingress")
     FIREWALL_SOURCE_RANGES = StringListMetadataField("source_ranges")
     FIREWALL_DESTINATION_RANGES = StringListMetadataField("destination_ranges")
     FIREWALL_TARGET_TAGS = StringListMetadataField("target_tags")

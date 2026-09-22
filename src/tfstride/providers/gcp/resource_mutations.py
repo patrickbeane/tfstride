@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.firewall_ingress_evidence import GcpEffectiveFirewallIngress
 from tfstride.providers.gcp.kms_evidence import (
     GcpKmsIamGrant,
     GcpKmsKeyRingIamGrant,
@@ -63,10 +64,12 @@ class GcpResourceMutations:
         internet_ingress_reasons: Sequence[str],
         firewall_addresses: Sequence[str],
         uncertainties: Sequence[str] = (),
+        effective_ingress: Sequence[GcpEffectiveFirewallIngress] = (),
     ) -> None:
         self.resource.internet_ingress_capable = bool(internet_ingress_reasons)
         self.resource.internet_ingress_reasons = list(internet_ingress_reasons)
         gcp_facts(self.resource).set(GcpResourceMetadata.INTERNET_INGRESS_UNCERTAINTIES, list(uncertainties))
+        gcp_facts(self.resource).set(GcpResourceMetadata.EFFECTIVE_FIREWALL_INGRESS, list(effective_ingress))
         gcp_facts(self.resource).set(
             GcpResourceMetadata.INTERNET_INGRESS_STATE,
             "allowed" if internet_ingress_reasons else "unknown" if uncertainties else "not_established",

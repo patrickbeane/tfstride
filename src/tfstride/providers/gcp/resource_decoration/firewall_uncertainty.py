@@ -55,7 +55,10 @@ def uncertain_match_can_override(
     *,
     same_policy: bool,
     policy_constraint: bool,
+    excluded_protocols: tuple[str, ...] = (),
 ) -> bool:
+    if match["protocol"] in excluded_protocols:
+        return False
     if match["action"] == "allow" or not firewall_match_may_overlap(match, rule):
         return False
     # Numeric priorities are comparable within a VPC rule set or one policy,

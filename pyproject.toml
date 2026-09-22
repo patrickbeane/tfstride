@@ -149,6 +149,14 @@ include = [
   "src/tfstride/providers/aws/ecs_kms_rules.py",
   "src/tfstride/providers/aws/ecs_secret_management_rules.py",
 
+  # GCP firewall match scope and effective VPC ingress contracts.
+  "src/tfstride/providers/gcp/firewall_matches.py",
+  "src/tfstride/providers/gcp/firewall_ingress_evidence.py",
+  "src/tfstride/providers/gcp/resource_decoration/vpc_firewall_ingress.py",
+  "src/tfstride/providers/gcp/resource_decoration/compute_firewall_exposure.py",
+  "src/tfstride/providers/gcp/resource_decoration/firewall_uncertainty.py",
+  "src/tfstride/providers/network_ranges.py",
+
   # GCP secret-management evidence contracts and lifecycle paths.
   "src/tfstride/providers/gcp/secret_management_evidence.py",
   "src/tfstride/providers/gcp/secret_manager_normalizers.py",

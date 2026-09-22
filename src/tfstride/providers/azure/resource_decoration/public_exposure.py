@@ -7,6 +7,7 @@ from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndex
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES, AzureResourceType
+from tfstride.providers.network_ranges import consume_intervals
 
 _PROTOCOLS = ("tcp", "udp")
 _ADMINISTRATIVE_PORTS = (22, 3389)
@@ -104,7 +105,7 @@ def _effective_nsg_ingress(network_security_group: NormalizedResource) -> list[_
             if not _record_applies_to_protocol(record, protocol):
                 continue
             for rule_start, rule_end in _record_port_ranges(record):
-                matched, undecided = _consume_intervals(undecided, rule_start, rule_end)
+                matched, undecided = consume_intervals(undecided, rule_start, rule_end)
                 if str(record.get("access") or "").lower() != "allow":
                     continue
                 description = _describe_nsg_rule(network_security_group, record, protocol, rule_start, rule_end)
@@ -251,27 +252,6 @@ def _record_port_ranges(record: dict[str, Any]) -> list[tuple[int, int]]:
             if port is not None:
                 ranges.append((port, port))
     return ranges
-
-
-def _consume_intervals(
-    intervals: list[tuple[int, int]],
-    rule_start: int,
-    rule_end: int,
-) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-    matched: list[tuple[int, int]] = []
-    remaining: list[tuple[int, int]] = []
-    for start, end in intervals:
-        overlap_start = max(start, rule_start)
-        overlap_end = min(end, rule_end)
-        if overlap_start > overlap_end:
-            remaining.append((start, end))
-            continue
-        matched.append((overlap_start, overlap_end))
-        if start < overlap_start:
-            remaining.append((start, overlap_start - 1))
-        if overlap_end < end:
-            remaining.append((overlap_end + 1, end))
-    return matched, remaining
 
 
 def _describe_nsg_rule(

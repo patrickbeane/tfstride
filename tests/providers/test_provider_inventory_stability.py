@@ -119,8 +119,8 @@ _GCP_DECORATED_RESOURCES = (
         direct_internet_reachable=True,
         metadata={
             "internet_ingress_firewalls": [
-                "google_compute_firewall.public_ssh",
                 "google_compute_firewall.public_app",
+                "google_compute_firewall.public_ssh",
             ],
         },
     ),

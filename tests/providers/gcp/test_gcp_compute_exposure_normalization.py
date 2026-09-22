@@ -22,13 +22,13 @@ class GcpComputeExposureNormalizationTests(GcpNormalizerTestCase):
         self.assertEqual(
             instance.internet_ingress_reasons,
             [
-                "google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0",
                 "google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0",
+                "google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0",
             ],
         )
         self.assertEqual(
             instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS),
-            ["google_compute_firewall.public_ssh", "google_compute_firewall.public_app"],
+            ["google_compute_firewall.public_app", "google_compute_firewall.public_ssh"],
         )
         self.assertTrue(instance.public_exposure)
         self.assertTrue(instance.direct_internet_reachable)

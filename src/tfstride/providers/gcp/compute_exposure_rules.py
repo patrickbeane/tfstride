@@ -15,7 +15,9 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
+from tfstride.providers.gcp.firewall_ingress_evidence import effective_ingress_rule, is_risky_effective_ingress
 from tfstride.providers.gcp.indexes import gcp_org_policy_guardrail_index
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.org_policy_evidence import organization_guardrail_evidence
 from tfstride.providers.gcp.org_policy_guardrails import (
     ORG_POLICY_REQUIRE_OS_LOGIN,
@@ -640,6 +642,13 @@ def _risky_public_firewall_rules(
     instance: NormalizedResource,
     inventory: ResourceInventory,
 ) -> list[tuple[NormalizedResource, SecurityGroupRule]]:
+    if instance.has_metadata_field(GcpResourceMetadata.EFFECTIVE_FIREWALL_INGRESS):
+        effective_rules: list[tuple[NormalizedResource, SecurityGroupRule]] = []
+        for ingress in gcp_facts(instance).effective_firewall_ingress:
+            firewall = inventory.get_by_address(ingress["firewall_address"])
+            if firewall is not None and is_risky_effective_ingress(ingress):
+                effective_rules.append((firewall, effective_ingress_rule(ingress)))
+        return effective_rules
     firewall_addresses = gcp_facts(instance).internet_ingress_firewalls
     risky_rules: list[tuple[NormalizedResource, SecurityGroupRule]] = []
     for firewall_address in firewall_addresses:

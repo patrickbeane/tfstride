@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from tfstride.models import NormalizedResource, SecurityGroupRule
+from tfstride.providers.gcp.firewall_ingress_evidence import ingress_from_policy_rule
 from tfstride.providers.gcp.firewall_matches import GcpFirewallMatch
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.firewall_decisions import FirewallIngressSource
@@ -96,6 +97,13 @@ class _FirewallPolicyIngressDecision:
             FirewallIngressSource(
                 resource=candidate.policy_rule,
                 internet_ingress_reasons=candidate.internet_ingress_reasons,
+                effective_ingress=tuple(
+                    ingress_from_policy_rule(
+                        candidate.policy_rule, rule, priority=candidate.priority, match_path=f"network_rules[{index}]"
+                    )
+                    for index, rule in enumerate(candidate.policy_rule.network_rules)
+                    if describe_security_group_rule(candidate.policy_rule, rule) in candidate.internet_ingress_reasons
+                ),
             ),
         )
 

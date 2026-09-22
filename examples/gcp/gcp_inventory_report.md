@@ -345,7 +345,7 @@ This run identified **4 trust boundaries** and **26 findings** across **23 norma
 - Evidence:
   - firewall rules: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0
   - network tags: web
-  - internet ingress reasons: google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0; google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0
+  - internet ingress reasons: google_compute_firewall.public_app ingress tcp 8080 from 0.0.0.0/0; google_compute_firewall.public_ssh ingress tcp 22 from 0.0.0.0/0
   - public exposure reasons: compute instance has an external access config and matching firewall rules allow internet ingress
 
 #### Pub/Sub subscription does not configure a dead-letter policy

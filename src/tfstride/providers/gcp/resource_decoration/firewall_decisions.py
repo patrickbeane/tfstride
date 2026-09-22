@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.firewall_ingress_evidence import GcpEffectiveFirewallIngress
 
 
 @dataclass(frozen=True, slots=True)
 class FirewallIngressSource:
     resource: NormalizedResource
     internet_ingress_reasons: tuple[str, ...]
+    effective_ingress: tuple[GcpEffectiveFirewallIngress, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,3 +29,7 @@ class FirewallIngressDecision:
     @property
     def firewall_addresses(self) -> tuple[str, ...]:
         return tuple(source.resource.address for source in self.sources)
+
+    @property
+    def effective_ingress(self) -> tuple[GcpEffectiveFirewallIngress, ...]:
+        return tuple(ingress for source in self.sources for ingress in source.effective_ingress)

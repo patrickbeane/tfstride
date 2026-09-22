@@ -5,6 +5,7 @@ from typing import Any
 from tfstride.providers.gcp.audit_telemetry_disruption_evidence import (
     GcpCloudRunLoggingSinkAuditTelemetryDisruptionPath,
 )
+from tfstride.providers.gcp.firewall_ingress_evidence import GcpEffectiveFirewallIngress
 from tfstride.providers.gcp.kms_evidence import (
     GcpCloudRunKmsManagementPath,
     GcpCloudRunKmsOperationPath,
@@ -60,6 +61,10 @@ class GcpComputeFacts(GcpBaseFacts):
     @property
     def internet_ingress_firewalls(self) -> list[str]:
         return self.get(GcpResourceMetadata.INTERNET_INGRESS_FIREWALLS)
+
+    @property
+    def effective_firewall_ingress(self) -> list[GcpEffectiveFirewallIngress]:
+        return self.get(GcpResourceMetadata.EFFECTIVE_FIREWALL_INGRESS)
 
     @property
     def fronted_by_internet_facing_load_balancer(self) -> bool:
