@@ -28,10 +28,12 @@ class AwsS3ScopeEvaluation(TypedDict):
         "conditional_allow",
         "conditional_deny",
         "partial_deny",
+        "unresolved_deny_applicability",
         "unsupported_resource_scope",
     ]
     overlapping_deny_resources: list[str]
     conditional_deny_resources: list[str]
+    unresolved_deny_resources: list[str]
     conditional_evaluation_required: bool
 
 
@@ -52,6 +54,14 @@ class AwsS3PolicyStatementEvidence(TypedDict):
     access_classes: list[AwsS3AccessClass]
     conditions: list[AwsS3PolicyConditionEvidence]
     conditional: bool
+    applicability_uncertain: NotRequired[bool]
+
+
+class AwsS3BucketPolicyStatementEvidence(AwsS3PolicyStatementEvidence):
+    source_address: str
+    target_match: Literal["resolved", "unknown"]
+    principal_match: Literal["role", "account", "wildcard", "unknown"]
+    principals: list[dict[str, str]]
 
 
 class AwsEcsS3AccessPath(TypedDict):
@@ -65,7 +75,7 @@ class AwsEcsS3AccessPath(TypedDict):
     role_address: str
     role_arn: str | None
     role_policy_complete: bool
-    evaluation_basis: Literal["modeled_identity_policy"]
+    evaluation_basis: Literal["modeled_identity_policy_with_bucket_policy_constraints"]
     modeled_access_state: AwsS3AccessState
     access_state: AwsS3AccessState
     access_classes: list[AwsS3AccessClass]
@@ -83,6 +93,12 @@ class AwsEcsS3AccessPath(TypedDict):
     resource_scopes: list[AwsS3ResourceScope]
     policy_statements: list[AwsS3PolicyStatementEvidence]
     scope_evaluations: list[AwsS3ScopeEvaluation]
+    # False when unknown contents or conflicting sources may hide arbitrary denies.
+    # Known statements can still have scope-specific applicability or condition uncertainty.
+    bucket_policy_constraints_complete: bool
+    bucket_policy_source_addresses: list[str]
+    bucket_policy_statements: list[AwsS3BucketPolicyStatementEvidence]
+    bucket_policy_uncertainties: list[str]
     task_definition_address: NotRequired[str]
     task_definition_arn: NotRequired[str | None]
     internet_facing_load_balancers: NotRequired[list[str]]

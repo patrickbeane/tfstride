@@ -45,6 +45,20 @@ class AwsStorageFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.BUCKET_ACL) or ""
 
     @property
+    def s3_bucket_policy_state(self) -> str | None:
+        """State of this resource\'s own policy attribute, before standalone policies are merged."""
+
+        return self.get(AwsResourceMetadata.S3_BUCKET_POLICY_STATE)
+
+    @property
+    def s3_bucket_policy_completeness_state(self) -> str | None:
+        return self.get(AwsResourceMetadata.S3_BUCKET_POLICY_COMPLETENESS_STATE)
+
+    @property
+    def s3_bucket_policy_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.S3_BUCKET_POLICY_UNCERTAINTIES)
+
+    @property
     def s3_versioning_status(self) -> str | None:
         return self.get(AwsResourceMetadata.S3_VERSIONING_STATUS)
 

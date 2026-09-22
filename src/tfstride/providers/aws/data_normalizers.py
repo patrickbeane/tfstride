@@ -11,6 +11,7 @@ from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import parse_policy_statements
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.aws.resource_utils import bucket_public_exposure_reasons
+from tfstride.providers.aws.s3_bucket_policies import s3_bucket_policy_details
 from tfstride.providers.coercion import (
     STATE_CONFIGURED,
     STATE_DISABLED,
@@ -145,7 +146,10 @@ def normalize_db_instance(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    policy_document = load_json_document(values.get("policy"))
+    statements, policy_document, policy_state, completeness, uncertainties = s3_bucket_policy_details(
+        resource,
+        allow_absent=True,
+    )
     bucket_acl = values.get("acl", "")
     public_policy = policy_allows_public_access(policy_document)
     public_access_configured = bucket_acl in {"public-read", "public-read-write", "website"} or public_policy
@@ -161,11 +165,14 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
         public_access_configured=public_access_configured,
         public_exposure=public_access_configured,
         data_sensitivity="sensitive",
-        policy_statements=parse_policy_statements(policy_document),
+        policy_statements=statements,
         metadata={
             AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
             AwsResourceMetadata.BUCKET_ACL: bucket_acl,
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
+            AwsResourceMetadata.S3_BUCKET_POLICY_STATE: policy_state,
+            AwsResourceMetadata.S3_BUCKET_POLICY_COMPLETENESS_STATE: completeness,
+            AwsResourceMetadata.S3_BUCKET_POLICY_UNCERTAINTIES: uncertainties,
         },
     )
     mutations = aws_mutations(normalized)
@@ -176,7 +183,11 @@ def normalize_s3_bucket(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_s3_bucket_policy(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    policy_document = load_json_document(values.get("policy"))
+    statements, policy_document, policy_state, completeness, uncertainties = s3_bucket_policy_details(
+        resource,
+        allow_absent=False,
+    )
+    bucket_name = known_string(values, resource.unknown_values, "bucket", uncertainties, require_string=True)
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -184,10 +195,13 @@ def normalize_s3_bucket_policy(resource: TerraformResource) -> NormalizedResourc
         name=resource.name,
         category=ResourceCategory.DATA,
         identifier=values.get("id") or resource.address,
-        policy_statements=parse_policy_statements(policy_document),
+        policy_statements=statements,
         metadata={
-            AwsResourceMetadata.BUCKET_NAME: values.get("bucket"),
+            AwsResourceMetadata.BUCKET_NAME: bucket_name,
             AwsResourceMetadata.POLICY_DOCUMENT: policy_document,
+            AwsResourceMetadata.S3_BUCKET_POLICY_STATE: policy_state,
+            AwsResourceMetadata.S3_BUCKET_POLICY_COMPLETENESS_STATE: completeness,
+            AwsResourceMetadata.S3_BUCKET_POLICY_UNCERTAINTIES: uncertainties,
         },
     )
 

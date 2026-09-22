@@ -10,6 +10,7 @@ from tfstride.providers.aws.protected_data_evidence import (
     AwsEcsS3AccessPath,
     AwsS3AccessClass,
     AwsS3AccessState,
+    AwsS3BucketPolicyStatementEvidence,
     AwsS3PolicyConditionEvidence,
     AwsS3PolicyStatementEvidence,
     AwsS3ResourceScope,
@@ -17,6 +18,11 @@ from tfstride.providers.aws.protected_data_evidence import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_bucket_policies import (
+    S3BucketPolicySources,
+    prepare_s3_bucket_policy_sources,
+    s3_bucket_principal_match,
+)
 from tfstride.providers.aws.s3_object_scopes import (
     object_scope_contains,
     object_scope_from_resource,
@@ -92,6 +98,13 @@ _S3_ACTIONS = (
 _ACTION_BY_NAME = {action.name: action for action in _S3_ACTIONS}
 
 
+@dataclass(frozen=True, slots=True)
+class _DenyScope:
+    resource: str
+    conditional: bool
+    applicability_uncertain: bool
+
+
 class _S3AccessAssessment(TypedDict):
     allowed_actions: list[str]
     denied_actions: list[str]
@@ -100,14 +113,23 @@ class _S3AccessAssessment(TypedDict):
     scope_evaluations: list[AwsS3ScopeEvaluation]
 
 
+@dataclass(frozen=True, slots=True)
+class _BucketPolicyConstraints:
+    records: tuple[AwsS3BucketPolicyStatementEvidence, ...]
+    source_addresses: tuple[str, ...]
+    complete: bool
+    uncertainties: tuple[str, ...]
+
+
 class ModelEcsS3AccessPathsStage:
     name = "model_ecs_s3_access_paths"
 
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
+        bucket_policies = prepare_s3_bucket_policy_sources(resources, context)
         for task_definition in resources:
             if task_definition.resource_type != _ECS_TASK_DEFINITION:
                 continue
-            paths, uncertainties = _ecs_s3_access_paths(task_definition, context)
+            paths, uncertainties = _ecs_s3_access_paths(task_definition, context, bucket_policies)
             facts = aws_facts(task_definition)
             facts.set_ecs_s3_access_paths(paths)
             facts.extend_ecs_s3_access_path_uncertainties(uncertainties)
@@ -163,6 +185,7 @@ def _service_access_path(
 def _ecs_s3_access_paths(
     task_definition: NormalizedResource,
     context: AwsDecorationContext,
+    bucket_policies: dict[str, S3BucketPolicySources],
 ) -> tuple[list[AwsEcsS3AccessPath], list[str]]:
     task_facts = aws_facts(task_definition)
     task_role_reference = task_facts.task_role_arn
@@ -204,7 +227,10 @@ def _ecs_s3_access_paths(
         statement_records = _matching_statement_records(task_role.policy_statements, bucket.arn)
         if not statement_records:
             continue
-        assessment = _assess_actions(statement_records, bucket.arn)
+        bucket_constraints = _bucket_policy_constraints(bucket_policies[bucket.address], bucket.arn, task_role)
+        uncertainties.extend(f"{task_definition.address}: {reason}" for reason in bucket_constraints.uncertainties)
+        applicable_denies: list[AwsS3PolicyStatementEvidence] = [record for record in bucket_constraints.records]
+        assessment = _assess_actions([*statement_records, *applicable_denies], bucket.arn)
         for evaluation in assessment["scope_evaluations"]:
             if evaluation["reason"] == "partial_deny":
                 reason = "allow scope is narrowed by an explicit deny; the residual object scope is not representable"
@@ -217,9 +243,14 @@ def _ecs_s3_access_paths(
                 f"{evaluation['action']} on {evaluation['resource']}: {reason}"
             )
         if assessment["conditional_actions"]:
+            policy_kind = (
+                "identity- or bucket-policy"
+                if any(record["conditional"] for record in applicable_denies)
+                else "identity-policy"
+            )
             uncertainties.append(
                 f"{task_definition.address}: {task_role.address} targeting {bucket.address} has conditional "
-                "identity-policy evidence for actions: " + ", ".join(assessment["conditional_actions"])
+                f"{policy_kind} evidence for actions: " + ", ".join(assessment["conditional_actions"])
             )
         paths.append(
             _access_path_record(
@@ -230,10 +261,76 @@ def _ecs_s3_access_paths(
                 assessment,
                 role_policy_complete=role_policy_complete,
                 permissions_boundary_compatible=not boundary_uncertainties,
+                bucket_constraints=bucket_constraints,
             )
         )
 
     return paths, dedupe(uncertainties)
+
+
+def _bucket_policy_constraints(
+    sources: S3BucketPolicySources,
+    bucket_arn: str,
+    task_role: NormalizedResource,
+) -> _BucketPolicyConstraints:
+    records: list[AwsS3BucketPolicyStatementEvidence] = []
+    uncertainties = list(sources.uncertainties)
+    addresses = set(sources.source_addresses)
+    unresolved_addresses = {source.address for source in sources.unresolved_sources}
+    complete = sources.complete
+    if len(sources.source_addresses) > 1:
+        # A merged inline document no longer preserves individual statement provenance.
+        # Conflicting authoritative policies cannot establish a deterministic constraint.
+        return _BucketPolicyConstraints((), sources.source_addresses, False, sources.uncertainties)
+    for source in (*sources.sources, *sources.unresolved_sources):
+        unresolved_target = source.address in unresolved_addresses
+        source_complete = aws_facts(source).s3_bucket_policy_completeness_state == "complete"
+        if not source_complete:
+            if unresolved_target:
+                addresses.add(source.address)
+                uncertainties.append(
+                    f"{source.address}: incomplete bucket policy has an unresolved target that may affect {bucket_arn}"
+                )
+                uncertainties.extend(
+                    f"{source.address}: {reason}" for reason in aws_facts(source).s3_bucket_policy_uncertainties
+                )
+                complete = False
+            continue
+        for statement in source.policy_statements:
+            if statement.effect.strip().lower() != "deny":
+                continue
+            matches = _matching_statement_records((statement,), bucket_arn)
+            if not matches:
+                continue
+            principal_match = s3_bucket_principal_match(statement, task_role.arn)
+            if principal_match is None:
+                continue
+            if unresolved_target:
+                addresses.add(source.address)
+                uncertainties.extend(
+                    f"{source.address}: {reason}" for reason in aws_facts(source).s3_bucket_policy_uncertainties
+                )
+                uncertainties.append(
+                    f"{source.address}: bucket-policy deny may affect {task_role.address} on {bucket_arn}, "
+                    "but its target association is unresolved"
+                )
+            if principal_match == "unknown":
+                uncertainties.append(
+                    f"{source.address}: bucket-policy deny principal applicability to {task_role.address} is unresolved"
+                )
+            for match in matches:
+                record: AwsS3BucketPolicyStatementEvidence = {
+                    **match,
+                    "source_address": source.address,
+                    "principal_match": principal_match,
+                    "target_match": "unknown" if unresolved_target else "resolved",
+                    "applicability_uncertain": unresolved_target or principal_match == "unknown",
+                    "principals": [
+                        {"kind": principal.kind, "value": principal.value} for principal in statement.principal_entries
+                    ],
+                }
+                records.append(record)
+    return _BucketPolicyConstraints(tuple(records), tuple(sorted(addresses)), complete, tuple(dedupe(uncertainties)))
 
 
 def _target_buckets(
@@ -361,8 +458,10 @@ def _resource_for_bucket(
 
     # Wildcards in the bucket selector can span object-key separators too.
     # Retain potential matches as uncertainty instead of treating them as an exact namespace.
-    literal_prefix = resource.split("*", 1)[0].split("?", 1)[0]
-    if _has_wildcard(resource) and (
+    if resource.startswith(("aws_s3_bucket.", "module.")):
+        return resource
+    literal_prefix = resource.split("*", 1)[0].split("?", 1)[0].split("${", 1)[0]
+    if (_has_wildcard(resource) or "${" in resource) and (
         bucket_arn.startswith(literal_prefix) or literal_prefix.startswith(bucket_arn + "/")
     ):
         return resource
@@ -391,7 +490,7 @@ def _assess_actions(
         if not matching:
             continue
         allow_scopes: dict[str, list[AwsS3PolicyStatementEvidence]] = {}
-        deny_scopes: list[tuple[str, bool]] = []
+        deny_scopes: list[_DenyScope] = []
         for record in matching:
             for resource in record["matching_resources"]:
                 if (
@@ -402,7 +501,9 @@ def _assess_actions(
                 if record["effect"] == "allow":
                     allow_scopes.setdefault(resource, []).append(record)
                 else:
-                    deny_scopes.append((resource, record["conditional"]))
+                    deny_scopes.append(
+                        _DenyScope(resource, record["conditional"], record.get("applicability_uncertain", False))
+                    )
         action_evaluations = [
             _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
             for resource, allows in sorted(allow_scopes.items())
@@ -422,11 +523,11 @@ def _assess_actions(
             denied.append(action.name)
         elif deny_scopes:
             # Preserve deny-only evidence without turning it into an allow candidate.
-            if any(not is_conditional for _, is_conditional in deny_scopes):
+            if any(not deny.conditional and not deny.applicability_uncertain for deny in deny_scopes):
                 denied.append(action.name)
             else:
                 unknown.append(action.name)
-            if any(is_conditional for _, is_conditional in deny_scopes):
+            if any(deny.conditional for deny in deny_scopes):
                 conditional.append(action.name)
     return {
         "allowed_actions": allowed,
@@ -441,23 +542,27 @@ def _evaluate_scope(
     action: _S3Action,
     resource: str,
     allows: list[AwsS3PolicyStatementEvidence],
-    denies: list[tuple[str, bool]],
+    denies: list[_DenyScope],
     bucket_arn: str,
 ) -> AwsS3ScopeEvaluation:
     overlaps = [
-        (deny_resource, is_conditional, relationship)
-        for deny_resource, is_conditional in denies
-        if (relationship := _deny_relationship(deny_resource, resource, bucket_arn, action.resource_kind)) != "disjoint"
+        (deny, relationship)
+        for deny in denies
+        if (relationship := _deny_relationship(deny.resource, resource, bucket_arn, action.resource_kind)) != "disjoint"
     ]
-    conditional_denies = sorted({deny_resource for deny_resource, conditional, _ in overlaps if conditional})
-    unconditional_relations = {relationship for _, conditional, relationship in overlaps if not conditional}
+    conditional_denies = sorted({deny.resource for deny, _ in overlaps if deny.conditional})
+    unresolved_denies = sorted({deny.resource for deny, _ in overlaps if deny.applicability_uncertain})
+    unconditional_relations = {
+        relationship for deny, relationship in overlaps if not deny.conditional and not deny.applicability_uncertain
+    }
     result: AwsS3ScopeEvaluation = {
         "action": action.name,
         "resource": resource,
         "modeled_access_state": "unknown",
         "reason": "conditional_allow",
-        "overlapping_deny_resources": sorted({deny_resource for deny_resource, _, _ in overlaps}),
+        "overlapping_deny_resources": sorted({deny.resource for deny, _ in overlaps}),
         "conditional_deny_resources": conditional_denies,
+        "unresolved_deny_resources": unresolved_denies,
         "conditional_evaluation_required": bool(conditional_denies) or any(record["conditional"] for record in allows),
     }
     if "covers" in unconditional_relations:
@@ -465,11 +570,13 @@ def _evaluate_scope(
     elif (
         "${" in resource
         or (action.resource_kind == "object_level" and object_scope_from_resource(resource, bucket_arn) is None)
-        or any(relationship == "unknown" for _, _, relationship in overlaps)
+        or any(relationship == "unknown" for _, relationship in overlaps)
     ):
         result["reason"] = "unsupported_resource_scope"
     elif "partial" in unconditional_relations:
         result["reason"] = "partial_deny"
+    elif unresolved_denies:
+        result["reason"] = "unresolved_deny_applicability"
     elif conditional_denies:
         result["reason"] = "conditional_deny"
     elif any(not record["conditional"] for record in allows):
@@ -514,12 +621,18 @@ def _access_path_record(
     *,
     role_policy_complete: bool,
     permissions_boundary_compatible: bool,
+    bucket_constraints: _BucketPolicyConstraints,
 ) -> AwsEcsS3AccessPath:
     allow_records = [record for record in statement_records if record["effect"] == "allow"]
-    deny_records = [record for record in statement_records if record["effect"] == "deny"]
+    deny_records: list[AwsS3PolicyStatementEvidence] = [
+        *[record for record in statement_records if record["effect"] == "deny"],
+        *bucket_constraints.records,
+    ]
     modeled_access_state = _modeled_access_state(assessment)
     access_state: AwsS3AccessState = modeled_access_state if role_policy_complete else "unknown"
     if access_state == "allowed" and not permissions_boundary_compatible:
+        access_state = "unknown"
+    if not bucket_constraints.complete:
         access_state = "unknown"
     bucket_arn = bucket.arn
     assert bucket_arn is not None
@@ -534,7 +647,7 @@ def _access_path_record(
         "role_address": task_role.address,
         "role_arn": task_role.arn or aws_facts(task_definition).task_role_arn,
         "role_policy_complete": role_policy_complete,
-        "evaluation_basis": "modeled_identity_policy",
+        "evaluation_basis": "modeled_identity_policy_with_bucket_policy_constraints",
         "modeled_access_state": modeled_access_state,
         "access_state": access_state,
         "access_classes": _access_classes(assessment["allowed_actions"]),
@@ -552,6 +665,10 @@ def _access_path_record(
         "resource_scopes": _statement_resource_scopes(allow_records),
         "policy_statements": statement_records,
         "scope_evaluations": assessment["scope_evaluations"],
+        "bucket_policy_constraints_complete": bucket_constraints.complete,
+        "bucket_policy_source_addresses": list(bucket_constraints.source_addresses),
+        "bucket_policy_statements": list(bucket_constraints.records),
+        "bucket_policy_uncertainties": list(bucket_constraints.uncertainties),
     }
 
 

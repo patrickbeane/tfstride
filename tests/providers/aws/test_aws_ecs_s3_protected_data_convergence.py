@@ -381,6 +381,36 @@ class AwsEcsS3ProtectedDataConvergenceTests(unittest.TestCase):
                     [],
                 )
 
+    def test_bucket_policy_denies_constrain_payload_convergence_by_action(self) -> None:
+        for action, condition, expected in (
+            ("s3:GetObject", None, 0),
+            ("s3:GetObject", {"Bool": {"aws:SecureTransport": "false"}}, 0),
+            ("s3:ListBucket", None, 1),
+        ):
+            with self.subTest(action=action, condition=condition):
+                resources = _aws_resources()
+                statement = {"Effect": "Deny", "Action": action, "Resource": "*", "Principal": "*"}
+                if condition is not None:
+                    statement["Condition"] = condition
+                resources.append(
+                    TerraformResource(
+                        address="aws_s3_bucket_policy.data",
+                        mode="managed",
+                        resource_type="aws_s3_bucket_policy",
+                        name="data",
+                        provider_name="registry.terraform.io/hashicorp/aws",
+                        values={
+                            "bucket": _AWS_BUCKET_ARN.removeprefix("arn:aws:s3:::"),
+                            "policy": json.dumps({"Statement": [statement]}),
+                        },
+                        provider_config_key=None,
+                    )
+                )
+                inventory = _normalize(resources)
+                service = _resource(inventory, "aws_ecs_service.orders")
+                facts = aws_facts(service)
+                self.assertEqual(len(facts.ecs_s3_protected_data_convergences), expected)
+
     def test_s3_deny_scopes_constrain_payload_read_convergence(self) -> None:
         for deny_resource, expected_count in (
             ("*", 0),

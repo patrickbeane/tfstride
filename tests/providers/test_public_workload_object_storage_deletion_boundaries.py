@@ -707,7 +707,7 @@ class PublicWorkloadObjectStorageDeletionBoundaryTests(unittest.TestCase):
                     mode,
                 )
 
-    def test_aws_bucket_policy_denies_and_conditions_remain_independent_evidence(
+    def test_aws_bucket_policy_denies_and_conditions_constrain_access_paths(
         self,
     ) -> None:
         bucket_policy = _aws_bucket_policy(
@@ -757,9 +757,13 @@ class PublicWorkloadObjectStorageDeletionBoundaryTests(unittest.TestCase):
         identity_path = aws_facts(task_definition).ecs_s3_access_paths[0]
         self.assertEqual(
             identity_path["evaluation_basis"],
-            "modeled_identity_policy",
+            "modeled_identity_policy_with_bucket_policy_constraints",
         )
-        self.assertEqual(identity_path["access_state"], "allowed")
+        self.assertEqual(identity_path["access_state"], "unknown")
+        self.assertEqual(identity_path["matched_actions"], [])
+        self.assertEqual(identity_path["denied_actions"], ["s3:DeleteObjectVersion"])
+        self.assertEqual(identity_path["unknown_actions"], ["s3:DeleteObject"])
+        self.assertEqual(len(identity_path["bucket_policy_statements"]), 2)
         self.assertTrue(identity_path["role_policy_complete"])
 
         self.assertEqual(

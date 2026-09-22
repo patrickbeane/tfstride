@@ -715,7 +715,7 @@ class PublicWorkloadObjectStorageTopologyDestructionBoundaryTests(unittest.TestC
                 else:
                     self.assertEqual(len(facts.ecs_s3_access_paths), 1)
 
-    def test_aws_bucket_policy_and_same_account_evidence_remain_separate(
+    def test_aws_bucket_policy_constraints_preserve_separate_account_evidence(
         self,
     ) -> None:
         bucket_policy = _aws_bucket_policy(
@@ -752,7 +752,12 @@ class PublicWorkloadObjectStorageTopologyDestructionBoundaryTests(unittest.TestC
 
         self.assertEqual(
             facts.ecs_s3_access_paths[0]["evaluation_basis"],
-            "modeled_identity_policy",
+            "modeled_identity_policy_with_bucket_policy_constraints",
+        )
+        self.assertEqual(facts.ecs_s3_access_paths[0]["access_state"], "denied")
+        self.assertEqual(
+            facts.ecs_s3_access_paths[0]["denied_actions"],
+            [_AWS_DELETE_BUCKET],
         )
         self.assertEqual(
             aws_facts(bucket).resource_policy_source_addresses,

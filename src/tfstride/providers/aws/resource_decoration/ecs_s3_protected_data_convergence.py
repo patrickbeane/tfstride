@@ -214,8 +214,7 @@ def _deterministic_payload_read(
         and path["access_state"] == "allowed"
         and path["role_policy_complete"] is True
         and "read" in path["access_classes"]
-        and "read" not in path["denied_access_classes"]
-        and "read" not in path["unknown_access_classes"]
+        and path["bucket_policy_constraints_complete"] is True
         and bool(_S3_PAYLOAD_READ_ACTIONS.intersection(path["matched_actions"]))
         and bool(_S3_OBJECT_SCOPES.intersection(path["resource_scopes"]))
         and _has_unconditional_payload_read_statement(path)

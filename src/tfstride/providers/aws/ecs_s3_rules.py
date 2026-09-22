@@ -134,6 +134,7 @@ def _is_deterministic_mutation_path(path: Mapping[str, Any], service_address: st
         and path.get("access_state") == "allowed"
         and path.get("modeled_access_state") == "allowed"
         and path.get("role_policy_complete") is True
+        and path.get("bucket_policy_constraints_complete") is True
         and bool(_path_mutation_classes(path))
         and bool(_mutation_actions(path))
     )
@@ -199,7 +200,9 @@ def _mutation_path_evidence(paths: list[dict[str, Any]]) -> list[str]:
                     f"authorized_scopes={','.join(_authorized_scope_evidence(path))}",
                     f"denied_actions={','.join(_string_values(path.get('denied_actions'))) or 'none'}",
                     "access_state=allowed",
-                    "mutation_evaluation=unconditional_identity_policy_allow",
+                    f"bucket_policy_sources={','.join(_string_values(path.get('bucket_policy_source_addresses'))) or 'none'}",
+                    "bucket_policy_constraints_complete=true",
+                    "mutation_evaluation=unconditional_identity_policy_allow_with_bucket_policy_constraints",
                 )
             )
             for path in paths
