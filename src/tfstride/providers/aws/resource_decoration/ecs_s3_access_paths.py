@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 from typing import Literal, TypedDict
 
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, NormalizedResource
+from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.protected_data_evidence import (
     AwsEcsS3AccessPath,
     AwsS3AccessClass,
@@ -188,6 +189,8 @@ def _ecs_s3_access_paths(
             f"{task_definition.address}: {task_role.address}: {reason}"
             for reason in (role_facts.iam_policy_posture_uncertainties or ["identity-policy evidence is incomplete"])
         )
+    boundary_uncertainties = permissions_boundary_uncertainties(task_role, authority="S3")
+    uncertainties.extend(f"{task_definition.address}: {reason}" for reason in boundary_uncertainties)
     target_buckets, target_uncertainties = _target_buckets(task_role, context)
     uncertainties.extend(f"{task_definition.address}: {message}" for message in target_uncertainties)
 
@@ -226,6 +229,7 @@ def _ecs_s3_access_paths(
                 statement_records,
                 assessment,
                 role_policy_complete=role_policy_complete,
+                permissions_boundary_compatible=not boundary_uncertainties,
             )
         )
 
@@ -509,11 +513,14 @@ def _access_path_record(
     assessment: _S3AccessAssessment,
     *,
     role_policy_complete: bool,
+    permissions_boundary_compatible: bool,
 ) -> AwsEcsS3AccessPath:
     allow_records = [record for record in statement_records if record["effect"] == "allow"]
     deny_records = [record for record in statement_records if record["effect"] == "deny"]
     modeled_access_state = _modeled_access_state(assessment)
     access_state: AwsS3AccessState = modeled_access_state if role_policy_complete else "unknown"
+    if access_state == "allowed" and not permissions_boundary_compatible:
+        access_state = "unknown"
     bucket_arn = bucket.arn
     assert bucket_arn is not None
     return {

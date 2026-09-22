@@ -23,6 +23,7 @@ from tfstride.providers.aws.audit_telemetry_disruption_evidence import (
     AwsEcsCloudTrailDeleteTrailPath,
     AwsEcsCloudTrailStopLoggingPath,
 )
+from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.reference_resolution import (
     assess_symbolic_reference,
     symbolic_reference_target,
@@ -32,7 +33,6 @@ from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.coercion import (
     STATE_DISABLED,
     STATE_ENABLED,
-    STATE_NOT_CONFIGURED,
     dedupe,
 )
 from tfstride.resource_helpers import parse_aws_account_id
@@ -258,7 +258,7 @@ def _task_definition_paths(
             ],
         )
 
-    boundary_uncertainties = _permissions_boundary_uncertainties(task_role)
+    boundary_uncertainties = permissions_boundary_uncertainties(task_role, authority="CloudTrail disruption")
     if boundary_uncertainties:
         return (
             [],
@@ -836,28 +836,6 @@ def _identity_policy_complete(role: NormalizedResource) -> bool:
             for statement in role.policy_statements
         )
     )
-
-
-def _permissions_boundary_uncertainties(role: NormalizedResource) -> list[str]:
-    facts = aws_facts(role)
-    if facts.iam_permissions_boundary_state == STATE_NOT_CONFIGURED:
-        return []
-
-    boundary = facts.iam_permissions_boundary_arn
-    if boundary is not None:
-        return [
-            f"{role.address} has configured permissions boundary {boundary}; "
-            "effective CloudTrail disruption authority is unresolved because "
-            "permissions-boundary policy intersection is not modeled"
-        ]
-
-    details = facts.iam_permissions_boundary_uncertainties
-    if details:
-        return [f"{role.address} permissions-boundary evidence is unresolved: {detail}" for detail in details]
-    return [
-        f"{role.address} permissions-boundary state is unresolved; effective "
-        "CloudTrail disruption authority cannot be established"
-    ]
 
 
 def _identity_policy_resources(
