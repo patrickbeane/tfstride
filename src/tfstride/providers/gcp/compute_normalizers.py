@@ -5,6 +5,7 @@ from typing import Any
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import as_bool
+from tfstride.providers.gcp.identity_normalizers import hierarchy_unknown_metadata
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizers import GCP_PROVIDER
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
@@ -23,6 +24,7 @@ def normalize_compute_instance(resource: TerraformResource) -> NormalizedResourc
     public_access_configured = has_external_access_config(resource.values)
     public_access_reasons = ["compute instance has an external access config"] if public_access_configured else []
     metadata = {
+        **hierarchy_unknown_metadata(resource),
         GcpResourceMetadata.NAME: resource_name(resource),
         GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
         GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),

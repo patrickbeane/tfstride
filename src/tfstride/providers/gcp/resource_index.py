@@ -376,6 +376,14 @@ def gcp_resource_references(resource: NormalizedResource) -> tuple[str, ...]:
         f"{resource.address}.id",
         f"{resource.address}.name",
     }
+    if resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY:
+        policy_reference = resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
+        if policy_reference:
+            references.add(policy_reference)
+    if resource.resource_type == GcpResourceType.PROJECT:
+        project = resource.get_metadata_field(GcpResourceMetadata.PROJECT)
+        if project:
+            references.update({project, f"projects/{project}"})
     kms_key_ring = resource.get_metadata_field(GcpResourceMetadata.KMS_KEY_RING)
     kms_key_name = resource.get_metadata_field(GcpResourceMetadata.NAME)
     canonical_kms_key = (

@@ -719,7 +719,7 @@ class GcpComputeRuleTests(unittest.TestCase):
             "google_compute_instance",
             ResourceCategory.COMPUTE,
             public_access_configured=True,
-            metadata={GcpResourceMetadata.ORGANIZATION_ID: "1234567890"},
+            metadata={GcpResourceMetadata.PROJECT: "org-project"},
         )
         folder_rule = _normalized_gcp_resource(
             "google_compute_firewall_policy_rule.folder_admin",
@@ -763,6 +763,22 @@ class GcpComputeRuleTests(unittest.TestCase):
             folder_rule,
             folder_association,
             folder_instance,
+            _normalized_gcp_resource(
+                "google_project.org",
+                "google_project",
+                ResourceCategory.IAM,
+                metadata={
+                    GcpResourceMetadata.PROJECT: "org-project",
+                    GcpResourceMetadata.ORGANIZATION_ID: "1234567890",
+                },
+            ),
+            _normalized_gcp_resource(
+                "google_folder.separate",
+                "google_folder",
+                ResourceCategory.IAM,
+                identifier="folders/12345",
+                metadata={GcpResourceMetadata.HIERARCHY_PARENT: "organizations/other"},
+            ),
         ]
         GcpResourceDecorator().decorate(resources)
         inventory = ResourceInventory(provider="gcp", resources=resources)

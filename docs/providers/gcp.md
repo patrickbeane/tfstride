@@ -44,6 +44,7 @@ This is a concise coverage map. Repetitive IAM variants are grouped, and reports
 * `google_cloudfunctions2_function`
 * Cloud Functions IAM member, binding, and policy resources
 * `google_project`
+* `google_folder` parent links for hierarchical firewall policy ordering
 * Organization, folder, and project IAM member, binding, and policy resources
 * Organization, folder, and project organization-policy resources
 * Project and organization custom IAM roles
@@ -79,6 +80,10 @@ This is a concise coverage map. Repetitive IAM variants are grouped, and reports
 ## Trust Boundaries
 
 GCP trust-boundary coverage includes public compute, GKE control planes, Cloud Run, Cloud Functions, external forwarding rules, Cloud SQL, GCS buckets, Cloud NAT posture, and workload-to-sensitive-data paths through GCE, Cloud Run, and Cloud Functions service accounts.
+
+Hierarchical firewall policies follow modeled attachment scopes and project/folder ancestry, with rule priorities compared only within each policy. The VPC's host project supplies ancestry for Shared VPC workloads. A policy's `parent` identifies its owner, and a rule's `target_resources` restricts its targets; neither establishes an attachment. Missing or ambiguous associations and ancestry remain explicit ingress uncertainty and cannot establish unrestricted fallback to VPC firewall rules.
+
+Policy traversal currently selects a terminal matching policy rule for the instance. Per-packet policy progression, including partial `goto_next` matches, remains a limitation; VPC firewall precedence already preserves protocol/port subsets.
 
 ## Rule Coverage
 

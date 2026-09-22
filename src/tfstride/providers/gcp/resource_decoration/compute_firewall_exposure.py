@@ -64,6 +64,7 @@ def _compute_internet_ingress_decision(
         sorted(
             {
                 *decision.uncertainties,
+                *policy_decision.uncertainties,
                 *(
                     f"{firewall.address}: {reason}"
                     for firewall, match in policy_uncertainties
@@ -83,12 +84,7 @@ def _compute_internet_ingress_decision(
                     match,
                     source.resource,
                     effective_ingress_rule(ingress),
-                    same_policy=bool(
-                        is_policy
-                        and source.resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
-                        and source.resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
-                        == firewall.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
-                    ),
+                    same_policy=bool(is_policy and policy_decision.same_policy(source.resource, firewall)),
                     policy_constraint=True,
                     excluded_protocols=tuple(ingress["excluded_protocols"]),
                 )

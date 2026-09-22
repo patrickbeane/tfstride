@@ -71,6 +71,20 @@ def _inventory(*firewalls):
                 },
             ),
             *firewalls,
+            *[
+                _terraform_resource(
+                    "google_compute_firewall_policy_association.test",
+                    "google_compute_firewall_policy_association",
+                    {"firewall_policy": reference, "attachment_target": "google_compute_network.main.id"},
+                )
+                for reference in sorted(
+                    {
+                        firewall.values["firewall_policy"]
+                        for firewall in firewalls
+                        if firewall.resource_type == "google_compute_firewall_policy_rule"
+                    }
+                )
+            ],
         ]
     )
 

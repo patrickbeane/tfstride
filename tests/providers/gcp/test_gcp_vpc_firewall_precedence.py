@@ -221,7 +221,16 @@ class GcpVpcFirewallPrecedenceTests(unittest.TestCase):
             },
         )
         inventory = _inventory(
-            [_firewall("allow", "allow", protocol="all"), _firewall("deny", "deny", priority=900), policy]
+            [
+                _firewall("allow", "allow", protocol="all"),
+                _firewall("deny", "deny", priority=900),
+                policy,
+                _terraform_resource(
+                    "google_compute_firewall_policy_association.test",
+                    "google_compute_firewall_policy_association",
+                    {"firewall_policy": "123", "attachment_target": "google_compute_network.main.id"},
+                ),
+            ]
         )
         instance = _instance(inventory)
         self.assertTrue(instance.public_exposure)

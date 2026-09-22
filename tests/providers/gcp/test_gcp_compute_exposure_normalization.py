@@ -167,7 +167,7 @@ class GcpComputeExposureNormalizationTests(GcpNormalizerTestCase):
         self.assertTrue(instance.public_exposure)
         self.assertTrue(instance.direct_internet_reachable)
 
-    def test_firewall_policy_target_resources_can_apply_without_association(self) -> None:
+    def test_firewall_policy_target_resources_do_not_establish_association(self) -> None:
         inventory = GcpNormalizer().normalize(
             [
                 _terraform_resource(
@@ -211,10 +211,12 @@ class GcpComputeExposureNormalizationTests(GcpNormalizerTestCase):
 
         self.assertIsNotNone(instance)
         assert instance is not None
-        self.assertTrue(instance.internet_ingress_capable)
-        self.assertEqual(
-            instance.internet_ingress_reasons,
-            ["google_compute_firewall_policy_rule.public_admin ingress tcp 3389 from 0.0.0.0/0"],
+        self.assertFalse(instance.internet_ingress_capable)
+        self.assertEqual(instance.internet_ingress_reasons, [])
+        self.assertEqual(instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_STATE), "unknown")
+        self.assertIn(
+            "association is not modeled",
+            " ".join(instance.get_metadata_field(GcpResourceMetadata.INTERNET_INGRESS_UNCERTAINTIES)),
         )
 
     def test_firewall_policy_target_service_accounts_limit_compute_matches(self) -> None:

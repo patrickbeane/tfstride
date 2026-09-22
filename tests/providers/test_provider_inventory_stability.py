@@ -341,7 +341,7 @@ _PROVIDER_INVENTORY_CASES = (
             "google_logging_project_sink.processor",
         ),
         supported_resource_types=SUPPORTED_GCP_TYPES,
-        expected_supported_type_count=118,
+        expected_supported_type_count=119,
         expected_input_count=23,
         expected_unsupported_resources=(),
         expected_unsupported_resource_types={},

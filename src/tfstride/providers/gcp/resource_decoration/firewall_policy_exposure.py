@@ -8,6 +8,7 @@ from tfstride.providers.gcp.firewall_ingress_evidence import ingress_from_policy
 from tfstride.providers.gcp.firewall_matches import GcpFirewallMatch
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.firewall_decisions import FirewallIngressSource
+from tfstride.providers.gcp.resource_decoration.firewall_policy_order import resolve_firewall_policy_order
 from tfstride.providers.gcp.resource_decoration.firewall_rules import priority_value
 from tfstride.providers.gcp.resource_decoration.firewall_targets import (
     instance_service_account_keys,
@@ -21,8 +22,6 @@ from tfstride.providers.gcp.resource_decoration.network_posture import (
     resource_has_network_reference,
 )
 from tfstride.providers.gcp.resource_index import GcpResourceIndex
-from tfstride.providers.gcp.resource_types import GcpResourceType
-from tfstride.providers.gcp.resource_utils import gcp_reference_key
 from tfstride.resource_helpers import describe_security_group_rule
 
 
@@ -56,37 +55,56 @@ class _FirewallPolicyIngressCandidate:
 
 @dataclass(frozen=True, slots=True)
 class _FirewallPolicyIngressDecision:
-    candidates: tuple[_FirewallPolicyIngressCandidate, ...]
+    policies: tuple[tuple[_FirewallPolicyIngressCandidate, ...], ...]
+    uncertainties: tuple[str, ...] = ()
+
+    @property
+    def candidates(self) -> tuple[_FirewallPolicyIngressCandidate, ...]:
+        return tuple(candidate for policy in self.policies for candidate in policy)
+
+    @property
+    def evaluated_candidates(self) -> tuple[_FirewallPolicyIngressCandidate, ...]:
+        evaluated: list[_FirewallPolicyIngressCandidate] = []
+        for policy in self.policies:
+            for candidate in policy:
+                evaluated.append(candidate)
+                if not candidate.matches_internet_ingress:
+                    continue
+                if candidate.action == _FirewallPolicyAction.GOTO_NEXT:
+                    break
+                if candidate.is_terminal:
+                    return tuple(evaluated)
+        return tuple(evaluated)
 
     @property
     def uncertain_matches(self) -> tuple[tuple[NormalizedResource, GcpFirewallMatch], ...]:
+        evaluated = {candidate.policy_key: candidate for candidate in self.evaluated_candidates}
         return tuple(
             (candidate.policy_rule, match)
             for candidate in self.candidates
+            if candidate.policy_key in evaluated
             for match in uncertain_firewall_matches(candidate.policy_rule)
+            if (
+                not evaluated[candidate.policy_key].matches_internet_ingress
+                or match["rule_priority"] is None
+                or match["rule_priority"] <= evaluated[candidate.policy_key].priority
+            )
         )
+
+    def same_policy(self, left: NormalizedResource, right: NormalizedResource) -> bool:
+        keys = {candidate.policy_rule.address: candidate.policy_key for candidate in self.candidates}
+        return left.address in keys and keys.get(left.address) == keys.get(right.address)
 
     @property
     def terminal_candidate(self) -> _FirewallPolicyIngressCandidate | None:
-        skipped_policy_keys: set[str] = set()
-        for candidate in sorted(
-            self.candidates,
-            key=lambda candidate: (candidate.priority, candidate.policy_rule.address),
-        ):
-            if candidate.policy_key in skipped_policy_keys:
-                continue
-            if not candidate.matches_internet_ingress:
-                continue
-            if candidate.action == _FirewallPolicyAction.GOTO_NEXT:
-                skipped_policy_keys.add(candidate.policy_key)
-                continue
-            if candidate.is_terminal:
+        for candidate in self.evaluated_candidates:
+            if candidate.matches_internet_ingress and candidate.is_terminal:
                 return candidate
         return None
 
     @property
     def continues_to_compute_firewalls(self) -> bool:
-        return self.terminal_candidate is None
+        return not self.uncertainties and self.terminal_candidate is None
 
     @property
     def sources(self) -> tuple[FirewallIngressSource, ...]:
@@ -112,30 +130,42 @@ def firewall_policy_ingress_decision(
     resource: NormalizedResource,
     index: GcpResourceIndex,
 ) -> _FirewallPolicyIngressDecision:
-    return _FirewallPolicyIngressDecision(candidates=_firewall_policy_ingress_candidates(resource, index))
-
-
-def _firewall_policy_ingress_candidates(
-    resource: NormalizedResource,
-    index: GcpResourceIndex,
-) -> tuple[_FirewallPolicyIngressCandidate, ...]:
-    return tuple(
-        candidate
-        for policy_rule in index.firewall_policy_rules
-        if _firewall_policy_rule_targets_instance(policy_rule, resource, index)
-        for candidate in (_firewall_policy_ingress_candidate(policy_rule, index),)
+    order = resolve_firewall_policy_order(
+        resource,
+        index,
+        tuple(
+            rule
+            for rule in index.firewall_policy_rules
+            if _firewall_policy_rule_targets_instance(rule, resource, index)
+        ),
+    )
+    return _FirewallPolicyIngressDecision(
+        policies=tuple(
+            tuple(
+                sorted(
+                    (_firewall_policy_ingress_candidate(rule, group.key) for rule in group.rules),
+                    key=lambda candidate: (
+                        candidate.priority,
+                        0 if candidate.action == _FirewallPolicyAction.DENY else 1,
+                        candidate.policy_rule.address,
+                    ),
+                )
+            )
+            for group in order.groups
+        ),
+        uncertainties=order.uncertainties,
     )
 
 
 def _firewall_policy_ingress_candidate(
     policy_rule: NormalizedResource,
-    index: GcpResourceIndex,
+    policy_key: str,
 ) -> _FirewallPolicyIngressCandidate:
     action = _firewall_policy_action(policy_rule)
     internet_ingress_rules = _firewall_policy_internet_ingress_rules(policy_rule)
     return _FirewallPolicyIngressCandidate(
         policy_rule=policy_rule,
-        policy_key=_firewall_policy_group_key(policy_rule, index),
+        policy_key=policy_key,
         action=action,
         priority=_firewall_policy_priority(policy_rule),
         matches_internet_ingress=bool(internet_ingress_rules),
@@ -156,17 +186,6 @@ def _firewall_policy_action(policy_rule: NormalizedResource) -> _FirewallPolicyA
     if action in {"goto_next", "go_to_next"}:
         return _FirewallPolicyAction.GOTO_NEXT
     return _FirewallPolicyAction.UNKNOWN
-
-
-def _firewall_policy_group_key(
-    policy_rule: NormalizedResource,
-    index: GcpResourceIndex,
-) -> str:
-    policy_reference = policy_rule.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE)
-    if policy_reference:
-        return gcp_reference_key(str(policy_reference))
-    policy_references = sorted(_firewall_policy_reference_keys(policy_rule, index))
-    return policy_references[0] if policy_references else gcp_reference_key(policy_rule.address)
 
 
 def _firewall_policy_priority(policy_rule: NormalizedResource) -> int:
@@ -215,164 +234,4 @@ def _firewall_policy_rule_targets_instance(
     ):
         return False
 
-    if firewall_field_is_uncertain(policy_rule, "firewall_policy"):
-        return True
-    associations = _firewall_policy_associations_for_rule(policy_rule, index)
-    if not associations:
-        return (
-            target_resource_applies
-            or firewall_field_is_uncertain(policy_rule, "firewall_policy")
-            or firewall_field_is_uncertain(policy_rule, "target_resources")
-        )
-    return any(
-        _firewall_policy_association_applies_to_instance(association, instance, index) for association in associations
-    )
-
-
-def _firewall_policy_associations_for_rule(
-    policy_rule: NormalizedResource,
-    index: GcpResourceIndex,
-) -> tuple[NormalizedResource, ...]:
-    policy_references = _firewall_policy_reference_keys(policy_rule, index)
-    if not policy_references:
-        return ()
-    return tuple(
-        association
-        for association in index.firewall_policy_associations
-        if policy_references.intersection(_firewall_policy_reference_keys(association, index))
-    )
-
-
-def _firewall_policy_association_applies_to_instance(
-    association: NormalizedResource,
-    instance: NormalizedResource,
-    index: GcpResourceIndex,
-) -> bool:
-    target = association.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_ATTACHMENT_TARGET)
-    if not target:
-        return False
-    if resource_has_network_reference(instance, target, index):
-        return True
-
-    project = _project_from_scope_reference(target)
-    if project and project == _resource_project(instance):
-        return True
-
-    folder_id = _hierarchy_id_from_scope_reference(target, "folders")
-    if folder_id and folder_id == _resource_folder_id(instance):
-        return True
-
-    organization_id = _hierarchy_id_from_scope_reference(target, "organizations")
-    if organization_id and organization_id == _resource_organization_id(instance):
-        return True
-
-    return False
-
-
-def _firewall_policy_reference_keys(
-    resource: NormalizedResource,
-    index: GcpResourceIndex | None = None,
-) -> set[str]:
-    references = {
-        resource.address,
-        f"{resource.address}.id",
-        f"{resource.address}.name",
-    }
-    for reference in (
-        resource.identifier,
-        resource.get_metadata_field(GcpResourceMetadata.NAME),
-        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
-        resource.get_metadata_field(GcpResourceMetadata.FIREWALL_POLICY_REFERENCE),
-    ):
-        if reference:
-            references.add(reference)
-    keys = {gcp_reference_key(str(reference)) for reference in references if str(reference).strip()}
-    if index is None:
-        return keys
-
-    expanded_keys = set(keys)
-    for key in keys:
-        policy = index.resources_by_reference.get(
-            key,
-            source=resource,
-            resource_types={GcpResourceType.COMPUTE_FIREWALL_POLICY},
-        )
-        if policy is None:
-            continue
-        expanded_keys.update(_firewall_policy_reference_keys(policy))
-    return expanded_keys
-
-
-def _resource_project(resource: NormalizedResource) -> str | None:
-    project = resource.get_metadata_field(GcpResourceMetadata.PROJECT)
-    if project:
-        return project
-    for reference in (
-        resource.identifier,
-        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
-        resource.vpc_id,
-    ):
-        project = _project_from_scope_reference(reference)
-        if project:
-            return project
-    return None
-
-
-def _resource_folder_id(resource: NormalizedResource) -> str | None:
-    folder_id = resource.get_metadata_field(GcpResourceMetadata.FOLDER_ID)
-    if folder_id:
-        return _normalize_hierarchy_id(folder_id, "folders")
-    for reference in (
-        resource.identifier,
-        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
-    ):
-        folder_id = _hierarchy_id_from_scope_reference(reference, "folders")
-        if folder_id:
-            return folder_id
-    return None
-
-
-def _resource_organization_id(resource: NormalizedResource) -> str | None:
-    organization_id = resource.get_metadata_field(GcpResourceMetadata.ORGANIZATION_ID)
-    if organization_id:
-        return _normalize_hierarchy_id(organization_id, "organizations")
-    for reference in (
-        resource.identifier,
-        resource.get_metadata_field(GcpResourceMetadata.SELF_LINK),
-    ):
-        organization_id = _hierarchy_id_from_scope_reference(reference, "organizations")
-        if organization_id:
-            return organization_id
-    return None
-
-
-def _project_from_scope_reference(value: object) -> str | None:
-    text = str(value or "").strip().rstrip("/")
-    if not text:
-        return None
-    parts = [part for part in text.split("/") if part]
-    for index, part in enumerate(parts[:-1]):
-        if part == "projects":
-            return parts[index + 1] or None
-    return None
-
-
-def _hierarchy_id_from_scope_reference(value: object, marker: str) -> str | None:
-    text = str(value or "").strip().rstrip("/")
-    if not text:
-        return None
-    parts = [part for part in text.split("/") if part]
-    for index, part in enumerate(parts[:-1]):
-        if part == marker:
-            return _normalize_hierarchy_id(parts[index + 1], marker)
-    return _normalize_hierarchy_id(text, marker) if text.startswith(f"{marker}/") else None
-
-
-def _normalize_hierarchy_id(value: str | None, marker: str) -> str | None:
-    text = str(value or "").strip().rstrip("/")
-    if not text:
-        return None
-    prefix = f"{marker}/"
-    if text.startswith(prefix):
-        return text.removeprefix(prefix) or None
-    return text
+    return True

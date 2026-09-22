@@ -72,7 +72,7 @@ from tfstride.providers.gcp.iam_normalizers import (
     normalize_workload_identity_pool,
     normalize_workload_identity_pool_provider,
 )
-from tfstride.providers.gcp.identity_normalizers import normalize_kms_key_ring, normalize_project
+from tfstride.providers.gcp.identity_normalizers import normalize_folder, normalize_kms_key_ring, normalize_project
 from tfstride.providers.gcp.kms_normalizers import normalize_kms_crypto_key, normalize_kms_crypto_key_version
 from tfstride.providers.gcp.network_normalizers import (
     GCP_PROVIDER,
@@ -227,6 +227,7 @@ _GCP_RESOURCE_NORMALIZERS: dict[str, ResourceNormalizer] = {
     ),
     GcpResourceType.ORG_POLICY_POLICY: normalize_org_policy_policy,
     GcpResourceType.ORGANIZATION_POLICY: normalize_organization_policy,
+    GcpResourceType.FOLDER: normalize_folder,
     GcpResourceType.PROJECT: normalize_project,
     GcpResourceType.PROJECT_ORGANIZATION_POLICY: normalize_project_organization_policy,
     GcpResourceType.PROJECT_IAM_BINDING: normalize_project_iam_binding,

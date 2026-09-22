@@ -89,6 +89,7 @@ class GcpResourceType:
     ORGANIZATION_IAM_POLICY = "google_organization_iam_policy"
     ORGANIZATION_POLICY = "google_organization_policy"
     ORG_POLICY_POLICY = "google_org_policy_policy"
+    FOLDER = "google_folder"
     PROJECT = "google_project"
     PROJECT_IAM_BINDING = "google_project_iam_binding"
     PROJECT_IAM_CUSTOM_ROLE = "google_project_iam_custom_role"
@@ -457,6 +458,7 @@ GCP_NORMALIZED_RESOURCE_TYPES = frozenset(
         GcpResourceType.NETWORK_CONNECTIVITY_SERVICE_CONNECTION_POLICY,
         GcpResourceType.ORG_POLICY_POLICY,
         GcpResourceType.ORGANIZATION_POLICY,
+        GcpResourceType.FOLDER,
         GcpResourceType.PROJECT,
         GcpResourceType.PROJECT_ORGANIZATION_POLICY,
         GcpResourceType.PROJECT_IAM_BINDING,

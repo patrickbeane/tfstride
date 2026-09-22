@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
+from tfstride.providers.coercion import attribute_unknown
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import first_item
 from tfstride.providers.gcp.firewall_matches import firewall_match_network_rules, normalize_firewall_matches
@@ -10,6 +11,7 @@ from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.network_normalizer_utils import _gcp_values
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
+from tfstride.resource_metadata import MetadataField
 
 
 def normalize_compute_firewall(resource: TerraformResource) -> NormalizedResource:
@@ -59,6 +61,7 @@ def normalize_compute_firewall_policy(resource: TerraformResource) -> Normalized
             values.get(GcpAttr.SHORT_NAME), values.get(GcpAttr.NAME), resource_identifier(resource)
         ),
         metadata={
+            **_policy_unknown_metadata(resource),
             GcpResourceMetadata.NAME: first_non_empty(values.get(GcpAttr.SHORT_NAME), values.get(GcpAttr.NAME)),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
             GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: values.get(GcpAttr.NAME),
@@ -113,6 +116,7 @@ def normalize_compute_firewall_policy_association(resource: TerraformResource) -
             values.get(GcpAttr.ATTACHMENT_TARGET), values.get(GcpAttr.NAME), resource_identifier(resource)
         ),
         metadata={
+            **_policy_unknown_metadata(resource),
             GcpResourceMetadata.NAME: first_non_empty(values.get(GcpAttr.NAME)),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
             GcpResourceMetadata.FIREWALL_POLICY_REFERENCE: values.get(GcpAttr.FIREWALL_POLICY),
@@ -120,6 +124,15 @@ def normalize_compute_firewall_policy_association(resource: TerraformResource) -
             "display_name": values.get(GcpAttr.DISPLAY_NAME),
         },
     )
+
+
+def _policy_unknown_metadata(resource: TerraformResource) -> dict[MetadataField[list[str]], list[str]]:
+    fields = [
+        key
+        for key in ("firewall_policy", "attachment_target", "name", "short_name", "id", "self_link")
+        if attribute_unknown(resource.unknown_values, key)
+    ]
+    return {GcpResourceMetadata.FIREWALL_POLICY_UNKNOWN_FIELDS: fields} if fields else {}
 
 
 def parse_firewall_allow_rules(values: dict[str, Any] | GcpValues) -> list[SecurityGroupRule]:

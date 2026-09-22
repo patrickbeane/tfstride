@@ -13,6 +13,7 @@ from tfstride.providers.coercion import (
 )
 from tfstride.providers.gcp.attributes import GcpAttr, GcpValues
 from tfstride.providers.gcp.coercion import first_item
+from tfstride.providers.gcp.identity_normalizers import hierarchy_unknown_metadata
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import first_non_empty, resource_identifier, resource_name
@@ -28,6 +29,7 @@ def normalize_compute_network(resource: TerraformResource) -> NormalizedResource
         category=ResourceCategory.NETWORK,
         identifier=resource_identifier(resource),
         metadata={
+            **hierarchy_unknown_metadata(resource),
             GcpResourceMetadata.NAME: resource_name(resource),
             GcpResourceMetadata.SELF_LINK: values.get(GcpAttr.SELF_LINK),
             GcpResourceMetadata.PROJECT: values.get(GcpAttr.PROJECT),
