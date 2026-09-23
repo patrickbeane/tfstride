@@ -153,6 +153,7 @@ include = [
   "src/tfstride/providers/gcp/firewall_matches.py",
   "src/tfstride/providers/gcp/firewall_ingress_evidence.py",
   "src/tfstride/providers/gcp/resource_decoration/vpc_firewall_ingress.py",
+  "src/tfstride/providers/gcp/resource_decoration/firewall_packet_subsets.py",
   "src/tfstride/providers/gcp/resource_decoration/compute_firewall_exposure.py",
   "src/tfstride/providers/gcp/resource_decoration/firewall_uncertainty.py",
   "src/tfstride/providers/gcp/resource_decoration/firewall_policy_hierarchy.py",

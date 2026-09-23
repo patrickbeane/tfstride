@@ -193,7 +193,10 @@ class GcpFirewallPolicyOrderTests(unittest.TestCase):
         result = _result(_base() + _policy("org", "organizations/1", "allow", 50000) + folder)
         self.assertTrue(result[0])
         self.assertEqual(result[1], ["google_compute_firewall_policy_rule.org"])
-        self.assertEqual(result[3], [])
+        # SSH terminates at the organization allow. Other traffic still reaches
+        # the folder's unknown match and retains that uncertainty.
+        self.assertEqual(result[3], ["google_compute_firewall_policy_rule.folder: match is unknown after planning"])
+        self.assertEqual((result[4][0]["from_port"], result[4][0]["to_port"]), (22, 22))
 
     def test_unknown_same_policy_priority_can_override_even_when_raw_priority_is_lower(self):
         uncertain = _rule("uncertain", "id-org", "deny", 1000, {"priority": True})

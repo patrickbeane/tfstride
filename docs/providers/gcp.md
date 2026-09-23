@@ -83,7 +83,7 @@ GCP trust-boundary coverage includes public compute, GKE control planes, Cloud R
 
 Hierarchical firewall policies follow modeled attachment scopes and project/folder ancestry, with rule priorities compared only within each policy. The VPC's host project supplies ancestry for Shared VPC workloads. A policy's `parent` identifies its owner, and a rule's `target_resources` restricts its targets; neither establishes an attachment. Missing or ambiguous associations and ancestry remain explicit ingress uncertainty and cannot establish unrestricted fallback to VPC firewall rules.
 
-Policy traversal currently selects a terminal matching policy rule for the instance. Per-packet policy progression, including partial `goto_next` matches, remains a limitation; VPC firewall precedence already preserves protocol/port subsets.
+Firewall policy actions apply to protocol/port subsets independently for IPv4 and IPv6. Allow and deny terminate only matching traffic; `goto_next` delegates only its matching traffic and skips the remaining rules of that policy for that traffic. Other traffic continues through the current policy, and only the surviving traffic reaches VPC rules. Partial or unresolved source-CIDR constraints remain conservative uncertainty for their possible protocol/port subsets; source-CIDR subtraction is not yet modeled.
 
 ## Rule Coverage
 

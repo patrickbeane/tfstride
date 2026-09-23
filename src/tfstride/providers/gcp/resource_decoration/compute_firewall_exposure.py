@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from tfstride.models import NormalizedResource
-from tfstride.providers.gcp.firewall_ingress_evidence import describe_effective_ingress, effective_ingress_rule
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.firewall_decisions import (
     FirewallIngressDecision,
-    FirewallIngressSource,
 )
 from tfstride.providers.gcp.resource_decoration.firewall_policy_exposure import (
     firewall_policy_ingress_decision,
@@ -16,7 +14,6 @@ from tfstride.providers.gcp.resource_decoration.firewall_targets import (
 )
 from tfstride.providers.gcp.resource_decoration.firewall_uncertainty import (
     firewall_field_is_uncertain,
-    uncertain_match_can_override,
 )
 from tfstride.providers.gcp.resource_decoration.network_posture import (
     resource_has_network_reference,
@@ -24,7 +21,6 @@ from tfstride.providers.gcp.resource_decoration.network_posture import (
 from tfstride.providers.gcp.resource_decoration.vpc_firewall_ingress import evaluate_vpc_firewall_ingress
 from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.gcp.resource_mutations import gcp_mutations
-from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 def derive_public_compute_exposure(resource: NormalizedResource, index: GcpResourceIndex) -> None:
@@ -52,54 +48,19 @@ def _compute_internet_ingress_decision(
     index: GcpResourceIndex,
 ) -> FirewallIngressDecision:
     policy_decision = firewall_policy_ingress_decision(resource, index)
-    decision = (
-        evaluate_vpc_firewall_ingress(
-            tuple(firewall for firewall in index.firewalls if _firewall_applies_to_instance(firewall, resource, index))
-        )
-        if policy_decision.continues_to_compute_firewalls
-        else FirewallIngressDecision(sources=policy_decision.sources)
+    vpc_decision = evaluate_vpc_firewall_ingress(
+        tuple(firewall for firewall in index.firewalls if _firewall_applies_to_instance(firewall, resource, index)),
+        incoming=policy_decision.continuing,
     )
-    policy_uncertainties = policy_decision.uncertain_matches
-    uncertainties = tuple(
-        sorted(
-            {
-                *decision.uncertainties,
-                *policy_decision.uncertainties,
-                *(
-                    f"{firewall.address}: {reason}"
-                    for firewall, match in policy_uncertainties
-                    for reason in match["uncertainties"]
-                ),
-            }
-        )
+    return FirewallIngressDecision(
+        sources=tuple(
+            sorted(
+                (*policy_decision.ingress.sources, *vpc_decision.sources),
+                key=lambda source: source.resource.address,
+            )
+        ),
+        uncertainties=tuple(sorted(set(policy_decision.ingress.uncertainties) | set(vpc_decision.uncertainties))),
     )
-    effective_sources: list[FirewallIngressSource] = []
-    for source in decision.sources:
-        is_policy = source.resource.resource_type == GcpResourceType.COMPUTE_FIREWALL_POLICY_RULE
-        paths = tuple(
-            ingress
-            for ingress in source.effective_ingress
-            if not any(
-                uncertain_match_can_override(
-                    match,
-                    source.resource,
-                    effective_ingress_rule(ingress),
-                    same_policy=bool(is_policy and policy_decision.same_policy(source.resource, firewall)),
-                    policy_constraint=True,
-                    excluded_protocols=tuple(ingress["excluded_protocols"]),
-                )
-                for firewall, match in policy_uncertainties
-            )
-        )
-        if paths:
-            effective_sources.append(
-                FirewallIngressSource(
-                    resource=source.resource,
-                    internet_ingress_reasons=tuple(describe_effective_ingress(source.resource, path) for path in paths),
-                    effective_ingress=paths,
-                )
-            )
-    return FirewallIngressDecision(sources=tuple(effective_sources), uncertainties=uncertainties)
 
 
 def _firewall_applies_to_instance(
