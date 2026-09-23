@@ -63,7 +63,7 @@ class _ProviderInventoryCase:
 _AWS_DECORATED_RESOURCES = (
     _DecoratedResourceExpectation(
         address="aws_instance.app",
-        vpc_id="vpc-001",
+        vpc_id="vpc-00000001",
         subnet_ids=("subnet-public-001",),
         security_group_ids=("sg-app-001",),
         public_access_configured=True,
@@ -102,7 +102,7 @@ _AWS_DECORATED_RESOURCES = (
     ),
     _DecoratedResourceExpectation(
         address="aws_lambda_function.processor",
-        vpc_id="vpc-001",
+        vpc_id="vpc-00000001",
         subnet_ids=("subnet-private-001",),
         security_group_ids=("sg-app-001",),
         attached_role_arns=("arn:aws:iam::111122223333:role/workload-role",),

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from tfstride.analysis.boundaries.shared import PublicPrivateSubnetBoundaryContributor
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.models import BoundaryType
+from tfstride.providers.azure.resource_index import AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import AZURE_COMPUTE_RESOURCE_TYPES
 
 
@@ -9,6 +11,9 @@ class AzureBoundaryContributor:
     def contribute(self, context: BoundaryContributionContext) -> None:
         if context.inventory.provider != "azure":
             return
+        PublicPrivateSubnetBoundaryContributor(
+            AzureResourceIndexBuilder().build(list(context.inventory.resources)).subnet_network_scope
+        ).contribute(context)
         for virtual_machine in context.inventory.by_type(*AZURE_COMPUTE_RESOURCE_TYPES):
             if not virtual_machine.direct_internet_reachable:
                 continue

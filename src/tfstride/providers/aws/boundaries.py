@@ -4,7 +4,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
-from tfstride.analysis.boundaries.shared import contribute_control_to_workload_boundary
+from tfstride.analysis.boundaries.shared import (
+    PublicPrivateSubnetBoundaryContributor,
+    contribute_control_to_workload_boundary,
+)
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
@@ -60,6 +63,9 @@ class AwsBoundaryContributor:
         resources = inventory.resources
         indexes = context.indexes
         security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
+        PublicPrivateSubnetBoundaryContributor(
+            security_group_relationships.resource_index.subnet_network_scope
+        ).contribute(context)
 
         data_store_candidates = _build_data_store_candidate_index(
             resources,

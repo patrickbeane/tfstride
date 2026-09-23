@@ -27,19 +27,22 @@ AWS_PROVIDER = "aws"
 
 def normalize_vpc(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    uncertainties: list[str] = []
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.NETWORK,
-        identifier=values.get("id"),
+        identifier=known_string(values, resource.unknown_values, "id", uncertainties, require_string=True),
+        arn=known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True),
         metadata={AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"), "tags": values.get("tags", {})},
     )
 
 
 def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    uncertainties: list[str] = []
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -47,7 +50,7 @@ def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
         name=resource.name,
         category=ResourceCategory.NETWORK,
         identifier=values.get("id"),
-        vpc_id=values.get("vpc_id"),
+        vpc_id=known_string(values, resource.unknown_values, "vpc_id", uncertainties, require_string=True),
         metadata={
             AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"),
             "availability_zone": values.get("availability_zone"),

@@ -43,6 +43,7 @@ include = [
   "src/tfstride/providers/normalization.py",
   "src/tfstride/providers/resource_facts.py",
   "src/tfstride/providers/resource_reference_index.py",
+  "src/tfstride/providers/network_scope.py",
   "src/tfstride/resource_metadata.py",
 
   # Provider resource-reference indexes.
@@ -66,8 +67,15 @@ include = [
   "src/tfstride/analysis/indexes.py",
   "src/tfstride/analysis/preparation.py",
   "src/tfstride/analysis/boundaries/types.py",
+  "src/tfstride/analysis/boundaries/core.py",
+  "src/tfstride/analysis/boundaries/shared.py",
   "src/tfstride/analysis/rule_definitions.py",
   "src/tfstride/analysis/privileged_assignment_evaluator.py",
+
+  # Provider-owned trust boundaries and network-scope resolution.
+  "src/tfstride/providers/aws/boundaries.py",
+  "src/tfstride/providers/gcp/boundaries.py",
+  "src/tfstride/providers/azure/boundaries.py",
 
   # Terraform plan configuration-reference resolution.
   "src/tfstride/input/configuration_references.py",

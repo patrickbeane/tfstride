@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable
 
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.resource_concepts import is_public_edge_resource, is_subnet_resource
 from tfstride.models import BoundaryType, NormalizedResource
+from tfstride.providers.network_scope import NetworkScopeKey, NetworkScopeResolution
 
 
 class InternetToServiceBoundaryContributor:
@@ -21,24 +22,30 @@ class InternetToServiceBoundaryContributor:
 
 
 class PublicPrivateSubnetBoundaryContributor:
+    def __init__(self, resolve_network: Callable[[NormalizedResource], NetworkScopeResolution]) -> None:
+        self._resolve_network = resolve_network
+
     def contribute(self, context: BoundaryContributionContext) -> None:
-        resources = context.inventory.resources
-        public_subnets = [
-            resource for resource in resources if is_subnet_resource(resource) and resource.is_public_subnet
-        ]
-        private_subnets_by_vpc = _private_subnets_by_vpc(resources)
-        for public_subnet in public_subnets:
-            if not public_subnet.vpc_id:
+        public_subnets: list[tuple[NormalizedResource, NetworkScopeKey, str]] = []
+        private_subnets_by_network: dict[NetworkScopeKey, list[NormalizedResource]] = {}
+        subnets = (resource for resource in context.inventory.resources if is_subnet_resource(resource))
+        for subnet in sorted(subnets, key=lambda resource: resource.address):
+            network = self._resolve_network(subnet)
+            if network.key is None:
                 continue
-            for private_subnet in private_subnets_by_vpc.get(public_subnet.vpc_id, ()):
-                # Model segmentation at the trust-zone level rather than every possible route;
-                # for review purposes, "public subnet can reach private subnet" is the key edge.
+            if subnet.is_public_subnet:
+                public_subnets.append((subnet, network.key, network.reason))
+            else:
+                private_subnets_by_network.setdefault(network.key, []).append(subnet)
+        for public_subnet, network_key, network_reason in public_subnets:
+            for private_subnet in private_subnets_by_network.get(network_key, ()):
                 context.add_boundary(
                     BoundaryType.PUBLIC_TO_PRIVATE,
                     public_subnet.address,
                     private_subnet.address,
-                    f"Traffic can move from {public_subnet.display_name} toward {private_subnet.display_name}.",
-                    "The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.",
+                    f"{public_subnet.display_name} and {private_subnet.display_name} occupy separate trust zones in the same network.",
+                    f"{network_reason} The network contains a publicly routable segment and a private trust zone. "
+                    "Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.",
                 )
 
 
@@ -56,12 +63,3 @@ def contribute_control_to_workload_boundary(
         f"{attached_role.display_name} governs actions performed by {workload.display_name}.",
         "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
     )
-
-
-def _private_subnets_by_vpc(resources: Sequence[NormalizedResource]) -> dict[str, tuple[NormalizedResource, ...]]:
-    grouped: dict[str, list[NormalizedResource]] = {}
-    for resource in resources:
-        if not is_subnet_resource(resource) or resource.is_public_subnet or not resource.vpc_id:
-            continue
-        grouped.setdefault(resource.vpc_id, []).append(resource)
-    return {vpc_id: tuple(subnets) for vpc_id, subnets in grouped.items()}

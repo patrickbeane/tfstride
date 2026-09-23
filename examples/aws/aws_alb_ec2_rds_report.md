@@ -45,15 +45,15 @@ This run identified **4 trust boundaries** and **4 findings** across **19 normal
 
 - Source: `aws_subnet.public_edge`
 - Target: `aws_subnet.private_app`
-- Description: Traffic can move from aws_subnet.public_edge toward aws_subnet.private_app.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_edge and aws_subnet.private_app occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `public-subnet-to-private-subnet`
 
 - Source: `aws_subnet.public_edge`
 - Target: `aws_subnet.private_data`
-- Description: Traffic can move from aws_subnet.public_edge toward aws_subnet.private_data.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_edge and aws_subnet.private_data occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `workload-to-data-store`
 
@@ -106,8 +106,8 @@ No findings in this severity band.
 - Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
 - Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
 - Evidence:
-  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-web-001; cidr_block=10.20.0.0/16
-  - flow log coverage: target_vpc_id=vpc-web-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-00000004; cidr_block=10.20.0.0/16
+  - flow log coverage: target_vpc_id=vpc-00000004; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 ### Low
 

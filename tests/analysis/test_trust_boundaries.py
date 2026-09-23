@@ -378,7 +378,7 @@ class TrustBoundaryIndexTests(unittest.TestCase):
             ],
         )
 
-    def test_public_private_subnet_boundaries_are_indexed_by_vpc(self) -> None:
+    def test_public_private_subnet_boundaries_are_indexed_by_scoped_vpc(self) -> None:
         public_a = _resource(
             address="aws_subnet.public_a",
             resource_type="aws_subnet",
@@ -429,6 +429,8 @@ class TrustBoundaryIndexTests(unittest.TestCase):
             ],
         )
 
+        for subnet in inventory.resources:
+            subnet.provider_config_key = "aws"
         boundaries = detect_trust_boundaries(inventory)
 
         public_to_private_pairs = [

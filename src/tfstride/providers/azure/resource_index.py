@@ -8,6 +8,7 @@ from types import MappingProxyType
 from tfstride.models import NormalizedResource
 from tfstride.providers.azure.resource_types import AzureResourceType
 from tfstride.providers.azure.resource_utils import azure_reference_key, azure_resource_references
+from tfstride.providers.network_scope import NetworkScopeResolution, resolve_subnet_network_scope
 from tfstride.providers.resource_reference_index import (
     ResourceReferenceIndex,
     ResourceReferenceResolution,
@@ -103,6 +104,56 @@ class AzureResourceIndex:
     network_security_rules: tuple[NormalizedResource, ...]
     subnet_nsg_associations: tuple[NormalizedResource, ...]
     nic_nsg_associations: tuple[NormalizedResource, ...]
+
+    def subnet_network_scope(self, subnet: NormalizedResource) -> NetworkScopeResolution:
+        return resolve_subnet_network_scope(
+            subnet,
+            attribute="virtual_network_name",
+            reference_suffixes=(".name", ".id"),
+            resolve=lambda reference: self._subnet_network_scope(subnet, reference),
+        )
+
+    def _subnet_network_scope(self, subnet: NormalizedResource, reference: str | None) -> NetworkScopeResolution:
+        view = self.resources_by_reference
+        resolution = view.resolve(reference, source=subnet, resource_types={AzureResourceType.VIRTUAL_NETWORK})
+        if resolution.state == "ambiguous":
+            return NetworkScopeResolution(None, resolution, "The VNet reference matches multiple networks.")
+        candidate = resolution.selected_candidate
+        strong = (
+            reference is not None
+            and candidate is not None
+            and _azure_reference_is_strong_for_candidate(reference, candidate)
+        )
+        subscription, resource_group = _resource_arm_scope(subnet)
+        if candidate is not None:
+            if not strong and (subscription is None or resource_group is None):
+                return NetworkScopeResolution(
+                    None, resolution, "The weak VNet reference has unknown subscription or resource-group scope."
+                )
+            return NetworkScopeResolution(
+                ("azure", "resource", candidate.address),
+                resolution,
+                f"VNet membership resolves to `{candidate.address}`.",
+            )
+        key = azure_reference_key(reference)
+        if re.fullmatch(
+            r"/subscriptions/[^/]+/resourcegroups/[^/]+/providers/microsoft\.network/virtualnetworks/[^/]+", key
+        ):
+            return NetworkScopeResolution(
+                ("azure", "arm", key), resolution, f"VNet membership uses the full ARM identity `{key}`."
+            )
+        if subscription is not None and resource_group is not None and re.fullmatch(r"[a-z0-9_.-]+", key):
+            # ARM scope, not provider-alias equality, establishes the namespace.
+            return NetworkScopeResolution(
+                (
+                    "azure",
+                    "arm",
+                    f"/subscriptions/{subscription}/resourcegroups/{resource_group}/providers/microsoft.network/virtualnetworks/{key}",
+                ),
+                resolution,
+                f"VNet name `{key}` is scoped to subscription `{subscription}` and resource group `{resource_group}`.",
+            )
+        return NetworkScopeResolution(None, resolution, "The VNet reference or its ARM scope is unresolved.")
 
     def resolve(
         self,

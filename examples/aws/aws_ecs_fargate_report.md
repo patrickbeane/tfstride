@@ -51,15 +51,15 @@ This run identified **6 trust boundaries** and **12 findings** across **21 norma
 
 - Source: `aws_subnet.public_a`
 - Target: `aws_subnet.private_app`
-- Description: Traffic can move from aws_subnet.public_a toward aws_subnet.private_app.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_a and aws_subnet.private_app occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `public-subnet-to-private-subnet`
 
 - Source: `aws_subnet.public_b`
 - Target: `aws_subnet.private_app`
-- Description: Traffic can move from aws_subnet.public_b toward aws_subnet.private_app.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_b and aws_subnet.private_app occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `workload-to-data-store`
 
@@ -203,8 +203,8 @@ This run identified **6 trust boundaries** and **12 findings** across **21 norma
 - Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
 - Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
 - Evidence:
-  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-ecs-001; cidr_block=10.60.0.0/16
-  - flow log coverage: target_vpc_id=vpc-ecs-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-00000006; cidr_block=10.60.0.0/16
+  - flow log coverage: target_vpc_id=vpc-00000006; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload role carries sensitive permissions
 
@@ -224,12 +224,12 @@ This run identified **6 trust boundaries** and **12 findings** across **21 norma
 - Affected resources: `aws_ecs_service.app`, `aws_iam_role.task`
 - Trust boundary: `not-applicable`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
-- Rationale: aws_ecs_service.app runs in VPC `vpc-ecs-001` and inherits Secrets Manager secret retrieval from aws_iam_role.task, but the Terraform plan does not show a Secrets Manager interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
+- Rationale: aws_ecs_service.app runs in VPC `vpc-00000006` and inherits Secrets Manager secret retrieval from aws_iam_role.task, but the Terraform plan does not show a Secrets Manager interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
 - Recommended mitigation: Add a Secrets Manager interface VPC endpoint with private DNS enabled for VPC workloads that retrieve secrets, and narrow endpoint policies where possible.
 - Evidence:
-  - target workload: address=aws_ecs_service.app; type=aws_ecs_service; vpc_id=vpc-ecs-001; subnet_ids=[subnet-ecs-private-app]; security_group_ids=[sg-ecs-service]
+  - target workload: address=aws_ecs_service.app; type=aws_ecs_service; vpc_id=vpc-00000006; subnet_ids=[subnet-ecs-private-app]; security_group_ids=[sg-ecs-service]
   - sensitive service dependency: service=secretsmanager; role=aws_iam_role.task; actions=[secretsmanager:GetSecretValue]; resources=[*]
-  - vpc endpoint coverage: vpc_id=vpc-ecs-001; service=secretsmanager; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
+  - vpc endpoint coverage: vpc_id=vpc-00000006; service=secretsmanager; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[secretsmanager:GetSecretValue] resources=[*]
 
 ### Low

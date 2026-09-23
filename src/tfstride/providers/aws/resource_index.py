@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from tfstride.models import NormalizedResource
@@ -11,6 +12,7 @@ from tfstride.providers.aws.resource_utils import (
     ecs_task_definition_identifier,
     route_table_has_internet_route,
 )
+from tfstride.providers.network_scope import NetworkScopeResolution, resolve_subnet_network_scope
 from tfstride.providers.resource_reference_index import (
     ResourceReferenceIndex,
     ResourceReferenceResolution,
@@ -18,6 +20,7 @@ from tfstride.providers.resource_reference_index import (
 )
 
 _AWS_ADDRESS_REFERENCE_SUFFIXES_BY_RESOURCE_TYPE: dict[str, tuple[str, ...]] = {
+    "aws_vpc": ("id", "arn"),
     "aws_secretsmanager_secret": ("id", "arn"),
     "aws_sns_topic": ("id", "arn"),
     "aws_sqs_queue": ("id", "arn", "url"),
@@ -133,6 +136,7 @@ def aws_reference_relationship_key(
 @dataclass(slots=True)
 class AwsResourceIndex:
     account_identities: AwsAccountIdentityIndex
+    vpcs: AwsResourceReferenceView
     subnets: AwsResourceReferenceView
     security_groups: AwsResourceReferenceView
     route_tables: AwsResourceReferenceView
@@ -160,6 +164,47 @@ class AwsResourceIndex:
     vpcs_with_public_routes: set[AwsScopedReferenceKey]
     nat_gateway_ids: set[AwsScopedReferenceKey]
     resources_by_address: dict[str, NormalizedResource]
+
+    def subnet_network_scope(self, subnet: NormalizedResource) -> NetworkScopeResolution:
+        return resolve_subnet_network_scope(
+            subnet,
+            attribute="vpc_id",
+            reference_suffixes=(".id", ".arn"),
+            resolve=lambda reference: self._subnet_network_scope(subnet, reference),
+        )
+
+    def _subnet_network_scope(self, subnet: NormalizedResource, reference: str | None) -> NetworkScopeResolution:
+        resolution = self.vpcs.resolve(reference, source=subnet)
+        if resolution.state == "ambiguous":
+            return NetworkScopeResolution(None, resolution, "The VPC reference matches multiple networks.")
+        candidate = resolution.selected_candidate
+        strong = reference is not None and (
+            (candidate is not None and reference in (candidate.address, *_aws_address_reference_aliases(candidate)))
+            or re.fullmatch(r"arn:aws(?:-[a-z0-9-]+)?:ec2:[a-z0-9-]+:[0-9]{12}:vpc/vpc-[a-z0-9]+", reference)
+            is not None
+        )
+        if not strong and not subnet.provider_config_key:
+            return NetworkScopeResolution(
+                None, resolution, "The weak VPC reference has unknown provider configuration."
+            )
+        if not strong and not re.fullmatch(r"vpc-[a-z0-9]+", reference or ""):
+            return NetworkScopeResolution(None, resolution, "The VPC reference is missing, unsupported, or unresolved.")
+        if candidate is not None and not strong and candidate.provider_config_key != subnet.provider_config_key:
+            return NetworkScopeResolution(
+                None, resolution, "The weak VPC reference does not establish local network scope."
+            )
+        key = aws_reference_relationship_key(self.vpcs, reference, source=subnet)
+        if strong and candidate is None:
+            key = ("arn", None, reference) if reference is not None else None
+        return NetworkScopeResolution(
+            ("aws", *key) if key is not None else None,
+            resolution,
+            f"VPC membership resolves to `{candidate.address}`."
+            if candidate is not None
+            else f"VPC membership uses the strong identity `{reference}`."
+            if strong
+            else f"VPC reference `{reference}` is scoped to provider configuration `{subnet.provider_config_key}`.",
+        )
 
 
 @dataclass(slots=True)
@@ -212,6 +257,7 @@ class AwsResourceIndexBuilder:
 
         return AwsResourceIndex(
             account_identities=build_aws_account_identity_index(resource_tuple),
+            vpcs=view("aws_vpc"),
             subnets=view("aws_subnet"),
             security_groups=view("aws_security_group"),
             route_tables=view("aws_route_table"),
@@ -248,7 +294,9 @@ def _aws_resource_references(resource: NormalizedResource) -> tuple[str | None, 
     address = resource.address
     address_aliases = _aws_address_reference_aliases(resource)
 
-    if resource_type in {"aws_subnet", "aws_security_group", "aws_route_table"}:
+    if resource_type == "aws_vpc":
+        aliases = (resource.identifier, resource.arn, *address_aliases)
+    elif resource_type in {"aws_subnet", "aws_security_group", "aws_route_table"}:
         aliases = (resource.identifier,)
     elif resource_type == "aws_s3_bucket":
         aliases = (resource.identifier, resource.arn)

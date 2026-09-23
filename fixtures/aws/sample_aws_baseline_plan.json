@@ -11,7 +11,7 @@
           "name": "main",
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
-            "id": "vpc-safe-001",
+            "id": "vpc-00000002",
             "cidr_block": "10.10.0.0/16",
             "tags": {
               "Name": "safe-main"
@@ -26,7 +26,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-safe-public-001",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "cidr_block": "10.10.1.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": true,
@@ -43,7 +43,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-safe-private-app-001",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "cidr_block": "10.10.2.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": false,
@@ -60,7 +60,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-safe-private-data-001",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "cidr_block": "10.10.3.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": false,
@@ -77,7 +77,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "igw-safe-001",
-            "vpc_id": "vpc-safe-001"
+            "vpc_id": "vpc-00000002"
           }
         },
         {
@@ -88,7 +88,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "rtb-safe-001",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "route": [
               {
                 "cidr_block": "0.0.0.0/0",
@@ -118,7 +118,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "rtb-safe-private-001",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "route": [
               {
                 "cidr_block": "0.0.0.0/0",
@@ -173,7 +173,7 @@
             "id": "sg-safe-lb-001",
             "name": "safe-lb-sg",
             "description": "Public load balancer ingress only",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "ingress": [
               {
                 "description": "HTTPS from internet",
@@ -211,7 +211,7 @@
             "id": "sg-safe-app-001",
             "name": "safe-app-sg",
             "description": "Application tier only reachable from the load balancer",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "ingress": [],
             "egress": [
               {
@@ -256,7 +256,7 @@
             "id": "sg-safe-db-001",
             "name": "safe-db-sg",
             "description": "Database ingress only from the app tier",
-            "vpc_id": "vpc-safe-001",
+            "vpc_id": "vpc-00000002",
             "ingress": [],
             "egress": [
               {
@@ -459,6 +459,200 @@
               }
             ]
           }
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws"
+      }
+    },
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_vpc.main",
+          "mode": "managed",
+          "type": "aws_vpc",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.public_edge",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "public_edge",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.private_app",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.private_data",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_data",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_internet_gateway.main",
+          "mode": "managed",
+          "type": "aws_internet_gateway",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table.public",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "public",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_nat_gateway.main",
+          "mode": "managed",
+          "type": "aws_nat_gateway",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table.private",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "private",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.public_edge",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "public_edge",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.private_app",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "private_app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.private_data",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "private_data",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.lb",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "lb",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.app",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group_rule.app_from_lb",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "app_from_lb",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.db",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "db",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group_rule.db_from_app",
+          "mode": "managed",
+          "type": "aws_security_group_rule",
+          "name": "db_from_app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lb.web",
+          "mode": "managed",
+          "type": "aws_lb",
+          "name": "web",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_instance.app",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_db_instance.app",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_s3_bucket.artifacts",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "artifacts",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_s3_bucket_public_access_block.artifacts",
+          "mode": "managed",
+          "type": "aws_s3_bucket_public_access_block",
+          "name": "artifacts",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_role.workload",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "workload",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_policy.artifact_read",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "artifact_read",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_role_policy_attachment.workload_artifact_read",
+          "mode": "managed",
+          "type": "aws_iam_role_policy_attachment",
+          "name": "workload_artifact_read",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_policy.observability",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "observability",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lambda_function.processor",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "processor",
+          "provider_config_key": "aws"
         }
       ]
     }

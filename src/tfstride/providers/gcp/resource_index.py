@@ -29,6 +29,7 @@ from tfstride.providers.gcp.resource_utils import (
     is_gcp_terraform_resource_address,
     normalize_gcp_project,
 )
+from tfstride.providers.network_scope import NetworkScopeResolution, resolve_subnet_network_scope
 from tfstride.providers.resource_reference_index import (
     ResourceReferenceIndex,
     ResourceReferenceResolution,
@@ -150,6 +151,40 @@ class GcpNetworkReferenceView:
     """Expose canonical network addresses over scope-aware resource resolution."""
 
     _resources: GcpResourceReferenceView
+
+    def subnet_network_scope(self, subnet: NormalizedResource) -> NetworkScopeResolution:
+        return resolve_subnet_network_scope(
+            subnet,
+            attribute="network",
+            reference_suffixes=(".id", ".name", ".self_link"),
+            resolve=lambda reference: self._subnet_network_scope(subnet, reference),
+        )
+
+    def _subnet_network_scope(self, subnet: NormalizedResource, reference: str | None) -> NetworkScopeResolution:
+        resolution = self.resolve(reference, source=subnet)
+        if resolution.state == "ambiguous":
+            return NetworkScopeResolution(None, resolution, "The network reference matches multiple networks.")
+        candidate = resolution.selected_candidate
+        strong = (
+            reference is not None
+            and candidate is not None
+            and _gcp_reference_is_strong_for_candidate(reference, candidate)
+        )
+        explicit_project, _ = _scope_from_reference(reference or "")
+        if not strong and explicit_project is None and _resource_project(subnet) is None:
+            return NetworkScopeResolution(None, resolution, "The weak network reference has unknown project scope.")
+        if candidate is None:
+            normalized = _gcp_reference_key(reference or "")
+            if not re.fullmatch(r"(?:projects/[^/]+/global/networks/)?[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?", normalized):
+                return NetworkScopeResolution(
+                    None, resolution, "The network reference is missing, unsupported, or unresolved."
+                )
+        key = self.canonical_reference(reference, source=subnet)
+        return NetworkScopeResolution(
+            ("gcp", key) if key is not None else None,
+            resolution,
+            f"Network membership resolves to `{key}` using a strong identity or a project-scoped reference.",
+        )
 
     def resolve(
         self,

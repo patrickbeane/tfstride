@@ -33,15 +33,15 @@ This run identified **6 trust boundaries** and **0 findings** across **28 normal
 
 - Source: `aws_subnet.public_edge`
 - Target: `aws_subnet.private_app`
-- Description: Traffic can move from aws_subnet.public_edge toward aws_subnet.private_app.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_edge and aws_subnet.private_app occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `public-subnet-to-private-subnet`
 
 - Source: `aws_subnet.public_edge`
 - Target: `aws_subnet.private_data`
-- Description: Traffic can move from aws_subnet.public_edge toward aws_subnet.private_data.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_edge and aws_subnet.private_data occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `workload-to-data-store`
 

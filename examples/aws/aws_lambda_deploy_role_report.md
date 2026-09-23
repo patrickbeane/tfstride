@@ -40,8 +40,8 @@ This run identified **4 trust boundaries** and **6 findings** across **13 normal
 
 - Source: `aws_subnet.public_edge`
 - Target: `aws_subnet.private_app`
-- Description: Traffic can move from aws_subnet.public_edge toward aws_subnet.private_app.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_edge and aws_subnet.private_app occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `workload-to-data-store`
 
@@ -125,8 +125,8 @@ No findings in this severity band.
 - Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
 - Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
 - Evidence:
-  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-lambda-001; cidr_block=10.30.0.0/16
-  - flow log coverage: target_vpc_id=vpc-lambda-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-00000005; cidr_block=10.30.0.0/16
+  - flow log coverage: target_vpc_id=vpc-00000005; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload role carries sensitive permissions
 
@@ -146,12 +146,12 @@ No findings in this severity band.
 - Affected resources: `aws_lambda_function.deployer`, `aws_iam_role.deployer`
 - Trust boundary: `not-applicable`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
-- Rationale: aws_lambda_function.deployer runs in VPC `vpc-lambda-001` and inherits S3 data-plane permissions from aws_iam_role.deployer, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
+- Rationale: aws_lambda_function.deployer runs in VPC `vpc-00000005` and inherits S3 data-plane permissions from aws_iam_role.deployer, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
 - Recommended mitigation: Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private subnets through it, and use endpoint policies where possible.
 - Evidence:
-  - target workload: address=aws_lambda_function.deployer; type=aws_lambda_function; vpc_id=vpc-lambda-001; subnet_ids=[subnet-lambda-private-app-001]; security_group_ids=[sg-lambda-app-001]
+  - target workload: address=aws_lambda_function.deployer; type=aws_lambda_function; vpc_id=vpc-00000005; subnet_ids=[subnet-lambda-private-app-001]; security_group_ids=[sg-lambda-app-001]
   - sensitive service dependency: service=s3; role=aws_iam_role.deployer; actions=[s3:GetObject]; resources=[arn:aws:lambda:us-east-1:333344445555:function:release-deployer, arn:aws:iam::333344445555:role/lambda-runtime-role, arn:aws:s3:::lambda-deploy-artifacts/*]
-  - vpc endpoint coverage: vpc_id=vpc-lambda-001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
+  - vpc endpoint coverage: vpc_id=vpc-00000005; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[lambda:UpdateFunctionCode, lambda:UpdateAlias, iam:PassRole, s3:GetObject] resources=[arn:aws:lambda:us-east-1:333344445555:function:release-deployer, arn:aws:iam::333344445555:role/lambda-runtime-role, arn:aws:s3:::lambda-deploy-artifacts/*]
 
 ### Low

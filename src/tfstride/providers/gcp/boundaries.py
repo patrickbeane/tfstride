@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from tfstride.analysis.boundaries.shared import contribute_control_to_workload_boundary
+from tfstride.analysis.boundaries.shared import (
+    PublicPrivateSubnetBoundaryContributor,
+    contribute_control_to_workload_boundary,
+)
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.resource_concepts import (
@@ -26,6 +29,7 @@ from tfstride.providers.gcp.custom_roles import (
     custom_role_allows_data_store_access,
 )
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_index import build_gcp_network_reference_view
 from tfstride.providers.gcp.resource_utils import binding_members
 
 
@@ -53,6 +57,9 @@ class GcpBoundaryContributor:
         inventory = context.inventory
         resources = inventory.resources
         analysis_indexes = context.indexes
+        PublicPrivateSubnetBoundaryContributor(
+            build_gcp_network_reference_view(resources).subnet_network_scope
+        ).contribute(context)
 
         data_store_candidates = _build_data_store_candidate_index(
             resources,

@@ -287,7 +287,8 @@ class AwsNetworkAnalysisIntegrationTests(TFSIntegrationTestCase):
     def test_segmentation_finding_is_preserved_without_a_matching_data_boundary(self) -> None:
         result = TfStride(provider_boundary_contributor_factories={}).analyze_plan(FIXTURE_PATH)
         boundary_types = {boundary.boundary_type for boundary in result.trust_boundaries}
-        self.assertIn(BoundaryType.PUBLIC_TO_PRIVATE, boundary_types)
+        # Disabling provider contributors also disables provider network-scope resolution.
+        self.assertNotIn(BoundaryType.PUBLIC_TO_PRIVATE, boundary_types)
         self.assertNotIn(BoundaryType.WORKLOAD_TO_DATA_STORE, boundary_types)
 
         expected_findings = [

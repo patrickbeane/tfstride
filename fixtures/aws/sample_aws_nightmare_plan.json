@@ -11,7 +11,7 @@
           "name": "main",
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
-            "id": "vpc-bad-001",
+            "id": "vpc-00000003",
             "cidr_block": "10.20.0.0/16",
             "tags": {
               "Name": "nightmare-main"
@@ -26,7 +26,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-bad-public-001",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "cidr_block": "10.20.1.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": true,
@@ -43,7 +43,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-bad-private-ops-001",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "cidr_block": "10.20.2.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": false,
@@ -60,7 +60,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "subnet-bad-private-data-001",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "cidr_block": "10.20.3.0/24",
             "availability_zone": "us-east-1a",
             "map_public_ip_on_launch": false,
@@ -77,7 +77,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "igw-bad-001",
-            "vpc_id": "vpc-bad-001"
+            "vpc_id": "vpc-00000003"
           }
         },
         {
@@ -88,7 +88,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "rtb-bad-001",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "route": [
               {
                 "cidr_block": "0.0.0.0/0",
@@ -118,7 +118,7 @@
           "provider_name": "registry.terraform.io/hashicorp/aws",
           "values": {
             "id": "rtb-bad-private-001",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "route": [
               {
                 "cidr_block": "0.0.0.0/0",
@@ -173,7 +173,7 @@
             "id": "sg-bad-front-001",
             "name": "bad-front-sg",
             "description": "Open frontend security group",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "ingress": [
               {
                 "description": "Everything from the internet",
@@ -211,7 +211,7 @@
             "id": "sg-bad-admin-001",
             "name": "bad-admin-sg",
             "description": "Remote admin directly from the internet",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "ingress": [
               {
                 "description": "RDP from internet",
@@ -249,7 +249,7 @@
             "id": "sg-bad-db-001",
             "name": "bad-db-sg",
             "description": "Database tier exposed to public and public app tiers",
-            "vpc_id": "vpc-bad-001",
+            "vpc_id": "vpc-00000003",
             "ingress": [
               {
                 "description": "Postgres from internet",
@@ -499,6 +499,193 @@
               }
             ]
           }
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws"
+      }
+    },
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_vpc.main",
+          "mode": "managed",
+          "type": "aws_vpc",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.public_web",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "public_web",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.private_ops",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_ops",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_subnet.private_data",
+          "mode": "managed",
+          "type": "aws_subnet",
+          "name": "private_data",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_internet_gateway.main",
+          "mode": "managed",
+          "type": "aws_internet_gateway",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table.public",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "public",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_nat_gateway.main",
+          "mode": "managed",
+          "type": "aws_nat_gateway",
+          "name": "main",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table.private",
+          "mode": "managed",
+          "type": "aws_route_table",
+          "name": "private",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.public_web",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "public_web",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.private_ops",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "private_ops",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_route_table_association.private_data",
+          "mode": "managed",
+          "type": "aws_route_table_association",
+          "name": "private_data",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.frontend",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "frontend",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.admin",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "admin",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_security_group.db",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "db",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lb.web",
+          "mode": "managed",
+          "type": "aws_lb",
+          "name": "web",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_instance.frontend",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "frontend",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_instance.admin",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "admin",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_db_instance.customer",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "customer",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_s3_bucket.assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "assets",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_s3_bucket.backups",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "backups",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_role.app",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "app",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_role.pipeline",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "pipeline",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_iam_policy.admin_like",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "admin_like",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lambda_function.processor",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "processor",
+          "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lambda_function.deployer",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "deployer",
+          "provider_config_key": "aws"
         }
       ]
     }

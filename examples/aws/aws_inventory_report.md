@@ -71,8 +71,8 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 
 - Source: `aws_subnet.public_app`
 - Target: `aws_subnet.private_data`
-- Description: Traffic can move from aws_subnet.public_app toward aws_subnet.private_data.
-- Rationale: The VPC contains both publicly routable and private network segments that should be treated as separate trust zones.
+- Description: aws_subnet.public_app and aws_subnet.private_data occupy separate trust zones in the same network.
+- Rationale: VPC membership resolves to `aws_vpc.main`. The network contains a publicly routable segment and a private trust zone. Common network membership does not establish packet reachability; routes and traffic controls require separate evaluation.
 
 ### `workload-to-data-store`
 
@@ -269,8 +269,8 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 - Rationale: aws_vpc.main does not have a resolved aws_flow_log targeting the VPC in this Terraform plan. Network traffic metadata for incident response, threat hunting, and segmentation review may be unavailable unless Flow Logs are configured elsewhere.
 - Recommended mitigation: Enable VPC Flow Logs for production VPCs, route them to a retained CloudWatch Logs, S3, or Firehose destination, and manage Flow Log resources in Terraform so network telemetry posture is reviewable.
 - Evidence:
-  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-001; cidr_block=10.0.0.0/16
-  - flow log coverage: target_vpc_id=vpc-001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
+  - target vpc: address=aws_vpc.main; type=aws_vpc; identifier=vpc-00000001; cidr_block=10.0.0.0/16
+  - flow log coverage: target_vpc_id=vpc-00000001; resolved_vpc_flow_log_count=0; aws_flow_log resources are not modeled
 
 #### Workload uses KMS without a VPC endpoint
 
@@ -278,12 +278,12 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 - Affected resources: `aws_lambda_function.processor`, `aws_iam_role.workload`
 - Trust boundary: `not-applicable`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
-- Rationale: aws_lambda_function.processor runs in VPC `vpc-001` and inherits KMS cryptographic key access from aws_iam_role.workload, but the Terraform plan does not show a KMS interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
+- Rationale: aws_lambda_function.processor runs in VPC `vpc-00000001` and inherits KMS cryptographic key access from aws_iam_role.workload, but the Terraform plan does not show a KMS interface VPC endpoint for that VPC. Calls to the sensitive service may therefore depend on public AWS service endpoints, NAT, or another egress path.
 - Recommended mitigation: Add a KMS interface VPC endpoint with private DNS enabled for VPC workloads that perform key operations, and narrow endpoint policies where possible.
 - Evidence:
-  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
+  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-00000001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
   - sensitive service dependency: service=kms; role=aws_iam_role.workload; actions=[kms:Decrypt]; resources=[*]
-  - vpc endpoint coverage: vpc_id=vpc-001; service=kms; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
+  - vpc endpoint coverage: vpc_id=vpc-00000001; service=kms; expected_endpoint_type=interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[s3:*, kms:Decrypt, iam:PassRole, sts:AssumeRole] resources=[*]
 
 #### Workload uses S3 without a VPC endpoint
@@ -292,12 +292,12 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 - Affected resources: `aws_lambda_function.processor`, `aws_iam_role.workload`
 - Trust boundary: `not-applicable`
 - Severity reasoning: internet_exposure +0, privilege_breadth +1, data_sensitivity +1, lateral_movement +1, blast_radius +1, final_score 4 => medium
-- Rationale: aws_lambda_function.processor runs in VPC `vpc-001` and inherits S3 data-plane permissions from aws_iam_role.workload, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
+- Rationale: aws_lambda_function.processor runs in VPC `vpc-00000001` and inherits S3 data-plane permissions from aws_iam_role.workload, but the Terraform plan does not show an S3 VPC endpoint for that VPC. S3 access may therefore depend on public AWS service endpoints, NAT, or another egress path; this does not imply the bucket itself is public.
 - Recommended mitigation: Add an S3 gateway or interface VPC endpoint for VPC workloads that access S3, route expected private subnets through it, and use endpoint policies where possible.
 - Evidence:
-  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
+  - target workload: address=aws_lambda_function.processor; type=aws_lambda_function; vpc_id=vpc-00000001; subnet_ids=[subnet-private-001]; security_group_ids=[sg-app-001]
   - sensitive service dependency: service=s3; role=aws_iam_role.workload; actions=[s3:*]; resources=[*]
-  - vpc endpoint coverage: vpc_id=vpc-001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
+  - vpc endpoint coverage: vpc_id=vpc-00000001; service=s3; expected_endpoint_type=gateway_or_interface; vpc_endpoint_coverage=missing
   - policy statements: Allow actions=[s3:*, kms:Decrypt, iam:PassRole, sts:AssumeRole] resources=[*]
 
 ### Low

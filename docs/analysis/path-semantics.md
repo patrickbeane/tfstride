@@ -61,3 +61,9 @@ Condition narrowing focuses on high-signal, provider-specific authorization keys
 ## Subnet classification
 
 Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.
+
+Public-to-private subnet boundaries describe separate trust zones within one provider-resolved network. Common network membership does **not** prove packet reachability; routes, security groups, firewall rules, and other traffic controls require separate evaluation.
+
+Network membership uses AWS VPC relationship keys, GCP project-scoped network resolution, or Azure subscription/resource-group-scoped VNet resolution. Exact Terraform addresses and strong native identities can resolve across provider configurations. Exact symbolic identity references from plan ingestion also qualify on first apply. Weak aliases need known provider scope (AWS), project scope (GCP), or subscription and resource-group scope (Azure); equal raw strings alone are insufficient. Unresolved or ambiguous references have no grouping key, and the resolution result retains the reason and modeled candidates. Plans without scope evidence can therefore have fewer subnet boundaries than otherwise equivalent plans that include configuration. This does not remove independently established workload-to-data findings.
+
+Provider boundary contributors supply these resolutions to the shared subnet boundary builder. Disabling a provider's boundary contributor also disables its subnet boundaries; the shared builder never falls back to raw `vpc_id` equality.

@@ -4,7 +4,6 @@ from collections.abc import Sequence
 
 from tfstride.analysis.boundaries.shared import (
     InternetToServiceBoundaryContributor,
-    PublicPrivateSubnetBoundaryContributor,
 )
 from tfstride.analysis.boundaries.types import (
     BoundaryAccumulator,
@@ -20,7 +19,6 @@ def default_boundary_contributors(
 ) -> tuple[BoundaryContributor, ...]:
     return (
         InternetToServiceBoundaryContributor(),
-        PublicPrivateSubnetBoundaryContributor(),
         *(provider_contributors or ()),
     )
 
