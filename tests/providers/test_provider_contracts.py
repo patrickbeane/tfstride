@@ -407,6 +407,15 @@ class ProviderEncapsulationContractTests(unittest.TestCase):
 
         self.assertEqual(raw_metadata_reads, set())
 
+    def test_security_relationships_do_not_use_legacy_first_match_identifier_lookup(self) -> None:
+        offenders = {
+            path.relative_to(SOURCE_ROOT).as_posix()
+            for root in (SOURCE_ROOT / "analysis", SOURCE_ROOT / "providers")
+            for path in root.rglob("*.py")
+            if ".get_by_identifier(" in path.read_text(encoding="utf-8")
+        }
+        self.assertEqual(offenders, set())
+
     def test_provider_fact_consumers_do_not_depend_on_shared_fact_facades(self) -> None:
         offenders: set[str] = set()
         for provider in ("aws", "gcp", "azure"):

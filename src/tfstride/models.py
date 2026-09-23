@@ -623,6 +623,7 @@ class ResourceInventory:
         return self._resources_by_address.get(address)
 
     def get_by_identifier(self, identifier: str) -> NormalizedResource | None:
+        """Legacy unscoped first match; use provider reference indexes for security relationships."""
         return self._resources_by_identifier.get(identifier)
 
 

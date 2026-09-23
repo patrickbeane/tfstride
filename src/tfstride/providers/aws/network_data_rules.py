@@ -131,7 +131,9 @@ class AwsNetworkDataRuleDetectors:
                                 posture
                                 for _, _, workloads in public_tier_rules
                                 for workload in workloads
-                                for posture in subnet_posture(workload, inventory)
+                                for posture in subnet_posture(
+                                    workload, security_group_relationships.resource_index.resolve_subnet
+                                )
                             ],
                         ),
                     ),
@@ -219,7 +221,7 @@ class AwsNetworkDataRuleDetectors:
                                     for workload_address in exposed_workloads
                                     for posture in subnet_posture(
                                         inventory.get_by_address(workload_address),
-                                        inventory,
+                                        security_group_relationships.resource_index.resolve_subnet,
                                     )
                                 ],
                             ),

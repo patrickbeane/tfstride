@@ -21,6 +21,7 @@ from tfstride.providers.resource_reference_index import (
 
 _AWS_ADDRESS_REFERENCE_SUFFIXES_BY_RESOURCE_TYPE: dict[str, tuple[str, ...]] = {
     "aws_vpc": ("id", "arn"),
+    "aws_subnet": ("id", "arn"),
     "aws_secretsmanager_secret": ("id", "arn"),
     "aws_sns_topic": ("id", "arn"),
     "aws_sqs_queue": ("id", "arn", "url"),
@@ -165,6 +166,23 @@ class AwsResourceIndex:
     nat_gateway_ids: set[AwsScopedReferenceKey]
     resources_by_address: dict[str, NormalizedResource]
 
+    def resolve_subnet(self, reference: str, *, source: NormalizedResource) -> ResourceReferenceResolution:
+        """Resolve subnet evidence without treating missing provider scope as local."""
+        resolution = self.subnets.resolve(reference, source=source)
+        candidate = resolution.selected_candidate
+        if candidate is None:
+            return resolution
+        strong = (
+            reference in (candidate.address, *_aws_address_reference_aliases(candidate))
+            or re.fullmatch(r"arn:aws(?:-[a-z0-9-]+)?:ec2:[a-z0-9-]+:[0-9]{12}:subnet/subnet-[a-z0-9]+", reference)
+            is not None
+        )
+        if not strong and (
+            not source.provider_config_key or candidate.provider_config_key != source.provider_config_key
+        ):
+            return ResourceReferenceResolution(candidates=())
+        return resolution
+
     def subnet_network_scope(self, subnet: NormalizedResource) -> NetworkScopeResolution:
         return resolve_subnet_network_scope(
             subnet,
@@ -294,9 +312,9 @@ def _aws_resource_references(resource: NormalizedResource) -> tuple[str | None, 
     address = resource.address
     address_aliases = _aws_address_reference_aliases(resource)
 
-    if resource_type == "aws_vpc":
+    if resource_type in {"aws_vpc", "aws_subnet"}:
         aliases = (resource.identifier, resource.arn, *address_aliases)
-    elif resource_type in {"aws_subnet", "aws_security_group", "aws_route_table"}:
+    elif resource_type in {"aws_security_group", "aws_route_table"}:
         aliases = (resource.identifier,)
     elif resource_type == "aws_s3_bucket":
         aliases = (resource.identifier, resource.arn)

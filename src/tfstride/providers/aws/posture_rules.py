@@ -81,7 +81,10 @@ class AwsPostureRuleDetectors:
                             ],
                         ),
                         evidence_item("public_exposure_reasons", resource.public_exposure_reasons),
-                        evidence_item("subnet_posture", subnet_posture(resource, inventory)),
+                        evidence_item(
+                            "subnet_posture",
+                            subnet_posture(resource, security_group_relationships.resource_index.resolve_subnet),
+                        ),
                     ),
                     severity_reasoning=severity_reasoning,
                 )

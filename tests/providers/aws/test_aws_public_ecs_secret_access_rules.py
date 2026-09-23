@@ -76,6 +76,78 @@ def _evaluate(resources: list[TerraformResource]):
 
 
 class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
+    def test_colliding_secret_arns_do_not_choose_an_arbitrary_affected_resource(self) -> None:
+        first = _secret()
+        first.provider_config_key = "aws.first"
+        second = _resource("aws_secretsmanager_secret", "duplicate", dict(first.values))
+        second.provider_config_key = "aws.second"
+        runtime = [
+            _load_balancer(),
+            _role(
+                "execution", _EXECUTION_ROLE_ARN, [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)]
+            ),
+            _task_definition(task_role_arn=None),
+            _service(),
+        ]
+        expected = None
+        for resources in ([first, second, *runtime], [*reversed(runtime), second, first]):
+            _, _, findings = _evaluate(resources)
+            self.assertEqual(len(findings), 1)
+            finding = findings[0]
+            self.assertNotIn(first.address, finding.affected_resources)
+            self.assertNotIn(second.address, finding.affected_resources)
+            evidence = {item.key: item.values for item in finding.evidence}
+            self.assertEqual(
+                evidence["secret_reference_resolution"],
+                [
+                    f"secret_arn={_SECRET_ARN}; resource_resolution=ambiguous; "
+                    "candidates=[aws_secretsmanager_secret.duplicate, aws_secretsmanager_secret.orders]"
+                ],
+            )
+            self.assertIn(f"secret_arn={_SECRET_ARN}", evidence["secret_access_paths"][0])
+            if expected is not None:
+                self.assertEqual(finding, expected)
+            expected = finding
+
+    def test_exact_secret_arn_can_resolve_across_provider_configurations(self) -> None:
+        secret = _secret()
+        secret.provider_config_key = "aws.remote"
+        runtime = [
+            _load_balancer(),
+            _role(
+                "execution", _EXECUTION_ROLE_ARN, [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)]
+            ),
+            _task_definition(task_role_arn=None),
+            _service(),
+        ]
+        for resource in runtime:
+            resource.provider_config_key = "aws.local"
+        _, _, findings = _evaluate([secret, *runtime])
+        self.assertEqual(len(findings), 1)
+        self.assertIn(secret.address, findings[0].affected_resources)
+        self.assertNotIn("secret_reference_resolution", {item.key for item in findings[0].evidence})
+
+    def test_unmodeled_secret_keeps_exact_arn_access_evidence_without_inventing_a_resource(self) -> None:
+        _, _, findings = _evaluate(
+            [
+                _load_balancer(),
+                _role(
+                    "execution",
+                    _EXECUTION_ROLE_ARN,
+                    [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)],
+                ),
+                _task_definition(task_role_arn=None),
+                _service(),
+            ]
+        )
+        self.assertEqual(len(findings), 1)
+        self.assertFalse(
+            any(address.startswith("aws_secretsmanager_secret.") for address in findings[0].affected_resources)
+        )
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        self.assertIn("resource_resolution=unresolved", evidence["secret_reference_resolution"][0])
+        self.assertIn(f"secret_arn={_SECRET_ARN}", evidence["secret_access_paths"][0])
+
     def test_rule_id_is_registered(self) -> None:
         registered = {rule_id for group in AWS_RULE_GROUP_IDS for rule_id in group}
 

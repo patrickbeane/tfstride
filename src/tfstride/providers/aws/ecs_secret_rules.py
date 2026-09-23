@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
@@ -22,7 +23,6 @@ from tfstride.providers.secret_settings import (
 
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
 _AWS_ECS_SERVICE = "aws_ecs_service"
-_AWS_SECRETS_MANAGER_SECRET = "aws_secretsmanager_secret"
 _GET_SECRET_VALUE = "secretsmanager:GetSecretValue"
 
 
@@ -154,11 +154,11 @@ class AwsEcsSecretDeliveryRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
-        secret_addresses_by_arn = {
-            secret.arn: secret.address
-            for secret in context.inventory.by_type(_AWS_SECRETS_MANAGER_SECRET)
-            if secret.arn
-        }
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        secret_references = aws_analysis_indexes(
+            indexes, context.inventory
+        ).security_group_relationships.resource_index.secrets
         findings: list[Finding] = []
         for service in context.inventory.by_type(_AWS_ECS_SERVICE):
             deterministic_paths = [
@@ -182,16 +182,28 @@ class AwsEcsSecretDeliveryRuleDetectors:
             )
             role_addresses = path_string_values(deterministic_paths, "role_address")
             secret_arns = path_string_values(deterministic_paths, "secret_arn")
+            secret_addresses: list[str] = []
+            secret_resolution_evidence: list[str] = []
+            for secret_arn in secret_arns:
+                resolution = secret_references.resolve(secret_arn, source=service)
+                secret = resolution.selected_candidate
+                if secret is not None:
+                    secret_addresses.append(secret.address)
+                elif resolution.state == "ambiguous":
+                    candidates = ", ".join(candidate.address for candidate in resolution.candidates)
+                    secret_resolution_evidence.append(
+                        f"secret_arn={secret_arn}; resource_resolution=ambiguous; candidates=[{candidates}]"
+                    )
+                else:
+                    secret_resolution_evidence.append(
+                        f"secret_arn={secret_arn}; resource_resolution=unresolved; no exact modeled secret resource was resolved"
+                    )
             affected_resources = [
                 *load_balancer_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
-                *[
-                    secret_addresses_by_arn[secret_arn]
-                    for secret_arn in secret_arns
-                    if secret_arn in secret_addresses_by_arn
-                ],
+                *secret_addresses,
             ]
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=True,
@@ -230,6 +242,7 @@ class AwsEcsSecretDeliveryRuleDetectors:
                             "secret_access_paths",
                             _service_secret_access_evidence(deterministic_paths),
                         ),
+                        evidence_item("secret_reference_resolution", secret_resolution_evidence),
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -369,9 +382,10 @@ def _broad_secret_grants(
         policy_statements = path.get("policy_statements")
         if not isinstance(policy_statements, list):
             continue
-        for statement in policy_statements:
-            if not isinstance(statement, Mapping):
+        for raw_statement in policy_statements:
+            if not isinstance(raw_statement, Mapping):
                 continue
+            statement: Mapping[str, object] = raw_statement
             if statement.get("effect") != "allow" or statement.get("conditional") is not False:
                 continue
             actions = _string_values(statement.get("actions"))

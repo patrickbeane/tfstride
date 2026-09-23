@@ -49,7 +49,8 @@ def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.NETWORK,
-        identifier=values.get("id"),
+        identifier=known_string(values, resource.unknown_values, "id", uncertainties, require_string=True),
+        arn=known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True),
         vpc_id=known_string(values, resource.unknown_values, "vpc_id", uncertainties, require_string=True),
         metadata={
             AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"),

@@ -70,12 +70,20 @@ include = [
   "src/tfstride/analysis/boundaries/core.py",
   "src/tfstride/analysis/boundaries/shared.py",
   "src/tfstride/analysis/rule_definitions.py",
+  "src/tfstride/analysis/rule_helpers.py",
   "src/tfstride/analysis/privileged_assignment_evaluator.py",
 
   # Provider-owned trust boundaries and network-scope resolution.
   "src/tfstride/providers/aws/boundaries.py",
   "src/tfstride/providers/gcp/boundaries.py",
   "src/tfstride/providers/azure/boundaries.py",
+
+  # AWS finding evidence uses prepared, source-aware relationship indexes.
+  "src/tfstride/providers/aws/analysis_indexes.py",
+  "src/tfstride/providers/aws/posture_rules.py",
+  "src/tfstride/providers/aws/network_data_rules.py",
+  "src/tfstride/providers/aws/path_chain_rules.py",
+  "src/tfstride/providers/aws/ecs_secret_rules.py",
 
   # Terraform plan configuration-reference resolution.
   "src/tfstride/input/configuration_references.py",

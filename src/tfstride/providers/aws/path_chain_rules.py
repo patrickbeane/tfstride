@@ -13,7 +13,7 @@ from tfstride.analysis.resource_concepts import (
     is_database_resource,
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.analysis.rule_helpers import join_clauses, subnet_posture
+from tfstride.analysis.rule_helpers import SubnetReferenceResolver, join_clauses, subnet_posture
 from tfstride.models import (
     BoundaryType,
     Finding,
@@ -88,7 +88,7 @@ class AwsPathChainRuleDetectors:
                         _build_transitive_private_data_finding(
                             rule_id=rule_id,
                             finding_factory=self._finding_factory,
-                            inventory=inventory,
+                            resolve_subnet=security_group_relationships.resource_index.resolve_subnet,
                             entry=entry,
                             path_workloads=path_workloads,
                             security_group_hops=security_group_hops,
@@ -331,7 +331,7 @@ def _build_transitive_private_data_finding(
     *,
     rule_id: str,
     finding_factory: FindingFactory,
-    inventory: ResourceInventory,
+    resolve_subnet: SubnetReferenceResolver,
     entry: NormalizedResource,
     path_workloads: list[NormalizedResource],
     security_group_hops: list[tuple[NormalizedResource, SecurityGroupRule]],
@@ -386,7 +386,7 @@ def _build_transitive_private_data_finding(
             ),
             evidence_item(
                 "subnet_posture",
-                [posture for workload in workload_path for posture in subnet_posture(workload, inventory)],
+                [posture for workload in workload_path for posture in subnet_posture(workload, resolve_subnet)],
             ),
             evidence_item("data_tier_posture", data_posture),
             evidence_item("boundary_rationale", [data_boundary.rationale]),
