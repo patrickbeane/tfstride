@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from tfstride.identity import PrivilegedAccessGrant, PrivilegedAccessPosture
+from tfstride.providers.aws.account_identity_evidence import AwsAccountArnInput
 from tfstride.providers.aws.iam_assignment_posture import deserialize_privileged_access_grants
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_facts.base import AwsBaseFacts
@@ -13,12 +14,32 @@ class AwsIdentityFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property
+    def has_account_identity_inputs(self) -> bool:
+        return self.resource.has_metadata_field(AwsResourceMetadata.ACCOUNT_IDENTITY_SOURCE_MODE)
+
+    @property
+    def account_identity_source_mode(self) -> str | None:
+        return self.get(AwsResourceMetadata.ACCOUNT_IDENTITY_SOURCE_MODE)
+
+    @property
+    def account_identity_arn_inputs(self) -> list[AwsAccountArnInput]:
+        return self.get(AwsResourceMetadata.ACCOUNT_IDENTITY_ARN_INPUTS)
+
+    def set_account_identity_inputs(self, mode: str, inputs: list[AwsAccountArnInput]) -> None:
+        self.set(AwsResourceMetadata.ACCOUNT_IDENTITY_SOURCE_MODE, mode)
+        self.set(AwsResourceMetadata.ACCOUNT_IDENTITY_ARN_INPUTS, inputs)
+
+    @property
     def caller_identity_account_id(self) -> str | None:
         return self.get(AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_ID)
 
     @property
     def caller_identity_account_id_state(self) -> str | None:
         return self.get(AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_ID_STATE)
+
+    @property
+    def caller_identity_account_evidence(self) -> list[str]:
+        return self.get(AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_EVIDENCE)
 
     @property
     def caller_identity_user_id(self) -> str | None:

@@ -4,15 +4,51 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.aws.account_identity_evidence import AwsAccountArnInput
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.coercion import attribute_unknown, known_string
+from tfstride.providers.normalization import ResourceNormalizer
 from tfstride.resource_helpers import parse_aws_account_id
 
 _STATE_RESOLVED = "resolved"
 _STATE_AMBIGUOUS = "ambiguous"
 _STATE_INVALID = "invalid"
 _STATE_UNKNOWN = "unknown"
+
+
+def with_account_identity_inputs(normalizer: ResourceNormalizer) -> ResourceNormalizer:
+    """Retain own-identity provenance before normalization loses mode/unknowns.
+
+    Related identities (role_arn, resource_arn, etc.) are deliberately excluded:
+    credentials and reference targets do not establish this resource's owner.
+    """
+
+    def normalize(resource: TerraformResource) -> NormalizedResource:
+        normalized = normalizer(resource)
+        inputs: list[AwsAccountArnInput] = []
+        fields = ["arn", "id"]
+        if resource.resource_type in {"aws_api_gateway_rest_api", "aws_apigatewayv2_api"}:
+            fields.append("execution_arn")
+        for field in fields:
+            value = resource.values.get(field)
+            if attribute_unknown(resource.unknown_values, field):
+                inputs.append(AwsAccountArnInput(field=field, value=None, state="unknown"))
+            elif field == "id" and not (isinstance(value, str) and value.startswith("arn:")):
+                continue
+            elif value is not None:
+                inputs.append(
+                    AwsAccountArnInput(
+                        field=field,
+                        value=value if isinstance(value, str) else None,
+                        state="known" if isinstance(value, str) else "invalid",
+                    )
+                )
+        aws_facts(normalized).set_account_identity_inputs(resource.mode, inputs)
+        return normalized
+
+    return normalize
 
 
 def normalize_caller_identity(resource: TerraformResource) -> NormalizedResource:
@@ -76,6 +112,11 @@ def normalize_caller_identity(resource: TerraformResource) -> NormalizedResource
         metadata={
             AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_ID: resolved_account_id,
             AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_ID_STATE: account_id_state,
+            AwsResourceMetadata.CALLER_IDENTITY_ACCOUNT_EVIDENCE: [
+                f"{field} = {value}"
+                for field, value in (("account_id", account_id), ("id", identifier), ("arn", arn))
+                if value is not None
+            ],
             AwsResourceMetadata.CALLER_IDENTITY_USER_ID: user_id,
             AwsResourceMetadata.CALLER_IDENTITY_POSTURE_UNCERTAINTIES: uncertainties,
         },

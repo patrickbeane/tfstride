@@ -76,6 +76,14 @@ This is a concise coverage map. Reports identify unsupported AWS resource types 
 * `aws_macie2_account`
 * `aws_caller_identity`
 
+## Account-resolution primitive
+
+`AwsResourceIndex.account_identities.resolve(resource)` returns an immutable account-resolution result with an account ID, partition, state (`resolved`, `unknown`, `ambiguous`, or `invalid`), evidence, and uncertainty reasons. A known, validated own ARN takes precedence over caller credentials and unrelated accounts in the plan. Normalization retains the original identity inputs and their unknown state so stale planned ARN values cannot establish ownership.
+
+Caller-identity fallback requires an explicit matching provider configuration and a managed resource type whose creation establishes ownership in that account. The initial fallback set covers IAM roles/policies/instance profiles/OIDC providers, S3 buckets, KMS keys/aliases, Secrets Manager secrets, SNS topics, SQS queues, Lambda functions, DynamoDB tables, and API Gateway APIs. Data lookups, attachments, and other resource types do not inherit ownership from credentials. Missing scope and incomplete or conflicting scoped callers remain unresolved, with evidence retained.
+
+This primitive is available to subsequent trust and authorization migrations; this change does not migrate existing finding consumers. `inventory.primary_account_id` retains its existing summary behavior and is not consulted by the resource-local resolver. Resolve resource references with the existing provider-aware reference views before resolving the selected target's account.
+
 ## Rule Coverage
 
 ### Public exposure & edge

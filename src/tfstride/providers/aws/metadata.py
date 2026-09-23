@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tfstride.providers.aws.account_identity_evidence import AwsAccountArnInput
 from tfstride.providers.aws.audit_telemetry_disruption_evidence import (
     AwsEcsCloudTrailAuditTelemetryDisruptionPath,
 )
@@ -202,8 +203,11 @@ class AwsResourceMetadata:
     IAM_INSTANCE_PROFILE = OptionalStringMetadataField("iam_instance_profile")
     POLICY_ARN = OptionalStringMetadataField("policy_arn")
     POLICY_NAME = OptionalStringMetadataField("policy_name")
+    ACCOUNT_IDENTITY_SOURCE_MODE = OptionalStringMetadataField("account_identity_source_mode")
+    ACCOUNT_IDENTITY_ARN_INPUTS = RecordListMetadataField[AwsAccountArnInput]("account_identity_arn_inputs")
     CALLER_IDENTITY_ACCOUNT_ID = OptionalStringMetadataField("caller_identity_account_id")
     CALLER_IDENTITY_ACCOUNT_ID_STATE = OptionalStringMetadataField("caller_identity_account_id_state")
+    CALLER_IDENTITY_ACCOUNT_EVIDENCE = StringListMetadataField("caller_identity_account_evidence")
     CALLER_IDENTITY_USER_ID = OptionalStringMetadataField("caller_identity_user_id")
     OIDC_PROVIDER_URL = OptionalStringMetadataField("oidc_provider_url")
     OIDC_PROVIDER_ARN = OptionalStringMetadataField("oidc_provider_arn")

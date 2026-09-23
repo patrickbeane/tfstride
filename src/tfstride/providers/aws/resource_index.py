@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.account_identity import AwsAccountIdentityIndex, build_aws_account_identity_index
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_utils import (
     AwsScopedReferenceKey,
@@ -131,6 +132,7 @@ def aws_reference_relationship_key(
 
 @dataclass(slots=True)
 class AwsResourceIndex:
+    account_identities: AwsAccountIdentityIndex
     subnets: AwsResourceReferenceView
     security_groups: AwsResourceReferenceView
     route_tables: AwsResourceReferenceView
@@ -209,6 +211,7 @@ class AwsResourceIndexBuilder:
             )
 
         return AwsResourceIndex(
+            account_identities=build_aws_account_identity_index(resource_tuple),
             subnets=view("aws_subnet"),
             security_groups=view("aws_security_group"),
             route_tables=view("aws_route_table"),

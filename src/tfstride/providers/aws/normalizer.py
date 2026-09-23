@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceInventory, TerraformResource
-from tfstride.providers.aws.account_identity_normalizers import normalize_caller_identity
+from tfstride.providers.aws.account_identity_normalizers import normalize_caller_identity, with_account_identity_inputs
 from tfstride.providers.aws.api_gateway_normalizers import (
     normalize_api_gateway_authorizer,
     normalize_api_gateway_method,
@@ -177,7 +177,10 @@ class AwsNormalizer(ProviderNormalizer):
 
     def __init__(self, resource_decorator: AwsResourceDecorator | None = None) -> None:
         self._resource_decorator = resource_decorator or AwsResourceDecorator()
-        self._resource_normalizers = dict(_AWS_RESOURCE_NORMALIZERS)
+        self._resource_normalizers = {
+            resource_type: with_account_identity_inputs(normalizer)
+            for resource_type, normalizer in _AWS_RESOURCE_NORMALIZERS.items()
+        }
 
     def owns_resource(self, resource: TerraformResource) -> bool:
         return _is_aws_resource(resource)

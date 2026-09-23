@@ -46,6 +46,9 @@ include = [
   "src/tfstride/resource_metadata.py",
 
   # Provider resource-reference indexes.
+  "src/tfstride/providers/aws/account_identity.py",
+  "src/tfstride/providers/aws/account_identity_evidence.py",
+  "src/tfstride/providers/aws/account_identity_normalizers.py",
   "src/tfstride/providers/aws/resource_index.py",
   "src/tfstride/providers/gcp/resource_index.py",
   "src/tfstride/providers/azure/resource_index.py",
