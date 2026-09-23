@@ -11,6 +11,7 @@ from tfstride.models import (
     TerraformReferenceProvenance,
     TerraformReferenceResolutionState,
 )
+from tfstride.providers.aws.account_identity import describe_account_relationship
 from tfstride.providers.aws.object_storage_topology_destruction_evidence import (
     AwsEcsS3BucketTopologyDestructionPath,
     AwsS3BucketTopologyDestructionAuthorizationBasis,
@@ -35,7 +36,6 @@ _ECS_SERVICE = "aws_ecs_service"
 _IAM_ROLE = "aws_iam_role"
 _S3_BUCKET = "aws_s3_bucket"
 _S3_BUCKET_POLICY = "aws_s3_bucket_policy"
-_CALLER_IDENTITY = "aws_caller_identity"
 _COMPLETE = "complete"
 _DELETE_BUCKET = "s3:DeleteBucket"
 _PrincipalMatch = Literal["role", "account", "wildcard"]
@@ -272,21 +272,18 @@ def _task_definition_paths(
         if not operation_evidence:
             continue
 
-        same_account, partitions_match = _account_relationship(
-            role_arn,
-            bucket_arn,
-            _provider_account_id_for_bucket_role(
-                tuple(context.index.resources_by_address.values()),
-                task_role,
-                bucket,
-            ),
-        )
-        if same_account is False or not partitions_match:
+        account_relationship = context.index.account_identities.relationship(task_role, bucket)
+        same_account = account_relationship.same_account
+        if same_account is False:
             continue
         if same_account is None:
             uncertainties.append(
                 f"{task_definition.address}: {bucket.address} bucket ownership "
                 f"compatibility with {task_role.address} is unresolved"
+            )
+            uncertainties.extend(
+                f"{task_definition.address}: S3 bucket-deletion ownership is unresolved; {detail}"
+                for detail in describe_account_relationship(account_relationship)
             )
             continue
 
@@ -1108,52 +1105,6 @@ def _normalized_effect(
 
 def _aws_principal_values(statement: IAMPolicyStatement) -> set[str]:
     return {entry.value for entry in statement.principal_entries if entry.kind.casefold() in {"aws", "unknown"}}
-
-
-def _account_relationship(
-    role_arn: str,
-    bucket_arn: str,
-    primary_account_id: str | None,
-) -> tuple[bool | None, bool]:
-    role_account_id = parse_aws_account_id(role_arn)
-    if role_account_id is None or primary_account_id is None:
-        return None, _arn_partition(role_arn) == _arn_partition(bucket_arn)
-    return (
-        role_account_id == primary_account_id,
-        _arn_partition(role_arn) == _arn_partition(bucket_arn),
-    )
-
-
-def _provider_account_id_for_bucket_role(
-    resources: Sequence[NormalizedResource],
-    role: NormalizedResource,
-    bucket: NormalizedResource,
-) -> str | None:
-    provider_config_key = bucket.provider_config_key
-    if provider_config_key is None or role.provider_config_key != provider_config_key:
-        return None
-
-    caller_identity_facts = [
-        aws_facts(resource)
-        for resource in resources
-        if resource.resource_type == _CALLER_IDENTITY and resource.provider_config_key == provider_config_key
-    ]
-    caller_states = {facts.caller_identity_account_id_state for facts in caller_identity_facts}
-    if caller_states & {"ambiguous", "invalid"}:
-        return None
-    caller_account_ids = {
-        facts.caller_identity_account_id
-        for facts in caller_identity_facts
-        if facts.caller_identity_account_id is not None
-    }
-    if caller_account_ids:
-        if caller_states != {"resolved"} or len(caller_account_ids) != 1:
-            return None
-        return next(iter(caller_account_ids))
-
-    # S3 bucket ARNs do not encode ownership. Other resource ARNs can identify
-    # the role's account, but cannot prove that it owns the bucket.
-    return None
 
 
 def _is_exact_unmodeled_bucket_reference(value: str | None) -> bool:

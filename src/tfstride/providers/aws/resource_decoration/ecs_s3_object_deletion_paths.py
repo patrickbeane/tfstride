@@ -6,6 +6,7 @@ from fnmatch import fnmatchcase
 from typing import Literal
 
 from tfstride.models import IAMPolicyStatement, NormalizedResource
+from tfstride.providers.aws.account_identity import describe_account_relationship
 from tfstride.providers.aws.object_storage_deletion_evidence import (
     AwsEcsS3BucketObjectNamespaceDeletionPath,
     AwsEcsS3BucketObjectVersionNamespaceDeletionPath,
@@ -113,7 +114,6 @@ class ModelEcsS3ObjectDeletionPathsStage:
         context: AwsDecorationContext,
     ) -> None:
         buckets = tuple(resource for resource in resources if resource.resource_type == _S3_BUCKET)
-        primary_account_id = _infer_primary_account_id(resources)
         unresolved_policy_sources = _unresolved_bucket_policy_sources(resources, context)
 
         for task_definition in resources:
@@ -123,7 +123,6 @@ class ModelEcsS3ObjectDeletionPathsStage:
                 task_definition,
                 buckets,
                 context,
-                primary_account_id=primary_account_id,
                 unresolved_policy_sources=unresolved_policy_sources,
             )
             facts = aws_facts(task_definition)
@@ -173,7 +172,6 @@ def _task_definition_paths(
     buckets: Sequence[NormalizedResource],
     context: AwsDecorationContext,
     *,
-    primary_account_id: str | None,
     unresolved_policy_sources: tuple[str, ...],
 ) -> tuple[list[AwsEcsS3ObjectDeletionPath], list[str]]:
     task_facts = aws_facts(task_definition)
@@ -281,11 +279,14 @@ def _task_definition_paths(
 
         uncertainties.extend(f"{task_definition.address}: {message}" for message in scope_uncertainties)
         uncertainties.extend(f"{task_definition.address}: {message}" for message in bucket_posture.uncertainties)
-        same_account, partitions_match = _account_relationship(
-            task_role.arn,
-            bucket_arn,
-            primary_account_id,
-        )
+        account_relationship = context.index.account_identities.relationship(task_role, bucket)
+        same_account = account_relationship.same_account
+        partitions_match = account_relationship.partitions_match
+        if same_account is None:
+            uncertainties.extend(
+                f"{task_definition.address}: S3 object-deletion ownership is unresolved; {detail}"
+                for detail in describe_account_relationship(account_relationship)
+            )
         bypass_evaluation = _evaluate_authorization(
             bucket,
             task_role,
@@ -383,7 +384,7 @@ def _evaluate_authorization(
             (),
             (
                 f"{bucket.address}: {role.address} {operation} authorization is unresolved "
-                "because the S3 bucket account is not exact",
+                "because role or bucket account ownership is not established",
             ),
         )
     if not partitions_match:
@@ -1207,61 +1208,6 @@ def _dedupe_matches(matches: Sequence[_StatementMatch]) -> list[_StatementMatch]
         seen.add(fingerprint)
         result.append(match)
     return result
-
-
-def _account_relationship(
-    role_arn: str,
-    bucket_arn: str,
-    primary_account_id: str | None,
-) -> tuple[bool | None, bool]:
-    role_account_id = parse_aws_account_id(role_arn)
-    if role_account_id is None or primary_account_id is None:
-        return None, _arn_partition(role_arn) == _arn_partition(bucket_arn)
-    return (
-        role_account_id == primary_account_id,
-        _arn_partition(role_arn) == _arn_partition(bucket_arn),
-    )
-
-
-def _infer_primary_account_id(resources: Sequence[NormalizedResource]) -> str | None:
-    caller_identity_facts = [
-        aws_facts(resource) for resource in resources if resource.resource_type == "aws_caller_identity"
-    ]
-    caller_states = {facts.caller_identity_account_id_state for facts in caller_identity_facts}
-    if caller_states & {"ambiguous", "invalid"}:
-        return None
-    caller_account_ids = {
-        facts.caller_identity_account_id
-        for facts in caller_identity_facts
-        if facts.caller_identity_account_id is not None
-    }
-    if caller_account_ids:
-        if caller_states != {"resolved"} or len(caller_account_ids) != 1:
-            return None
-        return next(iter(caller_account_ids))
-
-    resource_account_ids: set[str] = set()
-    for resource in resources:
-        if resource.resource_type == "aws_caller_identity":
-            continue
-        account_id, invalid_account_segment = _resource_arn_account_evidence(resource.arn)
-        if invalid_account_segment:
-            return None
-        if account_id is not None:
-            resource_account_ids.add(account_id)
-    if len(resource_account_ids) != 1:
-        return None
-    return next(iter(resource_account_ids))
-
-
-def _resource_arn_account_evidence(arn: str | None) -> tuple[str | None, bool]:
-    if not arn or not arn.startswith("arn:"):
-        return None, False
-    parts = arn.split(":")
-    if len(parts) < 5 or not parts[4]:
-        return None, False
-    account_id = parse_aws_account_id(arn)
-    return account_id, account_id is None
 
 
 def _is_exact_unmodeled_bucket_reference(value: str | None) -> bool:

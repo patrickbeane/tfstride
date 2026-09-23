@@ -84,7 +84,9 @@ Caller-identity fallback requires an explicit matching provider configuration an
 
 Role-trust findings, resource-policy findings, KMS-grant findings, trust boundaries, narrowed-trust observations, and trust-based workload paths classify principals against the target resource's account. Findings and observations retain the account-resolution evidence and uncertainty. Unknown ownership cannot establish foreign-account access, but wildcard and account-root breadth remain meaningful independently. A proven same-account KMS root retains lower-severity treatment as account-level IAM delegation; it does not grant every identity key access. KMS grants are classified against the key's owner, not the grant declaration's provider credentials.
 
-`inventory.primary_account_id` retains its existing summary behavior and is not consulted by this trust classification. Resolve resource references with the existing provider-aware reference views before resolving the selected target's account. Separate workload-to-data authorization consumers are outside this trust migration.
+S3 object-deletion and bucket-deletion authorization compare the established owners of the task role and bucket. An S3 bucket ARN does not contain an account ID: bucket ownership requires a managed bucket and resolved caller identity scoped to its provider configuration. Another resource's ARN cannot establish bucket ownership. Different provider aliases can represent the same account, and matching aliases do not override a role's foreign account identity. Missing, conflicting, or unknown ownership prevents a deterministic path and retains resolution evidence in the path uncertainties. Cross-account object deletion still requires overlapping identity-policy and bucket-policy authority; bucket deletion retains its same-account restriction.
+
+`inventory.primary_account_id` retains its existing summary behavior. Resolve resource references with the existing provider-aware reference views before comparing the selected resources' account identities.
 
 ## Rule Coverage
 

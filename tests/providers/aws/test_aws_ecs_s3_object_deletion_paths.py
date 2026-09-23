@@ -103,6 +103,7 @@ def _caller_identity(account_id: str = _ACCOUNT_ID) -> TerraformResource:
         resource_type="aws_caller_identity",
         name="current",
         provider_name="registry.terraform.io/hashicorp/aws",
+        provider_config_key="aws",
         values={
             "account_id": account_id,
             "id": account_id,
@@ -112,6 +113,10 @@ def _caller_identity(account_id: str = _ACCOUNT_ID) -> TerraformResource:
 
 
 def _normalize(resources: list[TerraformResource]):
+    # Authorization cases in this suite assume a managed bucket with proven
+    # local ownership. Ownership-absence cases exercise the normalizer directly.
+    if not any(resource.resource_type == "aws_caller_identity" for resource in resources):
+        resources = [_caller_identity(), *resources]
     return AwsNormalizer().normalize(resources)
 
 

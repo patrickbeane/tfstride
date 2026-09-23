@@ -28,6 +28,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
 from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _task_definition as aws_task_definition,
 )
+from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _caller_identity as aws_caller_identity
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _load_balancer as aws_load_balancer,
 )
@@ -220,6 +221,7 @@ def _aws_resources(
     condition: dict[str, object] | None = None,
 ) -> list[TerraformResource]:
     return [
+        aws_caller_identity(),
         aws_load_balancer(internal=internal),
         aws_bucket(),
         aws_role(

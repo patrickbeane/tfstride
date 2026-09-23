@@ -12,6 +12,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _task_definition,
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
+    _caller_identity,
     _object_lock,
     _versioning,
 )
@@ -48,6 +49,7 @@ def _runtime_resources(
     object_lock: bool = False,
 ) -> list[TerraformResource]:
     resources: list[TerraformResource] = [
+        _caller_identity(),
         _load_balancer(),
         _bucket(),
         _role("orders_task", _TASK_ROLE_ARN, [_statement("Allow", actions, f"{_BUCKET_ARN}/*")]),
@@ -101,6 +103,7 @@ class AwsPublicEcsS3ObjectDisruptionRuleTests(unittest.TestCase):
 
     def test_multiple_scopes_in_one_bucket_do_not_inflate_rationale_bucket_count(self) -> None:
         resources = [
+            _caller_identity(),
             _load_balancer(),
             _bucket(),
             _versioning("disabled"),

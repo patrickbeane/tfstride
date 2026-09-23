@@ -28,6 +28,9 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _task_definition as aws_task_definition,
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
+    _caller_identity as aws_caller_identity,
+)
+from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
     _object_lock as aws_object_lock,
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
@@ -203,6 +206,7 @@ def _aws_resources(
     extra_resources: Sequence[TerraformResource] = (),
 ) -> list[TerraformResource]:
     resources = [
+        aws_caller_identity(),
         aws_load_balancer(internal=not public),
         aws_bucket(),
     ]

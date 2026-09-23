@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from tfstride.models import NormalizedResource
-from tfstride.providers.aws.account_identity_evidence import AwsAccountArnInput, AwsAccountResolution
+from tfstride.providers.aws.account_identity_evidence import (
+    AwsAccountArnInput,
+    AwsAccountRelationship,
+    AwsAccountResolution,
+)
 from tfstride.providers.aws.resource_facts import aws_facts
 
 _ACCOUNT = re.compile(r"[0-9]{12}")
@@ -185,6 +189,10 @@ def _caller_identity(resource: NormalizedResource) -> AwsAccountResolution:
 class AwsAccountIdentityIndex:
     provider_accounts: Mapping[str, AwsAccountResolution]
 
+    def relationship(self, source: NormalizedResource, target: NormalizedResource) -> AwsAccountRelationship:
+        """Compare established owners, without treating provider aliases as accounts."""
+        return AwsAccountRelationship(self.resolve(source), self.resolve(target))
+
     def resolve(self, resource: NormalizedResource) -> AwsAccountResolution:
         if resource.provider != "aws":
             return AwsAccountResolution(None, "unknown", uncertainties=("resource is not an AWS resource",))
@@ -246,6 +254,13 @@ def describe_account_resolution(result: AwsAccountResolution) -> list[str]:
         f"partition={result.partition or 'unknown'}",
         *(f"evidence={item}" for item in result.evidence),
         *(f"uncertainty={item}" for item in result.uncertainties),
+    ]
+
+
+def describe_account_relationship(result: AwsAccountRelationship) -> list[str]:
+    return [
+        "source account: " + "; ".join(describe_account_resolution(result.source)),
+        "target account: " + "; ".join(describe_account_resolution(result.target)),
     ]
 
 
