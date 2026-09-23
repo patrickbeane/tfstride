@@ -22,6 +22,7 @@ from tfstride.models import (
     SecurityGroupRule,
     TrustBoundary,
 )
+from tfstride.providers.aws.account_identity import describe_account_resolution
 from tfstride.providers.aws.analysis_indexes import (
     AwsSecurityGroupRelationships,
     aws_analysis_indexes,
@@ -105,23 +106,30 @@ class AwsPathChainRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         boundary_index = context.boundary_index
-        primary_account_id = inventory.primary_account_id
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        account_identities = aws_analysis_indexes(indexes, inventory).account_identities
         control_boundaries_by_role = _control_workload_boundaries_by_role(boundary_index)
         sensitive_data_paths = _private_sensitive_controlled_data_paths(boundary_index, inventory)
         seen: set[tuple[str, str, tuple[str, ...], tuple[str, ...]]] = set()
 
         for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
+            target_account = account_identities.resolve(role)
             control_boundaries = control_boundaries_by_role.get(role.address, [])
             if not control_boundaries:
                 continue
             for trust_statement in aws_facts(role).trust_statements:
-                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                for assessment in trust_statement_principal_assessments(
+                    trust_statement,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                ):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
-                    if not (assessment.is_foreign_account or assessment.is_wildcard):
+                    if not (assessment.is_foreign_account or assessment.is_wildcard or assessment.is_root_like):
                         continue
 
                     chained_paths: list[
@@ -171,6 +179,7 @@ class AwsPathChainRuleDetectors:
                             ),
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
+                                evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                                 evidence_item(
                                     "trust_scope",
                                     [assessment.scope_description] if assessment.scope_description else [],

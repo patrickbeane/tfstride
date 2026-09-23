@@ -16,6 +16,8 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding
+from tfstride.providers.aws.account_identity import describe_account_resolution
+from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
 from tfstride.providers.aws.policy_conditions import (
     PrincipalAssessment,
     describe_trust_narrowing_for_principal,
@@ -66,18 +68,25 @@ class AwsPolicyTrustRuleDetectors:
         sensitive_resource: bool,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = context.inventory.primary_account_id
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        account_identities = aws_analysis_indexes(indexes, context.inventory).account_identities
         seen: set[tuple[str, str]] = set()
 
         for resource in context.inventory.resources:
             if resource.resource_type not in resource_types:
                 continue
+            target_account = account_identities.resolve(resource)
             for statement in resource.policy_statements:
                 if statement.effect != "Allow":
                     continue
                 if resource_policy_statement_has_effective_narrowing(statement):
                     continue
-                for assessment in policy_statement_principal_assessments(statement, primary_account_id):
+                for assessment in policy_statement_principal_assessments(
+                    statement,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                ):
                     principal = assessment.principal
                     if assessment.is_service:
                         continue
@@ -99,7 +108,7 @@ class AwsPolicyTrustRuleDetectors:
                         and assessment.is_root_like
                         and not assessment.is_foreign_account
                         and assessment.account_id is not None
-                        and assessment.account_id == primary_account_id
+                        and assessment.account_id == target_account.account_id
                     )
                     if same_account_kms_root:
                         severity_reasoning = build_severity_reasoning(
@@ -110,9 +119,10 @@ class AwsPolicyTrustRuleDetectors:
                             blast_radius=0,
                         )
                         rationale = (
-                            f"{resource.display_name} allows same-account root through its key policy. "
-                            "That is a common default KMS posture, but it still keeps key control broader than "
-                            "a role-scoped grant and can make delegation or decryption authority harder to constrain."
+                            f"{resource.display_name} delegates its key-policy permissions to its own AWS account "
+                            "through the account-root principal. This common KMS default enables IAM policies in "
+                            "that account to delegate the permitted actions; it does not itself grant every "
+                            "identity access. The delegation scope is broader than named roles."
                         )
                     else:
                         severity_reasoning = build_severity_reasoning(
@@ -145,6 +155,7 @@ class AwsPolicyTrustRuleDetectors:
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item("trust_scope", [assessment.scope_description]),
+                                evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                                 evidence_item("policy_actions", sorted(statement.actions)),
                                 evidence_item(
                                     "policy_statements",
@@ -166,12 +177,19 @@ class AwsPolicyTrustRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = context.inventory.primary_account_id
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        account_identities = aws_analysis_indexes(indexes, context.inventory).account_identities
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
+            target_account = account_identities.resolve(role)
             for trust_statement in aws_facts(role).trust_statements:
-                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                for assessment in trust_statement_principal_assessments(
+                    trust_statement,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                ):
                     if trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                         continue
                     principal = assessment.principal
@@ -205,6 +223,7 @@ class AwsPolicyTrustRuleDetectors:
                             rationale=_trust_expansion_rationale(role.display_name, principal, assessment),
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
+                                evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                                 evidence_item(
                                     "trust_path",
                                     [assessment.trust_path_description],
@@ -222,12 +241,19 @@ class AwsPolicyTrustRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = context.inventory.primary_account_id
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        account_identities = aws_analysis_indexes(indexes, context.inventory).account_identities
         seen: set[tuple[str, str]] = set()
 
         for role in context.inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
+            target_account = account_identities.resolve(role)
             for trust_statement in aws_facts(role).trust_statements:
-                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                for assessment in trust_statement_principal_assessments(
+                    trust_statement,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                ):
                     if trust_statement_has_supported_narrowing_for_principal(trust_statement, assessment):
                         continue
                     principal = assessment.principal
@@ -262,6 +288,7 @@ class AwsPolicyTrustRuleDetectors:
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
                                 evidence_item("trust_scope", [assessment.scope_description]),
+                                evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                                 evidence_item(
                                     "trust_narrowing",
                                     describe_trust_narrowing_for_principal(trust_statement, assessment),

@@ -84,13 +84,12 @@ class AwsLambdaRuleDetectors:
         rule_id: str,
     ) -> list[Finding]:
         findings: list[Finding] = []
-        primary_account_id = context.inventory.primary_account_id
         seen: set[tuple[str, str]] = set()
 
         for function in context.inventory.by_type(_AWS_LAMBDA_FUNCTION):
             resource_policy_sources = aws_facts(function).resource_policy_source_addresses
             for statement in function.policy_statements:
-                if not _is_public_invocation_statement(statement, primary_account_id):
+                if not _is_public_invocation_statement(statement):
                     continue
                 finding_key = (function.address, describe_policy_statement(statement))
                 if finding_key in seen:
@@ -133,7 +132,6 @@ def _normalized_authorization_type(facts: AwsResourceFacts) -> str | None:
 
 def _is_public_invocation_statement(
     statement: IAMPolicyStatement,
-    primary_account_id: str | None,
 ) -> bool:
     if statement.effect != "Allow":
         return False
@@ -141,9 +139,7 @@ def _is_public_invocation_statement(
         return False
     if not any(_allows_lambda_invocation_action(action) for action in statement.actions):
         return False
-    return any(
-        assessment.is_wildcard for assessment in policy_statement_principal_assessments(statement, primary_account_id)
-    )
+    return any(assessment.is_wildcard for assessment in policy_statement_principal_assessments(statement, None))
 
 
 def _allows_lambda_invocation_action(action: str) -> bool:

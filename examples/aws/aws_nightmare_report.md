@@ -254,6 +254,7 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 - Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: *
+  - target account resolution: state=resolved; account_id=555566667777; partition=aws; evidence=aws_iam_role.app.arn = arn:aws:iam::555566667777:role/nightmare-app-role
   - trust path: trust policy allows any AWS principal
 
 #### Workload role carries sensitive permissions
@@ -293,6 +294,7 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 - Evidence:
   - trust principals: *
   - trust scope: principal is wildcard
+  - target account resolution: state=resolved; account_id=555566667777; partition=aws; evidence=aws_iam_role.app.arn = arn:aws:iam::555566667777:role/nightmare-app-role
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
 
 #### Cross-account or broad role trust lacks narrowing conditions
@@ -306,6 +308,7 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:root
   - trust scope: principal is foreign account root 444455556666
+  - target account resolution: state=resolved; account_id=555566667777; partition=aws; evidence=aws_iam_role.pipeline.arn = arn:aws:iam::555566667777:role/nightmare-pipeline-role
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
 
 #### Database storage encryption is disabled
@@ -452,6 +455,7 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 - Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:root
+  - target account resolution: state=resolved; account_id=555566667777; partition=aws; evidence=aws_iam_role.pipeline.arn = arn:aws:iam::555566667777:role/nightmare-pipeline-role
   - trust path: trust principal belongs to foreign account 444455556666
 
 #### VPC Flow Logs are not configured for a modeled VPC

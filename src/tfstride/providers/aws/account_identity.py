@@ -238,6 +238,17 @@ def _with_reason(result: AwsAccountResolution, reason: str) -> AwsAccountResolut
     )
 
 
+def describe_account_resolution(result: AwsAccountResolution) -> list[str]:
+    """Keep the account decision and its limitations visible in trust evidence."""
+    return [
+        f"state={result.state}",
+        f"account_id={result.account_id or 'unknown'}",
+        f"partition={result.partition or 'unknown'}",
+        *(f"evidence={item}" for item in result.evidence),
+        *(f"uncertainty={item}" for item in result.uncertainties),
+    ]
+
+
 def build_aws_account_identity_index(resources: Iterable[NormalizedResource]) -> AwsAccountIdentityIndex:
     grouped: dict[str, list[AwsAccountResolution]] = {}
     for resource in resources:

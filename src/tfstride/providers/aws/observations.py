@@ -8,6 +8,7 @@ from tfstride.analysis.resource_concepts import (
     OBJECT_STORAGE_RESOURCE_TYPES,
 )
 from tfstride.models import Observation, ResourceInventory
+from tfstride.providers.aws.account_identity import build_aws_account_identity_index, describe_account_resolution
 from tfstride.providers.aws.policy_conditions import (
     describe_trust_narrowing_for_principal,
     trust_statement_has_effective_narrowing_for_principal,
@@ -84,11 +85,16 @@ def _observe_bucket_public_access_blocks(inventory: ResourceInventory) -> list[O
 
 def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
     observations: list[Observation] = []
-    primary_account_id = inventory.primary_account_id
+    account_identities = build_aws_account_identity_index(inventory.resources)
     seen: set[tuple[str, str]] = set()
     for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
+        target_account = account_identities.resolve(role)
         for trust_statement in aws_facts(role).trust_statements:
-            for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+            for assessment in trust_statement_principal_assessments(
+                trust_statement,
+                target_account.account_id,
+                target_partition=target_account.partition,
+            ):
                 if not trust_statement_has_effective_narrowing_for_principal(trust_statement, assessment):
                     continue
                 principal = assessment.principal
@@ -117,6 +123,7 @@ def _observe_narrowed_trust(inventory: ResourceInventory) -> list[Observation]:
                         evidence=collect_evidence(
                             evidence_item("trust_principals", [principal]),
                             evidence_item("trust_scope", [assessment.scope_description]),
+                            evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                             evidence_item(
                                 "trust_narrowing",
                                 describe_trust_narrowing_for_principal(trust_statement, assessment),

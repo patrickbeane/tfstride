@@ -68,6 +68,15 @@
             ]
           },
           {
+            "key": "target_account_resolution",
+            "values": [
+              "state=resolved",
+              "account_id=111122223333",
+              "partition=aws",
+              "evidence=aws_secretsmanager_secret.primary.arn = arn:aws:secretsmanager:us-east-1:111122223333:secret:primary"
+            ]
+          },
+          {
             "key": "policy_actions",
             "values": [
               "secretsmanager:GetSecretValue"

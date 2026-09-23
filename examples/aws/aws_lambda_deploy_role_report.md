@@ -83,6 +83,7 @@ No findings in this severity band.
 - Evidence:
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
   - trust scope: principal belongs to foreign account 777788889999
+  - target account resolution: state=resolved; account_id=333344445555; partition=aws; evidence=aws_iam_role.deployer.arn = arn:aws:iam::333344445555:role/lambda-deployer-role
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
 
 #### IAM role has privileged assignment posture
@@ -112,6 +113,7 @@ No findings in this severity band.
 - Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::777788889999:role/ci-deployer
+  - target account resolution: state=resolved; account_id=333344445555; partition=aws; evidence=aws_iam_role.deployer.arn = arn:aws:iam::333344445555:role/lambda-deployer-role
   - trust path: trust principal belongs to foreign account 777788889999
 
 #### VPC Flow Logs are not configured for a modeled VPC

@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.models import NormalizedResource, ResourceInventory
+from tfstride.providers.aws.account_identity import AwsAccountIdentityIndex
 from tfstride.providers.aws.resource_index import (
     AwsReferenceRelationshipKey,
     AwsResourceIndex,
@@ -63,6 +64,10 @@ class AwsSecurityGroupRelationships:
 @dataclass(frozen=True, slots=True)
 class AwsAnalysisIndexes:
     security_group_relationships: AwsSecurityGroupRelationships
+
+    @property
+    def account_identities(self) -> AwsAccountIdentityIndex:
+        return self.security_group_relationships.resource_index.account_identities
 
 
 def build_aws_analysis_indexes(inventory: ResourceInventory) -> AwsAnalysisIndexes:

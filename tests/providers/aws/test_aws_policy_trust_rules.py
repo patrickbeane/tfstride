@@ -29,6 +29,7 @@ class AwsPolicyTrustRuleDetectorsTests(unittest.TestCase):
             provider="aws",
             resource_type="aws_secretsmanager_secret",
             name="app",
+            arn="arn:aws:secretsmanager:us-east-1:111122223333:secret:app",
             category=ResourceCategory.DATA,
             metadata={
                 "resource_policy_source_addresses": ["aws_secretsmanager_secret_policy.app"],
@@ -89,6 +90,7 @@ class AwsPolicyTrustRuleDetectorsTests(unittest.TestCase):
             provider="aws",
             resource_type="aws_iam_role",
             name="deployer",
+            arn="arn:aws:iam::111122223333:role/deployer",
             category=ResourceCategory.IAM,
             metadata={
                 "trust_statements": [

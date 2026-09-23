@@ -182,6 +182,7 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 - Evidence:
   - trust principals: arn:aws:iam::999988887777:root
   - trust scope: principal is foreign account root 999988887777
+  - target account resolution: state=resolved; account_id=111122223333; partition=aws; evidence=aws_iam_role.workload.arn = arn:aws:iam::111122223333:role/workload-role
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
 
 #### IAM policy grants wildcard privileges
@@ -256,6 +257,7 @@ This run identified **9 trust boundaries** and **15 findings** across **23 norma
 - Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::999988887777:root
+  - target account resolution: state=resolved; account_id=111122223333; partition=aws; evidence=aws_iam_role.workload.arn = arn:aws:iam::111122223333:role/workload-role
   - trust path: trust principal belongs to foreign account 999988887777
 
 #### VPC Flow Logs are not configured for a modeled VPC

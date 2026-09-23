@@ -344,6 +344,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             provider="aws",
             resource_type="aws_iam_role",
             name="deployer",
+            arn="arn:aws:iam::111122223333:role/deployer",
             category=ResourceCategory.IAM,
             metadata={
                 "trust_statements": [
@@ -574,6 +575,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             provider="aws",
             resource_type="aws_iam_role",
             name="deployer",
+            arn="arn:aws:iam::111122223333:role/deployer",
             category=ResourceCategory.IAM,
             metadata={
                 "trust_statements": [

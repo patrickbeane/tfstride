@@ -18,6 +18,7 @@ from tfstride.analysis.resource_concepts import (
 )
 from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
+from tfstride.providers.aws.account_identity_evidence import AwsAccountResolution
 from tfstride.providers.aws.analysis_indexes import (
     AwsSecurityGroupRelationships,
     aws_analysis_indexes,
@@ -88,11 +89,16 @@ class AwsBoundaryContributor:
                     )
             contribute_control_to_workload_boundary(context, workload, attached_role)
 
-        primary_account_id = inventory.primary_account_id
+        account_identities = security_group_relationships.resource_index.account_identities
         for role in inventory.by_type(*IDENTITY_ROLE_RESOURCE_TYPES):
+            target_account = account_identities.resolve(role)
             seen_role_principals: set[tuple[str, str]] = set()
             for trust_statement in aws_facts(role).trust_statements:
-                for assessment in trust_statement_principal_assessments(trust_statement, primary_account_id):
+                for assessment in trust_statement_principal_assessments(
+                    trust_statement,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                ):
                     principal_key = (assessment.principal_kind, assessment.principal)
                     if principal_key in seen_role_principals:
                         continue
@@ -110,7 +116,7 @@ class AwsBoundaryContributor:
         for resource in resources:
             if is_identity_role_resource(resource):
                 continue
-            for assessment in _resource_policy_principals(resource, primary_account_id):
+            for assessment in _resource_policy_principals(resource, account_identities.resolve(resource)):
                 principal = assessment.principal
                 if assessment.is_service:
                     continue
@@ -397,14 +403,18 @@ def _workload_has_general_egress_path(workload: NormalizedResource) -> bool:
 
 def _resource_policy_principals(
     resource: NormalizedResource,
-    primary_account_id: str | None,
+    target_account: AwsAccountResolution,
 ) -> list[PrincipalAssessment]:
     principals: list[PrincipalAssessment] = []
     seen_principals: set[str] = set()
     for statement in resource.policy_statements:
         if statement.effect != "Allow":
             continue
-        for assessment in policy_statement_principal_assessments(statement, primary_account_id):
+        for assessment in policy_statement_principal_assessments(
+            statement,
+            target_account.account_id,
+            target_partition=target_account.partition,
+        ):
             if assessment.is_service:
                 continue
             if is_object_storage_resource(resource) and assessment.is_wildcard:

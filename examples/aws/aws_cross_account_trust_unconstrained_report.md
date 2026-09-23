@@ -65,6 +65,7 @@ No findings in this severity band.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:role/github-actions-deployer
   - trust scope: principal belongs to foreign account 444455556666
+  - target account resolution: state=resolved; account_id=111122223333; partition=aws; evidence=aws_iam_role.deployer.arn = arn:aws:iam::111122223333:role/release-deployer-role
   - trust narrowing: supported narrowing conditions present: false; supported narrowing condition keys: none
 
 #### Role trust relationship expands blast radius
@@ -77,6 +78,7 @@ No findings in this severity band.
 - Recommended mitigation: Limit trust policies to the exact service principals or roles required, prefer role ARNs over account root where possible, and add conditions such as `ExternalId`, source ARN, SAML audience, or OIDC audience and subject checks.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:role/github-actions-deployer
+  - target account resolution: state=resolved; account_id=111122223333; partition=aws; evidence=aws_iam_role.deployer.arn = arn:aws:iam::111122223333:role/release-deployer-role
   - trust path: trust principal belongs to foreign account 444455556666
 
 ### Low

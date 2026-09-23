@@ -11,6 +11,8 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.key_management import ManagedKeyLifecyclePosture
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.aws.account_identity import describe_account_resolution
+from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
 from tfstride.providers.aws.kms_evidence import AwsKmsGrantRelationship, AwsKmsKeyPolicyEvidence
 from tfstride.providers.aws.policy_conditions import assess_principal
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
@@ -213,15 +215,22 @@ class AwsKmsRuleDetectors:
             return []
 
         findings: list[Finding] = []
-        primary_account_id = context.inventory.primary_account_id
+        indexes = context.analysis_indexes
+        assert indexes is not None
+        account_identities = aws_analysis_indexes(indexes, context.inventory).account_identities
         for key in context.inventory.by_type(_AWS_KMS_KEY):
+            target_account = account_identities.resolve(key)
             for grant in _deterministic_key_grants(key, context):
                 principal = _known_string(grant.get("grantee_principal"))
                 operations = _grant_operations(grant)
                 if principal is None or not operations:
                     continue
 
-                assessment = assess_principal(principal, primary_account_id)
+                assessment = assess_principal(
+                    principal,
+                    target_account.account_id,
+                    target_partition=target_account.partition,
+                )
                 reasons = _broad_grant_reasons(
                     assessment_is_foreign=assessment.is_foreign_account,
                     assessment_is_root=assessment.is_root_like,
@@ -262,6 +271,7 @@ class AwsKmsRuleDetectors:
                                 _kms_grant_evidence(grant, operations),
                             ),
                             evidence_item("authorization_reasons", reasons),
+                            evidence_item("target_account_resolution", describe_account_resolution(target_account)),
                             evidence_item(
                                 "authorization_scope",
                                 [

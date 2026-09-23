@@ -82,7 +82,9 @@ This is a concise coverage map. Reports identify unsupported AWS resource types 
 
 Caller-identity fallback requires an explicit matching provider configuration and a managed resource type whose creation establishes ownership in that account. The initial fallback set covers IAM roles/policies/instance profiles/OIDC providers, S3 buckets, KMS keys/aliases, Secrets Manager secrets, SNS topics, SQS queues, Lambda functions, DynamoDB tables, and API Gateway APIs. Data lookups, attachments, and other resource types do not inherit ownership from credentials. Missing scope and incomplete or conflicting scoped callers remain unresolved, with evidence retained.
 
-This primitive is available to subsequent trust and authorization migrations; this change does not migrate existing finding consumers. `inventory.primary_account_id` retains its existing summary behavior and is not consulted by the resource-local resolver. Resolve resource references with the existing provider-aware reference views before resolving the selected target's account.
+Role-trust findings, resource-policy findings, KMS-grant findings, trust boundaries, narrowed-trust observations, and trust-based workload paths classify principals against the target resource's account. Findings and observations retain the account-resolution evidence and uncertainty. Unknown ownership cannot establish foreign-account access, but wildcard and account-root breadth remain meaningful independently. A proven same-account KMS root retains lower-severity treatment as account-level IAM delegation; it does not grant every identity key access. KMS grants are classified against the key's owner, not the grant declaration's provider credentials.
+
+`inventory.primary_account_id` retains its existing summary behavior and is not consulted by this trust classification. Resolve resource references with the existing provider-aware reference views before resolving the selected target's account. Separate workload-to-data authorization consumers are outside this trust migration.
 
 ## Rule Coverage
 

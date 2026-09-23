@@ -31,8 +31,9 @@ class PrincipalAssessment:
 
 def assess_principal(
     principal: str,
-    primary_account_id: str | None,
+    target_account_id: str | None,
     *,
+    target_partition: str | None = None,
     principal_kind: str | None = None,
     federated_provider_type_override: str | None = None,
     oidc_condition_key_prefix: str | None = None,
@@ -46,7 +47,15 @@ def assess_principal(
     is_wildcard = principal == "*"
     account_id = parse_aws_account_id(principal, allow_bare=True)
     is_root_like = _is_root_like_principal(principal)
-    is_foreign_account = bool(account_id and primary_account_id and account_id != primary_account_id)
+    principal_partition = principal.split(":", 2)[1] if principal.startswith("arn:") else None
+    is_foreign_account = bool(
+        account_id
+        and target_account_id
+        and (
+            account_id != target_account_id
+            or (principal_partition and target_partition and principal_partition != target_partition)
+        )
+    )
 
     scope_description = None
     if is_wildcard:
@@ -107,7 +116,9 @@ def assess_principal(
 
 def trust_statement_principal_assessments(
     trust_statement: Mapping[str, Any],
-    primary_account_id: str | None,
+    target_account_id: str | None,
+    *,
+    target_partition: str | None = None,
 ) -> list[PrincipalAssessment]:
     entries = _trust_statement_principal_entries(trust_statement)
     assessments: list[PrincipalAssessment] = []
@@ -120,7 +131,8 @@ def trust_statement_principal_assessments(
         assessments.append(
             assess_principal(
                 value,
-                primary_account_id,
+                target_account_id,
+                target_partition=target_partition,
                 principal_kind=kind,
                 federated_provider_type_override="oidc" if resolved_provider is not None else None,
                 oidc_condition_key_prefix=condition_key_prefix,
@@ -131,10 +143,15 @@ def trust_statement_principal_assessments(
 
 def policy_statement_principal_assessments(
     statement: Any,
-    primary_account_id: str | None,
+    target_account_id: str | None,
+    *,
+    target_partition: str | None = None,
 ) -> list[PrincipalAssessment]:
     entries = _policy_statement_principal_entries(statement)
-    return [assess_principal(value, primary_account_id, principal_kind=kind) for kind, value in entries]
+    return [
+        assess_principal(value, target_account_id, principal_kind=kind, target_partition=target_partition)
+        for kind, value in entries
+    ]
 
 
 def trust_statement_narrowing_conditions(trust_statement: Mapping[str, Any]) -> list[IAMPolicyCondition]:

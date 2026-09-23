@@ -303,7 +303,8 @@ class AwsCoverageExpansionTests(TFSIntegrationTestCase):
 
         self.assertEqual(finding.title, "Sensitive resource policy allows broad or cross-account access")
         self.assertEqual(finding.severity, Severity.MEDIUM)
-        self.assertIn("same-account root through its key policy", finding.rationale)
+        self.assertIn("delegates its key-policy permissions to its own AWS account", finding.rationale)
+        self.assertIn("does not itself grant every identity access", finding.rationale)
         self.assertEqual(evidence["trust_scope"], ["principal is account root 111122223333"])
         self.assertEqual(finding.severity_reasoning.final_score, 4)
 

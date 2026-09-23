@@ -67,6 +67,7 @@ No findings in this severity band.
 - Evidence:
   - trust principals: arn:aws:iam::444455556666:role/github-actions-deployer
   - trust scope: principal belongs to foreign account 444455556666
+  - target account resolution: state=resolved; account_id=111122223333; partition=aws; evidence=aws_iam_role.deployer.arn = arn:aws:iam::111122223333:role/release-deployer-role
   - trust narrowing: supported narrowing conditions present: true; supported narrowing condition keys: aws:SourceAccount, aws:SourceArn, sts:ExternalId
 
 ## Limitations / Unsupported Resources
