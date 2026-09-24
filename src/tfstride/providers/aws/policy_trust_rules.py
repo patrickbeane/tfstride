@@ -109,6 +109,7 @@ class AwsPolicyTrustRuleDetectors:
                         and not assessment.is_foreign_account
                         and assessment.account_id is not None
                         and assessment.account_id == target_account.account_id
+                        and target_account.partition is not None
                     )
                     if same_account_kms_root:
                         severity_reasoning = build_severity_reasoning(

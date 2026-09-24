@@ -270,6 +270,34 @@ class AwsResourceLocalTrustTests(unittest.TestCase):
                     self.assertEqual(_findings(_analyze([target]), POLICY), [finding])
                 self.assertIsNotNone(_trust_boundary(result, target.address))
 
+    def test_kms_root_treatment_requires_partition_from_scoped_caller_identity(self) -> None:
+        for arn_unknown in (False, True):
+            with self.subTest(arn_unknown=arn_unknown):
+                target = _resource(
+                    "aws_kms_key",
+                    "customer",
+                    {"key_id": "customer", "policy": _policy(f"arn:aws-cn:iam::{ACCOUNT}:root", "kms:*")},
+                    scope="aws.target",
+                    unknown={"arn": True} if arn_unknown else None,
+                )
+                caller = _resource(
+                    "aws_caller_identity",
+                    "current",
+                    {"account_id": ACCOUNT},
+                    scope="aws.target",
+                    mode="data",
+                    unknown={"arn": True} if arn_unknown else None,
+                )
+                findings = _findings(_analyze([target, caller]), POLICY)
+                self.assertEqual(len(findings), 1)
+                finding = findings[0]
+                evidence = _evidence(finding)["target_account_resolution"]
+                self.assertIn("state=resolved", evidence)
+                self.assertIn(f"account_id={ACCOUNT}", evidence)
+                self.assertIn("partition=unknown", evidence)
+                self.assertEqual(finding.severity.value, "high")
+                self.assertNotIn("enables IAM policies", finding.rationale)
+
     def test_resource_policy_uses_target_account_for_sensitive_and_service_resources(self) -> None:
         for resource_type, arn, action, rule in (
             ("aws_kms_key", f"arn:aws:kms:us-east-1:{ACCOUNT}:key/customer", "kms:Decrypt", POLICY),
