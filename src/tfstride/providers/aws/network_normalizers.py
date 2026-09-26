@@ -11,6 +11,12 @@ from tfstride.providers.aws.load_balancer_forwarding import (
     normalize_listener_conditions,
 )
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.aws.network_inputs import (
+    network_attachments,
+    network_port,
+    network_string,
+    security_group_traffic_rules,
+)
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
     attribute_unknown,
@@ -57,7 +63,9 @@ def normalize_subnet(resource: TerraformResource) -> NormalizedResource:
         arn=known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True),
         vpc_id=known_string(values, resource.unknown_values, "vpc_id", uncertainties, require_string=True),
         metadata={
-            AwsResourceMetadata.CIDR_BLOCK: values.get("cidr_block"),
+            AwsResourceMetadata.CIDR_BLOCK: known_string(
+                values, resource.unknown_values, "cidr_block", uncertainties, require_string=True
+            ),
             "availability_zone": values.get("availability_zone"),
             "map_public_ip_on_launch": bool(values.get("map_public_ip_on_launch", False)),
             "tags": values.get("tags", {}),
@@ -111,16 +119,20 @@ def normalize_route_table_association(resource: TerraformResource) -> Normalized
 
 def normalize_security_group(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    uncertainties: list[str] = []
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.NETWORK,
-        identifier=values.get("id"),
-        vpc_id=values.get("vpc_id"),
+        identifier=known_string(values, resource.unknown_values, "id", uncertainties, require_string=True),
+        arn=known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True),
+        vpc_id=known_string(values, resource.unknown_values, "vpc_id", uncertainties, require_string=True),
         network_rules=parse_security_group_rules(values),
         metadata={
+            AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES: security_group_traffic_rules(resource),
+            AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES_KNOWN: True,
             "description": values.get("description"),
             "group_name": values.get("name"),
         },
@@ -129,6 +141,7 @@ def normalize_security_group(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_security_group_rule(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    uncertainties: list[str] = []
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
@@ -137,7 +150,13 @@ def normalize_security_group_rule(resource: TerraformResource) -> NormalizedReso
         category=ResourceCategory.NETWORK,
         identifier=values.get("id") or resource.address,
         network_rules=[parse_standalone_security_group_rule(values)],
-        metadata={"security_group_id": values.get("security_group_id")},
+        metadata={
+            AwsResourceMetadata.SECURITY_GROUP_ID: known_string(
+                values, resource.unknown_values, "security_group_id", uncertainties, require_string=True
+            ),
+            AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES: security_group_traffic_rules(resource),
+            AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES_KNOWN: True,
+        },
     )
 
 
@@ -361,7 +380,13 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         public_access_configured=internet_facing,
         metadata={
             "internal": not internet_facing,
-            AwsResourceMetadata.LOAD_BALANCER_TYPE: values.get("load_balancer_type"),
+            AwsResourceMetadata.LOAD_BALANCER_TYPE: network_string(
+                values, resource.unknown_values, "load_balancer_type"
+            ),
+            AwsResourceMetadata.LOAD_BALANCER_IP_ADDRESS_TYPE: network_string(
+                values, resource.unknown_values, "ip_address_type", "ipv4"
+            ),
+            AwsResourceMetadata.NETWORK_ATTACHMENTS: network_attachments(resource),
         },
     )
     mutations = aws_mutations(normalized)
@@ -394,6 +419,7 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
             ),
             AwsResourceMetadata.LOAD_BALANCER_ACTIONS: actions,
             AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: action_target_references(actions),
+            AwsResourceMetadata.LOAD_BALANCER_LISTENER_PORT: network_port(values, unknown_values, "port"),
             "port": as_optional_int(values.get("port")),
             "protocol": protocol,
             AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL: protocol,
@@ -455,6 +481,15 @@ def normalize_load_balancer_target_group(resource: TerraformResource) -> Normali
             "port": as_optional_int(values.get("port")),
             "protocol": values.get("protocol"),
             "target_type": values.get("target_type"),
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_PROTOCOL: network_string(
+                values, resource.unknown_values, "protocol"
+            ),
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_TYPE: network_string(
+                values, resource.unknown_values, "target_type", "instance"
+            ),
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_IP_ADDRESS_TYPE: network_string(
+                values, resource.unknown_values, "ip_address_type", "ipv4"
+            ),
         },
     )
 

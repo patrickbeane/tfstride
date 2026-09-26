@@ -391,7 +391,8 @@
               "FARGATE"
             ],
             "task_role_arn": "arn:aws:iam::111122223333:role/app-task-role",
-            "execution_role_arn": "arn:aws:iam::111122223333:role/app-execution-role"
+            "execution_role_arn": "arn:aws:iam::111122223333:role/app-execution-role",
+            "container_definitions": "[{\"name\":\"app\",\"portMappings\":[{\"containerPort\":8080,\"hostPort\":8080,\"protocol\":\"tcp\"}]}]"
           }
         },
         {

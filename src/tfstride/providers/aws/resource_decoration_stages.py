@@ -39,6 +39,7 @@ from tfstride.providers.aws.resource_decoration.ecs_messaging_topology_destructi
     ModelEcsMessagingTopologyDestructionPathsStage,
     ProjectEcsMessagingTopologyDestructionPathsOntoServicesStage,
 )
+from tfstride.providers.aws.resource_decoration.ecs_public_ingress import DeriveEcsPublicIngressStage
 from tfstride.providers.aws.resource_decoration.ecs_s3_access_paths import (
     ModelEcsS3AccessPathsStage,
     ProjectEcsS3AccessPathsOntoServicesStage,
@@ -151,6 +152,7 @@ def default_aws_decoration_stages() -> tuple[AwsDecorationStage, ...]:
         InferVpcIdsStage(),
         DerivePublicExposureStage(),
         MarkEcsLoadBalancerExposureStage(),
+        DeriveEcsPublicIngressStage(),
         ProjectEcsKmsOperationPathsOntoServicesStage(),
         ProjectEcsKmsManagementPathsOntoServicesStage(),
         ProjectEcsSecretsManagerManagementPathsOntoServicesStage(),

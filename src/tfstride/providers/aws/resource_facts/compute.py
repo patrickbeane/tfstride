@@ -49,6 +49,30 @@ class AwsComputeFacts(AwsBaseFacts):
         self.set(AwsResourceMetadata.ECS_FORWARDING_UNCERTAINTIES, sorted(set(uncertainties)))
 
     @property
+    def ecs_container_network(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.ECS_CONTAINER_NETWORK)
+
+    @property
+    def ecs_public_ingress_paths(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_PUBLIC_INGRESS_PATHS)
+
+    @property
+    def ecs_public_ingress_decisions(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_PUBLIC_INGRESS_DECISIONS)
+
+    @property
+    def ecs_public_ingress_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_PUBLIC_INGRESS_UNCERTAINTIES)
+
+    def set_ecs_public_ingress(self, decisions: list[dict[str, Any]], uncertainties: list[str]) -> None:
+        self.set(AwsResourceMetadata.ECS_PUBLIC_INGRESS_DECISIONS, decisions)
+        self.set(
+            AwsResourceMetadata.ECS_PUBLIC_INGRESS_PATHS,
+            [decision for decision in decisions if decision["state"] == "allowed"],
+        )
+        self.set(AwsResourceMetadata.ECS_PUBLIC_INGRESS_UNCERTAINTIES, sorted(set(uncertainties)))
+
+    @property
     def ecs_load_balancers(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECS_LOAD_BALANCERS)
 

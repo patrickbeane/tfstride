@@ -14,6 +14,26 @@ class AwsEdgeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.LOAD_BALANCER_TYPE)
 
     @property
+    def load_balancer_listener_port(self) -> int | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_LISTENER_PORT)
+
+    @property
+    def load_balancer_ip_address_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_IP_ADDRESS_TYPE)
+
+    @property
+    def load_balancer_target_protocol(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_TARGET_PROTOCOL)
+
+    @property
+    def load_balancer_target_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_TARGET_TYPE)
+
+    @property
+    def load_balancer_target_ip_address_type(self) -> str | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_TARGET_IP_ADDRESS_TYPE)
+
+    @property
     def load_balancer_arn(self) -> str | None:
         return self.get(AwsResourceMetadata.LOAD_BALANCER_ARN)
 

@@ -134,6 +134,20 @@ def aws_reference_relationship_key(
     return "reference", provider_config_key, value
 
 
+def resolve_aws_network_reference(
+    view: AwsResourceReferenceView, reference: str | None, source: NormalizedResource
+) -> NormalizedResource | None:
+    """Require one modeled target; weak network aliases also require known source scope."""
+    candidate = view.resolve(reference, source=source).selected_candidate
+    if candidate is None or not reference:
+        return None
+    if not _aws_reference_is_strong_for_candidate(reference, candidate) and (
+        not source.provider_config_key or candidate.provider_config_key != source.provider_config_key
+    ):
+        return None
+    return candidate
+
+
 @dataclass(slots=True)
 class AwsResourceIndex:
     account_identities: AwsAccountIdentityIndex

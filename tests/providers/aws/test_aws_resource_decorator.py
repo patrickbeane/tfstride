@@ -567,6 +567,7 @@ class AwsResourceDecoratorTests(unittest.TestCase):
                 "infer_vpc_ids",
                 "derive_public_exposure",
                 "mark_ecs_services_fronted_by_internet_facing_load_balancers",
+                "derive_ecs_public_ingress",
                 "project_ecs_kms_operation_paths_onto_services",
                 "project_ecs_kms_management_paths_onto_services",
                 "project_ecs_secrets_manager_management_paths_onto_services",

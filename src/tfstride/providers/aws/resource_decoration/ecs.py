@@ -9,7 +9,7 @@ from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import (
     AwsDecorationContext,
     AwsResourceIndex,
-    AwsResourceReferenceView,
+    resolve_aws_network_reference,
 )
 from tfstride.providers.aws.resource_mutations import aws_mutations
 
@@ -71,7 +71,7 @@ class MarkEcsLoadBalancerExposureStage:
             associations: list[dict[str, Any]] = []
             uncertainties: list[str] = []
             for binding in aws_facts(service).ecs_load_balancers:
-                target = _resolved_reference(
+                target = resolve_aws_network_reference(
                     context.index.load_balancer_target_groups, binding.get("target_group_arn"), service
                 )
                 if target is None:
@@ -103,32 +103,26 @@ class MarkEcsLoadBalancerExposureStage:
                     item["container_port"],
                 )
             )
-            addresses = sorted({association["load_balancer_address"] for association in associations})
+            # Keep configured forwarding chains for packet evaluation, including
+            # blocked ones, without widening the existing exposure flags.
+            addresses = sorted(
+                {
+                    association["load_balancer_address"]
+                    for association in associations
+                    if context.index.resources_by_address[association["load_balancer_address"]].public_exposure
+                }
+            )
             facts.set_ecs_forwarding(associations, uncertainties)
             facts.set_fronted_by_internet_facing_load_balancer(bool(addresses))
             # Re-running decoration must not leave evidence from a removed listener.
             facts.set_internet_facing_load_balancer_addresses(addresses)
 
 
-def _resolved_reference(
-    view: AwsResourceReferenceView, reference: str | None, source: NormalizedResource
-) -> NormalizedResource | None:
-    candidate = view.resolve(reference, source=source).selected_candidate
-    if candidate is None or not reference:
-        return None
-    strong = reference in (candidate.address, f"{candidate.address}.arn", f"{candidate.address}.id") or (
-        reference.startswith("arn:") and reference == candidate.arn
-    )
-    if not strong and (not source.provider_config_key or candidate.provider_config_key != source.provider_config_key):
-        return None
-    return candidate
-
-
 def _listener_rules(index: AwsResourceIndex) -> dict[str, list[tuple[NormalizedResource, bool]]]:
     result: dict[str, list[tuple[NormalizedResource, bool]]] = {}
     for rule in sorted(index.load_balancer_listener_rules, key=lambda item: item.address):
         reference = aws_facts(rule).listener_arn
-        listener = _resolved_reference(index.load_balancer_listeners, reference, rule)
+        listener = resolve_aws_network_reference(index.load_balancer_listeners, reference, rule)
         if listener is not None:
             result.setdefault(listener.address, []).append((rule, True))
             continue
@@ -154,7 +148,9 @@ def _listener_forwarding(index: AwsResourceIndex) -> tuple[dict[str, list[dict[s
     uncertainties: dict[str, list[str]] = {}
     rules_by_listener = _listener_rules(index)
     for listener in sorted(index.load_balancer_listeners.resources, key=lambda item: item.address):
-        load_balancer = _resolved_reference(index.load_balancers, aws_facts(listener).load_balancer_arn, listener)
+        load_balancer = resolve_aws_network_reference(
+            index.load_balancers, aws_facts(listener).load_balancer_arn, listener
+        )
         rules = rules_by_listener.get(listener.address, [])
         for source in [listener, *(rule for rule, certain in rules if certain)]:
             facts = aws_facts(source)
@@ -185,11 +181,13 @@ def _listener_forwarding(index: AwsResourceIndex) -> tuple[dict[str, list[dict[s
             witness = listener_request_witness(conditions, predecessors) if not reasons else None
             if witness is None:
                 reasons.append("no request is proven to reach this action after preceding listener rules")
-            if load_balancer is None or not load_balancer.public_exposure:
+            if load_balancer is None or not (load_balancer.public_access_configured or load_balancer.public_exposure):
                 reasons.append("listener load balancer is unresolved or not established as public")
             all_targets = [target for action in actions for target in action["targets"]]
             for target in all_targets:
-                target_group = _resolved_reference(index.load_balancer_target_groups, target["reference"], source)
+                target_group = resolve_aws_network_reference(
+                    index.load_balancer_target_groups, target["reference"], source
+                )
                 if target_group is None:
                     continue
                 target_reasons = list(reasons)

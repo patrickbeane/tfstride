@@ -9,6 +9,12 @@ from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCate
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact, first_item
 from tfstride.providers.aws.load_balancer_forwarding import normalize_ecs_bindings
 from tfstride.providers.aws.metadata import AwsResourceMetadata
+from tfstride.providers.aws.network_inputs import (
+    container_network_inputs,
+    network_attachments,
+    network_string,
+    network_value,
+)
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import (
     compact_condition_entries,
@@ -84,18 +90,23 @@ def normalize_ecs_cluster(resource: TerraformResource) -> NormalizedResource:
 
 def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    revision = as_optional_int(values.get("revision"))
-    image_references, image_uncertainties = _ecs_container_image_references(resource)
-    secret_references, secret_uncertainties = _ecs_secret_references(resource)
-    family = values.get("family")
+    revision = as_optional_int(network_value(values, resource.unknown_values, "revision"))
+    definitions, definition_uncertainties = _ecs_container_definitions(resource)
+    image_references, image_uncertainties = _ecs_container_image_references(
+        resource, definitions, definition_uncertainties
+    )
+    secret_references, secret_uncertainties = _ecs_secret_references(resource, definitions, definition_uncertainties)
+    family = network_string(values, resource.unknown_values, "family")
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.COMPUTE,
-        identifier=ecs_task_definition_identifier(family, revision) or values.get("id") or family,
-        arn=values.get("arn"),
+        identifier=ecs_task_definition_identifier(family, revision)
+        or network_string(values, resource.unknown_values, "id")
+        or family,
+        arn=network_string(values, resource.unknown_values, "arn"),
         metadata={
             "family": family,
             "revision": revision,
@@ -107,6 +118,9 @@ def normalize_ecs_task_definition(resource: TerraformResource) -> NormalizedReso
             AwsResourceMetadata.CONTAINER_IMAGE_POSTURE_UNCERTAINTIES: image_uncertainties,
             AwsResourceMetadata.ECS_SECRET_REFERENCES: secret_references,
             AwsResourceMetadata.ECS_SECRET_POSTURE_UNCERTAINTIES: secret_uncertainties,
+            AwsResourceMetadata.ECS_CONTAINER_NETWORK: container_network_inputs(
+                resource, definitions, definition_uncertainties
+            ),
         },
     )
 
@@ -166,13 +180,14 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
         public_access_configured=assign_public_ip,
         metadata={
             "cluster": values.get("cluster"),
-            "task_definition": values.get("task_definition"),
+            "task_definition": network_string(values, resource.unknown_values, "task_definition"),
             "desired_count": as_optional_int(values.get("desired_count")),
             "launch_type": values.get("launch_type"),
             "platform_version": values.get("platform_version"),
             "assign_public_ip": assign_public_ip,
             AwsResourceMetadata.ECS_LOAD_BALANCERS: normalize_ecs_bindings(resource),
             AwsResourceMetadata.ECS_NETWORK_POSTURE_UNCERTAINTIES: network_uncertainties,
+            AwsResourceMetadata.NETWORK_ATTACHMENTS: network_attachments(resource, ecs=True),
             AwsResourceMetadata.ECS_SECURITY_GROUP_REFERENCE_STATE: security_group_reference_state,
         },
     )
@@ -321,8 +336,9 @@ def _ecs_container_definitions(resource: TerraformResource) -> tuple[list[Any], 
 
 def _ecs_container_image_references(
     resource: TerraformResource,
+    definitions: list[Any],
+    parse_uncertainties: list[str],
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    definitions, parse_uncertainties = _ecs_container_definitions(resource)
     references: list[dict[str, Any]] = []
     uncertainties = list(parse_uncertainties)
     unknown_definition_values = resource.unknown_values.get("container_definitions")
@@ -355,8 +371,9 @@ def _ecs_container_image_references(
     return references, uncertainties
 
 
-def _ecs_secret_references(resource: TerraformResource) -> tuple[list[dict[str, Any]], list[str]]:
-    definitions, parse_uncertainties = _ecs_container_definitions(resource)
+def _ecs_secret_references(
+    resource: TerraformResource, definitions: list[Any], parse_uncertainties: list[str]
+) -> tuple[list[dict[str, Any]], list[str]]:
     references: list[dict[str, Any]] = []
     uncertainties = list(parse_uncertainties)
     unknown_definitions = resource.unknown_values.get("container_definitions")

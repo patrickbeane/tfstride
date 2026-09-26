@@ -10,6 +10,18 @@ class AwsNetworkFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property
+    def network_attachments(self) -> dict[str, Any]:
+        return self.get(AwsResourceMetadata.NETWORK_ATTACHMENTS)
+
+    @property
+    def security_group_traffic_rules(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES)
+
+    @property
+    def security_group_traffic_rules_known(self) -> bool:
+        return self.get(AwsResourceMetadata.SECURITY_GROUP_TRAFFIC_RULES_KNOWN)
+
+    @property
     def security_group_id(self) -> str | None:
         return self.get(AwsResourceMetadata.SECURITY_GROUP_ID)
 
