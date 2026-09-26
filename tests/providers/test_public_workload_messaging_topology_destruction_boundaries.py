@@ -35,7 +35,7 @@ from tests.providers.aws.test_aws_ecs_messaging_access_paths import (
     _topic as aws_topic,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
     _service as aws_service,
@@ -189,7 +189,7 @@ def _aws_resources(
     incomplete: bool = False,
 ) -> list[TerraformResource]:
     resources = [
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         topic or aws_topic(),
         queue or aws_queue(),
         aws_role("orders_task", AWS_TASK_ROLE_ARN, statements),

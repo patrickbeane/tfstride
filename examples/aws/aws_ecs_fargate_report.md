@@ -2,12 +2,12 @@
 
 - Analyzed file: `sample_aws_ecs_fargate_plan.json`
 - Provider: `aws`
-- Normalized resources: `21`
+- Normalized resources: `23`
 - Unsupported resources: `0`
 
 ## Summary
 
-This run identified **6 trust boundaries** and **12 findings** across **21 normalized resources**.
+This run identified **6 trust boundaries** and **12 findings** across **23 normalized resources**.
 
 - High severity findings: `1`
 - Medium severity findings: `10`
@@ -15,9 +15,9 @@ This run identified **6 trust boundaries** and **12 findings** across **21 norma
 
 ## Analysis Coverage
 
-- Terraform resources seen: `21`
-- Provider resources considered: `21`
-- Normalized resources: `21`
+- Terraform resources seen: `23`
+- Provider resources considered: `23`
+- Normalized resources: `23`
 - Unsupported resources: `0`
 - Resources with plan-time unknown values: `0`
 - Registered provider rules (AWS): `104`

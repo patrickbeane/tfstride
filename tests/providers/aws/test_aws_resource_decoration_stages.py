@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.ecs_forwarding_support import forwarding_action
 from tfstride.models import (
     IAMPolicyStatement,
     NormalizedResource,
@@ -1194,7 +1195,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             ["aws_iam_instance_profile.web"],
         )
 
-    def test_ecs_load_balancer_stage_marks_services_fronted_by_public_load_balancer(self) -> None:
+    def test_ecs_load_balancer_stage_does_not_infer_fronting_from_security_group_trust(self) -> None:
         load_balancer = _resource(
             "aws_lb.web",
             "aws_lb",
@@ -1230,10 +1231,10 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
 
         MarkEcsLoadBalancerExposureStage().apply(resources, _context(resources))
 
-        self.assertTrue(service.metadata["fronted_by_internet_facing_load_balancer"])
+        self.assertFalse(service.metadata["fronted_by_internet_facing_load_balancer"])
         self.assertEqual(
             service.metadata["internet_facing_load_balancer_addresses"],
-            ["aws_lb.web"],
+            [],
         )
 
     def test_ecs_secret_paths_project_complete_evidence_onto_resolved_service(self) -> None:
@@ -1329,6 +1330,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             metadata={
                 "load_balancer_arn": load_balancer_arn,
                 "target_group_arns": [target_group_arn],
+                "load_balancer_actions": [forwarding_action(target_group_arn)],
             },
         )
         target_group = _resource(
@@ -1390,6 +1392,9 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             metadata={
                 "listener_arn": listener_arn,
                 "target_group_arns": [target_group_reference],
+                "load_balancer_actions": [forwarding_action(target_group_reference, "action")],
+                "listener_rule_priority": 10,
+                "load_balancer_conditions": [{"field": "path_pattern", "values": ["/app/*"]}],
             },
         )
         target_group = _resource(
@@ -1403,7 +1408,11 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             "aws_ecs_service.app",
             "aws_ecs_service",
             ResourceCategory.COMPUTE,
-            metadata={"load_balancers": [{"target_group_arn": target_group_reference}]},
+            metadata={
+                "load_balancers": [
+                    {"target_group_arn": target_group_reference, "container_name": "app", "container_port": 8080}
+                ]
+            },
         )
         resources = [load_balancer, listener, listener_rule, target_group, service]
 
@@ -1436,6 +1445,7 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             metadata={
                 "load_balancer_arn": load_balancer_arn,
                 "target_group_arns": [target_group_arn],
+                "load_balancer_actions": [forwarding_action(target_group_arn)],
             },
         )
         target_group = _resource(
@@ -1449,14 +1459,18 @@ class AwsResourceDecorationStageTests(unittest.TestCase):
             "aws_ecs_service.app",
             "aws_ecs_service",
             ResourceCategory.COMPUTE,
-            metadata={"load_balancers": [{"target_group_arn": target_group_arn}]},
+            metadata={
+                "load_balancers": [
+                    {"target_group_arn": target_group_arn, "container_name": "app", "container_port": 8080}
+                ]
+            },
         )
         resources = [load_balancer, listener, target_group, service]
 
         MarkEcsLoadBalancerExposureStage().apply(resources, _context(resources))
 
         self.assertFalse(service.metadata["fronted_by_internet_facing_load_balancer"])
-        self.assertNotIn("internet_facing_load_balancer_addresses", service.metadata)
+        self.assertEqual(aws_facts(service).internet_facing_load_balancer_addresses, [])
 
 
 if __name__ == "__main__":

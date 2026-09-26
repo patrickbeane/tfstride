@@ -37,7 +37,7 @@ from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
     _versioning as aws_versioning,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _service as aws_service,
@@ -207,7 +207,7 @@ def _aws_resources(
 ) -> list[TerraformResource]:
     resources = [
         aws_caller_identity(),
-        aws_load_balancer(internal=not public),
+        *aws_load_balancer_path(internal=not public),
         aws_bucket(),
     ]
     if versioning is not None:

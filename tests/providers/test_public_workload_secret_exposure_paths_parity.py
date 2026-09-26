@@ -26,7 +26,7 @@ from tests.providers.aws.test_aws_ecs_secret_access_paths import (
     _task_definition as aws_task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_secret_access_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_secret_access_rules import (
     _secret as aws_secret,
@@ -125,7 +125,7 @@ def _gcp_project_iam_member() -> TerraformResource:
 
 def _aws_public_resources(*, internal: bool = False) -> list[TerraformResource]:
     return [
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         aws_secret(),
         aws_role(
             "execution",
@@ -269,7 +269,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
                 "aws-denied",
                 AwsNormalizer(),
                 [
-                    aws_load_balancer(),
+                    *aws_load_balancer_path(),
                     aws_role(
                         "execution",
                         AWS_EXECUTION_ROLE_ARN,
@@ -286,7 +286,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
                 "aws-conditional",
                 AwsNormalizer(),
                 [
-                    aws_load_balancer(),
+                    *aws_load_balancer_path(),
                     aws_role(
                         "execution",
                         AWS_EXECUTION_ROLE_ARN,
@@ -307,7 +307,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
                 "aws-external-policy",
                 AwsNormalizer(),
                 [
-                    aws_load_balancer(),
+                    *aws_load_balancer_path(),
                     aws_role(
                         "execution",
                         AWS_EXECUTION_ROLE_ARN,
@@ -321,7 +321,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
             (
                 "aws-unresolved-role",
                 AwsNormalizer(),
-                [aws_load_balancer(), aws_task_definition(task_role_arn=None), aws_service()],
+                [*aws_load_balancer_path(), aws_task_definition(task_role_arn=None), aws_service()],
             ),
             (
                 "gcp-conditional",
@@ -445,7 +445,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
                 "aws",
                 AwsNormalizer(),
                 [
-                    aws_load_balancer(),
+                    *aws_load_balancer_path(),
                     aws_secret(),
                     aws_role(
                         "execution",

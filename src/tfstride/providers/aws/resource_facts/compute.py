@@ -37,6 +37,18 @@ class AwsComputeFacts(AwsBaseFacts):
     __slots__ = ()
 
     @property
+    def ecs_forwarding_associations(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.ECS_FORWARDING_ASSOCIATIONS)
+
+    @property
+    def ecs_forwarding_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.ECS_FORWARDING_UNCERTAINTIES)
+
+    def set_ecs_forwarding(self, associations: list[dict[str, Any]], uncertainties: list[str]) -> None:
+        self.set(AwsResourceMetadata.ECS_FORWARDING_ASSOCIATIONS, associations)
+        self.set(AwsResourceMetadata.ECS_FORWARDING_UNCERTAINTIES, sorted(set(uncertainties)))
+
+    @property
     def ecs_load_balancers(self) -> list[dict[str, Any]]:
         return self.get(AwsResourceMetadata.ECS_LOAD_BALANCERS)
 

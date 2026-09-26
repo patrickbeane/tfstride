@@ -197,6 +197,12 @@ class AwsResourceMetadata:
     TRUST_PRINCIPALS = StringListMetadataField("trust_principals")
     RESOURCE_POLICY_SOURCE_ADDRESSES = StringListMetadataField("resource_policy_source_addresses")
     LOAD_BALANCER_TARGET_GROUP_ARNS = StringListMetadataField("target_group_arns")
+    LOAD_BALANCER_ACTIONS = DictListMetadataField("load_balancer_actions")
+    LOAD_BALANCER_CONDITIONS = DictListMetadataField("load_balancer_conditions")
+    LOAD_BALANCER_CONDITION_UNCERTAINTIES = StringListMetadataField("load_balancer_condition_uncertainties")
+    LOAD_BALANCER_RULE_PRIORITY = OptionalIntMetadataField("listener_rule_priority")
+    ECS_FORWARDING_ASSOCIATIONS = DictListMetadataField("ecs_forwarding_associations")
+    ECS_FORWARDING_UNCERTAINTIES = StringListMetadataField("ecs_forwarding_uncertainties")
 
     SECURITY_GROUP_ID = OptionalStringMetadataField("security_group_id")
     ROLE_REFERENCE = OptionalStringMetadataField("role")

@@ -15,7 +15,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _evaluate,
-    _load_balancer,
+    _load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _service as _public_service,
@@ -104,7 +104,7 @@ class AwsEcsS3ScopeEvaluationTests(unittest.TestCase):
             with self.subTest(blocked_state=blocked_state):
                 inventory, _, findings = _evaluate(
                     [
-                        _load_balancer(),
+                        *_load_balancer_path(),
                         _bucket(),
                         _role(
                             "orders_task",
@@ -248,7 +248,7 @@ class AwsEcsS3ScopeEvaluationTests(unittest.TestCase):
             with self.subTest(resource=resource, condition=condition):
                 _, _, findings = _evaluate(
                     [
-                        _load_balancer(),
+                        *_load_balancer_path(),
                         _bucket(),
                         _role(
                             "orders_task",

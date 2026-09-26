@@ -29,7 +29,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _task_definition as aws_task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _service as aws_service,
@@ -195,7 +195,7 @@ def _aws_resources(
 ) -> list[TerraformResource]:
     resources = [
         caller_identity or _aws_caller_identity(),
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         aws_bucket(),
         aws_role("orders_task", task_role_arn, statements),
     ]

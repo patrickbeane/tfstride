@@ -29,7 +29,7 @@ from tests.providers.aws.test_aws_ecs_messaging_access_paths import (
     _task_definition as aws_task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
     _service as aws_service,
@@ -202,7 +202,7 @@ def _aws_resources(
         )
 
     resources = [
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         queue or aws_queue(),
     ]
     if execution_only:

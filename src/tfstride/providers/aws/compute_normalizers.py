@@ -7,6 +7,7 @@ from typing import Any
 
 from tfstride.models import IAMPolicyStatement, NormalizedResource, ResourceCategory, TerraformResource
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact, first_item
+from tfstride.providers.aws.load_balancer_forwarding import normalize_ecs_bindings
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.network_normalizers import AWS_PROVIDER
 from tfstride.providers.aws.policy_documents import (
@@ -170,7 +171,7 @@ def normalize_ecs_service(resource: TerraformResource) -> NormalizedResource:
             "launch_type": values.get("launch_type"),
             "platform_version": values.get("platform_version"),
             "assign_public_ip": assign_public_ip,
-            AwsResourceMetadata.ECS_LOAD_BALANCERS: as_list(values.get("load_balancer")),
+            AwsResourceMetadata.ECS_LOAD_BALANCERS: normalize_ecs_bindings(resource),
             AwsResourceMetadata.ECS_NETWORK_POSTURE_UNCERTAINTIES: network_uncertainties,
             AwsResourceMetadata.ECS_SECURITY_GROUP_REFERENCE_STATE: security_group_reference_state,
         },

@@ -5,12 +5,16 @@ from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, SecurityGroupRule, TerraformResource
 from tfstride.providers.aws.coercion import as_list, as_optional_int, compact
+from tfstride.providers.aws.load_balancer_forwarding import (
+    action_target_references,
+    normalize_forwarding_actions,
+    normalize_listener_conditions,
+)
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.resource_mutations import aws_mutations
 from tfstride.providers.coercion import (
     attribute_unknown,
     bool_state,
-    dedupe,
     first_mapping,
     known_block_bool,
     known_block_string,
@@ -338,7 +342,11 @@ def normalize_cloudfront_distribution(resource: TerraformResource) -> Normalized
 
 def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
-    internet_facing = not bool(values.get("internal", False))
+    uncertainties: list[str] = []
+    internal = known_bool(values, resource.unknown_values, "internal", uncertainties)
+    internet_facing = internal is False or (
+        "internal" not in values and not attribute_unknown(resource.unknown_values, "internal")
+    )
     public_access_reasons = ["load balancer is configured as internet-facing"] if internet_facing else []
     normalized = NormalizedResource(
         address=resource.address,
@@ -346,8 +354,8 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.EDGE,
-        identifier=values.get("id"),
-        arn=values.get("arn"),
+        identifier=known_string(values, resource.unknown_values, "id", uncertainties, require_string=True),
+        arn=known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True),
         subnet_ids=tuple(as_list(values.get("subnets"))),
         security_group_ids=tuple(as_list(values.get("security_groups"))),
         public_access_configured=internet_facing,
@@ -369,19 +377,23 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
     protocol = known_string(values, unknown_values, "protocol", uncertainties)
     certificate_arn = known_string(values, unknown_values, "certificate_arn", uncertainties)
     ssl_policy = known_string(values, unknown_values, "ssl_policy", uncertainties)
+    actions = normalize_forwarding_actions(resource, "default_action")
+    reference_uncertainties: list[str] = []
+    arn = known_string(values, unknown_values, "arn", reference_uncertainties, require_string=True)
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.EDGE,
-        identifier=values.get("id") or values.get("arn"),
-        arn=values.get("arn"),
+        identifier=known_string(values, unknown_values, "id", reference_uncertainties, require_string=True) or arn,
+        arn=arn,
         metadata={
-            AwsResourceMetadata.LOAD_BALANCER_ARN: values.get("load_balancer_arn"),
-            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: _load_balancer_action_target_group_arns(
-                values.get("default_action")
+            AwsResourceMetadata.LOAD_BALANCER_ARN: known_string(
+                values, unknown_values, "load_balancer_arn", reference_uncertainties, require_string=True
             ),
+            AwsResourceMetadata.LOAD_BALANCER_ACTIONS: actions,
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: action_target_references(actions),
             "port": as_optional_int(values.get("port")),
             "protocol": protocol,
             AwsResourceMetadata.LOAD_BALANCER_LISTENER_PROTOCOL: protocol,
@@ -394,34 +406,49 @@ def normalize_load_balancer_listener(resource: TerraformResource) -> NormalizedR
 
 def normalize_load_balancer_listener_rule(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    unknown_values = resource.unknown_values
+    uncertainties: list[str] = []
+    actions = normalize_forwarding_actions(resource, "action")
+    conditions, condition_uncertainties = normalize_listener_conditions(resource)
+    arn = known_string(values, unknown_values, "arn", uncertainties, require_string=True)
+    priority = values.get("priority")
+    if attribute_unknown(unknown_values, "priority") or type(priority) is not int or not 1 <= priority <= 50000:
+        priority = None
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.EDGE,
-        identifier=values.get("id") or values.get("arn"),
-        arn=values.get("arn"),
+        identifier=known_string(values, unknown_values, "id", uncertainties, require_string=True) or arn,
+        arn=arn,
         metadata={
-            AwsResourceMetadata.LISTENER_ARN: values.get("listener_arn"),
-            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: _load_balancer_action_target_group_arns(
-                values.get("action")
+            AwsResourceMetadata.LISTENER_ARN: known_string(
+                values, unknown_values, "listener_arn", uncertainties, require_string=True
             ),
-            "listener_rule_priority": as_optional_int(values.get("priority")),
+            AwsResourceMetadata.LOAD_BALANCER_ACTIONS: actions,
+            AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS: action_target_references(actions),
+            AwsResourceMetadata.LOAD_BALANCER_CONDITIONS: conditions,
+            AwsResourceMetadata.LOAD_BALANCER_CONDITION_UNCERTAINTIES: condition_uncertainties,
+            AwsResourceMetadata.LOAD_BALANCER_RULE_PRIORITY: priority,
         },
     )
 
 
 def normalize_load_balancer_target_group(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
+    uncertainties: list[str] = []
+    arn = known_string(values, resource.unknown_values, "arn", uncertainties, require_string=True)
     return NormalizedResource(
         address=resource.address,
         provider=AWS_PROVIDER,
         resource_type=resource.resource_type,
         name=resource.name,
         category=ResourceCategory.EDGE,
-        identifier=values.get("id") or values.get("arn") or values.get("name"),
-        arn=values.get("arn"),
+        identifier=known_string(values, resource.unknown_values, "id", uncertainties, require_string=True)
+        or arn
+        or known_string(values, resource.unknown_values, "name", uncertainties, require_string=True),
+        arn=arn,
         vpc_id=values.get("vpc_id"),
         metadata={
             "name": values.get("name"),
@@ -933,23 +960,3 @@ def parse_standalone_security_group_rule(values: dict[str, Any]) -> SecurityGrou
         referenced_security_group_ids=referenced_security_group_ids,
         description=values.get("description"),
     )
-
-
-def _load_balancer_action_target_group_arns(actions: Any) -> list[str]:
-    target_group_arns: list[str] = []
-    for action in as_list(actions):
-        if not isinstance(action, dict):
-            continue
-        target_group_arn = action.get("target_group_arn")
-        if target_group_arn:
-            target_group_arns.append(str(target_group_arn))
-        for forward in as_list(action.get("forward")):
-            if not isinstance(forward, dict):
-                continue
-            for target_group in as_list(forward.get("target_group")):
-                if not isinstance(target_group, dict):
-                    continue
-                target_group_arn = target_group.get("arn")
-                if target_group_arn:
-                    target_group_arns.append(str(target_group_arn))
-    return dedupe(target_group_arns)

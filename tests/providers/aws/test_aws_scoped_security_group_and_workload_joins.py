@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
+from tests.providers.aws.ecs_forwarding_support import forwarding_action
 from tfstride.analysis.indexes import build_analysis_indexes
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -497,6 +498,7 @@ class AwsScopedSecurityGroupAndWorkloadJoinTests(unittest.TestCase):
             metadata={
                 "load_balancer_arn": load_balancer_arn,
                 "target_group_arns": [target_group.address],
+                "load_balancer_actions": [forwarding_action(target_group.address)],
             },
         )
         service = _resource(
@@ -504,7 +506,11 @@ class AwsScopedSecurityGroupAndWorkloadJoinTests(unittest.TestCase):
             "aws_ecs_service",
             ResourceCategory.COMPUTE,
             provider_config_key=_FOREIGN,
-            metadata={"load_balancers": [{"target_group_arn": target_group.address}]},
+            metadata={
+                "load_balancers": [
+                    {"target_group_arn": target_group.address, "container_name": "app", "container_port": 8080}
+                ]
+            },
         )
         resources = [load_balancer, listener, target_group, service]
 
@@ -560,6 +566,7 @@ class AwsScopedSecurityGroupAndWorkloadJoinTests(unittest.TestCase):
             metadata={
                 "load_balancer_arn": load_balancer_arn,
                 "target_group_arns": [target_group_alias],
+                "load_balancer_actions": [forwarding_action(target_group_alias)],
             },
         )
         task_definition = _resource(
@@ -592,7 +599,9 @@ class AwsScopedSecurityGroupAndWorkloadJoinTests(unittest.TestCase):
             ResourceCategory.COMPUTE,
             provider_config_key=_LOCAL,
             metadata={
-                "load_balancers": [{"target_group_arn": target_group_alias}],
+                "load_balancers": [
+                    {"target_group_arn": target_group_alias, "container_name": "app", "container_port": 8080}
+                ],
                 "resolved_task_definition_addresses": [task_definition.address],
             },
         )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.load_balancer_forwarding import action_target_references
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.reference_resolution import (
     resource_reference_value,
@@ -135,19 +136,7 @@ class ResolveAwsSymbolicRelationshipsStage:
                     resource_reference_value(load_balancer),
                 )
 
-        target_groups = facts.load_balancer_target_group_arns
-        target_groups.extend(
-            resource_reference_value(target_group)
-            for _, target_group in symbolic_reference_target_records(
-                resource,
-                context.index,
-                path_prefix=("default_action",),
-                terminal_segments={"target_group_arn", "arn"},
-                expected_resource_types={"aws_lb_target_group"},
-                expected_reference_suffixes={".arn"},
-            )
-        )
-        facts.set(AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS, _dedupe(target_groups))
+        self._resolve_action_targets(resource, context, "default_action")
 
     def _resolve_listener_rule(self, resource: NormalizedResource, context: AwsDecorationContext) -> None:
         facts = aws_facts(resource)
@@ -162,19 +151,27 @@ class ResolveAwsSymbolicRelationshipsStage:
             if listener is not None:
                 facts.set(AwsResourceMetadata.LISTENER_ARN, resource_reference_value(listener))
 
-        target_groups = facts.load_balancer_target_group_arns
-        target_groups.extend(
-            resource_reference_value(target_group)
-            for _, target_group in symbolic_reference_target_records(
-                resource,
-                context.index,
-                path_prefix=("action",),
-                terminal_segments={"target_group_arn", "arn"},
-                expected_resource_types={"aws_lb_target_group"},
-                expected_reference_suffixes={".arn"},
-            )
-        )
-        facts.set(AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS, _dedupe(target_groups))
+        self._resolve_action_targets(resource, context, "action")
+
+    def _resolve_action_targets(self, resource: NormalizedResource, context: AwsDecorationContext, field: str) -> None:
+        facts = aws_facts(resource)
+        actions = facts.load_balancer_actions
+        targets_by_path = {
+            tuple(target["configuration_path"]): target for action in actions for target in action["targets"]
+        }
+        for path, target_group in symbolic_reference_target_records(
+            resource,
+            context.index,
+            path_prefix=(field,),
+            terminal_segments={"target_group_arn", "arn"},
+            expected_resource_types={"aws_lb_target_group"},
+            expected_reference_suffixes={".arn"},
+        ):
+            target = targets_by_path.get(path)
+            if target is not None and not target["reference"]:
+                target["reference"] = resource_reference_value(target_group)
+        facts.set(AwsResourceMetadata.LOAD_BALANCER_ACTIONS, actions)
+        facts.set(AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS, action_target_references(actions))
 
     def _resolve_kms_alias(self, resource: NormalizedResource, context: AwsDecorationContext) -> None:
         facts = aws_facts(resource)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.ecs_forwarding_support import TARGET_GROUP_ARN
+from tests.providers.aws.ecs_forwarding_support import load_balancer_path as _load_balancer_path
 from tests.providers.aws.test_aws_ecs_messaging_access_paths import (
     _EXECUTION_ROLE_ARN,
     _QUEUE_ARN,
@@ -25,19 +27,6 @@ from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 _RULE_ID = "aws-public-ecs-messaging-mutation-access"
 
 
-def _load_balancer(*, internal: bool = False) -> TerraformResource:
-    return _resource(
-        "aws_lb",
-        "public",
-        {
-            "name": "public",
-            "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/public/abc",
-            "internal": internal,
-            "load_balancer_type": "application",
-        },
-    )
-
-
 def _service(task_definition: str = "orders:1") -> TerraformResource:
     return _resource(
         "aws_ecs_service",
@@ -47,7 +36,7 @@ def _service(task_definition: str = "orders:1") -> TerraformResource:
             "task_definition": task_definition,
             "load_balancer": [
                 {
-                    "elb_name": "public",
+                    "target_group_arn": TARGET_GROUP_ARN,
                     "container_name": "orders",
                     "container_port": 8080,
                 }
@@ -76,7 +65,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
     def test_public_service_with_exact_task_role_mutation_access_is_reported(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _queue(),
                 _role(
@@ -156,7 +145,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
     def test_message_removal_only_access_remains_outside_tampering(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -178,7 +167,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
     def test_receive_only_access_remains_quiet(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -206,7 +195,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
     def test_excluded_move_task_action_does_not_inflate_triggering_write_access(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -240,7 +229,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
         external_topic_arn = "arn:aws:sns:us-west-2:999900001111:external-events"
         cases = {
             "comparable explicit deny": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role(
                     "orders_task",
@@ -254,7 +243,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "conditional allow": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -272,7 +261,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "incomplete task role policy": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role(
                     "orders_task",
@@ -284,7 +273,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "execution role only": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role("orders_task", _TASK_ROLE_ARN, []),
                 _role(
@@ -296,7 +285,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "external exact target": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role(
                     "orders_task",
@@ -307,7 +296,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "non-exact target": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role(
                     "orders_task",
@@ -318,7 +307,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "internal load balancer": [
-                _load_balancer(internal=True),
+                *_load_balancer_path(internal=True),
                 _topic(),
                 _role(
                     "orders_task",
@@ -329,7 +318,7 @@ class AwsPublicEcsMessagingMutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "unresolved task definition": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _topic(),
                 _role(
                     "orders_task",

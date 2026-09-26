@@ -25,7 +25,7 @@ from tests.providers.aws.test_aws_ecs_messaging_access_paths import (
     _task_definition as aws_task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
     _service as aws_service,
@@ -174,7 +174,7 @@ def _aws_resources(
     if deny:
         statements.append(aws_statement("Deny", "sqs:ReceiveMessage", target))
     resources = [
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         aws_queue(),
         aws_role("orders_task", AWS_TASK_ROLE_ARN, statements),
     ]

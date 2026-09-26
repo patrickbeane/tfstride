@@ -84,6 +84,9 @@ include = [
   "src/tfstride/providers/aws/network_data_rules.py",
   "src/tfstride/providers/aws/path_chain_rules.py",
   "src/tfstride/providers/aws/ecs_secret_rules.py",
+  "src/tfstride/providers/aws/load_balancer_forwarding.py",
+  "src/tfstride/providers/aws/listener_conditions.py",
+  "src/tfstride/providers/aws/resource_decoration/ecs.py",
 
   # Terraform plan configuration-reference resolution.
   "src/tfstride/input/configuration_references.py",

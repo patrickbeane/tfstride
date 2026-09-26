@@ -20,7 +20,7 @@ from tests.providers.aws.test_aws_ecs_s3_bucket_topology_destruction_paths impor
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _versioning
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
-    _load_balancer,
+    _load_balancer_path,
     _service,
 )
 from tfstride.analysis.rule_registry import RulePolicy
@@ -55,7 +55,7 @@ def _runtime_resources(
         _service(),
     ]
     if include_load_balancer:
-        resources.insert(1, _load_balancer())
+        resources[1:1] = _load_balancer_path()
     resources.extend(extra or [])
     return resources
 

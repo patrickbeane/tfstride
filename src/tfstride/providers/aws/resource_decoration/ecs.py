@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from typing import TypeGuard
+from typing import Any
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.listener_conditions import listener_request_witness
+from tfstride.providers.aws.load_balancer_forwarding import forwarding_targets
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import (
     AwsDecorationContext,
-    AwsReferenceRelationshipKey,
     AwsResourceIndex,
-    aws_reference_relationship_key,
+    AwsResourceReferenceView,
 )
 from tfstride.providers.aws.resource_mutations import aws_mutations
-from tfstride.providers.coercion import append_unique, dedupe
 
 
 class ResolveEcsServiceRelationshipsStage:
@@ -64,197 +64,161 @@ class MarkEcsLoadBalancerExposureStage:
     name = "mark_ecs_services_fronted_by_internet_facing_load_balancers"
 
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
-        public_load_balancers_by_target_group = _internet_facing_load_balancer_addresses_by_target_group(context.index)
-        public_load_balancers_by_security_group = _internet_facing_load_balancer_addresses_by_security_group(
-            context.index
-        )
-
-        for resource in resources:
-            if resource.resource_type != "aws_ecs_service":
+        routes, route_uncertainties = _listener_forwarding(context.index)
+        for service in resources:
+            if service.resource_type != "aws_ecs_service":
                 continue
-            fronting_load_balancers = _fronting_load_balancers_for_ecs_service(
-                resource,
-                context.index,
-                public_load_balancers_by_target_group,
-                public_load_balancers_by_security_group,
-            )
-            aws_facts(resource).set_fronted_by_internet_facing_load_balancer(bool(fronting_load_balancers))
-            if fronting_load_balancers:
-                aws_facts(resource).set_internet_facing_load_balancer_addresses(fronting_load_balancers)
-
-
-def _internet_facing_load_balancer_addresses_by_target_group(
-    index: AwsResourceIndex,
-) -> dict[AwsReferenceRelationshipKey, list[str]]:
-    load_balancers_by_target_group: dict[AwsReferenceRelationshipKey, list[str]] = {}
-    for listener in index.load_balancer_listeners.resources:
-        load_balancer = _listener_load_balancer(listener, index)
-        if not _is_internet_facing_load_balancer(load_balancer):
-            continue
-        for target_group_reference in aws_facts(listener).load_balancer_target_group_arns:
-            _append_load_balancer_target_group_references(
-                load_balancers_by_target_group,
-                index,
-                target_group_reference,
-                load_balancer.address,
-                source=listener,
-            )
-
-    for listener_rule in index.load_balancer_listener_rules:
-        listener = index.load_balancer_listeners.get(
-            aws_facts(listener_rule).listener_arn,
-            source=listener_rule,
-        )
-        load_balancer = _listener_load_balancer(listener, index)
-        if not _is_internet_facing_load_balancer(load_balancer):
-            continue
-        for target_group_reference in aws_facts(listener_rule).load_balancer_target_group_arns:
-            _append_load_balancer_target_group_references(
-                load_balancers_by_target_group,
-                index,
-                target_group_reference,
-                load_balancer.address,
-                source=listener_rule,
-            )
-    return load_balancers_by_target_group
-
-
-def _internet_facing_load_balancer_addresses_by_security_group(
-    index: AwsResourceIndex,
-) -> dict[AwsReferenceRelationshipKey, list[str]]:
-    load_balancers_by_security_group: dict[AwsReferenceRelationshipKey, list[str]] = {}
-    for load_balancer in index.load_balancers.resources:
-        if not _is_internet_facing_load_balancer(load_balancer):
-            continue
-        for security_group_id in load_balancer.security_group_ids:
-            key = aws_reference_relationship_key(
-                index.security_groups,
-                security_group_id,
-                source=load_balancer,
-            )
-            if key is not None:
-                append_unique(
-                    load_balancers_by_security_group.setdefault(key, []),
-                    load_balancer.address,
+            associations: list[dict[str, Any]] = []
+            uncertainties: list[str] = []
+            for binding in aws_facts(service).ecs_load_balancers:
+                target = _resolved_reference(
+                    context.index.load_balancer_target_groups, binding.get("target_group_arn"), service
                 )
-    return load_balancers_by_security_group
-
-
-def _fronting_load_balancers_for_ecs_service(
-    service: NormalizedResource,
-    index: AwsResourceIndex,
-    public_load_balancers_by_target_group: dict[AwsReferenceRelationshipKey, list[str]],
-    public_load_balancers_by_security_group: dict[AwsReferenceRelationshipKey, list[str]],
-) -> list[str]:
-    fronting_load_balancers: list[str] = []
-    for load_balancer_reference in _ecs_load_balancer_references(service):
-        load_balancer = index.load_balancers.get(load_balancer_reference, source=service)
-        if _is_internet_facing_load_balancer(load_balancer):
-            append_unique(fronting_load_balancers, load_balancer.address)
-
-    for target_group_reference in _ecs_target_group_references(service):
-        key = aws_reference_relationship_key(
-            index.load_balancer_target_groups,
-            target_group_reference,
-            source=service,
-        )
-        if key is None:
-            continue
-        for load_balancer_address in public_load_balancers_by_target_group.get(key, []):
-            append_unique(fronting_load_balancers, load_balancer_address)
-
-    for load_balancer_address in _security_group_fronting_load_balancers(
-        service,
-        index,
-        public_load_balancers_by_security_group,
-    ):
-        append_unique(fronting_load_balancers, load_balancer_address)
-
-    return fronting_load_balancers
-
-
-def _security_group_fronting_load_balancers(
-    service: NormalizedResource,
-    index: AwsResourceIndex,
-    public_load_balancers_by_security_group: dict[AwsReferenceRelationshipKey, list[str]],
-) -> list[str]:
-    fronting_load_balancers: list[str] = []
-    security_group_references = dedupe(
-        [*service.security_group_ids, *aws_facts(service).ecs_symbolic_security_group_addresses]
-    )
-    attached_security_groups = [
-        security_group
-        for security_group_id in security_group_references
-        if (security_group := index.security_groups.get(security_group_id, source=service)) is not None
-    ]
-    for security_group in attached_security_groups:
-        for rule in security_group.network_rules:
-            if rule.direction != "ingress":
-                continue
-            for security_group_id in rule.referenced_security_group_ids:
-                key = aws_reference_relationship_key(
-                    index.security_groups,
-                    security_group_id,
-                    source=security_group,
-                )
-                if key is None:
+                if target is None:
+                    uncertainties.append("ECS binding target group is unresolved, ambiguous, or lacks provider scope")
                     continue
-                for load_balancer_address in public_load_balancers_by_security_group.get(key, []):
-                    append_unique(fronting_load_balancers, load_balancer_address)
-    return fronting_load_balancers
+                container_name = binding.get("container_name")
+                container_port = binding.get("container_port")
+                if (
+                    not isinstance(container_name, str)
+                    or not container_name
+                    or type(container_port) is not int
+                    or not 1 <= container_port <= 65535
+                ):
+                    uncertainties.append(f"{target.address}: ECS container binding is incomplete")
+                    continue
+                for route in routes.get(target.address, []):
+                    associations.append({**route, "container_name": container_name, "container_port": container_port})
+                uncertainties.extend(route_uncertainties.get(target.address, []))
+                if not routes.get(target.address):
+                    uncertainties.append(f"{target.address}: no established public listener/action forwarding chain")
+            facts = aws_facts(service)
+            associations.sort(
+                key=lambda item: (
+                    item["load_balancer_address"],
+                    item["listener_address"],
+                    item["action_source_address"],
+                    item["target_group_address"],
+                    item["container_name"],
+                    item["container_port"],
+                )
+            )
+            addresses = sorted({association["load_balancer_address"] for association in associations})
+            facts.set_ecs_forwarding(associations, uncertainties)
+            facts.set_fronted_by_internet_facing_load_balancer(bool(addresses))
+            # Re-running decoration must not leave evidence from a removed listener.
+            facts.set_internet_facing_load_balancer_addresses(addresses)
 
 
-def _append_load_balancer_target_group_references(
-    load_balancers_by_target_group: dict[AwsReferenceRelationshipKey, list[str]],
-    index: AwsResourceIndex,
-    target_group_reference: str,
-    load_balancer_address: str,
-    *,
-    source: NormalizedResource,
-) -> None:
-    key = aws_reference_relationship_key(
-        index.load_balancer_target_groups,
-        target_group_reference,
-        source=source,
-    )
-    if key is not None:
-        append_unique(
-            load_balancers_by_target_group.setdefault(key, []),
-            load_balancer_address,
-        )
-
-
-def _listener_load_balancer(
-    listener: NormalizedResource | None,
-    index: AwsResourceIndex,
+def _resolved_reference(
+    view: AwsResourceReferenceView, reference: str | None, source: NormalizedResource
 ) -> NormalizedResource | None:
-    if listener is None:
+    candidate = view.resolve(reference, source=source).selected_candidate
+    if candidate is None or not reference:
         return None
-    return index.load_balancers.get(
-        aws_facts(listener).load_balancer_arn,
-        source=listener,
+    strong = reference in (candidate.address, f"{candidate.address}.arn", f"{candidate.address}.id") or (
+        reference.startswith("arn:") and reference == candidate.arn
     )
+    if not strong and (not source.provider_config_key or candidate.provider_config_key != source.provider_config_key):
+        return None
+    return candidate
 
 
-def _is_internet_facing_load_balancer(
-    resource: NormalizedResource | None,
-) -> TypeGuard[NormalizedResource]:
-    return resource is not None and resource.resource_type == "aws_lb" and resource.public_exposure
+def _listener_rules(index: AwsResourceIndex) -> dict[str, list[tuple[NormalizedResource, bool]]]:
+    result: dict[str, list[tuple[NormalizedResource, bool]]] = {}
+    for rule in sorted(index.load_balancer_listener_rules, key=lambda item: item.address):
+        reference = aws_facts(rule).listener_arn
+        listener = _resolved_reference(index.load_balancer_listeners, reference, rule)
+        if listener is not None:
+            result.setdefault(listener.address, []).append((rule, True))
+            continue
+        candidates = index.load_balancer_listeners.resolve(reference, source=rule).candidates
+        if not candidates:
+            # A known exact reference to an unmodeled listener cannot affect a different listener.
+            if reference and (reference.startswith("arn:") or reference.startswith("aws_lb_listener.")):
+                continue
+            candidates = tuple(
+                item
+                for item in index.load_balancer_listeners.resources
+                if not rule.provider_config_key
+                or not item.provider_config_key
+                or item.provider_config_key == rule.provider_config_key
+            )
+        for candidate in candidates:
+            result.setdefault(candidate.address, []).append((rule, False))
+    return result
 
 
-def _ecs_target_group_references(service: NormalizedResource) -> list[str]:
-    references: list[str] = []
-    for load_balancer in aws_facts(service).ecs_load_balancers:
-        target_group_arn = load_balancer.get("target_group_arn")
-        if target_group_arn:
-            references.append(str(target_group_arn))
-    return dedupe(references)
+def _listener_forwarding(index: AwsResourceIndex) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[str]]]:
+    routes: dict[str, list[dict[str, Any]]] = {}
+    uncertainties: dict[str, list[str]] = {}
+    rules_by_listener = _listener_rules(index)
+    for listener in sorted(index.load_balancer_listeners.resources, key=lambda item: item.address):
+        load_balancer = _resolved_reference(index.load_balancers, aws_facts(listener).load_balancer_arn, listener)
+        rules = rules_by_listener.get(listener.address, [])
+        for source in [listener, *(rule for rule, certain in rules if certain)]:
+            facts = aws_facts(source)
+            actions = facts.load_balancer_actions
+            positive_targets, action_uncertainties = forwarding_targets(actions)
+            conditions = [] if source is listener else facts.load_balancer_conditions
+            reasons = list(action_uncertainties)
+            if source is not listener:
+                reasons.extend(facts.load_balancer_condition_uncertainties)
+                if not conditions:
+                    reasons.append("listener rule conditions are not established")
+                if facts.load_balancer_rule_priority is None:
+                    reasons.append("listener rule priority is unknown or invalid")
+            predecessors = [
+                aws_facts(rule).load_balancer_conditions
+                if certain
+                and not aws_facts(rule).load_balancer_condition_uncertainties
+                and aws_facts(rule).load_balancer_conditions
+                else None
+                for rule, certain in rules
+                if rule is not source
+                and (
+                    not certain
+                    or source is listener
+                    or _could_precede(aws_facts(rule).load_balancer_rule_priority, facts.load_balancer_rule_priority)
+                )
+            ]
+            witness = listener_request_witness(conditions, predecessors) if not reasons else None
+            if witness is None:
+                reasons.append("no request is proven to reach this action after preceding listener rules")
+            if load_balancer is None or not load_balancer.public_exposure:
+                reasons.append("listener load balancer is unresolved or not established as public")
+            all_targets = [target for action in actions for target in action["targets"]]
+            for target in all_targets:
+                target_group = _resolved_reference(index.load_balancer_target_groups, target["reference"], source)
+                if target_group is None:
+                    continue
+                target_reasons = list(reasons)
+                if target not in positive_targets:
+                    target_reasons.append("target has no established positive-weight forwarding action")
+                if target_reasons:
+                    uncertainties.setdefault(target_group.address, []).extend(
+                        f"{source.address}: {reason}" for reason in target_reasons
+                    )
+                    continue
+                assert load_balancer is not None
+                routes.setdefault(target_group.address, []).append(
+                    {
+                        "load_balancer_address": load_balancer.address,
+                        "listener_address": listener.address,
+                        "action_source_address": source.address,
+                        "target_group_address": target_group.address,
+                        "target_weight": target["weight"],
+                        "conditions": conditions,
+                        "request_witness": witness,
+                        "authentication_actions": [
+                            action["type"]
+                            for action in actions
+                            if action["type"] in {"authenticate-cognito", "authenticate-oidc"}
+                        ],
+                    }
+                )
+    return routes, uncertainties
 
 
-def _ecs_load_balancer_references(service: NormalizedResource) -> list[str]:
-    references: list[str] = []
-    for load_balancer in aws_facts(service).ecs_load_balancers:
-        elb_name = load_balancer.get("elb_name")
-        if elb_name:
-            references.append(str(elb_name))
-    return dedupe(references)
+def _could_precede(priority: int | None, current_priority: int | None) -> bool:
+    return priority is None or current_priority is None or priority <= current_priority

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from tests.providers.aws.ecs_forwarding_support import forwarding_action
 from tfstride.input.terraform_plan import load_terraform_plan
 from tfstride.models import (
     IAMPolicyStatement,
@@ -108,6 +109,7 @@ class AwsSymbolicRelationshipTests(unittest.TestCase):
             "aws_lb_listener.https",
             "aws_lb_listener",
             ResourceCategory.EDGE,
+            metadata={"load_balancer_actions": [forwarding_action(None)]},
             reference_resolutions=(
                 _symbolic_resolution(
                     ("load_balancer_arn",),
@@ -160,6 +162,7 @@ class AwsSymbolicRelationshipTests(unittest.TestCase):
             "aws_lb_listener_rule.app",
             "aws_lb_listener_rule",
             ResourceCategory.EDGE,
+            metadata={"load_balancer_actions": [forwarding_action(None, "action")]},
             reference_resolutions=(
                 _symbolic_resolution(("listener_arn",), listener.address, ".arn"),
                 _symbolic_resolution(
@@ -180,7 +183,7 @@ class AwsSymbolicRelationshipTests(unittest.TestCase):
             [target_group.address],
         )
 
-    def test_symbolic_ecs_security_group_relationship_is_used_for_fronting(self) -> None:
+    def test_symbolic_ecs_security_group_relationship_does_not_establish_fronting(self) -> None:
         load_balancer = _resource(
             "aws_lb.web",
             "aws_lb",
@@ -217,7 +220,7 @@ class AwsSymbolicRelationshipTests(unittest.TestCase):
         ).decorate([load_balancer, load_balancer_security_group, service_security_group, service])
 
         self.assertEqual(aws_facts(service).ecs_symbolic_security_group_addresses, [service_security_group.address])
-        self.assertTrue(service.metadata["fronted_by_internet_facing_load_balancer"])
+        self.assertFalse(service.metadata["fronted_by_internet_facing_load_balancer"])
 
     def test_aws_normalizer_carries_plan_symbolic_relationships_into_decoration(self) -> None:
         fixture = Path("fixtures/aws/sample_aws_first_apply_symbolic_plan.json")

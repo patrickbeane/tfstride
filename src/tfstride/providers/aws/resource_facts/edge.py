@@ -22,6 +22,22 @@ class AwsEdgeFacts(AwsBaseFacts):
         return self.get(AwsResourceMetadata.LOAD_BALANCER_TARGET_GROUP_ARNS)
 
     @property
+    def load_balancer_actions(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_ACTIONS)
+
+    @property
+    def load_balancer_conditions(self) -> list[dict[str, Any]]:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_CONDITIONS)
+
+    @property
+    def load_balancer_condition_uncertainties(self) -> list[str]:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_CONDITION_UNCERTAINTIES)
+
+    @property
+    def load_balancer_rule_priority(self) -> int | None:
+        return self.get(AwsResourceMetadata.LOAD_BALANCER_RULE_PRIORITY)
+
+    @property
     def listener_arn(self) -> str | None:
         return self.get(AwsResourceMetadata.LISTENER_ARN)
 

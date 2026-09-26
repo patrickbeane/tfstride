@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.ecs_forwarding_support import TARGET_GROUP_ARN
+from tests.providers.aws.ecs_forwarding_support import load_balancer_path as _load_balancer_path
 from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _BUCKET_ARN,
     _EXECUTION_ROLE_ARN,
@@ -25,19 +27,6 @@ from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 _RULE_ID = "aws-public-ecs-s3-mutation-access"
 
 
-def _load_balancer(*, internal: bool = False) -> TerraformResource:
-    return _resource(
-        "aws_lb",
-        "public",
-        {
-            "name": "public",
-            "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/public/abc",
-            "internal": internal,
-            "load_balancer_type": "application",
-        },
-    )
-
-
 def _service(task_definition: str = "orders:1") -> TerraformResource:
     return _resource(
         "aws_ecs_service",
@@ -47,7 +36,7 @@ def _service(task_definition: str = "orders:1") -> TerraformResource:
             "task_definition": task_definition,
             "load_balancer": [
                 {
-                    "elb_name": "public",
+                    "target_group_arn": TARGET_GROUP_ARN,
                     "container_name": "orders",
                     "container_port": 8080,
                 }
@@ -72,7 +61,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
         for label, policy_resources in _incomplete_role_policy_cases().items():
             with self.subTest(label=label):
                 inventory, _, findings = _evaluate(
-                    [_load_balancer(), _bucket(), *policy_resources, _task_definition(), _service()]
+                    [*_load_balancer_path(), _bucket(), *policy_resources, _task_definition(), _service()]
                 )
                 service = inventory.get_by_address("aws_ecs_service.orders")
                 assert service is not None
@@ -90,7 +79,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
     def test_public_service_with_exact_task_role_mutation_access_is_reported(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -152,7 +141,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
     def test_unrelated_read_deny_does_not_hide_write_access(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -176,7 +165,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
         external_policy_arn = "arn:aws:iam::aws:policy/ExternalS3Access"
         cases = {
             "read only": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -187,7 +176,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "comparable explicit deny": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -201,7 +190,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "conditional allow": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -219,7 +208,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "conditional deny": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -238,7 +227,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "incomplete task role policy": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -250,7 +239,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "execution role only": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role("orders_task", _TASK_ROLE_ARN, []),
                 _role(
@@ -262,7 +251,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "non-exact bucket resource": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -273,7 +262,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "internal load balancer": [
-                _load_balancer(internal=True),
+                *_load_balancer_path(internal=True),
                 _bucket(),
                 _role(
                     "orders_task",
@@ -284,7 +273,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _service(),
             ],
             "unresolved task definition": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",

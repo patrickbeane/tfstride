@@ -13,7 +13,7 @@ from tests.providers.aws.test_aws_ecs_messaging_access_paths import (
     _task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer,
+    _load_balancer_path,
     _service,
 )
 from tfstride.analysis.rule_registry import RulePolicy
@@ -46,7 +46,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
     def test_public_service_with_exact_task_role_receive_access_is_reported(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -142,7 +142,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
             with self.subTest(case=case):
                 _, _, findings = _evaluate(
                     [
-                        _load_balancer(),
+                        *_load_balancer_path(),
                         _queue(),
                         _role(
                             "orders_task",
@@ -161,7 +161,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
         external_queue_arn = "arn:aws:sqs:us-west-2:999900001111:external"
         cases = {
             "comparable explicit deny": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -175,7 +175,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "conditional allow": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -197,7 +197,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "incomplete task role policy": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -209,7 +209,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "execution role only": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role("orders_task", _TASK_ROLE_ARN, []),
                 _role(
@@ -221,7 +221,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "external exact queue": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -232,7 +232,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "wildcard queue scope": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",
@@ -249,7 +249,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "internal load balancer": [
-                _load_balancer(internal=True),
+                *_load_balancer_path(internal=True),
                 _queue(),
                 _role(
                     "orders_task",
@@ -260,7 +260,7 @@ class AwsPublicEcsSqsReceiveRuleTests(unittest.TestCase):
                 _service(),
             ],
             "unresolved task definition": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(),
                 _role(
                     "orders_task",

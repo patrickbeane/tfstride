@@ -248,6 +248,41 @@
           }
         },
         {
+          "address": "aws_lb_target_group.app",
+          "type": "aws_lb_target_group",
+          "name": "app",
+          "mode": "managed",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "name": "app",
+            "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/app/abcd",
+            "port": 8080,
+            "protocol": "HTTP",
+            "target_type": "ip",
+            "vpc_id": "vpc-00000006"
+          }
+        },
+        {
+          "address": "aws_lb_listener.https",
+          "type": "aws_lb_listener",
+          "name": "https",
+          "mode": "managed",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/web/1234",
+            "port": 443,
+            "protocol": "HTTPS",
+            "certificate_arn": "arn:aws:acm:us-east-1:111122223333:certificate/ecs-web",
+            "ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+            "default_action": [
+              {
+                "type": "forward",
+                "target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/app/abcd"
+              }
+            ]
+          }
+        },
+        {
           "address": "aws_ecs_cluster.main",
           "mode": "managed",
           "type": "aws_ecs_cluster",
@@ -583,6 +618,22 @@
           "type": "aws_secretsmanager_secret",
           "name": "app",
           "provider_config_key": "aws"
+        },
+        {
+          "address": "aws_lb_target_group.app",
+          "type": "aws_lb_target_group",
+          "name": "app",
+          "mode": "managed",
+          "provider_config_key": "aws",
+          "expressions": {}
+        },
+        {
+          "address": "aws_lb_listener.https",
+          "type": "aws_lb_listener",
+          "name": "https",
+          "mode": "managed",
+          "provider_config_key": "aws",
+          "expressions": {}
         }
       ]
     }

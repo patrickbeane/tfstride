@@ -30,7 +30,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _caller_identity as aws_caller_identity
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
-    _load_balancer as aws_load_balancer,
+    _load_balancer_path as aws_load_balancer_path,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
     _service as aws_service,
@@ -222,7 +222,7 @@ def _aws_resources(
 ) -> list[TerraformResource]:
     return [
         aws_caller_identity(),
-        aws_load_balancer(internal=internal),
+        *aws_load_balancer_path(internal=internal),
         aws_bucket(),
         aws_role(
             "orders_task",
@@ -543,7 +543,7 @@ class PublicWorkloadObjectStorageDeletionBoundaryTests(unittest.TestCase):
         ]
         inventory = AwsNormalizer().normalize(
             [
-                aws_load_balancer(),
+                *aws_load_balancer_path(),
                 aws_bucket(),
                 _aws_versioning("Enabled"),
                 _aws_object_lock("GOVERNANCE"),

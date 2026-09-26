@@ -15,7 +15,7 @@ from tests.providers.aws.test_aws_ecs_messaging_topology_destruction_paths impor
     _with_policy,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer,
+    _load_balancer_path,
     _service,
 )
 from tfstride.analysis.rule_registry import RulePolicy
@@ -68,7 +68,7 @@ def _public_resources(
     topic_resource = topic or _topic()
     statements = [_statement("Allow", operation, resource) for operation, resource in actions]
     return [
-        _load_balancer(internal=internal),
+        *_load_balancer_path(internal=internal),
         queue_resource,
         topic_resource,
         _role("orders_task", f"arn:aws:iam::{_ACCOUNT_ID}:role/orders-task", statements),

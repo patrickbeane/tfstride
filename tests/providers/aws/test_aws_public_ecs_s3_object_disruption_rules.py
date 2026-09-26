@@ -17,7 +17,7 @@ from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
     _versioning,
 )
 from tests.providers.aws.test_aws_public_ecs_s3_mutation_rules import (
-    _load_balancer,
+    _load_balancer_path,
     _service,
 )
 from tfstride.analysis.rule_registry import RulePolicy
@@ -50,7 +50,7 @@ def _runtime_resources(
 ) -> list[TerraformResource]:
     resources: list[TerraformResource] = [
         _caller_identity(),
-        _load_balancer(),
+        *_load_balancer_path(),
         _bucket(),
         _role("orders_task", _TASK_ROLE_ARN, [_statement("Allow", actions, f"{_BUCKET_ARN}/*")]),
         _task_definition(execution_role_arn=None),
@@ -104,7 +104,7 @@ class AwsPublicEcsS3ObjectDisruptionRuleTests(unittest.TestCase):
     def test_multiple_scopes_in_one_bucket_do_not_inflate_rationale_bucket_count(self) -> None:
         resources = [
             _caller_identity(),
-            _load_balancer(),
+            *_load_balancer_path(),
             _bucket(),
             _versioning("disabled"),
             _role(

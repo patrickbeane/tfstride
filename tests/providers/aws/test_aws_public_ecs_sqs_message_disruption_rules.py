@@ -14,7 +14,7 @@ from tests.providers.aws.test_aws_ecs_sqs_message_removal_paths import (
     _task_definition,
 )
 from tests.providers.aws.test_aws_public_ecs_messaging_mutation_rules import (
-    _load_balancer,
+    _load_balancer_path,
     _service,
 )
 from tfstride.analysis.rule_registry import RulePolicy
@@ -52,7 +52,7 @@ def _public_resources(
     internal: bool = False,
 ) -> list[TerraformResource]:
     return [
-        _load_balancer(internal=internal),
+        *_load_balancer_path(internal=internal),
         queue or _queue(),
         _role([_statement("Allow", actions, (queue or _queue()).values["arn"])]),
         _task_definition(),
@@ -278,7 +278,7 @@ class AwsPublicEcsSqsMessageDisruptionRuleTests(unittest.TestCase):
     def test_multiple_exact_queues_expand_blast_radius(self) -> None:
         second_arn = f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:archive"
         resources = [
-            _load_balancer(),
+            *_load_balancer_path(),
             _queue(resource_name="orders"),
             _queue(arn=second_arn, resource_name="archive"),
             _role(
@@ -348,7 +348,7 @@ class AwsPublicEcsSqsMessageDisruptionRuleTests(unittest.TestCase):
         )
         inventory = AwsNormalizer().normalize(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _queue(policy=[allow]),
                 _role([]),
                 _task_definition(),

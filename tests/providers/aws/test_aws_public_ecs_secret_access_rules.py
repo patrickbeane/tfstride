@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.ecs_forwarding_support import TARGET_GROUP_ARN
+from tests.providers.aws.ecs_forwarding_support import load_balancer_path as _load_balancer_path
 from tests.providers.aws.test_aws_ecs_secret_access_paths import (
     _ACCOUNT_ID,
     _EXECUTION_ROLE_ARN,
@@ -22,19 +24,6 @@ from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 _RULE_ID = "aws-public-ecs-secret-access"
 
 
-def _load_balancer(*, internal: bool = False) -> TerraformResource:
-    return _resource(
-        "aws_lb",
-        "public",
-        {
-            "name": "public",
-            "arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/public/abc",
-            "internal": internal,
-            "load_balancer_type": "application",
-        },
-    )
-
-
 def _service(task_definition: str = "orders:1") -> TerraformResource:
     return _resource(
         "aws_ecs_service",
@@ -44,7 +33,7 @@ def _service(task_definition: str = "orders:1") -> TerraformResource:
             "task_definition": task_definition,
             "load_balancer": [
                 {
-                    "elb_name": "public",
+                    "target_group_arn": TARGET_GROUP_ARN,
                     "container_name": "orders",
                     "container_port": 8080,
                 }
@@ -82,7 +71,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
         second = _resource("aws_secretsmanager_secret", "duplicate", dict(first.values))
         second.provider_config_key = "aws.second"
         runtime = [
-            _load_balancer(),
+            *_load_balancer_path(),
             _role(
                 "execution", _EXECUTION_ROLE_ARN, [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)]
             ),
@@ -113,7 +102,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
         secret = _secret()
         secret.provider_config_key = "aws.remote"
         runtime = [
-            _load_balancer(),
+            *_load_balancer_path(),
             _role(
                 "execution", _EXECUTION_ROLE_ARN, [_statement("Allow", "secretsmanager:GetSecretValue", _SECRET_ARN)]
             ),
@@ -130,7 +119,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
     def test_unmodeled_secret_keeps_exact_arn_access_evidence_without_inventing_a_resource(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _role(
                     "execution",
                     _EXECUTION_ROLE_ARN,
@@ -156,7 +145,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
     def test_internet_facing_service_with_allowed_secret_path_is_reported(self) -> None:
         _, _, findings = _evaluate(
             [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _secret(),
                 _role(
                     "execution",
@@ -208,7 +197,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
         external_policy_arn = "arn:aws:iam::aws:policy/ExternalSecretAccess"
         cases = {
             "explicit deny": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _role(
                     "execution",
                     _EXECUTION_ROLE_ARN,
@@ -221,7 +210,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
                 _service(),
             ],
             "conditional allow": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _role(
                     "execution",
                     _EXECUTION_ROLE_ARN,
@@ -238,7 +227,7 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
                 _service(),
             ],
             "incomplete policy": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _role(
                     "execution",
                     _EXECUTION_ROLE_ARN,
@@ -249,16 +238,16 @@ class AwsPublicEcsSecretAccessRuleTests(unittest.TestCase):
                 _service(),
             ],
             "unresolved execution role": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _task_definition(task_role_arn=None),
                 _service(),
             ],
             "unresolved task definition": [
-                _load_balancer(),
+                *_load_balancer_path(),
                 _service("missing:1"),
             ],
             "internal load balancer": [
-                _load_balancer(internal=True),
+                *_load_balancer_path(internal=True),
                 _role(
                     "execution",
                     _EXECUTION_ROLE_ARN,
