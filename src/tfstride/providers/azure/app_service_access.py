@@ -190,11 +190,21 @@ def _site(
                 for headers, concrete in concrete_decisions:
                     if concrete.actions == {"Allow"} and "allow_witness" not in proof:
                         internet = _internet_witness(version, start, stop - 1)
-                        proof["allow_witness"] = {"source_ip": internet or _address(version, start), "headers": headers}
+                        proof["allow_witness"] = {
+                            "source_ip": internet or _address(version, start),
+                            "headers": headers,
+                            "rule_indices": list(concrete.winners),
+                            "default_possible": concrete.default_possible,
+                        }
                         allow_proven = True
                         external_proven |= internet is not None
                     if concrete.actions == {"Deny"} and "deny_witness" not in proof:
-                        proof["deny_witness"] = {"source_ip": _address(version, start), "headers": headers}
+                        proof["deny_witness"] = {
+                            "source_ip": _address(version, start),
+                            "headers": headers,
+                            "rule_indices": list(concrete.winners),
+                            "default_possible": concrete.default_possible,
+                        }
                         deny_proven = True
                     if len(proof) == 2:
                         break

@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     from tfstride.analysis.finding_factory import FindingFactory
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
+    from tfstride.models import ResourceInventory
+    from tfstride.providers.azure.analysis_indexes import AzureAnalysisIndexes
+
+
+def _azure_analysis_indexes(inventory: ResourceInventory) -> AzureAnalysisIndexes:
+    from tfstride.providers.azure.analysis_indexes import build_azure_analysis_indexes
+
+    return build_azure_analysis_indexes(inventory)
 
 
 def _azure_boundary_contributor() -> BoundaryContributor:
@@ -48,4 +56,5 @@ def azure_provider_plugin() -> ProviderPlugin:
         rule_contribution_factory=_azure_rule_contribution,
         boundary_contributor_factory=_azure_boundary_contributor,
         observation_factory=observe_azure_posture,
+        analysis_index_factory=_azure_analysis_indexes,
     )

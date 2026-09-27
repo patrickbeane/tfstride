@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.object_storage_topology_destruction_evidence import (
     AzureAppServiceStorageContainerTopologyDestructionPath,
 )
@@ -68,7 +69,8 @@ class AzureAppServiceStorageContainerTopologyDisruptionRuleDetectors:
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             workload_facts = azure_facts(workload)
-            if workload_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(workload, context)
+            if not ingress.is_public:
                 continue
 
             paths: list[AzureAppServiceStorageContainerTopologyDestructionPath] = []
@@ -111,7 +113,7 @@ class AzureAppServiceStorageContainerTopologyDisruptionRuleDetectors:
                     trust_boundary_id=None,
                     rationale=_rationale(workload, len(container_addresses)),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(workload)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item(
                             "storage_container_topology_destruction_paths",
@@ -213,18 +215,6 @@ def _path_string_values(paths: Sequence[Mapping[str, object]], key: str) -> list
 
 def _current_path_uncertainties(paths: Sequence[Mapping[str, object]]) -> list[str]:
     return sorted({uncertainty for path in paths for uncertainty in _string_values(path.get("posture_uncertainties"))})
-
-
-def _public_endpoint_evidence(workload: NormalizedResource) -> list[str]:
-    facts = azure_facts(workload)
-    return [
-        f"address={workload.address}",
-        f"type={workload.resource_type}",
-        f"public_network_access_enabled={_display(facts.public_network_access_enabled)}",
-        f"public_network_fallback_state={facts.public_network_fallback_state}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(paths: Sequence[Mapping[str, object]]) -> list[str]:

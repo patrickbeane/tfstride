@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.public_network import PUBLIC_NETWORK_FALLBACK_DISABLED
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES
@@ -40,9 +41,9 @@ class AzureAppServiceRuleDetectors:
             facts = azure_facts(app)
             if facts.public_network_fallback_state == PUBLIC_NETWORK_FALLBACK_DISABLED:
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -62,6 +63,7 @@ class AzureAppServiceRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item("posture_uncertainty", _public_network_uncertainty_evidence(facts)),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -81,7 +83,8 @@ class AzureAppServiceRuleDetectors:
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
             authentication = _effective_platform_authentication(facts)
-            if facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
             if authentication is None or authentication.enabled_state != STATE_DISABLED:
                 continue
@@ -99,7 +102,7 @@ class AzureAppServiceRuleDetectors:
                     affected_resources=[app.address],
                     trust_boundary_id=None,
                     rationale=(
-                        f"{app.display_name} has public network access enabled and its {authentication.source} "
+                        f"{app.display_name} permits external requests through its main-site restrictions and its {authentication.source} "
                         "configuration explicitly disables Azure platform authentication. The application may "
                         "still enforce its own authentication outside Terraform, but tfSTRIDE cannot verify "
                         "that control from this plan."
@@ -107,6 +110,7 @@ class AzureAppServiceRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item(
                             "platform_authentication",
                             _platform_authentication_evidence(authentication),
@@ -129,7 +133,8 @@ class AzureAppServiceRuleDetectors:
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
             authentication = _effective_platform_authentication(facts)
-            if facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
             if authentication is None or authentication.enabled_state != STATE_ENABLED:
                 continue
@@ -149,7 +154,7 @@ class AzureAppServiceRuleDetectors:
                     affected_resources=[app.address],
                     trust_boundary_id=None,
                     rationale=(
-                        f"{app.display_name} has public network access enabled and its {authentication.source} "
+                        f"{app.display_name} permits external requests through its main-site restrictions and its {authentication.source} "
                         "configuration explicitly allows anonymous requests. The application may still enforce "
                         "its own authentication outside Terraform, but tfSTRIDE cannot verify that control "
                         "from this plan."
@@ -157,6 +162,7 @@ class AzureAppServiceRuleDetectors:
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item(
                             "platform_authentication",
                             _platform_authentication_evidence(authentication),
@@ -181,9 +187,9 @@ class AzureAppServiceRuleDetectors:
             tls_version = facts.min_tls_version
             if not tls_version_below_1_2(tls_version):
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -203,6 +209,7 @@ class AzureAppServiceRuleDetectors:
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("transport_posture", [f"minimum_tls_version is {tls_version}"]),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -222,9 +229,9 @@ class AzureAppServiceRuleDetectors:
             facts = azure_facts(app)
             if facts.min_tls_version is not None:
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -244,6 +251,7 @@ class AzureAppServiceRuleDetectors:
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("transport_posture", _tls_unknown_evidence(facts)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item("posture_uncertainty", _tls_uncertainty_evidence(facts)),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -266,10 +274,10 @@ class AzureAppServiceRuleDetectors:
                 continue
             if _identity_is_unknown(facts):
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             key_vault_references = _exact_key_vault_reference_evidence(facts)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=1,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -297,6 +305,7 @@ class AzureAppServiceRuleDetectors:
                         evidence_item("identity_posture", _identity_posture_evidence(facts)),
                         evidence_item("key_vault_references", key_vault_references),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -318,9 +327,9 @@ class AzureAppServiceRuleDetectors:
                 continue
             if _vnet_integration_is_unknown(facts):
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=1,
                 lateral_movement=0,
@@ -340,6 +349,7 @@ class AzureAppServiceRuleDetectors:
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("vnet_integration", _vnet_integration_evidence(facts)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                     ),
                     severity_reasoning=severity_reasoning,
                 )
@@ -361,9 +371,9 @@ class AzureAppServiceRuleDetectors:
                 continue
             if not _main_site_access_restrictions_are_not_default_deny(facts):
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -376,13 +386,14 @@ class AzureAppServiceRuleDetectors:
                     affected_resources=[app.address],
                     trust_boundary_id=None,
                     rationale=(
-                        f"{app.display_name} has a public App Service endpoint but does not configure a "
-                        "deterministic default-deny access restriction posture for the main site. Public app "
-                        "traffic may reach the workload unless another front-door control blocks it."
+                        f"{app.display_name} does not establish a default-deny access restriction posture "
+                        "for the main site. This configuration finding does not establish effective ingress; "
+                        "earlier matching rules can still block requests."
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item("access_restrictions", _main_access_restriction_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
@@ -410,9 +421,9 @@ class AzureAppServiceRuleDetectors:
             broad_rules = _broad_allow_records(facts.app_service_access_restrictions)
             if not broad_rules:
                 continue
-            public_enabled = facts.public_network_access_enabled is True
+            ingress = app_service_ingress(app, context)
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=0,
                 data_sensitivity=0,
                 lateral_movement=0,
@@ -426,11 +437,13 @@ class AzureAppServiceRuleDetectors:
                     trust_boundary_id=None,
                     rationale=(
                         f"{app.display_name} has an App Service access restriction allow rule with a broad "
-                        "public source. The rule does not narrow internet-origin traffic to trusted clients."
+                        "public source. Its source selector does not narrow clients, but earlier rules or "
+                        "additional match constraints can still restrict effective ingress."
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
+                        *ingress.evidence,
                         evidence_item("access_restrictions", _main_access_restriction_evidence(facts)),
                         evidence_item("broad_allow_rules", _restriction_records_evidence(broad_rules)),
                     ),
@@ -450,14 +463,11 @@ class AzureAppServiceRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
-            if not _public_network_fallback_may_allow_access(facts):
+            ingress = app_service_ingress(app, context, site="scm")
+            if not ingress.is_public or ingress.assessment.get("state") != "unrestricted":
                 continue
-            scm_posture = _scm_unrestricted_posture_evidence(facts)
-            if not scm_posture:
-                continue
-            public_enabled = facts.public_network_access_enabled is True
             severity_reasoning = build_severity_reasoning(
-                internet_exposure=public_enabled,
+                internet_exposure=ingress.is_public,
                 privilege_breadth=1,
                 data_sensitivity=0,
                 lateral_movement=1,
@@ -470,14 +480,14 @@ class AzureAppServiceRuleDetectors:
                     affected_resources=[app.address],
                     trust_boundary_id=None,
                     rationale=(
-                        f"{app.display_name} does not configure deterministic SCM/Kudu access restrictions. "
-                        "The deployment endpoint can expose privileged application management operations if it "
-                        "remains reachable from public networks."
+                        f"{app.display_name} permits external requests through unrestricted SCM/Kudu access "
+                        "restrictions. The deployment endpoint exposes privileged application management "
+                        "operations; authentication remains a separate access control."
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(app)),
                         evidence_item("network_posture", _public_network_evidence(facts)),
-                        evidence_item("scm_access_posture", scm_posture),
+                        *ingress.evidence,
                         evidence_item("scm_access_restrictions", _scm_access_restriction_evidence(facts)),
                         evidence_item(
                             "posture_uncertainty",
@@ -660,30 +670,6 @@ def _access_restriction_default_action_evidence(field_name: str, default_action:
     if default_action:
         return [f"{field_name} is {default_action}"]
     return [f"{field_name} is not represented"]
-
-
-def _scm_unrestricted_posture_evidence(facts: AzureResourceFacts) -> list[str]:
-    if facts.app_service_scm_use_main_ip_restriction is True:
-        if _broad_allow_records(facts.app_service_access_restrictions):
-            return ["SCM inherits a broad main-site allow rule"]
-        if _main_site_access_restrictions_are_not_default_deny(facts):
-            return ["SCM inherits main-site restrictions that are not default-deny"]
-        return []
-
-    broad_scm_rules = _broad_allow_records(facts.app_service_scm_access_restrictions)
-    if broad_scm_rules:
-        return ["SCM access restriction includes a broad allow rule"]
-
-    scm_default_action = facts.app_service_scm_ip_restriction_default_action
-    if _default_action_is_allow(scm_default_action):
-        return ["scm_ip_restriction_default_action is Allow"]
-    if _default_action_is_deny(scm_default_action):
-        return []
-
-    if facts.app_service_scm_use_main_ip_restriction is False and not facts.app_service_scm_access_restrictions:
-        return ["scm_use_main_ip_restriction is false", "scm access restrictions are not configured"]
-
-    return []
 
 
 def _broad_allow_records(records: list[dict[str, object]]) -> list[dict[str, object]]:

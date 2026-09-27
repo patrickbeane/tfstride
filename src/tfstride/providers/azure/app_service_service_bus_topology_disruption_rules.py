@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.arm_control_plane_authorization import (
     model_arm_control_plane_action_authority,
 )
@@ -126,7 +127,8 @@ class AzureAppServiceServiceBusTopologyDisruptionRuleDetectors:
 
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             app_facts = azure_facts(app)
-            if app_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             paths = [
@@ -177,13 +179,7 @@ class AzureAppServiceServiceBusTopologyDisruptionRuleDetectors:
                     trust_boundary_id=None,
                     rationale=_rationale(app, operations, len(target_addresses)),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "public_endpoint",
-                            [
-                                "public_network_access_enabled=True",
-                                f"workload_address={app.address}",
-                            ],
-                        ),
+                        *ingress.evidence,
                         evidence_item(
                             "runtime_identity",
                             _runtime_identity_evidence(paths),
@@ -598,7 +594,7 @@ def _rationale(
 ) -> str:
     target_text = _operation_target_text(operations)
     return (
-        f"{app.display_name} has public network access enabled and its runtime managed identity has deterministic "
+        f"{app.display_name} permits external ingress within the evidenced scope and its runtime managed identity has deterministic "
         f"Service Bus topology-deletion authority ({_operation_text(operations)}) across {target_count} exact "
         f"modeled {target_text}. A compromise through the public application path could delete those "
         "Service Bus topology resources, disrupting messaging availability. This is plan-local control-plane "

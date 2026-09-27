@@ -10,12 +10,13 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.diagnostic_index import (
     AzureDiagnosticSettingCoverage,
     build_azure_diagnostic_setting_index,
 )
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
-from tfstride.providers.azure.resource_types import AzureResourceType
+from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES, AzureResourceType
 from tfstride.providers.coercion import STATE_DISABLED
 
 _DIAGNOSTIC_TARGET_TYPES = (
@@ -73,7 +74,7 @@ class AzureAuditRuleDetectors:
                 continue
 
             facts = azure_facts(resource)
-            severity_reasoning = _diagnostic_coverage_severity(resource)
+            severity_reasoning = _diagnostic_coverage_severity(resource, context)
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -87,6 +88,11 @@ class AzureAuditRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(resource, facts)),
+                        *(
+                            app_service_ingress(resource, context).evidence
+                            if resource.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES
+                            else []
+                        ),
                         evidence_item(
                             "diagnostic_coverage",
                             ["no resolved azurerm_monitor_diagnostic_setting targets this resource"],
@@ -149,7 +155,7 @@ class AzureAuditRuleDetectors:
                 continue
 
             facts = azure_facts(resource)
-            severity_reasoning = _diagnostic_coverage_severity(resource)
+            severity_reasoning = _diagnostic_coverage_severity(resource, context)
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -163,6 +169,11 @@ class AzureAuditRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("target_resource", _target_resource_evidence(resource, facts)),
+                        *(
+                            app_service_ingress(resource, context).evidence
+                            if resource.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES
+                            else []
+                        ),
                         evidence_item("diagnostic_settings", _diagnostic_setting_coverage_evidence(coverage)),
                         evidence_item("diagnostic_categories", _diagnostic_coverage_category_evidence(coverage)),
                         evidence_item("audit_log_posture", _audit_security_log_posture_evidence(coverage)),
@@ -241,9 +252,13 @@ class AzureAuditRuleDetectors:
         return findings
 
 
-def _diagnostic_coverage_severity(resource: NormalizedResource):
+def _diagnostic_coverage_severity(resource: NormalizedResource, context: RuleEvaluationContext):
     return build_severity_reasoning(
-        internet_exposure=resource.public_access_configured or resource.direct_internet_reachable,
+        internet_exposure=(
+            app_service_ingress(resource, context).is_public
+            if resource.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES
+            else resource.public_access_configured or resource.direct_internet_reachable
+        ),
         privilege_breadth=0,
         data_sensitivity=2 if resource.resource_type in _DATA_PLANE_DIAGNOSTIC_TARGET_TYPES else 1,
         lateral_movement=1 if resource.resource_type == AzureResourceType.KUBERNETES_CLUSTER else 0,

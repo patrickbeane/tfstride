@@ -210,6 +210,7 @@ class PublicApplicationEndpointParityTests(unittest.TestCase):
             {
                 "azure-app-service-public-network-access-not-disabled",
                 "azure-app-service-access-restrictions-not-default-deny",
+                "azure-app-service-scm-access-unrestricted",
             },
         )
 
@@ -256,9 +257,12 @@ class PublicApplicationEndpointParityTests(unittest.TestCase):
             {
                 "azure-app-service-public-network-access-not-disabled",
                 "azure-app-service-broad-access-restriction-allow",
-                "azure-app-service-scm-access-unrestricted",
             },
         )
+
+        # SCM inherits broad IPv4 access with IPv6 denied, so its effective
+        # ingress is restricted rather than unrestricted across both families.
+        self.assertTrue(all(finding.severity_reasoning.internet_exposure == 2 for finding in azure_findings))
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.object_storage_deletion_evidence import (
     AzureAppServiceBlobDeletionPath,
     AzureBlobDeletionRecoveryEvidence,
@@ -77,7 +78,8 @@ class AzureAppServiceBlobRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             app_facts = azure_facts(app)
-            if app_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             paths = [
@@ -119,7 +121,7 @@ class AzureAppServiceBlobRuleDetectors:
                     trust_boundary_id=None,
                     rationale=_rationale(app, paths, operations),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(app)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item("storage_blob_deletion_paths", _deletion_path_evidence(paths)),
                         evidence_item("recovery_posture", _recovery_evidence(paths)),
@@ -465,18 +467,6 @@ def _target_model_evidence_addresses(paths: Sequence[Mapping[str, object]]) -> l
     )
 
 
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"address={app.address}",
-        f"type={app.resource_type}",
-        f"public_network_access_enabled={str(facts.public_network_access_enabled).lower()}",
-        f"public_network_fallback_state={facts.public_network_fallback_state}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
-
-
 def _runtime_identity_evidence(paths: Sequence[Mapping[str, object]]) -> list[str]:
     return sorted(
         {
@@ -619,7 +609,7 @@ def _rationale(
     operation_text = _operation_text(classes)
     containers = _path_addresses(paths, "container_address")
     rationale = (
-        f"{app.display_name} has public network access enabled and its runtime managed identity has deterministic "
+        f"{app.display_name} permits external ingress within the evidenced scope and its runtime managed identity has deterministic "
         f"Azure Blob deletion authority ({operation_text}) across {len(containers)} exact modeled container scope(s). "
         "A compromise of the public workload could disrupt Blob availability within the modeled account and container "
         "grants. Recovery evidence remains operation-specific: ordinary blob deletion is not treated as permanent loss, "

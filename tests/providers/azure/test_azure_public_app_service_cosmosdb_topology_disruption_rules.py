@@ -123,7 +123,7 @@ class AzurePublicAppServiceCosmosDbTopologyDisruptionRuleTests(unittest.TestCase
         self.assertTrue(any("target_scope=exact_cosmosdb_sql_container" in value for value in paths))
         self.assertIn("successful_deletion_observed=false", evidence["cosmosdb_backup_recovery_evidence"][0])
         self.assertIn("out_of_plan_restore_resources_evaluated=false", evidence["cosmosdb_backup_recovery_evidence"][0])
-        self.assertIn("public network access explicitly enabled", finding.rationale)
+        self.assertIn("permits external ingress within the evidenced scope", finding.rationale)
         self.assertIn("successful deletion", finding.rationale)
         self.assertNotIn("restoration_observed=true", finding.rationale)
 

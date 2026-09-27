@@ -24,6 +24,7 @@ from tfstride.models import (
     TerraformResource,
 )
 from tfstride.providers.aws.analysis_indexes import AwsAnalysisIndexes
+from tfstride.providers.azure.analysis_indexes import AzureAnalysisIndexes
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes, build_gcp_analysis_indexes
 from tfstride.providers.registry import ProviderNotRegisteredError, ProviderRegistry, ProviderSelectionError
@@ -174,7 +175,7 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
 
         self.assertIsInstance(prepared_runs[0].indexes.provider_extension, AwsAnalysisIndexes)
         self.assertIsInstance(prepared_runs[1].indexes.provider_extension, GcpAnalysisIndexes)
-        self.assertIsNone(prepared_runs[2].indexes.provider_extension)
+        self.assertIsInstance(prepared_runs[2].indexes.provider_extension, AzureAnalysisIndexes)
         self.assertIsInstance(prepared_runs[3].indexes.provider_extension, AwsAnalysisIndexes)
         self.assertIsNot(prepared_runs[0].indexes.provider_extension, prepared_runs[3].indexes.provider_extension)
         self.assertIs(prepared_runs[0].rule_set, prepared_runs[3].rule_set)

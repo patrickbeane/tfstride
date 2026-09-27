@@ -15,6 +15,7 @@ from tfstride.providers.aws.normalizer import SUPPORTED_AWS_TYPES, AwsNormalizer
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.rule_catalog import AWS_RULE_METADATA
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
+from tfstride.providers.azure.analysis_indexes import AzureAnalysisIndexes
 from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -146,8 +147,9 @@ class ProviderCatalogTests(unittest.TestCase):
         )
         self.assertIsInstance(azure_plugin.create_boundary_contributor(), AzureBoundaryContributor)
         self.assertIs(azure_plugin.observation_factory, observe_azure_posture)
-        self.assertIsNone(
-            azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[]))
+        self.assertIsInstance(
+            azure_plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])),
+            AzureAnalysisIndexes,
         )
 
     def test_default_provider_rule_metadata_merges_builtin_provider_catalogs(self) -> None:
@@ -159,10 +161,10 @@ class ProviderCatalogTests(unittest.TestCase):
     def test_default_analysis_index_factories_register_provider_extensions(self) -> None:
         factories = default_provider_analysis_index_factories_by_provider()
 
-        self.assertEqual(tuple(factories), ("aws", "gcp"))
+        self.assertEqual(tuple(factories), ("aws", "gcp", "azure"))
         self.assertIs(default_provider_analysis_index_factory(" AWS "), factories["aws"])
         self.assertIs(default_provider_analysis_index_factory(" GCP "), factories["gcp"])
-        self.assertIsNone(default_provider_analysis_index_factory("azure"))
+        self.assertIs(default_provider_analysis_index_factory(" AZURE "), factories["azure"])
         self.assertIsInstance(
             factories["aws"](ResourceInventory(provider="aws", resources=[])),
             AwsAnalysisIndexes,
@@ -170,6 +172,10 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertIsInstance(
             factories["gcp"](ResourceInventory(provider="gcp", resources=[])),
             GcpAnalysisIndexes,
+        )
+        self.assertIsInstance(
+            factories["azure"](ResourceInventory(provider="azure", resources=[])),
+            AzureAnalysisIndexes,
         )
 
     def test_default_boundary_contributors_register_builtin_provider_contributors(self) -> None:

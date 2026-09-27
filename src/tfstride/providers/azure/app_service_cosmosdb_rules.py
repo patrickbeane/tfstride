@@ -13,6 +13,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
@@ -79,7 +80,8 @@ class AzureAppServiceCosmosDbRuleDetectors:
 
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
-            if azure_facts(app).public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             mutation_paths = [
@@ -156,10 +158,7 @@ class AzureAppServiceCosmosDbRuleDetectors:
                         has_read_access=has_read_access,
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "public_endpoint",
-                            _public_endpoint_evidence(app),
-                        ),
+                        *ingress.evidence,
                         evidence_item(
                             "runtime_identity",
                             _runtime_identity_evidence(mutation_paths),
@@ -206,7 +205,8 @@ class AzureAppServiceCosmosDbRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             app_facts = azure_facts(app)
-            if app_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             deletion_paths = [
@@ -274,10 +274,7 @@ class AzureAppServiceCosmosDbRuleDetectors:
                         len(target_addresses),
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "public_endpoint",
-                            _public_endpoint_evidence(app),
-                        ),
+                        *ingress.evidence,
                         evidence_item(
                             "runtime_identity",
                             _runtime_identity_evidence(deletion_paths),
@@ -337,7 +334,8 @@ class AzureAppServiceCosmosDbRuleDetectors:
 
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
-            if azure_facts(app).public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             component_paths = [
@@ -422,10 +420,7 @@ class AzureAppServiceCosmosDbRuleDetectors:
                         len(target_addresses),
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "public_endpoint",
-                            _public_endpoint_evidence(app),
-                        ),
+                        *ingress.evidence,
                         evidence_item(
                             "runtime_identity",
                             _runtime_identity_evidence(read_paths),
@@ -1077,7 +1072,7 @@ def _item_disruption_rationale(
     target_count: int,
 ) -> str:
     return (
-        f"{app.display_name} has public network access explicitly enabled and its "
+        f"{app.display_name} permits external ingress within the evidenced scope and its "
         "runtime managed identity has deterministic Azure Cosmos DB for NoSQL native "
         f"RBAC item-delete authority across {target_count} exact modeled item "
         f"namespace target(s). {_scope_impact(scope_types)} A compromise through an "
@@ -1086,8 +1081,8 @@ def _item_disruption_rationale(
         "reported as plan-local recovery evidence; it does not establish a specific "
         "item deletion, irreversible loss, or successful restoration. This does not "
         "mean that the Cosmos DB for NoSQL account, database, or container is itself "
-        "public; Cosmos DB network controls and configured App Service access "
-        "restrictions are independent controls."
+        "public; Cosmos DB network controls remain separate from the evaluated workload "
+        "ingress restrictions."
     )
 
 
@@ -1227,7 +1222,7 @@ def _read_rationale(
     target_count: int,
 ) -> str:
     rationale = (
-        f"{app.display_name} has public network access explicitly enabled and its "
+        f"{app.display_name} permits external ingress within the evidenced scope and its "
         "runtime managed identity has deterministic Azure Cosmos DB for NoSQL native "
         f"RBAC grants that can {_read_capability_summary(profile.capabilities)} across "
         f"{target_count} exact modeled target(s). A compromise through an allowed "
@@ -1242,8 +1237,8 @@ def _read_rationale(
         )
     return rationale + (
         "This does not mean that the Cosmos DB for NoSQL account, database, or container "
-        "is itself public; Cosmos DB network controls and configured App Service access "
-        "restrictions are independent controls."
+        "is itself public; Cosmos DB network controls remain separate from the evaluated workload "
+        "ingress restrictions."
     )
 
 
@@ -1269,15 +1264,15 @@ def _mutation_rationale(
     has_read_access: bool,
 ) -> str:
     rationale = (
-        f"{app.display_name} has public network access explicitly enabled and its "
+        f"{app.display_name} permits external ingress within the evidenced scope and its "
         "runtime managed identity has deterministic Azure Cosmos DB for NoSQL native "
         f"RBAC grants for item {', '.join(operations)} operations across "
         f"{target_count} exact modeled target(s). A compromise through an allowed "
         "public application path could mutate items using the workload identity. "
         f"{_scope_impact(scope_types)} "
         "This does not mean that the Cosmos DB for NoSQL account, database, or "
-        "container is itself public; Cosmos DB network controls and configured App "
-        "Service access restrictions are independent controls."
+        "container is itself public; Cosmos DB network controls remain separate from the "
+        "evaluated workload ingress restrictions."
     )
     if not has_read_access:
         rationale += " The modeled mutation grants do not establish item read access or information disclosure."
@@ -1290,18 +1285,6 @@ def _scope_impact(scope_types: list[str]) -> str:
     if "database" in scope_types:
         return "The broadest modeled grant is database-scoped and can reach containers within that exact database."
     return "The modeled grants are limited to exact container scopes."
-
-
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"address={app.address}",
-        f"type={app.resource_type}",
-        "public_network_access_enabled=true",
-        (f"public_network_fallback_state={facts.public_network_fallback_state or 'unknown'}"),
-        (f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}"),
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(paths: list[dict[str, Any]]) -> list[str]:

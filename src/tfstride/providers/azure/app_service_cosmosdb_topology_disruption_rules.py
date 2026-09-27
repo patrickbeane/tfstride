@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.resource_decoration.app_service_cosmosdb_topology_destruction_paths import (
     current_app_service_cosmosdb_topology_destruction_paths,
 )
@@ -107,7 +108,8 @@ class AzureAppServiceCosmosDbTopologyDisruptionRuleDetectors:
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             workload_facts = azure_facts(workload)
-            if workload_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(workload, context)
+            if not ingress.is_public:
                 continue
 
             paths: list[AzureAppServiceCosmosDbTopologyDestructionPath] = []
@@ -159,7 +161,7 @@ class AzureAppServiceCosmosDbTopologyDisruptionRuleDetectors:
                     trust_boundary_id=None,
                     rationale=_rationale(workload, len(target_addresses), paths),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(workload)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item(
                             "cosmosdb_topology_destruction_paths",
@@ -298,18 +300,6 @@ def _path_string_values(paths: Sequence[Mapping[str, object]], key: str) -> list
 
 def _current_path_uncertainties(paths: Sequence[Mapping[str, object]]) -> list[str]:
     return sorted({uncertainty for path in paths for uncertainty in _string_values(path.get("posture_uncertainties"))})
-
-
-def _public_endpoint_evidence(workload: NormalizedResource) -> list[str]:
-    facts = azure_facts(workload)
-    return [
-        f"address={workload.address}",
-        f"type={workload.resource_type}",
-        "public_network_access_enabled=true",
-        f"public_network_fallback_state={facts.public_network_fallback_state or 'unknown'}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(paths: Sequence[Mapping[str, object]]) -> list[str]:
@@ -494,7 +484,7 @@ def _rationale(
     target_text = "target" if target_count == 1 else "targets"
     operations = _operation_text(paths)
     return (
-        f"{workload.display_name} has public network access explicitly enabled and its App Service runtime identity "
+        f"{workload.display_name} permits external ingress within the evidenced scope and its App Service runtime identity "
         "has deterministic "
         f"Azure RBAC control-plane deletion authority ({operations}) across {target_count} exact modeled Cosmos DB "
         f"topology {target_text}. A compromise could request deletion of those modeled account, database, or "

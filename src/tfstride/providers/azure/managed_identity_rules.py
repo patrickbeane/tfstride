@@ -12,7 +12,8 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.identity import PrivilegedAccessGrant
-from tfstride.models import BoundaryType, Finding
+from tfstride.models import BoundaryType, EvidenceItem, Finding
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.app_service_key_vault_rules import (
     app_service_key_vault_paths_for_assignments,
     key_vault_access_path_evidence,
@@ -119,8 +120,8 @@ class AzureManagedIdentityRuleDetectors:
             return []
 
         inventory = context.inventory
-        public_workloads_by_identity = _public_workloads_by_identity_address(inventory)
-        key_vault_paths_by_identity = _public_app_service_key_vault_paths_by_identity(inventory)
+        public_workloads_by_identity = _public_workloads_by_identity_address(context)
+        key_vault_paths_by_identity = _public_app_service_key_vault_paths_by_identity(context)
         findings: list[Finding] = []
         for identity in _managed_identity_resources(inventory):
             public_workloads = public_workloads_by_identity.get(identity.address, [])
@@ -175,6 +176,7 @@ class AzureManagedIdentityRuleDetectors:
                     ),
                     evidence=collect_evidence(
                         evidence_item("public_workloads", _public_workload_evidence(public_workloads)),
+                        *_app_workload_ingress_evidence(public_workloads, context),
                         evidence_item("managed_identity", _managed_identity_evidence(identity)),
                         evidence_item("sensitive_resource_assignments", _describe_role_assignments(assignments)),
                         evidence_item(
@@ -188,10 +190,13 @@ class AzureManagedIdentityRuleDetectors:
         return findings
 
 
-def _public_app_service_key_vault_paths_by_identity(inventory) -> dict[str, list[Mapping[str, Any]]]:
+def _public_app_service_key_vault_paths_by_identity(
+    context: RuleEvaluationContext,
+) -> dict[str, list[Mapping[str, Any]]]:
+    inventory = context.inventory
     paths_by_identity: dict[str, list[Mapping[str, Any]]] = {}
     for workload in inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
-        if not _is_public_workload(workload):
+        if not _is_public_workload(workload, context):
             continue
         for path in azure_facts(workload).app_service_key_vault_access_paths:
             if not _is_exact_app_service_key_vault_path(path, workload.address):
@@ -390,11 +395,12 @@ def _privileged_access_categories(grants: tuple[PrivilegedAccessGrant, ...]) -> 
     return dedupe_strings(category.value for grant in grants for category in grant.privilege_categories)
 
 
-def _public_workloads_by_identity_address(inventory) -> dict[str, list[Any]]:
+def _public_workloads_by_identity_address(context: RuleEvaluationContext) -> dict[str, list[Any]]:
+    inventory = context.inventory
     identity_by_reference = _identity_resources_by_reference(inventory)
     public_workloads_by_identity: dict[str, list[Any]] = {}
     for workload in inventory.by_type(*_AZURE_WORKLOAD_RESOURCE_TYPES):
-        if not _is_public_workload(workload):
+        if not _is_public_workload(workload, context):
             continue
         facts = azure_facts(workload)
         if facts.has_system_assigned_identity and facts.principal_id:
@@ -415,17 +421,26 @@ def _identity_resources_by_reference(inventory) -> ResourceReferenceIndex:
     )
 
 
-def _is_public_workload(workload: Any) -> bool:
+def _is_public_workload(workload: Any, context: RuleEvaluationContext) -> bool:
     if workload.resource_type in AZURE_COMPUTE_RESOURCE_TYPES:
         return bool(workload.public_exposure)
     if workload.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES:
-        return azure_facts(workload).public_network_access_enabled is True
+        return app_service_ingress(workload, context).is_public
     return False
 
 
 def _append_unique_resource(resources: list[Any], resource: Any) -> None:
     if all(existing.address != resource.address for existing in resources):
         resources.append(resource)
+
+
+def _app_workload_ingress_evidence(workloads: list[Any], context: RuleEvaluationContext) -> list[EvidenceItem]:
+    values_by_key: dict[str, list[str]] = {}
+    for workload in workloads:
+        if workload.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES:
+            for item in app_service_ingress(workload, context).evidence:
+                values_by_key.setdefault(item.key, []).extend(item.values)
+    return [EvidenceItem(key=key, values=values) for key, values in values_by_key.items()]
 
 
 def _public_workload_evidence(workloads: list[Any]) -> list[str]:

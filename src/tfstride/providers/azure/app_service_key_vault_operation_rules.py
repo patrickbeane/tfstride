@@ -14,6 +14,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.key_vault_dependency_evidence import (
     AzureKeyVaultEncryptionDependency,
 )
@@ -117,7 +118,8 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
-            if facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             paths: list[AzureAppServiceKeyVaultOperationPath] = [
@@ -181,7 +183,7 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
                         downstream_dependency_count=len(logical_protected_data_dependencies),
                     ),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(app)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item("key_vault_operation_paths", _operation_path_evidence(paths)),
                         evidence_item("scope_breadth", _scope_breadth_evidence(paths)),
@@ -453,7 +455,7 @@ def _rationale(
         )
     )
     return (
-        f"{app.display_name} has public network access enabled and its runtime managed identity has deterministic "
+        f"{app.display_name} permits external ingress within the evidenced scope and its runtime managed identity has deterministic "
         f"Key Vault {authority_text} authority "
         f"on {len(key_addresses)} exact modeled key(s). A compromise of the "
         f"public workload {capability}. {scope_text} {qualification}{downstream}"
@@ -985,18 +987,6 @@ def _plaintext_recovery_capability(operations: Sequence[AzureKeyVaultOperation])
         f"could submit ciphertext or wrapped key material to Key Vault {operation_text} operations, creating "
         "plaintext-recovery and information-disclosure potential"
     )
-
-
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"address={app.address}",
-        f"type={app.resource_type}",
-        "public_network_access_enabled=true",
-        f"public_network_fallback_state={facts.public_network_fallback_state}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(

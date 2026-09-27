@@ -111,6 +111,8 @@ include = [
   "src/tfstride/providers/azure/plugin.py",
   "src/tfstride/providers/azure/normalizer.py",
   "src/tfstride/providers/azure/app_service_access.py",
+  "src/tfstride/providers/azure/analysis_indexes.py",
+  "src/tfstride/providers/azure/app_service_ingress_helpers.py",
   "src/tfstride/providers/azure/app_service_access_inputs.py",
   "src/tfstride/providers/azure/resource_decoration/app_service_ingress.py",
   "src/tfstride/providers/azure/resource_decorator.py",

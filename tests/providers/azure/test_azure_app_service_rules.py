@@ -577,10 +577,9 @@ class AzureAppServiceAccessRestrictionRuleTests(unittest.TestCase):
         finding = findings[0]
         self.assertEqual(finding.severity.value, "medium")
         evidence = _evidence_by_key(finding)
-        self.assertEqual(
-            evidence["scm_access_posture"],
-            ["scm_use_main_ip_restriction is false", "scm access restrictions are not configured"],
-        )
+        self.assertIn("state=unrestricted", evidence["effective_public_ingress"])
+        self.assertIn("default_action_source=implicit_allow_without_rules", evidence["effective_public_ingress"])
+        self.assertIn("site=scm", evidence["public_endpoint"])
 
     def test_scm_broad_allow_rule_emits_finding(self) -> None:
         findings = _evaluate(
@@ -596,7 +595,13 @@ class AzureAppServiceAccessRestrictionRuleTests(unittest.TestCase):
                                 "priority": 100,
                                 "action": "Allow",
                                 "ip_address": "0.0.0.0/0",
-                            }
+                            },
+                            {
+                                "name": "any-scm-v6",
+                                "priority": 100,
+                                "action": "Allow",
+                                "ip_address": "::/0",
+                            },
                         ],
                     },
                 )
@@ -609,10 +614,8 @@ class AzureAppServiceAccessRestrictionRuleTests(unittest.TestCase):
             ["azure-app-service-scm-access-unrestricted"],
         )
         evidence = _evidence_by_key(findings[0])
-        self.assertEqual(
-            evidence["scm_access_posture"],
-            ["SCM access restriction includes a broad allow rule"],
-        )
+        self.assertIn("state=unrestricted", evidence["effective_public_ingress"])
+        self.assertIn('allowed_source_cidrs=["0.0.0.0/0","::/0"]', evidence["effective_public_ingress"])
         self.assertIn(
             "rule name=any-scm action=Allow priority=100 ip_address=0.0.0.0/0 broad_sources=[ip_address=0.0.0.0/0]",
             evidence["scm_access_restrictions"],

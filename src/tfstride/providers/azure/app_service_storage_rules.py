@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
@@ -47,7 +48,8 @@ class AzureAppServiceStorageRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
-            if facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             mutation_paths = [
@@ -97,7 +99,7 @@ class AzureAppServiceStorageRuleDetectors:
                         has_read_access=has_read_access,
                     ),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(app)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(mutation_paths)),
                         evidence_item("storage_mutation_paths", _mutation_path_evidence(mutation_paths)),
                         evidence_item("custom_role_permissions", _custom_role_permission_evidence(mutation_paths)),
@@ -224,12 +226,12 @@ def _mutation_rationale(
     has_read_access: bool,
 ) -> str:
     rationale = (
-        f"{app.display_name} has public network access enabled and its runtime managed identity has deterministic "
+        f"{app.display_name} permits external ingress within the evidenced scope and its runtime managed identity has deterministic "
         f"{', '.join(mutation_classes)} access to {len(storage_targets)} exact modeled Azure Blob Storage target(s). "
         "A compromise through an allowed public application path could tamper with stored blob data by "
         f"{_mutation_impact(mutation_classes)} within the modeled grants. "
-        "This path does not mean that the Storage Account or container itself is public; configured App Service "
-        "access restrictions may still narrow which clients can reach the endpoint."
+        "This path does not mean that the Storage Account or container itself is public. The ingress evidence "
+        "identifies the allowed source and request scope."
     )
     if not has_read_access:
         rationale += (
@@ -278,18 +280,6 @@ def _path_mutation_classes(path: Mapping[str, Any]) -> list[str]:
 
 def _path_string_values(paths: list[dict[str, Any]], key: str) -> list[str]:
     return sorted({value for path in paths if (value := _known_string(path.get(key))) is not None})
-
-
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"address={app.address}",
-        f"type={app.resource_type}",
-        "public_network_access_enabled=true",
-        f"public_network_fallback_state={facts.public_network_fallback_state or 'unknown'}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(paths: list[dict[str, Any]]) -> list[str]:

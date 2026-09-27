@@ -5,6 +5,7 @@ import unittest
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.rule_registry import default_rule_registry
 from tfstride.models import NormalizedResource, ResourceCategory, ResourceInventory, TerraformResource
+from tfstride.providers.azure.analysis_indexes import AzureAnalysisIndexes
 from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 from tfstride.providers.azure.limitations import AZURE_LIMITATIONS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -58,7 +59,10 @@ class AzureProviderTests(unittest.TestCase):
             plugin.create_observations(ResourceInventory(provider="azure", resources=[])),
             [],
         )
-        self.assertIsNone(plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])))
+        self.assertIsInstance(
+            plugin.create_analysis_index_extension(ResourceInventory(provider="azure", resources=[])),
+            AzureAnalysisIndexes,
+        )
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.STORAGE_ACCOUNT))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.CONTAINER_REGISTRY))
         self.assertTrue(plugin.supports_resource_type(AzureResourceType.SERVICE_BUS_QUEUE))

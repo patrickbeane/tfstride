@@ -125,9 +125,20 @@ retains both alternatives. Platform authentication is evaluated independently.
 An explicitly disabled public endpoint blocks this ingress; unknown endpoint
 configuration does not become a public-access claim.
 
-The evaluator currently provides normalized evidence. Existing public-workload
-findings still use their previous exposure prerequisites; migrating those
-consumers is a separate change. The restriction semantics follow
+Public-workload data paths, platform-authentication findings, and exposure-based
+severity now require a definite allowed external subset from this evaluator.
+Ingress is rebuilt once per analysis from current normalized inputs, so stale
+decoration metadata cannot preserve or suppress exposure. Findings include the
+winning restriction/default decisions, source scopes, request constraints, and
+authentication posture. Authentication does not make a reachable endpoint private.
+Blocked or unresolved ingress does not remove workload-to-data authorization facts.
+Configuration-posture findings can still report an enabled public endpoint or a
+broad configured rule when effective ingress is blocked; those settings alone do
+not increase the internet-exposure severity factor. The SCM unrestricted-access
+finding requires unrestricted effective SCM ingress across the evaluated address
+families and request constraints, independently of main-site ingress.
+
+The restriction semantics follow
 [Microsoft's App Service access restriction model](https://learn.microsoft.com/azure/app-service/overview-access-restrictions)
 and the modern AzureRM
 [restriction list schema](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/internal/services/appservice/helpers/shared_schema.go).

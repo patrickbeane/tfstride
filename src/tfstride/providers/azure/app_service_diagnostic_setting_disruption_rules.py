@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.audit_telemetry_disruption_evidence import (
     AzureAppServiceDiagnosticSettingAuditTelemetryDisruptionPath,
 )
@@ -66,7 +67,8 @@ class AzureAppServiceDiagnosticSettingDisruptionRuleDetectors:
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             app_facts = azure_facts(app)
-            if app_facts.public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             paths: list[AzureAppServiceDiagnosticSettingAuditTelemetryDisruptionPath] = []
@@ -117,7 +119,7 @@ class AzureAppServiceDiagnosticSettingDisruptionRuleDetectors:
                     trust_boundary_id=None,
                     rationale=_rationale(app, paths),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(app)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item(
                             "diagnostic_setting_audit_telemetry_disruption_paths",
@@ -251,14 +253,6 @@ def _target_model_evidence_addresses(paths: Sequence[Mapping[str, object]]) -> l
         if isinstance(target_addresses, list):
             values.update(item for item in target_addresses if isinstance(item, str) and item)
     return sorted(values)
-
-
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"public_network_fallback_state={facts.public_network_fallback_state}",
-        "public_network_access_enabled is true",
-    ]
 
 
 def _runtime_identity_evidence(paths: Sequence[Mapping[str, object]]) -> list[str]:
@@ -430,7 +424,7 @@ def _rationale(
     destinations = _destination_labels(paths)
     destination_text = ", ".join(destinations) or "the modeled configured destination"
     return (
-        f"{app.display_name} has public network access enabled and its current App Service runtime identity "
+        f"{app.display_name} permits external ingress within the evidenced scope and its current App Service runtime identity "
         f"has deterministic {_DELETE_DIAGNOSTIC_SETTING} authority over {diagnostic_count} exact {diagnostic_label} "
         f"that currently export modeled audit/security telemetry to {destination_text}. A compromise of the public "
         "workload could request deletion of those exact diagnostic-setting targets, disrupting future export or "

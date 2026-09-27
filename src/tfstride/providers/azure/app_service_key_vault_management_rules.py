@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource, SeverityReasoning
+from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.key_vault_dependency_evidence import (
     AzureKeyVaultEncryptionDependency,
 )
@@ -90,7 +91,8 @@ class AzureAppServiceKeyVaultManagementRuleDetectors:
 
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
-            if azure_facts(app).public_network_access_enabled is not True:
+            ingress = app_service_ingress(app, context)
+            if not ingress.is_public:
                 continue
 
             paths = [
@@ -153,7 +155,7 @@ class AzureAppServiceKeyVaultManagementRuleDetectors:
                         recovery_evidence=recovery_evidence,
                     ),
                     evidence=collect_evidence(
-                        evidence_item("public_endpoint", _public_endpoint_evidence(app)),
+                        *ingress.evidence,
                         evidence_item("runtime_identity", _runtime_identity_evidence(paths)),
                         evidence_item("key_vault_management_paths", _management_path_evidence(paths)),
                         evidence_item("scope_breadth", _scope_breadth_evidence(paths)),
@@ -564,7 +566,7 @@ def _management_rationale(
             else " Recovery evidence is unavailable or not applicable to these operations."
         )
     return (
-        f"{app.display_name} has public network access enabled and its runtime managed identity has {capability} "
+        f"{app.display_name} permits external ingress within the evidenced scope and its runtime managed identity has {capability} "
         f"({operation_text}) on {target_count} exact modeled Key Vault management target(s). A compromise of the "
         f"public workload {consequence}. {scope_text}{downstream_text}{recovery_text} This establishes modeled "
         "management authority, not proof that an operation will succeed outside the preserved Azure scope, role, "
@@ -614,18 +616,6 @@ def _operation_text(operations: Sequence[AzureKeyVaultManagementOperation]) -> s
     if len(values) == 2:
         return f"{values[0]} and {values[1]}"
     return ", ".join(values[:-1]) + f", and {values[-1]}"
-
-
-def _public_endpoint_evidence(app: NormalizedResource) -> list[str]:
-    facts = azure_facts(app)
-    return [
-        f"address={app.address}",
-        f"type={app.resource_type}",
-        "public_network_access_enabled=true",
-        f"public_network_fallback_state={facts.public_network_fallback_state}",
-        f"ip_restriction_default_action={facts.app_service_ip_restriction_default_action or 'not_configured'}",
-        f"ip_restriction_count={len(facts.app_service_access_restrictions)}",
-    ]
 
 
 def _runtime_identity_evidence(
