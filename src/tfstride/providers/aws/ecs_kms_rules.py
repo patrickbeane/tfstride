@@ -6,12 +6,11 @@ from collections.abc import Mapping, Sequence
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
-from tfstride.models import Finding, NormalizedResource, SeverityReasoning
+from tfstride.models import EvidenceItem, Finding, NormalizedResource, SeverityReasoning
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.kms_evidence import (
     AwsEcsKmsManagementEffect,
@@ -119,8 +118,10 @@ class AwsEcsKmsOperationRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(paths, "task_definition_address")
@@ -140,7 +141,7 @@ class AwsEcsKmsOperationRuleDetectors:
                 downstream_dependent_count=len(protected_data_dependent_addresses),
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -163,10 +164,8 @@ class AwsEcsKmsOperationRuleDetectors:
                         downstream_dependency_count=len(protected_data_convergences),
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(load_balancer_addresses, service.address),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -223,8 +222,10 @@ class AwsEcsKmsOperationRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(paths, "task_definition_address")
@@ -244,18 +245,16 @@ class AwsEcsKmsOperationRuleDetectors:
                 len(downstream_dependent_addresses),
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
                 *key_addresses,
                 *downstream_dependent_addresses,
             ]
-            management_evidence = [
-                evidence_item(
-                    "network_path",
-                    public_service_network_path(load_balancer_addresses, service.address),
-                ),
+            management_evidence: list[EvidenceItem | None] = [
+                evidence_item("network_path", ingress.network_path),
+                *ingress.evidence,
                 evidence_item(
                     "task_definitions",
                     [f"address={address}" for address in task_definition_addresses],

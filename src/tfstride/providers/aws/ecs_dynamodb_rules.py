@@ -14,8 +14,7 @@ from tfstride.models import Finding, NormalizedResource, SeverityReasoning
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.resource_decoration.ecs_dynamodb_access_paths import (
     DYNAMODB_ACCESS_CLASSES_BY_ACTION,
@@ -74,11 +73,10 @@ class AwsEcsDynamoDbAccessRuleDetectors:
             if not mutation_paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(
-                mutation_paths,
-                context,
-            )
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            mutation_paths = ingress.current_workload_paths(mutation_paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not mutation_paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -96,7 +94,7 @@ class AwsEcsDynamoDbAccessRuleDetectors:
                 table_count=len(table_addresses),
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -124,13 +122,8 @@ class AwsEcsDynamoDbAccessRuleDetectors:
                         "not public."
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -186,11 +179,10 @@ class AwsEcsDynamoDbAccessRuleDetectors:
             if not read_paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(
-                read_paths,
-                context,
-            )
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            read_paths = ingress.current_workload_paths(read_paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not read_paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -216,7 +208,7 @@ class AwsEcsDynamoDbAccessRuleDetectors:
                 broad_scope=bool(broad_scope_reasons),
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -246,13 +238,8 @@ class AwsEcsDynamoDbAccessRuleDetectors:
                         "not public."
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],

@@ -4,6 +4,7 @@ import json
 import unittest
 from typing import Any
 
+from tests.providers.aws.ecs_forwarding_support import load_balancer_path
 from tfstride.models import TerraformResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import AwsNormalizer
@@ -247,6 +248,7 @@ def _aws_public_edge(*, internal: bool = False) -> list[TerraformResource]:
                 "arn": _AWS_LOAD_BALANCER_ARN,
                 "internal": internal,
                 "load_balancer_type": "application",
+                "security_groups": ["aws_security_group.public_alb"],
             },
         ),
         _resource(
@@ -280,6 +282,7 @@ def _aws_public_edge(*, internal: bool = False) -> list[TerraformResource]:
                 ],
             },
         ),
+        *(item for item in load_balancer_path() if item.resource_type == "aws_security_group"),
     ]
 
 
@@ -293,7 +296,8 @@ def _aws_task_definition() -> TerraformResource:
             "revision": 1,
             "task_role_arn": _AWS_TASK_ROLE_ARN,
             "execution_role_arn": _AWS_EXECUTION_ROLE_ARN,
-            "container_definitions": "[]",
+            "network_mode": "awsvpc",
+            "container_definitions": '[{"name":"orders","portMappings":[{"containerPort":8080,"protocol":"tcp"}]}]',
         },
     )
 
@@ -305,7 +309,8 @@ def _aws_ecs_service() -> TerraformResource:
         "orders",
         {
             "name": "orders",
-            "task_definition": "orders:1",
+            "task_definition": "aws_ecs_task_definition.orders",
+            "network_configuration": [{"security_groups": ["aws_security_group.public_tasks"]}],
             "load_balancer": [
                 {
                     "target_group_arn": _AWS_TARGET_GROUP_ARN,

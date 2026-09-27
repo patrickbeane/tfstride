@@ -64,45 +64,8 @@ class MarkEcsLoadBalancerExposureStage:
     name = "mark_ecs_services_fronted_by_internet_facing_load_balancers"
 
     def apply(self, resources: list[NormalizedResource], context: AwsDecorationContext) -> None:
-        routes, route_uncertainties = _listener_forwarding(context.index)
-        for service in resources:
-            if service.resource_type != "aws_ecs_service":
-                continue
-            associations: list[dict[str, Any]] = []
-            uncertainties: list[str] = []
-            for binding in aws_facts(service).ecs_load_balancers:
-                target = resolve_aws_network_reference(
-                    context.index.load_balancer_target_groups, binding.get("target_group_arn"), service
-                )
-                if target is None:
-                    uncertainties.append("ECS binding target group is unresolved, ambiguous, or lacks provider scope")
-                    continue
-                container_name = binding.get("container_name")
-                container_port = binding.get("container_port")
-                if (
-                    not isinstance(container_name, str)
-                    or not container_name
-                    or type(container_port) is not int
-                    or not 1 <= container_port <= 65535
-                ):
-                    uncertainties.append(f"{target.address}: ECS container binding is incomplete")
-                    continue
-                for route in routes.get(target.address, []):
-                    associations.append({**route, "container_name": container_name, "container_port": container_port})
-                uncertainties.extend(route_uncertainties.get(target.address, []))
-                if not routes.get(target.address):
-                    uncertainties.append(f"{target.address}: no established public listener/action forwarding chain")
+        for service, associations, uncertainties in evaluate_ecs_forwarding(context.index):
             facts = aws_facts(service)
-            associations.sort(
-                key=lambda item: (
-                    item["load_balancer_address"],
-                    item["listener_address"],
-                    item["action_source_address"],
-                    item["target_group_address"],
-                    item["container_name"],
-                    item["container_port"],
-                )
-            )
             # Keep configured forwarding chains for packet evaluation, including
             # blocked ones, without widening the existing exposure flags.
             addresses = sorted(
@@ -116,6 +79,54 @@ class MarkEcsLoadBalancerExposureStage:
             facts.set_fronted_by_internet_facing_load_balancer(bool(addresses))
             # Re-running decoration must not leave evidence from a removed listener.
             facts.set_internet_facing_load_balancer_addresses(addresses)
+
+
+def evaluate_ecs_forwarding(
+    index: AwsResourceIndex,
+) -> list[tuple[NormalizedResource, list[dict[str, Any]], list[str]]]:
+    """Resolve current forwarding without trusting or mutating decorated path facts."""
+    services = [item for item in index.resources_by_address.values() if item.resource_type == "aws_ecs_service"]
+    if not services:
+        return []
+    routes, route_uncertainties = _listener_forwarding(index)
+    results: list[tuple[NormalizedResource, list[dict[str, Any]], list[str]]] = []
+    for service in sorted(services, key=lambda item: item.address):
+        associations: list[dict[str, Any]] = []
+        uncertainties: list[str] = []
+        for binding in aws_facts(service).ecs_load_balancers:
+            target = resolve_aws_network_reference(
+                index.load_balancer_target_groups, binding.get("target_group_arn"), service
+            )
+            if target is None:
+                uncertainties.append("ECS binding target group is unresolved, ambiguous, or lacks provider scope")
+                continue
+            container_name = binding.get("container_name")
+            container_port = binding.get("container_port")
+            if (
+                not isinstance(container_name, str)
+                or not container_name
+                or type(container_port) is not int
+                or not 1 <= container_port <= 65535
+            ):
+                uncertainties.append(f"{target.address}: ECS container binding is incomplete")
+                continue
+            for route in routes.get(target.address, []):
+                associations.append({**route, "container_name": container_name, "container_port": container_port})
+            uncertainties.extend(route_uncertainties.get(target.address, []))
+            if not routes.get(target.address):
+                uncertainties.append(f"{target.address}: no established public listener/action forwarding chain")
+        associations.sort(
+            key=lambda item: (
+                item["load_balancer_address"],
+                item["listener_address"],
+                item["action_source_address"],
+                item["target_group_address"],
+                item["container_name"],
+                item["container_port"],
+            )
+        )
+        results.append((service, associations, sorted(set(uncertainties))))
+    return results
 
 
 def _listener_rules(index: AwsResourceIndex) -> dict[str, list[tuple[NormalizedResource, bool]]]:

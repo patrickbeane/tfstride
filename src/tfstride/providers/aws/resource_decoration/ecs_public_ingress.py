@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.resource_decoration.ecs import evaluate_ecs_forwarding
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex, resolve_aws_network_reference
 from tfstride.providers.aws.security_group_traffic import (
@@ -31,15 +32,42 @@ class DeriveEcsPublicIngressStage:
         traffic = AwsSecurityGroupTrafficIndex(context.index)
         for service in services:
             facts = aws_facts(service)
-            decisions = [
-                _evaluate_association(service, association, context.index, traffic)
-                for association in facts.ecs_forwarding_associations
-            ]
+            decisions = evaluate_ecs_public_ingress(service, facts.ecs_forwarding_associations, context.index, traffic)
             uncertainties = [
                 reason for decision in decisions if decision["state"] == "unknown" for reason in decision["reasons"]
             ]
             uncertainties.extend(facts.ecs_forwarding_uncertainties)
             facts.set_ecs_public_ingress(decisions, uncertainties)
+
+
+def current_ecs_public_ingress(index: AwsResourceIndex) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Prepare ingress once per analysis from current inputs, not cached path metadata.
+
+    Analysis indexes describe a completed inventory snapshot. Rebuilding them also
+    revalidates listener rules, bindings and SG permissions without mutating the
+    independently useful workload-to-data authorization facts.
+    """
+    forwarding = evaluate_ecs_forwarding(index)
+    if not forwarding:
+        return {}
+    traffic = AwsSecurityGroupTrafficIndex(index)
+    return {
+        service.address: tuple(
+            decision
+            for decision in evaluate_ecs_public_ingress(service, associations, index, traffic)
+            if decision["state"] == "allowed"
+        )
+        for service, associations, _ in forwarding
+    }
+
+
+def evaluate_ecs_public_ingress(
+    service: NormalizedResource,
+    associations: list[dict[str, Any]],
+    index: AwsResourceIndex,
+    traffic: AwsSecurityGroupTrafficIndex,
+) -> list[dict[str, Any]]:
+    return [_evaluate_association(service, association, index, traffic) for association in associations]
 
 
 def _evaluate_association(

@@ -14,8 +14,7 @@ from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.object_storage_topology_destruction_evidence import (
     AwsEcsS3BucketTopologyDestructionPath,
@@ -86,8 +85,10 @@ class AwsEcsS3BucketTopologyDisruptionRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(paths, "task_definition_address")
@@ -101,7 +102,7 @@ class AwsEcsS3BucketTopologyDisruptionRuleDetectors:
                 blast_radius=2 if len(bucket_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -115,10 +116,8 @@ class AwsEcsS3BucketTopologyDisruptionRuleDetectors:
                     trust_boundary_id=internet_boundary_id(load_balancer_addresses, context),
                     rationale=_rationale(service, len(bucket_addresses)),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(load_balancer_addresses, service.address),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],

@@ -42,7 +42,8 @@ def _task_definition(
             "revision": 1,
             "task_role_arn": task_role_arn,
             "execution_role_arn": execution_role_arn,
-            "container_definitions": "[]",
+            "network_mode": "awsvpc",
+            "container_definitions": '[{"name":"orders","portMappings":[{"containerPort":8080,"protocol":"tcp"}]}]',
         },
         unknown_values={"task_role_arn": True} if task_role_arn is None else None,
     )

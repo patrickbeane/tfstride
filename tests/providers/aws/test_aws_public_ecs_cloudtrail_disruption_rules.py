@@ -75,6 +75,8 @@ class AwsPublicEcsCloudTrailDisruptionRuleTests(unittest.TestCase):
             finding.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.https",
+                "aws_lb_target_group.orders",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",

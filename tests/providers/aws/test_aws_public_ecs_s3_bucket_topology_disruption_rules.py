@@ -150,6 +150,8 @@ class AwsPublicEcsS3BucketTopologyDisruptionRuleTests(unittest.TestCase):
             finding.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.public",
+                "aws_lb_target_group.public",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",
@@ -160,8 +162,9 @@ class AwsPublicEcsS3BucketTopologyDisruptionRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["network_path"],
             [
-                "internet reaches aws_lb.public",
-                "aws_lb.public fronts aws_ecs_service.orders",
+                "internet reaches aws_lb.public through aws_lb_listener.public (HTTPS TCP 443)",
+                "aws_lb_listener.public forwards through aws_lb_target_group.public to "
+                "aws_ecs_service.orders container=orders (HTTP TCP 8080)",
             ],
         )
         self.assertIn(
@@ -318,6 +321,7 @@ class AwsPublicEcsS3BucketTopologyDisruptionRuleTests(unittest.TestCase):
                 "arn": ("arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/replacement/def"),
                 "internal": False,
                 "load_balancer_type": "application",
+                "security_groups": ["aws_security_group.public_alb"],
             },
         )
         inventory, findings = _evaluate(
@@ -332,6 +336,12 @@ class AwsPublicEcsS3BucketTopologyDisruptionRuleTests(unittest.TestCase):
         assert service is not None
         aws_facts(service).set_internet_facing_load_balancer_addresses(["aws_lb.replacement"])
 
+        # An address-only cache edit cannot establish forwarding through the replacement.
+        self.assertEqual(_reevaluate(inventory), findings)
+        listener = inventory.get_by_address("aws_lb_listener.public")
+        assert listener is not None
+        aws_facts(listener).set(AwsResourceMetadata.LOAD_BALANCER_ARN, replacement.values["arn"])
+
         current_findings = _reevaluate(inventory)
         self.assertEqual(
             [finding.rule_id for finding in current_findings],
@@ -343,8 +353,9 @@ class AwsPublicEcsS3BucketTopologyDisruptionRuleTests(unittest.TestCase):
         self.assertEqual(
             _evidence(current_finding)["network_path"],
             [
-                "internet reaches aws_lb.replacement",
-                "aws_lb.replacement fronts aws_ecs_service.orders",
+                "internet reaches aws_lb.replacement through aws_lb_listener.public (HTTPS TCP 443)",
+                "aws_lb_listener.public forwards through aws_lb_target_group.public to "
+                "aws_ecs_service.orders container=orders (HTTP TCP 8080)",
             ],
         )
 

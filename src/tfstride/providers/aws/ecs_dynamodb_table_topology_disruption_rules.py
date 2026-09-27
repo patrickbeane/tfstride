@@ -14,8 +14,7 @@ from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.resource_decoration.ecs_dynamodb_table_topology_destruction_paths import (
     current_ecs_dynamodb_table_topology_destruction_path,
@@ -98,11 +97,10 @@ class AwsEcsDynamoDbTableTopologyDisruptionRuleDetectors:
             if not current_paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(
-                current_paths,
-                context,
-            )
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            current_paths = ingress.current_workload_paths(current_paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not current_paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -122,7 +120,7 @@ class AwsEcsDynamoDbTableTopologyDisruptionRuleDetectors:
                 blast_radius=2 if len(table_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -139,13 +137,8 @@ class AwsEcsDynamoDbTableTopologyDisruptionRuleDetectors:
                     ),
                     rationale=_rationale(service, len(table_addresses)),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],

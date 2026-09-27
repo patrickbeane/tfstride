@@ -34,6 +34,7 @@ def _service(task_definition: str = "orders:1") -> TerraformResource:
         {
             "name": "orders",
             "task_definition": task_definition,
+            "network_configuration": [{"security_groups": ["aws_security_group.public_tasks"]}],
             "load_balancer": [
                 {
                     "target_group_arn": TARGET_GROUP_ARN,
@@ -105,6 +106,8 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
             finding.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.public",
+                "aws_lb_target_group.public",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",
@@ -119,8 +122,9 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["network_path"],
             [
-                "internet reaches aws_lb.public",
-                "aws_lb.public fronts aws_ecs_service.orders",
+                "internet reaches aws_lb.public through aws_lb_listener.public (HTTPS TCP 443)",
+                "aws_lb_listener.public forwards through aws_lb_target_group.public to "
+                "aws_ecs_service.orders container=orders (HTTP TCP 8080)",
             ],
         )
         self.assertEqual(

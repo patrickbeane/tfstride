@@ -270,7 +270,9 @@ class PublicWorkloadMessagingReadPathParityTests(unittest.TestCase):
                 (
                     (
                         "network_path",
-                        ("aws_lb.public fronts aws_ecs_service.orders",),
+                        (
+                            "aws_lb_listener.public forwards through aws_lb_target_group.public to aws_ecs_service.orders",
+                        ),
                     ),
                     (
                         "task_roles",

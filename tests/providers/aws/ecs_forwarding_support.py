@@ -27,6 +27,7 @@ def load_balancer_path(*, internal: bool = False) -> list[TerraformResource]:
             "arn": load_balancer_arn,
             "internal": internal,
             "load_balancer_type": "application",
+            "security_groups": ["aws_security_group.public_alb"],
         },
         "aws_lb_target_group": {
             "name": "public",
@@ -42,7 +43,7 @@ def load_balancer_path(*, internal: bool = False) -> list[TerraformResource]:
             "default_action": [{"type": "forward", "target_group_arn": TARGET_GROUP_ARN}],
         },
     }
-    return [
+    resources = [
         TerraformResource(
             address=f"{kind}.public",
             resource_type=kind,
@@ -54,3 +55,39 @@ def load_balancer_path(*, internal: bool = False) -> list[TerraformResource]:
         )
         for kind, values in values_by_type.items()
     ]
+    for name, values in {
+        "public_alb": {
+            "ingress": [{"protocol": "tcp", "from_port": 443, "to_port": 443, "cidr_blocks": ["0.0.0.0/0"]}],
+            "egress": [
+                {
+                    "protocol": "tcp",
+                    "from_port": 8080,
+                    "to_port": 8080,
+                    "security_groups": ["aws_security_group.public_tasks"],
+                }
+            ],
+        },
+        "public_tasks": {
+            "ingress": [
+                {
+                    "protocol": "tcp",
+                    "from_port": 8080,
+                    "to_port": 8080,
+                    "security_groups": ["aws_security_group.public_alb"],
+                }
+            ],
+            "egress": [],
+        },
+    }.items():
+        resources.append(
+            TerraformResource(
+                address=f"aws_security_group.{name}",
+                resource_type="aws_security_group",
+                name=name,
+                mode="managed",
+                provider_name="registry.terraform.io/hashicorp/aws",
+                provider_config_key="aws",
+                values={"id": f"sg-{name}", **values},
+            )
+        )
+    return resources

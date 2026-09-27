@@ -15,8 +15,7 @@ from tfstride.models import Finding, IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.message_removal_evidence import (
     AwsEcsSqsMessageRemovalPath,
@@ -83,8 +82,10 @@ class AwsEcsSqsMessageDisruptionRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -102,7 +103,7 @@ class AwsEcsSqsMessageDisruptionRuleDetectors:
                 blast_radius=2 if len(queue_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -123,13 +124,8 @@ class AwsEcsSqsMessageDisruptionRuleDetectors:
                         len(queue_addresses),
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -213,10 +209,6 @@ def _is_current_deterministic_path(
         or path.get("conditional_evaluation_required") is not False
         or path.get("lifecycle_compatibility_state") != "not_applicable"
         or path.get("target_model_evidence_addresses") != _current_model_evidence_addresses(queue_facts, queue.address)
-        or not _current_load_balancers(
-            path,
-            service_facts.internet_facing_load_balancer_addresses,
-        )
         or not _delivery_evidence_is_current(path, queue, queue_facts)
         or not _operation_authorizations_are_current(
             path,
@@ -685,14 +677,6 @@ def _resource_for_path(
     if resource is None or resource.provider != "aws" or resource.resource_type != expected_type:
         return None
     return resource
-
-
-def _current_load_balancers(
-    path: Mapping[str, object],
-    current: Sequence[str],
-) -> bool:
-    values = _string_values_exact(path.get("internet_facing_load_balancers"))
-    return values is not None and set(values) == set(current)
 
 
 def _operations(paths: Sequence[Mapping[str, object]]) -> list[str]:

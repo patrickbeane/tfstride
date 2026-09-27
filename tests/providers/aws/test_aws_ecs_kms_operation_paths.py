@@ -151,7 +151,8 @@ def _task_definition() -> TerraformResource:
             "revision": 1,
             "task_role_arn": _TASK_ROLE_ARN,
             "execution_role_arn": _EXECUTION_ROLE_ARN,
-            "container_definitions": "[]",
+            "network_mode": "awsvpc",
+            "container_definitions": '[{"name":"orders","portMappings":[{"containerPort":8080,"protocol":"tcp"}]}]',
         },
     )
 

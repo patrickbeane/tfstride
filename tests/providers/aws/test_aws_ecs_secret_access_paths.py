@@ -73,10 +73,12 @@ def _task_definition(
     values: dict[str, Any] = {
         "family": "orders",
         "revision": 1,
+        "network_mode": "awsvpc",
         "container_definitions": json.dumps(
             [
                 {
                     "name": "orders",
+                    "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
                     "secrets": [{"name": "DB_PASSWORD", "valueFrom": secret_reference}],
                 }
             ]

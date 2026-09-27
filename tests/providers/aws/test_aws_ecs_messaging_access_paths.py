@@ -96,7 +96,8 @@ def _task_definition(
     values: dict[str, Any] = {
         "family": "orders",
         "revision": 1,
-        "container_definitions": "[]",
+        "network_mode": "awsvpc",
+        "container_definitions": '[{"name":"orders","portMappings":[{"containerPort":8080,"protocol":"tcp"}]}]',
     }
     if task_role_arn is not None:
         values["task_role_arn"] = task_role_arn

@@ -19,8 +19,7 @@ from tfstride.models import (
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.messaging_topology_destruction_evidence import (
     AwsEcsMessagingTopologyDestructionPath,
@@ -100,8 +99,10 @@ class AwsEcsMessagingTopologyDisruptionRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -122,7 +123,7 @@ class AwsEcsMessagingTopologyDisruptionRuleDetectors:
                 blast_radius=2 if len(target_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -139,13 +140,8 @@ class AwsEcsMessagingTopologyDisruptionRuleDetectors:
                     ),
                     rationale=_rationale(service, operations, len(target_addresses)),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -250,10 +246,6 @@ def _is_current_deterministic_path(
         or path.get("posture_uncertainties") != []
         or path.get("outcome_evidence") != _current_outcome_evidence()
         or not _target_identity_is_current(path, target, target_facts, target_type)
-        or not _current_load_balancers(
-            path,
-            service_facts.internet_facing_load_balancer_addresses,
-        )
         or not _matches_current_task_path(
             path,
             (current_task_path,),
@@ -327,14 +319,6 @@ def _task_role_relationship_is_current(
             return False
         resolved = True
     return observed and resolved
-
-
-def _current_load_balancers(
-    path: Mapping[str, object],
-    current: Sequence[str],
-) -> bool:
-    values = path.get("internet_facing_load_balancers")
-    return isinstance(values, list) and set(values) == set(current)
 
 
 def _matches_current_task_path(

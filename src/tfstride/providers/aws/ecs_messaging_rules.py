@@ -10,8 +10,7 @@ from tfstride.models import Finding
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 
@@ -65,8 +64,10 @@ class AwsEcsMessagingAccessRuleDetectors:
             if not mutation_paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(mutation_paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            mutation_paths = ingress.current_workload_paths(mutation_paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not mutation_paths:
                 continue
 
             task_definition_addresses = path_string_values(mutation_paths, "task_definition_address")
@@ -81,7 +82,7 @@ class AwsEcsMessagingAccessRuleDetectors:
                 blast_radius=2 if len(target_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -101,10 +102,8 @@ class AwsEcsMessagingAccessRuleDetectors:
                         "mean that the topic or queue itself is public."
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(load_balancer_addresses, service.address),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -139,8 +138,10 @@ class AwsEcsMessagingAccessRuleDetectors:
             if not receive_paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(receive_paths, context)
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            receive_paths = ingress.current_workload_paths(receive_paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not receive_paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -160,7 +161,7 @@ class AwsEcsMessagingAccessRuleDetectors:
                 blast_radius=2 if len(queue_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -186,13 +187,8 @@ class AwsEcsMessagingAccessRuleDetectors:
                         "public."
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],

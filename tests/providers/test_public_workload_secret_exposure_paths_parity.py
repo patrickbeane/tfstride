@@ -205,7 +205,7 @@ class PublicWorkloadSecretExposurePathParityTests(unittest.TestCase):
                 _aws_public_resources(),
                 AWS_PUBLIC_RULE,
                 {
-                    "network_path": "aws_lb.public fronts aws_ecs_service.orders",
+                    "network_path": "aws_lb_listener.public forwards through aws_lb_target_group.public to aws_ecs_service.orders",
                     "execution_roles": "address=aws_iam_role.execution",
                     "secret_access_paths": f"secret_arn={AWS_SECRET_ARN}",
                 },

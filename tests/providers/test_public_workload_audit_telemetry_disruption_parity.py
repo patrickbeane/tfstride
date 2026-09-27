@@ -364,6 +364,7 @@ def _remove_current_public_exposure(provider: ProviderName, inventory: ResourceI
         load_balancer = inventory.get_by_address("aws_lb.public")
         assert load_balancer is not None
         load_balancer.public_exposure = False
+        load_balancer.public_access_configured = False
         return
     workload = inventory.get_by_address(_WORKLOAD_BY_PROVIDER[provider])
     assert workload is not None

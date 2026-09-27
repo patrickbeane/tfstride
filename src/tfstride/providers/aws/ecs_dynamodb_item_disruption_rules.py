@@ -20,8 +20,7 @@ from tfstride.models import (
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
-    public_service_network_path,
-    resolved_public_load_balancers,
+    verified_public_service_ingress,
 )
 from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
 from tfstride.providers.aws.structured_data_deletion_evidence import (
@@ -93,11 +92,10 @@ class AwsEcsDynamoDbItemDisruptionRuleDetectors:
             if not paths:
                 continue
 
-            load_balancer_addresses = resolved_public_load_balancers(
-                paths,
-                context,
-            )
-            if not load_balancer_addresses:
+            ingress = verified_public_service_ingress(service, context)
+            paths = ingress.current_workload_paths(paths)
+            load_balancer_addresses = ingress.load_balancer_addresses
+            if not load_balancer_addresses or not paths:
                 continue
 
             task_definition_addresses = path_string_values(
@@ -118,7 +116,7 @@ class AwsEcsDynamoDbItemDisruptionRuleDetectors:
                 blast_radius=2 if len(table_addresses) > 1 else 1,
             )
             affected_resources = [
-                *load_balancer_addresses,
+                *ingress.resource_addresses,
                 service.address,
                 *task_definition_addresses,
                 *role_addresses,
@@ -139,13 +137,8 @@ class AwsEcsDynamoDbItemDisruptionRuleDetectors:
                         len(table_addresses),
                     ),
                     evidence=collect_evidence(
-                        evidence_item(
-                            "network_path",
-                            public_service_network_path(
-                                load_balancer_addresses,
-                                service.address,
-                            ),
-                        ),
+                        evidence_item("network_path", ingress.network_path),
+                        *ingress.evidence,
                         evidence_item(
                             "task_definitions",
                             [f"address={address}" for address in task_definition_addresses],
@@ -238,10 +231,6 @@ def _is_current_deterministic_path(
         or not _batch_capability_is_coherent(
             path,
             batch_put_capability=batch_put_capability,
-        )
-        or not _current_load_balancers(
-            path,
-            service_facts.internet_facing_load_balancer_addresses,
         )
         or not _task_role_relationship_is_current(
             path,
@@ -698,16 +687,6 @@ def _matches_current_task_path(
         if all(projected_path[key] == current_path[key] for key in projected_keys):
             return True
     return False
-
-
-def _current_load_balancers(
-    path: Mapping[str, object],
-    current: Sequence[str],
-) -> bool:
-    value = path.get("internet_facing_load_balancers")
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        return False
-    return set(value) == set(current)
 
 
 def _operations(

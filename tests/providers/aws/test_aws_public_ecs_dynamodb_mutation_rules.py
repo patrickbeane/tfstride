@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.providers.aws.ecs_forwarding_support import load_balancer_path
 from tests.providers.aws.test_aws_ecs_dynamodb_access_paths import (
     _EXECUTION_ROLE_ARN,
     _INDEX_ARN,
@@ -36,6 +37,7 @@ def _load_balancer(*, internal: bool = False) -> TerraformResource:
             "arn": _LOAD_BALANCER_ARN,
             "internal": internal,
             "load_balancer_type": "application",
+            "security_groups": ["aws_security_group.public_alb"],
         },
     )
 
@@ -75,13 +77,14 @@ def _listener() -> TerraformResource:
     )
 
 
-def _service(task_definition: str = "orders:1") -> TerraformResource:
+def _service(task_definition: str = "aws_ecs_task_definition.orders") -> TerraformResource:
     return _resource(
         "aws_ecs_service",
         "orders",
         {
             "name": "orders",
             "task_definition": task_definition,
+            "network_configuration": [{"security_groups": ["aws_security_group.public_tasks"]}],
             "load_balancer": [
                 {
                     "target_group_arn": _TARGET_GROUP_ARN,
@@ -98,6 +101,7 @@ def _public_edge(*, internal: bool = False) -> list[TerraformResource]:
         _load_balancer(internal=internal),
         _target_group(),
         _listener(),
+        *(item for item in load_balancer_path() if item.resource_type == "aws_security_group"),
     ]
 
 
@@ -285,6 +289,8 @@ class AwsPublicEcsDynamoDbMutationRuleTests(unittest.TestCase):
             finding.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.https",
+                "aws_lb_target_group.orders",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",
@@ -299,8 +305,9 @@ class AwsPublicEcsDynamoDbMutationRuleTests(unittest.TestCase):
         self.assertEqual(
             evidence["network_path"],
             [
-                "internet reaches aws_lb.public",
-                "aws_lb.public fronts aws_ecs_service.orders",
+                "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+                "aws_lb_listener.https forwards through aws_lb_target_group.orders to "
+                "aws_ecs_service.orders container=orders (HTTP TCP 8080)",
             ],
         )
         self.assertEqual(

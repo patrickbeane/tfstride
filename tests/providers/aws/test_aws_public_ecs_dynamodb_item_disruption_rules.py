@@ -101,6 +101,8 @@ class AwsPublicEcsDynamoDbItemDisruptionRuleTests(unittest.TestCase):
             finding.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.https",
+                "aws_lb_target_group.orders",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",
@@ -336,7 +338,8 @@ class AwsPublicEcsDynamoDbItemDisruptionRuleTests(unittest.TestCase):
             {
                 "family": "orders",
                 "revision": 1,
-                "container_definitions": "[]",
+                "network_mode": "awsvpc",
+                "container_definitions": '[{"name":"orders","portMappings":[{"containerPort":8080,"protocol":"tcp"}]}]',
             },
             unknown_values={"task_role_arn": True},
             reference_resolutions=(

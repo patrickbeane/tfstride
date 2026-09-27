@@ -125,6 +125,8 @@ class AwsPublicEcsKmsManagementRuleTests(unittest.TestCase):
             disruption.affected_resources,
             [
                 "aws_lb.public",
+                "aws_lb_listener.https",
+                "aws_lb_target_group.orders",
                 "aws_ecs_service.orders",
                 "aws_ecs_task_definition.orders",
                 "aws_iam_role.orders_task",
@@ -138,8 +140,9 @@ class AwsPublicEcsKmsManagementRuleTests(unittest.TestCase):
         self.assertEqual(
             disruption_evidence["network_path"],
             [
-                "internet reaches aws_lb.public",
-                "aws_lb.public fronts aws_ecs_service.orders",
+                "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+                "aws_lb_listener.https forwards through aws_lb_target_group.orders to "
+                "aws_ecs_service.orders container=orders (HTTP TCP 8080)",
             ],
         )
         self.assertEqual(

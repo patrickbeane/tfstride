@@ -128,7 +128,7 @@ _AZURE_EXTERNAL_SCOPE = (
 _AWS_READ_CONTEXT_EVIDENCE = (
     (
         "network_path",
-        ("aws_lb.public fronts aws_ecs_service.orders",),
+        ("aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders",),
     ),
     (
         "task_roles",

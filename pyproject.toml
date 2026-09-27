@@ -80,6 +80,7 @@ include = [
 
   # AWS finding evidence uses prepared, source-aware relationship indexes.
   "src/tfstride/providers/aws/analysis_indexes.py",
+  "src/tfstride/providers/aws/ecs_path_rule_helpers.py",
   "src/tfstride/providers/aws/posture_rules.py",
   "src/tfstride/providers/aws/network_data_rules.py",
   "src/tfstride/providers/aws/path_chain_rules.py",
