@@ -73,8 +73,8 @@ class AwsPublicEcsVerifiedIngressTests(unittest.TestCase):
                 "priority": 10,
                 "condition": [{"path_pattern": [{"values": ["/app/*"]}]}],
                 "action": [
-                    {"type": "authenticate-oidc", "order": 1},
-                    {"type": "forward", "order": 2, "target_group_arn": TARGET_GROUP_ARN},
+                    {"type": "authenticate-oidc"},
+                    {"type": "forward", "target_group_arn": TARGET_GROUP_ARN},
                 ],
             },
         )

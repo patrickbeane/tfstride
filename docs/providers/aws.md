@@ -104,6 +104,11 @@ S3 object-deletion and bucket-deletion authorization compare the established own
 * ECR mutable tags, customer-managed encryption, and repository scanning posture
 
 ### Workload-to-data paths
+
+Public ECS findings require a current, resolved load-balancer → listener/action → target-group → service/container binding, with permitted listener ingress, load-balancer egress, and service ingress. The verified-ingress model currently covers internet-facing application load balancers with HTTP/HTTPS listeners, HTTP/HTTPS IPv4 IP targets, and ECS tasks using `awsvpc`. Listener and backend ports may differ, such as HTTPS 443 → HTTP 8080. Findings retain forwarding, container, and security-group evidence; authentication remains a separate dimension.
+
+NLBs, instance targets, other ECS network modes, and unresolved or unsupported traffic constraints remain uncertain and cannot establish this public-ingress prerequisite. This assessment proves the modeled forwarding and security-group permissions; it does not establish runtime health or full route/NACL reachability. Workload-to-data authorization facts remain available independently when public ingress is unproven. Known omitted action orders use their one-based list positions, and an omitted `aws_lb.load_balancer_type` defaults to `application`; explicit plan-time unknowns do not inherit those defaults.
+
 * Public ECS service-to-Secrets Manager, S3, SNS/SQS, and DynamoDB mutation paths
 * Exact public ECS-to-SQS receive and message-removal paths; `DeleteMessage` requires receive authority for runtime receipt handles, while `PurgeQueue` is independent
 * Public ECS SQS queue and SNS topic topology-deletion paths for `DeleteQueue` and `DeleteTopic`

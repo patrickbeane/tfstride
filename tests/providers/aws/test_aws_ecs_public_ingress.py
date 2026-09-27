@@ -226,6 +226,24 @@ class AwsEcsPublicIngressTests(unittest.TestCase):
                 self.assertEqual(facts.ecs_public_ingress_decisions[0]["state"], "unknown")
                 self.assertTrue(facts.ecs_public_ingress_uncertainties)
 
+    def test_omitted_alb_type_defaults_to_application_but_unknown_type_does_not(self) -> None:
+        resources = _resources()
+        load_balancer = _get(resources, "aws_lb.public")
+        del load_balancer.values["load_balancer_type"]
+        inventory = AwsNormalizer().normalize(resources)
+        normalized = inventory.get_by_address(load_balancer.address)
+        assert normalized is not None
+        self.assertEqual(aws_facts(normalized).load_balancer_type, "application")
+        self.assertEqual(len(_facts(resources).ecs_public_ingress_paths), 1)
+
+        load_balancer.unknown_values = {"load_balancer_type": True}
+        inventory = AwsNormalizer().normalize(resources)
+        normalized = inventory.get_by_address(load_balancer.address)
+        assert normalized is not None
+        self.assertIsNone(aws_facts(normalized).load_balancer_type)
+        self.assertEqual(_facts(resources).ecs_public_ingress_paths, [])
+        self.assertEqual(_facts(resources).ecs_public_ingress_decisions[0]["state"], "unknown")
+
     def test_unsupported_network_mode_and_conflicting_host_port_are_uncertain(self) -> None:
         for mode, host_port in (("bridge", 8080), ("host", 8080), ("awsvpc", 9090)):
             with self.subTest(mode=mode, host_port=host_port):

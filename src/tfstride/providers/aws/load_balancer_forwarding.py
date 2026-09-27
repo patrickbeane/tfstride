@@ -47,7 +47,9 @@ def normalize_forwarding_actions(resource: TerraformResource, field: str) -> lis
         uncertainties: list[str] = []
         path = f"{field}[{i}]"
         action_type = _string(values, unknown, "type")
-        order = _integer(values, unknown, "order", None, 50000)
+        # The provider defaults action order to its one-based list position.
+        # _integer still rejects explicitly unknown planned values.
+        order = _integer(values, unknown, "order", i + 1, 50000)
         if block_attribute_unknown(unknown, "order") or (
             values.get("order") is not None and (order is None or order < 1)
         ):

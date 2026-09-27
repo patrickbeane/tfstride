@@ -122,7 +122,12 @@ class AwsEdgeProtectionRuleTests(unittest.TestCase):
     def test_internal_or_non_application_load_balancer_is_quiet(self) -> None:
         self.assertEqual(_findings([_load_balancer(internal=True)]), [])
         self.assertEqual(_findings([_load_balancer(load_balancer_type="network")]), [])
-        self.assertEqual(_findings([_load_balancer(load_balancer_type=_MISSING)]), [])
+
+    def test_omitted_alb_type_uses_provider_default_without_overriding_unknown(self) -> None:
+        resource = _load_balancer(load_balancer_type=_MISSING)
+        self.assertEqual([finding.rule_id for finding in _findings([resource])], [_RULE_ID])
+        resource.unknown_values = {"load_balancer_type": True}
+        self.assertEqual(_findings([resource]), [])
 
     def test_unknown_waf_association_target_does_not_create_missing_waf_finding(self) -> None:
         self.assertEqual(

@@ -381,7 +381,7 @@ def normalize_load_balancer(resource: TerraformResource) -> NormalizedResource:
         metadata={
             "internal": not internet_facing,
             AwsResourceMetadata.LOAD_BALANCER_TYPE: network_string(
-                values, resource.unknown_values, "load_balancer_type"
+                values, resource.unknown_values, "load_balancer_type", "application"
             ),
             AwsResourceMetadata.LOAD_BALANCER_IP_ADDRESS_TYPE: network_string(
                 values, resource.unknown_values, "ip_address_type", "ipv4"

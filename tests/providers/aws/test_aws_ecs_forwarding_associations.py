@@ -252,6 +252,37 @@ class AwsEcsForwardingAssociationTests(unittest.TestCase):
             _facts(resources).ecs_forwarding_associations[0]["authentication_actions"], ["authenticate-oidc"]
         )
 
+    def test_omitted_action_orders_use_list_position_for_listener_and_rule_actions(self) -> None:
+        for field in ("default_action", "action"):
+            with self.subTest(field=field):
+                resources = _chain()
+                source = resources[2]
+                if field == "action":
+                    source.values["default_action"] = [{"type": "fixed-response"}]
+                    source = _rule()
+                    resources.append(source)
+                source.values[field] = [
+                    {"type": "authenticate-oidc"},
+                    {"type": "forward", "target_group_arn": "aws_lb_target_group.app"},
+                ]
+                facts = _facts(resources)
+                self.assertEqual(len(facts.ecs_forwarding_associations), 1)
+                self.assertEqual(facts.ecs_forwarding_associations[0]["authentication_actions"], ["authenticate-oidc"])
+
+                # A known default cannot repair a plan-time unknown or a duplicate order.
+                source.unknown_values = {field: [{"order": True}, {}]}
+                self.assertEqual(_facts(resources).ecs_forwarding_associations, [])
+                source.unknown_values = {}
+                source.values[field][0]["order"] = 2
+                self.assertEqual(_facts(resources).ecs_forwarding_associations, [])
+
+                # Explicit order continues to override list position.
+                source.values[field] = [
+                    {"type": "forward", "order": 2, "target_group_arn": "aws_lb_target_group.app"},
+                    {"type": "authenticate-oidc", "order": 1},
+                ]
+                self.assertEqual(len(_facts(resources).ecs_forwarding_associations), 1)
+
     def test_redecoration_clears_a_removed_listener(self) -> None:
         inventory = AwsNormalizer().normalize(_chain())
         resources = [item for item in inventory.resources if item.resource_type != "aws_lb_listener"]
