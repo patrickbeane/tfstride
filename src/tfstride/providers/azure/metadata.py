@@ -464,6 +464,8 @@ class AzureResourceMetadata:
         "app_service_diagnostic_setting_audit_telemetry_disruption_path_uncertainties"
     )
     APP_SERVICE_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_access_restrictions")
+    APP_SERVICE_RESTRICTION_INPUTS = DictMetadataField("app_service_restriction_inputs")
+    APP_SERVICE_EFFECTIVE_INGRESS = DictMetadataField("app_service_effective_ingress")
     APP_SERVICE_SCM_ACCESS_RESTRICTIONS = DictListMetadataField("app_service_scm_access_restrictions")
     APP_SERVICE_SECRET_REFERENCES = DictListMetadataField("app_service_secret_references")
     APP_SERVICE_KEY_VAULT_ACCESS_PATHS = DictListMetadataField("app_service_key_vault_access_paths")

@@ -18,6 +18,7 @@ from tfstride.providers.azure.resource_decoration.app_service_cosmosdb_topology_
 from tfstride.providers.azure.resource_decoration.app_service_diagnostic_setting_audit_telemetry_disruption_paths import (
     ModelAppServiceDiagnosticSettingAuditTelemetryDisruptionPathsStage,
 )
+from tfstride.providers.azure.resource_decoration.app_service_ingress import EvaluateAppServiceIngressStage
 from tfstride.providers.azure.resource_decoration.app_service_key_vault_access_paths import (
     ModelAppServiceKeyVaultAccessPathsStage,
 )
@@ -107,6 +108,7 @@ def default_azure_decoration_stages() -> tuple[AzureDecorationStage, ...]:
         ResolveNetworkInterfaceRelationshipsStage(),
         ResolveVirtualMachineRelationshipsStage(),
         DerivePublicComputeExposureStage(),
+        EvaluateAppServiceIngressStage(),
         DecorateStorageRelationshipsStage(),
         DecorateServiceBusRelationshipsStage(),
         DecorateCosmosDbNoSqlRelationshipsStage(),

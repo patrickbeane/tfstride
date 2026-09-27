@@ -260,6 +260,7 @@ class ProviderDecorationRunnerContractTests(unittest.TestCase):
                 "resolve_network_interface_relationships",
                 "resolve_virtual_machine_relationships",
                 "derive_public_compute_exposure",
+                "evaluate_app_service_ingress",
                 "decorate_storage_relationships",
                 "decorate_service_bus_relationships",
                 "decorate_cosmosdb_nosql_relationships",

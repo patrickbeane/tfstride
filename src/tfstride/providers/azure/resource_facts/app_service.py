@@ -460,6 +460,17 @@ class AzureAppServiceFacts(AzureBaseFacts):
         return self.get(AzureResourceMetadata.APP_SERVICE_ACCESS_RESTRICTIONS)
 
     @property
+    def app_service_restriction_inputs(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_RESTRICTION_INPUTS)
+
+    @property
+    def app_service_effective_ingress(self) -> dict[str, Any]:
+        return self.get(AzureResourceMetadata.APP_SERVICE_EFFECTIVE_INGRESS)
+
+    def set_app_service_effective_ingress(self, value: dict[str, Any]) -> None:
+        self.set(AzureResourceMetadata.APP_SERVICE_EFFECTIVE_INGRESS, value)
+
+    @property
     def app_service_scm_access_restrictions(self) -> list[dict[str, Any]]:
         return self.get(AzureResourceMetadata.APP_SERVICE_SCM_ACCESS_RESTRICTIONS)
 

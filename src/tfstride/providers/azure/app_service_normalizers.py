@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.azure.app_service_access_inputs import app_service_restriction_inputs, site_config_inputs
 from tfstride.providers.azure.app_service_container_images import app_service_container_image_metadata
 from tfstride.providers.azure.app_service_secret_delivery import app_service_secret_delivery_metadata
 from tfstride.providers.azure.identity_normalizers import managed_identity_metadata
@@ -114,6 +115,7 @@ def _normalize_app_service(resource: TerraformResource, *, os_type: str | None) 
     auth_settings_v2 = _auth_settings_v2(resource, values, auth_uncertainties)
 
     metadata: dict[Any, Any] = {
+        AzureResourceMetadata.APP_SERVICE_RESTRICTION_INPUTS: app_service_restriction_inputs(resource),
         AzureResourceMetadata.NAME: first_non_empty(values.get("name"), resource.name),
         AzureResourceMetadata.LOCATION: first_non_empty(values.get("location")),
         AzureResourceMetadata.APP_SERVICE_ID: app_service_id,
@@ -374,8 +376,8 @@ def _known_site_config_string(
     *,
     display_key: str,
 ) -> str | None:
-    raw_unknown = resource.unknown_values.get("site_config")
-    if raw_unknown is True and site_config is None:
+    _, raw_unknown = site_config_inputs(resource)
+    if raw_unknown is True:
         uncertainty = "site_config is unknown after planning"
         if uncertainty not in uncertainties:
             uncertainties.append(uncertainty)
@@ -400,8 +402,8 @@ def _known_site_config_bool(
     key: str,
     uncertainties: list[str],
 ) -> bool | None:
-    raw_unknown = resource.unknown_values.get("site_config")
-    if raw_unknown is True and site_config is None:
+    _, raw_unknown = site_config_inputs(resource)
+    if raw_unknown is True:
         uncertainty = "site_config is unknown after planning"
         if uncertainty not in uncertainties:
             uncertainties.append(uncertainty)
@@ -425,8 +427,8 @@ def _access_restriction_records(
     block_key: str,
     uncertainties: list[str],
 ) -> list[dict[str, Any]]:
-    raw_unknown = resource.unknown_values.get("site_config")
-    if raw_unknown is True and site_config is None:
+    _, raw_unknown = site_config_inputs(resource)
+    if raw_unknown is True:
         uncertainty = "site_config is unknown after planning"
         if uncertainty not in uncertainties:
             uncertainties.append(uncertainty)
@@ -435,12 +437,14 @@ def _access_restriction_records(
     unknown_site_config = first_mapping(raw_unknown)
     unknown_blocks = unknown_site_config.get(block_key) if unknown_site_config else None
     blocks = as_list(site_config.get(block_key)) if site_config is not None else []
-    if value_is_unknown(unknown_blocks) and not blocks:
+    if unknown_blocks is True and not blocks:
         uncertainties.append(f"site_config.{block_key} is unknown after planning")
         return []
 
     records: list[dict[str, Any]] = []
-    for index, raw_block in enumerate(blocks):
+    count = max(len(blocks), len(unknown_blocks) if isinstance(unknown_blocks, list) else 0)
+    for index in range(count):
+        raw_block = blocks[index] if index < len(blocks) else None
         path = f"site_config.{block_key}[{index}]"
         unknown_block = unknown_block_at(unknown_blocks, index)
         if unknown_block is True:
@@ -462,6 +466,18 @@ def _access_restriction_records(
             continue
         if not isinstance(raw_block, Mapping):
             uncertainties.append(f"{path} has an unrecognized value shape")
+            records.append(
+                {
+                    "unknown_fields": [
+                        "priority",
+                        "action",
+                        "ip_address",
+                        "service_tag",
+                        "virtual_network_subnet_id",
+                        "headers",
+                    ]
+                }
+            )
             continue
         records.append(_access_restriction_record(raw_block, unknown_block, path, uncertainties))
     return records
@@ -476,12 +492,25 @@ def _access_restriction_record(
     unknown_fields: list[str] = []
     record: dict[str, Any] = {}
     for key in ("name", "action", "ip_address", "service_tag", "virtual_network_subnet_id", "description"):
+        if key == "action" and values.get(key) not in (None, "Allow", "Deny"):
+            unknown_fields.append(key)
+            uncertainties.append(f"{path}.{key} is not a supported action")
+            continue
+        if values.get(key) is not None and not isinstance(values[key], str):
+            unknown_fields.append(key)
+            uncertainties.append(f"{path}.{key} has an unrecognized value shape")
+            continue
         value = known_block_string(values, unknown_values, key, uncertainties, path=path, unknown_fields=unknown_fields)
         if value is not None:
             record[key] = value
-    priority = known_block_int(
-        values, unknown_values, "priority", uncertainties, path=path, unknown_fields=unknown_fields
-    )
+    if values.get("priority") is not None and type(values["priority"]) is not int:
+        priority = None
+        unknown_fields.append("priority")
+        uncertainties.append(f"{path}.priority has an unrecognized value shape")
+    else:
+        priority = known_block_int(
+            values, unknown_values, "priority", uncertainties, path=path, unknown_fields=unknown_fields
+        )
     if priority is not None:
         record["priority"] = priority
     headers = _access_restriction_headers(values.get("headers"))
@@ -490,6 +519,32 @@ def _access_restriction_record(
     if isinstance(unknown_values, Mapping) and value_is_unknown(unknown_values.get("headers")):
         uncertainties.append(f"{path}.headers is unknown after planning")
         unknown_fields.append("headers")
+        unknown_headers = unknown_values["headers"]
+        if isinstance(unknown_headers, list) and len(unknown_headers) == 1:
+            unknown_headers = unknown_headers[0]
+        if isinstance(unknown_headers, Mapping):
+            record["unknown_header_fields"] = sorted(
+                str(key) for key, value in unknown_headers.items() if value_is_unknown(value)
+            )
+    raw_headers = values.get("headers")
+    if raw_headers is not None and (
+        not isinstance(raw_headers, list)
+        or len(raw_headers) > 1
+        or any(
+            not isinstance(header, Mapping)
+            or any(
+                items is not None
+                and (
+                    not isinstance(items, list) or any(not isinstance(item, str) or not item.strip() for item in items)
+                )
+                for items in header.values()
+            )
+            for header in raw_headers
+        )
+    ):
+        uncertainties.append(f"{path}.headers has an unrecognized value shape")
+        unknown_fields.append("headers")
+        record.pop("unknown_header_fields", None)
     if unknown_fields:
         record["unknown_fields"] = sorted(set(unknown_fields))
     return record

@@ -92,6 +92,46 @@ Azure trust-boundary records currently cover public storage and Key Vault endpoi
 * Public access, platform authentication, TLS, managed-identity, VNet-integration, access-restriction, and SCM posture
 * App Service Key Vault reference identity/access paths
 
+App Service normalization also calculates `app_service_effective_ingress` for the
+main site and SCM site independently. Each result distinguishes `unrestricted`,
+`restricted`, `blocked`, and `unresolved` access and retains source CIDRs, possible
+winning rules, default-action evidence, and unresolved constraints. These states
+describe the default endpoint's access restrictions across IPv4, IPv6, and
+modeled request headers. A narrow public-IP allowlist remains restricted external
+access; it does not establish privacy. `external_access=allowed` proves that the
+restrictions permit at least one globally routable source, including any required
+header witness. It does not establish public routing to an internal App Service
+Environment or access through a private endpoint.
+
+Rules use numeric priority followed by preserved list order for modern AzureRM
+App Service resources. Conflicting equal-priority rules on legacy Function Apps
+retain uncertainty because their ordering contract is not established. tfSTRIDE
+does not introduce deny precedence or sort ties by resource address or rule name.
+Explicit planned default actions take precedence, including defaults materialized
+by AzureRM. When a managed resource has a known unset default, Azure's implicit
+behavior applies: allow without rules, deny with rules. Unknown collections,
+actions, priorities, and defaults remain uncertain only on subsets where they
+could change a decision. Missing data-source inputs are not treated as managed
+resource defaults.
+
+Literal IP/CIDR and comma-separated source ranges are evaluated directly. Service
+tags, subnet service-endpoint selectors, `AnyVnets`, and unsupported header
+patterns retain their constraints without online expansion. Supported exact
+header filters are evaluated using a bounded request partition; incomplete
+partitions may establish individual witnesses but cannot establish exhaustive
+denial. Unknown header values cannot reuse stale planned values. SCM inherits the
+main restrictions only when inheritance is established; unknown inheritance
+retains both alternatives. Platform authentication is evaluated independently.
+An explicitly disabled public endpoint blocks this ingress; unknown endpoint
+configuration does not become a public-access claim.
+
+The evaluator currently provides normalized evidence. Existing public-workload
+findings still use their previous exposure prerequisites; migrating those
+consumers is a separate change. The restriction semantics follow
+[Microsoft's App Service access restriction model](https://learn.microsoft.com/azure/app-service/overview-access-restrictions)
+and the modern AzureRM
+[restriction list schema](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/internal/services/appservice/helpers/shared_schema.go).
+
 ### Workload-to-data paths
 * Exact public App Service-to-Key Vault, Storage, Service Bus, and Cosmos DB for NoSQL read and mutation paths across account, database, and container scopes
 * Exact public App Service-to-Service Bus receive and destructive-settlement paths for modeled queues and subscriptions, including namespace-scoped RBAC fanout
