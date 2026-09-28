@@ -135,8 +135,10 @@ Blocked or unresolved ingress does not remove workload-to-data authorization fac
 Configuration-posture findings can still report an enabled public endpoint or a
 broad configured rule when effective ingress is blocked; those settings alone do
 not increase the internet-exposure severity factor. The SCM unrestricted-access
-finding requires unrestricted effective SCM ingress across the evaluated address
-families and request constraints, independently of main-site ingress.
+finding requires unrestricted effective SCM ingress for at least one address
+family, without constraints on request headers, independently of main-site
+ingress. World-open IPv4 access still triggers when IPv6 is denied, and vice versa;
+the evaluator's combined state can remain `restricted` in those cases.
 
 The restriction semantics follow
 [Microsoft's App Service access restriction model](https://learn.microsoft.com/azure/app-service/overview-access-restrictions)

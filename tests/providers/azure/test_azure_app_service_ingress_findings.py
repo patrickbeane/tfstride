@@ -296,6 +296,52 @@ class AzureAppServiceIngressFindingTests(unittest.TestCase):
         self.assertEqual([finding.rule_id for finding in findings], [_SCM_RULE])
         self.assertIn("site=scm", _evidence(findings[0])["public_endpoint"])
 
+    def test_scm_world_open_family_is_detected_when_the_other_family_is_denied(self):
+        for sources, canonical in (
+            (["0.0.0.0/0"], "0.0.0.0/0"),
+            (["::/0"], "::/0"),
+            (["0.0.0.0/1", "128.0.0.0/1"], "0.0.0.0/0"),
+            (["::/1", "8000::/1"], "::/0"),
+        ):
+            for explicit_default in (False, True):
+                with self.subTest(sources=sources, explicit_default=explicit_default):
+                    config = {"scm_ip_restriction": [_allow(source) for source in sources]}
+                    if explicit_default:
+                        config["scm_ip_restriction_default_action"] = "Deny"
+                    app = _app(public_network=True, site_config_overrides=config)
+                    _, findings = _evaluate([app], _SCM_RULE)
+                    self.assertEqual([finding.rule_id for finding in findings], [_SCM_RULE])
+                    decision = _decision(findings[0])
+                    self.assertEqual(decision["state"], "restricted")
+                    self.assertEqual(decision["allowed_source_cidrs"], [canonical])
+                    self.assertEqual(findings[0].severity_reasoning.internet_exposure, 2)
+
+    def test_scm_narrow_or_header_constrained_external_access_is_not_unrestricted(self):
+        for rule in (
+            _allow("8.8.8.0/24"),
+            _allow("0.0.0.0/0", headers=[{"x_azure_fdid": ["reviewed-proxy"]}]),
+        ):
+            with self.subTest(rule=rule):
+                app = _app(public_network=True, site_config_overrides={"scm_ip_restriction": [rule]})
+                inventory, findings = _evaluate([app], _SCM_RULE)
+                decision = azure_facts(inventory.get_by_address(app.address)).app_service_effective_ingress["scm"]
+                self.assertEqual(decision["external_access"], "allowed")
+                self.assertEqual(decision["state"], "restricted")
+                self.assertEqual(findings, [])
+
+    def test_scm_unknown_inheritance_does_not_erase_proven_unrestricted_alternatives(self):
+        app = _app(
+            public_network=True,
+            site_config_overrides={
+                "ip_restriction_default_action": "Allow",
+                "scm_ip_restriction_default_action": "Allow",
+            },
+            unknown_values={"site_config": [{"scm_use_main_ip_restriction": True}]},
+        )
+        _, findings = _evaluate([app], _SCM_RULE)
+        self.assertEqual([finding.rule_id for finding in findings], [_SCM_RULE])
+        self.assertEqual(_decision(findings[0])["inheritance"], "unknown")
+
     def test_scm_inheritance_blocking_allowlists_and_uncertainty_are_not_unrestricted(self):
         for config, unknown in (
             ({"ip_restriction_default_action": "Deny", "scm_use_main_ip_restriction": True}, None),

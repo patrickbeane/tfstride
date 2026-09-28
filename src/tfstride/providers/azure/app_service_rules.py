@@ -464,7 +464,12 @@ class AzureAppServiceRuleDetectors:
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
             ingress = app_service_ingress(app, context, site="scm")
-            if not ingress.is_public or ingress.assessment.get("state") != "unrestricted":
+            # The aggregate state also proves broad access when SCM inheritance
+            # is unknown but both possible restriction sets are unrestricted.
+            unrestricted_family = ingress.assessment.get("state") == "unrestricted" or any(
+                cidr in {"0.0.0.0/0", "::/0"} for cidr in ingress.assessment.get("allowed_source_cidrs", [])
+            )
+            if not ingress.is_public or not unrestricted_family:
                 continue
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=ingress.is_public,
@@ -480,8 +485,9 @@ class AzureAppServiceRuleDetectors:
                     affected_resources=[app.address],
                     trust_boundary_id=None,
                     rationale=(
-                        f"{app.display_name} permits external requests through unrestricted SCM/Kudu access "
-                        "restrictions. The deployment endpoint exposes privileged application management "
+                        f"{app.display_name} permits SCM/Kudu requests from every source in at least one IP "
+                        "address family without access restrictions requiring particular request headers. "
+                        "The deployment endpoint exposes privileged application management "
                         "operations; authentication remains a separate access control."
                     ),
                     evidence=collect_evidence(
