@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, EvidenceItem, NormalizedResource
 from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
+from tfstride.providers.aws.resource_decoration.ecs_public_ingress import AwsEcsPublicIngressAssessment
 
 _Path = TypeVar("_Path", bound=Mapping[str, Any])
 
@@ -51,13 +52,13 @@ def internet_boundary_id(
 @dataclass(frozen=True, slots=True)
 class EcsPublicIngress:
     service_address: str
-    paths: tuple[dict[str, Any], ...]
+    paths: tuple[AwsEcsPublicIngressAssessment, ...]
 
     def current_workload_paths(self, paths: Iterable[_Path]) -> list[_Path]:
         task_addresses = {
             proof["task_definition_address"]
-            for path in self.paths
-            for proof in path["checks"]["container_binding"]["evidence"]
+            for assessment in self.paths
+            for proof in assessment.provider_record()["checks"]["container_binding"]["evidence"]
         }
         return [
             path
@@ -68,14 +69,14 @@ class EcsPublicIngress:
 
     @property
     def load_balancer_addresses(self) -> list[str]:
-        return path_string_values(self.paths, "load_balancer_address")
+        return path_string_values((item.provider_record() for item in self.paths), "load_balancer_address")
 
     @property
     def resource_addresses(self) -> list[str]:
         return list(
             dict.fromkeys(
                 path[key]
-                for path in self.paths
+                for path in (item.provider_record() for item in self.paths)
                 for key in (
                     "load_balancer_address",
                     "listener_address",
@@ -89,7 +90,7 @@ class EcsPublicIngress:
     def network_path(self) -> list[str]:
         return [
             line
-            for path in self.paths
+            for path in (item.provider_record() for item in self.paths)
             for line in (
                 f"internet reaches {path['load_balancer_address']} through {path['listener_address']} "
                 f"({path['listener_protocol']} TCP {path['listener_port']})",
@@ -103,7 +104,8 @@ class EcsPublicIngress:
     def evidence(self) -> list[EvidenceItem]:
         forwarding: list[str] = []
         permissions: list[str] = []
-        for path in self.paths:
+        for assessment in self.paths:
+            path = assessment.provider_record()
             forwarding.append(
                 "; ".join(
                     (

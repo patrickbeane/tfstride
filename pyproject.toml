@@ -66,6 +66,7 @@ include = [
   # Shared analysis contracts.
   "src/tfstride/analysis/indexes.py",
   "src/tfstride/analysis/preparation.py",
+  "src/tfstride/analysis/relationships.py",
   "src/tfstride/analysis/boundaries/types.py",
   "src/tfstride/analysis/boundaries/core.py",
   "src/tfstride/analysis/boundaries/shared.py",

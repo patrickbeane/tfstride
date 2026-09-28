@@ -8,12 +8,18 @@ from pathlib import Path
 from typing import Any
 
 from tests.providers.aws.test_aws_ecs_forwarding_associations import _chain, _resource
+from tfstride.analysis.relationships import RelationshipKind, RelationshipOutcome
 from tfstride.input.terraform_plan import load_terraform_plan
-from tfstride.models import TerraformResource
+from tfstride.models import TerraformReferenceProvenance, TerraformReferenceResolutionState, TerraformResource
 from tfstride.providers.aws.normalizer import AwsNormalizer
-from tfstride.providers.aws.resource_decoration.ecs_public_ingress import DeriveEcsPublicIngressStage
+from tfstride.providers.aws.resource_decoration.ecs_public_ingress import (
+    DeriveEcsPublicIngressStage,
+    evaluate_ecs_public_ingress,
+)
 from tfstride.providers.aws.resource_decorator import AwsResourceDecorator
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsResourceIndexBuilder
+from tfstride.providers.aws.security_group_traffic import AwsSecurityGroupTrafficIndex
 
 
 def _rule(port: int, *, peer: str | None = None, cidr: str | None = None, protocol: str = "tcp") -> dict[str, Any]:
@@ -77,6 +83,26 @@ def _facts(resources: list[TerraformResource]):
     return aws_facts(service)
 
 
+def _current_assessments(resources: list[TerraformResource]):
+    return tuple(
+        assessment
+        for assessment in _all_assessments(resources)
+        if assessment.relationship.outcome == RelationshipOutcome.ESTABLISHED
+    )
+
+
+def _all_assessments(resources: list[TerraformResource]):
+    inventory = AwsNormalizer().normalize(deepcopy(resources))
+    index = AwsResourceIndexBuilder().build(list(inventory.resources))
+    service = index.resources_by_address["aws_ecs_service.app"]
+    return evaluate_ecs_public_ingress(
+        service,
+        aws_facts(service).ecs_forwarding_associations,
+        index,
+        AwsSecurityGroupTrafficIndex(index),
+    )
+
+
 def _plan_resources(resources: list[TerraformResource], expressions: dict[str, Any]) -> list[TerraformResource]:
     declarations = [
         {"address": item.address, "type": item.resource_type, "name": item.name, "mode": item.mode}
@@ -117,6 +143,61 @@ def _plan_resources(resources: list[TerraformResource], expressions: dict[str, A
 
 
 class AwsEcsPublicIngressTests(unittest.TestCase):
+    def test_effective_ingress_is_exposed_as_a_typed_relationship(self) -> None:
+        assessment = _current_assessments(_resources())[0].relationship
+
+        self.assertEqual(assessment.kind, RelationshipKind.EFFECTIVE_INGRESS)
+        self.assertEqual(assessment.outcome, RelationshipOutcome.ESTABLISHED)
+        self.assertEqual((assessment.source_address, assessment.target_address), ("internet", "aws_ecs_service.app"))
+        self.assertEqual(
+            [(scope.name, scope.application_protocol, scope.from_port) for scope in assessment.traffic_scope],
+            [("internet_to_load_balancer", "HTTPS", 443), ("load_balancer_to_service", "HTTP", 8080)],
+        )
+        self.assertEqual(assessment.traffic_scope[0].source_cidrs, ("0.0.0.0/0",))
+        prerequisites = {item.name: item.outcome for item in assessment.prerequisites}
+        for name in (
+            "forwarding_association",
+            "container_binding",
+            "listener_ingress",
+            "load_balancer_egress",
+            "service_ingress",
+        ):
+            self.assertEqual(prerequisites[name], RelationshipOutcome.ESTABLISHED)
+        self.assertIn("aws_lb_listener.https", assessment.resource_scope.resource_addresses)
+        self.assertIn("aws_security_group.tasks", assessment.resource_scope.resource_addresses)
+
+    def test_typed_relationship_retains_conditions_and_localized_uncertainty(self) -> None:
+        resources = _resources()
+        listener = _get(resources, "aws_lb_listener.https")
+        listener.values["default_action"] = [{"type": "fixed-response"}]
+        resources.append(
+            _resource(
+                "aws_lb_listener_rule",
+                "app",
+                {
+                    "listener_arn": listener.address,
+                    "priority": 10,
+                    "condition": [{"path_pattern": [{"values": ["/app/*"]}]}],
+                    "action": [
+                        {"type": "authenticate-oidc"},
+                        {"type": "forward", "target_group_arn": "aws_lb_target_group.app"},
+                    ],
+                },
+            )
+        )
+        relationship = _all_assessments(resources)[0].relationship
+        self.assertEqual(relationship.outcome, RelationshipOutcome.ESTABLISHED)
+        self.assertTrue(any(item.startswith("listener_conditions=") for item in relationship.remaining_conditions))
+        self.assertTrue(any(item.startswith("authentication_actions=") for item in relationship.remaining_conditions))
+
+        resources = _resources()
+        _get(resources, "aws_lb.public").unknown_values = {"security_groups": True}
+        relationship = _all_assessments(resources)[0].relationship
+        self.assertEqual(relationship.outcome, RelationshipOutcome.UNKNOWN)
+        self.assertTrue(any("attachments" in reason for reason in relationship.uncertainties))
+        prerequisites = {item.name: item for item in relationship.prerequisites}
+        self.assertEqual(prerequisites["listener_ingress"].outcome, RelationshipOutcome.UNKNOWN)
+
     def test_https_listener_to_http_container_has_three_permission_proofs(self) -> None:
         facts = _facts(_resources())
         self.assertEqual(len(facts.ecs_public_ingress_paths), 1)
@@ -457,7 +538,19 @@ class AwsEcsPublicIngressTests(unittest.TestCase):
             "aws_security_group.alb": {"egress": [{"security_groups": tasks}]},
             "aws_security_group.tasks": {"ingress": [{"security_groups": alb}]},
         }
-        self.assertEqual(len(_facts(_plan_resources(resources, expressions)).ecs_public_ingress_paths), 1)
+        planned = _plan_resources(resources, expressions)
+        self.assertEqual(len(_facts(planned).ecs_public_ingress_paths), 1)
+        relationship = _current_assessments(planned)[0].relationship
+        symbolic = [
+            resolution
+            for resolution in relationship.reference_resolutions
+            if resolution.state == TerraformReferenceResolutionState.SYMBOLIC
+        ]
+        self.assertTrue(symbolic)
+        self.assertTrue(all(item.establishes_identity for item in symbolic))
+        self.assertTrue(
+            all(item.provenance == TerraformReferenceProvenance.CONFIGURATION_REFERENCE for item in symbolic)
+        )
         # An unknown port cannot be repaired by resolving the security-group identity.
         _get(resources, "aws_security_group.tasks").unknown_values["ingress"][0]["from_port"] = True
         self.assertEqual(

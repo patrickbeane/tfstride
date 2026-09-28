@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
 
 from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.aws.account_identity import AwsAccountIdentityIndex
-from tfstride.providers.aws.resource_decoration.ecs_public_ingress import current_ecs_public_ingress
+from tfstride.providers.aws.resource_decoration.ecs_public_ingress import (
+    AwsEcsPublicIngressAssessment,
+    current_ecs_public_ingress,
+)
 from tfstride.providers.aws.resource_index import (
     AwsReferenceRelationshipKey,
     AwsResourceIndex,
@@ -66,7 +68,7 @@ class AwsSecurityGroupRelationships:
 @dataclass(frozen=True, slots=True)
 class AwsAnalysisIndexes:
     security_group_relationships: AwsSecurityGroupRelationships
-    ecs_public_ingress: Mapping[str, tuple[dict[str, Any], ...]]
+    ecs_public_ingress: Mapping[str, tuple[AwsEcsPublicIngressAssessment, ...]]
 
     @property
     def account_identities(self) -> AwsAccountIdentityIndex:
