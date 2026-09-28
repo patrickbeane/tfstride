@@ -166,6 +166,12 @@ class AwsEcsPublicIngressTests(unittest.TestCase):
         self.assertIn("aws_lb_listener.https", assessment.resource_scope.resource_addresses)
         self.assertIn("aws_security_group.tasks", assessment.resource_scope.resource_addresses)
 
+    def test_provider_associations_do_not_fabricate_reference_resolution_evidence(self) -> None:
+        assessment = _current_assessments(_resources())[0].relationship
+
+        self.assertTrue(assessment.evidence_sources)
+        self.assertEqual(assessment.reference_resolutions, ())
+
     def test_typed_relationship_retains_conditions_and_localized_uncertainty(self) -> None:
         resources = _resources()
         listener = _get(resources, "aws_lb_listener.https")

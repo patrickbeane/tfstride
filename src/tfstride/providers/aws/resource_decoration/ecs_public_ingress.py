@@ -18,7 +18,7 @@ from tfstride.analysis.relationships import (
     RelationshipResourceScope,
     RelationshipTrafficScope,
 )
-from tfstride.models import NormalizedResource, TerraformReferenceProvenance, TerraformReferenceResolutionState
+from tfstride.models import NormalizedResource
 from tfstride.providers.aws.resource_decoration.ecs import evaluate_ecs_forwarding
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndex, resolve_aws_network_reference
@@ -418,27 +418,6 @@ def _reference_resolution_evidence(
             for resolution in source.reference_resolutions
             if target_address in {target.address for target in resolution.targets}
         ]
-        has_establishing_resolution = any(
-            len(resolution.targets) == 1
-            and (
-                resolution.state == TerraformReferenceResolutionState.RESOLVED
-                or (
-                    resolution.state == TerraformReferenceResolutionState.SYMBOLIC
-                    and resolution.provenance == TerraformReferenceProvenance.CONFIGURATION_REFERENCE
-                )
-            )
-            for resolution in matching
-        )
-        if not has_establishing_resolution:
-            records.append(
-                RelationshipReferenceResolution(
-                    source_address=source_address,
-                    target_addresses=(target_address,),
-                    expression_path=(),
-                    state=TerraformReferenceResolutionState.RESOLVED,
-                    provenance=TerraformReferenceProvenance.PLANNED_VALUE,
-                )
-            )
         records.extend(
             RelationshipReferenceResolution(
                 source_address=source_address,
