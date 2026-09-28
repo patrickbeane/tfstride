@@ -68,8 +68,8 @@ This run identified **6 trust boundaries** and **0 findings** across **28 normal
 
 - Source: `aws_iam_role.workload`
 - Target: `aws_lambda_function.processor`
-- Description: aws_iam_role.workload governs actions performed by aws_lambda_function.processor.
-- Rationale: IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.
+- Description: aws_lambda_function.processor uses aws_iam_role.workload as its runtime identity.
+- Rationale: The workload inherits permissions from the attached identity. This attachment does not establish authority to modify or operate the workload.
 
 ## Findings
 

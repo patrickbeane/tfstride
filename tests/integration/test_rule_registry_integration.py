@@ -560,6 +560,7 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             provider="aws",
             resource_type="aws_instance",
             name="worker",
+            arn="arn:aws:ec2:us-east-1:111122223333:instance/i-worker",
             category=ResourceCategory.COMPUTE,
             security_group_ids=["sg-worker"],
         )
@@ -577,6 +578,13 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
             name="deployer",
             arn="arn:aws:iam::111122223333:role/deployer",
             category=ResourceCategory.IAM,
+            policy_statements=[
+                IAMPolicyStatement(
+                    effect="Allow",
+                    actions=["ec2:ModifyInstanceAttribute"],
+                    resources=["arn:aws:ec2:us-east-1:111122223333:instance/i-worker"],
+                )
+            ],
             metadata={
                 "trust_statements": [
                     {
@@ -585,7 +593,9 @@ class RuleRegistryIntegrationTests(unittest.TestCase):
                         "narrowing_conditions": [],
                         "has_narrowing_conditions": False,
                     }
-                ]
+                ],
+                "iam_policy_completeness_state": "complete",
+                "iam_permissions_boundary_state": "not_configured",
             },
         )
         boundaries = [

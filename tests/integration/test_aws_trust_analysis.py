@@ -403,7 +403,10 @@ class AwsTrustAnalysisIntegrationTests(TFSIntegrationTestCase):
                                                 "Statement": [
                                                     {
                                                         "Effect": "Allow",
-                                                        "Action": "secretsmanager:GetSecretValue",
+                                                        "Action": [
+                                                            "lambda:UpdateFunctionCode",
+                                                            "secretsmanager:GetSecretValue",
+                                                        ],
                                                         "Resource": "*",
                                                     }
                                                 ],
@@ -503,8 +506,19 @@ class AwsTrustAnalysisIntegrationTests(TFSIntegrationTestCase):
             evidence["control_path"],
         )
         self.assertIn(
-            "aws_iam_role.deployer governs aws_lambda_function.deployer",
+            "aws_lambda_function.deployer uses aws_iam_role.deployer as its runtime identity",
             evidence["control_path"],
+        )
+        self.assertIn(
+            "aws_iam_role.deployer can operate aws_lambda_function.deployer with lambda:UpdateFunctionCode",
+            evidence["control_path"],
+        )
+        self.assertEqual(
+            evidence["workload_control_authority"],
+            [
+                "workload=aws_lambda_function.deployer; operation=lambda:UpdateFunctionCode; "
+                "statements=Allow actions=[lambda:UpdateFunctionCode, secretsmanager:GetSecretValue] resources=[*]"
+            ],
         )
         self.assertIn(
             "aws_lambda_function.deployer reaches aws_db_instance.customer",

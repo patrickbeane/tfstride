@@ -54,8 +54,8 @@ This run identified **4 trust boundaries** and **6 findings** across **13 normal
 
 - Source: `aws_iam_role.deployer`
 - Target: `aws_lambda_function.deployer`
-- Description: aws_iam_role.deployer governs actions performed by aws_lambda_function.deployer.
-- Rationale: IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.
+- Description: aws_lambda_function.deployer uses aws_iam_role.deployer as its runtime identity.
+- Rationale: The workload inherits permissions from the attached identity. This attachment does not establish authority to modify or operate the workload.
 
 ### `cross-account-or-role-access`
 

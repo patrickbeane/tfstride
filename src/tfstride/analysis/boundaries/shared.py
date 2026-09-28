@@ -60,6 +60,7 @@ def contribute_control_to_workload_boundary(
         BoundaryType.CONTROL_TO_WORKLOAD,
         attached_role.address,
         workload.address,
-        f"{attached_role.display_name} governs actions performed by {workload.display_name}.",
-        "IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.",
+        f"{workload.display_name} uses {attached_role.display_name} as its runtime identity.",
+        "The workload inherits permissions from the attached identity. This attachment does not establish authority "
+        "to modify or operate the workload.",
     )

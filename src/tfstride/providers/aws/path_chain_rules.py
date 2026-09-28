@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from fnmatch import fnmatchcase
+
 from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import (
     build_severity_reasoning,
     collect_evidence,
+    describe_policy_statement,
     evidence_item,
 )
 from tfstride.analysis.resource_concepts import (
@@ -17,6 +21,7 @@ from tfstride.analysis.rule_helpers import SubnetReferenceResolver, join_clauses
 from tfstride.models import (
     BoundaryType,
     Finding,
+    IAMPolicyStatement,
     NormalizedResource,
     ResourceInventory,
     SecurityGroupRule,
@@ -27,6 +32,7 @@ from tfstride.providers.aws.analysis_indexes import (
     AwsSecurityGroupRelationships,
     aws_analysis_indexes,
 )
+from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.policy_conditions import (
     describe_trust_narrowing_for_principal,
     trust_statement_has_effective_narrowing_for_principal,
@@ -34,6 +40,22 @@ from tfstride.providers.aws.policy_conditions import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.resource_helpers import describe_security_group_rule
+
+_WORKLOAD_CONTROL_OPERATIONS: dict[str, tuple[str, ...]] = {
+    "aws_instance": ("ec2:ModifyInstanceAttribute",),
+    "aws_lambda_function": (
+        "lambda:InvokeFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+    ),
+    "aws_ecs_service": ("ecs:UpdateService",),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkloadControlAuthority:
+    operation: str
+    matching_statements: tuple[str, ...]
 
 
 class AwsPathChainRuleDetectors:
@@ -133,19 +155,32 @@ class AwsPathChainRuleDetectors:
                         continue
 
                     chained_paths: list[
-                        tuple[NormalizedResource, TrustBoundary, NormalizedResource, TrustBoundary]
+                        tuple[
+                            NormalizedResource,
+                            TrustBoundary,
+                            tuple[_WorkloadControlAuthority, ...],
+                            NormalizedResource,
+                            TrustBoundary,
+                        ]
                     ] = []
                     for control_boundary in control_boundaries:
                         workload = inventory.get_by_address(control_boundary.target)
                         if workload is None:
                             continue
+                        control_authorities = _workload_control_authorities(role, workload)
+                        if not control_authorities:
+                            continue
                         for data_store, data_boundary in sensitive_data_paths.get(workload.address, []):
-                            chained_paths.append((workload, control_boundary, data_store, data_boundary))
+                            chained_paths.append(
+                                (workload, control_boundary, control_authorities, data_store, data_boundary)
+                            )
                     if not chained_paths:
                         continue
 
-                    workload_addresses = tuple(sorted({workload.address for workload, _, _, _ in chained_paths}))
-                    data_store_addresses = tuple(sorted({data_store.address for _, _, data_store, _ in chained_paths}))
+                    workload_addresses = tuple(sorted({workload.address for workload, _, _, _, _ in chained_paths}))
+                    data_store_addresses = tuple(
+                        sorted({data_store.address for _, _, _, data_store, _ in chained_paths})
+                    )
                     finding_key = (role.address, principal, workload_addresses, data_store_addresses)
                     if finding_key in seen:
                         continue
@@ -172,10 +207,10 @@ class AwsPathChainRuleDetectors:
                             ],
                             trust_boundary_id=trust_boundary.identifier if trust_boundary else None,
                             rationale=(
-                                f"{principal} can assume {role.display_name}, and that role governs workload paths into "
-                                f"{', '.join(data_store.display_name for data_store in sorted({data_store.address: data_store for _, _, data_store, _ in chained_paths}.values(), key=lambda resource: resource.address))}. "
-                                "A broad or foreign control-plane principal can therefore influence a workload that already "
-                                "retains sensitive secret or database access."
+                                f"{principal} can assume {role.display_name}, whose modeled permissions allow it to operate "
+                                f"{', '.join(workload.display_name for workload in sorted({workload.address: workload for workload, _, _, _, _ in chained_paths}.values(), key=lambda resource: resource.address))}. "
+                                "Those workloads use the role as their runtime identity and retain paths into "
+                                f"{', '.join(data_store.display_name for data_store in sorted({data_store.address: data_store for _, _, _, data_store, _ in chained_paths}.values(), key=lambda resource: resource.address))}."
                             ),
                             evidence=collect_evidence(
                                 evidence_item("trust_principals", [principal]),
@@ -189,20 +224,34 @@ class AwsPathChainRuleDetectors:
                                     [
                                         f"{principal} assumes {role.address}",
                                         *[
-                                            f"{control_boundary.source} governs {control_boundary.target}"
-                                            for _, control_boundary, _, _ in chained_paths
+                                            f"{control_boundary.target} uses {control_boundary.source} as its runtime identity"
+                                            for _, control_boundary, _, _, _ in chained_paths
+                                        ],
+                                        *[
+                                            f"{role.address} can operate {workload.address} with {authority.operation}"
+                                            for workload, _, authorities, _, _ in chained_paths
+                                            for authority in authorities
                                         ],
                                         *[
                                             f"{data_boundary.source} reaches {data_boundary.target}"
-                                            for _, _, _, data_boundary in chained_paths
+                                            for _, _, _, _, data_boundary in chained_paths
                                         ],
+                                    ],
+                                ),
+                                evidence_item(
+                                    "workload_control_authority",
+                                    [
+                                        f"workload={workload.address}; operation={authority.operation}; "
+                                        f"statements={'; '.join(authority.matching_statements)}"
+                                        for workload, _, authorities, _, _ in chained_paths
+                                        for authority in authorities
                                     ],
                                 ),
                                 evidence_item(
                                     "boundary_rationale",
                                     [
-                                        *[control_boundary.rationale for _, control_boundary, _, _ in chained_paths],
-                                        *[data_boundary.rationale for _, _, _, data_boundary in chained_paths],
+                                        *[control_boundary.rationale for _, control_boundary, _, _, _ in chained_paths],
+                                        *[data_boundary.rationale for _, _, _, _, data_boundary in chained_paths],
                                     ],
                                 ),
                                 evidence_item(
@@ -317,6 +366,63 @@ def _control_workload_boundaries_by_role(
             continue
         boundaries_by_role.setdefault(boundary.source, []).append(boundary)
     return boundaries_by_role
+
+
+def _workload_control_authorities(
+    role: NormalizedResource,
+    workload: NormalizedResource,
+) -> tuple[_WorkloadControlAuthority, ...]:
+    operations = _WORKLOAD_CONTROL_OPERATIONS.get(workload.resource_type, ())
+    role_facts = aws_facts(role)
+    if (
+        not operations
+        or role_facts.iam_policy_completeness_state != "complete"
+        or role_facts.unresolved_attached_policy_arns
+        or permissions_boundary_uncertainties(role, authority="workload control")
+    ):
+        return ()
+
+    authorities: list[_WorkloadControlAuthority] = []
+    for operation in operations:
+        matching_allows = [
+            statement
+            for statement in role.policy_statements
+            if statement.effect.casefold() == "allow"
+            and not statement.conditions
+            and _statement_matches_workload_control(statement, operation, workload)
+        ]
+        if not matching_allows:
+            continue
+        if any(
+            statement.effect.casefold() == "deny"
+            and _statement_matches_workload_control(statement, operation, workload)
+            for statement in role.policy_statements
+        ):
+            continue
+        authorities.append(
+            _WorkloadControlAuthority(
+                operation=operation,
+                matching_statements=tuple(describe_policy_statement(statement) for statement in matching_allows),
+            )
+        )
+    return tuple(authorities)
+
+
+def _statement_matches_workload_control(
+    statement: IAMPolicyStatement,
+    operation: str,
+    workload: NormalizedResource,
+) -> bool:
+    return any(
+        fnmatchcase(operation.casefold(), action.strip().casefold()) for action in statement.actions if action.strip()
+    ) and any(_resource_scope_matches_workload(resource, workload) for resource in statement.resources)
+
+
+def _resource_scope_matches_workload(resource_pattern: str, workload: NormalizedResource) -> bool:
+    normalized = resource_pattern.strip()
+    if normalized == "*":
+        return True
+    return workload.arn is not None and fnmatchcase(workload.arn, normalized)
 
 
 def _is_hidden_data_store(resource: NormalizedResource) -> bool:

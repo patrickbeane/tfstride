@@ -408,7 +408,14 @@ class AwsResourceLocalTrustTests(unittest.TestCase):
                         "name": "secret",
                         "policy": {
                             "Statement": [
-                                {"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": "*"}
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lambda:UpdateFunctionCode",
+                                        "secretsmanager:GetSecretValue",
+                                    ],
+                                    "Resource": "*",
+                                }
                             ],
                         },
                     }

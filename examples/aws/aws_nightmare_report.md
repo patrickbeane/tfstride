@@ -135,8 +135,8 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 
 - Source: `aws_iam_role.app`
 - Target: `aws_lambda_function.processor`
-- Description: aws_iam_role.app governs actions performed by aws_lambda_function.processor.
-- Rationale: IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.
+- Description: aws_lambda_function.processor uses aws_iam_role.app as its runtime identity.
+- Rationale: The workload inherits permissions from the attached identity. This attachment does not establish authority to modify or operate the workload.
 
 ### `workload-to-data-store`
 
@@ -163,8 +163,8 @@ This run identified **19 trust boundaries** and **25 findings** across **25 norm
 
 - Source: `aws_iam_role.pipeline`
 - Target: `aws_lambda_function.deployer`
-- Description: aws_iam_role.pipeline governs actions performed by aws_lambda_function.deployer.
-- Rationale: IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.
+- Description: aws_lambda_function.deployer uses aws_iam_role.pipeline as its runtime identity.
+- Rationale: The workload inherits permissions from the attached identity. This attachment does not establish authority to modify or operate the workload.
 
 ### `cross-account-or-role-access`
 

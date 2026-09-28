@@ -79,8 +79,8 @@ This run identified **6 trust boundaries** and **12 findings** across **23 norma
 
 - Source: `aws_iam_role.task`
 - Target: `aws_ecs_service.app`
-- Description: aws_iam_role.task governs actions performed by aws_ecs_service.app.
-- Rationale: IAM configuration acts as a control-plane boundary because the workload inherits whatever privileges the role carries.
+- Description: aws_ecs_service.app uses aws_iam_role.task as its runtime identity.
+- Rationale: The workload inherits permissions from the attached identity. This attachment does not establish authority to modify or operate the workload.
 
 ## Findings
 
