@@ -65,18 +65,15 @@ class AwsNetworkDataRuleDetectors:
             if direct_internet_reachable:
                 boundary = boundary_index.get((BoundaryType.INTERNET_TO_SERVICE, "internet", database.address))
             elif public_tier_rules:
-                first_public_workload = sorted(
-                    {workload.address for _, _, workloads in public_tier_rules for workload in workloads}
-                )[0]
-                boundary = boundary_index.get(
-                    (BoundaryType.WORKLOAD_TO_DATA_STORE, first_public_workload, database.address)
+                boundary = _select_workload_to_database_boundary(
+                    boundary_index,
+                    database.address,
+                    (
+                        workload.address
+                        for _, _, matched_workloads in public_tier_rules
+                        for workload in matched_workloads
+                    ),
                 )
-            if boundary is None and database.vpc_id:
-                public_private_boundary = next(
-                    (item for item in boundary_index.values() if item.boundary_type == BoundaryType.PUBLIC_TO_PRIVATE),
-                    None,
-                )
-                boundary = public_private_boundary
             severity_reasoning = build_severity_reasoning(
                 internet_exposure=bool(internet_rules or public_tier_rules or direct_internet_reachable),
                 privilege_breadth=0,

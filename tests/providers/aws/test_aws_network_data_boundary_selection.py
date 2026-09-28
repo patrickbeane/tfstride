@@ -5,7 +5,17 @@ from collections.abc import Iterable
 from itertools import permutations
 
 from tfstride.analysis.rule_definitions import BoundaryIndex
-from tfstride.models import BoundaryType, TrustBoundary
+from tfstride.analysis.rule_registry import RulePolicy
+from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.models import (
+    BoundaryType,
+    Finding,
+    NormalizedResource,
+    ResourceCategory,
+    ResourceInventory,
+    SecurityGroupRule,
+    TrustBoundary,
+)
 from tfstride.providers.aws.network_data_rules import _select_workload_to_database_boundary
 
 _DATABASE = "module.data.aws_db_instance.app"
@@ -31,6 +41,97 @@ def _boundary(
 
 def _boundary_index(boundaries: Iterable[TrustBoundary]) -> BoundaryIndex:
     return {(boundary.boundary_type, boundary.source, boundary.target): boundary for boundary in boundaries}
+
+
+def _resource(
+    address: str,
+    resource_type: str,
+    category: ResourceCategory,
+    *,
+    identifier: str | None = None,
+    vpc_id: str | None = None,
+    security_group_ids: tuple[str, ...] = (),
+    network_rules: tuple[SecurityGroupRule, ...] = (),
+    public_exposure: bool = False,
+) -> NormalizedResource:
+    return NormalizedResource(
+        address=address,
+        provider="aws",
+        resource_type=resource_type,
+        name=address.rsplit(".", 1)[-1],
+        category=category,
+        identifier=identifier,
+        vpc_id=vpc_id,
+        security_group_ids=security_group_ids,
+        network_rules=network_rules,
+        public_exposure=public_exposure,
+        provider_config_key="aws.default",
+    )
+
+
+def _database_exposure_resources(
+    *workload_addresses: str,
+) -> tuple[list[NormalizedResource], NormalizedResource]:
+    source_groups = [
+        _resource(
+            f"aws_security_group.source_{index}",
+            "aws_security_group",
+            ResourceCategory.NETWORK,
+            identifier=f"sg-source-{index}",
+            vpc_id="vpc-shared",
+        )
+        for index, _ in enumerate(workload_addresses)
+    ]
+    workloads = [
+        _resource(
+            address,
+            "aws_instance",
+            ResourceCategory.COMPUTE,
+            vpc_id="vpc-shared",
+            security_group_ids=(source_group.identifier or "",),
+            public_exposure=True,
+        )
+        for address, source_group in zip(workload_addresses, source_groups, strict=True)
+    ]
+    database_group = _resource(
+        "aws_security_group.database",
+        "aws_security_group",
+        ResourceCategory.NETWORK,
+        identifier="sg-database",
+        vpc_id="vpc-shared",
+        network_rules=(
+            SecurityGroupRule(
+                direction="ingress",
+                protocol="tcp",
+                from_port=5432,
+                to_port=5432,
+                referenced_security_group_ids=[group.identifier or "" for group in source_groups],
+            ),
+        ),
+    )
+    database = _resource(
+        _DATABASE,
+        "aws_db_instance",
+        ResourceCategory.DATA,
+        identifier="database",
+        vpc_id="vpc-shared",
+        security_group_ids=("sg-database",),
+    )
+    return [*source_groups, *workloads, database_group, database], database
+
+
+def _database_exposure_finding(
+    resources: list[NormalizedResource],
+    boundaries: Iterable[TrustBoundary],
+) -> Finding:
+    findings = StrideRuleEngine().evaluate(
+        ResourceInventory(provider="aws", resources=resources),
+        list(boundaries),
+        rule_policy=RulePolicy(enabled_rule_ids=frozenset({"aws-database-permissive-ingress"})),
+    )
+    if len(findings) != 1:
+        raise AssertionError(f"Expected one database exposure finding, received {len(findings)}")
+    return findings[0]
 
 
 class AwsWorkloadToDatabaseBoundarySelectionTests(unittest.TestCase):
@@ -120,6 +221,90 @@ class AwsWorkloadToDatabaseBoundarySelectionTests(unittest.TestCase):
         )
 
         self.assertIs(selected, first)
+
+
+class AwsDatabaseExposureBoundaryAttributionTests(unittest.TestCase):
+    def test_unrelated_boundaries_are_not_attributed_and_finding_remains(self) -> None:
+        resources, database = _database_exposure_resources(_WORKLOAD)
+        resources.extend(
+            (
+                _resource(
+                    "aws_subnet.public_same_vpc",
+                    "aws_subnet",
+                    ResourceCategory.NETWORK,
+                    identifier="subnet-public-same-vpc",
+                    vpc_id="vpc-shared",
+                ),
+                _resource(
+                    "aws_subnet.private_same_vpc",
+                    "aws_subnet",
+                    ResourceCategory.NETWORK,
+                    identifier="subnet-private-same-vpc",
+                    vpc_id="vpc-shared",
+                ),
+                _resource(
+                    "aws_subnet.public_other_vpc",
+                    "aws_subnet",
+                    ResourceCategory.NETWORK,
+                    identifier="subnet-public-other-vpc",
+                    vpc_id="vpc-other",
+                ),
+                _resource(
+                    "aws_subnet.private_other_vpc",
+                    "aws_subnet",
+                    ResourceCategory.NETWORK,
+                    identifier="subnet-private-other-vpc",
+                    vpc_id="vpc-other",
+                ),
+            )
+        )
+        unrelated_boundaries = (
+            _boundary(
+                "aws_subnet.public_same_vpc",
+                "aws_subnet.private_same_vpc",
+                boundary_type=BoundaryType.PUBLIC_TO_PRIVATE,
+                identifier="same-vpc-subnet-boundary",
+            ),
+            _boundary(
+                "aws_subnet.public_other_vpc",
+                "aws_subnet.private_other_vpc",
+                boundary_type=BoundaryType.PUBLIC_TO_PRIVATE,
+                identifier="other-vpc-subnet-boundary",
+            ),
+            _boundary(
+                _WORKLOAD,
+                "aws_db_instance.unrelated",
+                identifier="wrong-database-boundary",
+            ),
+        )
+
+        for ordered_boundaries in (unrelated_boundaries, tuple(reversed(unrelated_boundaries))):
+            for ordered_resources in (resources, list(reversed(resources))):
+                with self.subTest(
+                    boundary_order=[boundary.identifier for boundary in ordered_boundaries],
+                    resource_order=[resource.address for resource in ordered_resources],
+                ):
+                    finding = _database_exposure_finding(ordered_resources, ordered_boundaries)
+
+                    self.assertIn(database.address, finding.affected_resources)
+                    self.assertIsNone(finding.trust_boundary_id)
+
+    def test_selects_matching_boundary_for_later_matched_workload(self) -> None:
+        first_workload = "aws_instance.alpha"
+        later_workload = "aws_instance.zeta"
+        resources, _ = _database_exposure_resources(first_workload, later_workload)
+        matching = _boundary(later_workload, _DATABASE, identifier="later-workload-boundary")
+        unrelated = _boundary(first_workload, "aws_db_instance.unrelated", identifier="unrelated-boundary")
+
+        for ordered_boundaries in ((unrelated, matching), (matching, unrelated)):
+            for ordered_resources in (resources, list(reversed(resources))):
+                with self.subTest(
+                    boundary_order=[boundary.identifier for boundary in ordered_boundaries],
+                    resource_order=[resource.address for resource in ordered_resources],
+                ):
+                    finding = _database_exposure_finding(ordered_resources, ordered_boundaries)
+
+                    self.assertEqual(finding.trust_boundary_id, matching.identifier)
 
 
 if __name__ == "__main__":
