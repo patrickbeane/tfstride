@@ -5,6 +5,8 @@ from collections.abc import Mapping, Sequence
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import STATE_CONFIGURED, dedupe
+from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_evaluation import gcs_path_permissions
 from tfstride.providers.gcp.kms_dependency_evidence import (
     GcpKmsEncryptionDependency,
 )
@@ -13,6 +15,7 @@ from tfstride.providers.gcp.protected_data_evidence import (
     GcpCloudRunGcsAccessPath,
     GcpCloudRunGcsProtectedDataConvergence,
 )
+from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import current_cloud_run_gcs_access_paths
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
@@ -23,27 +26,8 @@ from tfstride.providers.gcp.resource_types import (
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
-from tfstride.providers.gcp.resource_utils import binding_members
 
 _DECRYPT_PERMISSION = "cloudkms.cryptoKeyVersions.useToDecrypt"
-_GCS_PAYLOAD_READ_ROLES = frozenset(
-    {
-        "roles/storage.objectViewer",
-        "roles/storage.objectUser",
-        "roles/storage.objectAdmin",
-        "roles/storage.admin",
-        "roles/editor",
-        "roles/owner",
-    }
-)
-_GCS_PAYLOAD_READ_PERMISSIONS = frozenset(
-    {
-        "*",
-        "storage.*",
-        "storage.objects.*",
-        "storage.objects.get",
-    }
-)
 _KMS_IAM_RESOURCE_TYPES = (
     GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES | GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES
 )
@@ -86,6 +70,8 @@ def _protected_data_convergences(
         *facts.cloud_run_kms_operation_path_uncertainties,
     ]
     convergences: list[GcpCloudRunGcsProtectedDataConvergence] = []
+    resources = list(resources_by_address.values())
+    current_paths = current_cloud_run_gcs_access_paths(workload, resources, build_gcp_custom_role_index(resources))
 
     for access_path in facts.cloud_run_gcs_access_paths:
         if not _potential_payload_read(access_path):
@@ -119,6 +105,7 @@ def _protected_data_convergences(
             workload,
             bucket,
             resources_by_address,
+            current_paths,
         ):
             if dependencies:
                 uncertainties.append(
@@ -164,9 +151,7 @@ def _protected_data_convergences(
 
 
 def _potential_payload_read(path: GcpCloudRunGcsAccessPath) -> bool:
-    if path["role"] in _GCS_PAYLOAD_READ_ROLES:
-        return True
-    return bool(_GCS_PAYLOAD_READ_PERMISSIONS.intersection(path["matched_permissions"]))
+    return "storage.objects.get" in gcs_path_permissions(path)
 
 
 def _deterministic_payload_read(
@@ -174,6 +159,7 @@ def _deterministic_payload_read(
     workload: NormalizedResource,
     bucket: NormalizedResource,
     resources_by_address: Mapping[str, NormalizedResource],
+    current_paths: list[GcpCloudRunGcsAccessPath],
 ) -> bool:
     workload_facts = gcp_facts(workload)
     service_account_email = workload_facts.service_account_email
@@ -196,28 +182,15 @@ def _deterministic_payload_read(
         and path["bucket_project"] == bucket_facts.project
         and iam_resource is not None
         and iam_resource.provider == "gcp"
-        and iam_resource.resource_type in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
-        and _access_binding_matches_current_bucket(path, bucket)
-        and path["grant_basis"] == "storage_bucket_iam"
+        and iam_resource.resource_type in (GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES | GCP_PROJECT_IAM_RESOURCE_TYPES)
+        and path in current_paths
+        and path["grant_basis"] in {"storage_bucket_iam", "storage_project_iam"}
         and path["resource_scope"] == "exact_bucket"
         and path["condition"] is None
         and path["condition_state"] == "not_configured"
         and path["access_state"] == "granted"
         and "read" in path["access_classes"]
         and _potential_payload_read(path)
-    )
-
-
-def _access_binding_matches_current_bucket(
-    path: GcpCloudRunGcsAccessPath,
-    bucket: NormalizedResource,
-) -> bool:
-    return any(
-        binding.get("source") == path["iam_resource_address"]
-        and binding.get("role") == path["role"]
-        and path["service_account_member"] in binding_members(binding)
-        and not isinstance(binding.get("condition"), Mapping)
-        for binding in gcp_facts(bucket).bindings
     )
 
 

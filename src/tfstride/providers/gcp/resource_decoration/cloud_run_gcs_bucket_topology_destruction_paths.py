@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
     gcs_bucket_scope_name,
     gcs_bucket_target_matches,
@@ -121,6 +122,7 @@ class ModelCloudRunGcsBucketTopologyDestructionPathsStage:
         iam_resources = _iam_resources(resources)
         custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
+        grant_context = GcsGrantConstraintContext.build(resources)
 
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
@@ -132,6 +134,7 @@ class ModelCloudRunGcsBucketTopologyDestructionPathsStage:
                 context,
                 custom_roles,
                 project_organizations,
+                grant_context,
             )
             uncertainties.extend(f"{workload.address}: {message}" for message in target_uncertainties)
             facts = gcp_facts(workload)
@@ -162,6 +165,7 @@ def current_cloud_run_gcs_bucket_topology_destruction_paths(
         context,
         build_gcp_custom_role_index(resources),
         _project_organizations(resources),
+        GcsGrantConstraintContext.build(resources),
     )
     return paths
 
@@ -173,6 +177,7 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
     context: GcpDecorationContext,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
+    grant_context: GcsGrantConstraintContext,
 ) -> tuple[list[GcpCloudRunGcsBucketTopologyDestructionPath], list[str]]:
     workload_facts = gcp_facts(workload)
     service_account_email = _known_string(workload_facts.service_account_email)
@@ -256,6 +261,13 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
                 if role_evidence is None:
                     if role_uncertainty is not None:
                         uncertainties.append(f"{workload.address}: {source} {role_uncertainty}")
+                    continue
+
+                compatible, problems = evaluate_gcs_operation_constraints(
+                    service_account_member, target.resource, source, role, _DELETE_BUCKET, grant_context
+                )
+                uncertainties.extend(f"{workload.address}: {problem}" for problem in problems)
+                if not compatible:
                     continue
 
                 role_key = _role_reconciliation_key(role, custom_roles)

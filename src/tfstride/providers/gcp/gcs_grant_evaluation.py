@@ -14,11 +14,17 @@ from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint, gcs_permission_constraints
-from tfstride.providers.gcp.gcs_project_grants import project_grant_candidates, project_reference_index
+from tfstride.providers.gcp.gcs_project_grants import (
+    bucket_grant_candidates,
+    project_grant_candidates,
+    project_reference_index,
+)
 from tfstride.providers.gcp.protected_data_evidence import GcpGcsAccessClass, GcpGcsAccessState
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 from tfstride.providers.gcp.resource_types import GcpResourceType
 from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, binding_members, gcp_reference_key
+from tfstride.providers.resource_reference_index import ResourceReferenceIndex
 
 if TYPE_CHECKING:
     from tfstride.providers.gcp.custom_roles import GcpCustomRoleIndex
@@ -88,6 +94,70 @@ class _GcsRoleAccess:
     matched_permissions: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class GcsGrantConstraintContext:
+    """Indexes scoped to one evaluation; callers rebuild after input mutations."""
+
+    resources: tuple[NormalizedResource, ...]
+    index: GcpResourceIndex
+    projects: ResourceReferenceIndex
+    deny_policies: tuple[NormalizedResource, ...]
+
+    @classmethod
+    def build(cls, resources: Sequence[NormalizedResource]) -> GcsGrantConstraintContext:
+        return cls(
+            tuple(resources),
+            GcpResourceIndexBuilder().build(list(resources)),
+            project_reference_index(resources),
+            tuple(
+                sorted(
+                    (item for item in resources if item.resource_type == GcpResourceType.IAM_DENY_POLICY),
+                    key=lambda item: item.address,
+                )
+            ),
+        )
+
+    def bindings(self, principal: str, bucket: NormalizedResource) -> tuple[list[dict[str, object]], list[str]]:
+        local, local_problems = bucket_grant_candidates(principal, bucket, self.resources, self.index)
+        inherited, problems = project_grant_candidates(principal, bucket, self.resources, self.projects)
+        return [*local, *inherited], [*local_problems, *problems]
+
+
+def evaluate_gcs_operation_constraints(
+    principal: str,
+    bucket: NormalizedResource,
+    source_address: str,
+    role: str,
+    permission: str,
+    context: GcsGrantConstraintContext,
+) -> tuple[bool, list[str]]:
+    """Require a current scoped grant and compatible denies for a proven role operation.
+
+    The caller must independently establish that this role grants this exact
+    permission, including custom-role lifecycle. This query can only constrain
+    that proof; an IAM binding by itself never proves a role's permissions.
+    """
+    bindings, problems = context.bindings(principal, bucket)
+    if not any(
+        binding.get("source") == source_address
+        and binding.get("role") == role
+        and binding.get("condition") in (None, {}, [])
+        and binding.get("condition_state") in (None, "not_configured")
+        for binding in bindings
+    ):
+        return False, [
+            *problems,
+            f"{source_address} for {bucket.address}: unconditional scoped grant for {permission} is not established",
+        ]
+    decisions = gcs_permission_constraints(principal, permission, bucket, context.deny_policies, context.projects)
+    if any(decision["state"] == "denied" for decision in decisions):
+        return False, []
+    return not decisions, [
+        f"{decision['policy_address']} for {bucket.address}: {permission}: {decision['reason']}"
+        for decision in decisions
+    ]
+
+
 def evaluate_gcs_bucket_grants(
     principal: str,
     buckets: Sequence[NormalizedResource],
@@ -102,18 +172,14 @@ def evaluate_gcs_bucket_grants(
     """
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
-    projects = project_reference_index(resources)
-    deny_policies = sorted(
-        (resource for resource in resources if resource.resource_type == GcpResourceType.IAM_DENY_POLICY),
-        key=lambda resource: resource.address,
-    )
+    context = GcsGrantConstraintContext.build(resources)
     seen: set[tuple[str, str, str, str]] = set()
     for bucket in buckets:
         if bucket.resource_type != GcpResourceType.STORAGE_BUCKET:
             continue
-        inherited, problems = project_grant_candidates(principal, bucket, resources, projects)
+        bindings, problems = context.bindings(principal, bucket) if resources else (gcp_facts(bucket).bindings, [])
         uncertainties.extend(problems)
-        for binding in [*gcp_facts(bucket).bindings, *inherited]:
+        for binding in bindings:
             if principal not in binding_members(binding):
                 continue
             role = _known_string(binding.get("role"))
@@ -150,13 +216,15 @@ def evaluate_gcs_bucket_grants(
                 continue
             seen.add(fingerprint)
             constraints: list[GcsPermissionConstraint] = []
-            if deny_policies:
+            if context.deny_policies:
                 # Keep decisions at permission granularity. Denying delete must not
                 # erase independent create authority (nor vice versa).
                 permissions = _modeled_permissions(role, role_access)
                 surviving: list[str] = []
                 for permission in permissions:
-                    decisions = gcs_permission_constraints(principal, permission, bucket, deny_policies, projects)
+                    decisions = gcs_permission_constraints(
+                        principal, permission, bucket, context.deny_policies, context.projects
+                    )
                     constraints.extend(decisions)
                     if not decisions:
                         surviving.append(permission)
@@ -212,6 +280,25 @@ def _modeled_permissions(role: str, access: _GcsRoleAccess) -> tuple[str, ...]:
         elif access_class == "administrative":
             permissions.append("storage.objects.setIamPolicy")
     return tuple(sorted(permissions))
+
+
+def gcs_path_permissions(path: Mapping[str, object]) -> tuple[str, ...]:
+    """Read evaluated operation scope without widening role evidence.
+
+    Scope remains available for conditional alternatives. Consumers must also
+    establish that the grant is current and unconditional before claiming access.
+    """
+    matched = path.get("matched_permissions")
+    if isinstance(matched, list) and matched:
+        permissions = tuple(value for value in matched if isinstance(value, str))
+        if any(value in {"*", "storage.*", "storage.objects.*"} for value in permissions):
+            return tuple(sorted(_READ_PERMISSIONS | _WRITE_PERMISSIONS | _DELETE_PERMISSIONS | _ADMIN_PERMISSIONS))
+        return permissions
+    role = path.get("role")
+    access = _BUILT_IN_ROLE_ACCESS.get(role) if isinstance(role, str) else None
+    if access is None or not isinstance(role, str):
+        return ()
+    return _modeled_permissions(role, _GcsRoleAccess(*access))
 
 
 def _role_access(role: str, custom_roles: GcpCustomRoleIndex) -> _GcsRoleAccess | None:

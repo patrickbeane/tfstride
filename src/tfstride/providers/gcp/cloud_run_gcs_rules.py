@@ -20,6 +20,11 @@ from tfstride.providers.gcp.cloud_run_public_invocation import (
     current_cloud_run_public_invokers,
 )
 from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_evaluation import (
+    GcsGrantConstraintContext,
+    evaluate_gcs_operation_constraints,
+    gcs_path_permissions,
+)
 from tfstride.providers.gcp.iam_reference_utils import (
     custom_role_reference_keys,
     gcs_bucket_target_matches,
@@ -62,6 +67,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
             return []
 
         current_resources = list(context.inventory.resources)
+        grant_context = GcsGrantConstraintContext.build(current_resources)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = current_cloud_run_public_invokers(
@@ -75,7 +81,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
             paths = [
                 path
                 for path in gcp_facts(workload).cloud_run_gcs_object_deletion_paths
-                if _is_current_object_deletion_path(path, workload, context)
+                if _is_current_object_deletion_path(path, workload, context, grant_context)
             ]
             if not paths:
                 continue
@@ -313,7 +319,7 @@ def _mutation_rationale(
 def _mutation_impact(mutation_classes: list[str]) -> str:
     impacts = {
         "write": "writing objects",
-        "administrative": "changing bucket or object controls",
+        "administrative": "changing object access controls",
     }
     values = [impacts[access_class] for access_class in mutation_classes]
     if len(values) == 1:
@@ -329,7 +335,7 @@ def _has_deterministic_read_access(
         path.get("bucket_address") in bucket_addresses
         and path.get("access_state") == "granted"
         and path.get("condition_state") == "not_configured"
-        and "read" in _string_values(path.get("access_classes"))
+        and "storage.objects.get" in gcs_path_permissions(path)
         for path in paths
     )
 
@@ -340,10 +346,27 @@ def _mutation_classes(paths: Sequence[Mapping[str, Any]]) -> list[str]:
 
 
 def _path_mutation_classes(path: Mapping[str, Any]) -> list[str]:
+    permissions = gcs_path_permissions(path)
     return [
         access_class
         for access_class in _string_values(path.get("access_classes"))
         if access_class in _MUTATION_ACCESS_CLASSES
+        and (
+            access_class == "write"
+            and any(
+                permission in permissions
+                for permission in (
+                    "storage.objects.create",
+                    "storage.objects.update",
+                    "storage.objects.compose",
+                    "storage.objects.move",
+                    "storage.objects.restore",
+                    "storage.objects.rewrite",
+                )
+            )
+            or access_class == "administrative"
+            and "storage.objects.setIamPolicy" in permissions
+        )
     ]
 
 
@@ -380,6 +403,7 @@ def _mutation_path_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
                     f"role_kind={path['role_kind']}",
                     f"mutation_classes={','.join(_path_mutation_classes(path))}",
                     f"access_classes={','.join(_string_values(path.get('access_classes')))}",
+                    f"operations={','.join(gcs_path_permissions(path))}",
                     f"matched_permissions={','.join(_string_values(path.get('matched_permissions'))) or 'built-in-role'}",
                     "resource_scope=exact_bucket",
                     "access_state=granted",
@@ -434,6 +458,7 @@ def _is_current_object_deletion_path(
     path: GcpCloudRunGcsObjectDeletionPath,
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    grant_context: GcsGrantConstraintContext,
 ) -> bool:
     if (
         path.get("workload_address") != workload.address
@@ -488,7 +513,9 @@ def _is_current_object_deletion_path(
         return False
     if not _recovery_evidence_is_current(path, bucket):
         return False
-    return True
+    return evaluate_gcs_operation_constraints(
+        member, bucket, source.address, path["role"], _DELETE_PERMISSION, grant_context
+    )[0]
 
 
 def _is_exact_service_account_identity(email: str | None, member: str | None) -> bool:

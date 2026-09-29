@@ -13,6 +13,7 @@ from tfstride.providers.coercion import (
     dedupe_strings,
 )
 from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
     gcs_bucket_scope_name,
     gcs_bucket_target_matches,
@@ -166,6 +167,7 @@ def _cloud_run_gcs_object_deletion_paths(
 
     paths: list[GcpCloudRunGcsObjectDeletionPath] = []
     uncertainties: list[str] = []
+    grant_context = GcsGrantConstraintContext.build(tuple(resources_by_address.values()))
     for bucket in buckets:
         bucket_name = _bucket_name(bucket)
         bucket_project = normalize_gcp_project(gcp_facts(bucket).project)
@@ -188,6 +190,12 @@ def _cloud_run_gcs_object_deletion_paths(
         lifecycle_state, recovery_evidence = _recovery_evidence(bucket)
         for candidate in candidates:
             if candidate.authorization_state != "granted" or candidate.management_state != "unambiguous":
+                continue
+            compatible, problems = evaluate_gcs_operation_constraints(
+                member, bucket, candidate.source_address, candidate.role, _DELETE_PERMISSION, grant_context
+            )
+            uncertainties.extend(f"{workload.address}: {problem}" for problem in problems)
+            if not compatible:
                 continue
             paths.extend(
                 _path_records(

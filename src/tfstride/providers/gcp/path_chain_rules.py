@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, TrustBoundary
 from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_evaluation import gcs_path_permissions
 from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import current_cloud_run_gcs_access_paths
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
@@ -173,23 +174,9 @@ def _exact_cloud_run_gcs_read_state(
     return any(
         path.get("access_state") == "granted"
         and path.get("condition_state") == "not_configured"
-        and "read" in _string_list(path.get("access_classes"))
-        and (
-            not path.get("matched_permissions")
-            or "storage.objects.get" in _string_list(path.get("matched_permissions"))
-            or any(
-                value in {"*", "storage.*", "storage.objects.*"}
-                for value in _string_list(path.get("matched_permissions"))
-            )
-        )
+        and "storage.objects.get" in gcs_path_permissions(path)
         for path in matching_paths
     )
-
-
-def _string_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str) and item]
 
 
 def _has_nonempty_strings(path: dict[str, Any], *keys: str) -> bool:
