@@ -6,7 +6,7 @@ from itertools import permutations
 from unittest.mock import patch
 
 from tests.helpers.paths import FIXTURES_DIR
-from tfstride.analysis.boundaries.types import BoundaryAccumulator, BoundarySupport
+from tfstride.analysis.boundaries.types import BoundaryAccumulator, BoundaryAssessmentScope, BoundarySupport
 from tfstride.analysis.relationships import (
     RelationshipAssessment,
     RelationshipKind,
@@ -35,10 +35,28 @@ def _assessment() -> RelationshipAssessment:
 
 
 def _add(accumulator: BoundaryAccumulator, support: BoundarySupport) -> None:
-    accumulator.add_boundary(*EDGE, support.description, support.rationale, assessment=support.assessment)
+    accumulator.add_boundary(
+        *EDGE,
+        support.description,
+        support.rationale,
+        assessment=support.assessment,
+        assessment_scope=support.assessment_scope,
+    )
 
 
 class BoundarySupportTests(unittest.TestCase):
+    def test_path_crossing_is_distinct_from_whole_relationship_support(self) -> None:
+        support = BoundarySupport("Public entry", "Verified path", _assessment())
+        crossing = replace(support, assessment_scope="path_crossing")
+        snapshots = []
+        for ordering in ((support, crossing), (crossing, support)):
+            accumulator = BoundaryAccumulator()
+            for item in ordering:
+                _add(accumulator, item)
+            snapshots.append(accumulator.supports(*EDGE))
+        self.assertEqual(snapshots[0], snapshots[1])
+        self.assertEqual(set(snapshots[0]), {support, crossing})
+
     def test_exact_duplicates_are_deduplicated_without_losing_other_contributions(self) -> None:
         assessment = _assessment()
         support = BoundarySupport("Public entry", "Verified path", assessment)
@@ -155,6 +173,9 @@ class _LegacyAccumulator:
         target: str,
         description: str,
         rationale: str,
+        *,
+        assessment: RelationshipAssessment | None = None,
+        assessment_scope: BoundaryAssessmentScope = "relationship",
     ) -> None:
         self.edges.setdefault(
             (boundary_type, source, target),
@@ -170,6 +191,9 @@ class _LegacyAccumulator:
 
     def boundaries(self) -> list[TrustBoundary]:
         return list(self.edges.values())
+
+    def support_index(self):
+        return {}
 
 
 class BoundarySupportParityTests(unittest.TestCase):

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Protocol
+from types import MappingProxyType
+from typing import Literal, Protocol
 
 from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.analysis.relationships import RelationshipAssessment
 from tfstride.models import BoundaryType, ResourceInventory, TrustBoundary
+
+BoundaryKey = tuple[BoundaryType, str, str]
+BoundaryAssessmentScope = Literal["relationship", "path_crossing"]
 
 
 class BoundaryEmitter(Protocol):
@@ -19,6 +24,7 @@ class BoundaryEmitter(Protocol):
         rationale: str,
         *,
         assessment: RelationshipAssessment | None = None,
+        assessment_scope: BoundaryAssessmentScope = "relationship",
     ) -> None: ...
 
 
@@ -45,17 +51,25 @@ class BoundarySupport:
     description: str
     rationale: str
     assessment: RelationshipAssessment | None = None
+    # A path crossing represents only a segment of the full assessment, whose
+    # original endpoints, scope, and conditions must remain intact.
+    assessment_scope: BoundaryAssessmentScope = "relationship"
 
-    def _canonical_key(self) -> tuple[str, str, str]:
+    def _canonical_key(self) -> tuple[str, str, str, str]:
         # Preserve tuple ordering inside assessments: canonical ordering of
         # alternatives does not reinterpret provider scopes or conditions.
         assessment = asdict(self.assessment) if self.assessment is not None else None
-        return self.description, self.rationale, json.dumps(assessment, sort_keys=True, separators=(",", ":"))
+        return (
+            self.description,
+            self.rationale,
+            json.dumps(assessment, sort_keys=True, separators=(",", ":")),
+            self.assessment_scope,
+        )
 
 
 class BoundaryAccumulator:
     def __init__(self) -> None:
-        self._supports: dict[tuple[BoundaryType, str, str], dict[tuple[str, str, str], BoundarySupport]] = {}
+        self._supports: dict[BoundaryKey, dict[tuple[str, str, str, str], BoundarySupport]] = {}
 
     def add_boundary(
         self,
@@ -66,8 +80,9 @@ class BoundaryAccumulator:
         rationale: str,
         *,
         assessment: RelationshipAssessment | None = None,
+        assessment_scope: BoundaryAssessmentScope = "relationship",
     ) -> None:
-        support = BoundarySupport(description, rationale, assessment)
+        support = BoundarySupport(description, rationale, assessment, assessment_scope)
         key = (boundary_type, source, target)
         self._supports.setdefault(key, {})[support._canonical_key()] = support
 
@@ -75,6 +90,10 @@ class BoundaryAccumulator:
         """Return distinct alternatives in canonical order without merging them."""
         alternatives = self._supports.get((boundary_type, source, target), {})
         return tuple(alternatives[key] for key in sorted(alternatives))
+
+    def support_index(self) -> Mapping[BoundaryKey, tuple[BoundarySupport, ...]]:
+        """Snapshot internal support for downstream analysis, outside report models."""
+        return MappingProxyType({key: self.supports(*key) for key in sorted(self._supports)})
 
     def boundaries(self) -> list[TrustBoundary]:
         # Keep legacy edge order and IDs. For competing presentations, select

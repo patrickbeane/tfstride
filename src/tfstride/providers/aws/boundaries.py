@@ -7,8 +7,10 @@ from typing import TypeVar
 from tfstride.analysis.boundaries.shared import (
     PublicPrivateSubnetBoundaryContributor,
     contribute_control_to_workload_boundary,
+    contribute_internet_to_service_boundary,
 )
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
+from tfstride.analysis.relationships import RelationshipKind, RelationshipOutcome
 from tfstride.analysis.resource_concepts import (
     DATA_STORE_RESOURCE_TYPES,
     IDENTITY_ROLE_RESOURCE_TYPES,
@@ -23,6 +25,7 @@ from tfstride.analysis.role_helpers import resolve_workload_role
 from tfstride.models import BoundaryType, NormalizedResource
 from tfstride.providers.aws.account_identity_evidence import AwsAccountResolution
 from tfstride.providers.aws.analysis_indexes import (
+    AwsAnalysisIndexes,
     AwsSecurityGroupRelationships,
     aws_analysis_indexes,
 )
@@ -62,7 +65,9 @@ class AwsBoundaryContributor:
         inventory = context.inventory
         resources = inventory.resources
         indexes = context.indexes
-        security_group_relationships = aws_analysis_indexes(indexes, inventory).security_group_relationships
+        aws_indexes = aws_analysis_indexes(indexes, inventory)
+        security_group_relationships = aws_indexes.security_group_relationships
+        _contribute_ecs_ingress_support(context, aws_indexes)
         PublicPrivateSubnetBoundaryContributor(
             security_group_relationships.resource_index.subnet_network_scope
         ).contribute(context)
@@ -141,6 +146,44 @@ class AwsBoundaryContributor:
                     description,
                     rationale,
                 )
+
+
+def _contribute_ecs_ingress_support(context: BoundaryContributionContext, indexes: AwsAnalysisIndexes) -> None:
+    """Project the internet-to-ALB crossing of each verified ECS ingress path.
+
+    The ALB crossing is not the full internet-to-ECS relationship. Keep the
+    original assessment and reuse public-edge presentation so support enrichment
+    does not change boundary IDs, explanations, or standalone ALB eligibility.
+    """
+    resources = indexes.security_group_relationships.resource_index.resources_by_address
+    for service_address, assessments in sorted(indexes.ecs_public_ingress.items()):
+        for ingress in assessments:
+            assessment = ingress.relationship
+            if (
+                assessment.kind != RelationshipKind.EFFECTIVE_INGRESS
+                or assessment.outcome != RelationshipOutcome.ESTABLISHED
+                or assessment.source_address != "internet"
+                or assessment.target_address != service_address
+            ):
+                continue
+            load_balancers = {
+                evidence.address
+                for evidence in assessment.evidence_sources
+                if evidence.evidence_type == "load_balancer"
+            }
+            if len(load_balancers) != 1:
+                continue
+            address = next(iter(load_balancers))
+            load_balancer = resources.get(address)
+            if (
+                load_balancer is None
+                or load_balancer.resource_type not in {"aws_lb", "aws_alb"}
+                or address not in assessment.resource_scope.resource_addresses
+            ):
+                continue
+            contribute_internet_to_service_boundary(
+                context, load_balancer, assessment=assessment, assessment_scope="path_crossing"
+            )
 
 
 def _build_data_store_candidate_index(

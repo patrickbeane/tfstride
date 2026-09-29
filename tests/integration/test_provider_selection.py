@@ -11,7 +11,7 @@ from tests.integration.analysis_support import (
     GCP_FIXTURE_PATH,
     TFSIntegrationTestCase,
 )
-from tfstride.analysis.boundaries import detect_trust_boundaries
+from tfstride.analysis.boundaries.core import collect_boundary_contributions
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.indexes import AnalysisIndexes, AnalysisIndexExtensionFactory, build_analysis_indexes
 from tfstride.analysis.preparation import PreparedAnalysis, prepare_analysis
@@ -102,8 +102,8 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                 side_effect=AssertionError("Application index factories must be selected explicitly."),
             ),
             patch(
-                "tfstride.analysis.preparation.detect_trust_boundaries",
-                wraps=detect_trust_boundaries,
+                "tfstride.analysis.preparation.collect_boundary_contributions",
+                wraps=collect_boundary_contributions,
             ) as detect_boundaries,
             patch.object(
                 engine._rule_engine,
@@ -212,8 +212,8 @@ class ProviderSelectionIntegrationTests(TFSIntegrationTestCase):
                         side_effect=AssertionError("Configured factories must not fall back to the catalog."),
                     ),
                     patch(
-                        "tfstride.analysis.preparation.detect_trust_boundaries",
-                        wraps=detect_trust_boundaries,
+                        "tfstride.analysis.preparation.collect_boundary_contributions",
+                        wraps=collect_boundary_contributions,
                     ) as detect_boundaries,
                     patch.object(
                         engine._rule_engine,

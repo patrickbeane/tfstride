@@ -29,6 +29,16 @@ def detect_trust_boundaries(
     *,
     contributors: Sequence[BoundaryContributor] | None = None,
 ) -> list[TrustBoundary]:
+    return collect_boundary_contributions(inventory, indexes, contributors=contributors).boundaries()
+
+
+def collect_boundary_contributions(
+    inventory: ResourceInventory,
+    indexes: AnalysisIndexes | None = None,
+    *,
+    contributors: Sequence[BoundaryContributor] | None = None,
+) -> BoundaryAccumulator:
+    """Collect both reportable boundaries and their internal supporting evidence."""
     analysis_indexes = indexes if indexes is not None else build_analysis_indexes(inventory)
     accumulator = BoundaryAccumulator()
     context = BoundaryContributionContext(
@@ -41,4 +51,4 @@ def detect_trust_boundaries(
     for contributor in resolved_contributors:
         contributor.contribute(context)
 
-    return accumulator.boundaries()
+    return accumulator

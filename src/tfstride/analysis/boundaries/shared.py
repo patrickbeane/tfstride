@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from tfstride.analysis.boundaries.types import BoundaryContributionContext
+from tfstride.analysis.boundaries.types import BoundaryAssessmentScope, BoundaryContributionContext
+from tfstride.analysis.relationships import RelationshipAssessment
 from tfstride.analysis.resource_concepts import is_public_edge_resource, is_subnet_resource
 from tfstride.models import BoundaryType, NormalizedResource
 from tfstride.providers.network_scope import NetworkScopeKey, NetworkScopeResolution
@@ -11,14 +12,27 @@ from tfstride.providers.network_scope import NetworkScopeKey, NetworkScopeResolu
 class InternetToServiceBoundaryContributor:
     def contribute(self, context: BoundaryContributionContext) -> None:
         for resource in context.inventory.resources:
-            if resource.direct_internet_reachable and is_public_edge_resource(resource):
-                context.add_boundary(
-                    BoundaryType.INTERNET_TO_SERVICE,
-                    "internet",
-                    resource.address,
-                    f"Traffic can cross from the public internet to {resource.display_name}.",
-                    "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
-                )
+            contribute_internet_to_service_boundary(context, resource)
+
+
+def contribute_internet_to_service_boundary(
+    context: BoundaryContributionContext,
+    resource: NormalizedResource,
+    *,
+    assessment: RelationshipAssessment | None = None,
+    assessment_scope: BoundaryAssessmentScope = "relationship",
+) -> None:
+    """Use the existing public-edge eligibility and presentation for all support."""
+    if resource.direct_internet_reachable and is_public_edge_resource(resource):
+        context.add_boundary(
+            BoundaryType.INTERNET_TO_SERVICE,
+            "internet",
+            resource.address,
+            f"Traffic can cross from the public internet to {resource.display_name}.",
+            "The resource is directly reachable or intentionally exposed to unauthenticated network clients.",
+            assessment=assessment,
+            assessment_scope=assessment_scope,
+        )
 
 
 class PublicPrivateSubnetBoundaryContributor:

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from types import MappingProxyType
 
-from tfstride.analysis.boundaries import default_boundary_contributors, detect_trust_boundaries
+from tfstride.analysis.boundaries import default_boundary_contributors
+from tfstride.analysis.boundaries.core import collect_boundary_contributions
+from tfstride.analysis.boundaries.types import BoundaryKey, BoundarySupport
 from tfstride.analysis.indexes import AnalysisIndexes, AnalysisIndexExtensionFactory, build_analysis_indexes
 from tfstride.analysis.stride_rules import ProviderRuleSet
 from tfstride.models import ResourceInventory, TrustBoundary
@@ -23,6 +26,9 @@ class PreparedAnalysis:
     indexes: AnalysisIndexes
     boundaries: list[TrustBoundary]
     rule_set: ProviderRuleSet
+    boundary_supports: Mapping[BoundaryKey, tuple[BoundarySupport, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 def prepare_analysis(
@@ -34,7 +40,7 @@ def prepare_analysis(
 ) -> PreparedAnalysis:
     """Build fresh indexes and boundaries using explicitly selected provider hooks."""
     indexes = build_analysis_indexes(inventory, provider_extension_factory=provider_extension_factory)
-    boundaries = detect_trust_boundaries(
+    contributions = collect_boundary_contributions(
         inventory,
         indexes=indexes,
         contributors=default_boundary_contributors(
@@ -44,6 +50,7 @@ def prepare_analysis(
     return PreparedAnalysis(
         inventory=inventory,
         indexes=indexes,
-        boundaries=boundaries,
+        boundaries=contributions.boundaries(),
         rule_set=rule_set,
+        boundary_supports=contributions.support_index(),
     )
