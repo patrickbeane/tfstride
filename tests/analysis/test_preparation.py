@@ -159,7 +159,7 @@ class AnalysisPreparationTests(unittest.TestCase):
             )
             self.assertEqual(
                 prepared.boundaries[0].description,
-                f"Traffic can cross from the public internet to {workload.display_name}.",
+                "Duplicate provider description.",
             )
             self.assertEqual(prepared.boundaries[1].rationale, "Provider rationale.")
 

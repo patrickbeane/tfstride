@@ -10,6 +10,7 @@ from tfstride.analysis.boundaries.types import (
     BoundaryContributionContext,
     BoundaryContributor,
     BoundaryEmitter,
+    BoundarySupport,
 )
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "BoundaryContributionContext",
     "BoundaryContributor",
     "BoundaryEmitter",
+    "BoundarySupport",
     "InternetToServiceBoundaryContributor",
     "PublicPrivateSubnetBoundaryContributor",
     "default_boundary_contributors",

@@ -203,7 +203,7 @@ class RecordingBoundaryContributor:
 
 
 class BoundaryCoreTests(unittest.TestCase):
-    def test_core_runs_contributors_and_dedupes_boundaries(self) -> None:
+    def test_core_runs_contributors_and_selects_canonical_boundary_presentation(self) -> None:
         inventory = ResourceInventory(provider="aws", resources=[])
 
         boundaries = detect_trust_boundaries_from_core(
@@ -213,7 +213,7 @@ class BoundaryCoreTests(unittest.TestCase):
 
         self.assertEqual(len(boundaries), 1)
         self.assertEqual(boundaries[0].identifier, "internet-to-service:internet->aws_lb.web")
-        self.assertEqual(boundaries[0].description, "Traffic can cross from the public internet to aws_lb.web.")
+        self.assertEqual(boundaries[0].description, "Duplicate edge with different wording.")
 
 
 class TrustBoundaryIndexTests(unittest.TestCase):
