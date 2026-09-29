@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint
 
 from tfstride.providers.gcp.kms_dependency_evidence import GcpKmsEncryptionDependency
 from tfstride.providers.gcp.kms_evidence import GcpCloudRunKmsOperationPath
@@ -25,11 +28,13 @@ class GcpCloudRunGcsAccessPath(TypedDict):
     access_classes: list[GcpGcsAccessClass]
     custom_role_permissions: list[str]
     matched_permissions: list[str]
-    grant_basis: Literal["storage_bucket_iam"]
+    grant_basis: Literal["storage_bucket_iam", "storage_project_iam"]
     resource_scope: Literal["exact_bucket"]
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
+    grant_project: NotRequired[str]
+    permission_constraints: NotRequired[list[GcsPermissionConstraint]]
 
 
 class GcpCloudRunGcsProtectedDataConvergence(TypedDict):

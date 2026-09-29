@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from tfstride.models import NormalizedResource
@@ -26,7 +27,7 @@ class ModelCloudRunGcsAccessPathsStage:
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
-            paths, uncertainties = _cloud_run_gcs_access_paths(workload, buckets, custom_roles)
+            paths, uncertainties = _cloud_run_gcs_access_paths(workload, buckets, custom_roles, resources)
             facts = gcp_facts(workload)
             facts.set_cloud_run_gcs_access_paths(paths)
             facts.extend_cloud_run_gcs_access_path_uncertainties(uncertainties)
@@ -36,12 +37,15 @@ def _cloud_run_gcs_access_paths(
     workload: NormalizedResource,
     buckets: tuple[NormalizedResource, ...],
     custom_roles: GcpCustomRoleIndex,
+    resources: Sequence[NormalizedResource],
 ) -> tuple[list[GcpCloudRunGcsAccessPath], list[str]]:
     service_account_member = gcp_facts(workload).service_account_member
     if not service_account_member:
         return [], [f"{workload.address}: Cloud Run service account is unresolved"]
 
-    grants, uncertainties = evaluate_gcs_bucket_grants(service_account_member, buckets, custom_roles)
+    grants, uncertainties = evaluate_gcs_bucket_grants(
+        service_account_member, buckets, custom_roles, resources=resources
+    )
     return (
         [_access_path_record(workload, grant) for grant in grants],
         [f"{workload.address}: {uncertainty}" for uncertainty in uncertainties],
@@ -49,7 +53,7 @@ def _cloud_run_gcs_access_paths(
 
 
 def _access_path_record(workload: NormalizedResource, grant: GcpGcsBucketGrant) -> GcpCloudRunGcsAccessPath:
-    return {
+    path: GcpCloudRunGcsAccessPath = {
         "workload_address": workload.address,
         "workload_type": workload.resource_type,
         "service_account_email": gcp_facts(workload).service_account_email,
@@ -71,3 +75,15 @@ def _access_path_record(workload: NormalizedResource, grant: GcpGcsBucketGrant) 
         "condition_state": grant["condition_state"],
         "access_state": grant["access_state"],
     }
+    if "grant_project" in grant:
+        path["grant_project"] = grant["grant_project"]
+    if "permission_constraints" in grant:
+        path["permission_constraints"] = grant["permission_constraints"]
+    return path
+
+
+def current_cloud_run_gcs_access_paths(
+    workload: NormalizedResource, resources: Sequence[NormalizedResource], custom_roles: GcpCustomRoleIndex
+) -> list[GcpCloudRunGcsAccessPath]:
+    buckets = tuple(resource for resource in resources if resource.resource_type == GcpResourceType.STORAGE_BUCKET)
+    return _cloud_run_gcs_access_paths(workload, buckets, custom_roles, resources)[0]

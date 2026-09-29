@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from tfstride.analysis.finding_factory import FindingFactory
@@ -10,6 +11,8 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, TrustBoundary
+from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import current_cloud_run_gcs_access_paths
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
 
@@ -28,6 +31,8 @@ class GcpPathChainRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         paths_by_workload: dict[str, list[_CloudRunDataPath]] = {}
+        custom_roles = build_gcp_custom_role_index(inventory.resources)
+        gcs_paths: dict[str, Sequence[Mapping[str, Any]]] = {}
 
         for boundary in context.boundary_index.values():
             if boundary.boundary_type != BoundaryType.WORKLOAD_TO_DATA_STORE:
@@ -48,7 +53,11 @@ class GcpPathChainRuleDetectors:
                 and exact_cloud_run_path is None
             ):
                 continue
-            gcs_read_state = _exact_cloud_run_gcs_read_state(workload, data_store)
+            if workload.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES and workload.address not in gcs_paths:
+                gcs_paths[workload.address] = current_cloud_run_gcs_access_paths(
+                    workload, inventory.resources, custom_roles
+                )
+            gcs_read_state = _exact_cloud_run_gcs_read_state(workload, data_store, gcs_paths.get(workload.address, ()))
             if gcs_read_state is False:
                 continue
             paths_by_workload.setdefault(workload.address, []).append((data_store, boundary, exact_cloud_run_path))
@@ -151,6 +160,7 @@ def _exact_cloud_run_secret_access_path(
 def _exact_cloud_run_gcs_read_state(
     workload: NormalizedResource,
     data_store: NormalizedResource,
+    paths: Sequence[Mapping[str, Any]],
 ) -> bool | None:
     if (
         workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES
@@ -158,17 +168,20 @@ def _exact_cloud_run_gcs_read_state(
     ):
         return None
 
-    matching_paths = [
-        path
-        for path in gcp_facts(workload).cloud_run_gcs_access_paths
-        if path.get("bucket_address") == data_store.address
-    ]
-    if not matching_paths:
-        return None
+    matching_paths = [path for path in paths if path.get("bucket_address") == data_store.address]
+    # Topology/IAM boundaries cannot replace a missing or constrained grant.
     return any(
         path.get("access_state") == "granted"
         and path.get("condition_state") == "not_configured"
         and "read" in _string_list(path.get("access_classes"))
+        and (
+            not path.get("matched_permissions")
+            or "storage.objects.get" in _string_list(path.get("matched_permissions"))
+            or any(
+                value in {"*", "storage.*", "storage.objects.*"}
+                for value in _string_list(path.get("matched_permissions"))
+            )
+        )
         for path in matching_paths
     )
 

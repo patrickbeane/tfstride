@@ -44,7 +44,12 @@ def _iam_bindings(
     if members_unknown:
         binding["members_state"] = "unknown"
     normalized_condition = _condition(condition)
-    if condition_unknown:
+    condition_shape_unknown = (
+        condition not in (None, {}, [])
+        and not isinstance(condition, dict)
+        and not (isinstance(condition, list) and len(condition) == 1 and isinstance(condition[0], dict))
+    )
+    if condition_unknown or condition_shape_unknown:
         binding["condition_state"] = "unknown"
     elif normalized_condition:
         binding["condition"] = normalized_condition

@@ -1,19 +1,20 @@
-"""Evaluate existing bucket IAM grants for a principal and exact modeled targets.
+"""Evaluate bucket/project IAM grants and modeled constraints for exact buckets.
 
-This preserves the bucket-binding evaluator's access classifications. It does
-not expand ancestor grants, evaluate IAM denies, or prove network reachability.
 Workload identity selection and path/report projection belong to the caller.
+An authority result does not establish network reachability or operation success.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, TypedDict
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint, gcs_permission_constraints
+from tfstride.providers.gcp.gcs_project_grants import project_grant_candidates, project_reference_index
 from tfstride.providers.gcp.protected_data_evidence import GcpGcsAccessClass, GcpGcsAccessState
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
@@ -34,11 +35,13 @@ class GcpGcsBucketGrant(TypedDict):
     access_classes: list[GcpGcsAccessClass]
     custom_role_permissions: list[str]
     matched_permissions: list[str]
-    grant_basis: Literal["storage_bucket_iam"]
+    grant_basis: Literal["storage_bucket_iam", "storage_project_iam"]
     resource_scope: Literal["exact_bucket"]
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
+    grant_project: NotRequired[str]
+    permission_constraints: NotRequired[list[GcsPermissionConstraint]]
 
 
 _ACCESS_CLASS_ORDER: tuple[GcpGcsAccessClass, ...] = (
@@ -89,26 +92,43 @@ def evaluate_gcs_bucket_grants(
     principal: str,
     buckets: Sequence[NormalizedResource],
     custom_roles: GcpCustomRoleIndex,
+    *,
+    resources: Sequence[NormalizedResource] = (),
 ) -> tuple[list[GcpGcsBucketGrant], list[str]]:
     """Return matching grant evidence and uncertainty without workload-specific prose.
 
-    Only bindings already resolved onto the supplied buckets are considered.
-    Conditions remain separate alternatives; operation classes and permissions
-    retain the existing evaluator's meaning rather than implying broader access.
+    Full inventory inputs supply project grants and deny constraints. Conditions
+    remain separate alternatives. Project custom/basic roles stay unresolved.
     """
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
+    projects = project_reference_index(resources)
+    deny_policies = sorted(
+        (resource for resource in resources if resource.resource_type == GcpResourceType.IAM_DENY_POLICY),
+        key=lambda resource: resource.address,
+    )
     seen: set[tuple[str, str, str, str]] = set()
     for bucket in buckets:
         if bucket.resource_type != GcpResourceType.STORAGE_BUCKET:
             continue
-        for binding in gcp_facts(bucket).bindings:
+        inherited, problems = project_grant_candidates(principal, bucket, resources, projects)
+        uncertainties.extend(problems)
+        for binding in [*gcp_facts(bucket).bindings, *inherited]:
             if principal not in binding_members(binding):
                 continue
             role = _known_string(binding.get("role"))
             source = _known_string(binding.get("source"))
+            if any(binding.get(f"{field}_state") == "unknown" for field in ("role", "members", "condition")):
+                uncertainties.append(f"{source or bucket.address}: IAM grant for {bucket.address} is unresolved")
+                continue
             if role is None or role == "unknown role":
                 uncertainties.append(f"{source or bucket.address} IAM role is unresolved")
+                continue
+            project = _known_string(binding.get("grant_project"))
+            if project and (role not in _BUILT_IN_ROLE_ACCESS or role in {"roles/editor", "roles/owner"}):
+                uncertainties.append(
+                    f"{source}: project role {role} for {bucket.address} is not representable by predefined GCS semantics"
+                )
                 continue
             role_access = _role_access(role, custom_roles)
             if role_access is None:
@@ -129,18 +149,69 @@ def evaluate_gcs_bucket_grants(
             if fingerprint in seen:
                 continue
             seen.add(fingerprint)
-            grants.append(
-                _grant_record(
-                    principal,
-                    bucket,
-                    source,
-                    role,
-                    role_access,
-                    condition,
-                )
+            constraints: list[GcsPermissionConstraint] = []
+            if deny_policies:
+                # Keep decisions at permission granularity. Denying delete must not
+                # erase independent create authority (nor vice versa).
+                permissions = _modeled_permissions(role, role_access)
+                surviving: list[str] = []
+                for permission in permissions:
+                    decisions = gcs_permission_constraints(principal, permission, bucket, deny_policies, projects)
+                    constraints.extend(decisions)
+                    if not decisions:
+                        surviving.append(permission)
+                    elif not any(decision["state"] == "denied" for decision in decisions):
+                        uncertainties.extend(
+                            f"{decision['policy_address']} for {bucket.address}: {permission}: {decision['reason']}"
+                            for decision in decisions
+                        )
+                if constraints:
+                    classes = _custom_access_classes(tuple(surviving))
+                    role_access = replace(
+                        role_access,
+                        access_classes=tuple(value for value in role_access.access_classes if value in classes),
+                        matched_permissions=tuple(surviving),
+                    )
+                    if not role_access.access_classes:
+                        continue
+            grant = _grant_record(
+                principal,
+                bucket,
+                source,
+                role,
+                role_access,
+                condition,
             )
+            if project:
+                grant["grant_basis"] = "storage_project_iam"
+                grant["grant_project"] = project
+                if not grant["matched_permissions"]:
+                    grant["matched_permissions"] = list(_modeled_permissions(role, role_access))
+            if constraints:
+                grant["permission_constraints"] = constraints
+            grants.append(grant)
 
     return grants, dedupe(uncertainties)
+
+
+def _modeled_permissions(role: str, access: _GcsRoleAccess) -> tuple[str, ...]:
+    if access.role_kind == "custom":
+        if any(value in {"*", "storage.*", "storage.objects.*"} for value in access.matched_permissions):
+            return tuple(sorted(_READ_PERMISSIONS | _WRITE_PERMISSIONS | _DELETE_PERMISSIONS | _ADMIN_PERMISSIONS))
+        return access.matched_permissions
+    permissions: list[str] = []
+    for access_class in access.access_classes:
+        if access_class == "read":
+            permissions.extend(("storage.objects.get", "storage.objects.list"))
+        elif access_class == "write":
+            permissions.append("storage.objects.create")
+            if role != "roles/storage.objectCreator":
+                permissions.append("storage.objects.update")
+        elif access_class == "delete":
+            permissions.append("storage.objects.delete")
+        elif access_class == "administrative":
+            permissions.append("storage.objects.setIamPolicy")
+    return tuple(sorted(permissions))
 
 
 def _role_access(role: str, custom_roles: GcpCustomRoleIndex) -> _GcsRoleAccess | None:

@@ -19,6 +19,7 @@ from tfstride.providers.gcp.cloud_run_public_invocation import (
     current_cloud_run_public_exposure_reasons,
     current_cloud_run_public_invokers,
 )
+from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
 from tfstride.providers.gcp.iam_reference_utils import (
     custom_role_reference_keys,
     gcs_bucket_target_matches,
@@ -28,6 +29,7 @@ from tfstride.providers.gcp.object_storage_deletion_evidence import (
     GcpCloudRunGcsObjectDeletionPath,
     GcpGcsObjectDeletionRecoveryEvidence,
 )
+from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import current_cloud_run_gcs_access_paths
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
@@ -152,6 +154,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
             return []
 
         current_resources = list(context.inventory.resources)
+        custom_roles = build_gcp_custom_role_index(current_resources)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = current_cloud_run_public_invokers(
@@ -162,10 +165,9 @@ class GcpCloudRunGcsAccessRuleDetectors:
             if not workload.public_access_configured or (not public_invokers and not invoker_iam_check_disabled):
                 continue
 
+            current_paths = current_cloud_run_gcs_access_paths(workload, current_resources, custom_roles)
             mutation_paths = [
-                path
-                for path in gcp_facts(workload).cloud_run_gcs_access_paths
-                if _is_deterministic_mutation_path(path, workload, context)
+                path for path in current_paths if _is_deterministic_mutation_path(path, workload, context)
             ]
             if not mutation_paths:
                 continue
@@ -175,7 +177,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
             public_source_addresses = sorted({binding["source"] for binding in public_invokers})
             mutation_classes = _mutation_classes(mutation_paths)
             has_read_access = _has_deterministic_read_access(
-                gcp_facts(workload).cloud_run_gcs_access_paths,
+                current_paths,
                 set(bucket_addresses),
             )
             severity_reasoning = build_severity_reasoning(
@@ -247,7 +249,7 @@ def _is_deterministic_mutation_path(
         or path.get("workload_type") != workload.resource_type
         or path.get("identity_kind") != "cloud_run_service_account"
         or path.get("credential_context") != "workload_runtime"
-        or path.get("grant_basis") != "storage_bucket_iam"
+        or path.get("grant_basis") not in {"storage_bucket_iam", "storage_project_iam"}
         or path.get("resource_scope") != "exact_bucket"
         or path.get("access_state") != "granted"
         or path.get("condition_state") != "not_configured"
@@ -272,7 +274,12 @@ def _is_deterministic_mutation_path(
         bucket is None
         or bucket.resource_type != GcpResourceType.STORAGE_BUCKET
         or iam_resource is None
-        or iam_resource.resource_type not in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
+        or iam_resource.resource_type
+        not in (
+            GCP_PROJECT_IAM_RESOURCE_TYPES
+            if path.get("grant_basis") == "storage_project_iam"
+            else GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
+        )
     ):
         return False
 
@@ -377,6 +384,21 @@ def _mutation_path_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
                     "resource_scope=exact_bucket",
                     "access_state=granted",
                     "condition_state=not_configured",
+                    *(
+                        (
+                            f"grant_basis={path['grant_basis']}",
+                            f"grant_project={path.get('grant_project')}",
+                        )
+                        if path.get("grant_basis") == "storage_project_iam"
+                        else ()
+                    ),
+                    *(
+                        f"permission_constraint={constraint.get('policy_address')}:"
+                        f"{constraint.get('permission')}:{constraint.get('state')}"
+                        for raw_constraint in path.get("permission_constraints", [])
+                        if isinstance(raw_constraint, Mapping)
+                        for constraint in (cast(Mapping[str, object], raw_constraint),)
+                    ),
                 )
             )
             for path in paths
