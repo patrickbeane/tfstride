@@ -58,6 +58,12 @@ Both are conceptually the same check, implemented against each provider's native
 
 Condition narrowing focuses on high-signal, provider-specific authorization keys (for example AWS's `SourceArn`, `SourceAccount`, and `ExternalId`) rather than exhaustive coverage of every service-specific authorization condition.
 
+## Boundary support and presentation
+
+Each logical boundary retains its distinct supporting contributions internally, including separate assessments with their original scopes and conditions. An ECS ingress assessment can support the `internet → ALB` crossing within its full `internet → ECS service` path; its target remains the ECS service. The standalone public ALB boundary remains even when no ECS ingress path is established. These support records are not part of `TrustBoundary` serialization.
+
+Boundary presentation selects one complete contribution in canonical order, sorting description and rationale lexically. This intentionally replaces first-writer presentation for duplicate edges with differing prose: contributor order cannot choose the wording, and descriptions and rationales from different contributions are never combined. The choice provides stable presentation, not a ranking of evidence strength. Boundary IDs, edge ordering, and serialized fields retain their existing behavior. Representative AWS/GCP/Azure fixture tests preserve identical boundaries, findings, evidence, and fingerprints; this parity does not promise unchanged prose for custom or other duplicate contributions that previously depended on arrival order.
+
 ## Subnet classification
 
 Subnet classification prefers explicit route table associations when available, but does not model main-route-table inheritance or every routing edge case.

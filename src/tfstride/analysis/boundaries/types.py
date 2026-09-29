@@ -96,8 +96,13 @@ class BoundaryAccumulator:
         return MappingProxyType({key: self.supports(*key) for key in sorted(self._supports)})
 
     def boundaries(self) -> list[TrustBoundary]:
-        # Keep legacy edge order and IDs. For competing presentations, select
-        # one whole contribution canonically; never splice conditional claims.
+        """Select one intact presentation by canonical support order.
+
+        Description and rationale sort lexically; this is a stable presentation
+        choice, not a ranking of evidence strength. Duplicate edges with differing
+        prose may intentionally differ from legacy first-writer output. Edge
+        order, identifiers, and serialized fields retain their existing behavior.
+        """
         boundaries: list[TrustBoundary] = []
         for boundary_type, source, target in self._supports:
             presentation = self.supports(boundary_type, source, target)[0]

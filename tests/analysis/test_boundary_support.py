@@ -81,7 +81,7 @@ class BoundarySupportTests(unittest.TestCase):
                     remaining_conditions=("path=/other/*",),
                 ),
             ),
-            BoundarySupport("Alternate entry", "A separate rationale", assessment),
+            BoundarySupport("Alternate entry", "Z: rationale for the alternate entry", assessment),
         )
         expected = None
         for ordering in permutations(alternatives):
@@ -94,9 +94,11 @@ class BoundarySupportTests(unittest.TestCase):
             self.assertEqual(actual, expected)
             self.assertEqual(set(accumulator.supports(*EDGE)), set(alternatives))
             boundary = accumulator.boundaries()[0]
-            self.assertIn(
+            # Choose the canonical description and its own rationale, even
+            # though another contribution has a lexically earlier rationale.
+            self.assertEqual(
                 (boundary.description, boundary.rationale),
-                {(support.description, support.rationale) for support in alternatives},
+                ("Alternate entry", "Z: rationale for the alternate entry"),
             )
 
     def test_uncertainty_and_prerequisite_outcomes_remain_separate(self) -> None:
