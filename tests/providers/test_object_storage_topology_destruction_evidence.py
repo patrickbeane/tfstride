@@ -120,7 +120,10 @@ class ObjectStorageTopologyDestructionEvidenceTests(unittest.TestCase):
         self.assertEqual(ancestor_hints["scope_type"], Literal["folder", "organization"])
         self.assertEqual(ancestor_hints["grant_basis"], Literal["gcs_folder_iam", "gcs_organization_iam"])
         self.assertEqual(ancestor_hints["resource_scope"], Literal["gcs_folder", "gcs_organization"])
-        self.assertEqual(ancestor_hints["role_evidence"], GcpGcsBucketTopologyBucketBuiltInRoleEvidence)
+        self.assertEqual(
+            ancestor_hints["role_evidence"],
+            GcpGcsBucketTopologyBucketBuiltInRoleEvidence | GcpGcsBucketTopologyCustomRoleEvidence,
+        )
         project_hints = get_type_hints(GcpCloudRunGcsProjectBucketTopologyDestructionPath)
         bucket_hints = get_type_hints(GcpCloudRunGcsExactBucketTopologyDestructionPath)
         project_role_hints = get_type_hints(GcpGcsBucketTopologyProjectBuiltInRoleEvidence)

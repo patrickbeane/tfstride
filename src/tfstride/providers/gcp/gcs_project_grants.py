@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex
 from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_scope, bucket_hierarchy
 from tfstride.providers.gcp.iam_reference_utils import gcs_bucket_scope_name
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
@@ -74,6 +75,7 @@ def project_grant_candidates(
     bucket: NormalizedResource,
     sources: Sequence[NormalizedResource],
     index: ResourceReferenceIndex,
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     project = project_identity(gcp_facts(bucket).project, index)
     managers: list[tuple[NormalizedResource, bool | None]] = []
@@ -107,7 +109,7 @@ def project_grant_candidates(
             conflicts = [
                 other.address
                 for other, _ in managers
-                if other.address != source.address and _conflicts(source, binding, other)
+                if other.address != source.address and _conflicts(source, binding, other, custom_roles)
             ]
             if conflicts:
                 uncertainties.append(
@@ -123,6 +125,7 @@ def ancestor_grant_candidates(
     bucket: NormalizedResource,
     sources: Sequence[NormalizedResource],
     index: GcpResourceIndex,
+    custom_roles: GcpCustomRoleIndex,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     hierarchy = bucket_hierarchy(bucket, index)
     managers: list[tuple[NormalizedResource, str, HierarchyScope | None, bool | None]] = []
@@ -158,7 +161,7 @@ def ancestor_grant_candidates(
                 other.address != source.address
                 and other_kind == kind
                 and (other_scope is None or other_scope.key == scope.key)
-                and _conflicts(source, binding, other)
+                and _conflicts(source, binding, other, custom_roles)
                 for other, other_kind, other_scope, _ in managers
             ):
                 problems.append(
@@ -265,7 +268,12 @@ def _policy_binding_valid(value: object) -> bool:
     )
 
 
-def _conflicts(source: NormalizedResource, binding: Mapping[str, Any], other: NormalizedResource) -> bool:
+def _conflicts(
+    source: NormalizedResource,
+    binding: Mapping[str, Any],
+    other: NormalizedResource,
+    custom_roles: GcpCustomRoleIndex | None = None,
+) -> bool:
     if any(item.resource_type.endswith("_iam_policy") for item in (source, other)):
         return True
     if not any(item.resource_type.endswith("_iam_binding") for item in (source, other)):
@@ -277,7 +285,31 @@ def _conflicts(source: NormalizedResource, binding: Mapping[str, Any], other: No
         if other_binding.get("role_state") == "unknown" or not other_binding.get("role"):
             return True
         if other_binding.get("role") != binding.get("role"):
-            continue
+            left = str(binding.get("role") or "")
+            right = str(other_binding.get("role") or "")
+            if custom_roles is None or left.startswith("roles/") or right.startswith("roles/"):
+                continue
+            native_pattern = r"(projects|organizations)/([a-z0-9-]+)/roles/([A-Za-z0-9_.]+)"
+            left_native = re.fullmatch(native_pattern, left)
+            right_native = re.fullmatch(native_pattern, right)
+            if (
+                left_native
+                and right_native
+                and (
+                    left_native[1] != right_native[1]
+                    or left_native[3] != right_native[3]
+                    or project_scope_matches(left_native[2], right_native[2]) is False
+                )
+            ):
+                # Distinct strong names need no modeled role definition merely
+                # to prove that their IAM binding managers cannot overlap.
+                continue
+            left_role = custom_roles.resolve(left).selected_candidate
+            right_role = custom_roles.resolve(right).selected_candidate
+            if left_role is not None and right_role is not None and left_role.address != right_role.address:
+                continue
+            # Scoped native and exact Terraform references can identify one role.
+            # Ambiguous custom-role identity cannot prove managers disjoint.
         if other_binding.get("condition_state") == "unknown":
             return True
         if json.dumps(other_binding.get("condition"), sort_keys=True) == json.dumps(

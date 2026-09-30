@@ -183,6 +183,13 @@ class GcpCloudRunGcsAccessRuleDetectors:
 
             bucket_addresses = _path_string_values(mutation_paths, "bucket_address")
             iam_resource_addresses = _path_string_values(mutation_paths, "iam_resource_address")
+            role_definitions = sorted(
+                {
+                    path["custom_role_evidence"]["role_definition_address"]
+                    for path in mutation_paths
+                    if "custom_role_evidence" in path
+                }
+            )
             public_source_addresses = sorted({binding["source"] for binding in public_invokers})
             mutation_classes = _mutation_classes(mutation_paths)
             has_read_access = _has_deterministic_read_access(
@@ -207,6 +214,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
                             *public_source_addresses,
                             *bucket_addresses,
                             *iam_resource_addresses,
+                            *role_definitions,
                         ]
                     ),
                     trust_boundary_id=boundary.identifier if boundary else None,
@@ -390,6 +398,19 @@ def _runtime_identity_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
     )
 
 
+def _custom_role_scope_evidence(path: Mapping[str, Any]) -> tuple[str, ...]:
+    raw = path.get("custom_role_evidence")
+    if not isinstance(raw, Mapping):
+        return ()
+    custom = cast(Mapping[str, object], raw)
+    return (
+        f"role_definition={custom.get('role_definition_address')}",
+        f"role_scope={custom.get('role_scope')}",
+        f"role_scope_compatibility={custom.get('grant_scope_compatibility')}",
+        f"role_stage={custom.get('stage')}",
+    )
+
+
 def _mutation_path_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
     return sorted(
         {
@@ -424,6 +445,7 @@ def _mutation_path_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
                         if path.get("grant_scope")
                         else ()
                     ),
+                    *_custom_role_scope_evidence(path),
                     *(
                         f"permission_constraint={constraint.get('policy_address')}:"
                         f"{constraint.get('permission')}:{constraint.get('state')}"

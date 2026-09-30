@@ -345,7 +345,7 @@ class GcpProjectGcsGrantTests(unittest.TestCase):
         self.assertEqual(len(grants), 1)
         self.assertEqual(problems, [])
 
-    def test_unknown_grant_constraints_and_custom_roles_stay_unresolved(self) -> None:
+    def test_unknown_grant_constraints_and_custom_role_permissions_stay_unresolved(self) -> None:
         for field in ("condition", "member", "role", "project"):
             with self.subTest(field=field):
                 grants, problems = _grants([_bucket(), _project_grant(unknown={field: True})])
@@ -354,12 +354,12 @@ class GcpProjectGcsGrantTests(unittest.TestCase):
         grants, problems = _grants(
             [
                 _bucket(),
-                _custom_role(),
+                replace(_custom_role(), unknown_values={"permissions": True}),
                 _project_grant(role=f"projects/{_PROJECT}/roles/cloudRunStorage"),
             ]
         )
         self.assertEqual(grants, [])
-        self.assertIn("not representable", str(problems))
+        self.assertIn("permissions are unresolved", str(problems))
 
     def test_condition_is_retained_without_a_definite_finding(self) -> None:
         condition = {

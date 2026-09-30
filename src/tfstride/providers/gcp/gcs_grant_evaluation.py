@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict, cast
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_custom_role_evaluation import assess_inherited_gcs_custom_role
 from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint, gcs_permission_constraints
 from tfstride.providers.gcp.gcs_project_grants import (
     ancestor_grant_candidates,
@@ -20,11 +22,16 @@ from tfstride.providers.gcp.gcs_project_grants import (
     project_grant_candidates,
     project_reference_index,
 )
-from tfstride.providers.gcp.protected_data_evidence import GcpGcsAccessClass, GcpGcsAccessState
+from tfstride.providers.gcp.protected_data_evidence import (
+    GcpGcsAccessClass,
+    GcpGcsAccessState,
+    GcsInheritedCustomRoleEvidence,
+)
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 from tfstride.providers.gcp.resource_types import (
     GCP_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
@@ -32,10 +39,6 @@ from tfstride.providers.gcp.resource_types import (
 )
 from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, binding_members, gcp_reference_key
 from tfstride.providers.resource_reference_index import ResourceReferenceIndex
-
-if TYPE_CHECKING:
-    from tfstride.providers.gcp.custom_roles import GcpCustomRoleIndex
-
 
 GCS_ACCESS_IAM_TYPES_BY_BASIS = {
     "storage_bucket_iam": GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
@@ -61,6 +64,7 @@ class GcpGcsBucketGrant(TypedDict):
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
+    custom_role_evidence: NotRequired[GcsInheritedCustomRoleEvidence]
     grant_project: NotRequired[str]
     grant_scope: NotRequired[str]
     grant_ancestry: NotRequired[list[str]]
@@ -118,6 +122,7 @@ class GcsGrantConstraintContext:
     resources: tuple[NormalizedResource, ...]
     index: GcpResourceIndex
     projects: ResourceReferenceIndex
+    custom_roles: GcpCustomRoleIndex
     deny_policies: tuple[NormalizedResource, ...]
 
     @classmethod
@@ -126,6 +131,7 @@ class GcsGrantConstraintContext:
             tuple(resources),
             GcpResourceIndexBuilder().build(list(resources)),
             project_reference_index(resources),
+            build_gcp_custom_role_index(resources),
             tuple(
                 sorted(
                     (item for item in resources if item.resource_type == GcpResourceType.IAM_DENY_POLICY),
@@ -136,8 +142,12 @@ class GcsGrantConstraintContext:
 
     def bindings(self, principal: str, bucket: NormalizedResource) -> tuple[list[dict[str, object]], list[str]]:
         local, local_problems = bucket_grant_candidates(principal, bucket, self.resources, self.index)
-        inherited, problems = project_grant_candidates(principal, bucket, self.resources, self.projects)
-        ancestors, ancestor_problems = ancestor_grant_candidates(principal, bucket, self.resources, self.index)
+        inherited, problems = project_grant_candidates(
+            principal, bucket, self.resources, self.projects, self.custom_roles
+        )
+        ancestors, ancestor_problems = ancestor_grant_candidates(
+            principal, bucket, self.resources, self.index, self.custom_roles
+        )
         return [*local, *inherited, *ancestors], [*local_problems, *problems, *ancestor_problems]
 
 
@@ -167,6 +177,19 @@ def evaluate_gcs_operation_constraints(
             *problems,
             f"{source_address} for {bucket.address}: unconditional scoped grant for {permission} is not established",
         ]
+    source = context.index.resources_by_reference.resolve(source_address).selected_candidate
+    if (
+        source is not None
+        and source.resource_type in (GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_ORG_FOLDER_IAM_RESOURCE_TYPES)
+        and _looks_like_custom_role(role)
+    ):
+        assessment = assess_inherited_gcs_custom_role(
+            role, source, bucket, context.custom_roles, context.index, context.projects
+        )
+        if assessment.state != "compatible":
+            return False, [f"{source_address} for {bucket.address}: {assessment.reason}"]
+        if permission not in assessment.permissions:
+            return False, [f"{source_address} for {bucket.address}: custom role does not grant {permission}"]
     decisions = gcs_permission_constraints(
         principal, permission, bucket, context.deny_policies, context.projects, context.index
     )
@@ -188,7 +211,7 @@ def evaluate_gcs_bucket_grants(
     """Return matching grant evidence and uncertainty without workload-specific prose.
 
     Full inventory inputs supply ancestor grants and deny constraints. Conditions
-    remain separate alternatives. Inherited custom/basic roles stay unresolved.
+    remain separate alternatives. Inherited custom roles require grantability and lifecycle proof; basic roles stay unresolved.
     """
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
@@ -212,14 +235,32 @@ def evaluate_gcs_bucket_grants(
                 continue
             project = _known_string(binding.get("grant_project"))
             ancestor_kind = binding.get("grant_scope_kind")
-            if (project or ancestor_kind) and (
-                role not in _BUILT_IN_ROLE_ACCESS or role in {"roles/editor", "roles/owner"}
-            ):
+            custom_evidence: GcsInheritedCustomRoleEvidence | None = None
+            if (project or ancestor_kind) and role not in _BUILT_IN_ROLE_ACCESS:
+                source_resource = context.index.resources_by_reference.resolve(source).selected_candidate
+                if source_resource is None:
+                    uncertainties.append(f"{source}: custom role grant source is unresolved")
+                    continue
+                assessment = assess_inherited_gcs_custom_role(
+                    role, source_resource, bucket, context.custom_roles, context.index, context.projects
+                )
+                if assessment.state != "compatible":
+                    uncertainties.append(f"{source} for {bucket.address}: {assessment.reason}")
+                    continue
+                matched = tuple(
+                    permission for permission in assessment.permissions if _is_gcs_data_permission(permission)
+                )
+                role_access = _GcsRoleAccess("custom", _custom_access_classes(matched), assessment.permissions, matched)
+                if not role_access.access_classes:
+                    continue
+                custom_evidence = assessment.evidence
+            elif (project or ancestor_kind) and role in {"roles/editor", "roles/owner"}:
                 uncertainties.append(
-                    f"{source}: inherited role {role} for {bucket.address} is not representable by predefined GCS semantics"
+                    f"{source}: inherited basic role {role} is not representable by predefined GCS semantics"
                 )
                 continue
-            role_access = _role_access(role, custom_roles)
+            else:
+                role_access = _role_access(role, custom_roles)
             if role_access is None:
                 if _looks_like_custom_role(role):
                     uncertainties.append(
@@ -273,6 +314,8 @@ def evaluate_gcs_bucket_grants(
                 role_access,
                 condition,
             )
+            if custom_evidence is not None:
+                grant["custom_role_evidence"] = custom_evidence
             if project:
                 grant["grant_basis"] = "storage_project_iam"
                 grant["grant_project"] = project

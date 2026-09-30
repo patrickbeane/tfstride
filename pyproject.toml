@@ -250,6 +250,7 @@ include = [
   "src/tfstride/providers/gcp/resource_decoration/kms_encryption_dependencies.py",
   "src/tfstride/providers/gcp/resource_decoration/cloud_run_gcs_access_paths.py",
   "src/tfstride/providers/gcp/gcs_grant_evaluation.py",
+  "src/tfstride/providers/gcp/gcs_custom_role_evaluation.py",
   "src/tfstride/providers/gcp/gcs_project_grants.py",
   "src/tfstride/providers/gcp/gcs_grant_ancestry.py",
   "src/tfstride/providers/gcp/resource_hierarchy.py",

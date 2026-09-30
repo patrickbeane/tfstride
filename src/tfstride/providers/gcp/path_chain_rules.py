@@ -100,12 +100,18 @@ class GcpPathChainRuleDetectors:
                 path
                 for path in gcs_paths.get(workload.address, ())
                 if path.get("bucket_address") in data_store_addresses
-                and path.get("grant_scope")
+                and (path.get("grant_scope") or path.get("custom_role_evidence"))
                 and path.get("access_state") == "granted"
                 and path.get("condition_state") == "not_configured"
                 and "storage.objects.get" in gcs_path_permissions(path)
             ]
             policy_sources.extend(str(path["iam_resource_address"]) for path in inherited_gcs_paths)
+            custom_role_sources = [
+                str(custom["role_definition_address"])
+                for path in inherited_gcs_paths
+                if isinstance(custom := path.get("custom_role_evidence"), Mapping)
+            ]
+            policy_sources.extend(custom_role_sources)
             policy_sources = list(dict.fromkeys(policy_sources))
             cloud_run_secret_paths = [exact_path for _, _, exact_path in data_paths if exact_path is not None]
             workload_identities = gcp_facts(workload).identity_members
@@ -166,11 +172,12 @@ class GcpPathChainRuleDetectors:
                             "gcs_inherited_read_authority",
                             [
                                 f"bucket={path['bucket_address']}; operation=storage.objects.get; "
-                                f"source={path['iam_resource_address']}; grant_scope={path['grant_scope']}; "
+                                f"source={path['iam_resource_address']}; grant_scope={path.get('grant_scope') or path.get('grant_project')}; "
                                 f"grant_ancestry={','.join(path.get('grant_ancestry', []))}"
                                 for path in inherited_gcs_paths
                             ],
                         ),
+                        evidence_item("gcs_custom_role_definitions", custom_role_sources),
                         evidence_item("resource_policy_sources", policy_sources),
                     ),
                     severity_reasoning=severity_reasoning,

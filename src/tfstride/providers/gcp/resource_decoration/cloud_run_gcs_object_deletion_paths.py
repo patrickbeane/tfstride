@@ -368,10 +368,10 @@ def _bucket_grant_candidates(
 
     _apply_management_ambiguity(
         candidates,
-        # Ancestor managers are reconciled with condition-aware alternatives by
+        # Inherited managers are reconciled with condition-aware alternatives by
         # evaluate_gcs_operation_constraints before any path is emitted.
-        [manager for manager in management_sources if manager.scope_type in {"project", "bucket"}],
-        [manager for manager in unresolved_managers if manager.scope_type in {"project", "bucket"}],
+        [manager for manager in management_sources if manager.scope_type == _BUCKET_SCOPE_TYPE],
+        [manager for manager in unresolved_managers if manager.scope_type == _BUCKET_SCOPE_TYPE],
         uncertainties,
         bucket,
     )
@@ -550,8 +550,6 @@ def _resolve_role(
     if not _looks_like_custom_role(role):
         return _RoleResolution("predefined", "unmodeled", False)
 
-    if scope_type in {"folder", "organization"}:
-        return _RoleResolution("custom", "unmodeled", False)
     resolution = custom_roles.resolve(role)
     custom = resolution.selected_candidate
     if custom is None:

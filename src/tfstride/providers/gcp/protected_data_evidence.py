@@ -12,6 +12,14 @@ GcpGcsAccessClass = Literal["read", "write", "delete", "administrative"]
 GcpGcsAccessState = Literal["granted", "conditional"]
 
 
+class GcsInheritedCustomRoleEvidence(TypedDict):
+    role_definition_address: str
+    role_scope: str
+    grant_scope_compatibility: Literal["compatible"]
+    stage: str
+    deleted: Literal[False]
+
+
 class GcpCloudRunGcsAccessPath(TypedDict):
     workload_address: str
     workload_type: str
@@ -33,6 +41,7 @@ class GcpCloudRunGcsAccessPath(TypedDict):
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
+    custom_role_evidence: NotRequired[GcsInheritedCustomRoleEvidence]
     grant_project: NotRequired[str]
     grant_scope: NotRequired[str]
     grant_ancestry: NotRequired[list[str]]

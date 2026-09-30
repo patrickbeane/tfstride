@@ -170,7 +170,7 @@ class GcpCloudRunGcsAncestorBucketTopologyDestructionPath(
     scope: str
     resource_scope: Literal["gcs_folder", "gcs_organization"]
     grant_basis: Literal["gcs_folder_iam", "gcs_organization_iam"]
-    role_evidence: GcpGcsBucketTopologyBucketBuiltInRoleEvidence
+    role_evidence: GcpGcsBucketTopologyBucketRoleEvidence
 
 
 GcpCloudRunGcsBucketTopologyDestructionPath = (

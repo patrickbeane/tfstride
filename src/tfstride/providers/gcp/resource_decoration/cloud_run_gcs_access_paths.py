@@ -75,6 +75,8 @@ def _access_path_record(workload: NormalizedResource, grant: GcpGcsBucketGrant) 
         "condition_state": grant["condition_state"],
         "access_state": grant["access_state"],
     }
+    if "custom_role_evidence" in grant:
+        path["custom_role_evidence"] = grant["custom_role_evidence"]
     if "grant_scope" in grant:
         path["grant_scope"] = grant["grant_scope"]
     if "grant_ancestry" in grant:

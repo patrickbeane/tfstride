@@ -7,6 +7,10 @@ from typing import Any, Literal, cast
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_custom_role_evaluation import (
+    GcsInheritedCustomRoleAssessment,
+    assess_inherited_gcs_custom_role,
+)
 from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
@@ -259,6 +263,18 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
                     scope_type,
                     custom_roles,
                     project_organizations,
+                    inherited_custom=(
+                        assess_inherited_gcs_custom_role(
+                            role,
+                            iam_resource,
+                            target.resource,
+                            custom_roles,
+                            grant_context.index,
+                            grant_context.projects,
+                        )
+                        if scope_type != "bucket" and _looks_like_custom_role(role)
+                        else None
+                    ),
                 )
                 if role_evidence is None:
                     if role_uncertainty is not None:
@@ -357,9 +373,9 @@ def _iam_manager_ambiguities(
     managers: list[_IamManager] = []
     unresolved_managers: list[_IamManager] = []
     for iam_resource in iam_resources:
-        # The shared constraint evaluator reconciles ancestor managers, retaining
+        # The shared constraint evaluator reconciles inherited managers, retaining
         # distinct conditions rather than collapsing every binding of one role.
-        if iam_resource.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+        if iam_resource.resource_type in (GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_ORG_FOLDER_IAM_RESOURCE_TYPES):
             continue
         scope_type, scope, scope_uncertainty = _iam_scope(
             iam_resource,
@@ -534,7 +550,22 @@ def _role_evidence(
     scope_type: _ScopeType,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
+    *,
+    inherited_custom: GcsInheritedCustomRoleAssessment | None = None,
 ) -> tuple[_RoleEvidence | None, str | None]:
+    if inherited_custom is not None:
+        if inherited_custom.state != "compatible" or inherited_custom.evidence is None:
+            return None, inherited_custom.reason
+        if _DELETE_BUCKET not in inherited_custom.permissions:
+            return None, None
+        return GcpGcsBucketTopologyCustomRoleEvidence(
+            role_kind="custom",
+            role_definition_address=inherited_custom.evidence["role_definition_address"],
+            custom_role_permissions=list(inherited_custom.permissions),
+            custom_role_stage=cast(GcpGcsBucketTopologyActiveCustomRoleStage, inherited_custom.evidence["stage"]),
+            custom_role_deleted=False,
+            custom_role_grant_scope_compatibility_state="compatible",
+        ), None
     if scope_type in {"folder", "organization"} and role != "roles/storage.admin":
         return None, None if role in _KNOWN_NON_DELETE_ROLES else "ancestor role permission is not modeled"
     if scope_type in {"project", "folder", "organization"}:
