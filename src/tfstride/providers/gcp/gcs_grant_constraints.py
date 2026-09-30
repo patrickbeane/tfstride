@@ -41,10 +41,15 @@ def gcs_permission_constraints(
             continue
         facts = gcp_facts(policy)
         decisions = [_rule_denies(rule, principal, permission) for rule in facts.iam_deny_policy_rules]
+        # Completeness describes the policy body; parent uncertainty is already
+        # represented by scope. It cannot expand a known rule's permission set.
+        rule_uncertainties = [
+            reason for reason in facts.iam_deny_policy_uncertainties if not reason.startswith("parent ")
+        ]
         # Field uncertainty is evaluated on its own rule. Missing/malformed rules
         # can affect any permission and cannot be discarded with unrelated rules.
         structural_unknown = facts.iam_deny_policy_completeness_state != "complete" and (
-            not facts.iam_deny_policy_uncertainties
+            not rule_uncertainties
             or any(
                 re.search(
                     r"\.deny_rule\[\d+\]\.(denied_principals|exception_principals|"
@@ -52,7 +57,7 @@ def gcs_permission_constraints(
                     reason,
                 )
                 is None
-                for reason in facts.iam_deny_policy_uncertainties
+                for reason in rule_uncertainties
             )
         )
         if True in decisions and scope is True:

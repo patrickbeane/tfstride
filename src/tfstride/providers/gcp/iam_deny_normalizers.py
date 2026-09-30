@@ -75,6 +75,10 @@ def _deny_policy_rules(
         uncertainties.append("rules are unknown after planning")
     rules: list[dict[str, Any]] = []
     rule_values = as_list(raw_rules)
+    # after_unknown can contain blocks absent from planned values. An existing
+    # field-level uncertainty must not hide an additional rule with unknown scope.
+    if isinstance(raw_unknown_rules, list) and value_is_unknown(raw_unknown_rules[len(rule_values) :]):
+        uncertainties.append("rules contain additional unknown blocks after planning")
     if not rule_values:
         if value_is_unknown(raw_unknown_rules):
             uncertainties.append("rules are unknown after planning")
@@ -94,6 +98,8 @@ def _deny_policy_rules(
             unknown_deny_rules = unknown_rule_mapping.get("deny_rule")
         else:
             unknown_deny_rules = unknown_rule
+        if isinstance(unknown_deny_rules, list) and value_is_unknown(unknown_deny_rules[len(raw_deny_rules) :]):
+            uncertainties.append(f"{rule_path}.deny_rule contains additional unknown blocks after planning")
         if not raw_deny_rules:
             if value_is_unknown(unknown_deny_rules):
                 uncertainties.append(f"{rule_path}.deny_rule is unknown after planning")
