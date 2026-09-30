@@ -8,12 +8,16 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_scope, bucket_hierarchy
 from tfstride.providers.gcp.iam_reference_utils import gcs_bucket_scope_name
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_decoration.iam import resolve_resource_iam_target
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_hierarchy import HierarchyScope
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, gcp_resource_references
 from tfstride.providers.gcp.resource_types import (
+    GCP_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
@@ -114,6 +118,65 @@ def project_grant_candidates(
     return candidates, uncertainties
 
 
+def ancestor_grant_candidates(
+    principal: str,
+    bucket: NormalizedResource,
+    sources: Sequence[NormalizedResource],
+    index: GcpResourceIndex,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    hierarchy = bucket_hierarchy(bucket, index)
+    managers: list[tuple[NormalizedResource, str, HierarchyScope | None, bool | None]] = []
+    for source in sorted(sources, key=lambda item: item.address):
+        if source.resource_type not in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+            continue
+        facts = gcp_facts(source)
+        kind = "folders" if source.resource_type in GCP_FOLDER_IAM_RESOURCE_TYPES else "organizations"
+        value = facts.folder_id if kind == "folders" else facts.organization_id
+        scope = ancestor_scope(value, kind, index) if facts.iam_scope_reference_state == "configured" else None
+        match = hierarchy.contains(scope)
+        if match is not False:
+            managers.append((source, kind, scope, match))
+    grants: list[dict[str, Any]] = []
+    problems: list[str] = []
+    for source, kind, scope, match in managers:
+        facts = gcp_facts(source)
+        if source.resource_type.endswith("_iam_policy") and facts.iam_policy_data_state != "configured":
+            problems.append(f"{source.address} for {bucket.address}: ancestor IAM policy data is incomplete")
+        for binding in facts.bindings:
+            if principal not in binding_members(binding) and binding.get("members_state") != "unknown":
+                continue
+            problem = _binding_problem(source, binding)
+            if match is not True or scope is None or problem:
+                problems.append(
+                    f"{source.address} for {bucket.address}: "
+                    f"{problem or hierarchy.uncertainty or 'grant ancestry is unresolved'}"
+                )
+                continue
+            # Authoritative policies only replace grants at their own scope.
+            # A parent and child grant remain independent alternatives.
+            if any(
+                other.address != source.address
+                and other_kind == kind
+                and (other_scope is None or other_scope.key == scope.key)
+                and _conflicts(source, binding, other)
+                for other, other_kind, other_scope, _ in managers
+            ):
+                problems.append(
+                    f"{source.address} for {bucket.address}: overlapping authoritative ancestor IAM managers"
+                )
+                continue
+            grants.append(
+                {
+                    **binding,
+                    "source": source.address,
+                    "grant_scope_kind": kind,
+                    "grant_scope": scope.key,
+                    "grant_ancestry": [item.key for item in hierarchy.scopes[: hierarchy.scopes.index(scope) + 1]],
+                }
+            )
+    return grants, problems
+
+
 def bucket_grant_candidates(
     principal: str,
     bucket: NormalizedResource,
@@ -167,7 +230,13 @@ def bucket_grant_candidates(
 
 
 def _binding_problem(source: NormalizedResource, binding: Mapping[str, Any]) -> str | None:
-    scope = "project" if source.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES else "bucket"
+    scope = (
+        "ancestor"
+        if source.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES
+        else "project"
+        if source.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES
+        else "bucket"
+    )
     if source.resource_type.endswith("_iam_policy"):
         facts = gcp_facts(source)
         if facts.iam_policy_data_state != "configured":

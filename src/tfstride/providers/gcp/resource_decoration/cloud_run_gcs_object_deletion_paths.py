@@ -13,6 +13,7 @@ from tfstride.providers.coercion import (
     dedupe_strings,
 )
 from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
     gcs_bucket_scope_name,
@@ -33,6 +34,7 @@ from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
@@ -43,7 +45,9 @@ from tfstride.providers.gcp.resource_utils import (
 
 _DELETE_PERMISSION = "storage.objects.delete"
 _SERVICE_ACCOUNT_DOMAIN = ".gserviceaccount.com"
-_IAM_RESOURCE_TYPES = GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
+_IAM_RESOURCE_TYPES = (
+    GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES | GCP_ORG_FOLDER_IAM_RESOURCE_TYPES
+)
 _DELETE_PREDEFINED_ROLES = frozenset(
     {
         "roles/storage.admin",
@@ -364,8 +368,10 @@ def _bucket_grant_candidates(
 
     _apply_management_ambiguity(
         candidates,
-        management_sources,
-        unresolved_managers,
+        # Ancestor managers are reconciled with condition-aware alternatives by
+        # evaluate_gcs_operation_constraints before any path is emitted.
+        [manager for manager in management_sources if manager.scope_type in {"project", "bucket"}],
+        [manager for manager in unresolved_managers if manager.scope_type in {"project", "bucket"}],
         uncertainties,
         bucket,
     )
@@ -480,7 +486,11 @@ def _applicable_scope(
     resources_by_address: Mapping[str, NormalizedResource],
     context: GcpDecorationContext,
 ) -> tuple[_ScopeState, GcpGcsObjectDeletionScopeType | None, str | None]:
-    del context
+    if source.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+        kind, scope, match = ancestor_iam_scope(source, bucket, context.index)
+        if match is False:
+            return "unrelated", None, None
+        return ("applicable" if match is True else "unresolved"), kind, scope or "unknown"
     facts = gcp_facts(source)
     if source.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
         scope = bucket_project
@@ -540,6 +550,8 @@ def _resolve_role(
     if not _looks_like_custom_role(role):
         return _RoleResolution("predefined", "unmodeled", False)
 
+    if scope_type in {"folder", "organization"}:
+        return _RoleResolution("custom", "unmodeled", False)
     resolution = custom_roles.resolve(role)
     custom = resolution.selected_candidate
     if custom is None:

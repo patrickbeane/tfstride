@@ -15,7 +15,7 @@ GcpGcsObjectDeletionTargetGranularity = Literal[
     "bucket_object_namespace",
     "bucket_generation_namespace",
 ]
-GcpGcsObjectDeletionScopeType = Literal["project", "bucket"]
+GcpGcsObjectDeletionScopeType = Literal["project", "bucket", "folder", "organization"]
 GcpGcsObjectDeletionAuthorizationState = Literal[
     "granted",
     "denied",

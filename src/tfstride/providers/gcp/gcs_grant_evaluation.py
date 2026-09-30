@@ -1,4 +1,4 @@
-"""Evaluate bucket/project IAM grants and modeled constraints for exact buckets.
+"""Evaluate scoped IAM grants and modeled constraints for exact GCS buckets.
 
 Workload identity selection and path/report projection belong to the caller.
 An authority result does not establish network reachability or operation success.
@@ -9,12 +9,13 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint, gcs_permission_constraints
 from tfstride.providers.gcp.gcs_project_grants import (
+    ancestor_grant_candidates,
     bucket_grant_candidates,
     project_grant_candidates,
     project_reference_index,
@@ -22,12 +23,26 @@ from tfstride.providers.gcp.gcs_project_grants import (
 from tfstride.providers.gcp.protected_data_evidence import GcpGcsAccessClass, GcpGcsAccessState
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
-from tfstride.providers.gcp.resource_types import GcpResourceType
+from tfstride.providers.gcp.resource_types import (
+    GCP_FOLDER_IAM_RESOURCE_TYPES,
+    GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
+    GCP_PROJECT_IAM_RESOURCE_TYPES,
+    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
+    GcpResourceType,
+)
 from tfstride.providers.gcp.resource_utils import GCP_ROLE_REFERENCE_SUFFIXES, binding_members, gcp_reference_key
 from tfstride.providers.resource_reference_index import ResourceReferenceIndex
 
 if TYPE_CHECKING:
     from tfstride.providers.gcp.custom_roles import GcpCustomRoleIndex
+
+
+GCS_ACCESS_IAM_TYPES_BY_BASIS = {
+    "storage_bucket_iam": GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
+    "storage_project_iam": GCP_PROJECT_IAM_RESOURCE_TYPES,
+    "storage_folder_iam": GCP_FOLDER_IAM_RESOURCE_TYPES,
+    "storage_organization_iam": GCP_ORGANIZATION_IAM_RESOURCE_TYPES,
+}
 
 
 class GcpGcsBucketGrant(TypedDict):
@@ -41,12 +56,14 @@ class GcpGcsBucketGrant(TypedDict):
     access_classes: list[GcpGcsAccessClass]
     custom_role_permissions: list[str]
     matched_permissions: list[str]
-    grant_basis: Literal["storage_bucket_iam", "storage_project_iam"]
+    grant_basis: Literal["storage_bucket_iam", "storage_project_iam", "storage_folder_iam", "storage_organization_iam"]
     resource_scope: Literal["exact_bucket"]
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
     grant_project: NotRequired[str]
+    grant_scope: NotRequired[str]
+    grant_ancestry: NotRequired[list[str]]
     permission_constraints: NotRequired[list[GcsPermissionConstraint]]
 
 
@@ -120,7 +137,8 @@ class GcsGrantConstraintContext:
     def bindings(self, principal: str, bucket: NormalizedResource) -> tuple[list[dict[str, object]], list[str]]:
         local, local_problems = bucket_grant_candidates(principal, bucket, self.resources, self.index)
         inherited, problems = project_grant_candidates(principal, bucket, self.resources, self.projects)
-        return [*local, *inherited], [*local_problems, *problems]
+        ancestors, ancestor_problems = ancestor_grant_candidates(principal, bucket, self.resources, self.index)
+        return [*local, *inherited, *ancestors], [*local_problems, *problems, *ancestor_problems]
 
 
 def evaluate_gcs_operation_constraints(
@@ -149,7 +167,9 @@ def evaluate_gcs_operation_constraints(
             *problems,
             f"{source_address} for {bucket.address}: unconditional scoped grant for {permission} is not established",
         ]
-    decisions = gcs_permission_constraints(principal, permission, bucket, context.deny_policies, context.projects)
+    decisions = gcs_permission_constraints(
+        principal, permission, bucket, context.deny_policies, context.projects, context.index
+    )
     if any(decision["state"] == "denied" for decision in decisions):
         return False, []
     return not decisions, [
@@ -167,8 +187,8 @@ def evaluate_gcs_bucket_grants(
 ) -> tuple[list[GcpGcsBucketGrant], list[str]]:
     """Return matching grant evidence and uncertainty without workload-specific prose.
 
-    Full inventory inputs supply project grants and deny constraints. Conditions
-    remain separate alternatives. Project custom/basic roles stay unresolved.
+    Full inventory inputs supply ancestor grants and deny constraints. Conditions
+    remain separate alternatives. Inherited custom/basic roles stay unresolved.
     """
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
@@ -191,9 +211,12 @@ def evaluate_gcs_bucket_grants(
                 uncertainties.append(f"{source or bucket.address} IAM role is unresolved")
                 continue
             project = _known_string(binding.get("grant_project"))
-            if project and (role not in _BUILT_IN_ROLE_ACCESS or role in {"roles/editor", "roles/owner"}):
+            ancestor_kind = binding.get("grant_scope_kind")
+            if (project or ancestor_kind) and (
+                role not in _BUILT_IN_ROLE_ACCESS or role in {"roles/editor", "roles/owner"}
+            ):
                 uncertainties.append(
-                    f"{source}: project role {role} for {bucket.address} is not representable by predefined GCS semantics"
+                    f"{source}: inherited role {role} for {bucket.address} is not representable by predefined GCS semantics"
                 )
                 continue
             role_access = _role_access(role, custom_roles)
@@ -223,7 +246,7 @@ def evaluate_gcs_bucket_grants(
                 surviving: list[str] = []
                 for permission in permissions:
                     decisions = gcs_permission_constraints(
-                        principal, permission, bucket, context.deny_policies, context.projects
+                        principal, permission, bucket, context.deny_policies, context.projects, context.index
                     )
                     constraints.extend(decisions)
                     if not decisions:
@@ -253,6 +276,14 @@ def evaluate_gcs_bucket_grants(
             if project:
                 grant["grant_basis"] = "storage_project_iam"
                 grant["grant_project"] = project
+                if not grant["matched_permissions"]:
+                    grant["matched_permissions"] = list(_modeled_permissions(role, role_access))
+            if ancestor_kind:
+                grant["grant_basis"] = (
+                    "storage_folder_iam" if ancestor_kind == "folders" else "storage_organization_iam"
+                )
+                grant["grant_scope"] = str(binding["grant_scope"])
+                grant["grant_ancestry"] = list(cast(list[str], binding["grant_ancestry"]))
                 if not grant["matched_permissions"]:
                     grant["matched_permissions"] = list(_modeled_permissions(role, role_access))
             if constraints:

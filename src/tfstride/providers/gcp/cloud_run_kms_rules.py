@@ -16,7 +16,7 @@ from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
-from tfstride.providers.gcp.gcs_grant_evaluation import gcs_path_permissions
+from tfstride.providers.gcp.gcs_grant_evaluation import GCS_ACCESS_IAM_TYPES_BY_BASIS, gcs_path_permissions
 from tfstride.providers.gcp.kms_dependency_evidence import GcpKmsEncryptionDependency
 from tfstride.providers.gcp.kms_evidence import (
     GcpCloudRunKmsManagementPath,
@@ -40,7 +40,6 @@ from tfstride.providers.gcp.resource_types import (
     GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
     GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
-    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
 from tfstride.providers.gcp.resource_utils import binding_members
@@ -1332,7 +1331,7 @@ def _is_deterministic_gcs_access_path(
         or path["credential_context"] != "workload_runtime"
         or path["bucket_address"] != bucket.address
         or path["bucket_name"] != (gcp_facts(bucket).bucket_name or bucket.name)
-        or path["grant_basis"] not in {"storage_bucket_iam", "storage_project_iam"}
+        or path["grant_basis"] not in GCS_ACCESS_IAM_TYPES_BY_BASIS
         or path["resource_scope"] != "exact_bucket"
         or path["condition"] is not None
         or path["condition_state"] != "not_configured"
@@ -1341,7 +1340,7 @@ def _is_deterministic_gcs_access_path(
         or not _gcs_path_has_payload_read(path)
         or iam_resource is None
         or iam_resource.provider != "gcp"
-        or iam_resource.resource_type not in (GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES | GCP_PROJECT_IAM_RESOURCE_TYPES)
+        or iam_resource.resource_type not in GCS_ACCESS_IAM_TYPES_BY_BASIS.get(path["grant_basis"], frozenset())
     ):
         return False
     return path in current_gcs_paths

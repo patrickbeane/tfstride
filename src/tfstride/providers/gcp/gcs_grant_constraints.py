@@ -12,9 +12,10 @@ from typing import Any, Literal, TypedDict
 from urllib.parse import unquote
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_scope, bucket_hierarchy
 from tfstride.providers.gcp.gcs_project_grants import project_identity, project_scope_matches
-from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_index import GcpResourceIndex
 from tfstride.providers.resource_reference_index import ResourceReferenceIndex
 
 
@@ -31,10 +32,11 @@ def gcs_permission_constraints(
     bucket: NormalizedResource,
     policies: Sequence[NormalizedResource],
     projects: ResourceReferenceIndex,
+    index: GcpResourceIndex,
 ) -> list[GcsPermissionConstraint]:
     evidence: list[GcsPermissionConstraint] = []
     for policy in policies:
-        scope = _policy_scope(policy, bucket, projects)
+        scope = _policy_scope(policy, bucket, projects, index)
         if scope is False:
             continue
         facts = gcp_facts(policy)
@@ -79,7 +81,7 @@ def gcs_permission_constraints(
 
 
 def _policy_scope(
-    policy: NormalizedResource, bucket: NormalizedResource, projects: ResourceReferenceIndex
+    policy: NormalizedResource, bucket: NormalizedResource, projects: ResourceReferenceIndex, index: GcpResourceIndex
 ) -> bool | None:
     facts = gcp_facts(policy)
     if facts.iam_deny_policy_parent_state != "configured":
@@ -93,24 +95,7 @@ def _policy_scope(
     project = project_identity(gcp_facts(bucket).project, projects)
     if kind == "projects":
         return project_scope_matches(project, project_identity(value, projects))
-    owner = projects.resolve(project).selected_candidate
-    if owner is None:
-        return None
-    unknown = owner.get_metadata_field(GcpResourceMetadata.HIERARCHY_UNKNOWN_FIELDS)
-    if set(unknown) & {"org_id", "organization_id", "folder_id", "parent"}:
-        return None
-    owner_facts = gcp_facts(owner)
-    parent = owner.get_metadata_field(GcpResourceMetadata.HIERARCHY_PARENT)
-    if kind == "organizations" and owner_facts.organization_id:
-        organization = owner_facts.organization_id.removeprefix("organizations/")
-        if owner_facts.folder_id or (parent and parent != f"organizations/{organization}"):
-            return None
-        return organization == value
-    if kind == "folders" and owner_facts.folder_id:
-        if owner_facts.folder_id.removeprefix("folders/") == value:
-            return True
-    # A different immediate folder does not exclude an ancestor folder.
-    return None
+    return bucket_hierarchy(bucket, index).contains(ancestor_scope(value, kind, index))
 
 
 def _rule_denies(rule: Mapping[str, Any], principal: str, permission: str) -> bool | None:

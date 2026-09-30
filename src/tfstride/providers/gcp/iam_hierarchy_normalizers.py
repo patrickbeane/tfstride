@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from tfstride.models import NormalizedResource, ResourceCategory, TerraformResource
+from tfstride.providers.coercion import attribute_unknown
 from tfstride.providers.gcp.attributes import GcpAttr, GcpAttribute, GcpValues
 from tfstride.providers.gcp.coercion import compact
 from tfstride.providers.gcp.iam_normalizer_utils import (
@@ -10,12 +11,24 @@ from tfstride.providers.gcp.iam_normalizer_utils import (
     _condition,
     _iam_bindings,
     _policy_bindings,
+    _policy_data_state,
     _target_reference,
 )
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer_common import GCP_PROVIDER
 from tfstride.providers.gcp.resource_utils import first_non_empty
 from tfstride.providers.json_documents import load_json_document
+
+
+def _scope_reference(
+    resource: TerraformResource,
+    values: GcpValues,
+    keys: tuple[GcpAttribute[Any], ...],
+) -> tuple[str | None, str]:
+    if any(attribute_unknown(resource.unknown_values, key.key) for key in keys):
+        return None, "unknown"
+    reference = _target_reference(values, keys)
+    return reference, "configured" if reference else "not_configured"
 
 
 def normalize_organization_iam_member(resource: TerraformResource) -> NormalizedResource:
@@ -73,7 +86,7 @@ def _normalize_scope_iam_member(
     scope_keys: tuple[GcpAttribute[Any], ...],
 ) -> NormalizedResource:
     values = GcpValues(resource.values)
-    scope_reference = _target_reference(values, scope_keys)
+    scope_reference, scope_state = _scope_reference(resource, values, scope_keys)
     role = first_non_empty(values.get(GcpAttr.ROLE))
     member = first_non_empty(values.get(GcpAttr.MEMBER))
     return NormalizedResource(
@@ -87,12 +100,18 @@ def _normalize_scope_iam_member(
         ),
         metadata={
             scope_field: scope_reference,
+            GcpResourceMetadata.IAM_SCOPE_REFERENCE_STATE: scope_state,
             GcpResourceMetadata.IAM_ROLE: role,
             GcpResourceMetadata.IAM_MEMBER: member,
             GcpResourceMetadata.IAM_MEMBERS: compact([member]),
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
             GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
-                role, compact([member]), condition=values.raw(GcpAttr.CONDITION)
+                role,
+                compact([member]),
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
+                role_unknown=attribute_unknown(resource.unknown_values, GcpAttr.ROLE.key),
+                members_unknown=attribute_unknown(resource.unknown_values, GcpAttr.MEMBER.key),
             ),
         },
     )
@@ -105,7 +124,7 @@ def _normalize_scope_iam_binding(
     scope_keys: tuple[GcpAttribute[Any], ...],
 ) -> NormalizedResource:
     values = GcpValues(resource.values)
-    scope_reference = _target_reference(values, scope_keys)
+    scope_reference, scope_state = _scope_reference(resource, values, scope_keys)
     role = first_non_empty(values.get(GcpAttr.ROLE))
     members = values.get(GcpAttr.MEMBERS)
     return NormalizedResource(
@@ -119,10 +138,18 @@ def _normalize_scope_iam_binding(
         ),
         metadata={
             scope_field: scope_reference,
+            GcpResourceMetadata.IAM_SCOPE_REFERENCE_STATE: scope_state,
             GcpResourceMetadata.IAM_ROLE: role,
             GcpResourceMetadata.IAM_MEMBERS: members,
             GcpResourceMetadata.IAM_CONDITION: _condition(values.raw(GcpAttr.CONDITION)),
-            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(role, members, condition=values.raw(GcpAttr.CONDITION)),
+            GcpResourceMetadata.IAM_BINDINGS: _iam_bindings(
+                role,
+                members,
+                condition=values.raw(GcpAttr.CONDITION),
+                condition_unknown=attribute_unknown(resource.unknown_values, GcpAttr.CONDITION.key),
+                role_unknown=attribute_unknown(resource.unknown_values, GcpAttr.ROLE.key),
+                members_unknown=attribute_unknown(resource.unknown_values, GcpAttr.MEMBERS.key),
+            ),
         },
     )
 
@@ -134,7 +161,7 @@ def _normalize_scope_iam_policy(
     scope_keys: tuple[GcpAttribute[Any], ...],
 ) -> NormalizedResource:
     values = GcpValues(resource.values)
-    scope_reference = _target_reference(values, scope_keys)
+    scope_reference, scope_state = _scope_reference(resource, values, scope_keys)
     policy_document = load_json_document(values.raw(GcpAttr.POLICY_DATA))
     bindings = _policy_bindings(policy_document)
     return NormalizedResource(
@@ -146,6 +173,11 @@ def _normalize_scope_iam_policy(
         identifier=first_non_empty(values.get(GcpAttr.ID), scope_reference, resource.address),
         metadata={
             scope_field: scope_reference,
+            GcpResourceMetadata.IAM_SCOPE_REFERENCE_STATE: scope_state,
+            GcpResourceMetadata.IAM_POLICY_DATA_STATE: _policy_data_state(
+                values.raw(GcpAttr.POLICY_DATA),
+                unknown=attribute_unknown(resource.unknown_values, GcpAttr.POLICY_DATA.key),
+            ),
             GcpResourceMetadata.IAM_BINDINGS: bindings,
             GcpResourceMetadata.POLICY_DOCUMENT: policy_document,
         },

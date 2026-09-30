@@ -20,7 +20,9 @@ from tfstride.providers.gcp.cloud_run_public_invocation import (
     current_cloud_run_public_invokers,
 )
 from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import (
+    GCS_ACCESS_IAM_TYPES_BY_BASIS,
     GcsGrantConstraintContext,
     evaluate_gcs_operation_constraints,
     gcs_path_permissions,
@@ -40,6 +42,7 @@ from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_RUN_RESOURCE_TYPES,
     GCP_CUSTOM_ROLE_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
@@ -255,7 +258,7 @@ def _is_deterministic_mutation_path(
         or path.get("workload_type") != workload.resource_type
         or path.get("identity_kind") != "cloud_run_service_account"
         or path.get("credential_context") != "workload_runtime"
-        or path.get("grant_basis") not in {"storage_bucket_iam", "storage_project_iam"}
+        or path.get("grant_basis") not in GCS_ACCESS_IAM_TYPES_BY_BASIS
         or path.get("resource_scope") != "exact_bucket"
         or path.get("access_state") != "granted"
         or path.get("condition_state") != "not_configured"
@@ -281,11 +284,7 @@ def _is_deterministic_mutation_path(
         or bucket.resource_type != GcpResourceType.STORAGE_BUCKET
         or iam_resource is None
         or iam_resource.resource_type
-        not in (
-            GCP_PROJECT_IAM_RESOURCE_TYPES
-            if path.get("grant_basis") == "storage_project_iam"
-            else GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
-        )
+        not in GCS_ACCESS_IAM_TYPES_BY_BASIS.get(str(path.get("grant_basis")), frozenset())
     ):
         return False
 
@@ -417,6 +416,15 @@ def _mutation_path_evidence(paths: Sequence[Mapping[str, Any]]) -> list[str]:
                         else ()
                     ),
                     *(
+                        (
+                            f"grant_basis={path['grant_basis']}",
+                            f"grant_scope={path.get('grant_scope')}",
+                            f"grant_ancestry={','.join(path.get('grant_ancestry', []))}",
+                        )
+                        if path.get("grant_scope")
+                        else ()
+                    ),
+                    *(
                         f"permission_constraint={constraint.get('policy_address')}:"
                         f"{constraint.get('permission')}:{constraint.get('state')}"
                         for raw_constraint in path.get("permission_constraints", [])
@@ -507,7 +515,7 @@ def _is_current_object_deletion_path(
     ):
         return False
 
-    if not _iam_source_is_current(path, source, bucket.address, bucket_name, bucket_project, member):
+    if not _iam_source_is_current(path, source, bucket, bucket_name, bucket_project, member, grant_context):
         return False
     if not _role_evidence_is_current(path, source, context):
         return False
@@ -549,15 +557,21 @@ def _target_scope_is_current(path: Mapping[str, object], bucket_name: str) -> bo
 def _iam_source_is_current(
     path: Mapping[str, object],
     source: NormalizedResource,
-    bucket_address: str,
+    bucket: NormalizedResource,
     bucket_name: str,
     bucket_project: str,
     service_account_member: str,
+    grant_context: GcsGrantConstraintContext,
 ) -> bool:
+    bucket_address = bucket.address
     source_facts = gcp_facts(source)
     if source_facts.iam_scope_reference_state in {"unknown", "not_configured"}:
         return False
-    if source.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
+    if source.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+        expected_scope_type, expected_scope, match = ancestor_iam_scope(source, bucket, grant_context.index)
+        if match is not True:
+            return False
+    elif source.resource_type in GCP_PROJECT_IAM_RESOURCE_TYPES:
         expected_scope_type = "project"
         expected_scope = bucket_project
         if normalize_gcp_project(source_facts.project) != bucket_project:

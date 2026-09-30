@@ -31,6 +31,7 @@ from tfstride.providers.azure.object_storage_topology_destruction_evidence impor
     AzureStorageContainerTopologyDestructionRecoveryEvidence,
 )
 from tfstride.providers.gcp.object_storage_topology_destruction_evidence import (
+    GcpCloudRunGcsAncestorBucketTopologyDestructionPath,
     GcpCloudRunGcsBucketTopologyDestructionPath,
     GcpCloudRunGcsExactBucketTopologyDestructionPath,
     GcpCloudRunGcsProjectBucketTopologyDestructionPath,
@@ -115,6 +116,11 @@ class ObjectStorageTopologyDestructionEvidenceTests(unittest.TestCase):
     def test_gcp_contract_discriminates_project_and_bucket_iam_scope(
         self,
     ) -> None:
+        ancestor_hints = get_type_hints(GcpCloudRunGcsAncestorBucketTopologyDestructionPath)
+        self.assertEqual(ancestor_hints["scope_type"], Literal["folder", "organization"])
+        self.assertEqual(ancestor_hints["grant_basis"], Literal["gcs_folder_iam", "gcs_organization_iam"])
+        self.assertEqual(ancestor_hints["resource_scope"], Literal["gcs_folder", "gcs_organization"])
+        self.assertEqual(ancestor_hints["role_evidence"], GcpGcsBucketTopologyBucketBuiltInRoleEvidence)
         project_hints = get_type_hints(GcpCloudRunGcsProjectBucketTopologyDestructionPath)
         bucket_hints = get_type_hints(GcpCloudRunGcsExactBucketTopologyDestructionPath)
         project_role_hints = get_type_hints(GcpGcsBucketTopologyProjectBuiltInRoleEvidence)
@@ -126,6 +132,7 @@ class ObjectStorageTopologyDestructionEvidenceTests(unittest.TestCase):
             {
                 GcpCloudRunGcsProjectBucketTopologyDestructionPath,
                 GcpCloudRunGcsExactBucketTopologyDestructionPath,
+                GcpCloudRunGcsAncestorBucketTopologyDestructionPath,
             },
         )
         self.assertEqual(

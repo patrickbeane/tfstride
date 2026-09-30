@@ -6,7 +6,7 @@ GcpGcsBucketTopologyDestructionOperation = Literal["storage.buckets.delete"]
 GcpGcsBucketTopologyDestructionOperationClass = Literal["bucket_deletion"]
 GcpGcsBucketTopologyDestructionInternalOperation = Literal["delete_bucket"]
 GcpGcsBucketTopologyDestructionTargetGranularity = Literal["bucket_topology"]
-GcpGcsBucketTopologyDestructionScopeType = Literal["project", "bucket"]
+GcpGcsBucketTopologyDestructionScopeType = Literal["project", "bucket", "folder", "organization"]
 GcpGcsBucketTopologyActiveCustomRoleStage = Literal[
     "ALPHA",
     "BETA",
@@ -163,7 +163,19 @@ class GcpCloudRunGcsExactBucketTopologyDestructionPath(
     role_evidence: GcpGcsBucketTopologyBucketRoleEvidence
 
 
+class GcpCloudRunGcsAncestorBucketTopologyDestructionPath(
+    GcpCloudRunGcsBucketTopologyDestructionPathCommon,
+):
+    scope_type: Literal["folder", "organization"]
+    scope: str
+    resource_scope: Literal["gcs_folder", "gcs_organization"]
+    grant_basis: Literal["gcs_folder_iam", "gcs_organization_iam"]
+    role_evidence: GcpGcsBucketTopologyBucketBuiltInRoleEvidence
+
+
 GcpCloudRunGcsBucketTopologyDestructionPath = (
-    GcpCloudRunGcsProjectBucketTopologyDestructionPath | GcpCloudRunGcsExactBucketTopologyDestructionPath
+    GcpCloudRunGcsAncestorBucketTopologyDestructionPath
+    | GcpCloudRunGcsProjectBucketTopologyDestructionPath
+    | GcpCloudRunGcsExactBucketTopologyDestructionPath
 )
 GcpCloudRunGcsBucketTopologyDestructionEvidence = GcpCloudRunGcsBucketTopologyDestructionPath

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import STATE_CONFIGURED, dedupe
 from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
-from tfstride.providers.gcp.gcs_grant_evaluation import gcs_path_permissions
+from tfstride.providers.gcp.gcs_grant_evaluation import GCS_ACCESS_IAM_TYPES_BY_BASIS, gcs_path_permissions
 from tfstride.providers.gcp.kms_dependency_evidence import (
     GcpKmsEncryptionDependency,
 )
@@ -23,7 +23,6 @@ from tfstride.providers.gcp.resource_types import (
     GCP_KMS_CRYPTO_KEY_IAM_RESOURCE_TYPES,
     GCP_KMS_KEY_RING_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
-    GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
 )
 
@@ -182,9 +181,9 @@ def _deterministic_payload_read(
         and path["bucket_project"] == bucket_facts.project
         and iam_resource is not None
         and iam_resource.provider == "gcp"
-        and iam_resource.resource_type in (GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES | GCP_PROJECT_IAM_RESOURCE_TYPES)
+        and iam_resource.resource_type in GCS_ACCESS_IAM_TYPES_BY_BASIS.get(path["grant_basis"], frozenset())
         and path in current_paths
-        and path["grant_basis"] in {"storage_bucket_iam", "storage_project_iam"}
+        and path["grant_basis"] in GCS_ACCESS_IAM_TYPES_BY_BASIS
         and path["resource_scope"] == "exact_bucket"
         and path["condition"] is None
         and path["condition_state"] == "not_configured"

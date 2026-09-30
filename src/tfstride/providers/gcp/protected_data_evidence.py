@@ -28,12 +28,14 @@ class GcpCloudRunGcsAccessPath(TypedDict):
     access_classes: list[GcpGcsAccessClass]
     custom_role_permissions: list[str]
     matched_permissions: list[str]
-    grant_basis: Literal["storage_bucket_iam", "storage_project_iam"]
+    grant_basis: Literal["storage_bucket_iam", "storage_project_iam", "storage_folder_iam", "storage_organization_iam"]
     resource_scope: Literal["exact_bucket"]
     condition: dict[str, object] | None
     condition_state: Literal["configured", "not_configured"]
     access_state: GcpGcsAccessState
     grant_project: NotRequired[str]
+    grant_scope: NotRequired[str]
+    grant_ancestry: NotRequired[list[str]]
     permission_constraints: NotRequired[list[GcsPermissionConstraint]]
 
 

@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
 from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
     gcs_bucket_scope_name,
@@ -28,6 +29,7 @@ from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
     GCP_CLOUD_RUN_RESOURCE_TYPES,
+    GCP_ORG_FOLDER_IAM_RESOURCE_TYPES,
     GCP_PROJECT_IAM_RESOURCE_TYPES,
     GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES,
     GcpResourceType,
@@ -71,7 +73,7 @@ _KNOWN_NON_DELETE_ROLES = frozenset(
     }
 )
 
-_ScopeType = Literal["project", "bucket"]
+_ScopeType = Literal["project", "bucket", "folder", "organization"]
 _ManagementMode = Literal[
     "authoritative_policy",
     "authoritative_role_binding",
@@ -355,6 +357,10 @@ def _iam_manager_ambiguities(
     managers: list[_IamManager] = []
     unresolved_managers: list[_IamManager] = []
     for iam_resource in iam_resources:
+        # The shared constraint evaluator reconciles ancestor managers, retaining
+        # distinct conditions rather than collapsing every binding of one role.
+        if iam_resource.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+            continue
         scope_type, scope, scope_uncertainty = _iam_scope(
             iam_resource,
             target,
@@ -462,6 +468,11 @@ def _iam_scope(
     target: _BucketTarget,
     context: GcpDecorationContext,
 ) -> tuple[_ScopeType | None, str | None, str | None]:
+    if iam_resource.resource_type in GCP_ORG_FOLDER_IAM_RESOURCE_TYPES:
+        kind, scope, match = ancestor_iam_scope(iam_resource, target.resource, context.index)
+        if match is True:
+            return kind, scope, None
+        return None, None, "grant ancestry is unresolved" if match is None else None
     facts = gcp_facts(iam_resource)
     if facts.iam_scope_reference_state in {"unknown", "not_configured"}:
         return None, None, "scope reference is unresolved"
@@ -524,7 +535,9 @@ def _role_evidence(
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
 ) -> tuple[_RoleEvidence | None, str | None]:
-    if scope_type == "project":
+    if scope_type in {"folder", "organization"} and role != "roles/storage.admin":
+        return None, None if role in _KNOWN_NON_DELETE_ROLES else "ancestor role permission is not modeled"
+    if scope_type in {"project", "folder", "organization"}:
         role_kind = _PROJECT_BUILT_IN_ROLES.get(role)
         if role_kind is not None:
             evidence: GcpGcsBucketTopologyProjectBuiltInRoleEvidence = {
@@ -655,8 +668,8 @@ def _topology_destruction_path(
         "recovery_evidence": _recovery_evidence(target.resource),
         "scope_type": scope_type,
         "scope": scope,
-        "resource_scope": "gcs_project" if scope_type == "project" else "exact_gcs_bucket",
-        "grant_basis": "gcs_project_iam" if scope_type == "project" else "gcs_bucket_iam",
+        "resource_scope": f"gcs_{scope_type}" if scope_type != "bucket" else "exact_gcs_bucket",
+        "grant_basis": f"gcs_{scope_type}_iam",
         "role_evidence": role_evidence,
     }
     common["posture_uncertainties"] = list(common["recovery_evidence"]["uncertainties"])
@@ -829,7 +842,9 @@ def _management_mode(resource: NormalizedResource) -> _ManagementMode:
 def _iam_resources(
     resources: Sequence[NormalizedResource],
 ) -> tuple[NormalizedResource, ...]:
-    resource_types = GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES
+    resource_types = (
+        GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES | GCP_ORG_FOLDER_IAM_RESOURCE_TYPES
+    )
     return tuple(resource for resource in resources if resource.resource_type in resource_types)
 
 

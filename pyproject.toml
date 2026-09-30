@@ -251,6 +251,8 @@ include = [
   "src/tfstride/providers/gcp/resource_decoration/cloud_run_gcs_access_paths.py",
   "src/tfstride/providers/gcp/gcs_grant_evaluation.py",
   "src/tfstride/providers/gcp/gcs_project_grants.py",
+  "src/tfstride/providers/gcp/gcs_grant_ancestry.py",
+  "src/tfstride/providers/gcp/resource_hierarchy.py",
   "src/tfstride/providers/gcp/gcs_grant_constraints.py",
   "src/tfstride/providers/gcp/resource_decoration/cloud_run_gcs_protected_data_convergence.py",
   "src/tfstride/providers/gcp/resource_decoration/kms_iam.py",

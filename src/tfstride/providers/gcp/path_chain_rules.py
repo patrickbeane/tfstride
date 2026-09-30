@@ -17,7 +17,7 @@ from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths impor
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
 
-_CloudRunDataPath = tuple[NormalizedResource, TrustBoundary, dict[str, Any] | None]
+_CloudRunDataPath = tuple[NormalizedResource, TrustBoundary | None, dict[str, Any] | None]
 
 
 class GcpPathChainRuleDetectors:
@@ -63,6 +63,25 @@ class GcpPathChainRuleDetectors:
                 continue
             paths_by_workload.setdefault(workload.address, []).append((data_store, boundary, exact_cloud_run_path))
 
+        # Exact evaluated GCS read authority does not require a coarse topology
+        # boundary. Inherited grants may have no such presentation edge at all.
+        for workload in inventory.resources:
+            if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES or not workload.public_exposure:
+                continue
+            if workload.address not in gcs_paths:
+                gcs_paths[workload.address] = current_cloud_run_gcs_access_paths(
+                    workload, inventory.resources, custom_roles
+                )
+            existing = {item[0].address for item in paths_by_workload.get(workload.address, ())}
+            for path in gcs_paths[workload.address]:
+                target = inventory.get_by_address(str(path.get("bucket_address")))
+                if target is None or target.address in existing or target.data_sensitivity != "sensitive":
+                    continue
+                if _exact_cloud_run_gcs_read_state(workload, target, (path,)) is not True:
+                    continue
+                paths_by_workload.setdefault(workload.address, []).append((target, None, None))
+                existing.add(target.address)
+
         for workload_address in sorted(paths_by_workload):
             workload = inventory.get_by_address(workload_address)
             if workload is None:
@@ -77,6 +96,17 @@ class GcpPathChainRuleDetectors:
                 for data_store, _, exact_path in data_paths
                 for source in _data_path_policy_sources(data_store, exact_path)
             ]
+            inherited_gcs_paths = [
+                path
+                for path in gcs_paths.get(workload.address, ())
+                if path.get("bucket_address") in data_store_addresses
+                and path.get("grant_scope")
+                and path.get("access_state") == "granted"
+                and path.get("condition_state") == "not_configured"
+                and "storage.objects.get" in gcs_path_permissions(path)
+            ]
+            policy_sources.extend(str(path["iam_resource_address"]) for path in inherited_gcs_paths)
+            policy_sources = list(dict.fromkeys(policy_sources))
             cloud_run_secret_paths = [exact_path for _, _, exact_path in data_paths if exact_path is not None]
             workload_identities = gcp_facts(workload).identity_members
             severity_reasoning = build_severity_reasoning(
@@ -86,7 +116,9 @@ class GcpPathChainRuleDetectors:
                 lateral_movement=1,
                 blast_radius=2 if len(data_store_addresses) > 1 else 1,
             )
-            trust_boundary_id = data_paths[0][1].identifier if len(data_paths) == 1 else None
+            trust_boundary_id = (
+                data_paths[0][1].identifier if len(data_paths) == 1 and data_paths[0][1] is not None else None
+            )
             findings.append(
                 self._finding_factory.build(
                     rule_id=rule_id,
@@ -109,18 +141,35 @@ class GcpPathChainRuleDetectors:
                         evidence_item(
                             "data_access_path",
                             [
-                                f"{workload.address} reaches {data_store.address}"
-                                for data_store, _, exact_path in data_paths
+                                (
+                                    f"{workload.address} identity is authorized for storage.objects.get on {data_store.address}"
+                                    if boundary is None
+                                    else f"{workload.address} reaches {data_store.address}"
+                                )
+                                for data_store, boundary, exact_path in data_paths
                                 if exact_path is None
                             ],
                         ),
                         evidence_item(
                             "boundary_rationale",
-                            [boundary.rationale for _, boundary, exact_path in data_paths if exact_path is None],
+                            [
+                                boundary.rationale
+                                for _, boundary, exact_path in data_paths
+                                if exact_path is None and boundary is not None
+                            ],
                         ),
                         evidence_item(
                             "cloud_run_secret_access_paths",
                             _cloud_run_secret_access_evidence(cloud_run_secret_paths),
+                        ),
+                        evidence_item(
+                            "gcs_inherited_read_authority",
+                            [
+                                f"bucket={path['bucket_address']}; operation=storage.objects.get; "
+                                f"source={path['iam_resource_address']}; grant_scope={path['grant_scope']}; "
+                                f"grant_ancestry={','.join(path.get('grant_ancestry', []))}"
+                                for path in inherited_gcs_paths
+                            ],
                         ),
                         evidence_item("resource_policy_sources", policy_sources),
                     ),
