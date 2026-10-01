@@ -17,6 +17,7 @@ from tfstride.providers.aws.s3_identity_authorization import (
     evaluate_s3_identity_authorization,
     s3_access_classes,
 )
+from tfstride.providers.aws.s3_object_scopes import is_exact_s3_bucket_arn, s3_resource_for_bucket
 from tfstride.providers.coercion import dedupe
 
 _ECS_TASK_DEFINITION = "aws_ecs_task_definition"
@@ -108,12 +109,17 @@ def _ecs_s3_access_paths(
 
     paths: list[AwsEcsS3AccessPath] = []
     for bucket in target_buckets:
-        if not bucket.arn:
+        if not is_exact_s3_bucket_arn(bucket.arn):
             uncertainties.append(
                 f"{task_definition.address}: S3 bucket {bucket.address} has no resolved ARN for IAM scope matching"
             )
             continue
-        authorization = evaluate_s3_identity_authorization(identity_policy, bucket, bucket_policies[bucket.address])
+        authorization = evaluate_s3_identity_authorization(
+            identity_policy,
+            bucket,
+            bucket_policies[bucket.address],
+            account_relationship=context.index.account_identities.relationship(task_role, bucket),
+        )
         if authorization is None:
             continue
         uncertainties.extend(f"{task_definition.address}: {reason}" for reason in authorization.uncertainties)
@@ -137,16 +143,31 @@ def _target_buckets(
                 # Broad denies constrain already resolved targets; they do not discover new grants.
                 if statement.effect.strip().lower() == "deny" and _has_wildcard(resource):
                     continue
-                uncertainties.append(
-                    f"{role.address} S3 policy resource {resource!r} does not identify an exact bucket"
-                )
+                if statement.effect.strip().lower() == "allow":
+                    for candidate in context.index.buckets.resources:
+                        arn = candidate.arn
+                        if not is_exact_s3_bucket_arn(arn):
+                            continue
+                        assert arn is not None
+                        if not any(
+                            s3_resource_for_bucket(resource, arn, kind) for kind in ("bucket_level", "object_level")
+                        ):
+                            continue
+                        if context.index.buckets.get(arn) is None:
+                            uncertainties.append(f"{role.address} S3 policy target {arn} is ambiguous in the plan")
+                            continue
+                        buckets[candidate.address] = candidate
+                if not _has_wildcard(resource) or "${" in resource:
+                    uncertainties.append(
+                        f"{role.address} S3 policy resource {resource!r} does not identify a modeled bucket scope"
+                    )
                 continue
             bucket = context.index.buckets.get(bucket_arn, source=role)
             if bucket is None:
                 uncertainties.append(f"{role.address} S3 policy targets {bucket_arn}, which is not modeled in the plan")
                 continue
             buckets[bucket.address] = bucket
-    return list(buckets.values()), dedupe(uncertainties)
+    return sorted(buckets.values(), key=lambda bucket: bucket.address), dedupe(uncertainties)
 
 
 def _has_s3_action_pattern(statement: IAMPolicyStatement) -> bool:
@@ -194,6 +215,9 @@ def _access_path_record(
         "role_address": task_role.address,
         "role_arn": task_role.arn or aws_facts(task_definition).task_role_arn,
         "role_policy_complete": authorization.identity_policy.complete,
+        "role_account_id": authorization.account_relationship.source.account_id,
+        "bucket_account_id": authorization.account_relationship.target.account_id,
+        "same_account": authorization.account_relationship.same_account,
         "evaluation_basis": "modeled_identity_policy_with_bucket_policy_constraints",
         "modeled_access_state": authorization.modeled_access_state,
         "access_state": authorization.access_state,
@@ -214,7 +238,7 @@ def _access_path_record(
         "scope_evaluations": assessment["scope_evaluations"],
         "bucket_policy_constraints_complete": bucket_constraints.complete,
         "bucket_policy_source_addresses": list(bucket_constraints.source_addresses),
-        "bucket_policy_statements": list(bucket_constraints.records),
+        "bucket_policy_statements": [*bucket_constraints.records, *bucket_constraints.allow_records],
         "bucket_policy_uncertainties": list(bucket_constraints.uncertainties),
     }
 

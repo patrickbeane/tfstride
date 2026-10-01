@@ -225,6 +225,8 @@ def _aws_resources(
             aws_service(),
         ]
     )
+    for resource in resources:
+        resource.provider_config_key = "aws"
     return resources
 
 
@@ -680,12 +682,12 @@ class PublicWorkloadObjectStorageTopologyDestructionBoundaryTests(unittest.TestC
                 ],
                 incomplete=True,
             ),
-            "non exact": _aws_resources(
+            "unmodeled": _aws_resources(
                 [
                     aws_statement(
                         "Allow",
                         _AWS_DELETE_BUCKET,
-                        "arn:aws:s3:::orders-*",
+                        "arn:aws:s3:::unmodeled-*",
                     )
                 ]
             ),
@@ -705,15 +707,7 @@ class PublicWorkloadObjectStorageTopologyDestructionBoundaryTests(unittest.TestC
                     and not path["conditional_evaluation_required"]
                 ]
                 self.assertEqual(deterministic, [])
-                if case == "non exact":
-                    self.assertTrue(
-                        any(
-                            "does not identify an exact bucket" in value
-                            for value in facts.ecs_s3_access_path_uncertainties
-                        )
-                    )
-                else:
-                    self.assertEqual(len(facts.ecs_s3_access_paths), 1)
+                self.assertEqual(len(facts.ecs_s3_access_paths), 0 if case == "unmodeled" else 1)
 
     def test_aws_bucket_policy_constraints_preserve_separate_account_evidence(
         self,
@@ -788,7 +782,7 @@ class PublicWorkloadObjectStorageTopologyDestructionBoundaryTests(unittest.TestC
         self.assertEqual(foreign_inventory.primary_account_id, _AWS_ACCOUNT_ID)
         self.assertEqual(
             foreign_facts.ecs_s3_access_paths[0]["access_state"],
-            "allowed",
+            "unknown",
         )
         self.assertNotEqual(
             parse_aws_account_id(foreign_facts.ecs_s3_access_paths[0]["role_arn"]),

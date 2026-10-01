@@ -354,7 +354,7 @@ class AwsEcsS3BucketTopologyDestructionPathTests(unittest.TestCase):
             )
         )
 
-    def test_explicit_denies_conditions_incompleteness_and_wildcards_fail_closed(
+    def test_explicit_denies_conditions_and_incompleteness_fail_closed(
         self,
     ) -> None:
         cases: dict[str, dict[str, object]] = {
@@ -385,15 +385,6 @@ class AwsEcsS3BucketTopologyDestructionPathTests(unittest.TestCase):
                         _DELETE_BUCKET,
                         _BUCKET_ARN,
                         condition={"StringEquals": {"aws:RequestedRegion": "us-east-1"}},
-                    )
-                ],
-            },
-            "wildcard target": {
-                "role_statements": [
-                    _statement(
-                        "Allow",
-                        _DELETE_BUCKET,
-                        "arn:aws:s3:::orders-*",
                     )
                 ],
             },

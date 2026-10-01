@@ -17,7 +17,7 @@ AwsS3ResourceScope = Literal[
 
 
 class AwsS3ScopeEvaluation(TypedDict):
-    """Modeled authorization for one action and one original allow resource scope."""
+    """Modeled authorization for one action and one bounded allow resource scope."""
 
     action: str
     resource: str
@@ -30,6 +30,7 @@ class AwsS3ScopeEvaluation(TypedDict):
         "partial_deny",
         "unresolved_deny_applicability",
         "unsupported_resource_scope",
+        "cross_account_not_authorized",
     ]
     overlapping_deny_resources: list[str]
     conditional_deny_resources: list[str]
@@ -75,6 +76,9 @@ class AwsEcsS3AccessPath(TypedDict):
     role_address: str
     role_arn: str | None
     role_policy_complete: bool
+    role_account_id: NotRequired[str | None]
+    bucket_account_id: NotRequired[str | None]
+    same_account: NotRequired[bool | None]
     evaluation_basis: Literal["modeled_identity_policy_with_bucket_policy_constraints"]
     modeled_access_state: AwsS3AccessState
     access_state: AwsS3AccessState

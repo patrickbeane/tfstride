@@ -12,6 +12,7 @@ from tfstride.models import (
     TerraformReferenceResolutionState,
 )
 from tfstride.providers.aws.account_identity import describe_account_relationship
+from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.object_storage_topology_destruction_evidence import (
     AwsEcsS3BucketTopologyDestructionPath,
     AwsS3BucketTopologyDestructionAuthorizationBasis,
@@ -28,6 +29,7 @@ from tfstride.providers.aws.reference_resolution import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_object_scopes import s3_resource_for_bucket
 from tfstride.providers.coercion import dedupe
 from tfstride.resource_helpers import parse_aws_account_id
 
@@ -209,6 +211,9 @@ def _task_definition_paths(
             ],
         )
     role_arn = cast(str, task_role.arn)
+    boundary_uncertainties = permissions_boundary_uncertainties(task_role, authority="S3 bucket-deletion")
+    if boundary_uncertainties:
+        return [], [f"{task_definition.address}: {reason}" for reason in boundary_uncertainties]
 
     identity_policy_complete = _identity_policy_complete(task_role)
     uncertainties: list[str] = []
@@ -238,6 +243,9 @@ def _task_definition_paths(
                 )
             continue
         assert bucket_arn is not None
+        if context.index.buckets.get(bucket_arn) is None:
+            uncertainties.append(f"{task_definition.address}: S3 bucket target {bucket_arn} is ambiguous in the plan")
+            continue
 
         identity_matches = _identity_policy_matches(
             task_role,
@@ -439,7 +447,6 @@ def _identity_policy_matches(
                 bucket,
                 sources,
                 context,
-                exact_allow_required=effect == "allow",
             )
             if applicability is True:
                 matches.append(
@@ -500,7 +507,6 @@ def _bucket_policy_matches(
                     bucket,
                     (source,),
                     context,
-                    exact_allow_required=effect == "allow",
                 )
                 if applicability is True:
                     matches.append(
@@ -531,8 +537,6 @@ def _resource_targets_bucket(
     bucket: NormalizedResource,
     sources: Sequence[NormalizedResource],
     context: AwsDecorationContext,
-    *,
-    exact_allow_required: bool,
 ) -> bool | None:
     bucket_arn = bucket.arn
     assert bucket_arn is not None
@@ -540,11 +544,11 @@ def _resource_targets_bucket(
     if normalized == bucket_arn:
         return True
     if normalized.startswith("arn:"):
+        if "${" in normalized:
+            literal_prefix = normalized.split("${", 1)[0].split("*", 1)[0].split("?", 1)[0]
+            return None if bucket_arn.startswith(literal_prefix) else False
         if _has_wildcard(normalized):
-            matches = fnmatchcase(bucket_arn, normalized)
-            if not matches:
-                return False
-            return None if exact_allow_required else True
+            return s3_resource_for_bucket(normalized, bucket_arn, "bucket_level") is not None
         return False
 
     candidates: set[str] = set()
@@ -566,8 +570,10 @@ def _resource_targets_bucket(
     if candidates:
         return candidates == {bucket.address}
 
+    if "${" in resource:
+        return None
     if normalized == "*":
-        return None if exact_allow_required else True
+        return True
     if _has_wildcard(normalized):
         return None
     return False
@@ -611,13 +617,19 @@ def _bucket_policy_posture(
                     f"{bucket.address}: {source.address} bucket-policy evidence "
                     f"is incomplete or unsupported for {_DELETE_BUCKET}"
                 )
-    elif _has_policy_statements(aws_facts(bucket).policy_document):
+    elif aws_facts(bucket).s3_bucket_policy_state != "not_configured" or _has_policy_statements(
+        aws_facts(bucket).policy_document
+    ):
         sources.append(bucket)
         source_addresses = (bucket.address,)
         if not _bucket_policy_is_complete_for_operation(bucket):
             uncertainties.append(
                 f"{bucket.address}: inline bucket-policy evidence is incomplete or unsupported for {_DELETE_BUCKET}"
             )
+
+    if source_addresses and bucket not in sources and aws_facts(bucket).s3_bucket_policy_state != "not_configured":
+        sources.append(bucket)
+        source_addresses = (*source_addresses, bucket.address)
 
     if len(source_addresses) > 1:
         uncertainties.append(
@@ -639,6 +651,8 @@ def _bucket_policy_posture(
 def _bucket_policy_is_complete_for_operation(
     source: NormalizedResource,
 ) -> bool:
+    if aws_facts(source).s3_bucket_policy_state == "unknown":
+        return False
     statement_documents = _raw_policy_statements(
         aws_facts(source).policy_document,
     )
@@ -748,7 +762,6 @@ def _unresolved_policy_may_affect_bucket_role(
                 bucket,
                 (source,),
                 context,
-                exact_allow_required=False,
             )
             if applicability is True:
                 return True

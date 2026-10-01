@@ -10,6 +10,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _EXECUTION_ROLE_ARN,
     _TASK_ROLE_ARN,
     _bucket,
+    _caller_identity,
     _resource,
     _role,
     _role_policy_attachment,
@@ -92,22 +93,6 @@ def _object_lock(mode: str = "GOVERNANCE") -> TerraformResource:
                     ]
                 }
             ],
-        },
-    )
-
-
-def _caller_identity(account_id: str = _ACCOUNT_ID) -> TerraformResource:
-    return TerraformResource(
-        address="data.aws_caller_identity.current",
-        mode="data",
-        resource_type="aws_caller_identity",
-        name="current",
-        provider_name="registry.terraform.io/hashicorp/aws",
-        provider_config_key="aws",
-        values={
-            "account_id": account_id,
-            "id": account_id,
-            "arn": f"arn:aws:iam::{account_id}:root",
         },
     )
 
@@ -488,13 +473,10 @@ class AwsEcsS3ObjectDeletionPathTests(unittest.TestCase):
         task_definition = wildcard_inventory.get_by_address("aws_ecs_task_definition.orders")
         assert task_definition is not None
         wildcard_facts = aws_facts(task_definition)
-        self.assertEqual(wildcard_facts.ecs_s3_object_deletion_paths, [])
-        self.assertTrue(
-            any(
-                "does not identify an exact object scope" in uncertainty
-                for uncertainty in wildcard_facts.ecs_s3_object_deletion_path_uncertainties
-            )
-        )
+        paths = wildcard_facts.ecs_s3_object_deletion_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["target_scope"], f"{_BUCKET_ARN}/*")
+        self.assertEqual(paths[0]["operation"], "s3:DeleteObject")
 
     def test_conditional_allow_incomplete_bucket_policy_and_partial_deny_remain_uncertain(
         self,

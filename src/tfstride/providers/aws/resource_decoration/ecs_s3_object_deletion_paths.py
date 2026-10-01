@@ -7,6 +7,7 @@ from typing import Literal
 
 from tfstride.models import IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.account_identity import describe_account_relationship
+from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.object_storage_deletion_evidence import (
     AwsEcsS3BucketObjectNamespaceDeletionPath,
     AwsEcsS3BucketObjectVersionNamespaceDeletionPath,
@@ -40,6 +41,7 @@ from tfstride.providers.aws.s3_object_scopes import (
 from tfstride.providers.aws.s3_object_scopes import (
     object_scopes_overlap as _scopes_overlap,
 )
+from tfstride.providers.aws.s3_object_scopes import s3_resource_for_bucket
 from tfstride.providers.coercion import STATE_DISABLED, dedupe
 from tfstride.resource_helpers import parse_aws_account_id
 
@@ -201,6 +203,9 @@ def _task_definition_paths(
             ],
         )
     assert task_role.arn is not None
+    boundary_uncertainties = permissions_boundary_uncertainties(task_role, authority="S3 object-deletion")
+    if boundary_uncertainties:
+        return [], [f"{task_definition.address}: {reason}" for reason in boundary_uncertainties]
 
     role_policy_complete = _identity_policy_complete(task_role)
     uncertainties: list[str] = []
@@ -230,6 +235,9 @@ def _task_definition_paths(
                 )
             continue
         assert bucket_arn is not None
+        if context.index.buckets.get(bucket_arn) is None:
+            uncertainties.append(f"{task_definition.address}: S3 bucket target {bucket_arn} is ambiguous in the plan")
+            continue
 
         modeled_actions: tuple[_ModeledAction, ...] = (
             *_OPERATION_ORDER,
@@ -584,7 +592,10 @@ def _identity_policy_matches(
             continue
         for operation, action_patterns in _matching_actions(statement.actions):
             for resource in statement.resources:
-                scope = _scope_from_resource(resource, bucket_arn)
+                scoped_resource = (
+                    s3_resource_for_bucket(resource, bucket_arn, "object_level") if effect == "allow" else resource
+                )
+                scope = _scope_from_resource(scoped_resource, bucket_arn) if scoped_resource is not None else None
                 if scope is None:
                     if _resource_may_target_bucket(resource, bucket_arn):
                         if effect == "deny":
@@ -642,7 +653,10 @@ def _bucket_policy_matches(
 
             for operation, action_patterns in _matching_actions(statement.actions):
                 for resource in statement.resources:
-                    scope = _scope_from_resource(resource, bucket_arn)
+                    scoped_resource = (
+                        s3_resource_for_bucket(resource, bucket_arn, "object_level") if effect == "allow" else resource
+                    )
+                    scope = _scope_from_resource(scoped_resource, bucket_arn) if scoped_resource is not None else None
                     if scope is None:
                         if _resource_may_target_bucket(resource, bucket_arn):
                             if effect == "deny":
@@ -802,16 +816,26 @@ def _matching_actions(
 def _resource_may_target_bucket(resource: str, bucket_arn: str) -> bool:
     if resource == "*":
         return True
+    if resource.startswith(("aws_s3_bucket.", "module.", "${")):
+        return True
+    if "${" in resource:
+        literal_prefix = resource.split("${", 1)[0].split("*", 1)[0].split("?", 1)[0]
+        return bucket_arn.startswith(literal_prefix) or literal_prefix.startswith(bucket_arn + "/")
     marker = ":s3:::"
     marker_index = resource.find(marker)
     if not resource.startswith("arn:") or marker_index < 0:
         return False
-    resource_path = resource[marker_index + len(marker) :]
-    if "/" not in resource_path:
+    if not fnmatchcase(bucket_arn.split(marker, 1)[0], resource[:marker_index]):
         return False
-    bucket_pattern, _ = resource_path.split("/", 1)
+    resource_path = resource[marker_index + len(marker) :]
+    bucket_pattern, separator, _ = resource_path.partition("/")
     bucket_name = bucket_arn.split(marker, 1)[1]
-    return bool(bucket_pattern and fnmatchcase(bucket_name, bucket_pattern))
+    if _has_wildcard(bucket_pattern):
+        # A bucket-selector wildcard can consume key separators, even when the
+        # selector alone does not match the bucket name. Do not discard that deny.
+        literal_prefix = bucket_pattern.split("*", 1)[0].split("?", 1)[0]
+        return bucket_name.startswith(literal_prefix)
+    return bool(separator and bucket_pattern == bucket_name)
 
 
 def _bypass_authorization_for_scope(
@@ -1055,11 +1079,17 @@ def _bucket_policy_posture(
                 uncertainties.append(
                     f"{bucket.address}: {source.address} bucket policy is incomplete, malformed, or unsupported"
                 )
-    elif _has_policy_statements(aws_facts(bucket).policy_document):
+    elif aws_facts(bucket).s3_bucket_policy_state != "not_configured" or _has_policy_statements(
+        aws_facts(bucket).policy_document
+    ):
         sources.append(bucket)
         source_addresses = (bucket.address,)
         if not _bucket_policy_is_representable(bucket):
             uncertainties.append(f"{bucket.address}: inline bucket policy is incomplete, malformed, or unsupported")
+
+    if source_addresses and bucket not in sources and aws_facts(bucket).s3_bucket_policy_state != "not_configured":
+        sources.append(bucket)
+        source_addresses = (*source_addresses, bucket.address)
 
     if len(source_addresses) > 1:
         uncertainties.append(
@@ -1096,6 +1126,8 @@ def _unresolved_bucket_policy_sources(
 
 
 def _bucket_policy_is_representable(source: NormalizedResource) -> bool:
+    if aws_facts(source).s3_bucket_policy_completeness_state != "complete":
+        return False
     document = aws_facts(source).policy_document
     raw_statements = document.get("Statement")
     if isinstance(raw_statements, Mapping):

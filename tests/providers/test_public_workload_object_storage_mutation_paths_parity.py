@@ -13,6 +13,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
 from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _bucket as aws_bucket,
 )
+from tests.providers.aws.test_aws_ecs_s3_access_paths import _caller_identity as aws_caller_identity
 from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _role as aws_role,
 )
@@ -107,6 +108,7 @@ def _aws_resources(
 ) -> list[TerraformResource]:
     return [
         *aws_load_balancer_path(internal=internal),
+        aws_caller_identity(),
         aws_bucket(),
         aws_role(
             "orders_task",
@@ -374,6 +376,7 @@ class PublicWorkloadObjectStorageMutationPathParityTests(unittest.TestCase):
 
     def test_broad_access_and_disclosure_findings_remain_distinct(self) -> None:
         aws_resources = [
+            aws_caller_identity(),
             *aws_load_balancer_path(),
             aws_bucket(),
             aws_role(

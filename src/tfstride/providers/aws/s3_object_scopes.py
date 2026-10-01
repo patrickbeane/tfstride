@@ -1,7 +1,56 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from typing import Literal
+
+
+def is_exact_s3_bucket_arn(value: str | None) -> bool:
+    if not value or any(marker in value for marker in ("*", "?", "[", "]", "${")):
+        return False
+    parts = value.split(":", 5)
+    return bool(
+        len(parts) == 6
+        and parts[0] == "arn"
+        and parts[1]
+        and parts[2:5] == ["s3", "", ""]
+        and parts[5]
+        and "/" not in parts[5]
+        and ":" not in parts[5]
+    )
+
+
+def s3_resource_for_bucket(
+    resource: str,
+    bucket_arn: str,
+    resource_kind: Literal["bucket_level", "object_level"],
+) -> str | None:
+    """Bind a grant to a guaranteed scope in one exact modeled bucket.
+
+    A wildcard bucket selector may also consume key separators. For object
+    grants we retain the namespace guaranteed by matching the selector to the
+    bucket itself; we never expand that namespace to those additional matches.
+    Deny callers must retain uncertainty for such additional matches.
+    """
+    if not is_exact_s3_bucket_arn(bucket_arn) or "${" in resource:
+        return None
+    if resource == "*":
+        return bucket_arn if resource_kind == "bucket_level" else bucket_arn + "/*"
+    parts = resource.split(":", 5)
+    if len(parts) != 6 or parts[:5] != bucket_arn.split(":", 5)[:5]:
+        return None
+    selector, separator, key = parts[5].partition("/")
+    # IAM supports * and ?, not fnmatch's bracket character classes.
+    if "[" in selector or "]" in selector:
+        return None
+    if resource_kind == "bucket_level":
+        return bucket_arn if fnmatchcase(bucket_arn, resource) else None
+    if separator:
+        if key and fnmatchcase(bucket_arn.split(":", 5)[5], selector):
+            return bucket_arn + "/" + key
+    elif resource.endswith("*") and fnmatchcase(bucket_arn + "/", resource):
+        return bucket_arn + "/*"
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +71,8 @@ class S3ObjectScope:
 
 
 def object_scope_from_resource(resource: str, bucket_arn: str) -> S3ObjectScope | None:
+    if "${" in resource:
+        return None
     prefix = f"{bucket_arn}/"
     if not resource.startswith(prefix):
         return None

@@ -5,6 +5,8 @@ from fnmatch import fnmatchcase
 from typing import Literal, TypedDict
 
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, NormalizedResource
+from tfstride.providers.aws.account_identity import describe_account_relationship
+from tfstride.providers.aws.account_identity_evidence import AwsAccountRelationship
 from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.protected_data_evidence import (
     AwsS3AccessClass,
@@ -21,9 +23,12 @@ from tfstride.providers.aws.s3_bucket_policies import (
     s3_bucket_principal_match,
 )
 from tfstride.providers.aws.s3_object_scopes import (
+    is_exact_s3_bucket_arn,
     object_scope_contains,
     object_scope_from_resource,
+    object_scope_intersection,
     object_scopes_overlap,
+    s3_resource_for_bucket,
 )
 from tfstride.providers.coercion import dedupe
 
@@ -114,6 +119,7 @@ class _BucketPolicyConstraints:
     source_addresses: tuple[str, ...]
     complete: bool
     uncertainties: tuple[str, ...]
+    allow_records: tuple[AwsS3BucketPolicyStatementEvidence, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,17 +132,17 @@ class S3IdentityPolicyAssessment:
 
 @dataclass(frozen=True, slots=True)
 class S3IdentityAuthorization:
-    """Identity-backed access to one bucket under P1's modeled constraints.
+    """Identity-backed authority scoped to one modeled bucket and its owner.
 
-    Scope evaluations describe policy matches. Only access_state includes the
-    completeness and permissions-boundary gates. This is not a cross-account
-    or resource-policy-only authorization proof; those operation-specific
-    prerequisites remain with the deletion and topology evaluators.
+    Scope evaluations retain operation/resource pairs and cross-account grant
+    intersections. Only access_state includes completeness, ownership, and
+    permissions-boundary gates. Resource-policy-only access is not synthesized.
     """
 
     bucket_address: str
     bucket_arn: str
     identity_policy: S3IdentityPolicyAssessment
+    account_relationship: AwsAccountRelationship
     statement_records: list[AwsS3PolicyStatementEvidence]
     assessment: _S3AccessAssessment
     bucket_constraints: _BucketPolicyConstraints
@@ -167,6 +173,8 @@ def evaluate_s3_identity_authorization(
     identity_policy: S3IdentityPolicyAssessment,
     bucket: NormalizedResource,
     bucket_policy_sources: S3BucketPolicySources,
+    *,
+    account_relationship: AwsAccountRelationship,
 ) -> S3IdentityAuthorization | None:
     """Evaluate P1's identity grants and applicable constraints for a resolved target.
 
@@ -174,15 +182,20 @@ def evaluate_s3_identity_authorization(
     synthesized for a bucket without matching modeled identity-policy evidence.
     """
     bucket_arn = bucket.arn
-    if bucket.resource_type != "aws_s3_bucket" or not bucket_arn:
+    if bucket.resource_type != "aws_s3_bucket" or not is_exact_s3_bucket_arn(bucket_arn):
         raise ValueError("S3 authorization requires a modeled bucket with a resolved ARN")
+    assert bucket_arn is not None
     role = identity_policy.role
     statement_records = _matching_statement_records(role.policy_statements, bucket_arn)
     if not statement_records:
         return None
     constraints = _bucket_policy_constraints(bucket_policy_sources, bucket_arn, role)
     applicable_denies: list[AwsS3PolicyStatementEvidence] = list(constraints.records)
-    assessment = _assess_actions([*statement_records, *applicable_denies], bucket_arn)
+    assessment = _assess_actions(
+        [*statement_records, *applicable_denies],
+        bucket_arn,
+        cross_account_allows=list(constraints.allow_records) if account_relationship.same_account is False else None,
+    )
     uncertainties = list(constraints.uncertainties)
     for evaluation in assessment["scope_evaluations"]:
         if evaluation["reason"] == "partial_deny":
@@ -197,23 +210,35 @@ def evaluate_s3_identity_authorization(
     if assessment["conditional_actions"]:
         policy_kind = (
             "identity- or bucket-policy"
-            if any(record["conditional"] for record in applicable_denies)
+            if any(record["conditional"] for record in [*applicable_denies, *constraints.allow_records])
             else "identity-policy"
         )
         uncertainties.append(
             f"{role.address} targeting {bucket.address} has conditional "
             f"{policy_kind} evidence for actions: " + ", ".join(assessment["conditional_actions"])
         )
+    ownership_compatible = account_relationship.same_account is not None and account_relationship.partitions_match
+    if not ownership_compatible:
+        uncertainties.extend(describe_account_relationship(account_relationship))
+        uncertainties.append(
+            f"{role.address} targeting {bucket.address}: S3 ownership or partition compatibility is unresolved"
+        )
+    if account_relationship.same_account is False and assessment["unknown_actions"]:
+        uncertainties.append(
+            f"{role.address} targeting {bucket.address}: cross-account S3 access requires compatible "
+            "identity and bucket-policy grants for each operation and resource scope"
+        )
     modeled_access_state = _modeled_access_state(assessment)
     access_state: AwsS3AccessState = modeled_access_state if identity_policy.complete else "unknown"
     if access_state == "allowed" and not identity_policy.permissions_boundary_compatible:
         access_state = "unknown"
-    if not constraints.complete:
+    if not constraints.complete or (access_state == "allowed" and not ownership_compatible):
         access_state = "unknown"
     return S3IdentityAuthorization(
         bucket_address=bucket.address,
         bucket_arn=bucket_arn,
         identity_policy=identity_policy,
+        account_relationship=account_relationship,
         statement_records=statement_records,
         assessment=assessment,
         bucket_constraints=constraints,
@@ -285,7 +310,32 @@ def _bucket_policy_constraints(
                     ],
                 }
                 records.append(record)
-    return _BucketPolicyConstraints(tuple(records), tuple(sorted(addresses)), complete, tuple(dedupe(uncertainties)))
+    allow_records: list[AwsS3BucketPolicyStatementEvidence] = []
+    if complete:
+        for source in sources.sources:
+            for statement in source.policy_statements:
+                if statement.effect.strip().lower() != "allow":
+                    continue
+                principal_match = s3_bucket_principal_match(statement, task_role.arn)
+                if principal_match not in {"role", "account"}:
+                    continue
+                for match in _matching_statement_records((statement,), bucket_arn):
+                    allow_records.append(
+                        {
+                            **match,
+                            "source_address": source.address,
+                            "principal_match": principal_match,
+                            "target_match": "resolved",
+                            "applicability_uncertain": False,
+                            "principals": [
+                                {"kind": principal.kind, "value": principal.value}
+                                for principal in statement.principal_entries
+                            ],
+                        }
+                    )
+    return _BucketPolicyConstraints(
+        tuple(records), tuple(sorted(addresses)), complete, tuple(dedupe(uncertainties)), tuple(allow_records)
+    )
 
 
 def _matching_statement_records(
@@ -305,6 +355,7 @@ def _matching_statement_records(
         matched_actions: list[str] = []
         matching_patterns: set[str] = set()
         matching_resources: set[str] = set()
+        bound_resources: set[str] = set()
         for action in _S3_ACTIONS:
             action_patterns = _matching_action_patterns(statement, action.name)
             resources = _matching_resources(statement, bucket_arn, action.resource_kind)
@@ -313,6 +364,16 @@ def _matching_statement_records(
             matched_actions.append(action.name)
             matching_patterns.update(action_patterns)
             matching_resources.update(resources)
+            bound_resources.update(
+                bound
+                for resource in resources
+                if (
+                    bound := _resource_for_bucket(
+                        resource, bucket_arn, action.resource_kind, deny=normalized_effect == "deny"
+                    )
+                )
+                is not None
+            )
 
         if not matched_actions:
             continue
@@ -324,7 +385,7 @@ def _matching_statement_records(
                 "matching_action_patterns": sorted(matching_patterns, key=str.lower),
                 "resources": list(statement.resources),
                 "matching_resources": sorted(matching_resources),
-                "resource_scopes": _resource_scopes(matching_resources, bucket_arn),
+                "resource_scopes": _resource_scopes(bound_resources, bucket_arn),
                 "access_classes": s3_access_classes(matched_actions),
                 "conditions": [_condition_record(condition) for condition in statement.conditions],
                 "conditional": bool(statement.conditions),
@@ -362,7 +423,7 @@ def _resource_for_bucket(
     if resource.startswith(bucket_arn + "/"):
         return resource if resource_kind == "object_level" else None
     if not deny:
-        return None
+        return s3_resource_for_bucket(resource, bucket_arn, resource_kind)
     if resource == "*":
         return bucket_arn if resource_kind == "bucket_level" else bucket_arn + "/*"
 
@@ -389,6 +450,8 @@ def _condition_record(condition: IAMPolicyCondition) -> AwsS3PolicyConditionEvid
 def _assess_actions(
     records: list[AwsS3PolicyStatementEvidence],
     bucket_arn: str,
+    *,
+    cross_account_allows: list[AwsS3BucketPolicyStatementEvidence] | None = None,
 ) -> _S3AccessAssessment:
     allowed: list[str] = []
     denied: list[str] = []
@@ -403,21 +466,24 @@ def _assess_actions(
         deny_scopes: list[_DenyScope] = []
         for record in matching:
             for resource in record["matching_resources"]:
-                if (
-                    _resource_for_bucket(resource, bucket_arn, action.resource_kind, deny=record["effect"] == "deny")
-                    is None
-                ):
+                bound = _resource_for_bucket(
+                    resource, bucket_arn, action.resource_kind, deny=record["effect"] == "deny"
+                )
+                if bound is None:
                     continue
                 if record["effect"] == "allow":
-                    allow_scopes.setdefault(resource, []).append(record)
+                    allow_scopes.setdefault(bound, []).append(record)
                 else:
                     deny_scopes.append(
                         _DenyScope(resource, record["conditional"], record.get("applicability_uncertain", False))
                     )
-        action_evaluations = [
-            _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
-            for resource, allows in sorted(allow_scopes.items())
-        ]
+        action_evaluations = _evaluate_action_scopes(
+            action,
+            allow_scopes,
+            deny_scopes,
+            bucket_arn,
+            cross_account_allows,
+        )
         evaluations.extend(action_evaluations)
         if any(evaluation["conditional_evaluation_required"] for evaluation in action_evaluations):
             conditional.append(action.name)
@@ -446,6 +512,61 @@ def _assess_actions(
         "conditional_actions": conditional,
         "scope_evaluations": evaluations,
     }
+
+
+def _evaluate_action_scopes(
+    action: _S3Action,
+    allow_scopes: dict[str, list[AwsS3PolicyStatementEvidence]],
+    deny_scopes: list[_DenyScope],
+    bucket_arn: str,
+    cross_account_allows: list[AwsS3BucketPolicyStatementEvidence] | None,
+) -> list[AwsS3ScopeEvaluation]:
+    if cross_account_allows is None:
+        return [
+            _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
+            for resource, allows in sorted(allow_scopes.items())
+        ]
+    intersections: dict[str, list[AwsS3PolicyStatementEvidence]] = {}
+    unmatched: list[AwsS3ScopeEvaluation] = []
+    for resource, allows in sorted(allow_scopes.items()):
+        matched = False
+        # Bucket administration remains owner-only in this model, including DeleteBucket.
+        grants = cross_account_allows if action.resource_kind == "object_level" or action.access_class == "read" else []
+        for grant in grants:
+            if action.name not in grant["matched_actions"]:
+                continue
+            for raw in grant["matching_resources"]:
+                bound = _resource_for_bucket(raw, bucket_arn, action.resource_kind, deny=False)
+                if bound is None:
+                    continue
+                if action.resource_kind == "bucket_level":
+                    intersection = resource if bound == resource else None
+                else:
+                    left = object_scope_from_resource(resource, bucket_arn)
+                    right = object_scope_from_resource(bound, bucket_arn)
+                    scope = object_scope_intersection(left, right) if left is not None and right is not None else None
+                    intersection = scope.resource if scope is not None else None
+                if intersection is None:
+                    continue
+                matched = True
+                intersections.setdefault(intersection, []).extend(
+                    {**allow, "conditional": allow["conditional"] or grant["conditional"]} for allow in allows
+                )
+        if not matched:
+            evaluation = _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
+            if evaluation["modeled_access_state"] == "allowed":
+                evaluation.update(modeled_access_state="unknown", reason="cross_account_not_authorized")
+            unmatched.append(evaluation)
+    return sorted(
+        [
+            *unmatched,
+            *[
+                _evaluate_scope(action, resource, allows, deny_scopes, bucket_arn)
+                for resource, allows in sorted(intersections.items())
+            ],
+        ],
+        key=lambda evaluation: evaluation["resource"],
+    )
 
 
 def _evaluate_scope(

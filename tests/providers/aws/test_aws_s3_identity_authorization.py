@@ -14,6 +14,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
 )
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _bucket_policy, _bucket_statement
 from tfstride.models import NormalizedResource, TerraformResource
+from tfstride.providers.aws.account_identity import build_aws_account_identity_index
 from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
 from tfstride.providers.aws.s3_bucket_policies import S3BucketPolicySources, prepare_s3_bucket_policy_sources
 from tfstride.providers.aws.s3_identity_authorization import (
@@ -53,7 +54,14 @@ class AwsS3IdentityAuthorizationTests(unittest.TestCase):
         )
         identity = assess_s3_identity_policy(resources["aws_iam_role.orders_task"])
         bucket = resources["aws_s3_bucket.orders"]
-        result = evaluate_s3_identity_authorization(identity, bucket, sources[bucket.address])
+        result = evaluate_s3_identity_authorization(
+            identity,
+            bucket,
+            sources[bucket.address],
+            account_relationship=build_aws_account_identity_index(resources.values()).relationship(
+                identity.role, bucket
+            ),
+        )
         assert result is not None
         self.assertEqual((result.bucket_address, result.bucket_arn), (bucket.address, _BUCKET_ARN))
         self.assertEqual(result.access_state, "allowed")
@@ -71,7 +79,16 @@ class AwsS3IdentityAuthorizationTests(unittest.TestCase):
         )
         self.assertEqual(result.bucket_constraints.source_addresses, ("aws_s3_bucket_policy.orders",))
         archive = resources["aws_s3_bucket.archive"]
-        self.assertIsNone(evaluate_s3_identity_authorization(identity, archive, sources[archive.address]))
+        self.assertIsNone(
+            evaluate_s3_identity_authorization(
+                identity,
+                archive,
+                sources[archive.address],
+                account_relationship=build_aws_account_identity_index(resources.values()).relationship(
+                    identity.role, archive
+                ),
+            )
+        )
 
     def test_effective_state_keeps_boundary_and_completeness_gates(self) -> None:
         for gate in ("permissions_boundary", "identity_policy", "bucket_policy"):
@@ -90,7 +107,14 @@ class AwsS3IdentityAuthorizationTests(unittest.TestCase):
                 resources, sources = _inputs([bucket, role, *extra])
                 identity = assess_s3_identity_policy(resources["aws_iam_role.orders_task"])
                 target = resources["aws_s3_bucket.orders"]
-                result = evaluate_s3_identity_authorization(identity, target, sources[target.address])
+                result = evaluate_s3_identity_authorization(
+                    identity,
+                    target,
+                    sources[target.address],
+                    account_relationship=build_aws_account_identity_index(resources.values()).relationship(
+                        identity.role, target
+                    ),
+                )
                 assert result is not None
                 self.assertEqual(result.modeled_access_state, "allowed")
                 self.assertEqual(result.access_state, "unknown")

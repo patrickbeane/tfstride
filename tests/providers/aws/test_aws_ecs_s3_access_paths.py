@@ -133,7 +133,27 @@ def _service(
     )
 
 
+def _caller_identity(account_id: str = _ACCOUNT_ID) -> TerraformResource:
+    return TerraformResource(
+        address="data.aws_caller_identity.current",
+        mode="data",
+        resource_type="aws_caller_identity",
+        name="current",
+        provider_name="registry.terraform.io/hashicorp/aws",
+        provider_config_key="aws",
+        values={
+            "account_id": account_id,
+            "id": account_id,
+            "arn": f"arn:aws:iam::{account_id}:root",
+        },
+    )
+
+
 def _normalize(resources: list[TerraformResource]):
+    # These authorization fixtures assume a managed bucket owned by this caller.
+    # Unknown ownership is tested through AwsNormalizer directly.
+    if not any(resource.resource_type == "aws_caller_identity" for resource in resources):
+        resources = [_caller_identity(), *resources]
     return AwsNormalizer().normalize(resources)
 
 
@@ -476,14 +496,12 @@ class AwsEcsS3AccessPathTests(unittest.TestCase):
         wildcard_task = wildcard_inventory.get_by_address("aws_ecs_task_definition.orders")
         assert wildcard_task is not None
         wildcard_facts = aws_facts(wildcard_task)
-        self.assertEqual(wildcard_facts.ecs_s3_access_paths, [])
-        self.assertEqual(len(wildcard_facts.ecs_s3_access_path_uncertainties), 2)
-        self.assertTrue(
-            all(
-                "does not identify an exact bucket" in uncertainty
-                for uncertainty in wildcard_facts.ecs_s3_access_path_uncertainties
-            )
-        )
+        self.assertEqual(len(wildcard_facts.ecs_s3_access_paths), 1)
+        path = wildcard_facts.ecs_s3_access_paths[0]
+        self.assertEqual(path["access_state"], "allowed")
+        self.assertEqual(path["matched_actions"], ["s3:GetObject"])
+        self.assertEqual([scope["resource"] for scope in path["scope_evaluations"]], [f"{_BUCKET_ARN}/*"])
+        self.assertEqual(wildcard_facts.ecs_s3_access_path_uncertainties, [])
 
 
 if __name__ == "__main__":

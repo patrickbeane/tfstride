@@ -28,6 +28,7 @@ from tests.providers.aws.test_aws_ecs_kms_operation_paths import (
 from tests.providers.aws.test_aws_ecs_kms_operation_paths import (
     _statement as aws_statement,
 )
+from tests.providers.aws.test_aws_ecs_s3_access_paths import _caller_identity
 from tests.providers.aws.test_aws_kms_encryption_dependencies import (
     _ALIAS_ARN as AWS_ALIAS_ARN,
 )
@@ -260,13 +261,15 @@ def _aws_bucket_encryption(
                 }
             ]
         }
-    return aws_dependency_resource(
+    resource = aws_dependency_resource(
         "aws_s3_bucket_server_side_encryption_configuration",
         "orders",
         values,
         unknown_values=unknown_values,
         reference_resolutions=(resolution,) if resolution is not None else (),
     )
+    resource.provider_config_key = "aws"
+    return resource
 
 
 def _aws_resources(
@@ -280,6 +283,7 @@ def _aws_resources(
     direct_runtime_allow = kms_condition is None
     resources = [
         *_aws_public_edge(),
+        _caller_identity(),
         _aws_bucket(),
         aws_key(
             "data",
@@ -335,6 +339,8 @@ def _aws_resources(
                 },
             )
         )
+    for resource in resources:
+        resource.provider_config_key = "aws"
     return resources
 
 

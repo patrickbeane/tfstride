@@ -939,13 +939,11 @@ class PublicWorkloadObjectStorageDeletionBoundaryTests(unittest.TestCase):
         wildcard_task = wildcard_inventory.get_by_address("aws_ecs_task_definition.orders")
         assert wildcard_task is not None
         wildcard_facts = aws_facts(wildcard_task)
-        self.assertEqual(wildcard_facts.ecs_s3_access_paths, [])
-        self.assertTrue(
-            any(
-                "does not identify an exact bucket" in uncertainty
-                for uncertainty in wildcard_facts.ecs_s3_access_path_uncertainties
-            )
-        )
+        self.assertEqual(len(wildcard_facts.ecs_s3_access_paths), 1)
+        path = wildcard_facts.ecs_s3_access_paths[0]
+        self.assertEqual(path["access_state"], "unknown")
+        self.assertEqual(path["scope_evaluations"][0]["resource"], f"{AWS_BUCKET_ARN}/*")
+        self.assertTrue(any("ownership" in value for value in wildcard_facts.ecs_s3_access_path_uncertainties))
 
     def test_gcp_preserves_exact_permission_bucket_scope_and_recovery_boundaries(
         self,

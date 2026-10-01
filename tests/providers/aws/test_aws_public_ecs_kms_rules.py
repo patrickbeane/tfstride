@@ -268,6 +268,8 @@ class AwsPublicEcsKmsRuleTests(unittest.TestCase):
             ]
         )
 
+        for resource in resources:
+            resource.provider_config_key = "aws"
         _, _, findings = _evaluate(resources)
 
         finding = findings[0]

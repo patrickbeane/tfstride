@@ -10,6 +10,7 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _TASK_ROLE_ARN,
     _bucket,
     _incomplete_role_policy_cases,
+    _normalize,
     _resource,
     _role,
     _role_policy_attachment,
@@ -20,7 +21,6 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import TerraformResource
-from tfstride.providers.aws.normalizer import AwsNormalizer
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 
@@ -47,7 +47,7 @@ def _service(task_definition: str = "orders:1") -> TerraformResource:
 
 
 def _evaluate(resources: list[TerraformResource]):
-    inventory = AwsNormalizer().normalize(resources)
+    inventory = _normalize(resources)
     boundaries = detect_trust_boundaries(inventory)
     findings = StrideRuleEngine().evaluate(
         inventory,
@@ -254,13 +254,13 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
                 _task_definition(),
                 _service(),
             ],
-            "non-exact bucket resource": [
+            "unmodeled bucket resource": [
                 *_load_balancer_path(),
                 _bucket(),
                 _role(
                     "orders_task",
                     _TASK_ROLE_ARN,
-                    [_statement("Allow", "s3:PutObject", "arn:aws:s3:::orders-*/*")],
+                    [_statement("Allow", "s3:PutObject", "arn:aws:s3:::unmodeled-*/*")],
                 ),
                 _task_definition(execution_role_arn=None),
                 _service(),

@@ -7,7 +7,14 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from tests.providers.aws.ecs_forwarding_support import TARGET_GROUP_ARN, load_balancer_path
-from tests.providers.aws.test_aws_ecs_s3_access_paths import _BUCKET_ARN, _TASK_ROLE_ARN, _bucket, _role, _statement
+from tests.providers.aws.test_aws_ecs_s3_access_paths import (
+    _BUCKET_ARN,
+    _TASK_ROLE_ARN,
+    _bucket,
+    _caller_identity,
+    _role,
+    _statement,
+)
 from tests.providers.aws.test_aws_ecs_secret_access_paths import (
     _EXECUTION_ROLE_ARN,
     _SECRET_ARN,
@@ -30,6 +37,7 @@ _RULES = frozenset({"aws-public-ecs-s3-mutation-access", "aws-public-ecs-secret-
 def _resources():
     resources = [
         *load_balancer_path(),
+        _caller_identity(),
         _bucket(),
         _secret(),
         _task_definition(task_role_arn=_TASK_ROLE_ARN),
