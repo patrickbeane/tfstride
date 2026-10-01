@@ -1,35 +1,26 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from typing import Literal
 
-from tfstride.models import (
-    NormalizedResource,
-    TerraformReferenceProvenance,
-    TerraformReferenceResolutionState,
-)
+from tfstride.models import NormalizedResource
 from tfstride.providers.azure.arm_control_plane_evidence import (
     AzureArmControlPlaneAuthorityState,
     AzureArmControlPlaneGrant,
     AzureArmDelegationConstraintKind,
     AzureArmRoleDefinitionConditionState,
-    AzureArmScopeType,
 )
+from tfstride.providers.azure.arm_scope import assignment_condition_state as assignment_condition_state
+from tfstride.providers.azure.arm_scope import (
+    assignment_field_unknown,
+    normalize_arm_id,
+    resolve_assignment_scope,
+    role_assignable_scope_state,
+)
+from tfstride.providers.azure.arm_scope import azure_arm_scope_contains as azure_arm_scope_contains
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
-from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES, AzureResourceType
-
-_SUBSCRIPTION_SCOPE_PATTERN = re.compile(r"^/subscriptions/[^/]+$", re.IGNORECASE)
-_RESOURCE_GROUP_SCOPE_PATTERN = re.compile(
-    r"^/subscriptions/[^/]+/resourcegroups/[^/]+$",
-    re.IGNORECASE,
-)
-_MANAGEMENT_GROUP_SCOPE_PATTERN = re.compile(
-    r"^/providers/microsoft\.management/managementgroups/[^/]+$",
-    re.IGNORECASE,
-)
+from tfstride.providers.azure.resource_types import AzureResourceType
 
 _KEY_VAULT_DATA_ROLE_IDS = (
     "00482a5a-887f-4fb3-b363-3b7fe8e74483",
@@ -253,13 +244,6 @@ class _RoleResolution:
 
 
 @dataclass(frozen=True, slots=True)
-class _ScopeResolution:
-    state: Literal["resolved", "unknown", "unrelated", "invalid"]
-    scope_type: AzureArmScopeType | None = None
-    arm_scope: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class AzureArmControlPlaneAuthorityResult:
     state: AzureArmControlPlaneAuthorityState
     grant: AzureArmControlPlaneGrant | None = None
@@ -276,7 +260,7 @@ def model_arm_control_plane_action_authority(
 ) -> AzureArmControlPlaneAuthorityResult:
     """Evaluate modeled ARM allow authority without claiming deny-assignment coverage."""
 
-    normalized_target = _arm_id(target_arm_id)
+    normalized_target = normalize_arm_id(target_arm_id)
     if normalized_target is None or not requested_actions:
         return AzureArmControlPlaneAuthorityResult(
             "unknown",
@@ -288,7 +272,7 @@ def model_arm_control_plane_action_authority(
     if assignment_principal is not None and assignment_principal.casefold() != principal_id.casefold():
         return AzureArmControlPlaneAuthorityResult("unrelated")
 
-    scope = _assignment_scope(assignment, context, normalized_target)
+    scope = resolve_assignment_scope(assignment, context, normalized_target)
     if scope.state == "unrelated":
         return AzureArmControlPlaneAuthorityResult("unrelated")
 
@@ -372,99 +356,6 @@ def model_arm_control_plane_action_authority(
     return AzureArmControlPlaneAuthorityResult("granted", grant=grant)
 
 
-def azure_arm_scope_contains(parent: str, child: str) -> bool:
-    normalized_parent = parent.strip().casefold().rstrip("/")
-    normalized_child = child.strip().casefold().rstrip("/")
-    if normalized_parent == "":
-        normalized_parent = "/"
-    if normalized_parent == "/":
-        return True
-    if not normalized_parent.startswith("/") or not normalized_child.startswith("/"):
-        return False
-    return normalized_child == normalized_parent or normalized_child.startswith(f"{normalized_parent}/")
-
-
-def _assignment_scope(
-    assignment: NormalizedResource,
-    context: AzureDecorationContext,
-    target_arm_id: str,
-) -> _ScopeResolution:
-    facts = azure_facts(assignment)
-    raw_scope = _known_string(facts.role_assignment_scope)
-    if raw_scope is None:
-        if _assignment_field_unknown(assignment, "scope"):
-            return _ScopeResolution("unknown")
-        target_address = _known_string(facts.role_assignment_target_resource_address)
-        target = context.index.resources_by_address.get(target_address or "")
-        arm_scope = _resource_arm_id(target) if target is not None else None
-    else:
-        arm_scope = _arm_id(raw_scope)
-        if arm_scope is None:
-            target = _proven_symbolic_assignment_scope_target(
-                assignment,
-                context,
-            )
-            arm_scope = _resource_arm_id(target) if target is not None else None
-
-    if arm_scope is None:
-        return _ScopeResolution("unknown")
-    scope_type = _scope_type(arm_scope)
-    if scope_type is None:
-        return _ScopeResolution("invalid")
-    if scope_type == "management_group" and not azure_arm_scope_contains(
-        arm_scope,
-        target_arm_id,
-    ):
-        return _ScopeResolution("unknown", scope_type, arm_scope)
-    if not azure_arm_scope_contains(arm_scope, target_arm_id):
-        return _ScopeResolution("unrelated", scope_type, arm_scope)
-    return _ScopeResolution("resolved", scope_type, arm_scope)
-
-
-def _proven_symbolic_assignment_scope_target(
-    assignment: NormalizedResource,
-    context: AzureDecorationContext,
-) -> NormalizedResource | None:
-    facts = azure_facts(assignment)
-    target_address = _known_string(facts.role_assignment_target_resource_address)
-    if target_address is None:
-        return None
-
-    resolution = assignment.reference_resolution("scope")
-    if (
-        resolution.state != TerraformReferenceResolutionState.SYMBOLIC
-        or resolution.provenance != TerraformReferenceProvenance.CONFIGURATION_REFERENCE
-        or len(resolution.targets) != 1
-    ):
-        return None
-
-    resolved_target = resolution.targets[0]
-    if resolved_target.address != target_address:
-        return None
-    target = context.index.resources_by_address.get(target_address)
-    if target is None or not _valid_symbolic_assignment_scope_reference(
-        target,
-        resolved_target.reference,
-    ):
-        return None
-    return target
-
-
-def _valid_symbolic_assignment_scope_reference(
-    target: NormalizedResource,
-    reference: str,
-) -> bool:
-    normalized = reference.casefold()
-    if target.resource_type in {
-        AzureResourceType.KEY_VAULT_KEY,
-        AzureResourceType.KEY_VAULT_SECRET,
-    }:
-        return normalized.endswith(".resource_versionless_id")
-    if target.resource_type == AzureResourceType.STORAGE_CONTAINER:
-        return normalized.endswith(".resource_manager_id")
-    return normalized.endswith(".id")
-
-
 def _resolve_role(
     assignment: NormalizedResource,
     context: AzureDecorationContext,
@@ -486,9 +377,9 @@ def _resolve_role(
             return _custom_role_resolution(custom, assignment_arm_scope)
         return _RoleResolution("unknown", "external_or_unresolved", ())
 
-    if _assignment_field_unknown(assignment, "role_definition_id"):
+    if assignment_field_unknown(assignment, "role_definition_id"):
         return _RoleResolution("unknown", "unresolved", ())
-    if role_name is None or _assignment_field_unknown(assignment, "role_definition_name"):
+    if role_name is None or assignment_field_unknown(assignment, "role_definition_name"):
         return _RoleResolution("unknown", "unresolved", ())
     built_in = _BUILT_IN_CONTROL_PLANE_ROLES_BY_NAME.get(role_name.casefold())
     if built_in is not None:
@@ -519,7 +410,7 @@ def _custom_role_resolution(
         or ".not_actions is unknown" in value
         for value in facts.role_definition_uncertainties
     )
-    assignable_scope_state = _assignable_scope_state(
+    assignable_scope_state = role_assignable_scope_state(
         role_definition,
         assignment_arm_scope,
     )
@@ -541,23 +432,6 @@ def _custom_role_resolution(
     )
 
 
-def _assignable_scope_state(
-    role_definition: NormalizedResource,
-    assignment_arm_scope: str | None,
-) -> str:
-    facts = azure_facts(role_definition)
-    if any("assignable_scopes" in value for value in facts.role_definition_uncertainties):
-        return "unknown"
-    scopes = facts.role_definition_assignable_scopes
-    if not scopes or assignment_arm_scope is None:
-        return "unknown"
-    return (
-        "resolved"
-        if any(azure_arm_scope_contains(scope, assignment_arm_scope) for scope in scopes)
-        else "outside_assignable_scope"
-    )
-
-
 def _matched_actions(
     requested_actions: tuple[str, ...],
     actions: tuple[str, ...],
@@ -572,82 +446,6 @@ def _matched_actions(
         action for action in requested_actions if _matches_any(action, actions) and _matches_any(action, not_actions)
     )
     return matched, excluded
-
-
-def assignment_condition_state(assignment: NormalizedResource) -> str:
-    facts = azure_facts(assignment)
-    if _assignment_field_unknown(assignment, "condition") or _assignment_field_unknown(
-        assignment,
-        "condition_version",
-    ):
-        return "unknown"
-    if facts.role_assignment_condition:
-        return "configured"
-    if facts.role_assignment_condition_version:
-        return "unknown"
-    return "not_configured"
-
-
-def _assignment_field_unknown(assignment: NormalizedResource, field: str) -> bool:
-    prefix = f"{field} is unknown"
-    return any(value.startswith(prefix) for value in azure_facts(assignment).key_vault_authorization_uncertainties)
-
-
-def _scope_type(value: str) -> AzureArmScopeType | None:
-    if _MANAGEMENT_GROUP_SCOPE_PATTERN.fullmatch(value):
-        return "management_group"
-    if _SUBSCRIPTION_SCOPE_PATTERN.fullmatch(value):
-        return "subscription"
-    if _RESOURCE_GROUP_SCOPE_PATTERN.fullmatch(value):
-        return "resource_group"
-    if _arm_id(value) is not None:
-        return "resource"
-    return None
-
-
-def _resource_arm_id(resource: NormalizedResource) -> str | None:
-    facts = azure_facts(resource)
-    if resource.resource_type in AZURE_APP_SERVICE_RESOURCE_TYPES:
-        value = facts.app_service_id
-    elif resource.resource_type == AzureResourceType.STORAGE_ACCOUNT:
-        value = facts.storage_account_id
-    elif resource.resource_type == AzureResourceType.STORAGE_CONTAINER:
-        value = facts.storage_container_resource_manager_id
-    elif resource.resource_type == AzureResourceType.KEY_VAULT:
-        value = facts.key_vault_id
-    elif resource.resource_type == AzureResourceType.KEY_VAULT_KEY:
-        value = facts.key_vault_key_versionless_resource_id
-    elif resource.resource_type == AzureResourceType.SERVICE_BUS_NAMESPACE:
-        value = facts.service_bus_namespace_id
-    elif resource.resource_type in {
-        AzureResourceType.SERVICE_BUS_QUEUE,
-        AzureResourceType.SERVICE_BUS_TOPIC,
-        AzureResourceType.SERVICE_BUS_SUBSCRIPTION,
-    }:
-        value = facts.service_bus_entity_id
-    elif resource.resource_type == AzureResourceType.COSMOSDB_ACCOUNT:
-        value = facts.cosmosdb_account_id
-    elif resource.resource_type == AzureResourceType.COSMOSDB_SQL_DATABASE:
-        value = facts.cosmosdb_sql_database_id
-    elif resource.resource_type == AzureResourceType.COSMOSDB_SQL_CONTAINER:
-        value = facts.cosmosdb_sql_container_id
-    elif resource.resource_type == AzureResourceType.COSMOSDB_SQL_ROLE_DEFINITION:
-        value = facts.cosmosdb_sql_role_definition_resource_id
-    else:
-        value = resource.identifier
-    return _arm_id(value) or _arm_id(resource.identifier)
-
-
-def _arm_id(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().rstrip("/")
-    if "|" in normalized:
-        return None
-    lowered = normalized.casefold()
-    if lowered == "/" or lowered.startswith("/subscriptions/") or lowered.startswith("/providers/"):
-        return normalized
-    return None
 
 
 def _role_id(value: str) -> str:

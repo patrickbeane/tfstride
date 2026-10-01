@@ -267,6 +267,8 @@ include = [
   # Azure ARM control-plane authorization.
   "src/tfstride/providers/azure/arm_control_plane_evidence.py",
   "src/tfstride/providers/azure/arm_control_plane_authorization.py",
+  "src/tfstride/providers/azure/arm_scope.py",
+  "src/tfstride/providers/azure/blob_operation_authority.py",
 
   # Azure secret-management evidence, authorization, and workload paths.
   "src/tfstride/providers/azure/secret_management_evidence.py",

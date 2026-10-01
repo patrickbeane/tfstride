@@ -16,6 +16,7 @@ from tfstride.providers.azure.resource_utils import (
     known_block_int,
     known_block_string,
     known_bool,
+    known_string,
     unknown_block_at,
 )
 
@@ -25,8 +26,8 @@ AZURE_PROVIDER = "azure"
 def normalize_storage_account(resource: TerraformResource) -> NormalizedResource:
     values = resource.values
     name = _optional_string(values.get("name")) or resource.name
-    account_id = _optional_string(values.get("id"))
     uncertainties: list[str] = []
+    account_id = known_string(values, resource.unknown_values, "id", uncertainties)
     inline_network_rules = first_mapping(values.get("network_rules"))
     network_rules_unknown = attribute_unknown(resource.unknown_values, "network_rules")
     default_action_unknown = network_rules_unknown or first_block_attribute_unknown(
@@ -112,7 +113,7 @@ def normalize_storage_container(resource: TerraformResource) -> NormalizedResour
     values = resource.values
     name = _optional_string(values.get("name")) or resource.name
     uncertainties: list[str] = []
-    container_id = _optional_string(values.get("id"))
+    container_id = known_string(values, resource.unknown_values, "id", uncertainties)
     if attribute_unknown(resource.unknown_values, "resource_manager_id"):
         resource_manager_id = None
         uncertainties.append("resource_manager_id is unknown after planning")

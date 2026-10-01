@@ -13,7 +13,10 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
-from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
+    current_app_service_storage_access_paths,
+)
+from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
     AzureResourceType,
@@ -45,18 +48,15 @@ class AzureAppServiceStorageRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
+        decoration_context = AzureDecorationContext(AzureResourceIndexBuilder().build(context.inventory.resources))
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
-            facts = azure_facts(app)
             ingress = app_service_ingress(app, context)
             if not ingress.is_public:
                 continue
 
-            mutation_paths = [
-                path
-                for path in facts.app_service_storage_access_paths
-                if _is_deterministic_mutation_path(path, app, context)
-            ]
+            current_paths, _ = current_app_service_storage_access_paths(app, decoration_context)
+            mutation_paths = [path for path in current_paths if _is_deterministic_mutation_path(path, app, context)]
             if not mutation_paths:
                 continue
 
@@ -67,7 +67,7 @@ class AzureAppServiceStorageRuleDetectors:
             role_definition_addresses = _path_string_values(mutation_paths, "role_definition_address")
             mutation_classes = _mutation_classes(mutation_paths)
             has_read_access = _has_deterministic_read_access(
-                facts.app_service_storage_access_paths,
+                current_paths,
                 set(storage_targets),
             )
             severity_reasoning = build_severity_reasoning(
@@ -123,7 +123,7 @@ def _is_deterministic_mutation_path(
         or path.get("grant_basis") not in _STORAGE_GRANT_BASES
         or path.get("evaluation_basis") != "modeled_rbac_assignment"
         or path.get("resource_scope") not in {"exact_storage_account", "exact_storage_container"}
-        or path.get("assignment_scope_kind") != "resource"
+        or path.get("assignment_scope_kind") not in {"resource", "resource_group", "subscription"}
         or path.get("access_state") != "granted"
         or path.get("condition_state") != "not_configured"
         or path.get("condition") is not None

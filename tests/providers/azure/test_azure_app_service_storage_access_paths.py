@@ -284,7 +284,7 @@ class AzureAppServiceStorageAccessPathTests(unittest.TestCase):
                 _web_app(),
                 _role_assignment(
                     role_name="Storage Blob Data Reader",
-                    role_definition_id="noncanonical-reader-id",
+                    role_definition_id=None,
                 ),
             ]
         )

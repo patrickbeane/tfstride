@@ -27,6 +27,8 @@ from tfstride.providers.coercion import unknown_block_at as unknown_block_at
 from tfstride.providers.coercion import value_is_unknown as value_is_unknown
 
 _AZURE_REFERENCE_SUFFIXES = (
+    ".role_definition_resource_id",
+    ".role_definition_id",
     ".resource_manager_id",
     ".resource_versionless_id",
     ".versionless_id",
