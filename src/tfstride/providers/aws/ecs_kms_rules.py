@@ -21,7 +21,10 @@ from tfstride.providers.aws.kms_evidence import (
 from tfstride.providers.aws.protected_data_evidence import (
     AwsEcsS3ProtectedDataConvergence,
 )
+from tfstride.providers.aws.resource_decoration.ecs_s3_access_paths import current_ecs_s3_access_path
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
+from tfstride.providers.aws.s3_bucket_policies import prepare_s3_bucket_policy_sources
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
@@ -786,6 +789,8 @@ def _resolved_protected_data_convergences(
         for path in paths
         if path["operation"] == _DECRYPT_OPERATION
     }
+    decoration_context = AwsDecorationContext(AwsResourceIndexBuilder().build(list(context.inventory.resources)))
+    bucket_policies = prepare_s3_bucket_policy_sources(list(context.inventory.resources), decoration_context)
     convergences: list[AwsEcsS3ProtectedDataConvergence] = []
     seen: set[tuple[str, str, str]] = set()
     for convergence in aws_facts(service).ecs_s3_protected_data_convergences:
@@ -796,6 +801,17 @@ def _resolved_protected_data_convergences(
             valid_path_keys,
         ):
             continue
+        current_access_path = current_ecs_s3_access_path(
+            convergence["access_path"],
+            service,
+            decoration_context,
+            actions=frozenset({"s3:GetObject", "s3:GetObjectVersion"}),
+            bucket_policies=bucket_policies,
+        )
+        if current_access_path is None:
+            continue
+        convergence = convergence.copy()
+        convergence["access_path"] = current_access_path
         dependency = convergence["encryption_dependency"]
         fingerprint = (
             convergence["bucket_address"],

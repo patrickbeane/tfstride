@@ -939,6 +939,17 @@ def _statement_record(
     return resource_record
 
 
+def s3_topology_proof_resource_targets_bucket(
+    resource: str,
+    bucket: NormalizedResource,
+    source: NormalizedResource,
+    context: AwsDecorationContext,
+) -> bool:
+    """Check a cached proof resource with the same target resolution as evaluation."""
+    sources = _identity_policy_resources(source, context) if source.resource_type == "aws_iam_role" else (source,)
+    return _resource_targets_bucket(resource, bucket, sources, context) is True
+
+
 def current_s3_bucket_topology_destruction_path(
     task_definition: NormalizedResource,
     bucket: NormalizedResource,

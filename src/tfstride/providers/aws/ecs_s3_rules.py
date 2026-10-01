@@ -12,7 +12,10 @@ from tfstride.providers.aws.ecs_path_rule_helpers import (
     path_string_values,
     verified_public_service_ingress,
 )
+from tfstride.providers.aws.resource_decoration.ecs_s3_access_paths import current_ecs_s3_access_path
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
+from tfstride.providers.aws.s3_bucket_policies import prepare_s3_bucket_policy_sources
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
 _MUTATION_ACCESS_CLASSES = frozenset({"write", "delete", "administrative"})
@@ -57,12 +60,24 @@ class AwsEcsS3AccessRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
+        decoration_context = AwsDecorationContext(AwsResourceIndexBuilder().build(list(context.inventory.resources)))
+        bucket_policies = prepare_s3_bucket_policy_sources(list(context.inventory.resources), decoration_context)
         findings: list[Finding] = []
         for service in context.inventory.by_type(_AWS_ECS_SERVICE):
             mutation_paths = [
                 path
-                for path in aws_facts(service).ecs_s3_access_paths
-                if _is_deterministic_mutation_path(path, service.address)
+                for cached_path in aws_facts(service).ecs_s3_access_paths
+                if (
+                    path := current_ecs_s3_access_path(
+                        cached_path,
+                        service,
+                        decoration_context,
+                        actions=frozenset(_mutation_actions(cached_path)),
+                        bucket_policies=bucket_policies,
+                    )
+                )
+                is not None
+                and _is_deterministic_mutation_path(path, service.address)
             ]
             if not mutation_paths:
                 continue

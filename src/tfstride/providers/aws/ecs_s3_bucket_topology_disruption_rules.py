@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from fnmatch import fnmatchcase
 from typing import cast
 
 from tfstride.analysis.finding_factory import FindingFactory
@@ -21,6 +22,7 @@ from tfstride.providers.aws.object_storage_topology_destruction_evidence import 
 )
 from tfstride.providers.aws.resource_decoration.ecs_s3_bucket_topology_destruction_paths import (
     current_s3_bucket_topology_destruction_path,
+    s3_topology_proof_resource_targets_bucket,
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import (
@@ -212,7 +214,7 @@ def _current_deterministic_path(
     current_path["task_definition_arn"] = task_definition.arn
     current_path["internet_facing_load_balancers"] = service_facts.internet_facing_load_balancer_addresses
     if not _authorization_relationship_matches(cached_path, current_path) or not _authorization_proof_identity_matches(
-        cached_path, current_path
+        cached_path, current_path, bucket, decoration_context
     ):
         return None
     return current_path
@@ -241,14 +243,18 @@ def _authorization_relationship_matches(
 def _authorization_proof_identity_matches(
     cached_path: Mapping[str, object],
     current_path: Mapping[str, object],
+    bucket: NormalizedResource,
+    context: AwsDecorationContext,
 ) -> bool:
-    cached_sources = _authorization_proof_sources(cached_path)
-    current_sources = _authorization_proof_sources(current_path)
+    cached_sources = _authorization_proof_sources(cached_path, bucket, context)
+    current_sources = _authorization_proof_sources(current_path, bucket, context)
     return cached_sources is not None and cached_sources == current_sources
 
 
 def _authorization_proof_sources(
     path: Mapping[str, object],
+    bucket: NormalizedResource,
+    context: AwsDecorationContext,
 ) -> frozenset[tuple[str, str]] | None:
     raw_statements = path.get("authorization_statements")
     if not isinstance(raw_statements, list) or not raw_statements:
@@ -265,6 +271,35 @@ def _authorization_proof_sources(
             "identity_policy",
             "bucket_policy",
         }:
+            return None
+        source = context.index.resources_by_address.get(source_address)
+        actions = _string_values(statement.get("actions"))
+        patterns = _string_values(statement.get("matching_action_patterns"))
+        resources = _string_values(statement.get("resources"))
+        matches = _string_values(statement.get("matching_resources"))
+        if (
+            source is None
+            or statement.get("effect") != "allow"
+            or statement.get("matched_actions") != [_DELETE_BUCKET]
+            or statement.get("conditional") is not False
+            or statement.get("conditions") != []
+            or statement.get("resource_scopes") != ["exact_bucket"]
+            or not patterns
+            or not all(
+                pattern in actions and fnmatchcase(_DELETE_BUCKET.lower(), pattern.lower()) for pattern in patterns
+            )
+            or not matches
+            or not all(
+                resource in resources
+                and s3_topology_proof_resource_targets_bucket(
+                    resource,
+                    bucket,
+                    source,
+                    context,
+                )
+                for resource in matches
+            )
+        ):
             return None
         assert isinstance(source_kind, str)
         sources.add((source_address, source_kind))

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fnmatch import fnmatchcase
 from typing import Literal
 
@@ -169,12 +169,37 @@ class ProjectEcsS3ObjectDeletionPathsOntoServicesStage:
             service_facts.extend_ecs_s3_object_deletion_path_uncertainties(dedupe(uncertainties))
 
 
+def current_s3_object_deletion_paths(
+    task_definition: NormalizedResource,
+    bucket: NormalizedResource,
+    context: AwsDecorationContext,
+    *,
+    operation: AwsS3ObjectDeletionOperation,
+    scope: _ObjectScope,
+) -> list[AwsEcsS3ObjectDeletionPath]:
+    """Recompute current authority within one cached operation and object scope."""
+    paths, _uncertainties = _task_definition_paths(
+        task_definition,
+        (bucket,),
+        context,
+        unresolved_policy_sources=_unresolved_bucket_policy_sources(
+            tuple(context.index.resources_by_address.values()),
+            context,
+        ),
+        operation_limit=operation,
+        scope_limit=scope,
+    )
+    return paths
+
+
 def _task_definition_paths(
     task_definition: NormalizedResource,
     buckets: Sequence[NormalizedResource],
     context: AwsDecorationContext,
     *,
     unresolved_policy_sources: tuple[str, ...],
+    operation_limit: AwsS3ObjectDeletionOperation | None = None,
+    scope_limit: _ObjectScope | None = None,
 ) -> tuple[list[AwsEcsS3ObjectDeletionPath], list[str]]:
     task_facts = aws_facts(task_definition)
     task_role_reference = task_facts.task_role_arn
@@ -307,10 +332,13 @@ def _task_definition_paths(
             ),
             same_account=same_account,
             partitions_match=partitions_match,
+            scope_limit=scope_limit,
         )
         bypass_policy_unresolved = bool(unresolved_sources_by_action[_BYPASS_GOVERNANCE_RETENTION])
 
         for operation in _OPERATION_ORDER:
+            if operation_limit is not None and operation != operation_limit:
+                continue
             evaluation = _evaluate_authorization(
                 bucket,
                 task_role,
@@ -321,6 +349,7 @@ def _task_definition_paths(
                 bucket_policy_complete=(bucket_posture.complete and not unresolved_sources_by_action[operation]),
                 same_account=same_account,
                 partitions_match=partitions_match,
+                scope_limit=scope_limit,
             )
             uncertainties.extend(
                 f"{task_definition.address}: {uncertainty}" for uncertainty in evaluation.uncertainties
@@ -376,6 +405,7 @@ def _evaluate_authorization(
     bucket_policy_complete: bool,
     same_account: bool | None,
     partitions_match: bool,
+    scope_limit: _ObjectScope | None = None,
 ) -> _AuthorizationEvaluation:
     operation_identity_matches = [match for match in identity_matches if match.operation == operation]
     operation_bucket_matches = [match for match in bucket_matches if match.operation == operation]
@@ -413,6 +443,11 @@ def _evaluate_authorization(
     conditional_deny_scopes: list[_ObjectScope] = []
     partially_denied_scopes: list[_ObjectScope] = []
     for candidate in candidates:
+        if scope_limit is not None:
+            intersection = _scope_intersection(candidate.scope, scope_limit)
+            if intersection is None:
+                continue
+            candidate = replace(candidate, scope=intersection)
         overlapping_denies = [
             match for match in (*identity_denies, *bucket_denies) if _scopes_overlap(match.scope, candidate.scope)
         ]

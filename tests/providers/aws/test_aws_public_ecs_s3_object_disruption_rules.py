@@ -206,14 +206,14 @@ class AwsPublicEcsS3ObjectDisruptionRuleTests(unittest.TestCase):
             configuration={},
             source_address=None,
         )
-        self.assertEqual(
-            StrideRuleEngine().evaluate(
-                inventory,
-                detect_trust_boundaries(inventory),
-                rule_policy=RulePolicy(enabled_rule_ids=frozenset({_DISRUPTION_RULE_ID})),
-            ),
-            [],
+        current = StrideRuleEngine().evaluate(
+            inventory,
+            detect_trust_boundaries(inventory),
+            rule_policy=RulePolicy(enabled_rule_ids=frozenset({_DISRUPTION_RULE_ID})),
         )
+        self.assertEqual([finding.rule_id for finding in current], [_DISRUPTION_RULE_ID])
+        evidence = {item.key: item.values for item in current[0].evidence}
+        self.assertIn("recovery_state=unversioned_current_object_deletion", evidence["recovery_evidence"][0])
 
 
 if __name__ == "__main__":

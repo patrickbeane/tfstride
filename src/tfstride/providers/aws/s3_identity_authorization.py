@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from typing import Literal, TypedDict
@@ -175,6 +176,7 @@ def evaluate_s3_identity_authorization(
     bucket_policy_sources: S3BucketPolicySources,
     *,
     account_relationship: AwsAccountRelationship,
+    scope_limits: Mapping[str, Sequence[str]] | None = None,
 ) -> S3IdentityAuthorization | None:
     """Evaluate P1's identity grants and applicable constraints for a resolved target.
 
@@ -195,6 +197,7 @@ def evaluate_s3_identity_authorization(
         [*statement_records, *applicable_denies],
         bucket_arn,
         cross_account_allows=list(constraints.allow_records) if account_relationship.same_account is False else None,
+        scope_limits=scope_limits,
     )
     uncertainties = list(constraints.uncertainties)
     for evaluation in assessment["scope_evaluations"]:
@@ -385,7 +388,7 @@ def _matching_statement_records(
                 "matching_action_patterns": sorted(matching_patterns, key=str.lower),
                 "resources": list(statement.resources),
                 "matching_resources": sorted(matching_resources),
-                "resource_scopes": _resource_scopes(bound_resources, bucket_arn),
+                "resource_scopes": s3_resource_scopes(bound_resources, bucket_arn),
                 "access_classes": s3_access_classes(matched_actions),
                 "conditions": [_condition_record(condition) for condition in statement.conditions],
                 "conditional": bool(statement.conditions),
@@ -452,6 +455,7 @@ def _assess_actions(
     bucket_arn: str,
     *,
     cross_account_allows: list[AwsS3BucketPolicyStatementEvidence] | None = None,
+    scope_limits: Mapping[str, Sequence[str]] | None = None,
 ) -> _S3AccessAssessment:
     allowed: list[str] = []
     denied: list[str] = []
@@ -459,6 +463,8 @@ def _assess_actions(
     conditional: list[str] = []
     evaluations: list[AwsS3ScopeEvaluation] = []
     for action in _S3_ACTIONS:
+        if scope_limits is not None and action.name not in scope_limits:
+            continue
         matching = [record for record in records if action.name in record["matched_actions"]]
         if not matching:
             continue
@@ -477,6 +483,14 @@ def _assess_actions(
                     deny_scopes.append(
                         _DenyScope(resource, record["conditional"], record.get("applicability_uncertain", False))
                     )
+        if scope_limits is not None:
+            limited: dict[str, list[AwsS3PolicyStatementEvidence]] = {}
+            for resource, allows in allow_scopes.items():
+                for limit in scope_limits[action.name]:
+                    intersection = _scope_resource_intersection(resource, limit, bucket_arn, action.resource_kind)
+                    if intersection is not None:
+                        limited.setdefault(intersection, []).extend(allows)
+            allow_scopes = limited
         action_evaluations = _evaluate_action_scopes(
             action,
             allow_scopes,
@@ -514,6 +528,20 @@ def _assess_actions(
     }
 
 
+def _scope_resource_intersection(
+    left_resource: str,
+    right_resource: str,
+    bucket_arn: str,
+    resource_kind: Literal["bucket_level", "object_level"],
+) -> str | None:
+    if resource_kind == "bucket_level":
+        return bucket_arn if left_resource == right_resource == bucket_arn else None
+    left = object_scope_from_resource(left_resource, bucket_arn)
+    right = object_scope_from_resource(right_resource, bucket_arn)
+    scope = object_scope_intersection(left, right) if left is not None and right is not None else None
+    return scope.resource if scope is not None else None
+
+
 def _evaluate_action_scopes(
     action: _S3Action,
     allow_scopes: dict[str, list[AwsS3PolicyStatementEvidence]],
@@ -539,13 +567,7 @@ def _evaluate_action_scopes(
                 bound = _resource_for_bucket(raw, bucket_arn, action.resource_kind, deny=False)
                 if bound is None:
                     continue
-                if action.resource_kind == "bucket_level":
-                    intersection = resource if bound == resource else None
-                else:
-                    left = object_scope_from_resource(resource, bucket_arn)
-                    right = object_scope_from_resource(bound, bucket_arn)
-                    scope = object_scope_intersection(left, right) if left is not None and right is not None else None
-                    intersection = scope.resource if scope is not None else None
+                intersection = _scope_resource_intersection(resource, bound, bucket_arn, action.resource_kind)
                 if intersection is None:
                     continue
                 matched = True
@@ -658,7 +680,7 @@ def s3_access_classes(actions: list[str]) -> list[AwsS3AccessClass]:
     return [access_class for access_class in _ACCESS_CLASS_ORDER if access_class in classes]
 
 
-def _resource_scopes(resources: set[str], bucket_arn: str) -> list[AwsS3ResourceScope]:
+def s3_resource_scopes(resources: set[str], bucket_arn: str) -> list[AwsS3ResourceScope]:
     scopes = {_resource_scope(resource, bucket_arn) for resource in resources}
     order = ("all_resources", "exact_bucket", "all_bucket_objects", "object_prefix", "exact_object")
     return [scope for scope in order if scope in scopes]

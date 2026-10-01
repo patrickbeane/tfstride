@@ -163,7 +163,7 @@ class AwsPublicEcsS3MutationRuleTests(unittest.TestCase):
         self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
         evidence = {item.key: item.values for item in findings[0].evidence}
         self.assertIn("actions=s3:PutObject", evidence["s3_mutation_paths"][0])
-        self.assertIn("denied_actions=s3:GetObject", evidence["s3_mutation_paths"][0])
+        self.assertIn("denied_actions=none", evidence["s3_mutation_paths"][0])
 
     def test_non_deterministic_non_mutating_or_non_public_paths_remain_quiet(self) -> None:
         external_policy_arn = "arn:aws:iam::aws:policy/ExternalS3Access"

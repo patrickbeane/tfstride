@@ -9,8 +9,10 @@ from tfstride.providers.aws.protected_data_evidence import (
     AwsEcsS3AccessPath,
     AwsEcsS3ProtectedDataConvergence,
 )
+from tfstride.providers.aws.resource_decoration.ecs_s3_access_paths import current_ecs_s3_access_path
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_bucket_policies import prepare_s3_bucket_policy_sources
 from tfstride.providers.coercion import dedupe
 
 _ECS_SERVICE = "aws_ecs_service"
@@ -79,6 +81,7 @@ def _protected_data_convergences(
     ]
     convergences: list[AwsEcsS3ProtectedDataConvergence] = []
 
+    bucket_policies = prepare_s3_bucket_policy_sources(list(context.index.resources_by_address.values()), context)
     for access_path in facts.ecs_s3_access_paths:
         if not _potential_payload_read(access_path):
             continue
@@ -113,8 +116,15 @@ def _protected_data_convergences(
                     f"{service.address}: {bucket.address} KMS dependency is {dependency['resolution_state']}"
                 )
 
-        if not _deterministic_payload_read(
+        current_access_path = current_ecs_s3_access_path(
             access_path,
+            service,
+            context,
+            actions=frozenset({"s3:GetObject", "s3:GetObjectVersion"}),
+            bucket_policies=bucket_policies,
+        )
+        if current_access_path is None or not _deterministic_payload_read(
+            current_access_path,
             service,
             bucket,
             context,
@@ -127,6 +137,7 @@ def _protected_data_convergences(
                 )
             continue
 
+        access_path = current_access_path
         for dependency in dependencies:
             key = _dependency_key(
                 dependency,

@@ -17,20 +17,16 @@ from tfstride.providers.aws.ecs_path_rule_helpers import (
     verified_public_service_ingress,
 )
 from tfstride.providers.aws.object_storage_deletion_evidence import AwsEcsS3ObjectDeletionPath
-from tfstride.providers.aws.resource_facts import AwsResourceFacts, aws_facts
+from tfstride.providers.aws.resource_decoration.ecs_s3_object_deletion_paths import current_s3_object_deletion_paths
+from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
+from tfstride.providers.aws.s3_object_scopes import object_scope_from_resource
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
 _AWS_IAM_ROLE = "aws_iam_role"
 _AWS_S3_BUCKET = "aws_s3_bucket"
 _AWS_OPERATION_ORDER = ("s3:DeleteObject", "s3:DeleteObjectVersion")
-_EXCLUDED_PROJECTION_FIELDS = frozenset(
-    {
-        "workload_address",
-        "workload_type",
-        "internet_facing_load_balancers",
-    }
-)
 
 
 class AwsEcsS3ObjectDisruptionRuleDetectors:
@@ -45,12 +41,13 @@ class AwsEcsS3ObjectDisruptionRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
+        decoration_context = AwsDecorationContext(AwsResourceIndexBuilder().build(list(context.inventory.resources)))
         findings: list[Finding] = []
         for service in context.inventory.by_type(_AWS_ECS_SERVICE):
             paths = [
                 path
-                for path in aws_facts(service).ecs_s3_object_deletion_paths
-                if _is_current_deterministic_path(path, service, context)
+                for cached_path in aws_facts(service).ecs_s3_object_deletion_paths
+                for path in _current_deterministic_paths(cached_path, service, context, decoration_context)
             ]
             if not paths:
                 continue
@@ -104,14 +101,15 @@ class AwsEcsS3ObjectDisruptionRuleDetectors:
         return findings
 
 
-def _is_current_deterministic_path(
+def _current_deterministic_paths(
     path: AwsEcsS3ObjectDeletionPath,
     service: NormalizedResource,
     context: RuleEvaluationContext,
-) -> bool:
+    decoration_context: AwsDecorationContext,
+) -> list[AwsEcsS3ObjectDeletionPath]:
     operation = path.get("operation")
     if operation not in _AWS_OPERATION_ORDER:
-        return False
+        return []
 
     task_definition_address = path.get("task_definition_address")
     role_address = path.get("role_address")
@@ -129,15 +127,14 @@ def _is_current_deterministic_path(
         or role.resource_type != _AWS_IAM_ROLE
         or bucket.resource_type != _AWS_S3_BUCKET
     ):
-        return False
+        return []
 
     service_facts = aws_facts(service)
     task_facts = aws_facts(task_definition)
-    bucket_facts = aws_facts(bucket)
     role_arn = role.arn
     bucket_arn = bucket.arn
     if not isinstance(role_arn, str) or not isinstance(bucket_arn, str):
-        return False
+        return []
     if (
         task_definition.address not in service_facts.resolved_task_definition_addresses
         or task_facts.task_role_arn != role_arn
@@ -159,26 +156,28 @@ def _is_current_deterministic_path(
         or path.get("conditional_evaluation_required") is not False
         or path.get("management_effect") != "disruption"
         or not _target_scope_is_coherent(path, bucket_arn)
-        or not _recovery_evidence_is_current(path, bucket_facts)
-        or not _matches_current_task_path(path, task_facts.ecs_s3_object_deletion_paths)
+        or path.get("object_version") is not None
+        or decoration_context.index.role_index.get(task_facts.task_role_arn, source=task_definition) is not role
     ):
-        return False
+        return []
 
-    return True
-
-
-def _matches_current_task_path(
-    projected_path: Mapping[str, object],
-    current_paths: Sequence[Mapping[str, object]],
-) -> bool:
-    projected_keys = set(projected_path) - _EXCLUDED_PROJECTION_FIELDS
-    for current_path in current_paths:
-        current_keys = set(current_path) - _EXCLUDED_PROJECTION_FIELDS
-        if projected_keys != current_keys:
-            continue
-        if all(projected_path[key] == current_path[key] for key in projected_keys):
-            return True
-    return False
+    scope = object_scope_from_resource(path["target_scope"], bucket_arn)
+    if scope is None:
+        return []
+    paths = current_s3_object_deletion_paths(
+        task_definition,
+        bucket,
+        decoration_context,
+        operation=path["operation"],
+        scope=scope,
+    )
+    for current in paths:
+        current["workload_address"] = service.address
+        current["workload_type"] = service.resource_type
+        current["task_definition_address"] = task_definition.address
+        current["task_definition_arn"] = task_definition.arn
+        current["internet_facing_load_balancers"] = service_facts.internet_facing_load_balancer_addresses
+    return paths
 
 
 def _target_scope_is_coherent(path: Mapping[str, object], bucket_arn: str) -> bool:
@@ -221,38 +220,6 @@ def _target_scope_is_coherent(path: Mapping[str, object], bucket_arn: str) -> bo
         return False
 
     return path.get("target_scope") == expected_scope and path.get("matched_actions") == [operation]
-
-
-def _recovery_evidence_is_current(path: Mapping[str, object], bucket_facts: AwsResourceFacts) -> bool:
-    evidence = path.get("recovery_evidence")
-    if not isinstance(evidence, Mapping):
-        return False
-    evidence = cast(Mapping[str, object], evidence)
-    if (
-        evidence.get("recovery_evidence_scope") != "s3_versioning_and_object_lock"
-        or evidence.get("versioning_status") != bucket_facts.s3_versioning_status
-        or evidence.get("versioning_enabled") != bucket_facts.s3_versioning_enabled
-        or evidence.get("object_lock_enabled") != bucket_facts.s3_object_lock_enabled
-        or evidence.get("object_lock_default_retention_mode") != bucket_facts.s3_object_lock_default_retention_mode
-        or evidence.get("object_lock_default_retention_days") != bucket_facts.s3_object_lock_default_retention_days
-        or evidence.get("object_lock_default_retention_years") != bucket_facts.s3_object_lock_default_retention_years
-    ):
-        return False
-
-    operation = path.get("operation")
-    lifecycle_state = path.get("lifecycle_compatibility_state")
-    if operation == "s3:DeleteObject":
-        status = (
-            bucket_facts.s3_versioning_status.casefold() if isinstance(bucket_facts.s3_versioning_status, str) else None
-        )
-        expected_state = (
-            "recoverable_delete_marker" if status == "enabled" else "compatible" if status == "disabled" else "unknown"
-        )
-    elif operation == "s3:DeleteObjectVersion":
-        expected_state = "compatible" if bucket_facts.s3_object_lock_enabled is False else "unknown"
-    else:
-        return False
-    return lifecycle_state == expected_state
 
 
 def _is_exact_arn(value: str, service: str) -> bool:

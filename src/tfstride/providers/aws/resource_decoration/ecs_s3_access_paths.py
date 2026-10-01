@@ -16,6 +16,7 @@ from tfstride.providers.aws.s3_identity_authorization import (
     assess_s3_identity_policy,
     evaluate_s3_identity_authorization,
     s3_access_classes,
+    s3_resource_scopes,
 )
 from tfstride.providers.aws.s3_object_scopes import is_exact_s3_bucket_arn, s3_resource_for_bucket
 from tfstride.providers.coercion import dedupe
@@ -83,6 +84,90 @@ def _service_access_path(
         "task_definition_arn": task_definition.arn,
         "internet_facing_load_balancers": aws_facts(service).internet_facing_load_balancer_addresses,
     }
+
+
+def current_ecs_s3_access_path(
+    cached_path: AwsEcsS3AccessPath,
+    service: NormalizedResource,
+    context: AwsDecorationContext,
+    *,
+    actions: frozenset[str] | None = None,
+    bucket_policies: dict[str, S3BucketPolicySources] | None = None,
+) -> AwsEcsS3AccessPath | None:
+    """Re-evaluate only the cached operation/scope pairs against current policy.
+
+    Limits are applied before denies, so a broad current grant with a disjoint
+    deny can still prove the narrower cached scope. Cached summaries never
+    authorize another operation or restore a denied/uncertain cached scope.
+    """
+    if (
+        service.resource_type != _ECS_SERVICE
+        or cached_path.get("workload_address") != service.address
+        or cached_path.get("workload_type") != _ECS_SERVICE
+        or cached_path.get("role_kind") != "ecs_task_role"
+        or cached_path.get("credential_context") != "workload_runtime"
+        or cached_path.get("access_state") != "allowed"
+        or cached_path.get("modeled_access_state") != "allowed"
+        or cached_path.get("role_policy_complete") is not True
+        or cached_path.get("bucket_policy_constraints_complete") is not True
+    ):
+        return None
+    task_address = cached_path.get("task_definition_address")
+    task = context.index.resources_by_address.get(task_address) if isinstance(task_address, str) else None
+    role = context.index.resources_by_address.get(cached_path.get("role_address", ""))
+    bucket = context.index.resources_by_address.get(cached_path.get("bucket_address", ""))
+    if (
+        task is None
+        or task.resource_type != _ECS_TASK_DEFINITION
+        or task.address not in aws_facts(service).resolved_task_definition_addresses
+        or role is None
+        or role.resource_type != "aws_iam_role"
+        or cached_path.get("role_arn") != role.arn
+        or context.index.role_index.get(aws_facts(task).task_role_arn, source=task) is not role
+        or bucket is None
+        or bucket.resource_type != "aws_s3_bucket"
+        or not is_exact_s3_bucket_arn(bucket.arn)
+        or cached_path.get("bucket_arn") != bucket.arn
+        or context.index.buckets.get(bucket.arn) is not bucket
+    ):
+        return None
+    evaluations = cached_path.get("scope_evaluations")
+    cached_actions = cached_path.get("matched_actions")
+    if not isinstance(evaluations, list) or not isinstance(cached_actions, list):
+        return None
+    limits: dict[str, list[str]] = {}
+    for scope in evaluations:
+        if not isinstance(scope, dict):
+            continue
+        action, resource = scope.get("action"), scope.get("resource")
+        if (
+            scope.get("modeled_access_state") == "allowed"
+            and isinstance(action, str)
+            and action in cached_actions
+            and (actions is None or action in actions)
+            and isinstance(resource, str)
+        ):
+            limits.setdefault(action, []).append(resource)
+    if not limits:
+        return None
+    if bucket_policies is None:
+        bucket_policies = prepare_s3_bucket_policy_sources(list(context.index.resources_by_address.values()), context)
+    authorization = evaluate_s3_identity_authorization(
+        assess_s3_identity_policy(role),
+        bucket,
+        bucket_policies[bucket.address],
+        account_relationship=context.index.account_identities.relationship(role, bucket),
+        scope_limits=limits,
+    )
+    if authorization is None or authorization.access_state != "allowed":
+        return None
+    result = _service_access_path(service, task, _access_path_record(task, bucket, role, authorization))
+    assert bucket.arn is not None
+    result["resource_scopes"] = s3_resource_scopes(
+        {scope["resource"] for scope in result["scope_evaluations"] if scope["modeled_access_state"] == "allowed"},
+        bucket.arn,
+    )
+    return result
 
 
 def _ecs_s3_access_paths(
