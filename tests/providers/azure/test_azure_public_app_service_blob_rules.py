@@ -304,8 +304,8 @@ class AzurePublicAppServiceBlobDisruptionRuleTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
-    def test_removed_current_storage_access_record_suppresses_copied_path(self) -> None:
-        inventory, _ = _evaluate(
+    def test_removed_cached_storage_access_record_does_not_erase_current_authority(self) -> None:
+        inventory, original_findings = _evaluate(
             [
                 _storage_account(),
                 _storage_container(),
@@ -323,7 +323,7 @@ class AzurePublicAppServiceBlobDisruptionRuleTests(unittest.TestCase):
             [],
             rule_policy=RulePolicy(enabled_rule_ids=frozenset({_RULE_ID})),
         )
-        self.assertEqual(findings, [])
+        self.assertEqual(findings, original_findings)
 
     def test_current_public_state_is_revalidated_against_copied_path(self) -> None:
         inventory, _ = _evaluate(

@@ -22,7 +22,11 @@ from tfstride.providers.azure.protected_data_evidence import AzureAppServiceStor
 from tfstride.providers.azure.resource_decoration.app_service_blob_deletion_paths import (
     storage_access_path_deletion_operations,
 )
+from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
+    current_app_service_storage_access_paths,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
+from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import AZURE_APP_SERVICE_RESOURCE_TYPES, AzureResourceType
 from tfstride.providers.coercion import dedupe
 
@@ -75,6 +79,9 @@ class AzureAppServiceBlobRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
+        decoration_context = AzureDecorationContext(
+            AzureResourceIndexBuilder().build(list(context.inventory.resources))
+        )
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             app_facts = azure_facts(app)
@@ -82,10 +89,13 @@ class AzureAppServiceBlobRuleDetectors:
             if not ingress.is_public:
                 continue
 
+            current_access_paths, authority_uncertainties = current_app_service_storage_access_paths(
+                app, decoration_context
+            )
             paths = [
                 path
                 for path in app_facts.app_service_blob_deletion_paths
-                if _is_current_deterministic_path(path, app, context)
+                if _is_current_deterministic_path(path, app, context, current_access_paths)
             ]
             if not paths:
                 continue
@@ -128,7 +138,7 @@ class AzureAppServiceBlobRuleDetectors:
                         evidence_item("authorization_scope", _authorization_scope_evidence(paths)),
                         evidence_item(
                             "storage_blob_deletion_path_uncertainties",
-                            app_facts.app_service_blob_deletion_path_uncertainties,
+                            dedupe([*app_facts.app_service_blob_deletion_path_uncertainties, *authority_uncertainties]),
                         ),
                     ),
                     severity_reasoning=severity_reasoning,
@@ -141,6 +151,7 @@ def _is_current_deterministic_path(
     path: AzureAppServiceBlobDeletionPath,
     app: NormalizedResource,
     context: RuleEvaluationContext,
+    current_access_paths: Sequence[AzureAppServiceStorageAccessPath],
 ) -> bool:
     operation = path.get("operation")
     if operation not in _RULE_OPERATIONS:
@@ -155,7 +166,7 @@ def _is_current_deterministic_path(
         or path.get("policy_complete") is not True
         or path.get("condition") is not None
         or path.get("condition_state") != "not_configured"
-        or path.get("assignment_scope_kind") != "resource"
+        or path.get("assignment_scope_kind") not in {"resource", "resource_group", "subscription"}
         or path.get("grant_basis")
         not in {
             "azure_storage_scoped_rbac",
@@ -173,7 +184,7 @@ def _is_current_deterministic_path(
     account, container = _current_storage_target(path, context)
     if account is None or container is None:
         return False
-    if not _current_storage_access_authority(path, app, account, container, operation, context):
+    if not _current_storage_access_authority(path, operation, current_access_paths):
         return False
     if not _recovery_evidence_is_current(path, account, container, operation, context):
         return False
@@ -272,66 +283,28 @@ def _current_storage_target(
 
 def _current_storage_access_authority(
     path: Mapping[str, object],
-    app: NormalizedResource,
-    account: NormalizedResource,
-    container: NormalizedResource,
     operation: str,
-    context: RuleEvaluationContext,
+    current_paths: Sequence[AzureAppServiceStorageAccessPath],
 ) -> bool:
-    current_paths = azure_facts(app).app_service_storage_access_paths
-    current = next(
-        (access_path for access_path in current_paths if _access_path_matches(path, access_path)),
-        None,
-    )
-    if current is None or operation not in storage_access_path_deletion_operations(current):
-        return False
-
-    expected_authorization_sources = [current["role_assignment_address"]]
-    current_role_definition_address = _known_string(current.get("role_definition_address"))
-    if current_role_definition_address is not None:
-        expected_authorization_sources.append(current_role_definition_address)
-    if path.get("authorization_source_addresses") != expected_authorization_sources:
-        return False
-
-    assignment_address = _known_string(path.get("role_assignment_address"))
-    assignment = context.inventory.get_by_address(assignment_address) if assignment_address is not None else None
-    if assignment is None or assignment.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
-        return False
-    assignment_facts = azure_facts(assignment)
-    if (
-        not _same_identifier(assignment_facts.principal_id, path.get("principal_id"))
-        or assignment_facts.role_assignment_scope != path.get("assignment_scope")
-        or assignment_facts.role_assignment_scope_kind != path.get("assignment_scope_kind")
-        or assignment_facts.role_definition_id != path.get("role_definition_id")
-        or assignment_facts.role_assignment_condition != path.get("condition")
-    ):
-        return False
-
-    expected_target = account if current["resource_scope"] == "exact_storage_account" else container
-    if (
-        assignment_facts.role_assignment_target_resource_address != expected_target.address
-        or assignment_facts.role_assignment_target_resource_type != expected_target.resource_type
-    ):
-        return False
-
-    role_definition_address = _known_string(path.get("role_definition_address"))
-    if current["role_kind"] == "custom":
-        role_definition = (
-            context.inventory.get_by_address(role_definition_address) if role_definition_address is not None else None
-        )
-        if role_definition is None or role_definition.resource_type != AzureResourceType.ROLE_DEFINITION:
-            return False
-        role_facts = azure_facts(role_definition)
+    # These records were rebuilt by the shared Blob authority evaluator in this
+    # invocation. Scope, assignability, conditions and exclusions belong to each
+    # assignment alternative; cached attachment summaries cannot prove authority.
+    for current in current_paths:
         if (
-            role_facts.name != path.get("role_definition_name")
-            or role_facts.role_definition_uncertainties
-            or role_facts.role_definition_data_actions != current["custom_role_data_actions"]
-            or role_facts.role_definition_not_data_actions != current["custom_role_not_data_actions"]
+            not _access_path_matches(path, current)
+            or current["access_state"] != "granted"
+            or current["condition_state"] != "not_configured"
+            or current["condition"] is not None
+            or operation not in storage_access_path_deletion_operations(current)
         ):
-            return False
-    elif assignment_facts.role_definition_name != path.get("role_definition_name"):
-        return False
-    return True
+            continue
+        sources = [current["role_assignment_address"]]
+        role_address = current["role_definition_address"]
+        if role_address is not None:
+            sources.append(role_address)
+        if path.get("authorization_source_addresses") == sources:
+            return True
+    return False
 
 
 def _access_path_matches(
