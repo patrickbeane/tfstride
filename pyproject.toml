@@ -170,6 +170,7 @@ include = [
   "src/tfstride/providers/aws/dynamodb_normalizers.py",
   "src/tfstride/providers/aws/resource_decoration/kms.py",
   "src/tfstride/providers/aws/resource_decoration/kms_encryption_dependencies.py",
+  "src/tfstride/providers/aws/s3_identity_authorization.py",
   "src/tfstride/providers/aws/resource_decoration/ecs_s3_access_paths.py",
   "src/tfstride/providers/aws/resource_decoration/ecs_s3_protected_data_convergence.py",
   "src/tfstride/providers/aws/resource_decoration/kms_operation_authorization.py",
