@@ -7,7 +7,6 @@ from tfstride.providers.azure.arm_scope import azure_arm_scope_contains, resourc
 from tfstride.providers.azure.blob_operation_authority import (
     AzureBlobAuthorityResult,
     AzureBlobDataGrant,
-    blob_data_grant,
     evaluate_blob_operation_authority,
 )
 from tfstride.providers.azure.key_vault_evidence import AzureKeyVaultRuntimeIdentityKind
@@ -114,14 +113,26 @@ def current_app_service_storage_access_paths(
     return _dedupe_dicts(paths), dedupe(uncertainties)
 
 
-def storage_assignment_may_grant_blob_deletion(
-    assignment: Mapping[str, object],
-    assignment_resource: NormalizedResource,
-    context: AzureDecorationContext,
-) -> bool:
-    """Compatibility entry point for deletion uncertainty classification."""
-    grant, uncertainty = blob_data_grant(assignment_resource, context)
-    return "delete" in grant.access_classes if grant is not None else uncertainty is not None
+def storage_access_path_allows_payload_read(path: Mapping[str, object]) -> bool:
+    """Test the payload-read operation of an evaluated path, excluding tag reads."""
+    if (
+        path.get("access_state") != "granted"
+        or path.get("condition_state") != "not_configured"
+        or path.get("condition") is not None
+    ):
+        return False
+    if path.get("role_kind") in {"blob_data_reader", "blob_data_contributor", "blob_data_owner"}:
+        return True
+    actions = path.get("matched_data_actions")
+    return (
+        path.get("role_kind") == "custom"
+        and isinstance(actions, (list, tuple))
+        and any(
+            isinstance(action, str)
+            and action.casefold() == "microsoft.storage/storageaccounts/blobservices/containers/blobs/read"
+            for action in actions
+        )
+    )
 
 
 def _access_path_record(

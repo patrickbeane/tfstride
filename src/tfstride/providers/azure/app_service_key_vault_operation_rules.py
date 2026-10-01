@@ -31,7 +31,11 @@ from tfstride.providers.azure.protected_data_evidence import (
     AzureAppServiceStorageAccessPath,
     AzureAppServiceStorageProtectedDataConvergence,
 )
+from tfstride.providers.azure.resource_decoration.app_service_key_vault_protected_data_convergence import (
+    current_storage_protected_data_convergences,
+)
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
+from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import (
     AZURE_APP_SERVICE_RESOURCE_TYPES,
     AzureResourceType,
@@ -115,6 +119,9 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
+        decoration_context = AzureDecorationContext(
+            AzureResourceIndexBuilder().build(list(context.inventory.resources))
+        )
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
             facts = azure_facts(app)
@@ -137,10 +144,10 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
             role_definition_addresses = _path_values(paths, "role_definition_address")
             operations = _path_operations(paths)
             parent_scope = any(path.get("scope_type") in _PARENT_SCOPE_TYPES for path in paths)
-            protected_data_convergences = (
-                _resolved_protected_data_convergences(paths, app, context)
+            protected_data_convergences, storage_uncertainties = (
+                _resolved_protected_data_convergences(paths, app, context, decoration_context)
                 if operation_class == _DECRYPT_OPERATION
-                else []
+                else ([], [])
             )
             logical_protected_data_dependencies = (
                 _logical_protected_data_dependencies(protected_data_convergences)
@@ -201,7 +208,7 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
                                 ),
                                 evidence_item(
                                     "downstream_dependency_uncertainties",
-                                    _protected_data_uncertainties(app),
+                                    _protected_data_uncertainties(app, storage_uncertainties),
                                 ),
                             ]
                             if operation_class == _DECRYPT_OPERATION
@@ -466,10 +473,12 @@ def _resolved_protected_data_convergences(
     paths: Sequence[AzureAppServiceKeyVaultOperationPath],
     app: NormalizedResource,
     context: RuleEvaluationContext,
-) -> list[_AzureProtectedDataConvergence]:
+    decoration_context: AzureDecorationContext,
+) -> tuple[list[_AzureProtectedDataConvergence], list[str]]:
     facts = azure_facts(app)
+    storage_convergences, storage_uncertainties = current_storage_protected_data_convergences(app, decoration_context)
     candidates: list[_AzureProtectedDataConvergence] = [
-        *facts.app_service_storage_protected_data_convergences,
+        *storage_convergences,
         *facts.app_service_service_bus_protected_data_convergences,
     ]
     resolved = [
@@ -477,7 +486,7 @@ def _resolved_protected_data_convergences(
         for convergence in candidates
         if _is_valid_protected_data_convergence(convergence, paths, app, context)
     ]
-    return sorted(
+    resolved = sorted(
         resolved,
         key=lambda convergence: (
             _protected_resource_address(convergence),
@@ -486,6 +495,8 @@ def _resolved_protected_data_convergences(
             convergence["key_operation_path"].get("grant_source_address") or "",
         ),
     )
+
+    return resolved, storage_uncertainties
 
 
 def _is_valid_protected_data_convergence(
@@ -567,12 +578,6 @@ def _is_valid_storage_convergence(
     app: NormalizedResource,
     context: RuleEvaluationContext,
 ) -> bool:
-    facts = azure_facts(app)
-    if (
-        convergence not in facts.app_service_storage_protected_data_convergences
-        or access_path not in facts.app_service_storage_access_paths
-    ):
-        return False
     account = context.inventory.get_by_address(convergence["storage_account_address"])
     target = context.inventory.get_by_address(convergence["storage_resource_address"])
     if (
@@ -932,11 +937,11 @@ def _protected_data_dependency_evidence(
     return values
 
 
-def _protected_data_uncertainties(app: NormalizedResource) -> list[str]:
+def _protected_data_uncertainties(app: NormalizedResource, storage_uncertainties: Sequence[str]) -> list[str]:
     facts = azure_facts(app)
     return sorted(
         {
-            *facts.app_service_storage_protected_data_convergence_uncertainties,
+            *storage_uncertainties,
             *facts.app_service_service_bus_protected_data_convergence_uncertainties,
         }
     )

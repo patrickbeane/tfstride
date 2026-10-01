@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Literal
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.azure.blob_operation_authority import blob_data_grant
 from tfstride.providers.azure.object_storage_deletion_evidence import (
     AzureAppServiceBlobDeletionPath,
     AzureAppServiceBlobDeletionPathCommon,
@@ -17,7 +18,7 @@ from tfstride.providers.azure.protected_data_evidence import (
     AzureAppServiceStorageAccessPath,
 )
 from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
-    storage_assignment_may_grant_blob_deletion,
+    current_app_service_storage_access_paths,
 )
 from tfstride.providers.azure.resource_decoration.workload_identities import (
     workload_managed_identities,
@@ -98,23 +99,17 @@ def _app_service_blob_deletion_paths(
     containers: Sequence[NormalizedResource],
     context: AzureDecorationContext,
 ) -> tuple[list[AzureAppServiceBlobDeletionPath], list[str]]:
-    facts = azure_facts(workload)
-    current_identities = _current_workload_identities(workload, context)
+    access_paths, access_uncertainties = current_app_service_storage_access_paths(workload, context)
     paths: list[AzureAppServiceBlobDeletionPath] = []
     uncertainties = _deletion_relevant_access_uncertainties(
         workload,
         context,
+        access_uncertainties,
     )
 
-    for access_path in facts.app_service_storage_access_paths:
+    for access_path in access_paths:
         operations = storage_access_path_deletion_operations(access_path)
         if not operations:
-            continue
-        if not _access_path_identity_is_current(access_path, current_identities):
-            uncertainties.append(
-                f"{workload.address}: Storage Blob deletion access path from "
-                f"{access_path['role_assignment_address']} no longer has an exact current runtime identity"
-            )
             continue
         if (
             access_path["access_state"] != "granted"
@@ -175,64 +170,27 @@ def _app_service_blob_deletion_paths(
 def _deletion_relevant_access_uncertainties(
     workload: NormalizedResource,
     context: AzureDecorationContext,
+    access_uncertainties: Sequence[str],
 ) -> list[str]:
-    workload_facts = azure_facts(workload)
-    identities, _identity_uncertainties = workload_managed_identities(
-        workload,
-        context,
-    )
+    identities, _ = workload_managed_identities(workload, context)
+    principals = {
+        principal.casefold() for identity, _ in identities if (principal := azure_facts(identity).principal_id)
+    }
     relevant_assignment_addresses: set[str] = set()
-    for identity, _identity_kind in identities:
-        for assignment in azure_facts(identity).managed_identity_role_assignments:
-            source_address = _known_string(assignment.get("source"))
-            assignment_resource = context.index.resolve(
-                source_address,
-                source=identity,
-                resource_types={AzureResourceType.ROLE_ASSIGNMENT},
-            )
-            if (
-                assignment_resource is not None
-                and assignment_resource.resource_type == AzureResourceType.ROLE_ASSIGNMENT
-                and storage_assignment_may_grant_blob_deletion(
-                    assignment,
-                    assignment_resource,
-                    context,
-                )
-            ):
-                relevant_assignment_addresses.add(assignment_resource.address)
-
+    for assignment in context.index.resources_by_address.values():
+        if assignment.resource_type != AzureResourceType.ROLE_ASSIGNMENT:
+            continue
+        principal = azure_facts(assignment).principal_id
+        if principal is not None and principal.casefold() not in principals:
+            continue
+        grant, uncertainty = blob_data_grant(assignment, context)
+        if uncertainty is not None or (grant is not None and "delete" in grant.access_classes):
+            relevant_assignment_addresses.add(assignment.address)
     return [
         uncertainty
-        for uncertainty in workload_facts.app_service_storage_access_path_uncertainties
-        if any(assignment_address in uncertainty for assignment_address in relevant_assignment_addresses)
+        for uncertainty in access_uncertainties
+        if any(address in uncertainty for address in relevant_assignment_addresses)
     ]
-
-
-def _current_workload_identities(
-    workload: NormalizedResource,
-    context: AzureDecorationContext,
-) -> dict[str, tuple[str, str]]:
-    identities, _uncertainties = workload_managed_identities(workload, context)
-    result: dict[str, tuple[str, str]] = {}
-    for identity, identity_kind in identities:
-        principal_id = _known_string(azure_facts(identity).principal_id)
-        if principal_id is not None:
-            result[identity.address] = (identity_kind, principal_id)
-    return result
-
-
-def _access_path_identity_is_current(
-    access_path: AzureAppServiceStorageAccessPath,
-    current_identities: Mapping[str, tuple[str, str]],
-) -> bool:
-    current = current_identities.get(access_path["identity_address"])
-    principal_id = _known_string(access_path["principal_id"])
-    return bool(
-        current is not None
-        and principal_id is not None
-        and current[0] == access_path["identity_kind"]
-        and _same_identifier(current[1], principal_id)
-    )
 
 
 def storage_access_path_deletion_operations(

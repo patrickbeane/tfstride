@@ -15,6 +15,7 @@ from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
 from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
     current_app_service_storage_access_paths,
+    storage_access_path_allows_payload_read,
 )
 from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndexBuilder
 from tfstride.providers.azure.resource_types import (
@@ -257,10 +258,7 @@ def _has_deterministic_read_access(
     storage_addresses: set[str],
 ) -> bool:
     return any(
-        path.get("storage_resource_address") in storage_addresses
-        and path.get("access_state") == "granted"
-        and path.get("condition_state") == "not_configured"
-        and "read" in _string_values(path.get("access_classes"))
+        path.get("storage_resource_address") in storage_addresses and storage_access_path_allows_payload_read(path)
         for path in paths
     )
 

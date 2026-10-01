@@ -17,6 +17,10 @@ from tfstride.providers.azure.protected_data_evidence import (
     AzureAppServiceStorageAccessPath,
     AzureAppServiceStorageProtectedDataConvergence,
 )
+from tfstride.providers.azure.resource_decoration.app_service_storage_access_paths import (
+    current_app_service_storage_access_paths,
+    storage_access_path_allows_payload_read,
+)
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import (
@@ -51,7 +55,7 @@ class ModelAppServiceKeyVaultProtectedDataConvergenceStage:
         for workload in resources:
             if workload.resource_type not in AZURE_APP_SERVICE_RESOURCE_TYPES:
                 continue
-            storage_convergences, storage_uncertainties = _storage_convergences(
+            storage_convergences, storage_uncertainties = current_storage_protected_data_convergences(
                 workload,
                 context,
             )
@@ -63,15 +67,15 @@ class ModelAppServiceKeyVaultProtectedDataConvergenceStage:
             facts.extend_app_service_service_bus_protected_data_convergence_uncertainties(service_bus_uncertainties)
 
 
-def _storage_convergences(
+def current_storage_protected_data_convergences(
     workload: NormalizedResource,
     context: AzureDecorationContext,
 ) -> tuple[list[AzureAppServiceStorageProtectedDataConvergence], list[str]]:
     workload_facts = azure_facts(workload)
-    uncertainties = list(workload_facts.app_service_storage_access_path_uncertainties)
+    access_paths, uncertainties = current_app_service_storage_access_paths(workload, context)
     convergences: list[AzureAppServiceStorageProtectedDataConvergence] = []
 
-    for access_path in workload_facts.app_service_storage_access_paths:
+    for access_path in access_paths:
         if "read" not in access_path["access_classes"]:
             continue
         account, ancestry_uncertainty = _storage_account_for_access(
@@ -378,7 +382,7 @@ def _deterministic_storage_read(
         and path["condition"] is None
         and path["condition_state"] == "not_configured"
         and path["access_state"] == "granted"
-        and "read" in path["access_classes"]
+        and storage_access_path_allows_payload_read(path)
         and assignment is not None
         and assignment.provider == "azure"
         and assignment.resource_type == AzureResourceType.ROLE_ASSIGNMENT
