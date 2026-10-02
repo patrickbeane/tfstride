@@ -64,6 +64,7 @@ include = [
   "src/tfstride/key_management/lifecycle.py",
 
   # Shared analysis contracts.
+  "src/tfstride/analysis/operation_gaps.py",
   "src/tfstride/analysis/indexes.py",
   "src/tfstride/analysis/preparation.py",
   "src/tfstride/analysis/relationships.py",

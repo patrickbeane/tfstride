@@ -8,6 +8,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, TypeVar
 
+from tfstride.analysis.operation_gaps import OperationGapResults
 from tfstride.resource_metadata import (
     InventoryMetadata,
     MetadataField,
@@ -741,3 +742,4 @@ class AnalysisResult:
     filter_summary: dict[str, Any] = field(default_factory=dict)
     analysis_coverage: AnalysisCoverage = field(default_factory=AnalysisCoverage)
     limitations: list[str] = field(default_factory=list)
+    operation_gaps: OperationGapResults = field(default_factory=OperationGapResults)
