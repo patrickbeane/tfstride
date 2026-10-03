@@ -105,6 +105,7 @@ _WRITE_PERMISSIONS = frozenset(
 )
 _DELETE_PERMISSIONS = frozenset({"storage.objects.delete"})
 _ADMIN_PERMISSIONS = frozenset({"storage.objects.setIamPolicy"})
+MODELED_GCS_OBJECT_PERMISSIONS = _READ_PERMISSIONS | _WRITE_PERMISSIONS | _DELETE_PERMISSIONS | _ADMIN_PERMISSIONS
 
 
 @dataclass(frozen=True, slots=True)
@@ -373,6 +374,12 @@ def gcs_path_permissions(path: Mapping[str, object]) -> tuple[str, ...]:
     if access is None or not isinstance(role, str):
         return ()
     return _modeled_permissions(role, _GcsRoleAccess(*access))
+
+
+def modeled_gcs_role_permissions(role: str, custom_roles: GcpCustomRoleIndex) -> tuple[str, ...]:
+    """Return current modeled GCS operations for one resolved IAM role."""
+    access = _role_access(role, custom_roles)
+    return _modeled_permissions(role, access) if access is not None else ()
 
 
 def _role_access(role: str, custom_roles: GcpCustomRoleIndex) -> _GcsRoleAccess | None:

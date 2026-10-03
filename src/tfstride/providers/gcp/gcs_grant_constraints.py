@@ -24,6 +24,7 @@ class GcsPermissionConstraint(TypedDict):
     permission: str
     state: Literal["denied", "unknown"]
     reason: str
+    reason_code: Literal["applicable_deny", "deny_scope_unresolved", "deny_rule_unresolved"]
 
 
 def gcs_permission_constraints(
@@ -67,6 +68,7 @@ def gcs_permission_constraints(
                     "permission": permission,
                     "state": "denied",
                     "reason": "applicable unconditional IAM deny",
+                    "reason_code": "applicable_deny",
                 }
             )
         elif True in decisions or None in decisions or structural_unknown:
@@ -80,6 +82,7 @@ def gcs_permission_constraints(
                         if scope is None
                         else "deny-policy condition, membership, or permission constraints are unresolved"
                     ),
+                    "reason_code": "deny_scope_unresolved" if scope is None else "deny_rule_unresolved",
                 }
             )
     return evidence

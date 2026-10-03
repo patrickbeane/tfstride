@@ -24,6 +24,12 @@ def _gcp_analysis_indexes(inventory: ResourceInventory) -> GcpAnalysisIndexes:
     return build_gcp_analysis_indexes(inventory)
 
 
+def _gcp_operation_gap_factory(inventory: ResourceInventory):
+    from tfstride.providers.gcp.gcs_operation_gaps import collect_gcs_operation_gaps
+
+    return collect_gcs_operation_gaps(inventory)
+
+
 def _gcp_rule_metadata() -> tuple[RuleMetadata, ...]:
     from tfstride.providers.gcp.rule_catalog import GCP_RULE_METADATA
 
@@ -55,4 +61,5 @@ def gcp_provider_plugin() -> ProviderPlugin:
         rule_contribution_factory=_gcp_rule_contribution,
         boundary_contributor_factory=_gcp_boundary_contributor,
         analysis_index_factory=_gcp_analysis_indexes,
+        operation_gap_factory=_gcp_operation_gap_factory,
     )

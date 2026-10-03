@@ -33,6 +33,7 @@ class GcsInheritedCustomRoleAssessment:
     reason: str
     permissions: tuple[str, ...] = ()
     evidence: GcsInheritedCustomRoleEvidence | None = None
+    reason_code: str | None = None
 
 
 def assess_inherited_gcs_custom_role(
@@ -47,10 +48,20 @@ def assess_inherited_gcs_custom_role(
     resolution = custom_roles.resolve(role)
     definition = resolution.selected_candidate
     if definition is None:
-        return GcsInheritedCustomRoleAssessment("unknown", f"custom role resolution is {resolution.state}")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown",
+            f"custom role resolution is {resolution.state}",
+            reason_code="custom_role_ambiguous"
+            if resolution.state == "ambiguous"
+            else "custom_role_definition_unavailable",
+        )
     reference = gcp_reference_key(role, suffixes=(".id", ".name"))
     if reference != definition.address and not _NATIVE_ROLE.fullmatch(reference):
-        return GcsInheritedCustomRoleAssessment("unknown", "custom role reference does not establish a scoped identity")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown",
+            "custom role reference does not establish a scoped identity",
+            reason_code="custom_role_ownership_unresolved",
+        )
     facts = gcp_facts(definition)
     is_project = definition.resource_type == GcpResourceType.PROJECT_IAM_CUSTOM_ROLE
     kind = "projects" if is_project else "organizations"
@@ -59,7 +70,9 @@ def assess_inherited_gcs_custom_role(
         organization = ancestor_scope(owner, "organizations", index)
         owner = organization.key.removeprefix("organizations/") if organization else None
     if owner is None:
-        return GcsInheritedCustomRoleAssessment("unknown", "custom role ownership is unresolved")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown", "custom role ownership is unresolved", reason_code="custom_role_ownership_unresolved"
+        )
     # Conflicting planned name/id and owner fields must not manufacture a role
     # in whichever namespace would make the binding applicable.
     for value in (reference, definition.identifier, definition.get_metadata_field(GcpResourceMetadata.NAME)):
@@ -69,7 +82,9 @@ def assess_inherited_gcs_custom_role(
         native_owner = project_identity(match[2], projects) if is_project else match[2]
         same_owner = project_scope_matches(owner, native_owner) if is_project else owner == native_owner
         if match[1] != kind or same_owner is not True or (facts.custom_role_id and match[3] != facts.custom_role_id):
-            return GcsInheritedCustomRoleAssessment("unknown", "custom role identity and ownership conflict")
+            return GcsInheritedCustomRoleAssessment(
+                "unknown", "custom role identity and ownership conflict", reason_code="custom_role_ownership_conflict"
+            )
     if is_project:
         if source.resource_type not in GCP_PROJECT_IAM_RESOURCE_TYPES:
             return GcsInheritedCustomRoleAssessment(
@@ -82,19 +97,30 @@ def assess_inherited_gcs_custom_role(
         return GcsInheritedCustomRoleAssessment(
             "incompatible" if compatible is False else "unknown",
             "custom role is not established as grantable at the inherited scope",
+            reason_code="custom_role_ownership_unresolved" if compatible is None else None,
         )
     stage = facts.custom_role_stage.upper() if facts.custom_role_stage else None
     if facts.custom_role_deleted is True or stage == "DISABLED":
         return GcsInheritedCustomRoleAssessment("inactive", "custom role is deleted or disabled")
     if facts.custom_role_deleted is not False or stage not in _ACTIVE_STAGES:
-        return GcsInheritedCustomRoleAssessment("unknown", "custom role lifecycle is unresolved or unsupported")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown",
+            "custom role lifecycle is unresolved or unsupported",
+            reason_code="custom_role_lifecycle_unresolved",
+        )
     permissions = tuple(sorted(set(facts.custom_role_permissions)))
     if facts.custom_role_permissions_state != "configured" or not permissions:
-        return GcsInheritedCustomRoleAssessment("unknown", "custom role permissions are unresolved")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown", "custom role permissions are unresolved", reason_code="custom_role_permissions_unavailable"
+        )
     if any(
         not re.fullmatch(r"[a-z][a-z0-9]*\.[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)+", permission) for permission in permissions
     ):
-        return GcsInheritedCustomRoleAssessment("unknown", "custom role contains unsupported permission syntax")
+        return GcsInheritedCustomRoleAssessment(
+            "unknown",
+            "custom role contains unsupported permission syntax",
+            reason_code="custom_role_permission_syntax_unsupported",
+        )
     assert stage is not None
     return GcsInheritedCustomRoleAssessment(
         "compatible",

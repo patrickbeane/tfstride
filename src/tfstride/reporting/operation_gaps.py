@@ -119,6 +119,68 @@ _AWS_EXPLANATIONS: dict[str, tuple[str, str]] = {
         "Review the grant's encryption-context constraints against the context used by the S3 read.",
     ),
 }
+_GCP_EXPLANATIONS: dict[str, tuple[str, str]] = {
+    "grant_ancestry_unresolved": (
+        "The IAM grant's project or ancestor scope cannot be established for this bucket.",
+        "Resolve the bucket's project ownership and the IAM source's project or parent links.",
+    ),
+    "iam_policy_document_unavailable": (
+        "The IAM policy document at this modeled scope is unavailable.",
+        "Include the policy_data document for this IAM source or review its bindings separately.",
+    ),
+    "iam_grant_source_ambiguous": (
+        "The modeled IAM source cannot establish one applicable grant at this scope.",
+        "Check overlapping authoritative IAM managers and the source's binding structure.",
+    ),
+    "iam_membership_unresolved": (
+        "The IAM binding's membership may include this workload identity.",
+        "Resolve the binding's members before assessing the workload's operations.",
+    ),
+    "iam_role_unresolved": (
+        "The IAM binding's role is unresolved.",
+        "Resolve the role reference to determine the operations granted by this binding.",
+    ),
+    "iam_condition_unresolved": (
+        "An IAM condition prevents a definite conclusion for this operation.",
+        "Review the binding condition against the request context for the affected operation.",
+    ),
+    "deny_scope_unresolved": (
+        "The IAM deny policy's parent scope cannot be established for this bucket.",
+        "Resolve the deny policy's parent and the bucket's modeled ancestry.",
+    ),
+    "deny_rule_unresolved": (
+        "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+        "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+    ),
+    "custom_role_definition_unavailable": (
+        "The custom role definition needed to establish granted operations is unavailable.",
+        "Include the exact custom role definition or review its permissions separately.",
+    ),
+    "custom_role_ambiguous": (
+        "The custom role reference resolves to multiple modeled definitions.",
+        "Disambiguate the role reference before using its permissions.",
+    ),
+    "custom_role_ownership_unresolved": (
+        "Ownership of the custom role or its grant scope is unresolved.",
+        "Resolve the role owner and the IAM grant's project or ancestor identity.",
+    ),
+    "custom_role_ownership_conflict": (
+        "The custom role's native identity conflicts with its modeled owner.",
+        "Reconcile the role name, owner, and IAM grant scope.",
+    ),
+    "custom_role_lifecycle_unresolved": (
+        "The custom role's active lifecycle state cannot be established.",
+        "Resolve its stage and deleted state before assessing its permissions.",
+    ),
+    "custom_role_permissions_unavailable": (
+        "The custom role's permissions are unavailable.",
+        "Include its included_permissions to establish the affected operations.",
+    ),
+    "custom_role_permission_syntax_unsupported": (
+        "The custom role contains permission syntax this evaluator cannot interpret.",
+        "Review the role's included_permissions separately for the affected bucket.",
+    ),
+}
 _FALLBACK_EXPLANATION = (
     "The reporting family could not complete this relationship assessment.",
     "Review the referenced evidence locations and the provider's support for this operation and scope.",
@@ -143,11 +205,8 @@ def _serialize_family(family: OperationGapFamily) -> OperationGapFamilyPayload:
 
 
 def _serialize_gap(gap: OperationGap) -> OperationGapPayload:
-    explanation, next_step = (
-        _AWS_EXPLANATIONS.get(gap.reason_code, _FALLBACK_EXPLANATION)
-        if gap.family.provider == "aws"
-        else _FALLBACK_EXPLANATION
-    )
+    explanations = {"aws": _AWS_EXPLANATIONS, "gcp": _GCP_EXPLANATIONS}.get(gap.family.provider, {})
+    explanation, next_step = explanations.get(gap.reason_code, _FALLBACK_EXPLANATION)
     return {
         "family": _serialize_family(gap.family),
         "resource_address": gap.resource_address,
