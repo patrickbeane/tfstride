@@ -158,7 +158,7 @@ Current report identity:
 
 ```text
 kind: "tfstride-report"
-version: "1.1"
+version: "1.2"
 ```
 
 Top-level JSON sections include:

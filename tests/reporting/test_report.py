@@ -427,6 +427,7 @@ class JsonReportTests(unittest.TestCase):
                 "summary",
                 "filtering",
                 "analysis_coverage",
+                "operation_gaps",
                 "inventory",
                 "trust_boundaries",
                 "findings",

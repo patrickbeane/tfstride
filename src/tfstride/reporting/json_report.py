@@ -19,6 +19,7 @@ from tfstride.models import (
     TrustBoundary,
 )
 from tfstride.reporting.finding_serialization import serialize_evidence, serialize_severity_reasoning
+from tfstride.reporting.operation_gaps import serialize_operation_gaps
 from tfstride.reporting.report_contract import (
     AnalysisCoveragePayload,
     FindingPayload,
@@ -34,7 +35,7 @@ from tfstride.reporting.report_contract import (
 )
 
 REPORT_KIND = "tfstride-report"
-REPORT_FORMAT_VERSION = "1.1"
+REPORT_FORMAT_VERSION = "1.2"
 
 
 def render_json(result: AnalysisResult) -> str:
@@ -78,6 +79,7 @@ def build_json_report_payload(result: AnalysisResult) -> TFSReportPayload:
         },
         "filtering": dict(filter_summary),
         "analysis_coverage": _serialize_analysis_coverage(result),
+        "operation_gaps": serialize_operation_gaps(result.operation_gaps),
         "inventory": _serialize_inventory(result.inventory),
         "trust_boundaries": [
             _serialize_trust_boundary(boundary)

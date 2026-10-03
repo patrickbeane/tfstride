@@ -9,6 +9,7 @@
     "summary",
     "filtering",
     "analysis_coverage",
+    "operation_gaps",
     "inventory",
     "trust_boundaries",
     "findings",
@@ -75,6 +76,32 @@
   "analysis_coverage.references.unresolved_references[]": [
     "resource",
     "references"
+  ],
+  "operation_gaps": [
+    "reporting_families",
+    "records"
+  ],
+  "operation_gaps.reporting_families[]": [
+    "provider",
+    "name"
+  ],
+  "operation_gaps.records[]": [
+    "family",
+    "resource_address",
+    "relationship",
+    "operation",
+    "target_address",
+    "scope",
+    "reason_code",
+    "evidence_state",
+    "provenance",
+    "explanation",
+    "next_step"
+  ],
+  "operation_gaps.records[].provenance[]": [
+    "resource_address",
+    "evidence_kind",
+    "field_path"
   ],
   "inventory": [
     "provider",

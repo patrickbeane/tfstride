@@ -76,6 +76,36 @@ class AnalysisCoveragePayload(TypedDict):
     references: ReferenceCoveragePayload
 
 
+class OperationGapFamilyPayload(TypedDict):
+    provider: str
+    name: str
+
+
+class OperationGapProvenancePayload(TypedDict):
+    resource_address: str
+    evidence_kind: str
+    field_path: list[str | int]
+
+
+class OperationGapPayload(TypedDict):
+    family: OperationGapFamilyPayload
+    resource_address: str
+    relationship: str
+    operation: str | None
+    target_address: str | None
+    scope: str | None
+    reason_code: str
+    evidence_state: str
+    provenance: list[OperationGapProvenancePayload]
+    explanation: str
+    next_step: str
+
+
+class OperationGapResultsPayload(TypedDict):
+    reporting_families: list[OperationGapFamilyPayload]
+    records: list[OperationGapPayload]
+
+
 class SecurityGroupRulePayload(TypedDict):
     direction: str
     protocol: str
@@ -193,6 +223,8 @@ class TFSReportPayload(TypedDict):
     filtering: FilteringSummaryPayload
     inventory: InventoryPayload
     analysis_coverage: AnalysisCoveragePayload
+    operation_gaps: OperationGapResultsPayload
+    inventory: InventoryPayload
     trust_boundaries: list[TrustBoundaryPayload]
     findings: list[FindingPayload]
     suppressed_findings: list[FindingPayload]

@@ -1,6 +1,6 @@
 {
   "kind": "tfstride-report",
-  "report_version": "1.1",
+  "report_version": "1.2",
   "tool_name": "tfstride",
   "title": "tfSTRIDE Threat Model Report",
   "analyzed_file": "sample_aws_plan.json",
@@ -262,6 +262,31 @@
       "unsupported_symbolic_relationships": 0,
       "unresolved_references": []
     }
+  },
+  "operation_gaps": {
+    "reporting_families": [
+      {
+        "provider": "aws",
+        "name": "ecs_s3_access"
+      },
+      {
+        "provider": "aws",
+        "name": "ecs_s3_bucket_topology"
+      },
+      {
+        "provider": "aws",
+        "name": "ecs_s3_mutation"
+      },
+      {
+        "provider": "aws",
+        "name": "ecs_s3_object_deletion"
+      },
+      {
+        "provider": "aws",
+        "name": "ecs_s3_protected_data"
+      }
+    ],
+    "records": []
   },
   "inventory": {
     "provider": "aws",
