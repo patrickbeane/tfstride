@@ -74,6 +74,8 @@ class OperationGap:
     target_address identifies a modeled target, not an unresolved policy literal.
     operation is an exact provider operation, or None when only the attempted
     relationship is known. relationship and reason_code are stable machine codes.
+    scope is a producer-selected bounded resource namespace, not a raw grant.
+    An unavailable or unrepresentable scope is None, with location provenance.
     Reason codes describe the missing prerequisite or unsupported semantics, not
     a denial. Fully evaluated denials and standing model limitations are not gaps.
     """
@@ -86,11 +88,16 @@ class OperationGap:
     operation: str | None = None
     target_address: str | None = None
     provenance: tuple[OperationGapProvenance, ...] = ()
+    scope: str | None = None
 
     def __post_init__(self) -> None:
         _validate_address(self.resource_address)
         if self.target_address is not None:
             _validate_address(self.target_address)
+        if self.scope is not None:
+            if self.target_address is None:
+                raise ValueError("an evaluated scope requires a modeled target")
+            _validate_address(self.scope)
         _validate_code(self.relationship, "relationship")
         _validate_code(self.reason_code, "reason code")
         if self.operation is not None and (
@@ -156,6 +163,7 @@ def _gap_key(value: OperationGap) -> tuple[str, ...]:
         value.relationship,
         value.operation or "",
         value.target_address or "",
+        value.scope or "",
         value.reason_code,
         value.evidence_state.value,
     )

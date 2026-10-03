@@ -177,7 +177,7 @@ class ModelKmsOperationAuthorizationStage:
         for key in resources:
             if key.resource_type != _KMS_KEY:
                 continue
-            authorizations, uncertainties = _operation_authorization_posture(
+            authorizations, uncertainties = current_kms_operation_authorizations(
                 key,
                 roles,
                 context,
@@ -188,7 +188,7 @@ class ModelKmsOperationAuthorizationStage:
             )
 
 
-def _operation_authorization_posture(
+def current_kms_operation_authorizations(
     key: NormalizedResource,
     roles: tuple[NormalizedResource, ...],
     context: AwsDecorationContext,

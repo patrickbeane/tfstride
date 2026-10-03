@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tfstride.analysis.coverage import build_analysis_coverage
 from tfstride.analysis.indexes import AnalysisIndexExtensionFactory
+from tfstride.analysis.operation_gaps import OperationGapResults
 from tfstride.analysis.preparation import prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy, apply_severity_overrides
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -16,10 +17,15 @@ from tfstride.providers.catalog import (
     default_provider_boundary_contributor_factories_by_provider,
     default_provider_limitations,
     default_provider_observation_factories_by_provider,
+    default_provider_operation_gap_factories_by_provider,
     default_provider_registry,
 )
 from tfstride.providers.names import normalize_provider_name
-from tfstride.providers.plugin import ProviderBoundaryContributorFactory, ProviderObservationFactory
+from tfstride.providers.plugin import (
+    ProviderBoundaryContributorFactory,
+    ProviderObservationFactory,
+    ProviderOperationGapFactory,
+)
 from tfstride.providers.registry import ProviderRegistry
 
 AUTO_PROVIDER = "auto"
@@ -45,12 +51,15 @@ class TfStride:
         ) = None,
         provider_observation_factories: Mapping[str, Iterable[ProviderObservationFactory]] | None = None,
         provider_analysis_index_factories: Mapping[str, AnalysisIndexExtensionFactory | None] | None = None,
+        provider_operation_gap_factories: Mapping[str, Iterable[ProviderOperationGapFactory]] | None = None,
     ) -> None:
         """Configure provider hooks for Terraform plan analysis.
 
         Omitting provider_analysis_index_factories uses the catalog defaults.
         A supplied mapping replaces those defaults; missing providers and
         None entries attach no provider analysis-index extension.
+        provider_operation_gap_factories likewise replaces catalog defaults when
+        supplied; an empty mapping runs no gap producers and claims no coverage.
         """
         self._provider_registry = provider_registry or default_provider_registry()
         self._provider = _normalize_requested_provider(provider)
@@ -72,6 +81,16 @@ class TfStride:
             if provider_analysis_index_factories is not None
             else default_provider_analysis_index_factories_by_provider()
         )
+        gap_factories = (
+            provider_operation_gap_factories
+            if provider_operation_gap_factories is not None
+            else default_provider_operation_gap_factories_by_provider()
+        )
+        self._provider_operation_gap_factories = {
+            normalize_provider_name(provider): tuple(factories)
+            for provider, factories in gap_factories.items()
+            if normalize_provider_name(provider)
+        }
         self._rule_engine = StrideRuleEngine()
         self._rule_policy = rule_policy
 
@@ -120,12 +139,23 @@ class TfStride:
             trust_boundaries=prepared.boundaries,
             findings=findings,
             observations=observations,
+            operation_gaps=self._operation_gaps_for_provider(prepared.inventory),
             analysis_coverage=build_analysis_coverage(
                 prepared.inventory,
                 rule_registry=prepared.rule_set.registry,
                 rule_policy=self._rule_policy,
             ),
             limitations=_limitations_for_provider(prepared.inventory.provider, self._provider_limitations),
+        )
+
+    def _operation_gaps_for_provider(self, inventory: ResourceInventory) -> OperationGapResults:
+        provider = normalize_provider_name(inventory.provider)
+        results = [factory(inventory) for factory in self._provider_operation_gap_factories.get(provider, ())]
+        if any(family.provider != provider for result in results for family in result.reporting_families):
+            raise ValueError("Operation gap producer reported a family for another provider")
+        return OperationGapResults(
+            reporting_families=tuple(family for result in results for family in result.reporting_families),
+            records=tuple(gap for result in results for gap in result.records),
         )
 
     def _normalize_resources(self, resources: list[TerraformResource]) -> ResourceInventory:

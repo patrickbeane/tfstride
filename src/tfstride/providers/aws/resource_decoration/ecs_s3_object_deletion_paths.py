@@ -26,6 +26,7 @@ from tfstride.providers.aws.object_storage_deletion_evidence import (
 from tfstride.providers.aws.policy_documents import policy_statement_is_fully_representable
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_gap_evidence import S3GapCollector
 from tfstride.providers.aws.s3_object_scopes import (
     S3ObjectScope as _ObjectScope,
 )
@@ -190,6 +191,105 @@ def current_s3_object_deletion_paths(
         scope_limit=scope,
     )
     return paths
+
+
+def collect_s3_object_deletion_gaps(
+    role: NormalizedResource,
+    bucket: NormalizedResource,
+    context: AwsDecorationContext,
+    gaps: S3GapCollector,
+    unresolved_sources: tuple[NormalizedResource, ...] = (),
+) -> None:
+    """Read current deletion diagnostics without changing decorated paths."""
+    assert bucket.arn is not None and role.arn is not None
+    posture = _bucket_policy_posture(bucket, context)
+    identity_matches, _ = _identity_policy_matches(role, bucket.arn, gaps=gaps, bucket=bucket)
+    bucket_matches, _ = _bucket_policy_matches(
+        posture.sources, bucket_arn=bucket.arn, role_arn=role.arn, gaps=gaps, bucket=bucket
+    )
+    for source in unresolved_sources:
+        potential, _ = _bucket_policy_matches((source,), bucket_arn=bucket.arn, role_arn=role.arn)
+        for match in potential:
+            if match.effect != "allow" or match.operation not in _OPERATION_ORDER:
+                continue
+            if any(
+                deny.effect == "deny"
+                and not deny.conditional
+                and deny.operation == match.operation
+                and _scope_contains(deny.scope, match.scope)
+                for deny in potential
+            ):
+                continue
+            gaps.add(
+                "target_ambiguous"
+                if context.index.buckets.get(bucket.arn) is None
+                else "bucket_policy_target_unresolved",
+                operation=match.operation,
+                bucket=bucket,
+                scope=match.scope.resource,
+                source=source,
+            )
+    relationship = context.index.account_identities.relationship(role, bucket)
+    unresolved = _unresolved_bucket_policy_sources(tuple(context.index.resources_by_address.values()), context)
+    for operation in _OPERATION_ORDER:
+        sources = [
+            context.index.resources_by_address[address]
+            for address in unresolved
+            if _unresolved_policy_may_affect_bucket_role_action(
+                context.index.resources_by_address[address], bucket, role.arn, operation, context
+            )
+        ]
+        request_scopes = {
+            match.scope
+            for match in (*identity_matches, *bucket_matches)
+            if match.effect == "allow" and match.operation == operation
+        }
+        for requested_scope in sorted(request_scopes, key=lambda scope: scope.resource):
+            first = len(gaps.records)
+            evaluation = _evaluate_authorization(
+                bucket,
+                role,
+                operation,
+                identity_matches=_matches_within_scope(identity_matches, requested_scope),
+                bucket_matches=_matches_within_scope(bucket_matches, requested_scope),
+                identity_policy_complete=_identity_policy_complete(role),
+                bucket_policy_complete=posture.complete and not sources,
+                same_account=relationship.same_account,
+                partitions_match=relationship.partitions_match,
+                gaps=gaps,
+            )
+            scopes: set[str | None] = {proof.scope.resource for proof in evaluation.proofs}
+            scopes.update(gap.scope for gap in gaps.records[first:])
+            for scope in scopes:
+                if context.index.buckets.get(bucket.arn) is None:
+                    gaps.add("target_ambiguous", operation=operation, bucket=bucket, scope=scope, source=bucket)
+                gaps.gates(
+                    role,
+                    bucket,
+                    context,
+                    operation=operation,
+                    scope=scope,
+                    identity_complete=_identity_policy_complete(role),
+                    bucket_complete=posture.complete,
+                )
+                for source in sources:
+                    gaps.add(
+                        "bucket_policy_target_unresolved",
+                        operation=operation,
+                        bucket=bucket,
+                        scope=scope,
+                        source=source,
+                    )
+
+
+def _matches_within_scope(matches: Sequence[_StatementMatch], scope: _ObjectScope) -> list[_StatementMatch]:
+    bounded: list[_StatementMatch] = []
+    for match in matches:
+        if match.effect == "deny":
+            bounded.append(match)
+        elif (intersection := _scope_intersection(match.scope, scope)) is not None:
+            bounded.append(replace(match, scope=intersection))
+    return bounded
 
 
 def _task_definition_paths(
@@ -406,6 +506,7 @@ def _evaluate_authorization(
     same_account: bool | None,
     partitions_match: bool,
     scope_limit: _ObjectScope | None = None,
+    gaps: S3GapCollector | None = None,
 ) -> _AuthorizationEvaluation:
     operation_identity_matches = [match for match in identity_matches if match.operation == operation]
     operation_bucket_matches = [match for match in bucket_matches if match.operation == operation]
@@ -414,10 +515,30 @@ def _evaluate_authorization(
     bucket_allows = [match for match in operation_bucket_matches if match.effect == "allow"]
     bucket_denies = [match for match in operation_bucket_matches if match.effect == "deny"]
 
+    def report(reason: str, scopes: Sequence[_ObjectScope]) -> None:
+        if gaps is None:
+            return
+        for scope in scopes:
+            if any(
+                not deny.conditional and _scope_contains(deny.scope, scope)
+                for deny in (*identity_denies, *bucket_denies)
+            ):
+                continue
+            for match in (*operation_identity_matches, *operation_bucket_matches):
+                if _scopes_overlap(scope, match.scope):
+                    gaps.add(
+                        reason,
+                        operation=operation,
+                        bucket=bucket,
+                        scope=scope.resource,
+                        source_address=match.source_address,
+                    )
+
     potential_allow = bool(identity_allows or bucket_allows)
     if not potential_allow:
         return _AuthorizationEvaluation((), ())
     if same_account is None:
+        report("ownership_unresolved", [match.scope for match in (*identity_allows, *bucket_allows)])
         return _AuthorizationEvaluation(
             (),
             (
@@ -426,6 +547,9 @@ def _evaluate_authorization(
             ),
         )
     if not partitions_match:
+        report(
+            "cross_partition_authorization_unsupported", [match.scope for match in (*identity_allows, *bucket_allows)]
+        )
         return _AuthorizationEvaluation(
             (),
             (
@@ -464,11 +588,13 @@ def _evaluate_authorization(
 
     uncertainties: list[str] = []
     if conditional_deny_scopes:
+        report("policy_condition_unresolved", conditional_deny_scopes)
         uncertainties.append(
             f"{bucket.address}: {role.address} {operation} has condition-dependent deny evidence "
             "for modeled object scope(s): " + ", ".join(sorted({scope.resource for scope in conditional_deny_scopes}))
         )
     if partially_denied_scopes:
+        report("residual_scope_unrepresentable", partially_denied_scopes)
         uncertainties.append(
             f"{bucket.address}: {role.address} {operation} allow scope is narrowed by a more-specific "
             "explicit deny; the residual object scope is not representable: "
@@ -483,6 +609,18 @@ def _evaluate_authorization(
             bucket_denies,
             same_account=same_account,
         ):
+            uncertain_scopes = [proof.scope for proof in surviving] or [
+                match.scope for match in (*identity_allows, *bucket_allows) if match.conditional
+            ]
+            if not identity_policy_complete:
+                report(
+                    "identity_policy_document_unavailable"
+                    if aws_facts(role).unresolved_attached_policy_arns
+                    else "identity_policy_incomplete",
+                    uncertain_scopes,
+                )
+            if not bucket_policy_complete:
+                report("bucket_policy_incomplete", uncertain_scopes)
             incomplete_surfaces: list[str] = []
             if not identity_policy_complete:
                 incomplete_surfaces.append("identity policy")
@@ -505,10 +643,18 @@ def _evaluate_authorization(
         bucket_denies,
         same_account=same_account,
     ):
+        report(
+            "policy_condition_unresolved",
+            [match.scope for match in (*identity_allows, *bucket_allows) if match.conditional],
+        )
         uncertainties.append(
             f"{bucket.address}: {role.address} {operation} authorization depends on runtime policy conditions"
         )
     elif any(match.principal_match == "wildcard" for match in bucket_allows):
+        report(
+            "principal_scope_unsupported",
+            [match.scope for match in bucket_allows if match.principal_match == "wildcard"],
+        )
         uncertainties.append(
             f"{bucket.address}: {role.address} {operation} has wildcard-principal bucket-policy "
             "allow evidence outside the exact-principal model"
@@ -618,6 +764,9 @@ def _merge_proofs(proofs: Sequence[_EffectiveProof]) -> list[_EffectiveProof]:
 def _identity_policy_matches(
     role: NormalizedResource,
     bucket_arn: str,
+    *,
+    gaps: S3GapCollector | None = None,
+    bucket: NormalizedResource | None = None,
 ) -> tuple[list[_StatementMatch], list[str]]:
     matches: list[_StatementMatch] = []
     uncertainties: list[str] = []
@@ -636,6 +785,8 @@ def _identity_policy_matches(
                         if effect == "deny":
                             scope = _ObjectScope(bucket_arn, "all", None)
                         else:
+                            if gaps is not None and operation in _OPERATION_ORDER:
+                                gaps.add("resource_scope_unsupported", operation=operation, bucket=bucket, source=role)
                             uncertainties.append(
                                 f"{role.address} {operation} policy resource {resource!r} does not "
                                 f"identify an exact object scope in {bucket_arn}"
@@ -663,6 +814,8 @@ def _bucket_policy_matches(
     *,
     bucket_arn: str,
     role_arn: str,
+    gaps: S3GapCollector | None = None,
+    bucket: NormalizedResource | None = None,
 ) -> tuple[list[_StatementMatch], list[str]]:
     role_account_id = parse_aws_account_id(role_arn)
     if role_account_id is None:
@@ -697,6 +850,10 @@ def _bucket_policy_matches(
                             if effect == "deny":
                                 scope = _ObjectScope(bucket_arn, "all", None)
                             else:
+                                if gaps is not None and operation in _OPERATION_ORDER:
+                                    gaps.add(
+                                        "resource_scope_unsupported", operation=operation, bucket=bucket, source=source
+                                    )
                                 uncertainties.append(
                                     f"{source.address} {operation} bucket-policy resource {resource!r} "
                                     f"does not identify an exact object scope in {bucket_arn}"

@@ -152,6 +152,15 @@ class S3IdentityAuthorization:
     uncertainties: tuple[str, ...]
 
 
+def modeled_s3_actions(patterns: Sequence[str]) -> tuple[tuple[str, Literal["bucket_level", "object_level"]], ...]:
+    """Expand only the operations already modeled by the authority evaluator."""
+    return tuple(
+        (action.name, action.resource_kind)
+        for action in _S3_ACTIONS
+        if any(fnmatchcase(action.name.lower(), pattern.lower()) for pattern in patterns)
+    )
+
+
 def assess_s3_identity_policy(role: NormalizedResource) -> S3IdentityPolicyAssessment:
     """Keep identity completeness and boundary uncertainty together for consumers."""
     facts = aws_facts(role)

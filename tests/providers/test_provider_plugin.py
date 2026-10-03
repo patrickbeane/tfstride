@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from tfstride.analysis.finding_factory import FindingFactory
+from tfstride.analysis.operation_gaps import OperationGapFamily, OperationGapResults
 from tfstride.analysis.rule_definitions import RuleContribution, RuleDefinition, RuleEvaluationContext
 from tfstride.analysis.rule_registry import RuleMetadata, RuleRegistry
 from tfstride.models import (
@@ -23,6 +24,7 @@ from tfstride.providers.plugin import (
     boundary_contributors_by_provider_from_plugins,
     boundary_contributors_from_plugins,
     observation_factories_by_provider_from_plugins,
+    operation_gap_factories_by_provider_from_plugins,
     provider_limitations_from_plugins,
     provider_registry_from_plugins,
     resource_capability_registry_from_plugins,
@@ -139,6 +141,22 @@ def _plugin(
 
 
 class ProviderPluginTests(unittest.TestCase):
+    def test_operation_gap_hooks_require_explicit_registration(self) -> None:
+        plugin = _plugin()
+        self.assertEqual(operation_gap_factories_by_provider_from_plugins((plugin,)), {})
+        family = OperationGapFamily("aws", "example_operation")
+
+        def report_gaps(inventory: ResourceInventory) -> OperationGapResults:
+            return OperationGapResults((family,)) if inventory.provider == "aws" else OperationGapResults()
+
+        registered = replace(plugin, operation_gap_factory=report_gaps)
+        hooks = operation_gap_factories_by_provider_from_plugins((registered,))
+        self.assertEqual(set(hooks), {"aws"})
+        self.assertEqual(hooks["aws"][0](ResourceInventory("aws", [])).reporting_families, (family,))
+        self.assertIsNone(plugin.operation_gap_factory)
+        with self.assertRaises(ProviderPluginError):
+            replace(plugin, operation_gap_factory=object())
+
     def test_plugin_normalizes_provider_and_resource_types(self) -> None:
         plugin = _plugin()
 

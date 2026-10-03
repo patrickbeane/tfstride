@@ -70,6 +70,8 @@ class OperationGapTests(unittest.TestCase):
             replace(original, target_address=None),
             replace(original, operation="s3:DeleteObject"),
             replace(original, operation=None),
+            replace(original, scope="arn:aws:s3:::data/public/*"),
+            replace(original, scope="arn:aws:s3:::data/private/*"),
             replace(original, relationship="runtime_identity_attachment"),
             replace(original, reason_code="policy_document_incomplete"),
             replace(original, evidence_state=OperationGapEvidenceState.UNKNOWN),
@@ -152,6 +154,8 @@ class OperationGapTests(unittest.TestCase):
             {"operation": ""},
             {"resource_address": ""},
             {"target_address": "target\nraw policy"},
+            {"target_address": None, "scope": "arn:aws:s3:::data/*"},
+            {"scope": "raw\npolicy"},
         ):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 replace(_gap(), **changes)

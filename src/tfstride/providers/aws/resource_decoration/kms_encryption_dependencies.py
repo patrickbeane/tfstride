@@ -101,6 +101,29 @@ _AwsCandidateAssessment = CandidateAssessment[
 ]
 
 
+def current_kms_encryption_dependencies(
+    dependent: NormalizedResource,
+    context: AwsDecorationContext,
+) -> tuple[list[AwsKmsEncryptionDependency], list[str]]:
+    """Resolve one current dependency without mutating decorated inventory facts."""
+    targets = tuple(
+        resource
+        for resource in context.index.resources_by_address.values()
+        if resource.resource_type in {_KMS_KEY, _KMS_ALIAS}
+    )
+    resolver = _dependency_resolver(
+        native_index=build_resource_reference_index(targets, references_for_resource=_native_kms_references),
+        resources_by_address=context.index.resources_by_address,
+    )
+    inputs, uncertainties = _dependency_inputs(dependent, context.index.resources_by_address)
+    records = [
+        resolver.resolve_record(item, render=_render_dependency_record)
+        for item in inputs
+        if not (item.configured_reference and _is_aws_managed_key_reference(item.configured_reference))
+    ]
+    return records, uncertainties
+
+
 class ResolveAwsKmsEncryptionDependenciesStage:
     name = "resolve_aws_kms_encryption_dependencies"
 

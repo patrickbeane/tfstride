@@ -172,6 +172,8 @@ include = [
   "src/tfstride/providers/aws/resource_decoration/kms.py",
   "src/tfstride/providers/aws/resource_decoration/kms_encryption_dependencies.py",
   "src/tfstride/providers/aws/s3_identity_authorization.py",
+  "src/tfstride/providers/aws/s3_gap_evidence.py",
+  "src/tfstride/providers/aws/s3_operation_gaps.py",
   "src/tfstride/providers/aws/s3_object_scopes.py",
   "src/tfstride/providers/aws/resource_decoration/ecs_s3_access_paths.py",
   "src/tfstride/providers/aws/resource_decoration/ecs_s3_protected_data_convergence.py",

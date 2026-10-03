@@ -170,15 +170,15 @@ def _path_mutation_classes(path: Mapping[str, Any]) -> list[str]:
 
 
 def _mutation_actions(path: Mapping[str, Any]) -> list[str]:
-    return [
-        action
-        for action in _string_values(path.get("matched_actions"))
-        if (
-            not action.lower().startswith(("s3:get", "s3:list"))
-            and action not in _OBJECT_DELETION_ACTIONS
-            and action not in _TOPOLOGY_DELETION_ACTIONS
-        )
-    ]
+    return [action for action in _string_values(path.get("matched_actions")) if is_s3_mutation_action(action)]
+
+
+def is_s3_mutation_action(action: str) -> bool:
+    return (
+        not action.lower().startswith(("s3:get", "s3:list"))
+        and action not in _OBJECT_DELETION_ACTIONS
+        and action not in _TOPOLOGY_DELETION_ACTIONS
+    )
 
 
 def _task_role_evidence(paths: list[dict[str, Any]]) -> list[str]:

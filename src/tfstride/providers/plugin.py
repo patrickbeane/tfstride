@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Protocol
 
+from tfstride.analysis.operation_gaps import OperationGapResults
 from tfstride.models import NormalizedResource, Observation, ResourceInventory
 from tfstride.providers.base import ProviderNormalizer
 from tfstride.providers.names import normalize_provider_name
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 ProviderBoundaryContributorFactory = Callable[[], "BoundaryContributor"]
 ProviderRuleContributionFactory = Callable[["FindingFactory"], "RuleContribution"]
 ProviderRuleMetadataFactory = Callable[[], tuple["RuleMetadata", ...]]
+ProviderOperationGapFactory = Callable[[ResourceInventory], OperationGapResults]
 ProviderObservationFactory = Callable[[ResourceInventory], list[Observation]]
 
 
@@ -55,6 +57,7 @@ class ProviderPlugin:
     boundary_contributor_factory: ProviderBoundaryContributorFactory | None = None
     observation_factory: ProviderObservationFactory | None = None
     analysis_index_factory: AnalysisIndexExtensionFactory | None = None
+    operation_gap_factory: ProviderOperationGapFactory | None = None
 
     def __post_init__(self) -> None:
         provider = normalize_provider_name(self.provider)
@@ -72,6 +75,8 @@ class ProviderPlugin:
             raise ProviderPluginError(f"Provider plugin `{provider}` boundary contributor factory must be callable.")
         if self.observation_factory is not None and not callable(self.observation_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` observation factory must be callable.")
+        if self.operation_gap_factory is not None and not callable(self.operation_gap_factory):
+            raise ProviderPluginError(f"Provider plugin `{provider}` operation gap factory must be callable.")
         if self.analysis_index_factory is not None and not callable(self.analysis_index_factory):
             raise ProviderPluginError(f"Provider plugin `{provider}` analysis index factory must be callable.")
         if not isinstance(self.metadata_namespace, type):
@@ -208,6 +213,16 @@ def observation_factories_by_provider_from_plugins(
             continue
         factories_by_provider.setdefault(plugin.provider, []).append(plugin.observation_factory)
     return {provider: tuple(factories) for provider, factories in factories_by_provider.items()}
+
+
+def operation_gap_factories_by_provider_from_plugins(
+    plugins: Iterable[ProviderPlugin],
+) -> dict[str, tuple[ProviderOperationGapFactory, ...]]:
+    factories: dict[str, list[ProviderOperationGapFactory]] = {}
+    for plugin in plugins:
+        if plugin.operation_gap_factory is not None:
+            factories.setdefault(plugin.provider, []).append(plugin.operation_gap_factory)
+    return {provider: tuple(items) for provider, items in factories.items()}
 
 
 def analysis_index_factories_by_provider_from_plugins(

@@ -12,6 +12,7 @@ from tfstride.providers.plugin import ProviderPlugin
 if TYPE_CHECKING:
     from tfstride.analysis.boundaries.types import BoundaryContributor
     from tfstride.analysis.finding_factory import FindingFactory
+    from tfstride.analysis.operation_gaps import OperationGapResults
     from tfstride.analysis.rule_definitions import RuleContribution
     from tfstride.analysis.rule_registry import RuleMetadata
     from tfstride.models import Observation, ResourceInventory
@@ -48,6 +49,12 @@ def _aws_observation_factory(inventory: ResourceInventory) -> list[Observation]:
     return observe_aws_controls(inventory)
 
 
+def _aws_operation_gap_factory(inventory: ResourceInventory) -> OperationGapResults:
+    from tfstride.providers.aws.s3_operation_gaps import collect_s3_operation_gaps
+
+    return collect_s3_operation_gaps(inventory)
+
+
 def aws_provider_plugin() -> ProviderPlugin:
     return ProviderPlugin(
         provider="aws",
@@ -62,4 +69,5 @@ def aws_provider_plugin() -> ProviderPlugin:
         boundary_contributor_factory=_aws_boundary_contributor,
         observation_factory=_aws_observation_factory,
         analysis_index_factory=_aws_analysis_indexes,
+        operation_gap_factory=_aws_operation_gap_factory,
     )

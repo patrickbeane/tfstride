@@ -29,6 +29,7 @@ from tfstride.providers.aws.reference_resolution import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_gap_evidence import S3GapCollector
 from tfstride.providers.aws.s3_object_scopes import s3_resource_for_bucket
 from tfstride.providers.coercion import dedupe
 from tfstride.resource_helpers import parse_aws_account_id
@@ -160,6 +161,75 @@ class ProjectEcsS3BucketTopologyDestructionPathsOntoServicesStage:
             service_facts.set_ecs_s3_bucket_topology_destruction_paths(paths)
             service_facts.extend_ecs_s3_bucket_topology_destruction_path_uncertainties(
                 dedupe(uncertainties),
+            )
+
+
+def collect_s3_bucket_topology_gaps(
+    task: NormalizedResource,
+    role: NormalizedResource,
+    bucket: NormalizedResource,
+    context: AwsDecorationContext,
+    gaps: S3GapCollector,
+    unresolved_sources: tuple[NormalizedResource, ...] = (),
+) -> None:
+    assert bucket.arn is not None and role.arn is not None
+    if not _task_role_relationship_is_exact(task, role, context):
+        gaps.add("runtime_identity_unresolved", operation=_DELETE_BUCKET, bucket=bucket, source=task)
+        return
+    relationship = context.index.account_identities.relationship(role, bucket)
+    if relationship.same_account is False:
+        return  # An established cross-account relationship is not owner authority.
+    for source in unresolved_sources:
+        potential = _bucket_policy_matches((source,), bucket, role.arn, context)
+        if any(match.effect == "allow" for match in potential.matches) and not any(
+            match.effect == "deny" and not match.conditional for match in potential.matches
+        ):
+            gaps.add(
+                "target_ambiguous"
+                if context.index.buckets.get(bucket.arn) is None
+                else "bucket_policy_target_unresolved",
+                operation=_DELETE_BUCKET,
+                bucket=bucket,
+                scope=bucket.arn,
+                source=source,
+            )
+    identity = _identity_policy_matches(role, bucket, context)
+    posture = _bucket_policy_posture(bucket, context)
+    bucket_matches = _bucket_policy_matches(posture.sources, bucket, role.arn, context)
+    sources = [
+        source
+        for source in _unresolved_bucket_policy_sources(tuple(context.index.resources_by_address.values()), context)
+        if _unresolved_policy_may_affect_bucket_role(source, bucket, role.arn, context)
+    ]
+    first = len(gaps.records)
+    evaluation = _evaluate_authorization(
+        bucket,
+        role,
+        identity_matches=identity,
+        bucket_matches=bucket_matches,
+        identity_policy_complete=_identity_policy_complete(role),
+        bucket_policy_complete=posture.complete and not sources,
+        gaps=gaps,
+    )
+    if evaluation.proof is not None or len(gaps.records) > first:
+        if context.index.buckets.get(bucket.arn) is None:
+            gaps.add("target_ambiguous", operation=_DELETE_BUCKET, bucket=bucket, scope=bucket.arn, source=bucket)
+        gaps.gates(
+            role,
+            bucket,
+            context,
+            operation=_DELETE_BUCKET,
+            scope=bucket.arn,
+            identity_complete=_identity_policy_complete(role),
+            bucket_complete=posture.complete,
+        )
+        for source in sources:
+            gaps.add(
+                "bucket_policy_target_unresolved",
+                operation=_DELETE_BUCKET,
+                bucket=bucket,
+                scope=bucket.arn,
+                source=source,
             )
 
 
@@ -336,17 +406,30 @@ def _evaluate_authorization(
     bucket_matches: _PolicyMatches,
     identity_policy_complete: bool,
     bucket_policy_complete: bool,
+    gaps: S3GapCollector | None = None,
 ) -> _AuthorizationEvaluation:
+    def report(reason: str) -> None:
+        if gaps is not None and (
+            identity_matches.unresolved_allow
+            or bucket_matches.unresolved_allow
+            or any(match.effect == "allow" for match in matches)
+        ):
+            sources = {match.source_address for match in matches} or {role.address}
+            for address in sources:
+                gaps.add(reason, operation=_DELETE_BUCKET, bucket=bucket, scope=bucket.arn, source_address=address)
+
     matches = (*identity_matches.matches, *bucket_matches.matches)
     denies = [match for match in matches if match.effect == "deny"]
     if any(not match.conditional for match in denies):
         return _AuthorizationEvaluation(None, ())
     if any(match.conditional for match in denies):
+        report("policy_condition_unresolved")
         return _AuthorizationEvaluation(
             None,
             (f"{bucket.address}: {role.address} {_DELETE_BUCKET} has condition-dependent explicit-deny evidence",),
         )
     if identity_matches.unresolved_deny or bucket_matches.unresolved_deny:
+        report("deny_applicability_unresolved")
         return _AuthorizationEvaluation(
             None,
             (f"{bucket.address}: {role.address} {_DELETE_BUCKET} has ambiguous or unresolved explicit-deny scope",),
@@ -373,8 +456,14 @@ def _evaluate_authorization(
     if not identity_policy_complete or not bucket_policy_complete:
         surfaces: list[str] = []
         if not identity_policy_complete:
+            report(
+                "identity_policy_document_unavailable"
+                if aws_facts(role).unresolved_attached_policy_arns
+                else "identity_policy_incomplete"
+            )
             surfaces.append("identity policy")
         if not bucket_policy_complete:
+            report("bucket_policy_incomplete")
             surfaces.append("bucket policy")
         return _AuthorizationEvaluation(
             None,
@@ -400,6 +489,7 @@ def _evaluate_authorization(
         )
 
     if identity_matches.unresolved_allow or bucket_matches.unresolved_allow:
+        report("resource_scope_unsupported")
         return _AuthorizationEvaluation(
             None,
             (
@@ -408,6 +498,7 @@ def _evaluate_authorization(
             ),
         )
     if any(match.effect == "allow" and match.conditional for match in matches):
+        report("policy_condition_unresolved")
         return _AuthorizationEvaluation(
             None,
             (f"{bucket.address}: {role.address} {_DELETE_BUCKET} authorization depends on runtime policy conditions",),
@@ -415,6 +506,7 @@ def _evaluate_authorization(
     if any(
         match.effect == "allow" and match.principal_match in {"account", "wildcard"} for match in bucket_matches.matches
     ):
+        report("principal_scope_unsupported")
         return _AuthorizationEvaluation(
             None,
             (
