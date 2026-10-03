@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from fnmatch import fnmatchcase
 
 from tfstride.analysis.operation_gaps import (
     OperationGap,
@@ -11,9 +12,10 @@ from tfstride.analysis.operation_gaps import (
     OperationGapFamily,
     OperationGapProvenance,
 )
-from tfstride.models import NormalizedResource
+from tfstride.models import IAMPolicyStatement, NormalizedResource
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_bucket_policies import s3_bucket_principal_match
 from tfstride.providers.aws.s3_object_scopes import is_exact_s3_bucket_arn, object_scope_from_resource
 
 S3_ACCESS = OperationGapFamily("aws", "ecs_s3_access")
@@ -51,6 +53,61 @@ _REASON_STATES = {
     "kms_authorization_unresolved": OperationGapEvidenceState.UNKNOWN,
     "kms_s3_constraint_compatibility_unresolved": OperationGapEvidenceState.CONDITIONAL,
 }
+
+
+def conclusive_s3_deny(
+    role: NormalizedResource,
+    operation: str,
+    *,
+    resource: str | None,
+    bucket_sources: tuple[NormalizedResource, ...] = (),
+) -> bool:
+    """Whether known, unconditional evidence denies every request in a selector.
+
+    Only a literal all-resource deny or a simple trailing-wildcard namespace
+    can establish containment without interpreting the uncertain Allow. A
+    missing target has no bound resource, so only `*` can settle that case.
+    Callers supply bucket sources only after their exact association and policy
+    representability have been established by the native S3 evaluator.
+    """
+    if (
+        aws_facts(role).iam_policy_completeness_state == "complete"
+        and not aws_facts(role).unresolved_attached_policy_arns
+    ):
+        if any(_statement_dominates(statement, operation, resource) for statement in role.policy_statements):
+            return True
+    for source in bucket_sources:
+        if aws_facts(source).s3_bucket_policy_completeness_state != "complete":
+            continue
+        if any(
+            _statement_dominates(statement, operation, resource)
+            and s3_bucket_principal_match(statement, role.arn) in {"role", "account", "wildcard"}
+            for statement in source.policy_statements
+        ):
+            return True
+    return False
+
+
+def _statement_dominates(statement: IAMPolicyStatement, operation: str, resource: str | None) -> bool:
+    return (
+        statement.effect.casefold() == "deny"
+        and not statement.conditions
+        and any(
+            "[" not in pattern and "${" not in pattern and fnmatchcase(operation.casefold(), pattern.casefold())
+            for pattern in statement.actions
+        )
+        and any(_deny_covers_resource(denied, resource) for denied in statement.resources)
+    )
+
+
+def _deny_covers_resource(denied: str, resource: str | None) -> bool:
+    if denied == "*":
+        return True
+    if resource is None:
+        return False
+    if denied.endswith("*") and denied.count("*") == 1 and not any(marker in denied for marker in ("?", "[", "${")):
+        return resource.startswith(denied[:-1])
+    return denied == resource and not any(marker in resource for marker in ("*", "?", "[", "${"))
 
 
 @dataclass(slots=True)

@@ -29,7 +29,7 @@ from tfstride.providers.aws.reference_resolution import (
 )
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
-from tfstride.providers.aws.s3_gap_evidence import S3GapCollector
+from tfstride.providers.aws.s3_gap_evidence import S3GapCollector, conclusive_s3_deny
 from tfstride.providers.aws.s3_object_scopes import s3_resource_for_bucket
 from tfstride.providers.coercion import dedupe
 from tfstride.resource_helpers import parse_aws_account_id
@@ -179,6 +179,14 @@ def collect_s3_bucket_topology_gaps(
     relationship = context.index.account_identities.relationship(role, bucket)
     if relationship.same_account is False:
         return  # An established cross-account relationship is not owner authority.
+    posture = _bucket_policy_posture(bucket, context)
+    if conclusive_s3_deny(
+        role,
+        _DELETE_BUCKET,
+        resource=bucket.arn,
+        bucket_sources=posture.sources if posture.complete else (),
+    ):
+        return
     for source in unresolved_sources:
         potential = _bucket_policy_matches((source,), bucket, role.arn, context)
         if any(match.effect == "allow" for match in potential.matches) and not any(
@@ -194,7 +202,6 @@ def collect_s3_bucket_topology_gaps(
                 source=source,
             )
     identity = _identity_policy_matches(role, bucket, context)
-    posture = _bucket_policy_posture(bucket, context)
     bucket_matches = _bucket_policy_matches(posture.sources, bucket, role.arn, context)
     sources = [
         source

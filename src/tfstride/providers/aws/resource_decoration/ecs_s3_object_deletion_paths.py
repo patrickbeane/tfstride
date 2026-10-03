@@ -26,7 +26,7 @@ from tfstride.providers.aws.object_storage_deletion_evidence import (
 from tfstride.providers.aws.policy_documents import policy_statement_is_fully_representable
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
-from tfstride.providers.aws.s3_gap_evidence import S3GapCollector
+from tfstride.providers.aws.s3_gap_evidence import S3GapCollector, conclusive_s3_deny
 from tfstride.providers.aws.s3_object_scopes import (
     S3ObjectScope as _ObjectScope,
 )
@@ -203,14 +203,34 @@ def collect_s3_object_deletion_gaps(
     """Read current deletion diagnostics without changing decorated paths."""
     assert bucket.arn is not None and role.arn is not None
     posture = _bucket_policy_posture(bucket, context)
-    identity_matches, _ = _identity_policy_matches(role, bucket.arn, gaps=gaps, bucket=bucket)
+    trusted_sources = posture.sources if posture.complete else ()
+    dominated = frozenset(
+        operation
+        for operation in _OPERATION_ORDER
+        if conclusive_s3_deny(role, operation, resource=f"{bucket.arn}/*", bucket_sources=trusted_sources)
+    )
+    identity_matches, _ = _identity_policy_matches(
+        role,
+        bucket.arn,
+        gaps=gaps,
+        bucket=bucket,
+        denied_operations=dominated,
+        trusted_bucket_sources=trusted_sources,
+    )
     bucket_matches, _ = _bucket_policy_matches(
-        posture.sources, bucket_arn=bucket.arn, role_arn=role.arn, gaps=gaps, bucket=bucket
+        posture.sources,
+        bucket_arn=bucket.arn,
+        role_arn=role.arn,
+        gaps=gaps,
+        bucket=bucket,
+        denied_operations=dominated,
+        gap_role=role,
+        trusted_bucket_sources=trusted_sources,
     )
     for source in unresolved_sources:
         potential, _ = _bucket_policy_matches((source,), bucket_arn=bucket.arn, role_arn=role.arn)
         for match in potential:
-            if match.effect != "allow" or match.operation not in _OPERATION_ORDER:
+            if match.effect != "allow" or match.operation not in _OPERATION_ORDER or match.operation in dominated:
                 continue
             if any(
                 deny.effect == "deny"
@@ -232,6 +252,8 @@ def collect_s3_object_deletion_gaps(
     relationship = context.index.account_identities.relationship(role, bucket)
     unresolved = _unresolved_bucket_policy_sources(tuple(context.index.resources_by_address.values()), context)
     for operation in _OPERATION_ORDER:
+        if operation in dominated:
+            continue
         sources = [
             context.index.resources_by_address[address]
             for address in unresolved
@@ -767,6 +789,8 @@ def _identity_policy_matches(
     *,
     gaps: S3GapCollector | None = None,
     bucket: NormalizedResource | None = None,
+    denied_operations: frozenset[str] = frozenset(),
+    trusted_bucket_sources: tuple[NormalizedResource, ...] = (),
 ) -> tuple[list[_StatementMatch], list[str]]:
     matches: list[_StatementMatch] = []
     uncertainties: list[str] = []
@@ -785,7 +809,14 @@ def _identity_policy_matches(
                         if effect == "deny":
                             scope = _ObjectScope(bucket_arn, "all", None)
                         else:
-                            if gaps is not None and operation in _OPERATION_ORDER:
+                            if (
+                                gaps is not None
+                                and operation in _OPERATION_ORDER
+                                and operation not in denied_operations
+                                and not conclusive_s3_deny(
+                                    role, operation, resource=resource, bucket_sources=trusted_bucket_sources
+                                )
+                            ):
                                 gaps.add("resource_scope_unsupported", operation=operation, bucket=bucket, source=role)
                             uncertainties.append(
                                 f"{role.address} {operation} policy resource {resource!r} does not "
@@ -816,6 +847,9 @@ def _bucket_policy_matches(
     role_arn: str,
     gaps: S3GapCollector | None = None,
     bucket: NormalizedResource | None = None,
+    denied_operations: frozenset[str] = frozenset(),
+    gap_role: NormalizedResource | None = None,
+    trusted_bucket_sources: tuple[NormalizedResource, ...] = (),
 ) -> tuple[list[_StatementMatch], list[str]]:
     role_account_id = parse_aws_account_id(role_arn)
     if role_account_id is None:
@@ -850,7 +884,15 @@ def _bucket_policy_matches(
                             if effect == "deny":
                                 scope = _ObjectScope(bucket_arn, "all", None)
                             else:
-                                if gaps is not None and operation in _OPERATION_ORDER:
+                                if (
+                                    gaps is not None
+                                    and gap_role is not None
+                                    and operation in _OPERATION_ORDER
+                                    and operation not in denied_operations
+                                    and not conclusive_s3_deny(
+                                        gap_role, operation, resource=resource, bucket_sources=trusted_bucket_sources
+                                    )
+                                ):
                                     gaps.add(
                                         "resource_scope_unsupported", operation=operation, bucket=bucket, source=source
                                     )

@@ -13,7 +13,11 @@ from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _role,
     _statement,
 )
-from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _bucket_policy, _bucket_statement
+from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import (
+    _bucket_policy,
+    _bucket_statement,
+    _unresolved_bucket_policy,
+)
 from tests.providers.aws.test_aws_s3_broad_grants import _OPERATIONS, _resources
 from tests.providers.test_protected_data_key_authority_convergence import _aws_resources
 from tfstride.analysis.operation_gaps import OperationGapEvidenceState
@@ -451,3 +455,100 @@ class AwsS3OperationGapTests(unittest.TestCase):
                 self.assertEqual({g.family for g in result.records}, {S3_ACCESS, S3_MUTATION})
                 self.assertTrue(all(g.target_address is None and g.scope is None for g in result.records))
                 self.assertEqual(tuple(r.address for r in inventory.resources), addresses)
+
+    def test_out_of_plan_allow_is_quiet_when_a_known_deny_covers_its_operation_and_scope(self):
+        target = "arn:aws:s3:::absent/public/*"
+        for denied_action, denied_resource, expected in (
+            ("s3:PutObject", "*", False),
+            ("s3:PutObject", "arn:aws:s3:::absent/*", False),
+            ("s3:GetObject", "*", True),
+            ("s3:PutObject", "arn:aws:s3:::other/*", True),
+        ):
+            with self.subTest(action=denied_action, resource=denied_resource):
+                resources = _resources(resource=target, actions="s3:PutObject")
+                resources[2] = _role(
+                    "orders_task",
+                    _TASK_ROLE_ARN,
+                    [
+                        _statement("Allow", "s3:PutObject", target),
+                        _statement("Deny", denied_action, denied_resource),
+                    ],
+                )
+                gaps = collect_s3_operation_gaps(AwsNormalizer().normalize(resources)).records
+                self.assertEqual(bool(gaps), expected)
+                if expected:
+                    self.assertEqual({gap.reason_code for gap in gaps}, {"target_not_modeled"})
+
+    def test_unresolved_bucket_identity_is_quiet_under_a_global_deny(self):
+        inventory = AwsNormalizer().normalize(_resources(actions="s3:PutObject", resource="*"))
+        _resource(inventory, "aws_s3_bucket.orders").arn = None
+        self.assertEqual(
+            {gap.reason_code for gap in collect_s3_operation_gaps(inventory).records}, {"target_arn_unresolved"}
+        )
+        _replace_role_policy(
+            inventory,
+            [_statement("Allow", "s3:PutObject", "*"), _statement("Deny", "s3:PutObject", "*")],
+        )
+        self.assertEqual(collect_s3_operation_gaps(inventory).records, ())
+
+    def test_unsupported_object_allow_is_quiet_under_a_known_deny(self):
+        target = f"{_BUCKET_ARN}/public/*.json"
+        for denied_resource, expected in (
+            ("*", False),
+            (f"{_BUCKET_ARN}/public/*", False),
+            (f"{_BUCKET_ARN}/private/*", True),
+        ):
+            with self.subTest(deny=denied_resource):
+                resources = _resources(resource=target, actions="s3:DeleteObject")
+                resources[2] = _role(
+                    "orders_task",
+                    _TASK_ROLE_ARN,
+                    [
+                        _statement("Allow", "s3:DeleteObject", target),
+                        _statement("Deny", "s3:DeleteObject", denied_resource),
+                    ],
+                )
+                gaps = collect_s3_operation_gaps(AwsNormalizer().normalize(resources)).records
+                self.assertEqual(bool(gaps), expected)
+                if expected:
+                    self.assertEqual({gap.reason_code for gap in gaps}, {"resource_scope_unsupported"})
+
+    def test_unresolved_policy_allow_is_quiet_when_a_known_deny_dominates_deletion_and_topology(self):
+        operations = ["s3:DeleteObject", "s3:DeleteBucket"]
+        for deny_source in ("identity", "bucket"):
+            with self.subTest(deny_source=deny_source):
+                resources = _resources(actions="s3:GetObject")
+                resources[2] = _role(
+                    "orders_task",
+                    _TASK_ROLE_ARN,
+                    [_statement("Deny", operations if deny_source == "identity" else "s3:GetObject", "*")],
+                )
+                if deny_source == "bucket":
+                    resources.append(_bucket_policy([_bucket_statement("Deny", operations, "*", _TASK_ROLE_ARN)]))
+                resources.append(
+                    _unresolved_bucket_policy("unknown", [_bucket_statement("Allow", operations, "*", _TASK_ROLE_ARN)])
+                )
+                gaps = collect_s3_operation_gaps(AwsNormalizer().normalize(resources)).records
+                self.assertFalse([gap for gap in gaps if gap.family in {S3_OBJECT_DELETION, S3_BUCKET_TOPOLOGY}])
+
+    def test_unrelated_bucket_policy_deny_does_not_suppress_unresolved_source(self):
+        resources = _resources(actions="s3:GetObject")
+        resources[2] = _role("orders_task", _TASK_ROLE_ARN, [_statement("Deny", "s3:GetObject", "*")])
+        resources.append(
+            _bucket_policy(
+                [
+                    _bucket_statement(
+                        "Deny", ["s3:DeleteObject", "s3:DeleteBucket"], "*", "arn:aws:iam::444455556666:role/other"
+                    )
+                ]
+            )
+        )
+        resources.append(
+            _unresolved_bucket_policy(
+                "unknown",
+                [_bucket_statement("Allow", ["s3:DeleteObject", "s3:DeleteBucket"], "*", _TASK_ROLE_ARN)],
+            )
+        )
+        gaps = collect_s3_operation_gaps(AwsNormalizer().normalize(resources)).records
+        self.assertEqual({gap.family for gap in gaps}, {S3_OBJECT_DELETION, S3_BUCKET_TOPOLOGY})
+        self.assertEqual({gap.reason_code for gap in gaps}, {"bucket_policy_target_unresolved"})

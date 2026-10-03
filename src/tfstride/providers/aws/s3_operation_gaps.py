@@ -25,6 +25,7 @@ from tfstride.providers.aws.s3_gap_evidence import (
     S3_OBJECT_DELETION,
     S3_PROTECTED_DATA,
     S3GapCollector,
+    conclusive_s3_deny,
 )
 from tfstride.providers.aws.s3_identity_authorization import (
     S3IdentityAuthorization,
@@ -154,6 +155,13 @@ def _access_gaps(
         ):
             continue
         operation, scope = evaluation["action"], evaluation["resource"]
+        if conclusive_s3_deny(
+            role,
+            operation,
+            resource=scope,
+            bucket_sources=policies.sources if len(policies.source_addresses) <= 1 else (),
+        ):
+            continue
         if context.index.buckets.get(bucket.arn) is None:
             gaps.add("target_ambiguous", operation=operation, bucket=bucket, scope=scope, source=bucket)
             continue
@@ -216,6 +224,8 @@ def _unresolved_bucket(role: NormalizedResource, bucket: NormalizedResource, gap
         ):
             continue
         for operation, _ in modeled_s3_actions(statement.actions):
+            if conclusive_s3_deny(role, operation, resource=None):
+                continue
             gaps.add("target_arn_unresolved", operation=operation, bucket=bucket, source=bucket, field_path=("arn",))
 
 
@@ -230,6 +240,8 @@ def _unbound_grants(
             if resource == "*":
                 continue
             for operation, _ in actions:
+                if conclusive_s3_deny(role, operation, resource=resource):
+                    continue
                 if any(
                     bucket.arn is not None
                     and is_exact_s3_bucket_arn(bucket.arn)
