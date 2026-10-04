@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, TypeVar
+from typing import Any, TypedDict, TypeVar
 
 from tfstride.analysis.operation_gaps import OperationGapResults
 from tfstride.resource_metadata import (
@@ -728,6 +728,15 @@ class AnalysisCoverage:
     references: ReferenceCoverage = field(default_factory=ReferenceCoverage)
 
 
+class FilterSummary(TypedDict):
+    total_findings: int
+    active_findings: int
+    suppressed_findings: int
+    baselined_findings: int
+    suppressions_path: str | None
+    baseline_path: str | None
+
+
 @dataclass(slots=True)
 class AnalysisResult:
     title: str
@@ -739,7 +748,7 @@ class AnalysisResult:
     observations: list[Observation] = field(default_factory=list)
     suppressed_findings: list[Finding] = field(default_factory=list)
     baselined_findings: list[Finding] = field(default_factory=list)
-    filter_summary: dict[str, Any] = field(default_factory=dict)
+    filter_summary: FilterSummary | None = None
     analysis_coverage: AnalysisCoverage = field(default_factory=AnalysisCoverage)
     limitations: list[str] = field(default_factory=list)
     operation_gaps: OperationGapResults = field(default_factory=OperationGapResults)

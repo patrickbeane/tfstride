@@ -35,9 +35,9 @@ def render_markdown(result: AnalysisResult) -> str:
         "",
     ]
 
-    filter_summary = result.filter_summary or {}
-    suppressed_count = int(filter_summary.get("suppressed_findings", 0) or 0)
-    baselined_count = int(filter_summary.get("baselined_findings", 0) or 0)
+    filter_summary = result.filter_summary
+    suppressed_count = filter_summary["suppressed_findings"] if filter_summary else 0
+    baselined_count = filter_summary["baselined_findings"] if filter_summary else 0
     lines.extend(
         [
             f"- High severity findings: `{len(findings_by_severity[Severity.HIGH])}`",
@@ -45,17 +45,17 @@ def render_markdown(result: AnalysisResult) -> str:
             f"- Low severity findings: `{len(findings_by_severity[Severity.LOW])}`",
         ]
     )
-    if suppressed_count or baselined_count:
+    if filter_summary and (suppressed_count or baselined_count):
         lines.extend(
             [
-                f"- Active findings after filters: `{filter_summary.get('active_findings', len(result.findings))}`",
+                f"- Active findings after filters: `{filter_summary['active_findings']}`",
                 f"- Suppressed findings: `{suppressed_count}`",
                 f"- Baselined findings: `{baselined_count}`",
             ]
         )
-        if filter_summary.get("suppressions_path"):
+        if filter_summary["suppressions_path"]:
             lines.append(f"- Suppressions file: `{filter_summary['suppressions_path']}`")
-        if filter_summary.get("baseline_path"):
+        if filter_summary["baseline_path"]:
             lines.append(f"- Baseline file: `{filter_summary['baseline_path']}`")
     lines.extend(["", "## Analysis Coverage", ""])
     lines.extend(_render_analysis_coverage(result))

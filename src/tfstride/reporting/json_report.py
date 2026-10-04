@@ -4,7 +4,7 @@ import json
 from collections import Counter
 
 from tfstride import __version__
-from tfstride.filtering import finding_fingerprint
+from tfstride.filtering import build_filter_summary, finding_fingerprint
 from tfstride.models import (
     AnalysisResult,
     Finding,
@@ -45,14 +45,12 @@ def render_json(result: AnalysisResult) -> str:
 
 
 def build_json_report_payload(result: AnalysisResult) -> TFSReportPayload:
-    filter_summary = result.filter_summary or {
-        "total_findings": len(result.findings),
-        "active_findings": len(result.findings),
-        "suppressed_findings": 0,
-        "baselined_findings": 0,
-        "suppressions_path": None,
-        "baseline_path": None,
-    }
+    filter_summary = result.filter_summary or build_filter_summary(
+        total_findings=len(result.findings),
+        active_findings=len(result.findings),
+        suppressed_findings=0,
+        baselined_findings=0,
+    )
     severity_counts = Counter(finding.severity.value for finding in result.findings)
     return {
         "kind": REPORT_KIND,
@@ -78,7 +76,7 @@ def build_json_report_payload(result: AnalysisResult) -> TFSReportPayload:
                 "low": severity_counts.get(Severity.LOW.value, 0),
             },
         },
-        "filtering": dict(filter_summary),
+        "filtering": build_filter_summary(**filter_summary),
         "analysis_coverage": _serialize_analysis_coverage(result),
         "operation_gaps": serialize_operation_gaps(result.operation_gaps),
         "resource_sensitivity": serialize_resource_sensitivity(),

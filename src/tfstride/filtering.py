@@ -5,10 +5,10 @@ import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from tfstride import __version__
-from tfstride.models import AnalysisResult, Finding, Severity
+from tfstride.models import AnalysisResult, FilterSummary, Finding, Severity
 
 BASELINE_FORMAT_VERSION = "1.0"
 SUPPRESSIONS_FORMAT_VERSION = "1.0"
@@ -53,7 +53,7 @@ def apply_finding_filters(
 ) -> AnalysisResult:
     suppressions = load_suppressions(suppressions_path) if suppressions_path else []
     baseline_fingerprints = load_baseline_fingerprints(baseline_path) if baseline_path else set()
-    existing_summary = result.filter_summary or {}
+    existing_summary = result.filter_summary
 
     active_findings: list[Finding] = []
     suppressed_findings = list(result.suppressed_findings)
@@ -74,28 +74,51 @@ def apply_finding_filters(
         findings=active_findings,
         suppressed_findings=suppressed_findings,
         baselined_findings=baselined_findings,
-        filter_summary={
-            "total_findings": _total_findings(result),
-            "active_findings": len(active_findings),
-            "suppressed_findings": len(suppressed_findings),
-            "baselined_findings": len(baselined_findings),
-            "suppressions_path": _filter_path(existing_summary, "suppressions_path", suppressions_path),
-            "baseline_path": _filter_path(existing_summary, "baseline_path", baseline_path),
-        },
+        filter_summary=build_filter_summary(
+            total_findings=_total_findings(result),
+            active_findings=len(active_findings),
+            suppressed_findings=len(suppressed_findings),
+            baselined_findings=len(baselined_findings),
+            suppressions_path=_filter_path(existing_summary, "suppressions_path", suppressions_path),
+            baseline_path=_filter_path(existing_summary, "baseline_path", baseline_path),
+        ),
     )
 
 
+def build_filter_summary(
+    *,
+    total_findings: int,
+    active_findings: int,
+    suppressed_findings: int,
+    baselined_findings: int,
+    suppressions_path: str | None = None,
+    baseline_path: str | None = None,
+) -> FilterSummary:
+    return {
+        "total_findings": total_findings,
+        "active_findings": active_findings,
+        "suppressed_findings": suppressed_findings,
+        "baselined_findings": baselined_findings,
+        "suppressions_path": suppressions_path,
+        "baseline_path": baseline_path,
+    }
+
+
 def _total_findings(result: AnalysisResult) -> int:
-    total_findings = result.filter_summary.get("total_findings")
+    total_findings = result.filter_summary.get("total_findings") if result.filter_summary else None
     if isinstance(total_findings, int):
         return total_findings
     return len(result.findings) + len(result.suppressed_findings) + len(result.baselined_findings)
 
 
-def _filter_path(summary: dict[str, Any], key: str, path: str | Path | None) -> str | None:
+def _filter_path(
+    summary: FilterSummary | None,
+    key: Literal["suppressions_path", "baseline_path"],
+    path: str | Path | None,
+) -> str | None:
     if path is not None:
         return str(path)
-    value = summary.get(key)
+    value = summary.get(key) if summary else None
     return str(value) if value else None
 
 

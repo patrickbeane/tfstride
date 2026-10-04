@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from tfstride.models import FilterSummary
+
 try:
     from typing_extensions import TypedDict
 except ImportError:  # pragma: no cover
@@ -30,13 +32,8 @@ class ReportSummaryPayload(TypedDict):
     severity_counts: SeverityCountsPayload
 
 
-class FilteringSummaryPayload(TypedDict):
-    total_findings: int
-    active_findings: int
-    suppressed_findings: int
-    baselined_findings: int
-    suppressions_path: str | None
-    baseline_path: str | None
+class FilteringSummaryPayload(FilterSummary):
+    """Serialized filtering summary uses the analysis result contract."""
 
 
 class ResourceCoveragePayload(TypedDict):
