@@ -116,6 +116,7 @@ API_REPORT_EXAMPLE: TFSReportPayload = {
             "unresolved_references": [],
         },
     },
+    "operation_gaps": {"reporting_families": [], "records": []},
     "inventory": {"provider": "aws", "unsupported_resources": [], "metadata": {}, "resources": []},
     "trust_boundaries": [],
     "findings": [],

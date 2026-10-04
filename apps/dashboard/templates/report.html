@@ -22,6 +22,7 @@
 
   <nav class="report-jump-nav" aria-label="Report sections">
     <a href="#coverage">Coverage</a>
+    <a href="#analysis-gaps">Analysis gaps</a>
     <a href="#findings">Findings</a>
     <a href="#observations">Observations</a>
     <a href="#boundaries">Boundaries</a>
@@ -147,6 +148,98 @@
           </section>
         {% endif %}
       </div>
+    {% endif %}
+  </section>
+
+  <section class="panel analysis-gap-panel" id="analysis-gaps">
+    <div class="panel-header">
+      <p class="eyebrow">Analysis gaps</p>
+      <h2>Unassessed operation paths</h2>
+    </div>
+
+    {% if operation_gap_resources %}
+      {% if payload.summary.total_findings == 0 %}
+        <p class="gap-status">No security findings were recorded, but relevant modeled relationships remain unassessed.</p>
+      {% elif payload.summary.active_findings == 0 %}
+        <p class="gap-status">No active security findings remain after filtering, but relevant modeled relationships remain unassessed.</p>
+      {% else %}
+        <p class="gap-status">These unassessed relationships are separate from the security findings reported for this run.</p>
+      {% endif %}
+      <p class="gap-summary">
+        {{ operation_gap_count }} analysis gap{{ "s" if operation_gap_count != 1 else "" }} across
+        {{ operation_gap_resources|length }} modeled resource{{ "s" if operation_gap_resources|length != 1 else "" }}.
+      </p>
+      <div class="gap-resource-list">
+        {% for resource in operation_gap_resources %}
+          <details class="gap-resource">
+            <summary>
+              <span class="gap-resource-address">{{ resource.address }}</span>
+              <span class="gap-count">{{ resource.records|length }} gap{{ "s" if resource.records|length != 1 else "" }}</span>
+            </summary>
+            <div class="gap-operation-list">
+              {% for gap in resource.records %}
+                <details class="gap-operation">
+                  <summary>
+                    <span>{{ gap.operation or "Operation undetermined" }}</span>
+                    <small>{{ gap.target_address or "No unique modeled target" }}</small>
+                  </summary>
+                  <div class="gap-operation-body">
+                    <p>{{ gap.explanation }}</p>
+                    <p><strong>Next:</strong> {{ gap.next_step }}</p>
+                    <dl class="detail-grid">
+                      <div>
+                        <dt>Relationship</dt>
+                        <dd class="detail-wrap">{{ gap.relationship }}</dd>
+                      </div>
+                      <div>
+                        <dt>Evidence state</dt>
+                        <dd>{{ gap.evidence_state }}</dd>
+                      </div>
+                      <div>
+                        <dt>Reason</dt>
+                        <dd class="detail-wrap">{{ gap.reason_code }}</dd>
+                      </div>
+                      <div>
+                        <dt>Analysis family</dt>
+                        <dd class="detail-wrap">{{ gap.family.provider }} / {{ gap.family.name }}</dd>
+                      </div>
+                      {% if gap.scope %}
+                        <div class="detail-span">
+                          <dt>Modeled scope</dt>
+                          <dd class="detail-wrap">{{ gap.scope }}</dd>
+                        </div>
+                      {% endif %}
+                    </dl>
+                    {% if gap.provenance %}
+                      <div class="gap-provenance">
+                        <h4>Evidence locations</h4>
+                        <ul>
+                          {% for source in gap.provenance %}
+                            <li>
+                              {{ source.resource_address }} · {{ source.evidence_kind }}
+                              {% if source.field_path %} · {{ source.field_path|join(".") }}{% endif %}
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    {% endif %}
+                  </div>
+                </details>
+              {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    {% elif not operation_gap_data_available %}
+      <p class="empty-state">This report does not include operation-gap data.</p>
+    {% elif operation_gap_reporting_family_count %}
+      <p class="empty-state">
+        No operation gaps were reported by the {{ operation_gap_reporting_family_count }} analysis
+        {{ "families" if operation_gap_reporting_family_count != 1 else "family" }} that ran.
+        This does not establish complete authorization coverage.
+      </p>
+    {% else %}
+      <p class="empty-state">No operation-gap reporting families ran for this report.</p>
     {% endif %}
   </section>
 

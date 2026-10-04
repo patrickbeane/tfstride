@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import Request
 
 from apps.dashboard.scenarios import PROVIDER_DISPLAY_NAMES
-from tfstride.reporting.report_contract import TFSReportPayload
+from tfstride.reporting.report_contract import OperationGapPayload, TFSReportPayload
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,8 +62,10 @@ def _report_context(
         severity: [finding for finding in findings if finding["severity"] == severity]
         for severity in ("high", "medium", "low")
     }
+    operation_gap_context = _operation_gap_context(payload)
     summary_cards = [
         {"label": "Active findings", "value": summary["active_findings"]},
+        {"label": "Analysis gaps", "value": operation_gap_context["operation_gap_count"]},
         {"label": "Trust boundaries", "value": summary["trust_boundaries"]},
         {"label": "Resources", "value": summary["normalized_resources"]},
         {"label": "Observations", "value": len(payload["observations"])},
@@ -83,9 +85,33 @@ def _report_context(
         "findings_by_severity": findings_by_severity,
         "unsupported_resources": payload["inventory"]["unsupported_resources"],
         **_coverage_context(payload),
+        **operation_gap_context,
         "raw_json": json.dumps(payload, indent=2),
         "raw_markdown": analysis.markdown_report,
         "scenario": scenario,
+    }
+
+
+def _operation_gap_context(payload: TFSReportPayload) -> dict[str, object]:
+    gap_results = payload.get("operation_gaps")
+    if gap_results is None:
+        return {
+            "operation_gap_count": "—",
+            "operation_gap_reporting_family_count": 0,
+            "operation_gap_resources": [],
+            "operation_gap_data_available": False,
+        }
+
+    by_resource: dict[str, list[OperationGapPayload]] = {}
+    for gap in gap_results["records"]:
+        by_resource.setdefault(gap["resource_address"], []).append(gap)
+    return {
+        "operation_gap_count": len(gap_results["records"]),
+        "operation_gap_reporting_family_count": len(gap_results["reporting_families"]),
+        "operation_gap_resources": [
+            {"address": address, "records": records} for address, records in sorted(by_resource.items())
+        ],
+        "operation_gap_data_available": True,
     }
 
 

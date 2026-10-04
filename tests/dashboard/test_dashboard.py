@@ -6,6 +6,15 @@ from copy import deepcopy
 from unittest import mock
 
 from tests.helpers.paths import FIXTURES_DIR
+from tfstride.analysis.operation_gaps import (
+    OperationGap,
+    OperationGapEvidenceKind,
+    OperationGapEvidenceState,
+    OperationGapFamily,
+    OperationGapProvenance,
+    OperationGapResults,
+)
+from tfstride.models import AnalysisResult, ResourceInventory
 
 FASTAPI_DEPS_AVAILABLE = all(
     importlib.util.find_spec(name) is not None for name in ("fastapi", "httpx2", "jinja2", "multipart")
@@ -32,6 +41,36 @@ AZURE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_plan.json"
 AZURE_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_nightmare_plan.json"
 SAFE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_safe_plan.json"
 NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
+_GAP_FAMILY = OperationGapFamily("aws", "ecs_s3_mutation")
+
+
+def _dashboard_gap_result(*, include_gap: bool = True) -> AnalysisResult:
+    gap = OperationGap(
+        family=_GAP_FAMILY,
+        resource_address="aws_ecs_task_definition.orders",
+        relationship="runtime_identity_to_storage",
+        operation="s3:PutObject",
+        target_address="aws_s3_bucket.orders",
+        scope="arn:aws:s3:::orders/public/<script>secret</script>/*",
+        reason_code="policy_condition_unresolved",
+        evidence_state=OperationGapEvidenceState.CONDITIONAL,
+        provenance=(
+            OperationGapProvenance(
+                "aws_iam_role.orders_task",
+                OperationGapEvidenceKind.POLICY_DOCUMENT,
+                ("inline_policy", 0, "policy"),
+            ),
+        ),
+    )
+    return AnalysisResult(
+        title="Gap-only dashboard",
+        analyzed_file="plan.json",
+        analyzed_path="plan.json",
+        inventory=ResourceInventory(provider="aws", resources=[]),
+        findings=[],
+        trust_boundaries=[],
+        operation_gaps=OperationGapResults((_GAP_FAMILY,), (gap,) if include_gap else ()),
+    )
 
 
 @unittest.skipUnless(FASTAPI_DEPS_AVAILABLE, "dashboard dependencies are not installed")
@@ -205,6 +244,82 @@ class DashboardAppTests(unittest.TestCase):
             custom_context["unsupported_resource_types_empty_message"],
             "No unsupported resource types were encountered.",
         )
+
+    def test_html_gap_only_report_explains_unassessed_path_without_finding_severity(self) -> None:
+        with mock.patch.object(dashboard_app.state.engine, "analyze_plan", return_value=_dashboard_gap_result()):
+            response = self.client.post(
+                "/analyze",
+                files={"plan": ("plan.json", b"{}", "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        gap_section = response.text.split('id="analysis-gaps"', 1)[1].split('class="content-grid"', 1)[0]
+        gap_text = " ".join(gap_section.split())
+        self.assertIn('href="#analysis-gaps"', response.text)
+        self.assertIn(
+            "No security findings were recorded, but relevant modeled relationships remain unassessed.", gap_text
+        )
+        self.assertIn("1 analysis gap across 1 modeled resource.", gap_text)
+        self.assertIn('<details class="gap-resource">', gap_section)
+        self.assertIn('<details class="gap-operation">', gap_section)
+        self.assertIn("aws_ecs_task_definition.orders", gap_section)
+        self.assertIn("s3:PutObject", gap_section)
+        self.assertIn("aws_s3_bucket.orders", gap_section)
+        self.assertIn("policy_condition_unresolved", gap_section)
+        self.assertIn("Review the condition at the referenced policy source", gap_section)
+        self.assertIn("aws_iam_role.orders_task", gap_section)
+        self.assertIn("inline_policy.0.policy", gap_section)
+        self.assertIn("&lt;script&gt;secret&lt;/script&gt;", gap_section)
+        self.assertNotIn("<script>secret</script>", response.text)
+        self.assertNotIn("finding-high", gap_section)
+
+    def test_zero_gap_report_does_not_claim_every_operation_was_assessed(self) -> None:
+        with mock.patch.object(
+            dashboard_app.state.engine, "analyze_plan", return_value=_dashboard_gap_result(include_gap=False)
+        ):
+            response = self.client.post(
+                "/analyze",
+                files={"plan": ("plan.json", b"{}", "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        gap_section = response.text.split('id="analysis-gaps"', 1)[1].split('class="content-grid"', 1)[0]
+        gap_text = " ".join(gap_section.split())
+        self.assertIn("No operation gaps were reported by the 1 analysis family that ran.", gap_text)
+        self.assertIn("This does not establish complete authorization coverage.", gap_section)
+        self.assertNotIn("relevant modeled relationships remain unassessed", gap_section)
+
+    def test_filtered_findings_do_not_hide_remaining_operation_gaps(self) -> None:
+        result = _dashboard_gap_result()
+        result.filter_summary = {
+            "total_findings": 1,
+            "active_findings": 0,
+            "suppressed_findings": 1,
+            "baselined_findings": 0,
+            "suppressions_path": None,
+            "baseline_path": None,
+        }
+        with mock.patch.object(dashboard_app.state.engine, "analyze_plan", return_value=result):
+            response = self.client.post(
+                "/analyze",
+                files={"plan": ("plan.json", b"{}", "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        gap_section = response.text.split('id="analysis-gaps"', 1)[1].split('class="content-grid"', 1)[0]
+        self.assertIn("No active security findings remain after filtering", gap_section)
+        self.assertIn("relevant modeled relationships remain unassessed", gap_section)
+        self.assertNotIn("No security findings were recorded", gap_section)
+
+    def test_legacy_report_without_gap_field_shows_coverage_unavailable(self) -> None:
+        payload = deepcopy(dashboard_routes.API_REPORT_EXAMPLE)
+        payload.pop("operation_gaps")
+
+        context = dashboard_view_models._operation_gap_context(payload)
+
+        self.assertEqual(context["operation_gap_count"], "—")
+        self.assertFalse(context["operation_gap_data_available"])
+        self.assertEqual(context["operation_gap_resources"], [])
 
     def test_api_docs_hide_topbar_and_schema_models(self) -> None:
         response = self.client.get("/api/docs")
