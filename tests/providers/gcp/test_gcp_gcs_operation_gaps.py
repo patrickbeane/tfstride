@@ -96,6 +96,41 @@ class GcpGcsOperationGapTests(unittest.TestCase):
         unrelated.values["member"] = "serviceAccount:unrelated@example.com"
         self.assertEqual(collect_gcs_operation_gaps(_normalize([_cloud_run(), _bucket(), unrelated])).records, ())
 
+    def test_unresolved_ancestor_scope_retains_known_bucket_delete_operation(self):
+        for role in ("roles/storage.admin", "roles/storage.editor"):
+            with self.subTest(role=role):
+                grant = _grant(scope="folders/100", role=role)
+                missing = collect_gcs_operation_gaps(_normalize([_cloud_run(), _bucket(), grant]))
+                self.assertEqual({gap.reason_code for gap in missing.records}, {"grant_ancestry_unresolved"})
+                self.assertEqual(
+                    {(gap.family, gap.operation) for gap in missing.records if gap.family == GCS_BUCKET_TOPOLOGY},
+                    {(GCS_BUCKET_TOPOLOGY, "storage.buckets.delete")},
+                )
+                self.assertTrue(all(gap.target_address == _BUCKET_ADDRESS for gap in missing.records))
+                if role == "roles/storage.admin":
+                    self.assertIn("storage.objects.create", {gap.operation for gap in missing.records})
+                denied = collect_gcs_operation_gaps(
+                    _normalize(
+                        [
+                            _cloud_run(),
+                            _bucket(),
+                            _grant(scope="folders/100", role=role),
+                            _deny(permission="storage.googleapis.com/buckets.delete"),
+                        ]
+                    )
+                )
+                self.assertNotIn(GCS_BUCKET_TOPOLOGY, {gap.family for gap in denied.records})
+                if role == "roles/storage.admin":
+                    self.assertIn("storage.objects.create", {gap.operation for gap in denied.records})
+                resolved = collect_gcs_operation_gaps(
+                    _normalize([_cloud_run(), _bucket(), *_hierarchy(), _grant(scope="folders/100", role=role)])
+                )
+                self.assertEqual(resolved.records, ())
+                unrelated = collect_gcs_operation_gaps(
+                    _normalize([_cloud_run(), _bucket(), *_hierarchy(), _grant(scope="folders/999", role=role)])
+                )
+                self.assertEqual(unrelated.records, ())
+
     def test_unknown_deny_is_local_to_its_permission_and_known_deny_is_quiet(self):
         base = [_cloud_run(), _bucket(), _bucket_iam_member(role="roles/storage.objectAdmin")]
         unknown = _deny(

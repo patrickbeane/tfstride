@@ -237,7 +237,7 @@ def _binding_gaps(
             "roles/owner",
         }:
             return  # Inherited basic-role semantics are a standing model limitation.
-    if role in {"roles/storage.admin", "roles/storage.editor"} and scope_state is True:
+    if role in {"roles/storage.admin", "roles/storage.editor"} and scope_state is not False:
         permissions = (*permissions, "storage.buckets.delete")
     if scope_state is None:
         if permissions:
