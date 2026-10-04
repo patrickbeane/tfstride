@@ -230,6 +230,13 @@ _BUILT_IN_CONTROL_PLANE_ROLES_BY_ID = {role.role_id.casefold(): role for role in
 _BUILT_IN_CONTROL_PLANE_ROLES_BY_NAME = {role.name.casefold(): role for role in _BUILT_IN_CONTROL_PLANE_ROLES}
 
 
+def is_modeled_arm_builtin_role(role_name: str | None, role_id: str | None) -> bool:
+    """Whether a known ARM role identity has modeled control-plane Actions."""
+    if role_id:
+        return _role_id(role_id) in _BUILT_IN_CONTROL_PLANE_ROLES_BY_ID
+    return bool(role_name and role_name.casefold() in _BUILT_IN_CONTROL_PLANE_ROLES_BY_NAME)
+
+
 @dataclass(frozen=True, slots=True)
 class _RoleResolution:
     role_kind: str
@@ -248,6 +255,7 @@ class AzureArmControlPlaneAuthorityResult:
     state: AzureArmControlPlaneAuthorityState
     grant: AzureArmControlPlaneGrant | None = None
     uncertainties: tuple[str, ...] = ()
+    reason_code: str | None = None
 
 
 def model_arm_control_plane_action_authority(
@@ -265,6 +273,7 @@ def model_arm_control_plane_action_authority(
         return AzureArmControlPlaneAuthorityResult(
             "unknown",
             uncertainties=(f"{assignment.address}: exact ARM target or requested actions are unresolved",),
+            reason_code="target_or_action_unresolved",
         )
 
     facts = azure_facts(assignment)
@@ -292,6 +301,7 @@ def model_arm_control_plane_action_authority(
             uncertainties=(
                 f"{assignment.address}: principal applicability is unresolved for modeled ARM action authority",
             ),
+            reason_code="assignment_principal_unresolved",
         )
     if scope.state != "resolved" or scope.scope_type is None or scope.arm_scope is None:
         return AzureArmControlPlaneAuthorityResult(
@@ -299,11 +309,13 @@ def model_arm_control_plane_action_authority(
             uncertainties=(
                 f"{assignment.address}: assignment scope applicability is unresolved for modeled ARM action authority",
             ),
+            reason_code="assignment_scope_unresolved",
         )
     if role.state not in {"resolved", "modeled_subset"}:
         return AzureArmControlPlaneAuthorityResult(
             "unknown",
             uncertainties=(f"{assignment.address}: control-plane role resolution is {role.state}",),
+            reason_code="role_actions_unresolved",
         )
     if role.assignable_scope_state not in {"resolved", "not_applicable"}:
         return AzureArmControlPlaneAuthorityResult(
@@ -311,6 +323,7 @@ def model_arm_control_plane_action_authority(
             uncertainties=(
                 f"{assignment.address}: custom-role assignable-scope compatibility is {role.assignable_scope_state}",
             ),
+            reason_code="assignable_scope_unresolved",
         )
 
     condition_state = assignment_condition_state(assignment)
@@ -318,6 +331,7 @@ def model_arm_control_plane_action_authority(
         return AzureArmControlPlaneAuthorityResult(
             "unknown",
             uncertainties=(f"{assignment.address}: assignment condition state is {condition_state}",),
+            reason_code="assignment_condition_unresolved",
         )
     if not matched_actions:
         return AzureArmControlPlaneAuthorityResult("not_granted")

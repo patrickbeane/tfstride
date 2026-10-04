@@ -47,5 +47,5 @@ No findings in this severity band.
 
 ## Limitations / Unsupported Resources
 
-- Azure support covers a curated AzureRM set including Storage, Service Bus, Container Registry, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS, networking and public edge, Private Endpoint/DNS-zone-group, diagnostic/Defender, and RBAC/identity posture. Remaining limitations include full Private DNS record correctness, broader RBAC hierarchy, MySQL, runtime application authentication and routing, full AKS node/workload posture, and unsupported platform services; analysis remains plan-local.
+- Azure support covers a curated AzureRM set including Storage, Service Bus, Container Registry, Key Vault, SQL/PostgreSQL, App Service/Function Apps, AKS, networking and public edge, Private Endpoint/DNS-zone-group, diagnostic/Defender, and RBAC/identity posture. Remaining limitations include full Private DNS record correctness, broader RBAC hierarchy, MySQL, runtime application authentication and routing, full AKS node/workload posture, and unsupported platform services; analysis remains plan-local. Azure deny assignments are not evaluated for modeled Blob authorization.
 - The engine reasons over Terraform planned values only and does not validate runtime drift, runtime audit evidence, or post-deployment control-plane activity.

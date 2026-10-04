@@ -25,6 +25,12 @@ def _azure_analysis_indexes(inventory: ResourceInventory) -> AzureAnalysisIndexe
     return build_azure_analysis_indexes(inventory)
 
 
+def _azure_operation_gap_factory(inventory: ResourceInventory):
+    from tfstride.providers.azure.blob_operation_gaps import collect_blob_operation_gaps
+
+    return collect_blob_operation_gaps(inventory)
+
+
 def _azure_boundary_contributor() -> BoundaryContributor:
     from tfstride.providers.azure.boundaries import AzureBoundaryContributor
 
@@ -57,4 +63,5 @@ def azure_provider_plugin() -> ProviderPlugin:
         boundary_contributor_factory=_azure_boundary_contributor,
         observation_factory=observe_azure_posture,
         analysis_index_factory=_azure_analysis_indexes,
+        operation_gap_factory=_azure_operation_gap_factory,
     )

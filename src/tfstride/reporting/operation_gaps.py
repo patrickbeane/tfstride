@@ -181,6 +181,44 @@ _GCP_EXPLANATIONS: dict[str, tuple[str, str]] = {
         "Review the role's included_permissions separately for the affected bucket.",
     ),
 }
+_AZURE_EXPLANATIONS: dict[str, tuple[str, str]] = {
+    "assignment_scope_unresolved": (
+        "This role assignment's scope cannot be established for the modeled storage target.",
+        "Resolve the assignment scope to the storage resource or an ARM ancestor.",
+    ),
+    "assignment_scope_ambiguous": (
+        "This role assignment's scope has multiple possible modeled targets.",
+        "Disambiguate the assignment scope reference before assessing Blob authority.",
+    ),
+    "assignment_principal_unresolved": (
+        "The assignment may apply to this workload identity, but its principal is unresolved.",
+        "Resolve the assignment principal to the workload's managed identity.",
+    ),
+    "role_definition_unavailable": (
+        "The role definition needed to establish storage operations is unavailable.",
+        "Include the exact role definition or review its permissions separately.",
+    ),
+    "role_definition_ambiguous": (
+        "The role reference resolves to multiple modeled definitions.",
+        "Disambiguate the role definition reference before assessing its permissions.",
+    ),
+    "role_data_actions_unresolved": (
+        "The custom role's Blob DataActions or exclusions are unresolved.",
+        "Resolve the role's DataActions and NotDataActions for the affected assignment.",
+    ),
+    "role_actions_unresolved": (
+        "The custom role's container-management Actions or exclusions are unresolved.",
+        "Resolve the role's Actions and NotActions for container deletion.",
+    ),
+    "assignable_scope_unresolved": (
+        "The custom role's assignable scope cannot be checked against this assignment.",
+        "Resolve the role's assignableScopes and the assignment's ARM scope.",
+    ),
+    "assignment_condition_unresolved": (
+        "The assignment condition prevents a definite conclusion for this operation.",
+        "Review the condition against the request context for the affected operation.",
+    ),
+}
 _FALLBACK_EXPLANATION = (
     "The reporting family could not complete this relationship assessment.",
     "Review the referenced evidence locations and the provider's support for this operation and scope.",
@@ -205,7 +243,9 @@ def _serialize_family(family: OperationGapFamily) -> OperationGapFamilyPayload:
 
 
 def _serialize_gap(gap: OperationGap) -> OperationGapPayload:
-    explanations = {"aws": _AWS_EXPLANATIONS, "gcp": _GCP_EXPLANATIONS}.get(gap.family.provider, {})
+    explanations = {"aws": _AWS_EXPLANATIONS, "gcp": _GCP_EXPLANATIONS, "azure": _AZURE_EXPLANATIONS}.get(
+        gap.family.provider, {}
+    )
     explanation, next_step = explanations.get(gap.reason_code, _FALLBACK_EXPLANATION)
     return {
         "family": _serialize_family(gap.family),
