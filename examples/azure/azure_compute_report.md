@@ -30,6 +30,8 @@ This run identified **1 trust boundary** and **3 findings** across **10 normaliz
   - `azure-public-compute-broad-ingress`: `1`
   - `azure-nsg-flow-logs-not-configured`: `2`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

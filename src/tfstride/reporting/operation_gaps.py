@@ -283,6 +283,11 @@ def render_operation_gaps(results: OperationGapResults) -> list[str]:
             f"- {_code(gap['resource_address'])} → {target} ({operation}{scope}): "
             f"{gap['explanation']} Next: {gap['next_step']}"
         )
+        for source in gap["provenance"]:
+            location = source["resource_address"] + "".join(
+                f"[{segment}]" if isinstance(segment, int) else f".{segment}" for segment in source["field_path"]
+            )
+            lines.append(f"  - Evidence location: {_code(location)} ({_code(source['evidence_kind'])})")
     return lines
 
 

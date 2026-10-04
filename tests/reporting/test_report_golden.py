@@ -16,6 +16,7 @@ from tfstride.reporting.report_contract import (
     OperationGapPayload,
     OperationGapProvenancePayload,
     PolicyConditionPayload,
+    ResourceSensitivityPayload,
     SeverityReasoningPayload,
     UnresolvedReferencePayload,
 )
@@ -53,6 +54,7 @@ def _key_schema(payload: dict[str, Any]) -> dict[str, list[str]]:
         "operation_gaps.reporting_families[]": list(OperationGapFamilyPayload.__annotations__),
         "operation_gaps.records[]": list(OperationGapPayload.__annotations__),
         "operation_gaps.records[].provenance[]": list(OperationGapProvenancePayload.__annotations__),
+        "resource_sensitivity": list(ResourceSensitivityPayload.__annotations__),
         "inventory": list(payload["inventory"]),
         "inventory.resources[]": list(resources[0]),
         "inventory.resources[].network_rules[]": list(network_rules[0]),
@@ -94,6 +96,7 @@ def _report_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
             "references": coverage["references"],
         },
         "operation_gaps": payload["operation_gaps"],
+        "resource_sensitivity": payload["resource_sensitivity"],
         "inventory": {
             "provider": payload["inventory"]["provider"],
             "unsupported_resources": payload["inventory"]["unsupported_resources"],

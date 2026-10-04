@@ -34,6 +34,8 @@ This run identified **7 trust boundaries** and **6 findings** across **26 normal
   - `aws-iam-wildcard-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

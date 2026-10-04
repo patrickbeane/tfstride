@@ -33,6 +33,8 @@ This run identified **1 trust boundary** and **5 findings** across **9 normalize
   - `gcp-project-iam-privileged-role`: `1`
   - `gcp-inherited-iam-blast-radius`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `workload-to-data-store`

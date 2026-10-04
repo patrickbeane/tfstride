@@ -29,6 +29,8 @@ This run identified **0 trust boundaries** and **1 finding** across **7 normaliz
 - Findings by rule:
   - `azure-nsg-flow-logs-not-configured`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 No trust boundaries were discovered.

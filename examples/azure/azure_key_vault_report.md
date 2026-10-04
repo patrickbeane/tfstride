@@ -35,6 +35,8 @@ This run identified **1 trust boundary** and **11 findings** across **8 normaliz
   - `azure-key-vault-key-rotation-policy-incomplete`: `1`
   - `azure-diagnostic-settings-missing`: `3`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

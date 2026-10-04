@@ -9,6 +9,7 @@ from tfstride.models import AnalysisResult, Finding, Severity
 from tfstride.reporting.finding_serialization import serialize_evidence, serialize_severity_reasoning
 from tfstride.reporting.operation_gaps import serialize_operation_gaps
 from tfstride.reporting.report_contract import OperationGapPayload
+from tfstride.reporting.resource_sensitivity import serialize_resource_sensitivity
 
 SARIF_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
 SARIF_VERSION = "2.1.0"
@@ -51,7 +52,10 @@ def _build_sarif_log(result: AnalysisResult) -> dict[str, object]:
                         for gap in gaps["records"]
                     ),
                 ],
-                "properties": {"operation_gap_reporting_families": gaps["reporting_families"]},
+                "properties": {
+                    "operation_gap_reporting_families": gaps["reporting_families"],
+                    "resource_sensitivity": serialize_resource_sensitivity(),
+                },
             }
         ],
     }

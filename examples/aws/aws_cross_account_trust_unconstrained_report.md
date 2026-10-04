@@ -30,6 +30,8 @@ This run identified **2 trust boundaries** and **2 findings** across **2 normali
   - `aws-role-trust-expansion`: `1`
   - `aws-role-trust-missing-narrowing`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `admin-to-workload-plane`

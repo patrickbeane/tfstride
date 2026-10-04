@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import unittest
 from copy import deepcopy
+from dataclasses import dataclass, field
 from unittest import mock
 
 from tests.helpers.paths import FIXTURES_DIR
@@ -15,6 +17,9 @@ from tfstride.analysis.operation_gaps import (
     OperationGapResults,
 )
 from tfstride.models import AnalysisResult, ResourceInventory
+from tfstride.reporting.json_report import render_json
+from tfstride.reporting.markdown import render_markdown
+from tfstride.reporting.sarif import render_sarif
 
 FASTAPI_DEPS_AVAILABLE = all(
     importlib.util.find_spec(name) is not None for name in ("fastapi", "httpx2", "jinja2", "multipart")
@@ -180,7 +185,8 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["kind"], "tfstride-report")
-        self.assertEqual(payload["version"], "1.2")
+        self.assertEqual(payload["version"], "1.3")
+        self.assertEqual(payload["resource_sensitivity"]["basis"], "resource_class_assumption")
         self.assertEqual(payload["title"], "Dashboard Test")
         self.assertEqual(payload["analyzed_file"], FIXTURE_PATH.name)
         self.assertEqual(payload["analyzed_path"], FIXTURE_PATH.name)
@@ -321,6 +327,72 @@ class DashboardAppTests(unittest.TestCase):
         self.assertFalse(context["operation_gap_data_available"])
         self.assertEqual(context["operation_gap_resources"], [])
 
+    def test_gap_scope_and_safe_provenance_survive_all_formats_without_internal_values(self) -> None:
+        sentinels = ("POLICY-BODY-PRIVATE", "SECRET-VALUE-PRIVATE", "ARBITRARY-METADATA-PRIVATE")
+
+        @dataclass(frozen=True)
+        class InternalGap(OperationGap):
+            policy_body: str = sentinels[0]
+            secret_value: str = sentinels[1]
+            arbitrary_metadata: dict[str, str] = field(default_factory=lambda: {"raw": sentinels[2]}, compare=False)
+
+        @dataclass(frozen=True)
+        class InternalProvenance(OperationGapProvenance):
+            condition_value: str = sentinels[1]
+
+        result = _dashboard_gap_result()
+        original = result.operation_gaps.records[0]
+        gap = InternalGap(
+            family=original.family,
+            resource_address=original.resource_address,
+            relationship=original.relationship,
+            reason_code=original.reason_code,
+            evidence_state=original.evidence_state,
+            operation=original.operation,
+            target_address=original.target_address,
+            scope=original.scope,
+            provenance=(
+                InternalProvenance(
+                    "aws_iam_role.orders_task",
+                    OperationGapEvidenceKind.POLICY_DOCUMENT,
+                    ("inline_policy", 0, "policy"),
+                ),
+            ),
+        )
+        result.operation_gaps = OperationGapResults((_GAP_FAMILY,), (gap,))
+
+        json_report = render_json(result)
+        markdown = render_markdown(result)
+        sarif = render_sarif(result)
+        with mock.patch.object(dashboard_app.state.engine, "analyze_plan", return_value=result):
+            response = self.client.post(
+                "/analyze",
+                files={"plan": ("plan.json", b"{}", "application/json")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        json_payload = json.loads(json_report)
+        sarif_run = json.loads(sarif)["runs"][0]
+        json_gap = json_payload["operation_gaps"]["records"][0]
+        sarif_gap = sarif_run["results"][0]["properties"]
+        self.assertEqual(sarif_run["properties"]["resource_sensitivity"], json_payload["resource_sensitivity"])
+        self.assertEqual(json_payload["resource_sensitivity"]["basis"], "resource_class_assumption")
+        self.assertEqual(json_payload["resource_sensitivity"]["data_contents_state"], "not_assessed")
+        self.assertIn(json_payload["resource_sensitivity"]["explanation"], markdown)
+        self.assertIn(json_payload["resource_sensitivity"]["explanation"], response.text)
+        self.assertEqual(json_gap["scope"], original.scope)
+        self.assertEqual(sarif_gap["scope"], original.scope)
+        self.assertEqual(sarif_gap["provenance"], json_gap["provenance"])
+        self.assertEqual(json_gap["provenance"][0]["field_path"], ["inline_policy", 0, "policy"])
+        self.assertIn("Evidence location: `aws_iam_role.orders_task.inline_policy[0].policy`", markdown)
+        self.assertIn("arn:aws:s3:::orders/public/", markdown)
+        self.assertIn("inline_policy.0.policy", response.text)
+        self.assertIn("&lt;script&gt;secret&lt;/script&gt;", response.text)
+        for output in (json_report, markdown, sarif, response.text):
+            for sentinel in sentinels:
+                with self.subTest(sentinel=sentinel):
+                    self.assertNotIn(sentinel, output)
+
     def test_api_docs_hide_topbar_and_schema_models(self) -> None:
         response = self.client.get("/api/docs")
 
@@ -377,6 +449,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn('href="#coverage"', response.text)
         self.assertIn("Analysis coverage", response.text)
         self.assertIn("Audit trail for this run", response.text)
+        self.assertIn("Sensitive resource labels are assumptions based on resource class", response.text)
         self.assertIn("aws_cloudwatch_log_group", response.text)
         self.assertIn("aws-database-permissive-ingress", response.text)
 

@@ -158,7 +158,7 @@ Current report identity:
 
 ```text
 kind: "tfstride-report"
-version: "1.2"
+version: "1.3"
 ```
 
 Top-level JSON sections include:
@@ -166,6 +166,8 @@ Top-level JSON sections include:
 * `summary`
 * `filtering`
 * `analysis_coverage`
+* `operation_gaps`
+* `resource_sensitivity` (resource-class assumption; stored contents not assessed)
 * `inventory`
 * `trust_boundaries`
 * `findings`

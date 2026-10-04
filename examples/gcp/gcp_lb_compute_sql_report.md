@@ -30,6 +30,8 @@ This run identified **2 trust boundaries** and **2 findings** across **11 normal
   - `gcp-cloud-sql-zonal-availability`: `1`
   - `gcp-subnetwork-flow-logs-not-configured`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

@@ -34,6 +34,7 @@ from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.reporting.json_report import REPORT_FORMAT_VERSION
 from tfstride.reporting.report_contract import TFSReportPayload
+from tfstride.reporting.resource_sensitivity import serialize_resource_sensitivity
 
 DOCS_CHROME_HIDE_STYLE = """
 <style>
@@ -117,6 +118,7 @@ API_REPORT_EXAMPLE: TFSReportPayload = {
         },
     },
     "operation_gaps": {"reporting_families": [], "records": []},
+    "resource_sensitivity": serialize_resource_sensitivity(),
     "inventory": {"provider": "aws", "unsupported_resources": [], "metadata": {}, "resources": []},
     "trust_boundaries": [],
     "findings": [],

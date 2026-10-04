@@ -4,6 +4,7 @@ from collections import Counter
 
 from tfstride.models import AnalysisResult, Finding, Severity
 from tfstride.reporting.operation_gaps import render_operation_gaps
+from tfstride.reporting.resource_sensitivity import RESOURCE_SENSITIVITY_EXPLANATION
 
 _PROVIDER_DISPLAY_NAMES = {
     "aws": "AWS",
@@ -58,6 +59,7 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"- Baseline file: `{filter_summary['baseline_path']}`")
     lines.extend(["", "## Analysis Coverage", ""])
     lines.extend(_render_analysis_coverage(result))
+    lines.extend(["", RESOURCE_SENSITIVITY_EXPLANATION])
     if result.operation_gaps.records:
         lines.extend(["", "## Analysis Gaps", ""])
         lines.extend(render_operation_gaps(result.operation_gaps))

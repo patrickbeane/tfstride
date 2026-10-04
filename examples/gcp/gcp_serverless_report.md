@@ -32,6 +32,8 @@ This run identified **4 trust boundaries** and **5 findings** across **11 normal
   - `gcp-cloud-functions-public-invoker`: `1`
   - `gcp-public-workload-sensitive-data-access`: `2`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

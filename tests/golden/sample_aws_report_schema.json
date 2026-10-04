@@ -10,6 +10,7 @@
     "filtering",
     "analysis_coverage",
     "operation_gaps",
+    "resource_sensitivity",
     "inventory",
     "trust_boundaries",
     "findings",
@@ -102,6 +103,11 @@
     "resource_address",
     "evidence_kind",
     "field_path"
+  ],
+  "resource_sensitivity": [
+    "basis",
+    "data_contents_state",
+    "explanation"
   ],
   "inventory": [
     "provider",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 try:
     from typing_extensions import TypedDict
@@ -104,6 +104,12 @@ class OperationGapPayload(TypedDict):
 class OperationGapResultsPayload(TypedDict):
     reporting_families: list[OperationGapFamilyPayload]
     records: list[OperationGapPayload]
+
+
+class ResourceSensitivityPayload(TypedDict):
+    basis: Literal["resource_class_assumption"]
+    data_contents_state: Literal["not_assessed"]
+    explanation: str
 
 
 class SecurityGroupRulePayload(TypedDict):
@@ -224,6 +230,7 @@ class TFSReportPayload(TypedDict):
     inventory: InventoryPayload
     analysis_coverage: AnalysisCoveragePayload
     operation_gaps: OperationGapResultsPayload
+    resource_sensitivity: ResourceSensitivityPayload
     inventory: InventoryPayload
     trust_boundaries: list[TrustBoundaryPayload]
     findings: list[FindingPayload]

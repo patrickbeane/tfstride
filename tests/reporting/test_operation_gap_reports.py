@@ -209,7 +209,7 @@ class OperationGapReportTests(unittest.TestCase):
         self.assertIn("2 modeled relationships could not be fully assessed", markdown)
         self.assertIn("`s3:PutObject`", markdown)
         self.assertIn(f"`{_BUCKET_ARN}/public/*`", markdown)
-        self.assertNotIn("aws_iam_role.orders_task.permissions_boundary", markdown)
+        self.assertIn("aws_iam_role.orders_task.permissions_boundary", markdown)
         self.assertLess(markdown.index("## Analysis Gaps"), markdown.index("## Findings"))
         self.assertNotIn("s3:GetObject", markdown)
 

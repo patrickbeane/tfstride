@@ -66,6 +66,7 @@ class MarkdownReportTests(unittest.TestCase):
         self.assertIn("# tfSTRIDE Threat Model Report", report)
         self.assertIn("## Summary", report)
         self.assertIn("## Analysis Coverage", report)
+        self.assertIn("Sensitive resource labels are assumptions based on resource class", report)
         self.assertIn("## Discovered Trust Boundaries", report)
         self.assertIn("## Findings", report)
         self.assertIn("### High", report)
@@ -220,6 +221,8 @@ class SarifReportTests(unittest.TestCase):
 
         run = payload["runs"][0]
         self.assertEqual(run["tool"]["driver"]["name"], "tfstride")
+        self.assertEqual(run["properties"]["resource_sensitivity"]["basis"], "resource_class_assumption")
+        self.assertEqual(run["properties"]["resource_sensitivity"]["data_contents_state"], "not_assessed")
         self.assertTrue(run["tool"]["driver"]["rules"])
         self.assertEqual(len(run["results"]), len(result.findings))
 
@@ -375,6 +378,8 @@ class JsonReportTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["active_findings"], 15)
         self.assertEqual(payload["summary"]["total_findings"], 15)
         self.assertEqual(payload["inventory"]["provider"], "aws")
+        self.assertEqual(payload["resource_sensitivity"]["basis"], "resource_class_assumption")
+        self.assertEqual(payload["resource_sensitivity"]["data_contents_state"], "not_assessed")
         self.assertEqual(len(payload["findings"]), 15)
         self.assertTrue(payload["findings"][0]["fingerprint"].startswith("sha256:"))
 
@@ -428,6 +433,7 @@ class JsonReportTests(unittest.TestCase):
                 "filtering",
                 "analysis_coverage",
                 "operation_gaps",
+                "resource_sensitivity",
                 "inventory",
                 "trust_boundaries",
                 "findings",

@@ -62,6 +62,10 @@
       {% endfor %}
     </div>
 
+    {% if payload.resource_sensitivity is defined %}
+      <p class="coverage-assumption">{{ payload.resource_sensitivity.explanation }}</p>
+    {% endif %}
+
     <div class="coverage-detail-grid">
       <section class="coverage-detail">
         <h3>Resource coverage</h3>

@@ -70,6 +70,8 @@ This run identified **9 trust boundaries** and **45 findings** across **31 norma
   - `gcp-inherited-iam-blast-radius`: `1`
   - `gcp-public-workload-sensitive-data-access`: `3`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

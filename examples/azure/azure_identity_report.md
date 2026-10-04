@@ -33,6 +33,8 @@ This run identified **1 trust boundary** and **5 findings** across **13 normaliz
   - `azure-public-workload-sensitive-resource-access`: `1`
   - `azure-diagnostic-settings-missing`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

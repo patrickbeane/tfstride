@@ -37,6 +37,8 @@ This run identified **1 trust boundary** and **7 findings** across **3 normalize
   - `azure-storage-account-missing-private-endpoint`: `1`
   - `azure-diagnostic-settings-missing`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

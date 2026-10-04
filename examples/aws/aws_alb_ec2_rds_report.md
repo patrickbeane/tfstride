@@ -32,6 +32,8 @@ This run identified **4 trust boundaries** and **4 findings** across **19 normal
   - `aws-vpc-flow-logs-not-configured`: `1`
   - `aws-private-data-transitive-exposure`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

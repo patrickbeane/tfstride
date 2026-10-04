@@ -38,6 +38,8 @@ This run identified **6 trust boundaries** and **12 findings** across **23 norma
   - `aws-workload-role-sensitive-permissions`: `1`
   - `aws-private-data-transitive-exposure`: `2`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`

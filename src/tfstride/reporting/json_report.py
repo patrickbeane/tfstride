@@ -33,9 +33,10 @@ from tfstride.reporting.report_contract import (
     TFSReportPayload,
     TrustBoundaryPayload,
 )
+from tfstride.reporting.resource_sensitivity import serialize_resource_sensitivity
 
 REPORT_KIND = "tfstride-report"
-REPORT_FORMAT_VERSION = "1.2"
+REPORT_FORMAT_VERSION = "1.3"
 
 
 def render_json(result: AnalysisResult) -> str:
@@ -80,6 +81,7 @@ def build_json_report_payload(result: AnalysisResult) -> TFSReportPayload:
         "filtering": dict(filter_summary),
         "analysis_coverage": _serialize_analysis_coverage(result),
         "operation_gaps": serialize_operation_gaps(result.operation_gaps),
+        "resource_sensitivity": serialize_resource_sensitivity(),
         "inventory": _serialize_inventory(result.inventory),
         "trust_boundaries": [
             _serialize_trust_boundary(boundary)

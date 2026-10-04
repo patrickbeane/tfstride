@@ -49,6 +49,8 @@ This run identified **3 trust boundaries** and **24 findings** across **15 norma
   - `azure-aks-defender-not-enabled`: `1`
   - `azure-aks-azure-policy-not-enabled`: `1`
 
+Sensitive resource labels are assumptions based on resource class. tfSTRIDE does not assess stored data contents from the plan.
+
 ## Discovered Trust Boundaries
 
 ### `internet-to-service`
