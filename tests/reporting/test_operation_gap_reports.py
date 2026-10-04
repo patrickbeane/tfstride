@@ -29,6 +29,7 @@ from tfstride.models import AnalysisResult, NormalizedResource, ResourceCategory
 from tfstride.reporting.json_report import build_json_report_payload, render_json
 from tfstride.reporting.markdown import render_markdown
 from tfstride.reporting.operation_gaps import serialize_operation_gaps
+from tfstride.reporting.sarif import SARIF_ANALYSIS_GAP_RULE_ID, render_sarif
 
 _FAMILY = OperationGapFamily("aws", "ecs_s3_mutation")
 _POLICY_SENTINEL = "POLICY-BODY-SENTINEL-never-in-gaps"
@@ -113,6 +114,77 @@ def _analyze(statements, *, boundary=False, missing_policy=False) -> AnalysisRes
 
 
 class OperationGapReportTests(unittest.TestCase):
+    def test_sarif_reports_gap_as_severity_free_review_separate_from_findings(self):
+        gap = _gap()
+        result = _result(OperationGapResults((_FAMILY,), (gap,)))
+        run = json.loads(render_sarif(result))["runs"][0]
+
+        self.assertEqual(result.findings, [])
+        self.assertEqual(
+            run["properties"]["operation_gap_reporting_families"], [{"provider": "aws", "name": _FAMILY.name}]
+        )
+        self.assertEqual(len(run["tool"]["driver"]["rules"]), 1)
+        rule = run["tool"]["driver"]["rules"][0]
+        self.assertEqual(rule["id"], SARIF_ANALYSIS_GAP_RULE_ID)
+        self.assertEqual(rule["defaultConfiguration"], {"level": "none"})
+        self.assertEqual(rule["properties"]["tags"], ["analysis-gap", "coverage"])
+
+        self.assertEqual(len(run["results"]), 1)
+        diagnostic = run["results"][0]
+        self.assertEqual(diagnostic["ruleId"], SARIF_ANALYSIS_GAP_RULE_ID)
+        self.assertEqual(diagnostic["ruleIndex"], 0)
+        self.assertEqual(diagnostic["kind"], "review")
+        self.assertEqual(diagnostic["level"], "none")
+        self.assertNotIn("severity", diagnostic)
+        self.assertNotIn("severity", diagnostic["properties"])
+        self.assertNotIn("stride_category", diagnostic["properties"])
+        self.assertIn("Could not assess s3:PutObject", diagnostic["message"]["text"])
+        self.assertIn("A policy condition affecting this operation", diagnostic["message"]["text"])
+        self.assertEqual(diagnostic["locations"][0]["physicalLocation"]["artifactLocation"]["uri"], "plan.json")
+        self.assertEqual(diagnostic["locations"][0]["logicalLocations"][0]["fullyQualifiedName"], gap.resource_address)
+        self.assertEqual(
+            diagnostic["relatedLocations"][0]["logicalLocations"][0]["fullyQualifiedName"], gap.target_address
+        )
+        properties = diagnostic["properties"]
+        self.assertEqual(properties["result_type"], "analysis_gap")
+        self.assertEqual(properties["family"], {"provider": "aws", "name": _FAMILY.name})
+        for key in (
+            "resource_address",
+            "relationship",
+            "operation",
+            "target_address",
+            "scope",
+            "reason_code",
+            "evidence_state",
+            "provenance",
+        ):
+            self.assertEqual(properties[key], serialize_operation_gaps(result.operation_gaps)["records"][0][key])
+
+    def test_sarif_retains_findings_and_gaps_as_distinct_results(self):
+        from tests.helpers.paths import FIXTURES_DIR
+
+        finding_result = TfStride().analyze_plan(FIXTURES_DIR / "aws" / "sample_aws_plan.json")
+        finding_count = len(finding_result.findings)
+        finding_result.operation_gaps = OperationGapResults((_FAMILY,), (_gap(),))
+        run = json.loads(render_sarif(finding_result))["runs"][0]
+
+        self.assertEqual(len(run["results"]), finding_count + 1)
+        self.assertEqual(run["results"][-1]["ruleId"], SARIF_ANALYSIS_GAP_RULE_ID)
+        self.assertEqual(run["results"][-1]["ruleIndex"], len(run["tool"]["driver"]["rules"]) - 1)
+        self.assertTrue(all(item["ruleId"] != SARIF_ANALYSIS_GAP_RULE_ID for item in run["results"][:-1]))
+        self.assertTrue(all(item["level"] in {"error", "warning", "note"} for item in run["results"][:-1]))
+
+    def test_sarif_preserves_missing_operation_and_target_without_inventing_associations(self):
+        gap = replace(_gap(), operation=None, target_address=None, scope=None)
+        run = json.loads(render_sarif(_result(OperationGapResults((_FAMILY,), (gap,)))))["runs"][0]
+        diagnostic = run["results"][0]
+
+        self.assertNotIn("relatedLocations", diagnostic)
+        self.assertEqual(diagnostic["properties"]["relationship"], gap.relationship)
+        self.assertIsNone(diagnostic["properties"]["operation"])
+        self.assertIsNone(diagnostic["properties"]["target_address"])
+        self.assertIsNone(diagnostic["properties"]["scope"])
+
     def test_zero_findings_and_zero_unresolved_references_still_explain_boundary_gap(self):
         result = _analyze([_statement("Allow", "s3:PutObject", f"{_BUCKET_ARN}/public/*")], boundary=True)
         payload = json.loads(render_json(apply_finding_filters(result)))
@@ -176,6 +248,12 @@ class OperationGapReportTests(unittest.TestCase):
         )
         self.assertNotIn("## Analysis Gaps", render_markdown(absent))
         self.assertNotIn("## Analysis Gaps", render_markdown(ran))
+        for result, expected_families in ((absent, []), (ran, [{"provider": "aws", "name": _FAMILY.name}])):
+            with self.subTest(result=result):
+                run = json.loads(render_sarif(result))["runs"][0]
+                self.assertEqual(run["results"], [])
+                self.assertEqual(run["tool"]["driver"]["rules"], [])
+                self.assertEqual(run["properties"]["operation_gap_reporting_families"], expected_families)
 
     def test_unknown_reason_or_provider_has_safe_generic_explanation(self):
         for gap in (
@@ -197,6 +275,7 @@ class OperationGapReportTests(unittest.TestCase):
         reordered = OperationGapResults((_FAMILY, _FAMILY), (other, first))
         self.assertEqual(render_json(_result(results)), render_json(_result(reordered)))
         self.assertEqual(render_markdown(_result(results)), render_markdown(_result(reordered)))
+        self.assertEqual(render_sarif(_result(results)), render_sarif(_result(reordered)))
         payload = serialize_operation_gaps(results)
         self.assertEqual(len(payload["records"]), 2)
         payload["records"][0]["provenance"][0]["field_path"].append("mutated")
@@ -223,7 +302,7 @@ class OperationGapReportTests(unittest.TestCase):
             provenance=(InternalProvenance("aws_iam_role.orders_task", OperationGapEvidenceKind.POLICY_DOCUMENT),),
         )
         result = _result(OperationGapResults((_FAMILY,), (gap,)))
-        for rendered in (render_json(result), render_markdown(result)):
+        for rendered in (render_json(result), render_markdown(result), render_sarif(result)):
             for sentinel in (_POLICY_SENTINEL, _SECRET_SENTINEL, _METADATA_SENTINEL):
                 with self.subTest(sentinel=sentinel):
                     self.assertNotIn(sentinel, rendered)
@@ -275,6 +354,7 @@ class OperationGapReportTests(unittest.TestCase):
                 self.assertIn(sentinel, json.dumps(payload["inventory"]))
                 self.assertNotIn(sentinel, json.dumps(payload["operation_gaps"]))
                 self.assertNotIn(sentinel, render_markdown(result))
+                self.assertNotIn(sentinel, render_sarif(result))
         self.assertIn("intended request context", payload["operation_gaps"]["records"][0]["next_step"])
 
     def test_markdown_keeps_scope_and_resource_markup_literal(self):
