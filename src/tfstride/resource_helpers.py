@@ -19,7 +19,7 @@ def policy_allows_public_access(policy_document: Mapping[str, Any] | None) -> bo
     for statement in raw_statements:
         if not isinstance(statement, Mapping):
             continue
-        if str(statement.get("Effect", "Allow")) != "Allow":
+        if statement.get("Effect") != "Allow":
             continue
         if _principal_allows_public_access(statement.get("Principal")):
             return True
