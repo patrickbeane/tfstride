@@ -51,6 +51,37 @@ def _terraform_resource(
 
 
 class ProviderInventoryPipelineTests(unittest.TestCase):
+    def test_decoration_sets_identity_before_inventory_indexes_are_sealed(self) -> None:
+        source = _terraform_resource(f"{_SUPPORTED_TYPE}.example", _SUPPORTED_TYPE)
+
+        def normalize_resource(resource: TerraformResource) -> NormalizedResource:
+            return NormalizedResource(
+                address=resource.address,
+                provider=_PROVIDER,
+                resource_type=resource.resource_type,
+                name=resource.name,
+                category=ResourceCategory.DATA,
+            )
+
+        def decorate_resources(resources: list[NormalizedResource]) -> None:
+            resources[0].identifier = "decorated-id"
+            resources[0].arn = "arn:example:decorated-id"
+
+        inventory = normalize_provider_inventory(
+            [source],
+            provider=_PROVIDER,
+            owns_resource=lambda resource: True,
+            resource_normalizers={_SUPPORTED_TYPE: normalize_resource},
+            decorate_resources=decorate_resources,
+        )
+
+        decorated = inventory.resources[0]
+        self.assertIs(inventory.get_by_address(source.address), decorated)
+        self.assertIs(inventory.get_by_identifier("decorated-id"), decorated)
+        self.assertIs(inventory.get_by_identifier("arn:example:decorated-id"), decorated)
+        with self.assertRaisesRegex(AttributeError, "identifier"):
+            decorated.identifier = "late-id"
+
     def test_pipeline_runs_provider_neutral_inventory_workflow_in_order(self) -> None:
         first = _terraform_resource(
             f"{_SUPPORTED_TYPE}.zeta",

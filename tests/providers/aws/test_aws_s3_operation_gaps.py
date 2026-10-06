@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from tests.helpers.inventory import inventory_with_updated_identity
 from tests.providers.aws.test_aws_ecs_s3_access_paths import (
     _BUCKET_ARN,
     _TASK_ROLE_ARN,
@@ -481,7 +482,7 @@ class AwsS3OperationGapTests(unittest.TestCase):
 
     def test_unresolved_bucket_identity_is_quiet_under_a_global_deny(self):
         inventory = AwsNormalizer().normalize(_resources(actions="s3:PutObject", resource="*"))
-        _resource(inventory, "aws_s3_bucket.orders").arn = None
+        inventory = inventory_with_updated_identity(inventory, _resource(inventory, "aws_s3_bucket.orders"), arn=None)
         self.assertEqual(
             {gap.reason_code for gap in collect_s3_operation_gaps(inventory).records}, {"target_arn_unresolved"}
         )

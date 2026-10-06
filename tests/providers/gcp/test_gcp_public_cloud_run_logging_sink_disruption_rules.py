@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tests.helpers.inventory import inventory_with_updated_identity
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
     _CUSTOM_ROLE_ADDRESS,
     _DENY_DELETE_SINK,
@@ -199,8 +200,10 @@ class GcpPublicCloudRunLoggingSinkDisruptionRuleTests(unittest.TestCase):
             [_RULE_ID],
         )
 
-        role.identifier = None
-        role_facts.set(GcpResourceMetadata.NAME, None)
+        inventory = inventory_with_updated_identity(inventory, role, identifier=None)
+        updated_role = inventory.get_by_address(_CUSTOM_ROLE_ADDRESS)
+        assert updated_role is not None
+        gcp_facts(updated_role).set(GcpResourceMetadata.NAME, None)
 
         self.assertEqual(_evaluate_inventory(inventory), [])
 

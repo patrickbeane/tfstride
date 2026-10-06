@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
+from tests.helpers.inventory import inventory_with_resources
 from tests.providers.azure.test_azure_app_service_service_bus_access_paths import (
     _QUEUE_ID,
     _TOPIC_ID,
@@ -304,7 +305,7 @@ class AzurePublicAppServiceServiceBusTopologyDisruptionRuleTests(unittest.TestCa
         )
         lock = lock_inventory.get_by_address("azurerm_management_lock.topology_lock")
         assert lock is not None
-        inventory.resources = (*inventory.resources, lock)
+        inventory = inventory_with_resources(inventory, (*inventory.resources, lock))
 
         _inventory, stale_findings = _evaluate_inventory(inventory)
         self.assertEqual(stale_findings, [])

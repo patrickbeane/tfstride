@@ -6,6 +6,7 @@ from dataclasses import replace
 from types import MappingProxyType
 from unittest.mock import patch
 
+from tests.helpers.inventory import inventory_with_resources
 from tests.helpers.paths import FIXTURES_DIR
 from tests.providers.aws.test_aws_ecs_forwarding_associations import _rule as _listener_rule
 from tests.providers.aws.test_aws_ecs_public_ingress import _get, _plan_resources, _resources, _rule
@@ -151,8 +152,11 @@ class AwsEcsIngressBoundarySupportTests(unittest.TestCase):
     def test_repreparation_discards_stale_ingress_support(self) -> None:
         prepared = _prepare(_resources())
         inventory = prepared.inventory
-        inventory.resources = [item for item in inventory.resources if item.resource_type != "aws_lb_listener"]
-        refreshed = _prepare_inventory(inventory)
+        refreshed_inventory = inventory_with_resources(
+            inventory,
+            (item for item in inventory.resources if item.resource_type != "aws_lb_listener"),
+        )
+        refreshed = _prepare_inventory(refreshed_inventory)
         self.assertEqual(len(_assessed_support(prepared)), 1)
         self.assertEqual(_assessed_support(refreshed), ())
 

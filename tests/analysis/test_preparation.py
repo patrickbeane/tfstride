@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 from unittest.mock import Mock
 
+from tests.helpers.inventory import inventory_with_resources
 from tfstride.analysis.boundaries.types import BoundaryContributionContext
 from tfstride.analysis.preparation import prepare_analysis
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -57,15 +59,20 @@ class AnalysisPreparationTests(unittest.TestCase):
             provider_boundary_contributor_factories=(),
         )
 
-        role.arn = "arn:aws:iam::111122223333:role/after"
-        security_group.identifier = "sg-after"
+        updated_role = replace(role, arn="arn:aws:iam::111122223333:role/after", metadata=role.metadata_snapshot())
+        updated_security_group = replace(
+            security_group,
+            identifier="sg-after",
+            metadata=security_group.metadata_snapshot(),
+        )
         web.security_group_ids = ("sg-after",)
         admin.security_group_ids = ("sg-after",)
         web.public_exposure = False
         web.direct_internet_reachable = False
 
+        updated_inventory = inventory_with_resources(inventory, [updated_role, updated_security_group, web, admin])
         after = prepare_analysis(
-            inventory,
+            updated_inventory,
             rule_set=rule_set,
             provider_extension_factory=extension_factory,
             provider_boundary_contributor_factories=(),
@@ -73,18 +80,18 @@ class AnalysisPreparationTests(unittest.TestCase):
 
         self.assertEqual(extension_factory.call_count, 2)
         self.assertIs(before.inventory, inventory)
-        self.assertIs(after.inventory, inventory)
+        self.assertIs(after.inventory, updated_inventory)
         self.assertIs(before.rule_set, rule_set)
         self.assertIs(after.rule_set, rule_set)
         self.assertIsNot(before, after)
         self.assertIsNot(before.indexes, after.indexes)
         self.assertIsNot(before.boundaries, after.boundaries)
         self.assertIs(before.indexes.role_index.unique_candidate("arn:aws:iam::111122223333:role/before"), role)
-        self.assertIsNone(before.indexes.role_index.unique_candidate(role.arn))
+        self.assertIsNone(before.indexes.role_index.unique_candidate(updated_role.arn))
         self.assertIsNone(after.indexes.role_index.unique_candidate("arn:aws:iam::111122223333:role/before"))
-        self.assertIs(after.indexes.role_index.unique_candidate(role.arn), role)
+        self.assertIs(after.indexes.role_index.unique_candidate(updated_role.arn), updated_role)
         self.assertIsNone(after.indexes.security_groups_by_reference.unique_candidate("sg-before"))
-        self.assertIs(after.indexes.security_groups_by_reference.unique_candidate("sg-after"), security_group)
+        self.assertIs(after.indexes.security_groups_by_reference.unique_candidate("sg-after"), updated_security_group)
         self.assertEqual(before.indexes.public_workloads_by_security_group["sg-before"], (web, admin))
         self.assertEqual(after.indexes.resources_by_security_group["sg-after"], (web, admin))
         self.assertEqual(after.indexes.public_workloads_by_security_group["sg-after"], (admin,))
@@ -97,7 +104,7 @@ class AnalysisPreparationTests(unittest.TestCase):
         )
         self.assertIs(
             after_extension.security_group_relationships.resource_index.security_groups.get("sg-after", source=web),
-            security_group,
+            updated_security_group,
         )
         self.assertEqual([boundary.target for boundary in before.boundaries], [web.address, admin.address])
         self.assertEqual([boundary.target for boundary in after.boundaries], [admin.address])

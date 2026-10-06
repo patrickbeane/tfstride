@@ -19,6 +19,7 @@ from tfstride.resource_metadata import (
 _MetadataValue = TypeVar("_MetadataValue")
 _MetadataKey = str | MetadataField[Any]
 UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
+_INDEXED_RESOURCE_IDENTITY_FIELDS = frozenset({"address", "provider", "resource_type", "identifier", "arn"})
 
 
 def _coerce_reference_values(value: Any) -> list[str]:
@@ -344,7 +345,14 @@ class NormalizedResource:
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
     _metadata_read_view: Mapping[str, Any] = field(init=False, repr=False)
     _decoration_state_frozen: bool = field(default=False, init=False, repr=False)
+    _indexed_identity_sealed: bool = field(default=False, init=False, repr=False, compare=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if getattr(self, "_indexed_identity_sealed", False):
+            if name in _INDEXED_RESOURCE_IDENTITY_FIELDS or (name == "_indexed_identity_sealed" and value is not True):
+                raise AttributeError(f"NormalizedResource.{name} cannot change after inventory indexing.")
+        object.__setattr__(self, name, value)
 
     def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self.subnet_ids = tuple(self.subnet_ids)
@@ -355,6 +363,9 @@ class NormalizedResource:
         self.reference_resolutions = tuple(self.reference_resolutions)
         self._metadata = _normalized_metadata(metadata)
         self._metadata_read_view = MappingProxyType(self._metadata)
+
+    def _seal_indexed_identity(self) -> None:
+        self._indexed_identity_sealed = True
 
     @property
     def display_name(self) -> str:
@@ -561,6 +572,13 @@ class ResourceInventory:
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resources_by_identifier: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resource_positions: dict[int, int] = field(init=False, repr=False, default_factory=dict)
+    _indexed_identity_sealed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if getattr(self, "_indexed_identity_sealed", False):
+            if name in {"provider", "resources"} or (name == "_indexed_identity_sealed" and value is not True):
+                raise AttributeError(f"ResourceInventory.{name} cannot change after inventory indexing.")
+        object.__setattr__(self, name, value)
 
     def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self._metadata = _normalized_metadata(metadata)
@@ -585,6 +603,9 @@ class ResourceInventory:
         self._resources_by_address = resources_by_address
         self._resources_by_identifier = resources_by_identifier
         self._resource_positions = resource_positions
+        for resource in resources:
+            resource._seal_indexed_identity()
+        self._indexed_identity_sealed = True
 
     def _validate_metadata_field_write(self, field: MetadataField[Any]) -> None:
         from tfstride.providers.metadata_ownership import validate_normalized_resource_metadata_write

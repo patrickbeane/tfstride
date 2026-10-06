@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from copy import deepcopy
 
+from tests.helpers.inventory import inventory_with_updated_identity
 from tests.providers.aws.test_aws_ecs_s3_access_paths import _BUCKET_ARN, _statement
 from tests.providers.aws.test_aws_ecs_s3_object_deletion_paths import _bucket_policy, _bucket_statement
 from tests.providers.aws.test_aws_public_ecs_kms_rules import _evaluate_inventory as _evaluate_kms
@@ -162,9 +163,9 @@ class AwsS3PathRevalidationTests(unittest.TestCase):
                 elif gate == "ownership":
                     bucket.provider_config_key = "aws.unresolved"
                 elif gate == "role":
-                    _role(inventory).arn = _FOREIGN_ROLE
+                    inventory = inventory_with_updated_identity(inventory, _role(inventory), arn=_FOREIGN_ROLE)
                 else:
-                    bucket.arn = "arn:aws:s3:::unrelated"
+                    inventory = inventory_with_updated_identity(inventory, bucket, arn="arn:aws:s3:::unrelated")
                 self.assertEqual(_evaluate(inventory), [])
 
     def test_cross_account_grants_must_still_cover_cached_operation_and_scope(self):

@@ -125,6 +125,40 @@ class ResourceInventoryTests(unittest.TestCase):
         with self.assertRaises(AttributeError):
             inventory.resources.append(second)
 
+    def test_indexed_identity_is_sealed_after_inventory_construction(self) -> None:
+        resource = _resource(address="aws_instance.original", resource_type="aws_instance")
+        resource.address = "aws_instance.web"
+        resource.resource_type = "aws_lambda_function"
+        resource.identifier = "function-web"
+        resource.arn = "arn:aws:lambda:us-east-1:111122223333:function:web"
+        inventory = ResourceInventory(provider="aws", resources=[resource])
+
+        for field_name, replacement in (
+            ("address", "aws_instance.changed"),
+            ("provider", "gcp"),
+            ("resource_type", "aws_instance"),
+            ("identifier", "function-changed"),
+            ("arn", "arn:aws:lambda:us-east-1:111122223333:function:changed"),
+        ):
+            with self.subTest(field=field_name):
+                with self.assertRaisesRegex(AttributeError, field_name):
+                    setattr(resource, field_name, replacement)
+
+        with self.assertRaisesRegex(AttributeError, "resources"):
+            inventory.resources = ()
+        with self.assertRaisesRegex(AttributeError, "provider"):
+            inventory.provider = "gcp"
+        with self.assertRaisesRegex(AttributeError, "_indexed_identity_sealed"):
+            resource._indexed_identity_sealed = False
+        with self.assertRaisesRegex(AttributeError, "_indexed_identity_sealed"):
+            inventory._indexed_identity_sealed = False
+
+        self.assertIs(inventory.get_by_address("aws_instance.web"), resource)
+        self.assertIs(inventory.get_by_identifier("function-web"), resource)
+        self.assertIs(inventory.get_by_identifier(resource.arn or ""), resource)
+        self.assertEqual(inventory.by_type("aws_lambda_function"), [resource])
+        self.assertEqual(inventory.resources, (resource,))
+
     def test_primary_account_id_property_defaults_and_setter_use_metadata(self) -> None:
         inventory = ResourceInventory(provider="aws", resources=[])
 

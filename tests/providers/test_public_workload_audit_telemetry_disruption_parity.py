@@ -5,6 +5,7 @@ import unittest
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, cast
 
+from tests.helpers.inventory import inventory_with_resources, inventory_with_updated_identity
 from tests.providers.aws.test_aws_ecs_cloudtrail_audit_telemetry_disruption_paths import (
     _DELETE_TRAIL as AWS_DELETE_TRAIL,
 )
@@ -42,6 +43,9 @@ from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disrupt
     _AUDIT_FILTER as GCP_AUDIT_FILTER,
 )
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
+    _CUSTOM_ROLE_ADDRESS as GCP_CUSTOM_ROLE_ADDRESS,
+)
+from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
     _IAM_ADDRESS as GCP_IAM_ADDRESS,
 )
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
@@ -58,6 +62,9 @@ from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disrupt
 )
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
     _custom_role as gcp_custom_role,
+)
+from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
+    _deny_policy as gcp_deny_policy,
 )
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
     _project_member as gcp_project_member,
@@ -104,6 +111,7 @@ from tfstride.analysis.trust_boundaries import detect_trust_boundaries
 from tfstride.models import Finding, ResourceInventory, StrideCategory, TerraformResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.policy_documents import parse_policy_statement
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 from tfstride.providers.azure.metadata import AzureResourceMetadata
@@ -153,6 +161,7 @@ _GCP_SECURITY_SINK_RESOURCE_NAME = f"projects/{GCP_PROJECT}/sinks/security"
 _AZURE_SECURITY_DIAGNOSTIC_ADDRESS = "azurerm_monitor_diagnostic_setting.security"
 _AZURE_SECURITY_DIAGNOSTIC_STATE_ID = f"{AZURE_WORKLOAD_ID}|security"
 _AZURE_SECURITY_DIAGNOSTIC_ARM_ID = f"{AZURE_WORKLOAD_ID}/providers/Microsoft.Insights/diagnosticSettings/security"
+_AZURE_ROLE_ADDRESS = "azurerm_role_definition.audit_telemetry"
 
 
 def _flatten(groups: tuple[tuple[str, ...], ...]) -> frozenset[str]:
@@ -414,11 +423,79 @@ def _revoke_current_authority(provider: ProviderName, inventory: ResourceInvento
         azure_facts(role).set(AzureResourceMetadata.ROLE_DEFINITION_ACTIONS, [])
 
 
-def _change_current_target_identity(provider: ProviderName, inventory: ResourceInventory) -> None:
+def _apply_current_negative_authorization_control(
+    provider: ProviderName,
+    inventory: ResourceInventory,
+) -> ResourceInventory:
+    if provider == "aws":
+        role = inventory.get_by_address("aws_iam_role.orders_task")
+        assert role is not None
+        role.set_metadata_field(
+            AwsResourceMetadata.IAM_PERMISSIONS_BOUNDARY_ARN,
+            "arn:aws:iam::111122223333:policy/orders-boundary",
+        )
+        role.set_metadata_field(
+            AwsResourceMetadata.IAM_PERMISSIONS_BOUNDARY_STATE,
+            "configured",
+        )
+        return inventory
+    if provider == "gcp":
+        deny_inventory = GcpNormalizer().normalize([gcp_deny_policy()])
+        return inventory_with_resources(inventory, (*inventory.resources, *deny_inventory.resources))
+    role = inventory.get_by_address(_AZURE_ROLE_ADDRESS)
+    assert role is not None
+    azure_facts(role).set(
+        AzureResourceMetadata.ROLE_DEFINITION_NOT_ACTIONS,
+        [AZURE_DELETE_DIAGNOSTIC],
+    )
+    return inventory
+
+
+def _refresh_current_authorization_evidence(
+    provider: ProviderName,
+    inventory: ResourceInventory,
+) -> None:
+    if provider == "aws":
+        role = inventory.get_by_address("aws_iam_role.orders_task")
+        assert role is not None
+        role.policy_statements = (
+            parse_policy_statement(
+                aws_statement(
+                    "Allow",
+                    [AWS_DELETE_TRAIL, "cloudtrail:GetTrail"],
+                    AWS_TRAIL_ARN,
+                )
+            ),
+        )
+        return
+    if provider == "gcp":
+        role = inventory.get_by_address(GCP_CUSTOM_ROLE_ADDRESS)
+        assert role is not None
+        gcp_facts(role).set(
+            GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS,
+            [GCP_DELETE_SINK, "logging.sinks.get"],
+        )
+        return
+    role = inventory.get_by_address(_AZURE_ROLE_ADDRESS)
+    assert role is not None
+    azure_facts(role).set(
+        AzureResourceMetadata.ROLE_DEFINITION_ACTIONS,
+        [
+            AZURE_DELETE_DIAGNOSTIC,
+            "Microsoft.Insights/DiagnosticSettings/Read",
+        ],
+    )
+
+
+def _change_current_target_identity(provider: ProviderName, inventory: ResourceInventory) -> ResourceInventory:
     target = inventory.get_by_address(_TARGET_BY_PROVIDER[provider])
     assert target is not None
     if provider == "aws":
-        target.arn = "arn:aws:cloudtrail:us-east-1:111122223333:trail/replacement"
+        return inventory_with_updated_identity(
+            inventory,
+            target,
+            arn="arn:aws:cloudtrail:us-east-1:111122223333:trail/replacement",
+        )
     elif provider == "gcp":
         gcp_facts(target).set(GcpResourceMetadata.LOGGING_SINK_NAME, "replacement")
     else:
@@ -426,14 +503,15 @@ def _change_current_target_identity(provider: ProviderName, inventory: ResourceI
             AzureResourceMetadata.DIAGNOSTIC_SETTING_ID,
             f"{AZURE_WORKLOAD_ID}|replacement",
         )
+    return inventory
 
 
-def _invalidate_current_target_state(case: str, inventory: ResourceInventory) -> None:
+def _invalidate_current_target_state(case: str, inventory: ResourceInventory) -> ResourceInventory:
     if case == "aws-disabled-trail":
         trail = inventory.get_by_address(_TARGET_BY_PROVIDER["aws"])
         assert trail is not None
         trail.set_metadata_field(AwsResourceMetadata.CLOUDTRAIL_ENABLE_LOGGING_STATE, "disabled")
-        return
+        return inventory
     if case.startswith("gcp-"):
         sink = inventory.get_by_address(_TARGET_BY_PROVIDER["gcp"])
         assert sink is not None
@@ -444,20 +522,30 @@ def _invalidate_current_target_state(case: str, inventory: ResourceInventory) ->
             facts.set(GcpResourceMetadata.LOGGING_SINK_DESTINATION, None)
         elif case == "gcp-irrelevant-filter":
             facts.set(GcpResourceMetadata.LOGGING_SINK_FILTER, "severity>=ERROR")
-        else:
+        elif case == "gcp-audit-token-lookalike":
+            facts.set(
+                GcpResourceMetadata.LOGGING_SINK_FILTER,
+                'jsonPayload.message="cloudaudit.googleapis.com"',
+            )
+        elif case in {
+            "gcp-active-audit-exclusion",
+            "gcp-active-irrelevant-exclusion",
+        }:
             facts.set(
                 GcpResourceMetadata.LOGGING_SINK_EXCLUSIONS,
                 [
                     {
                         "name": "drop-audit",
-                        "filter": GCP_AUDIT_FILTER,
+                        "filter": (GCP_AUDIT_FILTER if case == "gcp-active-audit-exclusion" else "severity=DEBUG"),
                         "filter_state": "configured",
                         "disabled_state": "configured",
                         "disabled": False,
                     }
                 ],
             )
-        return
+        else:
+            raise AssertionError(f"unsupported GCP parity drift case: {case}")
+        return inventory
     diagnostic = inventory.get_by_address(_TARGET_BY_PROVIDER["azure"])
     assert diagnostic is not None
     facts = azure_facts(diagnostic)
@@ -467,11 +555,24 @@ def _invalidate_current_target_state(case: str, inventory: ResourceInventory) ->
         facts.set(AzureResourceMetadata.DIAGNOSTIC_ENABLED_LOG_CATEGORY_GROUPS, [])
         facts.set(AzureResourceMetadata.DIAGNOSTIC_ENABLED_LOG_CATEGORIES, ["AppServiceHTTPLogs"])
         facts.set(AzureResourceMetadata.DIAGNOSTIC_LOG_RECORDS, [{"category": "AppServiceHTTPLogs"}])
-    else:
+    elif case == "azure-audit-category-lookalike":
+        facts.set(AzureResourceMetadata.DIAGNOSTIC_ENABLED_LOG_CATEGORY_GROUPS, [])
+        facts.set(
+            AzureResourceMetadata.DIAGNOSTIC_ENABLED_LOG_CATEGORIES,
+            ["AppServiceAuditLogsArchive"],
+        )
+        facts.set(
+            AzureResourceMetadata.DIAGNOSTIC_LOG_RECORDS,
+            [{"category": "AppServiceAuditLogsArchive"}],
+        )
+    elif case == "azure-new-blocking-lock":
         lock_inventory = AzureNormalizer().normalize(
             [azure_management_lock(scope=AZURE_DIAGNOSTIC_ID, name="audit_parity_lock")]
         )
-        inventory.resources = (*inventory.resources, *lock_inventory.resources)
+        return inventory_with_resources(inventory, (*inventory.resources, *lock_inventory.resources))
+    else:
+        raise AssertionError(f"unsupported Azure parity drift case: {case}")
+    return inventory
 
 
 class PublicWorkloadAuditTelemetryDisruptionParityTests(unittest.TestCase):
@@ -671,6 +772,54 @@ class PublicWorkloadAuditTelemetryDisruptionParityTests(unittest.TestCase):
                     {finding.rule_id for finding in _evaluate_inventory(inventory)},
                 )
 
+    def test_current_negative_authorization_controls_reject_cached_candidates(self) -> None:
+        for provider in _PROVIDERS:
+            with self.subTest(provider=provider):
+                inventory, findings = _analyze(
+                    provider,
+                    _resources(provider, single_operation=True),
+                )
+                self.assertIsNotNone(_finding(findings, provider))
+                cached_paths = _paths(provider, inventory)
+
+                inventory = _apply_current_negative_authorization_control(provider, inventory)
+
+                self.assertEqual(_paths(provider, inventory), cached_paths)
+                self.assertNotIn(
+                    _RULE_BY_PROVIDER[provider],
+                    {finding.rule_id for finding in _evaluate_inventory(inventory)},
+                )
+
+    def test_valid_current_authorization_refresh_preserves_exact_relationship(self) -> None:
+        for provider in _PROVIDERS:
+            with self.subTest(provider=provider):
+                inventory, initial_findings = _analyze(
+                    provider,
+                    _resources(provider, single_operation=True),
+                )
+                self.assertIsNotNone(_finding(initial_findings, provider))
+                cached_paths = _paths(provider, inventory)
+                self.assertEqual(len(cached_paths), 1)
+
+                _refresh_current_authorization_evidence(provider, inventory)
+
+                current_findings = _evaluate_inventory(inventory)
+                finding = _finding(current_findings, provider)
+                self.assertEqual(_paths(provider, inventory), cached_paths)
+                self.assertEqual(finding.category, StrideCategory.REPUDIATION)
+                self.assertEqual(
+                    len(_evidence(finding)[_EVIDENCE_KEY_BY_PROVIDER[provider]]),
+                    1,
+                )
+                self.assertEqual(
+                    finding.affected_resources.count(_TARGET_BY_PROVIDER[provider]),
+                    1,
+                )
+                self.assertEqual(
+                    _finding_payload(_evaluate_inventory(inventory)),
+                    _finding_payload(current_findings),
+                )
+
     def test_changed_current_exact_target_rejects_cached_candidates(self) -> None:
         for provider in _PROVIDERS:
             with self.subTest(provider=provider):
@@ -678,7 +827,7 @@ class PublicWorkloadAuditTelemetryDisruptionParityTests(unittest.TestCase):
                 self.assertIsNotNone(_finding(findings, provider))
                 cached_paths = _paths(provider, inventory)
 
-                _change_current_target_identity(provider, inventory)
+                inventory = _change_current_target_identity(provider, inventory)
 
                 self.assertEqual(_paths(provider, inventory), cached_paths)
                 self.assertNotIn(
@@ -692,9 +841,12 @@ class PublicWorkloadAuditTelemetryDisruptionParityTests(unittest.TestCase):
             ("gcp-disabled-sink", "gcp"),
             ("gcp-missing-destination", "gcp"),
             ("gcp-irrelevant-filter", "gcp"),
+            ("gcp-audit-token-lookalike", "gcp"),
             ("gcp-active-audit-exclusion", "gcp"),
+            ("gcp-active-irrelevant-exclusion", "gcp"),
             ("azure-missing-destination", "azure"),
             ("azure-irrelevant-categories", "azure"),
+            ("azure-audit-category-lookalike", "azure"),
             ("azure-new-blocking-lock", "azure"),
         )
 
@@ -704,7 +856,7 @@ class PublicWorkloadAuditTelemetryDisruptionParityTests(unittest.TestCase):
                 self.assertIsNotNone(_finding(findings, provider))
                 cached_paths = _paths(provider, inventory)
 
-                _invalidate_current_target_state(case, inventory)
+                inventory = _invalidate_current_target_state(case, inventory)
 
                 self.assertEqual(_paths(provider, inventory), cached_paths)
                 self.assertNotIn(
