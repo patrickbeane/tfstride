@@ -188,25 +188,39 @@ class ResourceInventoryTests(unittest.TestCase):
             {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
         )
 
-    def test_metadata_view_does_not_deepcopy_runtime_values(self) -> None:
+    def test_typed_metadata_access_does_not_deepcopy_unrelated_values(self) -> None:
         inventory = ResourceInventory(provider="aws", resources=[])
         value = _RaisesOnDeepcopy()
         inventory._metadata["opaque"] = value
 
-        self.assertIs(inventory.metadata["opaque"], value)
+        inventory.primary_account_id = "111122223333"
+        self.assertEqual(inventory.primary_account_id, "111122223333")
+        self.assertIs(inventory._metadata["opaque"], value)
 
     def test_metadata_view_is_read_only_and_detached(self) -> None:
-        source_metadata = {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}}
+        source_metadata = {
+            "unsupported_resource_types": {"aws_cloudwatch_log_group": 1},
+            "review": {"reviewers": ["security"]},
+        }
         inventory = ResourceInventory(provider="aws", resources=[], metadata=source_metadata)
 
         source_metadata["unsupported_resource_types"]["aws_cloudwatch_log_group"] = 2
+        view = inventory.metadata
         with self.assertRaises(TypeError):
-            inventory.metadata["unsupported_resource_types"] = {"aws_cloudwatch_log_group": 3}
+            view["unsupported_resource_types"] = {"aws_cloudwatch_log_group": 3}
+        view["unsupported_resource_types"]["aws_cloudwatch_log_group"] = 3
+        view["review"]["reviewers"].append("operations")
+        inventory.primary_account_id = "111122223333"
 
         self.assertEqual(
             inventory.metadata,
-            {"unsupported_resource_types": {"aws_cloudwatch_log_group": 1}},
+            {
+                "unsupported_resource_types": {"aws_cloudwatch_log_group": 1},
+                "review": {"reviewers": ["security"]},
+                "primary_account_id": "111122223333",
+            },
         )
+        self.assertNotIn("primary_account_id", view)
 
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
@@ -361,15 +375,17 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         self.assertTrue(resource.has_metadata_value(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
         self.assertFalse(resource.has_metadata_value(ResourceMetadata.VPC_ENABLED))
 
-    def test_metadata_view_does_not_deepcopy_runtime_values(self) -> None:
+    def test_typed_metadata_access_does_not_deepcopy_unrelated_values(self) -> None:
         resource = _resource(address="aws_instance.web", resource_type="aws_instance")
         value = _RaisesOnDeepcopy()
         resource._metadata["opaque"] = value
 
-        self.assertIs(resource.metadata["opaque"], value)
+        resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
+        self.assertTrue(resource.get_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED))
+        self.assertIs(resource._metadata["opaque"], value)
 
     def test_metadata_view_is_read_only_and_detached(self) -> None:
-        source_metadata = {"tags": {"env": "prod"}}
+        source_metadata = {"tags": {"env": "prod", "owners": ["security"]}}
         resource = NormalizedResource(
             address="aws_s3_bucket.logs",
             provider="aws",
@@ -380,10 +396,15 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
         )
 
         source_metadata["tags"]["env"] = "dev"
+        view = resource.metadata
         with self.assertRaises(TypeError):
-            resource.metadata["tags"] = {"env": "test"}
+            view["tags"] = {"env": "test"}
+        view["tags"]["env"] = "test"
+        view["tags"]["owners"].append("operations")
+        resource.set_metadata_field(ResourceMetadata.PUBLIC_ACCESS_CONFIGURED, True)
 
-        self.assertEqual(resource.metadata["tags"], {"env": "prod"})
+        self.assertEqual(resource.metadata["tags"], {"env": "prod", "owners": ["security"]})
+        self.assertNotIn("public_access_configured", view)
 
     def test_metadata_schema_helpers_update_private_metadata(self) -> None:
         resource = _resource(address="aws_iam_role.app", resource_type="aws_iam_role")

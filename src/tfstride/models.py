@@ -343,7 +343,6 @@ class NormalizedResource:
     provider_config_key: str | None = None
     reference_resolutions: tuple[TerraformReferenceResolution, ...] = field(default_factory=tuple)
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
-    _metadata_read_view: Mapping[str, Any] = field(init=False, repr=False)
     _decoration_state_frozen: bool = field(default=False, init=False, repr=False)
     _indexed_identity_sealed: bool = field(default=False, init=False, repr=False, compare=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
@@ -362,7 +361,6 @@ class NormalizedResource:
         self.policy_statements = tuple(self.policy_statements)
         self.reference_resolutions = tuple(self.reference_resolutions)
         self._metadata = _normalized_metadata(metadata)
-        self._metadata_read_view = MappingProxyType(self._metadata)
 
     def _seal_indexed_identity(self) -> None:
         self._indexed_identity_sealed = True
@@ -453,7 +451,7 @@ class NormalizedResource:
             raise RuntimeError("NormalizedResource decoration state is frozen.")
 
     def _metadata_readview(self) -> Mapping[str, Any]:
-        return self._metadata_read_view
+        return MappingProxyType(self.metadata_snapshot())
 
     @property
     def direct_internet_reachable(self) -> bool:
@@ -555,7 +553,7 @@ class NormalizedResource:
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
 NormalizedResource.metadata = property(
     NormalizedResource._metadata_readview,
-    doc="Read-only metadata view. Use typed properties or metadata field helpers to mutate.",
+    doc="Detached read-only metadata view. Use typed properties or metadata field helpers to mutate.",
 )
 
 
@@ -566,7 +564,6 @@ class ResourceInventory:
     unsupported_resources: list[str] = field(default_factory=list)
     plan_time_unknown_resources: int = 0
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
-    _metadata_read_view: Mapping[str, Any] = field(init=False, repr=False)
     metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
@@ -582,7 +579,6 @@ class ResourceInventory:
 
     def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
         self._metadata = _normalized_metadata(metadata)
-        self._metadata_read_view = MappingProxyType(self._metadata)
         resources = tuple(self.resources)
         self.resources = resources
         resources_by_type: dict[str, list[NormalizedResource]] = {}
@@ -614,7 +610,7 @@ class ResourceInventory:
 
     @property
     def primary_account_id(self) -> str | None:
-        return InventoryMetadata.PRIMARY_ACCOUNT_ID.get(self._metadata)
+        return self.get_metadata_field(InventoryMetadata.PRIMARY_ACCOUNT_ID)
 
     @primary_account_id.setter
     def primary_account_id(self, value: str | None) -> None:
@@ -625,8 +621,11 @@ class ResourceInventory:
         """Return a detached metadata copy for serialization boundaries."""
         return deepcopy(self._metadata)
 
+    def get_metadata_field(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
+        return field.get(self._metadata)
+
     def _metadata_readview(self) -> Mapping[str, Any]:
-        return self._metadata_read_view
+        return MappingProxyType(self.metadata_snapshot())
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
         if not resource_types:
@@ -652,7 +651,7 @@ class ResourceInventory:
 # Assign after dataclass generation so InitVar keeps a clean metadata=None default.
 ResourceInventory.metadata = property(
     ResourceInventory._metadata_readview,
-    doc="Read-only metadata view. Use typed properties or metadata_snapshot() for serialization.",
+    doc="Detached read-only metadata view. Use typed properties or metadata_snapshot() for serialization.",
 )
 
 

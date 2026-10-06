@@ -31,9 +31,8 @@ def build_analysis_coverage(
 
 
 def _build_resource_coverage(inventory: ResourceInventory) -> ResourceCoverage:
-    metadata = inventory.metadata
-    total_resources = InventoryMetadata.TOTAL_INPUT_RESOURCES.get(metadata)
-    provider_resources = InventoryMetadata.PROVIDER_RESOURCE_COUNT.get(metadata)
+    total_resources = inventory.get_metadata_field(InventoryMetadata.TOTAL_INPUT_RESOURCES)
+    provider_resources = inventory.get_metadata_field(InventoryMetadata.PROVIDER_RESOURCE_COUNT)
 
     return ResourceCoverage(
         total_resources=total_resources if total_resources is not None else len(inventory.resources),
@@ -41,7 +40,7 @@ def _build_resource_coverage(inventory: ResourceInventory) -> ResourceCoverage:
         normalized_resources=len(inventory.resources),
         unsupported_resources=len(inventory.unsupported_resources),
         plan_time_unknown_resources=inventory.plan_time_unknown_resources,
-        unsupported_resource_types=InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES.get(metadata),
+        unsupported_resource_types=inventory.get_metadata_field(InventoryMetadata.UNSUPPORTED_RESOURCE_TYPES),
     )
 
 
