@@ -10,11 +10,11 @@ from tfstride.models import (
     TerraformReferenceProvenance,
     TerraformReferenceResolutionState,
 )
-from tfstride.providers.aws.ecs_task_role_evidence import task_role_evidence_reference
-from tfstride.providers.aws.reference_resolution import (
-    assess_symbolic_reference,
-    symbolic_reference_target,
+from tfstride.providers.aws.ecs_task_role_evidence import (
+    task_role_evidence_reference,
+    task_role_relationship_is_exact,
 )
+from tfstride.providers.aws.reference_resolution import assess_symbolic_reference
 from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.structured_data_deletion_evidence import (
@@ -163,7 +163,7 @@ def _task_definition_deletion_paths(
                 "not modeled for DynamoDB item-deletion paths"
             ],
         )
-    if not _task_role_relationship_is_exact(
+    if not task_role_relationship_is_exact(
         task_definition,
         task_role,
         context,
@@ -497,7 +497,7 @@ def _source_path_is_current(
     return bool(
         task_role_reference is not None
         and table_reference is not None
-        and _task_role_relationship_is_exact(
+        and task_role_relationship_is_exact(
             task_definition,
             task_role,
             context,
@@ -524,26 +524,6 @@ def _source_path_is_current(
         and path.get("dynamodb_index_arn") is None
         and "exact_table" in _string_values(path.get("resource_scopes"))
     )
-
-
-def _task_role_relationship_is_exact(
-    task_definition: NormalizedResource,
-    task_role: NormalizedResource,
-    context: AwsDecorationContext,
-) -> bool:
-    reference = aws_facts(task_definition).task_role_arn
-    if reference is None:
-        return False
-    if task_role.arn is not None and reference == task_role.arn:
-        return True
-    symbolic = symbolic_reference_target(
-        task_definition,
-        context.index,
-        "task_role_arn",
-        expected_resource_types={_IAM_ROLE},
-        expected_reference_suffixes={".arn"},
-    )
-    return bool(symbolic is not None and symbolic.address == task_role.address and reference == task_role.address)
 
 
 def _task_role_configuration_reference_observed(

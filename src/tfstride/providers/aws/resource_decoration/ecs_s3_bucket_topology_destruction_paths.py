@@ -12,7 +12,10 @@ from tfstride.models import (
     TerraformReferenceResolutionState,
 )
 from tfstride.providers.aws.account_identity import describe_account_relationship
-from tfstride.providers.aws.ecs_task_role_evidence import task_role_evidence_reference
+from tfstride.providers.aws.ecs_task_role_evidence import (
+    task_role_evidence_reference,
+    task_role_relationship_is_exact,
+)
 from tfstride.providers.aws.iam_permissions_boundaries import permissions_boundary_uncertainties
 from tfstride.providers.aws.object_storage_topology_destruction_evidence import (
     AwsEcsS3BucketTopologyDestructionPath,
@@ -174,7 +177,7 @@ def collect_s3_bucket_topology_gaps(
     unresolved_sources: tuple[NormalizedResource, ...] = (),
 ) -> None:
     assert bucket.arn is not None and role.arn is not None
-    if not _task_role_relationship_is_exact(task, role, context):
+    if not task_role_relationship_is_exact(task, role, context):
         gaps.add("runtime_identity_unresolved", operation=_DELETE_BUCKET, bucket=bucket, source=task)
         return
     relationship = context.index.account_identities.relationship(role, bucket)
@@ -270,7 +273,7 @@ def _task_definition_paths(
                 "is not modeled for S3 bucket-deletion paths"
             ],
         )
-    if not _task_role_relationship_is_exact(
+    if not task_role_relationship_is_exact(
         task_definition,
         task_role,
         context,
@@ -1113,26 +1116,6 @@ def _identity_policy_sources(role: NormalizedResource) -> list[str]:
             *facts.attached_policy_addresses,
         ]
     )
-
-
-def _task_role_relationship_is_exact(
-    task_definition: NormalizedResource,
-    task_role: NormalizedResource,
-    context: AwsDecorationContext,
-) -> bool:
-    reference = aws_facts(task_definition).task_role_arn
-    if reference is None:
-        return False
-    if task_role.arn is not None and reference == task_role.arn:
-        return True
-    symbolic = symbolic_reference_target(
-        task_definition,
-        context.index,
-        "task_role_arn",
-        expected_resource_types={_IAM_ROLE},
-        expected_reference_suffixes={".arn"},
-    )
-    return bool(symbolic is not None and symbolic.address == task_role.address and reference == task_role.address)
 
 
 def _task_role_configuration_reference_observed(

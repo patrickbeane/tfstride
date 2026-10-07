@@ -5,7 +5,9 @@ from tfstride.models import (
     TerraformReferenceProvenance,
     TerraformReferenceResolutionState,
 )
+from tfstride.providers.aws.reference_resolution import symbolic_reference_target
 from tfstride.providers.aws.resource_facts import aws_facts
+from tfstride.providers.aws.resource_index import AwsDecorationContext
 
 
 def task_role_evidence_reference(
@@ -28,3 +30,24 @@ def task_role_evidence_reference(
         if target.address == task_role.address and target.reference.endswith(".arn"):
             return target.reference
     return None
+
+
+def task_role_relationship_is_exact(
+    task_definition: NormalizedResource,
+    task_role: NormalizedResource,
+    context: AwsDecorationContext,
+) -> bool:
+    """Check a concrete task-role ARN or a unique symbolic `.arn` target."""
+    reference = aws_facts(task_definition).task_role_arn
+    if reference is None:
+        return False
+    if task_role.arn is not None and reference == task_role.arn:
+        return True
+    symbolic = symbolic_reference_target(
+        task_definition,
+        context.index,
+        "task_role_arn",
+        expected_resource_types={"aws_iam_role"},
+        expected_reference_suffixes={".arn"},
+    )
+    return bool(symbolic is not None and symbolic.address == task_role.address and reference == task_role.address)
