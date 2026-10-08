@@ -18,6 +18,7 @@ AwsCloudTrailAuditTelemetryDisruptionTargetGranularity = Literal[
     "trail_logging_control",
     "trail_configuration",
 ]
+AwsCloudTrailResourceScope = Literal["exact_trail", "trail_pattern"]
 
 
 class AwsCloudTrailAuditTelemetryPolicyStatementEvidenceCommon(TypedDict):
@@ -28,7 +29,7 @@ class AwsCloudTrailAuditTelemetryPolicyStatementEvidenceCommon(TypedDict):
     matching_action_patterns: list[str]
     resources: list[str]
     matching_resources: list[str]
-    resource_scopes: list[Literal["exact_trail"]]
+    resource_scopes: list[AwsCloudTrailResourceScope]
     principals: list[Never]
     principal_match: None
     conditions: list[Never]

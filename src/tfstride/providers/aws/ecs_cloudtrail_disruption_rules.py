@@ -351,7 +351,7 @@ def _authorization_statements_are_coherent(
             statement.get("source_kind") == "identity_policy"
             and statement.get("effect") == "allow"
             and statement.get("matched_actions") == [operation]
-            and statement.get("resource_scopes") == ["exact_trail"]
+            and statement.get("resource_scopes") in (["exact_trail"], ["trail_pattern"])
             and statement.get("principals") == []
             and statement.get("principal_match") is None
             and statement.get("conditions") == []

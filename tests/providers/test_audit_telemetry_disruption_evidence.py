@@ -117,6 +117,17 @@ class AuditTelemetryDisruptionEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(stop_statement_hints["conditions"], list[Never])
 
+    def test_aws_cloudtrail_statement_evidence_distinguishes_grant_breadth(self) -> None:
+        for statement_type in (
+            AwsCloudTrailStopLoggingPolicyStatementEvidence,
+            AwsCloudTrailDeleteTrailPolicyStatementEvidence,
+        ):
+            with self.subTest(statement_type=statement_type.__name__):
+                self.assertEqual(
+                    get_type_hints(statement_type)["resource_scopes"],
+                    list[Literal["exact_trail", "trail_pattern"]],
+                )
+
     def test_aws_path_requires_exact_runtime_same_account_authority(self) -> None:
         hints = get_type_hints(AwsEcsCloudTrailStopLoggingPath)
 
