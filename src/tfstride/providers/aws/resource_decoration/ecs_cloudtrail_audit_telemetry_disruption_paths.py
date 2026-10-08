@@ -47,6 +47,8 @@ _STOP_LOGGING = "cloudtrail:StopLogging"
 _DELETE_TRAIL = "cloudtrail:DeleteTrail"
 _COMPLETE = "complete"
 
+_ResourceApplicability = Literal["exact", "pattern_covers", "not_covered", "unresolved"]
+
 
 @dataclass(frozen=True, slots=True)
 class _OperationDefinition:
@@ -441,7 +443,7 @@ def _identity_policy_matches(
                 context,
                 exact_allow_required=effect == "allow",
             )
-            if applicability is True:
+            if applicability in {"exact", "pattern_covers"}:
                 matches.append(
                     _StatementMatch(
                         statement,
@@ -451,7 +453,7 @@ def _identity_policy_matches(
                         effect,
                     )
                 )
-            elif applicability is None:
+            elif applicability == "unresolved":
                 if effect == "allow":
                     unresolved_allow = True
                 else:
@@ -470,19 +472,19 @@ def _resource_targets_trail(
     context: AwsDecorationContext,
     *,
     exact_allow_required: bool,
-) -> bool | None:
+) -> _ResourceApplicability:
     trail_arn = trail.arn
     normalized = _unwrap_reference(resource)
     if trail_arn is not None and normalized == trail_arn:
-        return True
+        return "exact"
     if normalized.startswith("arn:"):
         if trail_arn is None:
-            return None if _cloudtrail_arn_or_pattern(normalized) else False
+            return "unresolved" if _cloudtrail_arn_or_pattern(normalized) else "not_covered"
         if _has_wildcard(normalized):
             if not fnmatchcase(trail_arn, normalized):
-                return False
-            return None if exact_allow_required else True
-        return False
+                return "not_covered"
+            return "unresolved" if exact_allow_required else "pattern_covers"
+        return "not_covered"
 
     candidates: set[str] = set()
     uncertain = False
@@ -499,15 +501,15 @@ def _resource_targets_trail(
         elif assessment.state == "uncertain":
             uncertain = True
     if uncertain or len(candidates) > 1:
-        return None
+        return "unresolved"
     if candidates:
-        return candidates == {trail.address}
+        return "exact" if candidates == {trail.address} else "not_covered"
 
     if normalized == "*":
-        return None if exact_allow_required else True
+        return "unresolved" if exact_allow_required else "pattern_covers"
     if _has_wildcard(normalized):
-        return None
-    return False
+        return "unresolved"
+    return "not_covered"
 
 
 def _active_lifecycle(
