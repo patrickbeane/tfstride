@@ -17,6 +17,7 @@ from tfstride.providers.aws.audit_telemetry_disruption_evidence import (
     AwsCloudTrailAuditTelemetryPolicyStatementEvidence,
     AwsCloudTrailAuditTelemetryPolicyStatementEvidenceCommon,
     AwsCloudTrailDeleteTrailPolicyStatementEvidence,
+    AwsCloudTrailResourceScope,
     AwsCloudTrailStopLoggingPolicyStatementEvidence,
     AwsEcsCloudTrailAuditTelemetryDisruptionPath,
     AwsEcsCloudTrailAuditTelemetryDisruptionPathCommon,
@@ -83,6 +84,7 @@ class _StatementMatch:
     source_address: str
     matching_action_patterns: tuple[str, ...]
     matching_resource: str
+    resource_scope: AwsCloudTrailResourceScope
     effect: Literal["allow", "deny"]
 
     @property
@@ -441,7 +443,6 @@ def _identity_policy_matches(
                 trail,
                 sources,
                 context,
-                exact_allow_required=effect == "allow",
             )
             if applicability in {"exact", "pattern_covers"}:
                 matches.append(
@@ -450,6 +451,7 @@ def _identity_policy_matches(
                         role.address,
                         action_patterns,
                         resource,
+                        "exact_trail" if applicability == "exact" else "trail_pattern",
                         effect,
                     )
                 )
@@ -470,8 +472,6 @@ def _resource_targets_trail(
     trail: NormalizedResource,
     sources: Sequence[NormalizedResource],
     context: AwsDecorationContext,
-    *,
-    exact_allow_required: bool,
 ) -> _ResourceApplicability:
     trail_arn = trail.arn
     normalized = _unwrap_reference(resource)
@@ -483,7 +483,7 @@ def _resource_targets_trail(
         if _has_wildcard(normalized):
             if not fnmatchcase(trail_arn, normalized):
                 return "not_covered"
-            return "unresolved" if exact_allow_required else "pattern_covers"
+            return "pattern_covers"
         return "not_covered"
 
     candidates: set[str] = set()
@@ -506,7 +506,7 @@ def _resource_targets_trail(
         return "exact" if candidates == {trail.address} else "not_covered"
 
     if normalized == "*":
-        return "unresolved" if exact_allow_required else "pattern_covers"
+        return "pattern_covers"
     if _has_wildcard(normalized):
         return "unresolved"
     return "not_covered"
@@ -568,11 +568,17 @@ def _path(
     lifecycle: AwsCloudTrailActiveStandardTrailLifecycleEvidence,
 ) -> AwsEcsCloudTrailAuditTelemetryDisruptionPath:
     statement_records = [_statement_record(match, definition.operation) for match in allows]
-    matching_resources = sorted(
-        {match.matching_resource for match in allows},
+    exact_resources = sorted(
+        {match.matching_resource for match in allows if match.resource_scope == "exact_trail"},
         key=str.casefold,
     )
-    trail_reference = trail_arn if trail_arn is not None and trail_arn in matching_resources else matching_resources[0]
+    trail_reference = (
+        trail_arn
+        if trail_arn is not None and trail_arn in exact_resources
+        else exact_resources[0]
+        if exact_resources
+        else trail_arn or trail.address
+    )
     common: AwsEcsCloudTrailAuditTelemetryDisruptionPathCommon = {
         "workload_address": task_definition.address,
         "workload_type": task_definition.resource_type,
@@ -675,7 +681,7 @@ def _statement_record(
         "matching_action_patterns": list(match.matching_action_patterns),
         "resources": list(match.statement.resources),
         "matching_resources": [match.matching_resource],
-        "resource_scopes": ["exact_trail"],
+        "resource_scopes": [match.resource_scope],
         "principals": [],
         "principal_match": None,
         "conditions": [],

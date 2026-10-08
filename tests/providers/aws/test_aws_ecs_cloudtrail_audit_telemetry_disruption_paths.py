@@ -323,6 +323,88 @@ class AwsEcsCloudTrailAuditTelemetryDisruptionPathTests(
             self.assertFalse(path["outcome_evidence"]["successful_operation_observed"])
         self.assertIsNotNone(inventory.get_by_address("aws_caller_identity.current"))
 
+    def test_covering_wildcard_allows_project_trail_pattern_paths(self) -> None:
+        covering_resources = {
+            "bare wildcard": "*",
+            "region and name wildcard": f"arn:aws:cloudtrail:*:{_ACCOUNT_ID}:trail/*",
+            "name wildcard": f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/*",
+            "prefix wildcard": f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/aud*",
+        }
+        for case, resource in covering_resources.items():
+            with self.subTest(case=case):
+                _inventory, task, _service_resource = _normalize(
+                    [_statement("Allow", "cloudtrail:*", resource)],
+                )
+                paths = aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths
+                self.assertEqual(
+                    [path["operation"] for path in paths],
+                    [_DELETE_TRAIL, _STOP_LOGGING],
+                )
+                for path in paths:
+                    self.assertEqual(path["target_scope"], "exact_cloudtrail_trail")
+                    self.assertEqual(path["trail_address"], "aws_cloudtrail.audit")
+                    self.assertEqual(path["trail_reference"], _TRAIL_ARN)
+                    statement = path["authorization_statements"][0]
+                    self.assertEqual(statement["resource_scopes"], ["trail_pattern"])
+                    self.assertEqual(statement["matching_resources"], [resource])
+
+    def test_wildcard_allow_without_trail_arn_references_trail_address(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            [_statement("Allow", _STOP_LOGGING, "*")],
+            trail=_trail(arn=None),
+        )
+        paths = aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["trail_reference"], "aws_cloudtrail.audit")
+        self.assertIsNone(paths[0]["trail_arn"])
+
+    def test_non_covering_patterns_produce_no_path_or_uncertainty(self) -> None:
+        for resource in (
+            f"arn:aws:cloudtrail:us-east-1:{_FOREIGN_ACCOUNT_ID}:trail/*",
+            f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/other*",
+            f"arn:aws-us-gov:cloudtrail:*:{_ACCOUNT_ID}:trail/*",
+        ):
+            with self.subTest(resource=resource):
+                _inventory, task, _service_resource = _normalize(
+                    [_statement("Allow", _STOP_LOGGING, resource)],
+                )
+                facts = aws_facts(task)
+                self.assertEqual(facts.ecs_cloudtrail_audit_telemetry_disruption_paths, [])
+                self.assertEqual(
+                    facts.ecs_cloudtrail_audit_telemetry_disruption_path_uncertainties,
+                    [],
+                )
+
+    def test_exact_and_pattern_statements_keep_their_own_scopes(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            [
+                _statement("Allow", _STOP_LOGGING, _TRAIL_ARN),
+                _statement("Allow", _STOP_LOGGING, "*"),
+            ]
+        )
+        paths = aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["trail_reference"], _TRAIL_ARN)
+        self.assertEqual(
+            sorted(
+                (statement["matching_resources"][0], statement["resource_scopes"][0])
+                for statement in paths[0]["authorization_statements"]
+            ),
+            [("*", "trail_pattern"), (_TRAIL_ARN, "exact_trail")],
+        )
+
+    def test_exact_deny_carves_trail_out_of_wildcard_allow(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            [
+                _statement("Allow", "cloudtrail:*", "*"),
+                _statement("Deny", _DELETE_TRAIL, _TRAIL_ARN),
+            ]
+        )
+        self.assertEqual(
+            [path["operation"] for path in aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths],
+            [_STOP_LOGGING],
+        )
+
     def test_operation_local_deny_preserves_unrelated_operation(self) -> None:
         _inventory, task, _service_resource = _normalize(
             [
@@ -380,14 +462,15 @@ class AwsEcsCloudTrailAuditTelemetryDisruptionPathTests(
                     ),
                 ]
             ),
-            "wildcard target": _normalize(
+            "pattern with unknown trail arn": _normalize(
                 [
                     _statement(
                         "Allow",
                         _STOP_LOGGING,
                         (f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/*"),
                     )
-                ]
+                ],
+                trail=_trail(arn=None),
             ),
             "incomplete policy": _normalize(
                 [_statement("Allow", _STOP_LOGGING, _TRAIL_ARN)],
