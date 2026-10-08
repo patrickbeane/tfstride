@@ -129,6 +129,7 @@ def _role(
 
 def _trail(
     *,
+    name: str = "audit",
     arn: str | None = _TRAIL_ARN,
     logging: Literal["enabled", "disabled", "omitted", "unknown"] = "enabled",
     organization: Literal[
@@ -140,8 +141,8 @@ def _trail(
     provider_config_key: str = _PROVIDER,
 ) -> TerraformResource:
     values: dict[str, Any] = {
-        "id": "audit",
-        "name": "audit",
+        "id": name,
+        "name": name,
         "arn": arn,
     }
     unknown_values: dict[str, Any] = {}
@@ -159,7 +160,7 @@ def _trail(
         unknown_values["is_organization_trail"] = True
     return _resource(
         "aws_cloudtrail",
-        "audit",
+        name,
         values,
         provider_config_key=provider_config_key,
         unknown_values=unknown_values,
@@ -392,6 +393,87 @@ class AwsEcsCloudTrailAuditTelemetryDisruptionPathTests(
             ),
             [("*", "trail_pattern"), (_TRAIL_ARN, "exact_trail")],
         )
+
+    def test_wildcard_allow_fans_out_to_each_eligible_trail(self) -> None:
+        other_arn = f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/archive"
+        _inventory, task, service = _normalize(
+            [_statement("Allow", _STOP_LOGGING, "*")],
+            extra=[
+                _trail(name="archive", arn=other_arn),
+                _trail(
+                    name="disabled",
+                    arn=f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/disabled",
+                    logging="disabled",
+                ),
+                _trail(
+                    name="org",
+                    arn=f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/org",
+                    organization="enabled",
+                ),
+                _trail(
+                    name="aliased",
+                    arn=f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/aliased",
+                    provider_config_key=_ALIAS_PROVIDER,
+                ),
+            ],
+        )
+        for workload in (task, service):
+            paths = aws_facts(workload).ecs_cloudtrail_audit_telemetry_disruption_paths
+            self.assertEqual(
+                [path["trail_address"] for path in paths],
+                ["aws_cloudtrail.archive", "aws_cloudtrail.audit"],
+            )
+        uncertainties = aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_path_uncertainties
+        self.assertTrue(any("aws_cloudtrail.org" in value for value in uncertainties))
+        self.assertFalse(any("aws_cloudtrail.aliased" in value for value in uncertainties))
+
+    def test_pattern_scoped_to_one_trail_name_does_not_cover_siblings(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            [_statement("Allow", _STOP_LOGGING, f"arn:aws:cloudtrail:*:{_ACCOUNT_ID}:trail/arch*")],
+            extra=[_trail(name="archive", arn=f"arn:aws:cloudtrail:us-east-1:{_ACCOUNT_ID}:trail/archive")],
+        )
+        self.assertEqual(
+            [path["trail_address"] for path in aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths],
+            ["aws_cloudtrail.archive"],
+        )
+
+    def test_wildcard_allow_still_fails_closed_for_conditions_and_incomplete_policy(self) -> None:
+        cases = {
+            "conditional allow": _normalize(
+                [_statement("Allow", _STOP_LOGGING, "*", condition={"Bool": {"aws:SecureTransport": "true"}})]
+            ),
+            "conditional deny": _normalize(
+                [
+                    _statement("Allow", _STOP_LOGGING, "*"),
+                    _statement("Deny", _STOP_LOGGING, "*", condition={"Bool": {"aws:SecureTransport": "false"}}),
+                ]
+            ),
+            "incomplete policy": _normalize(
+                [_statement("Allow", _STOP_LOGGING, "*")],
+                extra=[_policy_attachment()],
+            ),
+            "permissions boundary": _normalize(
+                [],
+                role=_role(
+                    [_statement("Allow", _STOP_LOGGING, "*")],
+                    permissions_boundary=f"arn:aws:iam::{_ACCOUNT_ID}:policy/orders-permissions-boundary",
+                ),
+            ),
+        }
+        for case, (_inventory, task, _service_resource) in cases.items():
+            with self.subTest(case=case):
+                facts = aws_facts(task)
+                self.assertEqual(facts.ecs_cloudtrail_audit_telemetry_disruption_paths, [])
+                self.assertTrue(facts.ecs_cloudtrail_audit_telemetry_disruption_path_uncertainties)
+
+    def test_wildcard_deny_removes_exact_allow(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            [
+                _statement("Allow", _STOP_LOGGING, _TRAIL_ARN),
+                _statement("Deny", _STOP_LOGGING, "*"),
+            ]
+        )
+        self.assertEqual(aws_facts(task).ecs_cloudtrail_audit_telemetry_disruption_paths, [])
 
     def test_exact_deny_carves_trail_out_of_wildcard_allow(self) -> None:
         _inventory, task, _service_resource = _normalize(
