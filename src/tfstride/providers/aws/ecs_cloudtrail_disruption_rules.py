@@ -154,6 +154,7 @@ class AwsEcsCloudTrailDisruptionRuleDetectors:
                         service,
                         operations,
                         len(trail_addresses),
+                        wildcard_grant=any(scope == "trail_pattern" for scope in _grant_resource_scopes(current_paths)),
                     ),
                     evidence=collect_evidence(
                         evidence_item("network_path", ingress.network_path),
@@ -455,6 +456,8 @@ def _disruption_path_evidence(
                     f"internal_operation={path.get('internal_operation')}",
                     f"target_granularity={path.get('target_granularity')}",
                     f"target_scope={path.get('target_scope')}",
+                    f"grant_resource_scopes={','.join(_path_grant_resource_scopes(path))}",
+                    f"grant_resources={','.join(_path_grant_resources(path))}",
                     f"task_definition={path.get('task_definition_address')}",
                     f"task_role={path.get('role_address')}",
                     "same_account=true",
@@ -472,6 +475,38 @@ def _disruption_path_evidence(
             for path in paths
         }
     )
+
+
+def _path_statements(path: Mapping[str, object]) -> list[Mapping[str, object]]:
+    statements = path.get("authorization_statements")
+    if not isinstance(statements, list):
+        return []
+    return [
+        cast(Mapping[str, object], statement)
+        for statement in cast(list[object], statements)
+        if isinstance(statement, Mapping)
+    ]
+
+
+def _path_grant_resource_scopes(path: Mapping[str, object]) -> list[str]:
+    return sorted(
+        {scope for statement in _path_statements(path) for scope in _string_values(statement.get("resource_scopes"))}
+    )
+
+
+def _path_grant_resources(path: Mapping[str, object]) -> list[str]:
+    return sorted(
+        {
+            resource
+            for statement in _path_statements(path)
+            for resource in _string_values(statement.get("matching_resources"))
+        },
+        key=str.casefold,
+    )
+
+
+def _grant_resource_scopes(paths: Sequence[Mapping[str, object]]) -> list[str]:
+    return sorted({scope for path in paths for scope in _path_grant_resource_scopes(path)})
 
 
 def _authorization_patterns(path: Mapping[str, object]) -> list[str]:
@@ -569,7 +604,8 @@ def _assessment_scope() -> list[str]:
         (
             "establishes=deterministic cloudtrail:StopLogging or "
             "cloudtrail:DeleteTrail authority for an ECS task role over exact "
-            "modeled active standard CloudTrail trails; this creates a "
+            "modeled active standard CloudTrail trails, granted by exact trail "
+            "resources or by resource patterns covering each trail; this creates a "
             "Repudiation risk because workload compromise could disrupt future "
             "audit telemetry and weaken auditability"
         ),
@@ -586,15 +622,23 @@ def _rationale(
     service: NormalizedResource,
     operations: Sequence[AwsCloudTrailAuditTelemetryDisruptionOperation],
     trail_count: int,
+    *,
+    wildcard_grant: bool = False,
 ) -> str:
     trail_text = "trail" if trail_count == 1 else "trails"
+    wildcard_text = (
+        " Some of this authority is granted through wildcard resource patterns rather than exact trail "
+        "ARNs, so it may also extend to trails outside this plan."
+        if wildcard_grant
+        else ""
+    )
     return (
         f"{service.display_name} is reachable through an internet-facing load "
         "balancer and its ECS task role has deterministic CloudTrail control "
         f"authority to {_operation_text(operations)} across {trail_count} exact "
         f"modeled active standard CloudTrail {trail_text}. A compromise of the "
         "public workload could disrupt future audit-event collection for those "
-        "trails. This authority does not establish a successful operation, "
+        f"trails.{wildcard_text} This authority does not establish a successful operation, "
         "deletion of historical CloudTrail log objects or logging destinations, "
         "impact to every account trail or out-of-plan trails, telemetry recovery, "
         "or restoration."

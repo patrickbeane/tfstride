@@ -638,7 +638,8 @@ AWS_RULE_METADATA = (
         category=StrideCategory.REPUDIATION,
         recommended_mitigation=(
             "Reduce public ingress to the ECS service and remove cloudtrail:StopLogging and "
-            "cloudtrail:DeleteTrail from its task role. Keep audit-trail administration with a separate "
+            "cloudtrail:DeleteTrail from its task role, including grants made through wildcard trail resources. "
+            "Keep audit-trail administration with a separate "
             "operational identity, protect logging destinations independently, and do not treat retained "
             "historical logs as proof that future audit-event collection cannot be disrupted."
         ),

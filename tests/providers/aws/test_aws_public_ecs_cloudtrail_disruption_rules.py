@@ -31,12 +31,13 @@ _RULE_ID = "aws-public-ecs-cloudtrail-disruption"
 
 def _runtime_resources(
     actions: str | list[str],
+    trail_resource: str = _TRAIL_ARN,
 ) -> list[TerraformResource]:
     resources = [
         *_public_edge(),
         _caller_identity(),
         _trail(),
-        _role([_statement("Allow", actions, _TRAIL_ARN)]),
+        _role([_statement("Allow", actions, trail_resource)]),
         _task_definition(execution_role_arn=None),
         _service(),
     ]
@@ -112,6 +113,40 @@ class AwsPublicEcsCloudTrailDisruptionRuleTests(unittest.TestCase):
         self.assertIn("does_not_establish=successful operation", scope)
         self.assertIn("historical CloudTrail log-object deletion", scope)
         self.assertIn("telemetry recovery", scope)
+
+    def test_wildcard_grant_is_reported_with_grant_scope_evidence(self) -> None:
+        _, findings = _evaluate(_runtime_resources("cloudtrail:*", "*"))
+
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        finding = findings[0]
+        evidence = {item.key: item.values for item in finding.evidence}
+        paths = evidence["cloudtrail_audit_telemetry_disruption_paths"]
+        self.assertEqual(len(paths), 2)
+        self.assertTrue(all("target_scope=exact_cloudtrail_trail" in value for value in paths))
+        self.assertTrue(all("grant_resource_scopes=trail_pattern" in value for value in paths))
+        self.assertTrue(all("grant_resources=*;" in value for value in paths))
+        self.assertIn("granted through wildcard resource patterns", finding.rationale)
+        self.assertIn("outside this plan", finding.rationale)
+        self.assertIn("resource patterns covering each trail", " ".join(evidence["assessment_scope"]))
+
+    def test_exact_grant_rationale_does_not_mention_wildcards(self) -> None:
+        _, findings = _evaluate(_runtime_resources(_STOP_LOGGING))
+        self.assertEqual(len(findings), 1)
+        self.assertNotIn("wildcard", findings[0].rationale)
+        paths = {item.key: item.values for item in findings[0].evidence}["cloudtrail_audit_telemetry_disruption_paths"]
+        self.assertTrue(all("grant_resource_scopes=exact_trail" in value for value in paths))
+
+    def test_current_deny_suppresses_cached_wildcard_finding(self) -> None:
+        inventory, findings = _evaluate(_runtime_resources(_STOP_LOGGING, "*"))
+        self.assertEqual(len(findings), 1)
+        role = inventory.get_by_address("aws_iam_role.orders_task")
+        assert role is not None
+
+        role.policy_statements = (
+            *role.policy_statements,
+            parse_policy_statement(_statement("Deny", _STOP_LOGGING, "*")),
+        )
+        self.assertEqual(_reevaluate(inventory), [])
 
     def test_rationale_is_operation_specific(self) -> None:
         cases = (
