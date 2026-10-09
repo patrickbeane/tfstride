@@ -34,6 +34,7 @@ NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_nightmare_plan.json"
 ALB_EC2_RDS_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_alb_ec2_rds_plan.json"
 LAMBDA_DEPLOY_ROLE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_lambda_deploy_role_plan.json"
 ECS_FARGATE_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_ecs_fargate_plan.json"
+ECS_CLOUDTRAIL_WILDCARD_FIXTURE_PATH = FIXTURES_DIR / "aws" / "sample_aws_ecs_cloudtrail_wildcard_plan.json"
 GCP_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_plan.json"
 GCP_SAFE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_safe_plan.json"
 GCP_BASELINE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_baseline_plan.json"
@@ -141,6 +142,7 @@ class MarkdownReportTests(unittest.TestCase):
             ALB_EC2_RDS_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_alb_ec2_rds_report.md",
             LAMBDA_DEPLOY_ROLE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_lambda_deploy_role_report.md",
             ECS_FARGATE_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_ecs_fargate_report.md",
+            ECS_CLOUDTRAIL_WILDCARD_FIXTURE_PATH: EXAMPLES_DIR / "aws" / "aws_ecs_cloudtrail_wildcard_report.md",
             CROSS_ACCOUNT_TRUST_UNCONSTRAINED_FIXTURE_PATH: EXAMPLES_DIR
             / "aws"
             / "aws_cross_account_trust_unconstrained_report.md",

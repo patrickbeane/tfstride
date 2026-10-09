@@ -366,6 +366,7 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 | Baseline                           | `fixtures/aws/sample_aws_baseline_plan.json`                          | `examples/aws/aws_baseline_report.md`                          |
 | Realistic ALB / EC2 / RDS          | `fixtures/aws/sample_aws_alb_ec2_rds_plan.json`                       | `examples/aws/aws_alb_ec2_rds_report.md`                       |
 | ECS / Fargate                      | `fixtures/aws/sample_aws_ecs_fargate_plan.json`                       | `examples/aws/aws_ecs_fargate_report.md`                       |
+| ECS / CloudTrail wildcard grant    | `fixtures/aws/sample_aws_ecs_cloudtrail_wildcard_plan.json`           | `examples/aws/aws_ecs_cloudtrail_wildcard_report.md`           |
 | Cross-account trust, unconstrained | `fixtures/aws/sample_aws_cross_account_trust_unconstrained_plan.json` | `examples/aws/aws_cross_account_trust_unconstrained_report.md` |
 | Cross-account trust, narrowed      | `fixtures/aws/sample_aws_cross_account_trust_constrained_plan.json`   | `examples/aws/aws_cross_account_trust_constrained_report.md`   |
 | Lambda deploy-role                 | `fixtures/aws/sample_aws_lambda_deploy_role_plan.json`                | `examples/aws/aws_lambda_deploy_role_report.md`                |

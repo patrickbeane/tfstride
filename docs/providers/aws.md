@@ -143,7 +143,7 @@ NLBs, instance targets, other ECS network modes, and unresolved or unsupported t
 
 ### Audit & detection
 * CloudTrail multi-region, log-validation, event-selector, data-event, and Insights posture
-* Public ECS task roles with current `cloudtrail:StopLogging` or `cloudtrail:DeleteTrail` authority over an exact current CloudTrail trail, reported as prospective Repudiation risk
+* Public ECS task roles with current `cloudtrail:StopLogging` or `cloudtrail:DeleteTrail` authority over an exact current CloudTrail trail, granted by an exact trail resource or a covering wildcard resource (`*` or a matching ARN pattern), reported as prospective Repudiation risk
 * GuardDuty, Security Hub, AWS Config, Access Analyzer, and Macie account posture
 
 ### IAM & identity
@@ -160,6 +160,6 @@ KMS and secret-management posture, public workload cryptographic-operation paths
 * Identity-assignment analysis is deterministic and plan-local, focused on inline policies, standalone policies, role-policy attachments, OIDC providers, and trust policies.
 * Condition narrowing focuses on high-signal keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition.
 * Messaging findings establish modeled task-role authority, not successful payload retrieval, message or topology deletion, replay, or recovery; see [Public Workload Messaging Disclosure and Disruption Paths](../analysis/messaging-paths.md).
-* CloudTrail disruption findings establish current authority over an exact modeled trail, not a successful operation, historical CloudTrail event or destination-log deletion, destination-resource deletion, account-wide or out-of-plan disruption, or recovery/restoration.
+* CloudTrail disruption findings establish current authority over an exact modeled trail, granted exactly or by a wildcard resource that covers it. Wildcard grants are attributed to each covering in-plan active trail, and a pattern that cannot be matched because the trail ARN is unknown after planning stays unresolved. The findings do not establish a successful operation, historical CloudTrail event or destination-log deletion, destination-resource deletion, account-wide or out-of-plan disruption, or recovery/restoration.
 
 See [Cross-Provider Threat-Path Semantics](../analysis/path-semantics.md) for how these findings relate to the shared cross-provider evidence model.

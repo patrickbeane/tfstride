@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from tests.providers.aws.test_aws_ecs_cloudtrail_audit_telemetry_disruption_paths import (
     _DELETE_TRAIL,
@@ -19,6 +20,7 @@ from tests.providers.aws.test_aws_public_ecs_dynamodb_mutation_rules import (
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
+from tfstride.app import TfStride
 from tfstride.models import StrideCategory, TerraformResource
 from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import AwsNormalizer
@@ -27,6 +29,9 @@ from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.aws.rules import AWS_RULE_GROUP_IDS
 
 _RULE_ID = "aws-public-ecs-cloudtrail-disruption"
+_WILDCARD_FIXTURE = (
+    Path(__file__).resolve().parents[3] / "fixtures" / "aws" / "sample_aws_ecs_cloudtrail_wildcard_plan.json"
+)
 
 
 def _runtime_resources(
@@ -292,3 +297,16 @@ class AwsPublicEcsCloudTrailDisruptionRuleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AwsPublicEcsCloudTrailWildcardFixtureTests(unittest.TestCase):
+    def test_wildcard_fixture_reports_only_the_active_trail(self) -> None:
+        result = TfStride().analyze_plan(_WILDCARD_FIXTURE)
+
+        findings = [finding for finding in result.findings if finding.rule_id == _RULE_ID]
+        self.assertEqual(len(findings), 1)
+        self.assertIn("aws_cloudtrail.audit", findings[0].affected_resources)
+        self.assertNotIn("aws_cloudtrail.archive", findings[0].affected_resources)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        paths = evidence["cloudtrail_audit_telemetry_disruption_paths"]
+        self.assertTrue(all("grant_resource_scopes=trail_pattern" in value for value in paths))
