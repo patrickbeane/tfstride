@@ -35,6 +35,7 @@ from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_g
 from tfstride.providers.gcp.iam_reference_utils import (
     normalize_gcp_project,
 )
+from tfstride.providers.gcp.logging_filter_relevance import strict_audit_security_filter_signals
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
@@ -55,44 +56,8 @@ _PUBLIC_ALL_PRINCIPAL_SET = "principalSet://goog/public:all"
 _SERVICE_ACCOUNT_DOMAIN = ".gserviceaccount.com"
 _ACTIVE_CUSTOM_ROLE_STAGES = frozenset({"ALPHA", "BETA", "DEPRECATED", "EAP", "GA"})
 _SINK_RESOURCE_NAME_PATTERN = re.compile(r"^projects/([^/]+)/sinks/([^/]+)$")
-_NEGATIVE_FILTER_OPERATOR_PATTERN = re.compile(
-    r"(?:\bnot\b|!=|!~|(?:^|[\s(])-\s*)",
-    re.IGNORECASE,
-)
 _EXCLUSION_FIELD_UNCERTAINTY_PATTERN = re.compile(r"^exclusions\[\d+\]\.(?:filter|disabled)\b")
 _SINK_RESOURCE_NAME_SEARCH = re.compile(r"(?:^|/)projects/(?P<project>[^/]+)/sinks/(?P<name>[^/?#]+)(?:$|[?#])")
-_AUDIT_SECURITY_FILTER_PATTERNS = (
-    (
-        "cloudaudit.googleapis.com",
-        re.compile(
-            r'logname\s*(?::|=|=~)\s*(?:"(?:projects/[^"/\s]+/logs/)?cloudaudit\.googleapis\.com(?:%2f[^"]+)?"|(?:projects/[^\s()/]+/logs/)?cloudaudit\.googleapis\.com(?:%2f[^\s()]+)?)'
-        ),
-    ),
-    (
-        "google.cloud.audit.auditlog",
-        re.compile(
-            r'protopayload\.@type\s*(?::|=|=~)\s*(?:"(?:type\.googleapis\.com/)?google\.cloud\.audit\.auditlog"|(?:type\.googleapis\.com/)?google\.cloud\.audit\.auditlog)(?=$|[\s)])'
-        ),
-    ),
-    (
-        "securitycenter.googleapis.com",
-        re.compile(
-            r'logname\s*(?::|=|=~)\s*(?:"(?:projects/[^"/\s]+/logs/)?securitycenter\.googleapis\.com(?:%2f[^"]+)?"|(?:projects/[^\s()/]+/logs/)?securitycenter\.googleapis\.com(?:%2f[^\s()]+)?)'
-        ),
-    ),
-    (
-        "security_command_center",
-        re.compile(r'resource\.type\s*(?::|=|=~)\s*(?:"security_command_center"|security_command_center)(?=$|[\s)])'),
-    ),
-    (
-        "securitycenter",
-        re.compile(r'resource\.type\s*(?::|=|=~)\s*(?:"securitycenter"|securitycenter)(?=$|[\s)])'),
-    ),
-    (
-        'resource.type="gce_firewall_rule"',
-        re.compile(r'resource\.type\s*(?::|=|=~)\s*(?:"gce_firewall_rule"|gce_firewall_rule)(?=$|[\s)])'),
-    ),
-)
 _BUILT_IN_ROLES: dict[
     str,
     Literal[
@@ -604,7 +569,7 @@ def _logging_sink_audit_telemetry_relevance_evidence(
         }
         return all_logs
 
-    matched_signals = _audit_security_filter_signals(sink_filter)
+    matched_signals = strict_audit_security_filter_signals(sink_filter)
     if matched_signals:
         filtered: GcpLoggingSinkAuditFilterRelevanceEvidence = {
             "relevance_evidence_scope": ("plan_local_logging_sink_filter_and_destination"),
@@ -664,17 +629,6 @@ def _logging_sink_exclusion_relevance_state(
             "deterministic audit/security export relevance"
         ]
     return "compatible", []
-
-
-def _audit_security_filter_signals(filter_text: str) -> list[str]:
-    normalized = _normalized_filter(filter_text)
-    if _NEGATIVE_FILTER_OPERATOR_PATTERN.search(normalized):
-        return []
-    return [signal for signal, pattern in _AUDIT_SECURITY_FILTER_PATTERNS if pattern.fullmatch(normalized) is not None]
-
-
-def _normalized_filter(filter_text: str) -> str:
-    return " ".join(filter_text.lower().replace(chr(39), chr(34)).split())
 
 
 def _logging_sink_delete_deny_state(

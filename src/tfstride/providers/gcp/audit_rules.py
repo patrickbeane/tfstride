@@ -12,6 +12,7 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.coercion import STATE_DISABLED
+from tfstride.providers.gcp.logging_filter_relevance import lenient_audit_security_filter_signals
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
@@ -27,17 +28,6 @@ _MODELED_AUDIT_SECURITY_TYPES = (
     GcpResourceType.LOGGING_PROJECT_EXCLUSION,
     GcpResourceType.LOGGING_ORGANIZATION_EXCLUSION,
     GcpResourceType.SCC_ORGANIZATION_SETTINGS,
-)
-_AUDIT_SECURITY_FILTER_SIGNALS = (
-    ("cloudaudit.googleapis.com", "matches Cloud Audit Logs"),
-    ("google.cloud.audit.auditlog", "matches AuditLog proto payloads"),
-    ("protopayload.@type", "matches protoPayload audit log records"),
-    ("protopayload.servicename", "matches service audit payloads"),
-    ("securitycenter.googleapis.com", "matches Security Command Center logs"),
-    ("security_command_center", "matches Security Command Center logs"),
-    ("securitycenter", "matches security center logs"),
-    ('resource.type="gce_firewall_rule"', "matches firewall rule logs"),
-    ("resource.type=gce_firewall_rule", "matches firewall rule logs"),
 )
 
 
@@ -91,7 +81,7 @@ class GcpAuditRuleDetectors:
             facts = gcp_facts(exclusion)
             if not _is_active_logging_exclusion(facts):
                 continue
-            matched_signals = _audit_security_filter_signals(facts.logging_exclusion_filter)
+            matched_signals = lenient_audit_security_filter_signals(facts.logging_exclusion_filter)
             if not matched_signals:
                 continue
 
@@ -207,17 +197,6 @@ def _is_active_logging_exclusion(facts: GcpResourceFacts) -> bool:
     return bool(facts.logging_exclusion_filter)
 
 
-def _audit_security_filter_signals(filter_text: str | None) -> list[str]:
-    if not filter_text:
-        return []
-    normalized = _normalized_filter(filter_text)
-    return [description for signal, description in _AUDIT_SECURITY_FILTER_SIGNALS if signal in normalized]
-
-
-def _normalized_filter(filter_text: str) -> str:
-    return " ".join(filter_text.lower().replace(chr(39), chr(34)).split())
-
-
 def _modeled_audit_security_resources(resources: Iterable[NormalizedResource]) -> list[NormalizedResource]:
     return [resource for resource in resources if resource.resource_type in _MODELED_AUDIT_SECURITY_TYPES]
 
@@ -247,7 +226,7 @@ def _logging_sink_audit_export_issues(facts: GcpResourceFacts) -> list[str]:
 
     if filter_uncertainties:
         issues.extend(f"filter uncertainty: {uncertainty}" for uncertainty in filter_uncertainties)
-    elif facts.logging_sink_filter and not _audit_security_filter_signals(facts.logging_sink_filter):
+    elif facts.logging_sink_filter and not lenient_audit_security_filter_signals(facts.logging_sink_filter):
         issues.append("filter does not clearly include audit or security log streams")
 
     return issues
