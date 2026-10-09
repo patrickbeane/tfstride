@@ -12,7 +12,10 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.coercion import STATE_DISABLED
-from tfstride.providers.gcp.logging_filter_relevance import lenient_audit_security_filter_signals
+from tfstride.providers.gcp.logging_filter_relevance import (
+    classify_logging_filter_audit_relevance,
+    describe_audit_security_signal,
+)
 from tfstride.providers.gcp.resource_facts import GcpResourceFacts, gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
@@ -81,9 +84,10 @@ class GcpAuditRuleDetectors:
             facts = gcp_facts(exclusion)
             if not _is_active_logging_exclusion(facts):
                 continue
-            matched_signals = lenient_audit_security_filter_signals(facts.logging_exclusion_filter)
-            if not matched_signals:
+            relevance = classify_logging_filter_audit_relevance(facts.logging_exclusion_filter)
+            if relevance.state not in {"includes_audit", "narrowed_audit"}:
                 continue
+            matched_signals = [describe_audit_security_signal(signal) for signal in relevance.signals]
 
             severity_reasoning = _audit_detection_severity()
             findings.append(
@@ -226,8 +230,12 @@ def _logging_sink_audit_export_issues(facts: GcpResourceFacts) -> list[str]:
 
     if filter_uncertainties:
         issues.extend(f"filter uncertainty: {uncertainty}" for uncertainty in filter_uncertainties)
-    elif facts.logging_sink_filter and not lenient_audit_security_filter_signals(facts.logging_sink_filter):
-        issues.append("filter does not clearly include audit or security log streams")
+    elif facts.logging_sink_filter:
+        relevance = classify_logging_filter_audit_relevance(facts.logging_sink_filter)
+        if relevance.state == "no_audit_signal":
+            issues.append("filter does not clearly include audit or security log streams")
+        elif relevance.state == "excludes_audit":
+            issues.append("filter excludes audit or security log streams")
 
     return issues
 

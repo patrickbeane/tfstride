@@ -219,6 +219,59 @@ class GcpAuditRuleTests(unittest.TestCase):
             ["filter does not clearly include audit or security log streams"],
         )
 
+    def test_logging_sink_with_excluding_filter_is_detected(self) -> None:
+        for name, filter_text in (
+            ("not_audit", "NOT logName:cloudaudit.googleapis.com"),
+            ("dash_audit", '-logName:"cloudaudit.googleapis.com"'),
+            ("not_equal", 'logName!="cloudaudit.googleapis.com"'),
+        ):
+            with self.subTest(name=name):
+                findings = _evaluate([_project_sink(name=name, filter_text=filter_text)], _LOGGING_SINK_RULE)
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(
+                    _evidence_by_key(findings[0])["audit_export_posture"],
+                    ["filter excludes audit or security log streams"],
+                )
+
+    def test_logging_sink_with_compound_or_unparseable_audit_filter_is_quiet(self) -> None:
+        activity = 'logName="projects/tfstride-demo/logs/cloudaudit.googleapis.com%2Factivity"'
+        data_access = 'logName="projects/tfstride-demo/logs/cloudaudit.googleapis.com%2Fdata_access"'
+        findings = _evaluate(
+            [
+                _project_sink(name="or_terms", filter_text=f"{activity} OR {data_access}"),
+                _project_sink(name="narrowed", filter_text="logName:cloudaudit.googleapis.com AND severity>=ERROR"),
+                _project_sink(name="parenthesized", filter_text="(logName:cloudaudit.googleapis.com)"),
+                _project_sink(name="unparseable", filter_text="logName:cloudaudit.googleapis.com AND ("),
+            ],
+            _LOGGING_SINK_RULE,
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_logging_exclusion_only_matches_when_it_drops_audit_logs(self) -> None:
+        findings = _evaluate(
+            [
+                _project_exclusion("NOT logName:cloudaudit.googleapis.com", disabled=False, name="keep_audit"),
+                _project_exclusion("resource.type=gce_instance", disabled=False, name="other"),
+                _project_exclusion("logName:cloudaudit.googleapis.com AND (", disabled=False, name="unparseable"),
+                _project_exclusion(
+                    "logName:cloudaudit.googleapis.com AND severity=DEBUG", disabled=False, name="narrowed"
+                ),
+                _project_exclusion(
+                    "logName:cloudaudit.googleapis.com OR severity=DEBUG", disabled=False, name="or_terms"
+                ),
+            ],
+            _LOGGING_EXCLUSION_RULE,
+        )
+
+        self.assertEqual(
+            sorted(finding.affected_resources[0] for finding in findings),
+            [
+                "google_logging_project_exclusion.narrowed",
+                "google_logging_project_exclusion.or_terms",
+            ],
+        )
+
     def test_logging_sink_with_destination_and_audit_filter_or_no_filter_is_quiet(self) -> None:
         findings = _evaluate(
             [

@@ -45,18 +45,17 @@ _CASES = (
     ),
     _Case("no filter exports everything", None, True, True),
     _Case("non-audit filter", 'resource.type="gce_instance"', False, False),
-    # Rows below are the disagreements this baseline exists to expose. For the
-    # OR / AND / parenthesized / unparseable rows the disruption matcher is too
-    # strict; for the NOT and dash-negated rows the posture matcher is too
-    # lenient, because it counts a negated audit term as an audit signal.
+    # A negated audit term is no longer accepted by the posture rule.
+    _Case("NOT audit", 'NOT logName:"cloudaudit.googleapis.com"', False, False),
+    _Case("dash-negated audit", '-logName:"cloudaudit.googleapis.com"', False, False),
+    # Rows below are the remaining disagreements this baseline exists to
+    # expose: the disruption matcher is still too strict for compound filters.
     _Case("OR of audit terms", f"{_ACTIVITY} OR {_DATA_ACCESS}", True, False),
     _Case("audit AND severity", 'logName:"cloudaudit.googleapis.com" AND severity>=ERROR', True, False),
     _Case(
         "audit OR unrelated term", 'logName:"cloudaudit.googleapis.com" OR resource.type="gce_instance"', True, False
     ),
     _Case("parenthesized single term", '(logName:"cloudaudit.googleapis.com")', True, False),
-    _Case("NOT audit", 'NOT logName:"cloudaudit.googleapis.com"', True, False),
-    _Case("dash-negated audit", '-logName:"cloudaudit.googleapis.com"', True, False),
     _Case("unparseable", 'logName:"cloudaudit.googleapis.com" AND (', True, False),
 )
 
@@ -87,11 +86,9 @@ class GcpLoggingSinkRelevanceParityBaselineTests(unittest.TestCase):
         self.assertEqual(
             disagreements,
             [
-                "NOT audit",
                 "OR of audit terms",
                 "audit AND severity",
                 "audit OR unrelated term",
-                "dash-negated audit",
                 "parenthesized single term",
                 "unparseable",
             ],

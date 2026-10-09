@@ -1,10 +1,9 @@
 """Audit/security relevance matching for Cloud Logging filters.
 
 ``classify_logging_filter_audit_relevance`` parses a filter's boolean structure
-and reports how it relates to the audit/security streams. The older lenient and
-strict matchers remain until their callers move to the classifier: the lenient
-one backs the posture rules by substring, and the strict one backs
-public-workload disruption paths by accepting only a single positive term.
+and reports how it relates to the audit/security streams. The older strict
+matcher remains until public-workload disruption paths move to the classifier;
+it accepts only a filter that is exactly one positive term.
 """
 
 from __future__ import annotations
@@ -13,17 +12,14 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-_LENIENT_AUDIT_SECURITY_FILTER_SIGNALS = (
-    ("cloudaudit.googleapis.com", "matches Cloud Audit Logs"),
-    ("google.cloud.audit.auditlog", "matches AuditLog proto payloads"),
-    ("protopayload.@type", "matches protoPayload audit log records"),
-    ("protopayload.servicename", "matches service audit payloads"),
-    ("securitycenter.googleapis.com", "matches Security Command Center logs"),
-    ("security_command_center", "matches Security Command Center logs"),
-    ("securitycenter", "matches security center logs"),
-    ('resource.type="gce_firewall_rule"', "matches firewall rule logs"),
-    ("resource.type=gce_firewall_rule", "matches firewall rule logs"),
-)
+_AUDIT_SECURITY_SIGNAL_DESCRIPTIONS = {
+    "cloudaudit.googleapis.com": "matches Cloud Audit Logs",
+    "google.cloud.audit.auditlog": "matches AuditLog proto payloads",
+    "securitycenter.googleapis.com": "matches Security Command Center logs",
+    "security_command_center": "matches Security Command Center logs",
+    "securitycenter": "matches security center logs",
+    'resource.type="gce_firewall_rule"': "matches firewall rule logs",
+}
 
 _NEGATIVE_FILTER_OPERATOR_PATTERN = re.compile(
     r"(?:\bnot\b|!=|!~|(?:^|[\s(])-\s*)",
@@ -68,11 +64,8 @@ def normalize_logging_filter(filter_text: str) -> str:
     return " ".join(filter_text.lower().replace(chr(39), chr(34)).split())
 
 
-def lenient_audit_security_filter_signals(filter_text: str | None) -> list[str]:
-    if not filter_text:
-        return []
-    normalized = normalize_logging_filter(filter_text)
-    return [description for signal, description in _LENIENT_AUDIT_SECURITY_FILTER_SIGNALS if signal in normalized]
+def describe_audit_security_signal(signal: str) -> str:
+    return _AUDIT_SECURITY_SIGNAL_DESCRIPTIONS.get(signal, f"matches {signal}")
 
 
 def strict_audit_security_filter_signals(filter_text: str) -> list[str]:
