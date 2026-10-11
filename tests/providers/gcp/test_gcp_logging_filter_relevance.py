@@ -53,6 +53,17 @@ class LoggingFilterAuditRelevanceTests(unittest.TestCase):
             self.assert_state(filter_text, "narrowed_audit")
         self.assertTrue(classify_logging_filter_audit_relevance(f"{_AUDIT} AND severity>=ERROR").established)
 
+    def test_and_on_the_same_field_as_an_audit_term_is_unproven(self) -> None:
+        for filter_text in (
+            f'{_AUDIT} AND logName="projects/example/logs/custom"',
+            f'{_AUDIT}\nlogName="projects/example/logs/custom"',
+            'resource.type="gce_firewall_rule" AND resource.type="gce_instance"',
+        ):
+            with self.subTest(filter_text=filter_text):
+                relevance = classify_logging_filter_audit_relevance(filter_text)
+                self.assertEqual(relevance.state, "unknown")
+                self.assertIn("same field", relevance.reasons[0])
+
     def test_and_of_audit_terms_still_includes_audit(self) -> None:
         self.assert_state(f"{_AUDIT} AND {_ACTIVITY}", "includes_audit")
 

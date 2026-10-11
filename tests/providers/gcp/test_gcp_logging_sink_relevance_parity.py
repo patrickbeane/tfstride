@@ -31,6 +31,8 @@ class _Case:
     # The posture rule stays quiet: it treats the filter as exporting audit logs.
     posture_accepts: bool
     # The disruption path is established: the filter is proven audit-relevant.
+    # An unparseable filter is neither accepted nor rejected by posture, but it
+    # cannot establish a disruption path and records an uncertainty instead.
     disruption_established: bool
 
 
@@ -48,14 +50,11 @@ _CASES = (
     # A negated audit term is no longer accepted by the posture rule.
     _Case("NOT audit", 'NOT logName:"cloudaudit.googleapis.com"', False, False),
     _Case("dash-negated audit", '-logName:"cloudaudit.googleapis.com"', False, False),
-    # Rows below are the remaining disagreements this baseline exists to
-    # expose: the disruption matcher is still too strict for compound filters.
-    _Case("OR of audit terms", f"{_ACTIVITY} OR {_DATA_ACCESS}", True, False),
-    _Case("audit AND severity", 'logName:"cloudaudit.googleapis.com" AND severity>=ERROR', True, False),
-    _Case(
-        "audit OR unrelated term", 'logName:"cloudaudit.googleapis.com" OR resource.type="gce_instance"', True, False
-    ),
-    _Case("parenthesized single term", '(logName:"cloudaudit.googleapis.com")', True, False),
+    # Compound and parenthesized audit filters are now accepted by both paths.
+    _Case("OR of audit terms", f"{_ACTIVITY} OR {_DATA_ACCESS}", True, True),
+    _Case("audit AND severity", 'logName:"cloudaudit.googleapis.com" AND severity>=ERROR', True, True),
+    _Case("audit OR unrelated term", 'logName:"cloudaudit.googleapis.com" OR resource.type="gce_instance"', True, True),
+    _Case("parenthesized single term", '(logName:"cloudaudit.googleapis.com")', True, True),
     _Case("unparseable", 'logName:"cloudaudit.googleapis.com" AND (', True, False),
 )
 
@@ -85,11 +84,5 @@ class GcpLoggingSinkRelevanceParityBaselineTests(unittest.TestCase):
         disagreements = sorted(case.name for case in _CASES if case.posture_accepts != case.disruption_established)
         self.assertEqual(
             disagreements,
-            [
-                "OR of audit terms",
-                "audit AND severity",
-                "audit OR unrelated term",
-                "parenthesized single term",
-                "unparseable",
-            ],
+            ["unparseable"],
         )

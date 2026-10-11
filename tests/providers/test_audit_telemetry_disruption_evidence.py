@@ -57,6 +57,7 @@ from tfstride.providers.gcp.audit_telemetry_disruption_evidence import (
     GcpLoggingSinkEstablishedAuditTelemetryRelevanceEvidence,
     GcpLoggingSinkIrrelevantFilterEvidence,
     GcpLoggingSinkLifecycleEvidence,
+    GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence,
     GcpLoggingSinkSystemManagedDeletionConstraintEvidence,
     GcpLoggingSinkUnknownDeletionConstraintEvidence,
     GcpLoggingSinkUnknownLifecycleEvidence,
@@ -276,6 +277,7 @@ class AuditTelemetryDisruptionEvidenceTests(unittest.TestCase):
         filtered_hints = get_type_hints(GcpLoggingSinkAuditFilterRelevanceEvidence)
         irrelevant_hints = get_type_hints(GcpLoggingSinkIrrelevantFilterEvidence)
         relevance_unknown_hints = get_type_hints(GcpLoggingSinkUnknownRelevanceEvidence)
+        narrowed_hints = get_type_hints(GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence)
 
         self.assertEqual(
             set(get_args(GcpLoggingSinkLifecycleEvidence)),
@@ -308,6 +310,7 @@ class AuditTelemetryDisruptionEvidenceTests(unittest.TestCase):
             {
                 GcpLoggingSinkAllLogsRelevanceEvidence,
                 GcpLoggingSinkAuditFilterRelevanceEvidence,
+                GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence,
                 GcpLoggingSinkIrrelevantFilterEvidence,
                 GcpLoggingSinkUnknownRelevanceEvidence,
             },
@@ -323,6 +326,8 @@ class AuditTelemetryDisruptionEvidenceTests(unittest.TestCase):
             filtered_hints["audit_telemetry_relevance_state"],
             Literal["established"],
         )
+        self.assertEqual(narrowed_hints["relevance_basis"], Literal["narrowed_audit_security_filter"])
+        self.assertEqual(narrowed_hints["audit_telemetry_relevance_state"], Literal["established"])
         self.assertEqual(
             irrelevant_hints["audit_telemetry_relevance_state"],
             Literal["not_established"],

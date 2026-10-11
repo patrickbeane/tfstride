@@ -24,6 +24,7 @@ from tfstride.providers.gcp.audit_telemetry_disruption_evidence import (
     GcpLoggingSinkEstablishedAuditTelemetryRelevanceEvidence,
     GcpLoggingSinkIrrelevantFilterEvidence,
     GcpLoggingSinkLifecycleEvidence,
+    GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence,
     GcpLoggingSinkRoleEvidence,
     GcpLoggingSinkSystemManagedDeletionConstraintEvidence,
     GcpLoggingSinkUnknownDeletionConstraintEvidence,
@@ -35,7 +36,7 @@ from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_g
 from tfstride.providers.gcp.iam_reference_utils import (
     normalize_gcp_project,
 )
-from tfstride.providers.gcp.logging_filter_relevance import strict_audit_security_filter_signals
+from tfstride.providers.gcp.logging_filter_relevance import classify_logging_filter_audit_relevance
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
@@ -569,19 +570,46 @@ def _logging_sink_audit_telemetry_relevance_evidence(
         }
         return all_logs
 
-    matched_signals = strict_audit_security_filter_signals(sink_filter)
-    if matched_signals:
+    relevance = classify_logging_filter_audit_relevance(sink_filter)
+    if relevance.state == "includes_audit":
         filtered: GcpLoggingSinkAuditFilterRelevanceEvidence = {
             "relevance_evidence_scope": ("plan_local_logging_sink_filter_and_destination"),
             "filter_state": "configured",
             "sink_filter": sink_filter,
             "relevance_basis": "audit_security_filter",
-            "matched_audit_security_filter_signal": matched_signals[0],
-            "matched_audit_security_filter_signals": matched_signals,
+            "matched_audit_security_filter_signal": relevance.signals[0],
+            "matched_audit_security_filter_signals": list(relevance.signals),
             "audit_telemetry_relevance_state": "established",
             "uncertainties": [],
         }
         return filtered
+    if relevance.state == "narrowed_audit":
+        narrowed: GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence = {
+            "relevance_evidence_scope": ("plan_local_logging_sink_filter_and_destination"),
+            "filter_state": "configured",
+            "sink_filter": sink_filter,
+            "relevance_basis": "narrowed_audit_security_filter",
+            "matched_audit_security_filter_signal": relevance.signals[0],
+            "matched_audit_security_filter_signals": list(relevance.signals),
+            "audit_telemetry_relevance_state": "established",
+            "uncertainties": [],
+        }
+        return narrowed
+    if relevance.state == "unknown":
+        unresolved: GcpLoggingSinkUnknownRelevanceEvidence = {
+            "relevance_evidence_scope": ("plan_local_logging_sink_filter_and_destination"),
+            "filter_state": "unknown",
+            "sink_filter": None,
+            "relevance_basis": "unknown",
+            "matched_audit_security_filter_signal": None,
+            "matched_audit_security_filter_signals": [],
+            "audit_telemetry_relevance_state": "unknown",
+            "uncertainties": [
+                f"{target.resource.address}: logging sink filter audit relevance is unresolved: {reason}"
+                for reason in relevance.reasons
+            ],
+        }
+        return unresolved
 
     irrelevant: GcpLoggingSinkIrrelevantFilterEvidence = {
         "relevance_evidence_scope": ("plan_local_logging_sink_filter_and_destination"),

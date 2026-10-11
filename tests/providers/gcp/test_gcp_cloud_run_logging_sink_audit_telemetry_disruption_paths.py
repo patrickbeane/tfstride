@@ -601,6 +601,52 @@ class GcpCloudRunLoggingSinkAuditTelemetryDisruptionPathTests(unittest.TestCase)
                     [],
                 )
 
+    def test_compound_audit_filters_establish_relevance_with_explicit_basis(self) -> None:
+        activity = 'logName="projects/tfstride-demo/logs/cloudaudit.googleapis.com%2Factivity"'
+        data_access = 'logName="projects/tfstride-demo/logs/cloudaudit.googleapis.com%2Fdata_access"'
+        cases = {
+            "or of audit terms": (f"{activity} OR {data_access}", "audit_security_filter"),
+            "parenthesized term": (f"({_AUDIT_FILTER})", "audit_security_filter"),
+            "audit or unrelated term": (f'{_AUDIT_FILTER} OR resource.type="gce_instance"', "audit_security_filter"),
+            "audit narrowed by severity": (f"{_AUDIT_FILTER} AND severity>=ERROR", "narrowed_audit_security_filter"),
+            "implicit and": (f"{_AUDIT_FILTER}\nseverity>=ERROR", "narrowed_audit_security_filter"),
+        }
+        for case, (filter_text, basis) in cases.items():
+            with self.subTest(case=case):
+                _inventory, _workload, _sink_target, facts = _normalize(
+                    _cloud_run(),
+                    _sink(filter_text=filter_text),
+                    _project_member(role="roles/logging.admin"),
+                )
+                paths = facts.cloud_run_logging_sink_audit_telemetry_disruption_paths
+                self.assertEqual(len(paths), 1)
+                relevance = paths[0]["audit_telemetry_relevance_evidence"]
+                self.assertEqual(relevance["relevance_basis"], basis)
+                self.assertEqual(relevance["audit_telemetry_relevance_state"], "established")
+                self.assertEqual(relevance["sink_filter"], filter_text)
+                self.assertEqual(relevance["matched_audit_security_filter_signals"], ["cloudaudit.googleapis.com"])
+
+    def test_unparseable_or_ambiguous_filters_record_an_uncertainty(self) -> None:
+        for filter_text in (
+            f"{_AUDIT_FILTER} AND (",
+            f'SEARCH("{_SINK_NAME}")',
+            f'{_AUDIT_FILTER} AND severity>=ERROR OR resource.type="gce_instance"',
+            f'{_AUDIT_FILTER} AND logName="projects/example/logs/custom"',
+        ):
+            with self.subTest(filter_text=filter_text):
+                _inventory, _workload, _sink_target, facts = _normalize(
+                    _cloud_run(),
+                    _sink(filter_text=filter_text),
+                    _project_member(role="roles/logging.admin"),
+                )
+                self.assertEqual(facts.cloud_run_logging_sink_audit_telemetry_disruption_paths, [])
+                self.assertTrue(
+                    any(
+                        f"{_SINK_ADDRESS}: logging sink filter audit relevance is unresolved" in value
+                        for value in facts.cloud_run_logging_sink_audit_telemetry_disruption_path_uncertainties
+                    )
+                )
+
     def test_predefined_roles_and_provider_defaults_are_modeled_exactly(self) -> None:
         roles = {
             "roles/owner": "owner",

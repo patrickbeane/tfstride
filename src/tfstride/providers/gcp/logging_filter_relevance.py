@@ -1,9 +1,8 @@
 """Audit/security relevance matching for Cloud Logging filters.
 
 ``classify_logging_filter_audit_relevance`` parses a filter's boolean structure
-and reports how it relates to the audit/security streams. The older strict
-matcher remains until public-workload disruption paths move to the classifier;
-it accepts only a filter that is exactly one positive term.
+and reports how it relates to the audit/security streams. Posture rules and
+public-workload disruption paths share it so both judge a filter identically.
 """
 
 from __future__ import annotations
@@ -21,12 +20,7 @@ _AUDIT_SECURITY_SIGNAL_DESCRIPTIONS = {
     'resource.type="gce_firewall_rule"': "matches firewall rule logs",
 }
 
-_NEGATIVE_FILTER_OPERATOR_PATTERN = re.compile(
-    r"(?:\bnot\b|!=|!~|(?:^|[\s(])-\s*)",
-    re.IGNORECASE,
-)
-
-_STRICT_AUDIT_SECURITY_FILTER_PATTERNS = (
+_AUDIT_SECURITY_FILTER_PATTERNS = (
     (
         "cloudaudit.googleapis.com",
         re.compile(
@@ -66,17 +60,6 @@ def normalize_logging_filter(filter_text: str) -> str:
 
 def describe_audit_security_signal(signal: str) -> str:
     return _AUDIT_SECURITY_SIGNAL_DESCRIPTIONS.get(signal, f"matches {signal}")
-
-
-def strict_audit_security_filter_signals(filter_text: str) -> list[str]:
-    normalized = normalize_logging_filter(filter_text)
-    if _NEGATIVE_FILTER_OPERATOR_PATTERN.search(normalized):
-        return []
-    return [
-        signal
-        for signal, pattern in _STRICT_AUDIT_SECURITY_FILTER_PATTERNS
-        if pattern.fullmatch(normalized) is not None
-    ]
 
 
 LoggingFilterAuditRelevanceState = Literal[
@@ -128,6 +111,8 @@ class _Node:
     state: Literal["includes", "narrowed", "none", "excludes", "unknown"]
     signals: tuple[str, ...] = ()
     reasons: tuple[str, ...] = ()
+    fields: frozenset[str] = frozenset()
+    audit_fields: frozenset[str] = frozenset()
 
 
 def classify_logging_filter_audit_relevance(filter_text: str | None) -> LoggingFilterAuditRelevance:
@@ -243,33 +228,54 @@ class _Parser:
 
 
 def _comparison_node(text: str) -> _Node:
-    signals = tuple(signal for signal, pattern in _STRICT_AUDIT_SECURITY_FILTER_PATTERNS if pattern.fullmatch(text))
+    match = _COMPARISON_PATTERN.fullmatch(text)
+    fields = frozenset({match.group("field")}) if match is not None else frozenset()
+    signals = tuple(signal for signal, pattern in _AUDIT_SECURITY_FILTER_PATTERNS if pattern.fullmatch(text))
     if signals:
-        return _Node("includes", signals)
+        return _Node("includes", signals, fields=fields, audit_fields=fields)
     positive = text.replace("!=", "=", 1).replace("!~", "=~", 1)
     if positive != text:
-        negated = tuple(
-            signal for signal, pattern in _STRICT_AUDIT_SECURITY_FILTER_PATTERNS if pattern.fullmatch(positive)
-        )
+        negated = tuple(signal for signal, pattern in _AUDIT_SECURITY_FILTER_PATTERNS if pattern.fullmatch(positive))
         if negated:
-            return _Node("excludes", negated)
-    return _Node("none")
+            return _Node("excludes", negated, fields=fields, audit_fields=fields)
+    return _Node("none", fields=fields)
 
 
 def _negate(node: _Node) -> _Node:
     if node.state == "includes":
-        return _Node("excludes", node.signals)
+        return _Node("excludes", node.signals, fields=node.fields, audit_fields=node.audit_fields)
     if node.state == "narrowed":
-        return _Node("unknown", reasons=("logging filter negates a narrowed audit/security term",))
+        return _Node(
+            "unknown",
+            reasons=("logging filter negates a narrowed audit/security term",),
+            fields=node.fields,
+            audit_fields=node.audit_fields,
+        )
     if node.state == "none":
         return node
     if node.state == "excludes":
-        return _Node("unknown", reasons=("logging filter double-negates an audit/security term",))
+        return _Node(
+            "unknown",
+            reasons=("logging filter double-negates an audit/security term",),
+            fields=node.fields,
+            audit_fields=node.audit_fields,
+        )
     return node
 
 
 def _merge_signals(nodes: list[_Node]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(signal for node in nodes for signal in node.signals))
+
+
+def _merged(
+    state: Literal["includes", "narrowed", "none", "excludes", "unknown"], nodes: list[_Node], picked: list[_Node]
+) -> _Node:
+    return _Node(
+        state,
+        _merge_signals(picked),
+        fields=frozenset().union(*(node.fields for node in nodes)),
+        audit_fields=frozenset().union(*(node.audit_fields for node in nodes)),
+    )
 
 
 def _first_unknown(nodes: list[_Node]) -> _Node | None:
@@ -278,27 +284,42 @@ def _first_unknown(nodes: list[_Node]) -> _Node | None:
 
 def _combine_or(nodes: list[_Node]) -> _Node:
     if any(node.state == "includes" for node in nodes):
-        return _Node("includes", _merge_signals([node for node in nodes if node.state == "includes"]))
+        return _merged("includes", nodes, [node for node in nodes if node.state == "includes"])
     if any(node.state == "narrowed" for node in nodes):
-        return _Node("narrowed", _merge_signals([node for node in nodes if node.state == "narrowed"]))
+        return _merged("narrowed", nodes, [node for node in nodes if node.state == "narrowed"])
     unknown = _first_unknown(nodes)
     if unknown is not None:
-        return unknown
+        return _unknown_node(nodes, unknown.reasons)
     if any(node.state == "excludes" for node in nodes):
-        return _Node("excludes", _merge_signals([node for node in nodes if node.state == "excludes"]))
-    return _Node("none")
+        return _merged("excludes", nodes, [node for node in nodes if node.state == "excludes"])
+    return _merged("none", nodes, [])
 
 
 def _combine_and(nodes: list[_Node]) -> _Node:
     excluding = [node for node in nodes if node.state == "excludes"]
     if excluding:
-        return _Node("excludes", _merge_signals(excluding))
+        return _merged("excludes", nodes, excluding)
     unknown = _first_unknown(nodes)
     if unknown is not None:
-        return unknown
+        return _unknown_node(nodes, unknown.reasons)
     audit = [node for node in nodes if node.state in {"includes", "narrowed"}]
     if not audit:
-        return _Node("none")
-    if len(audit) == len(nodes) and all(node.state == "includes" for node in audit):
-        return _Node("includes", _merge_signals(audit))
-    return _Node("narrowed", _merge_signals(audit))
+        return _merged("none", nodes, [])
+    others = [node for node in nodes if node.state == "none"]
+    if any(node.audit_fields & other.fields for node in audit for other in others):
+        return _unknown_node(
+            nodes,
+            ("logging filter constrains the same field as an audit/security term, so the intersection is unproven",),
+        )
+    if not others and all(node.state == "includes" for node in audit):
+        return _merged("includes", nodes, audit)
+    return _merged("narrowed", nodes, audit)
+
+
+def _unknown_node(nodes: list[_Node], reasons: tuple[str, ...]) -> _Node:
+    return _Node(
+        "unknown",
+        reasons=reasons,
+        fields=frozenset().union(*(node.fields for node in nodes)),
+        audit_fields=frozenset().union(*(node.audit_fields for node in nodes)),
+    )

@@ -152,6 +152,17 @@ class GcpLoggingSinkAuditFilterRelevanceEvidence(TypedDict):
     uncertainties: list[Never]
 
 
+class GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence(TypedDict):
+    relevance_evidence_scope: Literal["plan_local_logging_sink_filter_and_destination"]
+    filter_state: Literal["configured"]
+    sink_filter: str
+    relevance_basis: Literal["narrowed_audit_security_filter"]
+    matched_audit_security_filter_signal: str
+    matched_audit_security_filter_signals: list[str]
+    audit_telemetry_relevance_state: Literal["established"]
+    uncertainties: list[Never]
+
+
 class GcpLoggingSinkIrrelevantFilterEvidence(TypedDict):
     relevance_evidence_scope: Literal["plan_local_logging_sink_filter_and_destination"]
     filter_state: Literal["configured"]
@@ -177,11 +188,14 @@ class GcpLoggingSinkUnknownRelevanceEvidence(TypedDict):
 GcpLoggingSinkAuditTelemetryRelevanceEvidence = (
     GcpLoggingSinkAllLogsRelevanceEvidence
     | GcpLoggingSinkAuditFilterRelevanceEvidence
+    | GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence
     | GcpLoggingSinkIrrelevantFilterEvidence
     | GcpLoggingSinkUnknownRelevanceEvidence
 )
 GcpLoggingSinkEstablishedAuditTelemetryRelevanceEvidence = (
-    GcpLoggingSinkAllLogsRelevanceEvidence | GcpLoggingSinkAuditFilterRelevanceEvidence
+    GcpLoggingSinkAllLogsRelevanceEvidence
+    | GcpLoggingSinkAuditFilterRelevanceEvidence
+    | GcpLoggingSinkNarrowedAuditFilterRelevanceEvidence
 )
 
 
