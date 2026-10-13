@@ -133,8 +133,8 @@ Firewall policy actions apply to protocol/port subsets independently for IPv4 an
 
 ### Audit & detection
 * Security Command Center asset-discovery posture
-* Logging exclusions that drop audit/security logs, logging sink destination/filter coverage, and central audit sink modeling
-* Public Cloud Run service accounts with current `logging.sinks.delete` authority over an exact active, user-managed project sink whose effective export deterministically carries audit/security telemetry, reported as prospective Repudiation risk
+* Logging exclusions that drop audit/security logs, logging sink destination/filter coverage, and central audit sink modeling; sink and exclusion filters are judged by boolean structure (`OR`, `AND`, `NOT`, parentheses), so compound audit filters are accepted and a filter that negates audit logs is reported
+* Public Cloud Run service accounts with current `logging.sinks.delete` authority over an exact active, user-managed project sink whose effective export deterministically carries audit/security telemetry (an audit term alone, or narrowed by other terms such as severity), reported as prospective Repudiation risk
 
 ### IAM & identity
 * Workload Identity Federation provider-condition and principal narrowing
@@ -150,6 +150,7 @@ Cloud KMS and Secret Manager lifecycle posture, public workload cryptographic-op
 * GCP support is broad across core workload, data, Kubernetes, private-connectivity, public-edge TLS/protection, and audit/security-posture checks, but still has limited provider-specific positive observation records compared with its finding coverage.
 * Identity-assignment analysis is deterministic and plan-local, focused on modeled IAM bindings/members, custom roles, and Workload Identity Federation pools/providers.
 * Messaging findings establish modeled service-account authority, not successful payload retrieval, acknowledgement or topology deletion, replay, or recovery; see [Public Workload Messaging Disclosure and Disruption Paths](../analysis/messaging-paths.md).
+* Logging-filter analysis parses a supported subset of the Cloud Logging query language: comparisons joined by `AND`, `OR`, `NOT`, `-`, implicit `AND`, and parentheses. Filters using functions such as `SEARCH(...)`, bare text terms, grouped values, or an unparenthesized mix of `AND` and `OR` are treated as unresolved rather than as audit or non-audit, and a conjunction that constrains the same field as an audit term (for example two different `logName` values) is treated as unproven.
 * Logging-sink disruption findings establish current authority over an exact modeled sink, not successful deletion, retained/source or already-delivered log deletion, destination-resource deletion, project-wide or out-of-plan disruption, historical audit-log erasure, or recovery/restoration.
 
 See [Cross-Provider Threat-Path Semantics](../analysis/path-semantics.md) for how these findings relate to the shared cross-provider evidence model.

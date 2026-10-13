@@ -28,7 +28,7 @@ Introduced in 0.4.40, this Repudiation path family models how compromise of a cu
 | Provider | Public workload and runtime identity | Exact target and operation | Current proof constraints |
 | --- | --- | --- | --- |
 | AWS | ECS service and task role | CloudTrail trail via `cloudtrail:StopLogging` or `cloudtrail:DeleteTrail` | Effective IAM (exact trail resources or covering wildcard resources), permissions-boundary compatibility, and current trail/logging state |
-| GCP | Cloud Run service and service account | Active user-managed project logging sink via `logging.sinks.delete` | Effective project IAM, IAM deny policies, destination, filter/exclusions, and sink state |
+| GCP | Cloud Run service and service account | Active user-managed project logging sink via `logging.sinks.delete` | Effective project IAM, IAM deny policies, destination, filter structure (including narrowed audit filters)/exclusions, and sink state |
 | Azure | App Service and attached managed identity | Diagnostic-setting ARM extension resource via `Microsoft.Insights/DiagnosticSettings/Delete` | AzureRM state-ID/ARM-target correlation, Actions/NotActions RBAC, destination/categories, and applicable management locks |
 
 Decorated paths are candidate relationships only. Each public-workload rule revalidates current exposure, runtime identity, authorization, exact target, lifecycle/configuration, and provider-native audit relevance before emission. Findings describe prospective weakening of auditability/accountability; they do not establish a successful destructive call, historical or already-delivered telemetry deletion, destination deletion, broad or out-of-plan disruption, or recovery/restoration.

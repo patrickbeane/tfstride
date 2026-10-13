@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from tests.helpers.inventory import inventory_with_updated_identity
 from tests.providers.gcp.test_gcp_cloud_run_logging_sink_audit_telemetry_disruption_paths import (
@@ -24,6 +25,7 @@ from tests.providers.gcp.test_gcp_public_cloud_run_firestore_mutation_rules impo
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
+from tfstride.app import TfStride
 from tfstride.models import ResourceInventory, StrideCategory, TerraformResource
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
@@ -339,6 +341,33 @@ class GcpPublicCloudRunLoggingSinkDisruptionRuleTests(unittest.TestCase):
         gcp_facts(workload).set_cloud_run_logging_sink_audit_telemetry_disruption_paths(paths)
 
         self.assertEqual(_evaluate_inventory(inventory), [])
+
+
+class GcpPublicCloudRunLoggingSinkFilterFixtureTests(unittest.TestCase):
+    def test_compound_filter_fixture_reports_full_and_narrowed_sinks_only(self) -> None:
+        fixture = (
+            Path(__file__).resolve().parents[3] / "fixtures" / "gcp" / "sample_gcp_cloud_run_logging_sink_plan.json"
+        )
+        result = TfStride().analyze_plan(fixture)
+
+        disruption = [finding for finding in result.findings if finding.rule_id == _RULE_ID]
+        self.assertEqual(len(disruption), 1)
+        self.assertEqual(
+            [address for address in disruption[0].affected_resources if "logging_project_sink" in address],
+            ["google_logging_project_sink.audit", "google_logging_project_sink.errors"],
+        )
+        relevance = " ".join(
+            {item.key: item.values for item in disruption[0].evidence}[
+                "logging_sink_audit_telemetry_relevance_evidence"
+            ]
+        )
+        self.assertIn("relevance_basis=audit_security_filter", relevance)
+        self.assertIn("relevance_basis=narrowed_audit_security_filter", relevance)
+
+        posture = [
+            finding for finding in result.findings if finding.rule_id == "gcp-logging-sink-audit-export-incomplete"
+        ]
+        self.assertEqual([finding.affected_resources for finding in posture], [["google_logging_project_sink.negated"]])
 
 
 if __name__ == "__main__":

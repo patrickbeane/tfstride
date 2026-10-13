@@ -384,6 +384,7 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 | Baseline                            | `fixtures/gcp/sample_gcp_baseline_plan.json`          | `examples/gcp/gcp_baseline_report.md`          |
 | Load balancer / compute / Cloud SQL | `fixtures/gcp/sample_gcp_lb_compute_sql_plan.json`    | `examples/gcp/gcp_lb_compute_sql_report.md`    |
 | Serverless                          | `fixtures/gcp/sample_gcp_serverless_plan.json`        | `examples/gcp/gcp_serverless_report.md`        |
+| Cloud Run / logging sink filters    | `fixtures/gcp/sample_gcp_cloud_run_logging_sink_plan.json` | `examples/gcp/gcp_cloud_run_logging_sink_report.md` |
 | Cross-project IAM                   | `fixtures/gcp/sample_gcp_cross_project_iam_plan.json` | `examples/gcp/gcp_cross_project_iam_report.md` |
 | Mixed inventory                     | `fixtures/gcp/sample_gcp_plan.json`                   | `examples/gcp/gcp_inventory_report.md`         |
 | Nightmare                           | `fixtures/gcp/sample_gcp_nightmare_plan.json`         | `examples/gcp/gcp_nightmare_report.md`         |

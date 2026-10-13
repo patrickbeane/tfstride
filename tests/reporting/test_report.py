@@ -40,6 +40,7 @@ GCP_SAFE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_safe_plan.json"
 GCP_BASELINE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_baseline_plan.json"
 GCP_LB_COMPUTE_SQL_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_lb_compute_sql_plan.json"
 GCP_SERVERLESS_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_serverless_plan.json"
+GCP_CLOUD_RUN_LOGGING_SINK_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cloud_run_logging_sink_plan.json"
 GCP_CROSS_PROJECT_IAM_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_cross_project_iam_plan.json"
 GCP_NIGHTMARE_FIXTURE_PATH = FIXTURES_DIR / "gcp" / "sample_gcp_nightmare_plan.json"
 AZURE_SAFE_FIXTURE_PATH = FIXTURES_DIR / "azure" / "sample_azure_safe_plan.json"
@@ -153,6 +154,7 @@ class MarkdownReportTests(unittest.TestCase):
             GCP_BASELINE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_baseline_report.md",
             GCP_LB_COMPUTE_SQL_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_lb_compute_sql_report.md",
             GCP_SERVERLESS_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_serverless_report.md",
+            GCP_CLOUD_RUN_LOGGING_SINK_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_cloud_run_logging_sink_report.md",
             GCP_CROSS_PROJECT_IAM_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_cross_project_iam_report.md",
             GCP_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_inventory_report.md",
             GCP_NIGHTMARE_FIXTURE_PATH: EXAMPLES_DIR / "gcp" / "gcp_nightmare_report.md",
