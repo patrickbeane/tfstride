@@ -148,6 +148,10 @@ _CATALOG: dict[str, AzureDiagnosticLogCatalogEntry] = {
 }
 
 
+def normalize_category_token(value: str) -> str:
+    return "".join(character for character in value.strip().lower() if character.isalnum())
+
+
 def diagnostic_log_catalog_entry(resource_type: str) -> AzureDiagnosticLogCatalogEntry | None:
     return _CATALOG.get(resource_type)
 
@@ -177,7 +181,7 @@ def category_audit_relevance(resource_type: str, category: str) -> CategoryAudit
 def category_group_audit_relevance(resource_type: str, group: str) -> CategoryAuditRelevance:
     """Whether an enabled category group carries audit telemetry for the resource type."""
 
-    key = "".join(character for character in group.strip().lower() if character.isalnum())
+    key = normalize_category_token(group)
     if key == "audit":
         return "audit"
     if key != "alllogs":

@@ -11,6 +11,10 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import Finding, NormalizedResource
 from tfstride.providers.azure.app_service_ingress_helpers import app_service_ingress
+from tfstride.providers.azure.diagnostic_audit_relevance import (
+    lenient_is_audit_or_security_category,
+    lenient_is_audit_or_security_category_group,
+)
 from tfstride.providers.azure.diagnostic_index import (
     AzureDiagnosticSettingCoverage,
     build_azure_diagnostic_setting_index,
@@ -51,7 +55,6 @@ _DIAGNOSTIC_DESTINATION_UNCERTAINTY_FIELDS = (
     "partner_solution_id",
 )
 _DIAGNOSTIC_CATEGORY_FIELDS = ("enabled_log", "log", "category", "category_group")
-_AUDIT_SECURITY_CATEGORY_GROUPS = frozenset({"audit", "alllogs"})
 
 
 class AzureAuditRuleDetectors:
@@ -338,23 +341,9 @@ def _diagnostic_destination_evidence(facts: AzureResourceFacts) -> list[str]:
 
 
 def _has_audit_or_security_log_coverage(coverage: AzureDiagnosticSettingCoverage) -> bool:
-    return any(_is_audit_or_security_log_category(category) for category in coverage.enabled_log_categories) or any(
-        _is_audit_or_security_log_category_group(group) for group in coverage.enabled_log_category_groups
+    return any(lenient_is_audit_or_security_category(category) for category in coverage.enabled_log_categories) or any(
+        lenient_is_audit_or_security_category_group(group) for group in coverage.enabled_log_category_groups
     )
-
-
-def _is_audit_or_security_log_category(value: str) -> bool:
-    normalized = _normalized_category_token(value)
-    return "audit" in normalized or "security" in normalized
-
-
-def _is_audit_or_security_log_category_group(value: str) -> bool:
-    normalized = _normalized_category_token(value)
-    return normalized in _AUDIT_SECURITY_CATEGORY_GROUPS or "audit" in normalized or "security" in normalized
-
-
-def _normalized_category_token(value: str) -> str:
-    return "".join(character for character in value.strip().lower() if character.isalnum())
 
 
 def _diagnostic_setting_coverage_evidence(coverage: AzureDiagnosticSettingCoverage) -> list[str]:

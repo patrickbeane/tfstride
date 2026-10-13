@@ -28,6 +28,10 @@ from tfstride.providers.azure.audit_telemetry_disruption_evidence import (
     AzureDiagnosticSettingRoleEvidence,
     AzureDiagnosticSettingStorageDestinationEvidence,
 )
+from tfstride.providers.azure.diagnostic_audit_relevance import (
+    strict_is_audit_or_security_category,
+    strict_is_audit_or_security_category_group,
+)
 from tfstride.providers.azure.key_vault_evidence import AzureKeyVaultRuntimeIdentityKind
 from tfstride.providers.azure.resource_decoration.workload_identities import (
     workload_managed_identities,
@@ -48,18 +52,6 @@ _PARENT_RESOURCE_ID_PATTERN = re.compile(
     r"^/subscriptions/[^/]+/resourcegroups/[^/]+/providers/[^/]+/[^/]+/[^/]+(?:/[^/]+/[^/]+)*$",
     re.IGNORECASE,
 )
-# Web App diagnostic categories deterministically include AppServiceAuditLogs.
-# Do not generalize allLogs relevance to Function Apps or other Azure targets.
-_ALL_LOGS_AUDIT_SECURITY_RESOURCE_TYPES = frozenset(
-    {
-        AzureResourceType.LINUX_WEB_APP,
-        AzureResourceType.WINDOWS_WEB_APP,
-    }
-)
-_AUDIT_SECURITY_CATEGORIES_BY_RESOURCE_TYPE = {
-    AzureResourceType.LINUX_WEB_APP: frozenset({"appserviceauditlogs"}),
-    AzureResourceType.WINDOWS_WEB_APP: frozenset({"appserviceauditlogs"}),
-}
 _DESTINATION_FIELDS = (
     "log_analytics_workspace_id",
     "storage_account_id",
@@ -442,7 +434,7 @@ def _relevance_evidence(
         (
             value
             for value in categories
-            if _is_audit_or_security_category(
+            if strict_is_audit_or_security_category(
                 value,
                 target.monitored_resource.resource_type,
             )
@@ -467,7 +459,7 @@ def _relevance_evidence(
         (
             value
             for value in groups
-            if _is_audit_or_security_category_group(
+            if strict_is_audit_or_security_category_group(
                 value,
                 target.monitored_resource.resource_type,
             )
@@ -769,31 +761,6 @@ def _symbolic_resource_address(value: str) -> str | None:
         return None
     address = normalized[:-3].strip()
     return address or None
-
-
-def _is_audit_or_security_category(
-    value: str,
-    monitored_resource_type: str,
-) -> bool:
-    supported = _AUDIT_SECURITY_CATEGORIES_BY_RESOURCE_TYPE.get(
-        monitored_resource_type,
-        frozenset(),
-    )
-    return value.strip().casefold() in supported
-
-
-def _is_audit_or_security_category_group(
-    value: str,
-    monitored_resource_type: str,
-) -> bool:
-    normalized = _normalized_category_token(value)
-    if normalized == "audit":
-        return True
-    return normalized == "alllogs" and monitored_resource_type in _ALL_LOGS_AUDIT_SECURITY_RESOURCE_TYPES
-
-
-def _normalized_category_token(value: str) -> str:
-    return "".join(character for character in value.strip().lower() if character.isalnum())
 
 
 def _matching_uncertainties(
