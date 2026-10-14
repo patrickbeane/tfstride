@@ -1,9 +1,12 @@
 """Audit/security relevance matching for enabled diagnostic-setting logs.
 
-Two matchers coexist while their callers move to the documented category
-catalog: the lenient matcher backs the posture rule by looking for the words
-"audit" and "security", and the strict matcher backs public-workload disruption
-paths and only knows Web App categories.
+Two matchers coexist. The lenient matcher backs the posture rule by looking for
+the words "audit" and "security". It stays lenient on purpose: the posture rule
+claims a setting "does not clearly enable audit logs", and a wrong claim is
+noise on a compliant configuration, so cases the documented category catalog
+cannot resolve are accepted rather than flagged. The strict matcher backs
+public-workload disruption paths, which need proof, and only knows Web App
+categories until it moves to the catalog.
 """
 
 from __future__ import annotations
