@@ -28,9 +28,9 @@ from tfstride.providers.azure.audit_telemetry_disruption_evidence import (
     AzureDiagnosticSettingRoleEvidence,
     AzureDiagnosticSettingStorageDestinationEvidence,
 )
-from tfstride.providers.azure.diagnostic_audit_relevance import (
-    strict_is_audit_or_security_category,
-    strict_is_audit_or_security_category_group,
+from tfstride.providers.azure.diagnostic_log_catalog import (
+    category_audit_relevance,
+    category_group_audit_relevance,
 )
 from tfstride.providers.azure.key_vault_evidence import AzureKeyVaultRuntimeIdentityKind
 from tfstride.providers.azure.resource_decoration.workload_identities import (
@@ -430,17 +430,11 @@ def _relevance_evidence(
     if uncertainties:
         return None, dedupe(uncertainties)
 
-    matched_category = next(
-        (
-            value
-            for value in categories
-            if strict_is_audit_or_security_category(
-                value,
-                target.monitored_resource.resource_type,
-            )
-        ),
-        None,
-    )
+    monitored_type = target.monitored_resource.resource_type
+    category_states = [(value, category_audit_relevance(monitored_type, value)) for value in categories]
+    group_states = [(value, category_group_audit_relevance(monitored_type, value)) for value in groups]
+
+    matched_category = next((value for value, state in category_states if state == "audit"), None)
     if matched_category is not None:
         return (
             AzureDiagnosticSettingAuditCategoryRelevanceEvidence(
@@ -455,17 +449,7 @@ def _relevance_evidence(
             ),
             [],
         )
-    matched_group = next(
-        (
-            value
-            for value in groups
-            if strict_is_audit_or_security_category_group(
-                value,
-                target.monitored_resource.resource_type,
-            )
-        ),
-        None,
-    )
+    matched_group = next((value for value, state in group_states if state == "audit"), None)
     if matched_group is not None:
         return (
             AzureDiagnosticSettingAuditCategoryGroupRelevanceEvidence(
@@ -480,7 +464,13 @@ def _relevance_evidence(
             ),
             [],
         )
-    return None, []
+    return None, [
+        f"{resource.address}: audit relevance of enabled log {kind} {value} is unresolved for "
+        f"{monitored_type} in the documented category catalog"
+        for kind, states in (("category", category_states), ("category group", group_states))
+        for value, state in states
+        if state == "unresolved"
+    ]
 
 
 def _management_lock_evaluation(

@@ -83,20 +83,26 @@ _CASES = (
     _Case("sql server", _group("audit"), True, True),
     _Case("postgresql server", _group("audit"), True, True),
     _Case("aks cluster", _group("audit"), True, True),
-    # Rows below are the disagreements this baseline exists to expose. The
-    # disruption path only knows Web App categories, and accepts allLogs only
-    # for Web Apps, so it cannot establish relevance for these settings.
+    # Documented audit categories and groups now establish relevance for the
+    # resource types the catalog covers.
+    _Case("key vault", _group("allLogs"), True, True),
+    _Case("key vault", _category("AuditEvent"), True, True),
+    _Case("aks cluster", _group("allLogs"), True, True),
+    _Case("aks cluster", _category("kube-audit"), True, True),
+    # Rows below are the remaining disagreements, and they are intentional:
+    # posture only claims a setting does not clearly enable audit logs, while
+    # the disruption path needs proof, so cases the catalog cannot resolve stay
+    # accepted by posture and unestablished for disruption. The catalog records
+    # an uncertainty for unresolved cases, and none where the documented list
+    # has no audit category (PostgreSQL allLogs).
     _Case("linux function app", _group("allLogs"), True, False),
-    _Case("key vault", _group("allLogs"), True, False),
-    _Case("key vault", _category("AuditEvent"), True, False),
     _Case("storage account", _group("allLogs"), True, False),
     _Case("sql server", _group("allLogs"), True, False),
     _Case("sql server", _category("SQLSecurityAuditEvents"), True, False),
     _Case("postgresql server", _group("allLogs"), True, False),
-    _Case("aks cluster", _group("allLogs"), True, False),
-    _Case("aks cluster", _category("kube-audit"), True, False),
     # A category that belongs to a different resource type is still accepted
-    # by posture, which matches on the words "audit" and "security" alone.
+    # by posture, which matches on the words "audit" and "security" alone, and
+    # is unresolved for disruption because the catalog does not list it there.
     _Case("linux web app", _category("AuditEvent"), True, False),
 )
 
@@ -143,10 +149,6 @@ class AzureDiagnosticAuditRelevanceParityBaselineTests(unittest.TestCase):
             disagreements,
             sorted(
                 [
-                    "aks cluster: {'category': 'kube-audit'}",
-                    "aks cluster: {'category_group': 'allLogs'}",
-                    "key vault: {'category': 'AuditEvent'}",
-                    "key vault: {'category_group': 'allLogs'}",
                     "linux function app: {'category_group': 'allLogs'}",
                     "linux web app: {'category': 'AuditEvent'}",
                     "postgresql server: {'category_group': 'allLogs'}",
