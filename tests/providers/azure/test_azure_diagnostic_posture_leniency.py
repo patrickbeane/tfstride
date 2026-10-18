@@ -48,8 +48,8 @@ class AzureDiagnosticPostureLeniencyTests(unittest.TestCase):
             ("linux function app", _group("allLogs")),
             ("storage account", _group("allLogs")),
             ("sql server", _group("allLogs")),
-            # allLogs where the list has no audit category but the service may still emit audit
-            # records inside another category, such as pgaudit output in PostgreSQLLogs.
+            # allLogs where the service may still emit audit records inside a category that is
+            # not audit by name, such as pgaudit output in PostgreSQLLogs.
             ("postgresql server", _group("allLogs")),
             # A documented audit category name used on a type that does not document it. The
             # catalog is a snapshot of Microsoft's reference and Azure adds categories over time.
@@ -68,6 +68,8 @@ class AzureDiagnosticPostureLeniencyTests(unittest.TestCase):
             ("linux function app", _category("FunctionAppLogs")),
             ("key vault", _category("AzurePolicyEvaluationDetails")),
             ("aks cluster", _category("kube-apiserver")),
+            # Pre-existing keyword behavior: PostgreSQLLogs alone names no audit signal, so
+            # posture still flags it even though the catalog treats it as unresolved.
             ("postgresql server", _category("PostgreSQLLogs")),
             ("storage account", _category("StorageRead")),
         )

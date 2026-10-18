@@ -24,10 +24,13 @@ class AzureDiagnosticLogCatalogTests(unittest.TestCase):
                 self.assertTrue(entry.source.startswith("https://learn.microsoft.com/"))
                 self.assertTrue(entry.arm_type.startswith("Microsoft."))
                 self.assertEqual(entry.audit_categories & entry.other_categories, frozenset())
+                self.assertEqual(entry.ambiguous_categories & entry.audit_categories, frozenset())
+                self.assertEqual(entry.ambiguous_categories & entry.other_categories, frozenset())
                 if entry.all_logs_state == "carries_audit":
                     self.assertTrue(entry.audit_categories)
                 if entry.all_logs_state == "no_audit":
                     self.assertFalse(entry.audit_categories)
+                    self.assertFalse(entry.ambiguous_categories)
 
     def test_documented_audit_categories_are_recognized_per_type(self) -> None:
         cases = (
@@ -51,7 +54,7 @@ class AzureDiagnosticLogCatalogTests(unittest.TestCase):
             (AzureResourceType.LINUX_WEB_APP, "AppServiceIPSecAuditLogs"),
             (AzureResourceType.KEY_VAULT, "AzurePolicyEvaluationDetails"),
             (AzureResourceType.KUBERNETES_CLUSTER, "kube-apiserver"),
-            (AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER, "PostgreSQLLogs"),
+            (AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER, "PostgreSQLFlexSessions"),
             (AzureResourceType.LINUX_FUNCTION_APP, "FunctionAppLogs"),
         )
         for resource_type, category in cases:
@@ -63,6 +66,7 @@ class AzureDiagnosticLogCatalogTests(unittest.TestCase):
             (AzureResourceType.LINUX_WEB_APP, "AuditEvent"),
             (AzureResourceType.KEY_VAULT, "AppServiceAuditLogs"),
             (AzureResourceType.MSSQL_SERVER, "SQLSecurityAuditEvents"),
+            (AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER, "PostgreSQLLogs"),
             (AzureResourceType.STORAGE_ACCOUNT, "StorageRead"),
             (AzureResourceType.LINUX_FUNCTION_APP, "AppServiceAuditLogs"),
             (AzureResourceType.MSSQL_DATABASE, "SQLSecurityAuditEvents"),
@@ -84,7 +88,7 @@ class AzureDiagnosticLogCatalogTests(unittest.TestCase):
             AzureResourceType.WINDOWS_WEB_APP: "audit",
             AzureResourceType.KEY_VAULT: "audit",
             AzureResourceType.KUBERNETES_CLUSTER: "audit",
-            AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER: "not_audit",
+            AzureResourceType.POSTGRESQL_FLEXIBLE_SERVER: "unresolved",
             AzureResourceType.LINUX_FUNCTION_APP: "unresolved",
             AzureResourceType.FUNCTION_APP: "unresolved",
             AzureResourceType.WINDOWS_FUNCTION_APP: "unresolved",

@@ -85,6 +85,8 @@ class AzureDiagnosticRelevanceCatalogTests(unittest.TestCase):
             ("unmodeled category", _COSMOSDB, {"category": "DataPlaneRequests"}),
             ("unmodeled allLogs", _COSMOSDB, {"category_group": "allLogs"}),
             ("unknown group", _KEY_VAULT, {"category_group": "someFutureGroup"}),
+            ("postgresql allLogs may include pgaudit", _POSTGRESQL, {"category_group": "allLogs"}),
+            ("postgresql server log may include pgaudit", _POSTGRESQL, {"category": "PostgreSQLLogs"}),
         )
         for case, monitored, log in cases:
             with self.subTest(case=case):
@@ -97,7 +99,7 @@ class AzureDiagnosticRelevanceCatalogTests(unittest.TestCase):
 
     def test_documented_non_audit_settings_are_not_uncertain(self) -> None:
         cases = (
-            ("postgresql allLogs has no audit category", _POSTGRESQL, {"category_group": "allLogs"}),
+            ("postgresql sessions", _POSTGRESQL, {"category": "PostgreSQLFlexSessions"}),
             ("web app http logs", _WEB_APP, {"category": "AppServiceHTTPLogs"}),
             ("key vault policy evaluation", _KEY_VAULT, {"category": "AzurePolicyEvaluationDetails"}),
             ("function app logs", _FUNCTION_APP, {"category": "FunctionAppLogs"}),

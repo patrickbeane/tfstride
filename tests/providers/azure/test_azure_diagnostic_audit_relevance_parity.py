@@ -92,9 +92,8 @@ _CASES = (
     # Rows below are the remaining disagreements, and they are intentional:
     # posture only claims a setting does not clearly enable audit logs, while
     # the disruption path needs proof, so cases the catalog cannot resolve stay
-    # accepted by posture and unestablished for disruption. The catalog records
-    # an uncertainty for unresolved cases, and none where the documented list
-    # has no audit category (PostgreSQL allLogs).
+    # accepted by posture and unestablished for disruption, where the catalog
+    # records an uncertainty for each unresolved case.
     _Case("linux function app", _group("allLogs"), True, False),
     _Case("storage account", _group("allLogs"), True, False),
     _Case("sql server", _group("allLogs"), True, False),

@@ -32,6 +32,7 @@ class AzureDiagnosticLogCatalogEntry:
     arm_type: str
     audit_categories: frozenset[str]
     other_categories: frozenset[str]
+    ambiguous_categories: frozenset[str]
     all_logs_state: AllLogsAuditState
     source: str
 
@@ -41,6 +42,7 @@ def _entry(
     *,
     audit: tuple[str, ...] = (),
     other: tuple[str, ...] = (),
+    ambiguous: tuple[str, ...] = (),
     all_logs: AllLogsAuditState,
     source: str,
 ) -> AzureDiagnosticLogCatalogEntry:
@@ -48,6 +50,7 @@ def _entry(
         arm_type=arm_type,
         audit_categories=frozenset(name.casefold() for name in audit),
         other_categories=frozenset(name.casefold() for name in other),
+        ambiguous_categories=frozenset(name.casefold() for name in ambiguous),
         all_logs_state=all_logs,
         source=source,
     )
@@ -118,10 +121,13 @@ _CATALOG: dict[str, AzureDiagnosticLogCatalogEntry] = {
             "PostgreSQLFlexQueryStoreWaitStats",
             "PostgreSQLFlexSessions",
             "PostgreSQLFlexTableStats",
-            "PostgreSQLLogs",
             "PostgreSQLQueryStoreSqlText",
         ),
-        all_logs="no_audit",
+        # The server log can carry pgaudit output when pgaudit is configured through
+        # server parameters, which a plan-local view of the diagnostic setting cannot
+        # show, so neither the category nor allLogs proves or disproves audit content.
+        ambiguous=("PostgreSQLLogs",),
+        all_logs="unresolved",
         source=f"{_SUPPORTED_LOGS}microsoft-dbforpostgresql-flexibleservers-logs",
     ),
     AzureResourceType.KUBERNETES_CLUSTER: _entry(
@@ -163,8 +169,8 @@ def cataloged_resource_types() -> frozenset[str]:
 def category_audit_relevance(resource_type: str, category: str) -> CategoryAuditRelevance:
     """Whether one enabled log category carries audit telemetry for the resource type.
 
-    A category the catalog does not list for the type, and any category on an
-    unmodeled type, is unresolved rather than non-audit.
+    A category the catalog does not list for the type, one it lists as ambiguous,
+    and any category on an unmodeled type, is unresolved rather than non-audit.
     """
 
     entry = _CATALOG.get(resource_type)
