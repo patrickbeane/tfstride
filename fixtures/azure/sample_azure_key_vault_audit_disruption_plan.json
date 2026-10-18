@@ -1,0 +1,75 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_linux_web_app.orders",
+          "mode": "managed",
+          "type": "azurerm_linux_web_app",
+          "name": "orders",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/sub-0001/resourceGroups/app/providers/Microsoft.Web/sites/orders",
+            "name": "orders",
+            "identity": [
+              {
+                "type": "SystemAssigned",
+                "principal_id": "app-system-principal-id",
+                "tenant_id": "tenant-id",
+                "identity_ids": []
+              }
+            ],
+            "public_network_access_enabled": true
+          }
+        },
+        {
+          "address": "azurerm_key_vault.orders",
+          "mode": "managed",
+          "type": "azurerm_key_vault",
+          "name": "orders",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/sub-0001/resourceGroups/ops/providers/Microsoft.KeyVault/vaults/orders-kv",
+            "name": "orders-kv",
+            "public_network_access_enabled": false,
+            "purge_protection_enabled": true
+          }
+        },
+        {
+          "address": "azurerm_monitor_diagnostic_setting.key_vault_audit",
+          "mode": "managed",
+          "type": "azurerm_monitor_diagnostic_setting",
+          "name": "key_vault_audit",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "id": "/subscriptions/sub-0001/resourceGroups/ops/providers/Microsoft.KeyVault/vaults/orders-kv|key-vault-audit",
+            "name": "key-vault-audit",
+            "target_resource_id": "/subscriptions/sub-0001/resourceGroups/ops/providers/Microsoft.KeyVault/vaults/orders-kv",
+            "log_analytics_workspace_id": "/subscriptions/sub-0001/resourceGroups/obs/providers/Microsoft.OperationalInsights/workspaces/security",
+            "enabled_log": [
+              {
+                "category": "AuditEvent"
+              }
+            ]
+          }
+        },
+        {
+          "address": "azurerm_role_assignment.monitoring",
+          "mode": "managed",
+          "type": "azurerm_role_assignment",
+          "name": "monitoring",
+          "provider_name": "registry.terraform.io/hashicorp/azurerm",
+          "values": {
+            "scope": "/subscriptions/sub-0001",
+            "role_definition_name": "Monitoring Contributor",
+            "role_definition_id": "/subscriptions/sub-0001/providers/Microsoft.Authorization/roleDefinitions/749f88d5-cbae-40b8-bcfc-e573ddc772fa",
+            "principal_id": "app-system-principal-id",
+            "principal_type": "ServicePrincipal"
+          }
+        }
+      ]
+    }
+  }
+}

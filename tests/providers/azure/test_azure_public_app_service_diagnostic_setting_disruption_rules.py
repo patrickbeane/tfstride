@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from tests.providers.azure.test_azure_app_service_diagnostic_setting_audit_telemetry_disruption_paths import (
     _AZURE_DIAGNOSTIC_ID,
@@ -17,6 +18,7 @@ from tests.providers.test_public_workload_structured_data_topology_destruction_b
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.analysis.trust_boundaries import detect_trust_boundaries
+from tfstride.app import TfStride
 from tfstride.models import ResourceInventory, StrideCategory, TerraformResource
 from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.normalizer import AzureNormalizer
@@ -270,6 +272,26 @@ class AzurePublicAppServiceDiagnosticSettingDisruptionRuleTests(unittest.TestCas
         evidence = _evidence(current_findings[0])
         self.assertEqual(len(evidence["diagnostic_setting_audit_telemetry_disruption_paths"]), 1)
         self.assertEqual(current_findings[0].affected_resources.count(_DIAGNOSTIC_ADDRESS), 1)
+
+
+class AzurePublicAppServiceKeyVaultAuditFixtureTests(unittest.TestCase):
+    def test_key_vault_audit_event_setting_is_a_disruption_target(self) -> None:
+        fixture = (
+            Path(__file__).resolve().parents[3]
+            / "fixtures"
+            / "azure"
+            / "sample_azure_key_vault_audit_disruption_plan.json"
+        )
+        result = TfStride().analyze_plan(fixture)
+
+        findings = [finding for finding in result.findings if finding.rule_id == _RULE_ID]
+        self.assertEqual(len(findings), 1)
+        self.assertIn("azurerm_monitor_diagnostic_setting.key_vault_audit", findings[0].affected_resources)
+        evidence = " ".join(
+            value for item in findings[0].evidence if item.key.endswith("relevance_evidence") for value in item.values
+        )
+        self.assertIn("relevance_basis=audit_security_category", evidence)
+        self.assertIn("AuditEvent", evidence)
 
 
 if __name__ == "__main__":

@@ -402,6 +402,7 @@ The repo includes ready-to-run Terraform plan fixtures and generated example rep
 | Key Vault        | `fixtures/azure/sample_azure_key_vault_plan.json`      | `examples/azure/azure_key_vault_report.md`         |
 | Managed identity | `fixtures/azure/sample_azure_identity_plan.json`       | `examples/azure/azure_identity_report.md`          |
 | NSG precedence   | `fixtures/azure/sample_azure_nsg_precedence_plan.json` | `examples/azure/azure_nsg_precedence_report.md`    |
+| Key Vault audit-log disruption | `fixtures/azure/sample_azure_key_vault_audit_disruption_plan.json` | `examples/azure/azure_key_vault_audit_disruption_report.md` |
 | Mixed inventory  | `fixtures/azure/sample_azure_plan.json`                | `examples/azure/azure_inventory_report.md`         |
 | Nightmare        | `fixtures/azure/sample_azure_nightmare_plan.json`      | `examples/azure/azure_nightmare_report.md`         |
 
