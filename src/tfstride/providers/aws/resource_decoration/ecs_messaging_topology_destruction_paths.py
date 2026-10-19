@@ -41,6 +41,8 @@ _IAM_ROLE = "aws_iam_role"
 _SQS_QUEUE = "aws_sqs_queue"
 _SNS_TOPIC = "aws_sns_topic"
 _COMPLETE = "complete"
+
+_ResourceApplicability = Literal["exact", "pattern_covers", "not_covered", "unresolved"]
 _DELETE_QUEUE = "sqs:DeleteQueue"
 _DELETE_TOPIC = "sns:DeleteTopic"
 _PrincipalMatch = Literal["role", "account", "wildcard"]
@@ -456,7 +458,7 @@ def _identity_policy_matches(
                 context,
                 exact_allow_required=effect == "allow",
             )
-            if applicability is True:
+            if applicability in {"exact", "pattern_covers"}:
                 matches.append(
                     _StatementMatch(
                         statement,
@@ -467,7 +469,7 @@ def _identity_policy_matches(
                         resource,
                     )
                 )
-            elif applicability is None:
+            elif applicability == "unresolved":
                 if effect == "allow":
                     unresolved_allow = True
                 else:
@@ -520,7 +522,7 @@ def _resource_policy_matches(
                 context,
                 exact_allow_required=effect == "allow",
             )
-            if applicability is True:
+            if applicability in {"exact", "pattern_covers"}:
                 matches.append(
                     _StatementMatch(
                         statement,
@@ -532,7 +534,7 @@ def _resource_policy_matches(
                         principal_match,
                     )
                 )
-            elif applicability is None:
+            elif applicability == "unresolved":
                 if effect == "allow":
                     unresolved_allow = True
                 else:
@@ -552,18 +554,18 @@ def _resource_targets(
     context: AwsDecorationContext,
     *,
     exact_allow_required: bool,
-) -> bool | None:
+) -> _ResourceApplicability:
     target_arn = target.arn
     assert target_arn is not None
     normalized = _unwrap_reference(resource)
     if normalized == target_arn:
-        return True
+        return "exact"
     if normalized.startswith("arn:"):
         if _has_wildcard(normalized):
             if exact_allow_required:
-                return None if _arn_pattern_targets_service(normalized, definition.service) else False
-            return fnmatchcase(target_arn, normalized)
-        return False
+                return "unresolved" if _arn_pattern_targets_service(normalized, definition.service) else "not_covered"
+            return "pattern_covers" if fnmatchcase(target_arn, normalized) else "not_covered"
+        return "not_covered"
 
     candidates: set[str] = set()
     uncertain = False
@@ -580,15 +582,15 @@ def _resource_targets(
         elif assessment.state == "uncertain":
             uncertain = True
     if uncertain or len(candidates) > 1:
-        return None
+        return "unresolved"
     if candidates:
-        return candidates == {target.address}
+        return "exact" if candidates == {target.address} else "not_covered"
 
     if normalized == "*":
-        return None if exact_allow_required else True
+        return "unresolved" if exact_allow_required else "pattern_covers"
     if _has_wildcard(normalized):
-        return None
-    return False
+        return "unresolved"
+    return "not_covered"
 
 
 def _resource_policy_posture(
