@@ -135,7 +135,7 @@ _FAMILIES = (
         f"arn:aws:sqs:*:{_ACCOUNT_ID}:*",
         f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:ord*",
         f"arn:aws:sqs:us-east-1:{_FOREIGN_ACCOUNT_ID}:*",
-        False,
+        True,
     ),
     _Family(
         "sns topic topology",
@@ -144,7 +144,7 @@ _FAMILIES = (
         f"arn:aws:sns:*:{_ACCOUNT_ID}:*",
         f"arn:aws:sns:us-east-1:{_ACCOUNT_ID}:orders-*",
         f"arn:aws:sns:us-east-1:{_FOREIGN_ACCOUNT_ID}:*",
-        False,
+        True,
     ),
     _Family(
         "dynamodb table topology",
@@ -206,7 +206,5 @@ class AwsEcsWildcardAuthorityParityBaselineTests(unittest.TestCase):
             [
                 "dynamodb item deletion",
                 "dynamodb table topology",
-                "sns topic topology",
-                "sqs queue topology",
             ],
         )

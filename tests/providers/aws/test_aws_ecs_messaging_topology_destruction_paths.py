@@ -389,13 +389,73 @@ class AwsEcsMessagingTopologyDestructionPathTests(unittest.TestCase):
         self.assertEqual(len(paths), 1)
         self.assertEqual(paths[0]["operation"], _DELETE_QUEUE)
 
-    def test_non_exact_allow_scope_is_uncertain_and_not_promoted(self) -> None:
+    def test_covering_wildcard_allows_project_queue_and_topic_pattern_paths(self) -> None:
+        cases = {
+            "star": ("*", "*"),
+            "region wildcard": (f"arn:aws:sqs:*:{_ACCOUNT_ID}:*", f"arn:aws:sns:*:{_ACCOUNT_ID}:*"),
+            "name prefix": (
+                f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:ord*",
+                f"arn:aws:sns:us-east-1:{_ACCOUNT_ID}:orders-*",
+            ),
+        }
+        for case, (queue_resource, topic_resource) in cases.items():
+            with self.subTest(case=case):
+                _inventory, task, service = _normalize(
+                    role_statements=[
+                        _statement("Allow", _DELETE_QUEUE, queue_resource),
+                        _statement("Allow", _DELETE_TOPIC, topic_resource),
+                    ]
+                )
+                for workload in (task, service):
+                    paths = {
+                        path["operation"]: path for path in aws_facts(workload).ecs_messaging_topology_destruction_paths
+                    }
+                    self.assertEqual(set(paths), {_DELETE_QUEUE, _DELETE_TOPIC})
+                    queue_statement = paths[_DELETE_QUEUE]["authorization_statements"][0]
+                    topic_statement = paths[_DELETE_TOPIC]["authorization_statements"][0]
+                    self.assertEqual(queue_statement["resource_scopes"], ["queue_pattern"])
+                    self.assertEqual(queue_statement["matching_resources"], [queue_resource])
+                    self.assertEqual(topic_statement["resource_scopes"], ["topic_pattern"])
+                    self.assertEqual(topic_statement["matching_resources"], [topic_resource])
+                    self.assertEqual(paths[_DELETE_QUEUE]["target_scope"], "exact_sqs_queue")
+                    self.assertEqual(paths[_DELETE_TOPIC]["target_scope"], "exact_sns_topic")
+
+    def test_non_covering_patterns_produce_no_path_or_uncertainty(self) -> None:
+        for queue_resource, topic_resource in (
+            (f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:orders-*", f"arn:aws:sns:us-east-1:{_ACCOUNT_ID}:audit-*"),
+            (f"arn:aws:sqs:us-east-1:{_EXTERNAL_ACCOUNT_ID}:*", f"arn:aws:sns:us-east-1:{_EXTERNAL_ACCOUNT_ID}:*"),
+            ("arn:aws:s3:::*", "arn:aws:s3:::*"),
+        ):
+            with self.subTest(queue_resource=queue_resource):
+                _inventory, task, _service_resource = _normalize(
+                    role_statements=[
+                        _statement("Allow", _DELETE_QUEUE, queue_resource),
+                        _statement("Allow", _DELETE_TOPIC, topic_resource),
+                    ]
+                )
+                facts = aws_facts(task)
+                self.assertEqual(facts.ecs_messaging_topology_destruction_paths, [])
+                self.assertEqual(facts.ecs_messaging_topology_destruction_path_uncertainties, [])
+
+    def test_wildcard_resource_in_a_direct_queue_or_topic_policy_is_effective(self) -> None:
+        queue = _with_policy(_queue(), [_resource_policy_statement("Allow", _DELETE_QUEUE, "*")])
+        topic = _with_policy(_topic(), [_resource_policy_statement("Allow", _DELETE_TOPIC, "*")])
+        _inventory, task, _service_resource = _normalize(queue=queue, topic=topic)
+
+        paths = {path["operation"]: path for path in aws_facts(task).ecs_messaging_topology_destruction_paths}
+        self.assertEqual(set(paths), {_DELETE_QUEUE, _DELETE_TOPIC})
+        self.assertEqual(paths[_DELETE_QUEUE]["authorization_bases"], ["queue_policy_direct"])
+        self.assertEqual(paths[_DELETE_TOPIC]["authorization_bases"], ["topic_policy_direct"])
+        self.assertEqual(paths[_DELETE_QUEUE]["authorization_statements"][0]["resource_scopes"], ["queue_pattern"])
+        self.assertEqual(paths[_DELETE_TOPIC]["authorization_statements"][0]["resource_scopes"], ["topic_pattern"])
+
+    def test_non_arn_wildcard_allow_scope_is_uncertain_and_not_promoted(self) -> None:
         _inventory, task, _service_resource = _normalize(
             role_statements=[
                 _statement(
                     "Allow",
                     _DELETE_QUEUE,
-                    f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:orders-*",
+                    "orders*",
                 )
             ]
         )

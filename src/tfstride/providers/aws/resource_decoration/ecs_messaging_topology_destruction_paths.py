@@ -84,6 +84,7 @@ class _StatementMatch:
     effect: Literal["allow", "deny"]
     matching_action_patterns: tuple[str, ...]
     matching_resource: str
+    resource_scope: Literal["exact", "pattern"]
     principal_match: _PrincipalMatch | None = None
 
     @property
@@ -456,7 +457,6 @@ def _identity_policy_matches(
                 definition,
                 sources,
                 context,
-                exact_allow_required=effect == "allow",
             )
             if applicability in {"exact", "pattern_covers"}:
                 matches.append(
@@ -467,6 +467,7 @@ def _identity_policy_matches(
                         effect,
                         action_patterns,
                         resource,
+                        "exact" if applicability == "exact" else "pattern",
                     )
                 )
             elif applicability == "unresolved":
@@ -520,7 +521,6 @@ def _resource_policy_matches(
                 definition,
                 (target,),
                 context,
-                exact_allow_required=effect == "allow",
             )
             if applicability in {"exact", "pattern_covers"}:
                 matches.append(
@@ -531,6 +531,7 @@ def _resource_policy_matches(
                         effect,
                         action_patterns,
                         resource,
+                        "exact" if applicability == "exact" else "pattern",
                         principal_match,
                     )
                 )
@@ -552,8 +553,6 @@ def _resource_targets(
     definition: _OperationDefinition,
     sources: Sequence[NormalizedResource],
     context: AwsDecorationContext,
-    *,
-    exact_allow_required: bool,
 ) -> _ResourceApplicability:
     target_arn = target.arn
     assert target_arn is not None
@@ -562,8 +561,6 @@ def _resource_targets(
         return "exact"
     if normalized.startswith("arn:"):
         if _has_wildcard(normalized):
-            if exact_allow_required:
-                return "unresolved" if _arn_pattern_targets_service(normalized, definition.service) else "not_covered"
             return "pattern_covers" if fnmatchcase(target_arn, normalized) else "not_covered"
         return "not_covered"
 
@@ -587,7 +584,7 @@ def _resource_targets(
         return "exact" if candidates == {target.address} else "not_covered"
 
     if normalized == "*":
-        return "unresolved" if exact_allow_required else "pattern_covers"
+        return "pattern_covers"
     if _has_wildcard(normalized):
         return "unresolved"
     return "not_covered"
@@ -858,7 +855,7 @@ def _queue_statement_record(
             match.source_kind,
         ),
         "matched_actions": ["sqs:DeleteQueue"],
-        "resource_scopes": ["exact_queue"],
+        "resource_scopes": ["exact_queue" if match.resource_scope == "exact" else "queue_pattern"],
     }
 
 
@@ -873,7 +870,7 @@ def _topic_statement_record(
             match.source_kind,
         ),
         "matched_actions": ["sns:DeleteTopic"],
-        "resource_scopes": ["exact_topic"],
+        "resource_scopes": ["exact_topic" if match.resource_scope == "exact" else "topic_pattern"],
     }
 
 
@@ -1052,14 +1049,6 @@ def _account_relationship(
         role_account == target_account,
         _arn_partition(role_arn) == _arn_partition(target_arn),
     )
-
-
-def _arn_pattern_targets_service(
-    value: str,
-    service: Literal["sqs", "sns"],
-) -> bool:
-    parts = value.split(":", 5)
-    return bool(len(parts) == 6 and parts[0] == "arn" and parts[2].casefold() == service)
 
 
 def _exact_target_arn(
