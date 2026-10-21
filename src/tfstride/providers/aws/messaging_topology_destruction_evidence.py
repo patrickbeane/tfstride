@@ -18,6 +18,8 @@ AwsMessagingTopologyDestructionTargetGranularity = Literal[
     "queue_topology",
     "topic_topology",
 ]
+AwsSqsQueueResourceScope = Literal["exact_queue", "queue_pattern"]
+AwsSnsTopicResourceScope = Literal["exact_topic", "topic_pattern"]
 AwsMessagingTopologyDestructionAuthorizationBasis = Literal[
     "identity_policy",
     "queue_policy_direct",
@@ -43,7 +45,7 @@ class AwsSqsQueueDeletionPolicyStatementEvidence(
 ):
     source_kind: Literal["identity_policy", "queue_policy"]
     matched_actions: list[Literal["sqs:DeleteQueue"]]
-    resource_scopes: list[Literal["exact_queue"]]
+    resource_scopes: list[AwsSqsQueueResourceScope]
 
 
 class AwsSnsTopicDeletionPolicyStatementEvidence(
@@ -51,7 +53,7 @@ class AwsSnsTopicDeletionPolicyStatementEvidence(
 ):
     source_kind: Literal["identity_policy", "topic_policy"]
     matched_actions: list[Literal["sns:DeleteTopic"]]
-    resource_scopes: list[Literal["exact_topic"]]
+    resource_scopes: list[AwsSnsTopicResourceScope]
 
 
 class AwsMessagingTopologyDestructionOutcomeEvidence(TypedDict):

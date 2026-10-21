@@ -65,6 +65,15 @@ class MessagingTopologyDestructionEvidenceTests(unittest.TestCase):
             Literal["identity_policy", "queue_policy"],
         )
 
+        self.assertEqual(
+            queue_statement_hints["resource_scopes"],
+            list[Literal["exact_queue", "queue_pattern"]],
+        )
+        self.assertEqual(
+            topic_statement_hints["resource_scopes"],
+            list[Literal["exact_topic", "topic_pattern"]],
+        )
+
         self.assertEqual(topic_hints["operation"], Literal["sns:DeleteTopic"])
         self.assertEqual(topic_hints["operation_class"], Literal["topic_deletion"])
         self.assertEqual(topic_hints["target_scope"], Literal["exact_sns_topic"])
