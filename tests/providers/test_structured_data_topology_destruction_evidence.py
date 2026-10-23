@@ -165,6 +165,11 @@ class StructuredDataTopologyDestructionEvidenceTests(unittest.TestCase):
                 AwsDynamoDbTableTopologyResourcePolicyStatementEvidence,
             },
         )
+        for statement_hints in (identity_statement_hints, resource_statement_hints):
+            self.assertEqual(
+                statement_hints["resource_scopes"],
+                list[Literal["exact_table", "table_pattern"]],
+            )
         self.assertEqual(
             identity_statement_hints["source_kind"],
             Literal["identity_policy"],

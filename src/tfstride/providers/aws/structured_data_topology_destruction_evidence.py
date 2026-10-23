@@ -6,6 +6,7 @@ AwsDynamoDbTableTopologyDestructionOperation = Literal["dynamodb:DeleteTable"]
 AwsDynamoDbTableTopologyDestructionOperationClass = Literal["table_deletion"]
 AwsDynamoDbTableTopologyDestructionInternalOperation = Literal["delete_table"]
 AwsDynamoDbTableTopologyDestructionTargetGranularity = Literal["table_topology"]
+AwsDynamoDbTableResourceScope = Literal["exact_table", "table_pattern"]
 AwsDynamoDbTableTopologyDestructionAuthorizationBasis = Literal[
     "identity_policy",
     "table_policy_direct",
@@ -26,7 +27,7 @@ class AwsDynamoDbTableTopologyPolicyStatementEvidenceCommon(TypedDict):
     matched_actions: list[Literal["dynamodb:DeleteTable"]]
     resources: list[str]
     matching_resources: list[str]
-    resource_scopes: list[Literal["exact_table"]]
+    resource_scopes: list[AwsDynamoDbTableResourceScope]
     conditions: list[Never]
     conditional: Literal[False]
 
