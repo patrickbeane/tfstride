@@ -153,7 +153,7 @@ _FAMILIES = (
         f"arn:aws:dynamodb:*:{_ACCOUNT_ID}:table/*",
         f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/ord*",
         f"arn:aws:dynamodb:us-east-1:{_FOREIGN_ACCOUNT_ID}:table/*",
-        False,
+        True,
     ),
     _Family(
         "dynamodb item deletion",
@@ -205,6 +205,5 @@ class AwsEcsWildcardAuthorityParityBaselineTests(unittest.TestCase):
             failing,
             [
                 "dynamodb item deletion",
-                "dynamodb table topology",
             ],
         )

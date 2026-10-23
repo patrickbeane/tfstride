@@ -64,6 +64,7 @@ class _StatementMatch:
     effect: Literal["allow", "deny"]
     matching_action_patterns: tuple[str, ...]
     matching_resource: str
+    resource_scope: Literal["exact", "pattern"]
     principal_match: _PrincipalMatch | None = None
 
     @property
@@ -533,7 +534,6 @@ def _identity_policy_matches(
                 table,
                 sources,
                 context,
-                exact_allow_required=effect == "allow",
             )
             if applicability in {"exact", "pattern_covers"}:
                 matches.append(
@@ -544,6 +544,7 @@ def _identity_policy_matches(
                         effect,
                         action_patterns,
                         resource,
+                        "exact" if applicability == "exact" else "pattern",
                     )
                 )
             elif applicability == "unresolved":
@@ -595,7 +596,6 @@ def _table_policy_matches(
                     table,
                     (source,),
                     context,
-                    exact_allow_required=effect == "allow",
                 )
                 if applicability in {"exact", "pattern_covers"}:
                     matches.append(
@@ -606,6 +606,7 @@ def _table_policy_matches(
                             effect,
                             action_patterns,
                             resource,
+                            "exact" if applicability == "exact" else "pattern",
                             principal_match,
                         )
                     )
@@ -626,8 +627,6 @@ def _resource_targets_table(
     table: NormalizedResource,
     sources: Sequence[NormalizedResource],
     context: AwsDecorationContext,
-    *,
-    exact_allow_required: bool,
 ) -> _ResourceApplicability:
     table_arn = aws_facts(table).dynamodb_table_arn or table.arn
     normalized = _unwrap_reference(resource)
@@ -640,7 +639,7 @@ def _resource_targets_table(
             matches = fnmatchcase(table_arn, normalized)
             if not matches:
                 return "not_covered"
-            return "unresolved" if exact_allow_required else "pattern_covers"
+            return "pattern_covers"
         return "not_covered"
 
     candidates: set[str] = set()
@@ -663,7 +662,7 @@ def _resource_targets_table(
         return "exact" if candidates == {table.address} else "not_covered"
 
     if normalized == "*":
-        return "unresolved" if exact_allow_required else "pattern_covers"
+        return "pattern_covers"
     if _has_wildcard(normalized):
         return "unresolved"
     return "not_covered"
@@ -830,7 +829,6 @@ def _unresolved_policy_may_affect_table_role(
                 table,
                 (source,),
                 context,
-                exact_allow_required=False,
             )
             if applicability in {"exact", "pattern_covers"}:
                 return True
@@ -1119,7 +1117,7 @@ def _statement_record(
             "matched_actions": ["dynamodb:DeleteTable"],
             "resources": list(match.statement.resources),
             "matching_resources": [match.matching_resource],
-            "resource_scopes": ["exact_table"],
+            "resource_scopes": ["exact_table" if match.resource_scope == "exact" else "table_pattern"],
             "principals": [],
             "principal_match": None,
             "conditions": [],
@@ -1135,7 +1133,7 @@ def _statement_record(
         "matched_actions": ["dynamodb:DeleteTable"],
         "resources": list(match.statement.resources),
         "matching_resources": [match.matching_resource],
-        "resource_scopes": ["exact_table"],
+        "resource_scopes": ["exact_table" if match.resource_scope == "exact" else "table_pattern"],
         "principals": sorted(_aws_principal_values(match.statement)),
         "principal_match": cast(_PrincipalMatch, match.principal_match),
         "conditions": [],

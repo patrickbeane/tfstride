@@ -390,7 +390,7 @@ class AwsEcsDynamoDbTableTopologyDestructionPathTests(unittest.TestCase):
                     )
                 ],
             ),
-            "wildcard target": _normalize(
+            "wildcard target with unknown table arn": _normalize(
                 role_statements=[
                     _statement(
                         "Allow",
@@ -398,6 +398,7 @@ class AwsEcsDynamoDbTableTopologyDestructionPathTests(unittest.TestCase):
                         f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/*",
                     )
                 ],
+                table=_table(arn=None),
             ),
             "index target": _normalize(
                 role_statements=[
@@ -422,6 +423,52 @@ class AwsEcsDynamoDbTableTopologyDestructionPathTests(unittest.TestCase):
                     aws_facts(task).ecs_dynamodb_table_topology_destruction_paths,
                     [],
                 )
+
+    def test_covering_wildcard_allows_project_table_pattern_paths(self) -> None:
+        covering_resources = {
+            "star": "*",
+            "region wildcard": f"arn:aws:dynamodb:*:{_ACCOUNT_ID}:table/*",
+            "name wildcard": f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/*",
+            "name prefix": f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/ord*",
+        }
+        for case, resource in covering_resources.items():
+            with self.subTest(case=case):
+                _inventory, task, service = _normalize(
+                    role_statements=[_statement("Allow", _DELETE_TABLE, resource)],
+                )
+                for workload in (task, service):
+                    paths = aws_facts(workload).ecs_dynamodb_table_topology_destruction_paths
+                    self.assertEqual(len(paths), 1)
+                    self.assertEqual(paths[0]["target_scope"], "exact_dynamodb_table")
+                    statement = paths[0]["authorization_statements"][0]
+                    self.assertEqual(statement["resource_scopes"], ["table_pattern"])
+                    self.assertEqual(statement["matching_resources"], [resource])
+
+    def test_non_covering_patterns_produce_no_path_or_uncertainty(self) -> None:
+        for resource in (
+            f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/audit-*",
+            f"arn:aws:dynamodb:us-east-1:{_FOREIGN_ACCOUNT_ID}:table/*",
+            f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/orders/index/*",
+            "arn:aws:s3:::*",
+        ):
+            with self.subTest(resource=resource):
+                _inventory, task, _service_resource = _normalize(
+                    role_statements=[_statement("Allow", _DELETE_TABLE, resource)],
+                )
+                facts = aws_facts(task)
+                self.assertEqual(facts.ecs_dynamodb_table_topology_destruction_paths, [])
+                self.assertEqual(facts.ecs_dynamodb_table_topology_destruction_path_uncertainties, [])
+
+    def test_wildcard_resource_in_a_direct_table_policy_is_effective(self) -> None:
+        policy = _resource_policy(
+            [_statement("Allow", _DELETE_TABLE, "*", principal=_TASK_ROLE_ARN)],
+        )
+        _inventory, task, _service_resource = _normalize(resource_policy=policy)
+
+        paths = aws_facts(task).ecs_dynamodb_table_topology_destruction_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["grant_basis"], "same_account_table_policy_direct")
+        self.assertEqual(paths[0]["authorization_statements"][0]["resource_scopes"], ["table_pattern"])
 
     def test_wildcard_action_is_operation_exact_and_replica_delete_is_separate(
         self,
