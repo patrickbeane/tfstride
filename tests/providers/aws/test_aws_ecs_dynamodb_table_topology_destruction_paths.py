@@ -470,6 +470,74 @@ class AwsEcsDynamoDbTableTopologyDestructionPathTests(unittest.TestCase):
         self.assertEqual(paths[0]["grant_basis"], "same_account_table_policy_direct")
         self.assertEqual(paths[0]["authorization_statements"][0]["resource_scopes"], ["table_pattern"])
 
+    def test_wildcard_allow_fans_out_to_each_table(self) -> None:
+        billing_arn = f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/billing"
+        billing = _resource(
+            "aws_dynamodb_table",
+            "billing",
+            {"id": "billing", "name": "billing", "arn": billing_arn},
+        )
+        _inventory, task, service = _normalize(
+            role_statements=[_statement("Allow", _DELETE_TABLE, "*")],
+            extra=[billing],
+        )
+        for workload in (task, service):
+            paths = aws_facts(workload).ecs_dynamodb_table_topology_destruction_paths
+            self.assertEqual(
+                [path["table_address"] for path in paths],
+                ["aws_dynamodb_table.billing", "aws_dynamodb_table.orders"],
+            )
+
+    def test_exact_deny_carves_one_table_out_of_a_wildcard_allow(self) -> None:
+        billing_arn = f"arn:aws:dynamodb:us-east-1:{_ACCOUNT_ID}:table/billing"
+        billing = _resource(
+            "aws_dynamodb_table",
+            "billing",
+            {"id": "billing", "name": "billing", "arn": billing_arn},
+        )
+        _inventory, task, _service_resource = _normalize(
+            role_statements=[
+                _statement("Allow", _DELETE_TABLE, "*"),
+                _statement("Deny", _DELETE_TABLE, _TABLE_ARN),
+            ],
+            extra=[billing],
+        )
+        self.assertEqual(
+            [path["table_address"] for path in aws_facts(task).ecs_dynamodb_table_topology_destruction_paths],
+            ["aws_dynamodb_table.billing"],
+        )
+
+    def test_wildcard_allows_still_fail_closed_for_conditions_and_incomplete_policies(self) -> None:
+        cases = {
+            "conditional allow": _normalize(
+                role_statements=[
+                    _statement("Allow", _DELETE_TABLE, "*", condition={"Bool": {"aws:SecureTransport": "true"}}),
+                ],
+            ),
+            "conditional deny": _normalize(
+                role_statements=[
+                    _statement("Allow", _DELETE_TABLE, "*"),
+                    _statement("Deny", _DELETE_TABLE, "*", condition={"Bool": {"aws:SecureTransport": "false"}}),
+                ],
+            ),
+            "incomplete policy": _normalize(
+                role_statements=[_statement("Allow", _DELETE_TABLE, "*")],
+                extra=[
+                    _resource(
+                        "aws_iam_role_policy_attachment",
+                        "external",
+                        {
+                            "role": _TASK_ROLE_ARN,
+                            "policy_arn": "arn:aws:iam::aws:policy/ExternalDynamoDbAdministration",
+                        },
+                    )
+                ],
+            ),
+        }
+        for case, (_inventory, task, _service_resource) in cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(aws_facts(task).ecs_dynamodb_table_topology_destruction_paths, [])
+
     def test_wildcard_action_is_operation_exact_and_replica_delete_is_separate(
         self,
     ) -> None:

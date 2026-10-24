@@ -449,6 +449,88 @@ class AwsEcsMessagingTopologyDestructionPathTests(unittest.TestCase):
         self.assertEqual(paths[_DELETE_QUEUE]["authorization_statements"][0]["resource_scopes"], ["queue_pattern"])
         self.assertEqual(paths[_DELETE_TOPIC]["authorization_statements"][0]["resource_scopes"], ["topic_pattern"])
 
+    def test_wildcard_allows_fan_out_to_each_queue_and_topic(self) -> None:
+        billing_queue_arn = f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:billing"
+        alerts_topic_arn = f"arn:aws:sns:us-east-1:{_ACCOUNT_ID}:alerts"
+        _inventory, task, service = _normalize(
+            role_statements=[
+                _statement("Allow", _DELETE_QUEUE, "*"),
+                _statement("Allow", _DELETE_TOPIC, "*"),
+            ],
+            extra=[
+                _queue("billing", arn=billing_queue_arn),
+                _topic("alerts", arn=alerts_topic_arn),
+            ],
+        )
+        for workload in (task, service):
+            paths = aws_facts(workload).ecs_messaging_topology_destruction_paths
+            self.assertEqual(
+                sorted((path["operation"], path.get("queue_address") or path.get("topic_address")) for path in paths),
+                [
+                    (_DELETE_TOPIC, "aws_sns_topic.alerts"),
+                    (_DELETE_TOPIC, "aws_sns_topic.orders"),
+                    (_DELETE_QUEUE, "aws_sqs_queue.billing"),
+                    (_DELETE_QUEUE, "aws_sqs_queue.orders"),
+                ],
+            )
+
+    def test_exact_deny_carves_one_target_out_of_a_wildcard_allow(self) -> None:
+        billing_queue_arn = f"arn:aws:sqs:us-east-1:{_ACCOUNT_ID}:billing"
+        _inventory, task, _service_resource = _normalize(
+            role_statements=[
+                _statement("Allow", _DELETE_QUEUE, "*"),
+                _statement("Deny", _DELETE_QUEUE, _QUEUE_ARN),
+            ],
+            extra=[_queue("billing", arn=billing_queue_arn)],
+        )
+        self.assertEqual(
+            [path["queue_address"] for path in aws_facts(task).ecs_messaging_topology_destruction_paths],
+            ["aws_sqs_queue.billing"],
+        )
+
+    def test_operation_local_deny_keeps_the_other_service_wildcard_authority(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            role_statements=[
+                _statement("Allow", ["sqs:*", "sns:*"], "*"),
+                _statement("Deny", _DELETE_QUEUE, "*"),
+            ],
+        )
+        paths = aws_facts(task).ecs_messaging_topology_destruction_paths
+        self.assertEqual([path["operation"] for path in paths], [_DELETE_TOPIC])
+        self.assertEqual(
+            paths[0]["authorization_statements"][0]["matching_action_patterns"],
+            ["sns:*"],
+        )
+
+    def test_wildcard_allows_still_fail_closed_for_conditions_and_incomplete_policies(self) -> None:
+        cases = {
+            "conditional allow": _normalize(
+                role_statements=[
+                    _statement("Allow", _DELETE_QUEUE, "*", condition={"Bool": {"aws:SecureTransport": "true"}}),
+                ],
+            ),
+            "conditional deny": _normalize(
+                role_statements=[
+                    _statement("Allow", _DELETE_QUEUE, "*"),
+                    _statement("Deny", _DELETE_QUEUE, "*", condition={"Bool": {"aws:SecureTransport": "false"}}),
+                ],
+            ),
+            "incomplete policy": _normalize(
+                role_statements=[_statement("Allow", _DELETE_QUEUE, "*")],
+                extra=[
+                    _role_policy_attachment(
+                        _TASK_ROLE_ARN,
+                        "arn:aws:iam::aws:policy/ExternalMessagingAdministration",
+                    )
+                ],
+            ),
+        }
+        for case, (_inventory, task, _service_resource) in cases.items():
+            with self.subTest(case=case):
+                facts = aws_facts(task)
+                self.assertEqual(facts.ecs_messaging_topology_destruction_paths, [])
+                self.assertTrue(facts.ecs_messaging_topology_destruction_path_uncertainties)
+
     def test_non_arn_wildcard_allow_scope_is_uncertain_and_not_promoted(self) -> None:
         _inventory, task, _service_resource = _normalize(
             role_statements=[

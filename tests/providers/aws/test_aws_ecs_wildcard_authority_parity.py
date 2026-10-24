@@ -105,7 +105,10 @@ class _Family:
     prefix_pattern: str
     # S3 bucket ARNs carry no account, so it has no foreign-account pattern.
     foreign_pattern: str | None
-    # Whether a wildcard allow establishes a path today.
+    # Whether a wildcard allow establishes a path today. DynamoDB item deletion is
+    # left failing closed on purpose: it copies statements from the shared DynamoDB
+    # access-path model, which only accepts exact table and index ARNs and also feeds
+    # the read, mutation, and index-scope findings, so it needs its own change.
     wildcard_allows_establish: bool
 
 
