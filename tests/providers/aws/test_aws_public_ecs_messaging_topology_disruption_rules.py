@@ -435,3 +435,39 @@ class AwsPublicEcsMessagingTopologyDisruptionRuleTests(unittest.TestCase):
             aws_facts(task).ecs_messaging_topology_destruction_paths,
             [],
         )
+
+
+class AwsPublicEcsMessagingTopologyWildcardGrantTests(unittest.TestCase):
+    def test_wildcard_grant_is_reported_with_grant_scope_evidence(self) -> None:
+        _inventory, findings = _evaluate(_public_resources([(_DELETE_QUEUE, "*"), (_DELETE_TOPIC, "*")]))
+
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        paths = evidence["messaging_topology_destruction_paths"]
+        self.assertEqual(len(paths), 2)
+        self.assertTrue(all("grant_resource_scopes=" in value for value in paths))
+        self.assertTrue(any("grant_resource_scopes=queue_pattern" in value for value in paths))
+        self.assertTrue(any("grant_resource_scopes=topic_pattern" in value for value in paths))
+        self.assertTrue(all("grant_resources=*;" in value for value in paths))
+        self.assertIn("granted through wildcard resource patterns", findings[0].rationale)
+        self.assertIn("outside this plan", findings[0].rationale)
+        self.assertIn("resource patterns covering each target", " ".join(evidence["assessment_scope"]))
+
+    def test_exact_grant_rationale_does_not_mention_wildcards(self) -> None:
+        _inventory, findings = _evaluate(_public_resources([(_DELETE_QUEUE, _QUEUE_ARN), (_DELETE_TOPIC, _TOPIC_ARN)]))
+        self.assertEqual(len(findings), 1)
+        self.assertNotIn("wildcard", findings[0].rationale)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        paths = evidence["messaging_topology_destruction_paths"]
+        self.assertTrue(all("grant_resource_scopes=exact_" in value for value in paths))
+
+    def test_current_deny_suppresses_cached_wildcard_finding(self) -> None:
+        inventory, findings = _evaluate(_public_resources([(_DELETE_QUEUE, "*")]))
+        self.assertEqual(len(findings), 1)
+        role = inventory.get_by_address("aws_iam_role.orders_task")
+        assert role is not None
+        role.policy_statements = (
+            *role.policy_statements,
+            parse_policy_statement(_statement("Deny", _DELETE_QUEUE, "*")),
+        )
+        self.assertEqual(_reevaluate(inventory), [])

@@ -33,6 +33,11 @@ from tfstride.providers.aws.resource_index import (
     AwsDecorationContext,
     AwsResourceIndexBuilder,
 )
+from tfstride.providers.aws.topology_grant_evidence import (
+    has_pattern_grant,
+    path_grant_resource_scopes,
+    path_grant_resources,
+)
 from tfstride.resource_helpers import parse_aws_account_id
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
@@ -138,7 +143,9 @@ class AwsEcsMessagingTopologyDisruptionRuleDetectors:
                         load_balancer_addresses,
                         context,
                     ),
-                    rationale=_rationale(service, operations, len(target_addresses)),
+                    rationale=_rationale(
+                        service, operations, len(target_addresses), wildcard_grant=has_pattern_grant(paths)
+                    ),
                     evidence=collect_evidence(
                         evidence_item("network_path", ingress.network_path),
                         *ingress.evidence,
@@ -416,6 +423,8 @@ def _topology_path_evidence(
                     f"operation_class={path.get('operation_class')}",
                     f"target_granularity={path.get('target_granularity')}",
                     f"target_scope={path.get('target_scope')}",
+                    f"grant_resource_scopes={','.join(path_grant_resource_scopes(path))}",
+                    f"grant_resources={','.join(path_grant_resources(path))}",
                     f"task_definition={path.get('task_definition_address')}",
                     f"task_role={path.get('role_address')}",
                     f"authorization_sources={','.join(_string_values(path.get('authorization_source_addresses'))) or 'none'}",
@@ -457,7 +466,8 @@ def _assessment_scope(operations: Sequence[str]) -> list[str]:
     return [
         (
             f"establishes=deterministic {_operation_text(operations)} authority for an ECS task role over exact "
-            "modeled SQS queue or SNS topic topology with Denial of Service effect"
+            "modeled SQS queue or SNS topic topology, granted by exact resources or by resource patterns covering "
+            "each target, with Denial of Service effect"
         ),
         (
             "does_not_establish=successful topology deletion, descendant-resource impact, recovery, or out-of-plan "
@@ -470,6 +480,8 @@ def _rationale(
     service: NormalizedResource,
     operations: Sequence[str],
     target_count: int,
+    *,
+    wildcard_grant: bool = False,
 ) -> str:
     if operations == [_DELETE_QUEUE]:
         impact = "delete exact modeled SQS queues"
@@ -481,8 +493,18 @@ def _rationale(
         f"{service.display_name} is reachable through an internet-facing load balancer and its ECS task role has "
         f"deterministic messaging topology-deletion authority ({_operation_text(operations)}) across {target_count} "
         f"exact modeled messaging target(s). A compromise of the public workload could {impact}, disrupting messaging "
-        "topology and availability. This is plan-local authorization evidence; it does not establish successful "
+        f"topology and availability.{_wildcard_text(wildcard_grant)} This is plan-local authorization evidence; it "
+        "does not establish successful "
         "deletion, descendant-resource impact, recovery, or out-of-plan topology."
+    )
+
+
+def _wildcard_text(wildcard_grant: bool) -> str:
+    if not wildcard_grant:
+        return ""
+    return (
+        " Some of this authority is granted through wildcard resource patterns rather than exact ARNs, so it may "
+        "also extend to messaging targets outside this plan."
     )
 
 

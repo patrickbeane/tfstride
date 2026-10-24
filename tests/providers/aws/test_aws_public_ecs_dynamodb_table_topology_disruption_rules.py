@@ -39,11 +39,12 @@ def _runtime_resources(
     actions: str | list[str],
     *,
     pitr: str = "enabled",
+    table_resource: str = _TABLE_ARN,
 ) -> list[TerraformResource]:
     return [
         *_public_edge(),
         _table(pitr=pitr),
-        _role([_statement("Allow", actions, _TABLE_ARN)]),
+        _role([_statement("Allow", actions, table_resource)]),
         _task_definition(execution_role_arn=None),
         _service(),
     ]
@@ -258,6 +259,42 @@ class AwsPublicEcsDynamoDbTableTopologyDisruptionRuleTests(unittest.TestCase):
         stale = dict(service_facts.ecs_dynamodb_table_topology_destruction_paths[0])
         stale["table_address"] = "aws_dynamodb_table.missing"
         service_facts.set_ecs_dynamodb_table_topology_destruction_paths([stale])
+        self.assertEqual(_reevaluate(inventory, {_RULE_ID}), [])
+
+
+class AwsPublicEcsDynamoDbTableTopologyWildcardGrantTests(unittest.TestCase):
+    def test_wildcard_grant_is_reported_with_grant_scope_evidence(self) -> None:
+        _inventory, findings = _evaluate(_runtime_resources(_DELETE_TABLE, table_resource="*"), {_RULE_ID})
+
+        self.assertEqual([finding.rule_id for finding in findings], [_RULE_ID])
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        paths = evidence["dynamodb_table_topology_destruction_paths"]
+        self.assertTrue(all("target_scope=exact_dynamodb_table" in value for value in paths))
+        self.assertTrue(all("grant_resource_scopes=table_pattern" in value for value in paths))
+        self.assertTrue(all("grant_resources=*;" in value for value in paths))
+        self.assertIn("granted through wildcard resource patterns", findings[0].rationale)
+        self.assertIn("outside this plan", findings[0].rationale)
+        self.assertIn("resource patterns covering each table", " ".join(evidence["assessment_scope"]))
+
+    def test_exact_grant_rationale_does_not_mention_wildcards(self) -> None:
+        _inventory, findings = _evaluate(_runtime_resources(_DELETE_TABLE), {_RULE_ID})
+        self.assertEqual(len(findings), 1)
+        self.assertNotIn("wildcard", findings[0].rationale)
+        evidence = {item.key: item.values for item in findings[0].evidence}
+        paths = evidence["dynamodb_table_topology_destruction_paths"]
+        self.assertTrue(all("grant_resource_scopes=exact_table" in value for value in paths))
+
+    def test_current_deny_suppresses_cached_wildcard_finding(self) -> None:
+        from tfstride.providers.aws.policy_documents import parse_policy_statement
+
+        inventory, findings = _evaluate(_runtime_resources(_DELETE_TABLE, table_resource="*"), {_RULE_ID})
+        self.assertEqual(len(findings), 1)
+        role = inventory.get_by_address("aws_iam_role.orders_task")
+        assert role is not None
+        role.policy_statements = (
+            *role.policy_statements,
+            parse_policy_statement(_statement("Deny", _DELETE_TABLE, "*")),
+        )
         self.assertEqual(_reevaluate(inventory, {_RULE_ID}), [])
 
 

@@ -27,6 +27,11 @@ from tfstride.providers.aws.resource_index import (
 from tfstride.providers.aws.structured_data_topology_destruction_evidence import (
     AwsEcsDynamoDbTableTopologyDestructionPath,
 )
+from tfstride.providers.aws.topology_grant_evidence import (
+    has_pattern_grant,
+    path_grant_resource_scopes,
+    path_grant_resources,
+)
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
@@ -135,7 +140,9 @@ class AwsEcsDynamoDbTableTopologyDisruptionRuleDetectors:
                         load_balancer_addresses,
                         context,
                     ),
-                    rationale=_rationale(service, len(table_addresses)),
+                    rationale=_rationale(
+                        service, len(table_addresses), wildcard_grant=has_pattern_grant(current_paths)
+                    ),
                     evidence=collect_evidence(
                         evidence_item("network_path", ingress.network_path),
                         *ingress.evidence,
@@ -350,6 +357,8 @@ def _topology_path_evidence(
                     f"operation_class={path.get('operation_class')}",
                     f"target_granularity={path.get('target_granularity')}",
                     f"target_scope={path.get('target_scope')}",
+                    f"grant_resource_scopes={','.join(path_grant_resource_scopes(path))}",
+                    f"grant_resources={','.join(path_grant_resources(path))}",
                     f"task_definition={path.get('task_definition_address')}",
                     f"task_role={path.get('role_address')}",
                     f"grant_basis={path.get('grant_basis')}",
@@ -429,7 +438,8 @@ def _assessment_scope() -> list[str]:
     return [
         (
             "establishes=deterministic dynamodb:DeleteTable authority for an ECS "
-            "task role over exact modeled DynamoDB table topology with Denial of "
+            "task role over exact modeled DynamoDB table topology, granted by exact "
+            "resources or by resource patterns covering each table, with Denial of "
             "Service effect"
         ),
         (
@@ -443,7 +453,15 @@ def _assessment_scope() -> list[str]:
 def _rationale(
     service: NormalizedResource,
     table_count: int,
+    *,
+    wildcard_grant: bool = False,
 ) -> str:
+    wildcard_text = (
+        " Some of this authority is granted through wildcard resource patterns "
+        "rather than exact ARNs, so it may also extend to tables outside this plan."
+        if wildcard_grant
+        else ""
+    )
     table_text = "table" if table_count == 1 else "tables"
     return (
         f"{service.display_name} is reachable through an internet-facing load "
@@ -451,7 +469,7 @@ def _rationale(
         f"deletion authority (dynamodb:DeleteTable) across {table_count} exact "
         f"modeled DynamoDB {table_text}. A compromise of the public workload "
         "could request deletion of those table topologies, subject to provider "
-        "deletion prerequisites. Point-in-time recovery posture is preserved as "
+        f"deletion prerequisites.{wildcard_text} Point-in-time recovery posture is preserved as "
         "provider-native evidence; it does not establish table emptiness, "
         "successful deletion, item or replica impact, restoration, or out-of-plan "
         "table topology."
