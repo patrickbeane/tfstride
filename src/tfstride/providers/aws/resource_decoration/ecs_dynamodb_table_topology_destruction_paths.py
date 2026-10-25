@@ -1003,11 +1003,20 @@ def _path(
     used_identity_sources = identity_sources if proof.identity_matches else []
     used_table_sources = dedupe(match.source_address for match in proof.table_matches)
     statement_records = [_statement_record(match) for match in (*proof.identity_matches, *proof.table_matches)]
-    table_references = sorted(
-        {match.matching_resource for match in (*proof.identity_matches, *proof.table_matches)},
+    exact_references = sorted(
+        {
+            match.matching_resource
+            for match in (*proof.identity_matches, *proof.table_matches)
+            if match.resource_scope == "exact"
+        },
         key=str.casefold,
     )
-    table_reference = table_arn if table_arn is not None and table_arn in table_references else table_references[0]
+    if table_arn is not None and table_arn in exact_references:
+        table_reference = table_arn
+    elif exact_references:
+        table_reference = exact_references[0]
+    else:
+        table_reference = table_arn or table.address
     common: dict[str, object] = {
         "workload_address": task_definition.address,
         "workload_type": task_definition.resource_type,

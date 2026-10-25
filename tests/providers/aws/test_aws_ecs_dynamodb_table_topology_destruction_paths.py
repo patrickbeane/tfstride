@@ -440,9 +440,28 @@ class AwsEcsDynamoDbTableTopologyDestructionPathTests(unittest.TestCase):
                     paths = aws_facts(workload).ecs_dynamodb_table_topology_destruction_paths
                     self.assertEqual(len(paths), 1)
                     self.assertEqual(paths[0]["target_scope"], "exact_dynamodb_table")
+                    self.assertEqual(paths[0]["table_reference"], _TABLE_ARN)
                     statement = paths[0]["authorization_statements"][0]
                     self.assertEqual(statement["resource_scopes"], ["table_pattern"])
                     self.assertEqual(statement["matching_resources"], [resource])
+
+    def test_exact_and_pattern_statements_keep_their_own_scopes_and_exact_reference(self) -> None:
+        _inventory, task, _service_resource = _normalize(
+            role_statements=[
+                _statement("Allow", _DELETE_TABLE, _TABLE_ARN),
+                _statement("Allow", _DELETE_TABLE, "*"),
+            ],
+        )
+        paths = aws_facts(task).ecs_dynamodb_table_topology_destruction_paths
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0]["table_reference"], _TABLE_ARN)
+        self.assertEqual(
+            sorted(
+                (statement["matching_resources"][0], statement["resource_scopes"][0])
+                for statement in paths[0]["authorization_statements"]
+            ),
+            [("*", "table_pattern"), (_TABLE_ARN, "exact_table")],
+        )
 
     def test_non_covering_patterns_produce_no_path_or_uncertainty(self) -> None:
         for resource in (
