@@ -15,7 +15,7 @@ Messaging analysis separates authority to send messages, receive their contents,
 
 | Provider | Message removal | Topology deletion |
 | --- | --- | --- |
-| AWS | ECS `DeleteMessage` requires the same task role to receive from the exact SQS queue; `PurgeQueue` is queue-wide. | ECS `DeleteQueue` and `DeleteTopic` cover exact modeled SQS queues and SNS topics. |
+| AWS | ECS `DeleteMessage` requires the same task role to receive from the exact SQS queue; `PurgeQueue` is queue-wide. | ECS `DeleteQueue` and `DeleteTopic` cover exact modeled SQS queues and SNS topics, granted by an exact resource or a covering wildcard. |
 | GCP | Cloud Run `pubsub.subscriptions.consume` establishes acknowledgement authority only for exact modeled pull subscriptions. | Cloud Run `pubsub.topics.delete` and `pubsub.subscriptions.delete` retain exact target and cross-project ancestry. |
 | Azure | App Service Service Bus receive authority establishes ReceiveAndDelete and PeekLock-completion capability for exact queues or topic subscriptions. | App Service ARM deletion covers exact modeled namespaces, queues, topics, and subscriptions; plan-local management locks qualify compatibility. |
 

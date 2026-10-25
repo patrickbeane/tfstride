@@ -111,10 +111,10 @@ NLBs, instance targets, other ECS network modes, and unresolved or unsupported t
 
 * Public ECS service-to-Secrets Manager, S3, SNS/SQS, and DynamoDB mutation paths
 * Exact public ECS-to-SQS receive and message-removal paths; `DeleteMessage` requires receive authority for runtime receipt handles, while `PurgeQueue` is independent
-* Public ECS SQS queue and SNS topic topology-deletion paths for `DeleteQueue` and `DeleteTopic`
+* Public ECS SQS queue and SNS topic topology-deletion paths for `DeleteQueue` and `DeleteTopic`, granted by an exact resource or a covering wildcard resource (`*` or a matching same-account ARN pattern)
 * Public ECS S3 `DeleteObject` and `DeleteObjectVersion` disruption paths with exact object, prefix, bucket-namespace, and version/Object Lock evidence
 * Public ECS S3 bucket-topology disruption paths for exact `s3:DeleteBucket` authority, with emptiness and access-point state left unestablished
-* Public ECS DynamoDB item-deletion and table-topology disruption paths for exact item operations or `DeleteTable` authority, with deletion-protection and point-in-time-recovery evidence
+* Public ECS DynamoDB item-deletion and table-topology disruption paths for exact item operations or `DeleteTable` authority, with deletion-protection and point-in-time-recovery evidence; table-topology paths accept an exact table or a covering wildcard resource, while item-deletion paths remain exact-table only
 * Public ECS secret-value tampering and secret-deletion disruption paths for task-role authority
 * Execution/task-role access broader than consumed references
 * Native Secrets Manager or SSM delivery references and explicitly denied paths stay quiet; condition-dependent, incomplete, or unresolved expected management paths remain uncertainty where modeled
@@ -160,6 +160,7 @@ KMS and secret-management posture, public workload cryptographic-operation paths
 * Identity-assignment analysis is deterministic and plan-local, focused on inline policies, standalone policies, role-policy attachments, OIDC providers, and trust policies.
 * Condition narrowing focuses on high-signal keys such as `SourceArn`, `SourceAccount`, and `ExternalId` rather than every service-specific authorization condition.
 * Messaging findings establish modeled task-role authority, not successful payload retrieval, message or topology deletion, replay, or recovery; see [Public Workload Messaging Disclosure and Disruption Paths](../analysis/messaging-paths.md).
+* SQS/SNS and DynamoDB table topology findings attribute a wildcard grant (`*` or a matching same-account ARN pattern) to each covering in-plan queue, topic, or table, and record the grant's resource scope in the path evidence. A pattern naming another account, another resource name, or an index ARN covers nothing, and a pattern against a table whose ARN is unknown after planning stays unresolved. DynamoDB item-deletion paths still require an exact table because they inherit the shared DynamoDB access-path model. The SQS/SNS and DynamoDB table topology path models do not evaluate IAM permissions boundaries.
 * CloudTrail disruption findings establish current authority over an exact modeled trail, granted exactly or by a wildcard resource that covers it. Wildcard grants are attributed to each covering in-plan active trail, and a pattern that cannot be matched because the trail ARN is unknown after planning stays unresolved. The findings do not establish a successful operation, historical CloudTrail event or destination-log deletion, destination-resource deletion, account-wide or out-of-plan disruption, or recovery/restoration.
 
 See [Cross-Provider Threat-Path Semantics](../analysis/path-semantics.md) for how these findings relate to the shared cross-provider evidence model.

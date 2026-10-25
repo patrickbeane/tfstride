@@ -13,12 +13,14 @@ from __future__ import annotations
 import unittest
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from tests.providers.aws import test_aws_ecs_cloudtrail_audit_telemetry_disruption_paths as cloudtrail_tests
 from tests.providers.aws import test_aws_ecs_dynamodb_item_deletion_paths as dynamodb_item_tests
 from tests.providers.aws import test_aws_ecs_dynamodb_table_topology_destruction_paths as dynamodb_table_tests
 from tests.providers.aws import test_aws_ecs_messaging_topology_destruction_paths as messaging_tests
 from tests.providers.aws import test_aws_ecs_s3_bucket_topology_destruction_paths as s3_bucket_tests
+from tfstride.app import TfStride
 from tfstride.providers.aws.resource_facts import aws_facts
 
 _ACCOUNT_ID = "111122223333"
@@ -210,3 +212,21 @@ class AwsEcsWildcardAuthorityParityBaselineTests(unittest.TestCase):
                 "dynamodb item deletion",
             ],
         )
+
+
+class AwsEcsTopologyWildcardFixtureTests(unittest.TestCase):
+    def test_wildcard_fixture_reports_each_in_plan_target(self) -> None:
+        fixture = (
+            Path(__file__).resolve().parents[3] / "fixtures" / "aws" / "sample_aws_ecs_topology_wildcard_plan.json"
+        )
+        findings = {finding.rule_id: finding for finding in TfStride().analyze_plan(fixture).findings}
+
+        table_finding = findings["aws-public-ecs-dynamodb-table-topology-disruption"]
+        self.assertIn("aws_dynamodb_table.orders", table_finding.affected_resources)
+        self.assertIn("aws_dynamodb_table.archive", table_finding.affected_resources)
+        self.assertIn("granted through wildcard resource patterns", table_finding.rationale)
+
+        messaging_finding = findings["aws-public-ecs-messaging-topology-disruption"]
+        self.assertIn("aws_sqs_queue.orders", messaging_finding.affected_resources)
+        self.assertIn("aws_sns_topic.events", messaging_finding.affected_resources)
+        self.assertIn("granted through wildcard resource patterns", messaging_finding.rationale)

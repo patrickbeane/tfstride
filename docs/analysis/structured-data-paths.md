@@ -19,7 +19,7 @@ Item-level paths retain exact provider-native namespaces:
 * GCP Firestore: exact database entity or bulk-entity namespace;
 * Azure Cosmos DB for NoSQL: account, database, or container item namespace.
 
-Topology paths target exact modeled DynamoDB tables, Firestore databases, or Cosmos DB accounts, databases, and containers. Broad grants fan out only to exact in-plan targets; parent authority preserves ancestry without manufacturing unmodeled descendants.
+Topology paths target exact modeled DynamoDB tables, Firestore databases, or Cosmos DB accounts, databases, and containers. Broad grants fan out only to exact in-plan targets; parent authority preserves ancestry without manufacturing unmodeled descendants. On AWS, table-topology paths accept `*` and covering same-account ARN patterns, while item-deletion paths remain exact-table only.
 
 ## Protection and recovery
 
