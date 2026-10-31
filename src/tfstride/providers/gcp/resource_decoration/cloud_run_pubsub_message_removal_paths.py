@@ -70,6 +70,13 @@ class _RoleAccess:
     custom_role_grant_scope_compatibility_state: Literal["compatible", "not_applicable"]
 
 
+_IamAmbiguity = tuple[
+    set[tuple[Literal["project", "subscription"], str]],
+    set[tuple[Literal["project", "subscription"], str, str]],
+    list[str],
+]
+
+
 @dataclass(frozen=True, slots=True)
 class _IamManager:
     source_address: str
@@ -108,6 +115,9 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
             for resource in resources
             if resource.resource_type in (GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES)
         )
+        # Manager ambiguity depends only on the subscription and the IAM resources, so it is
+        # computed once per subscription and shared across every workload.
+        ambiguity_cache: dict[str, _IamAmbiguity] = {}
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
@@ -115,6 +125,7 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
                 workload,
                 subscriptions,
                 iam_resources,
+                ambiguity_cache,
                 context,
                 custom_roles,
                 project_organizations,
@@ -128,6 +139,7 @@ def _cloud_run_pubsub_message_removal_paths(
     workload: NormalizedResource,
     subscriptions: Sequence[NormalizedResource],
     iam_resources: Sequence[NormalizedResource],
+    ambiguity_cache: dict[str, _IamAmbiguity],
     context: GcpDecorationContext,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
@@ -165,13 +177,17 @@ def _cloud_run_pubsub_message_removal_paths(
             )
             continue
 
-        ambiguous_scopes, ambiguous_roles, manager_uncertainties = _iam_manager_ambiguities(
-            subscription,
-            subscription_project,
-            iam_resources,
-            context,
-            custom_roles,
-        )
+        ambiguity = ambiguity_cache.get(subscription.address)
+        if ambiguity is None:
+            ambiguity = _iam_manager_ambiguities(
+                subscription,
+                subscription_project,
+                iam_resources,
+                context,
+                custom_roles,
+            )
+            ambiguity_cache[subscription.address] = ambiguity
+        ambiguous_scopes, ambiguous_roles, manager_uncertainties = ambiguity
         uncertainties.extend(
             f"{workload.address}: {message} for {subscription.address}" for message in manager_uncertainties
         )

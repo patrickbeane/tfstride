@@ -49,6 +49,11 @@ _PUBSUB_RESOURCE_REFERENCE_SUFFIXES = (".id", ".name")
 
 _TargetKind = Literal["topic", "subscription"]
 _ScopeType = Literal["project", "topic", "subscription"]
+_IamAmbiguity = tuple[
+    set[tuple[_ScopeType, str]],
+    set[tuple[_ScopeType, str, str]],
+    list[str],
+]
 _ManagementMode = Literal[
     "authoritative_policy",
     "authoritative_role_binding",
@@ -113,13 +118,21 @@ class ModelCloudRunPubsubTopologyDestructionPathsStage:
             )
         )
 
+        iam_by_kind: dict[_TargetKind, tuple[NormalizedResource, ...]] = {
+            kind: tuple(resource for resource in iam_resources if resource.resource_type in _iam_resource_types(kind))
+            for kind in ("topic", "subscription")
+        }
+        # Manager ambiguity depends only on the target and the IAM resources, so it is
+        # computed once per target and shared across every workload.
+        ambiguity_cache: dict[str, _IamAmbiguity] = {}
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
             paths, uncertainties = _cloud_run_pubsub_topology_destruction_paths(
                 workload,
                 targets,
-                iam_resources,
+                iam_by_kind,
+                ambiguity_cache,
                 context,
                 custom_roles,
                 project_organizations,
@@ -133,7 +146,8 @@ class ModelCloudRunPubsubTopologyDestructionPathsStage:
 def _cloud_run_pubsub_topology_destruction_paths(
     workload: NormalizedResource,
     targets: Sequence[_TopologyTarget],
-    iam_resources: Sequence[NormalizedResource],
+    iam_by_kind: Mapping[_TargetKind, Sequence[NormalizedResource]],
+    ambiguity_cache: dict[str, _IamAmbiguity],
     context: GcpDecorationContext,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
@@ -154,15 +168,17 @@ def _cloud_run_pubsub_topology_destruction_paths(
     uncertainties: list[str] = []
     seen: set[tuple[str, str, str, str, str]] = set()
     for target in targets:
-        relevant_iam_resources = tuple(
-            resource for resource in iam_resources if resource.resource_type in _iam_resource_types(target.kind)
-        )
-        ambiguous_scopes, ambiguous_roles, manager_uncertainties = _iam_manager_ambiguities(
-            target,
-            relevant_iam_resources,
-            context,
-            custom_roles,
-        )
+        relevant_iam_resources = iam_by_kind[target.kind]
+        ambiguity = ambiguity_cache.get(target.resource.address)
+        if ambiguity is None:
+            ambiguity = _iam_manager_ambiguities(
+                target,
+                relevant_iam_resources,
+                context,
+                custom_roles,
+            )
+            ambiguity_cache[target.resource.address] = ambiguity
+        ambiguous_scopes, ambiguous_roles, manager_uncertainties = ambiguity
         uncertainties.extend(
             f"{workload.address}: {message} for {target.resource.address}" for message in manager_uncertainties
         )
