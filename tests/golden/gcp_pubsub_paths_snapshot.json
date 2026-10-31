@@ -1,0 +1,2397 @@
+{
+ "scale": 12,
+ "workloads": {
+  "google_cloud_run_v2_service.w0": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t0",
+       "google_pubsub_topic_iam_member.local0",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "f313a3d1ae53fcde625cb15cd4ede1cad25607f403cc60713a47a7fa5bac4807"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "ca688a997e3016086084974ce2e19446b01db034031aa867dbed00d2feb9cb00"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "bedd4b5f94c453e9f2611139cc8000c1f638f6804de84fe96c91b2acbdc193a5"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "e014ee2e9c04da12e916664671c150eb64eee1bb1695644bd202f3ca882518ae"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "13d81a1201fa8f3826663fc9cf0c74e341ad910c3c3e0e9b0c2fecd04718a17e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b4682dc3fc44da319acc20aa8e470817f2915d26aa7c81bceaf74b1084c17e18"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6fdd3752ccce37fb2f36b43f9bb475f33661b70a6a557a84a99d638387f53130"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "fe4af1d9e86370be356b9492c605a474724f22f123a1508094406ce0ebf8f8f7"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "4257d3b9657e67a8a07821713c307b35692e25899333a3adae9a501219ed0a16"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d93d4f15376f947da103700af1be19cc700822eccecad7b1233cd8935aa67536"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "feb81586dffa5de4a4c80260650616865bc80394e5379c2474cb70ffa0fe98c9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8e0ac6eab96101b99b84f9a31954e40a1735dfc5930af4b4ef362ab695314a79"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "2a8aa3d8e18a0b8a6055524ef0018a6ca740df54dd16d7e28c264d150d50dfc5"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s0",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "4d70f259a1e99cd6cc16d080a37220a1456e2d733303c37a74dba6c180f65d87"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s1",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1490b6cd50f12f4c4567c8e3957d4aff247bae3720007fa0d38f4668629b25a5"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s10",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8b0a3f28c6208d1ed30ab3d8df1aeef04cd5b2ff78a29769c1e054b5b1403d96"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s11",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "24111c4e861f001fcdecb488efe4008302002bb0e05e61fd450523c1a4a0cef9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s2",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d8a6e6e94d205273747cd5202d66f637d1224e40c5c38164cb1ccac232f5f11d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s3",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "caf66bf7f4904a2e144566b424b41da9f7cece496bed865f73d440ebb2dfbb12"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s4",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "eca6666f955bfd79ca5e1848bf497d0cb6c1dc59ec5fa68a65658240da69a444"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s5",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "51442559564233325e759f995eebaec1235b319351c0b00a82feca486e75fdcc"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s6",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "9677c8719f12da2996ad7512740bf7fca69e2a8e721b85a9cdf39cee928c924f"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s7",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "484d30edbe3224b88cb84273f8182dabfc83856cbd0aa9e82c5c32d4559cb8ad"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s8",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "2f3b4eb727e99d676aae821b9eabfbe0fbd01e3fa57c3dc0f79c4f5d680fc3be"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s9",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c23dcd0b82b5fcb0f15d90f172c44b53c2c3c29406457be504333b00a25cea22"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "5cba394a792a9eefd2e551c6e66984acba76d5f3bda03f61ee3b5e5c2873b197"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_pubsub_topic_iam_member.local0",
+       "roles/pubsub.editor",
+       "topic",
+       "projects/tfstride-demo/topics/t0"
+      ],
+      "sha256": "96d8b4bbcb3330b71e6149c7b772ed8e6d96aab1b2c0c20f422d5dbbc3ed496b"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "94d1a1c7c085636a03464a9c99b0049b0548bd35c2e92bb0401dbd6fa5b47fca"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b170827861230b558cf13c66e3f5a21a799d0d869db4eaed14e170d2d7f46e8e"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c259bbd4f54eec990220cef1005ca1b8208c515f5cd4602ac08548d5a2f46901"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a4c53516b78adcafee9a0bafdec3371ae4d6668011cb35ad738df6931d4ea02b"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7b6897c4739a1bfec25a4beef1f423427fa2cefdd8619e8cac80f48ca868060e"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b7084437b0b4338b484e4ee856ced67cf7184a512fae7f42f024c506de56fc18"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8643fe64b4d56521624ed4e969a0862d7c4e95b0614f0944207d18bd76d39945"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f77c124945c9ce14c9f4dc022596e79cd39ec1b5a5418c6ba46265c8a8555884"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "4984424d223f889154790cf33b0ec1f6f511bba9ac473cde0d34e2a9e519dd79"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "eb57d3b6b58a6c389a4e9dd1f01bb98093afef70fe5d8528023c81950dd198c4"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "cd90e69ab698194b5e275b720ffb5550c7d8ba5c6bbd14220f8ddc92d16d0eb3"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w1": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s1",
+       "google_pubsub_subscription_iam_member.local1",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "8110a17ede7ac9a673b7a088736fbe0764cee1e5c1b93469edcd95468596bc36"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s1",
+       "google_pubsub_subscription_iam_binding.managed1",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "f2fbd6f589003396228a41e394e67cc87c85d3091523f0f6e49c22de2932d55f"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s2",
+       "google_pubsub_subscription_iam_member.cross1",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "cb9c472ef929c76f1f390ab65df01973379d2ce3cbc2c473d0b7e4c18813f9e1"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1dc1cc2e8c1f0af6826aea76e1379aa44710de7294fbebb0a08f639ed2a17367"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7fb97f47e6f3088044abb2c1878a14ff950dba682fede2ed7d129fa68038b523"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "566f7563da54b3f33b2f21a1fb0ca114de4ceb97b82f5a7b439e66d0b01eba1e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "07c970b85d8a750deb9536413b8b04d3b108f5c3f4fbf474c6ed9a19c3516d30"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c6399d04fa14a26f22de35e5f23561cc3fc86493d13a534cf4d9d1f99f0a5cb9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_pubsub_subscription_iam_member.cross1",
+       "roles/pubsub.editor",
+       "subscription",
+       "projects/tfstride-demo/subscriptions/s2"
+      ],
+      "sha256": "b39d92f2633d725e27441260ff8f7ddf9eba1ba7e88edd2bffbdfa10d6d844ce"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b0b656c042499f291dc4f181a23ffbafd7bc64528b04f7dd247b6912d5d1bc28"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "229404b172855dfef68a052aca9bdfe50113c7daf73d95407007d318ef3d8630"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b688d6823b9ab5eed1d45e85d10c50385baf1c3e77f730acbf447550e87a3f27"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d995ab3926b4002a887c3509a20fc470ff2bc70f4ec81da65993778b5314a86f"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d4617cf2261e3d905c48cb9afe4f3c1bbddbae85c095ac7d3eabc4bdf2af2f0d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "0fb62b860eafee99f8c0c0d43932385770d36726850ef1fe53efdf6a705dfe67"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "15f7f5ed48a79997d0acb35fd2810db53c69b45759b98314dfaba4fc42229361"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s0",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "9ebe8316880b21e20fafbc01dfa92bcdeab51a637d6ee248e96a614fe4899329"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s1",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c7804252e65682a2cd5d04e84c0cd4c469a575a5a85790006bae07a1dcfa4a50"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s10",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "97315ac54e291d1355548a7d3840b6967d85e696a89d8d99e76cfe024279567e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s11",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d0715f127cf1d3a19ff78a3b7b7cd31e90ad9ddb7dfa551e0688a058d568e30e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s2",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1844d7011370e268a008625121468c63c6f493c55ff474c08dd540f4f690807e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s2",
+       "google_pubsub_subscription_iam_member.cross1",
+       "roles/pubsub.editor",
+       "subscription",
+       "projects/tfstride-demo/subscriptions/s2"
+      ],
+      "sha256": "3a32dd4b4d12f30ccb06578bcb407dd91ca469a732d731362db88719c157d1c8"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s3",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c8ab7a389f5fd6286bec0985af376fa483d78f84ae19452c998580de738d6d6c"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s4",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7d5304f3174880c272484208529e60b0f74ba928aef9aece7bb3c2a60a9ae610"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s5",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "2ac86c36692b695a701066a638b34f3e9688001887824b84563d655ea7a97037"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s6",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f93073a14eb1dbdde01cce521c34db760e75712dffe2f05eb065dbc14bfa3470"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s7",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b013c235c17d47bb17f7aef76d5df9972a8b69f08ec68e52275a726ad75a51f1"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s8",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "fbd41aaec7d9374cfe26d381b13e21efeddc15e85b41cef28f3071aac07f2dfe"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s9",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7ff19382be6bcedfa0b74ef05e59ff737df90598ead4b1836cd32f785b4f938f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "bd11fc3e3d420f7f7e0c92e5fe789b83f5b1ee99b7343f66af52b8735b0728aa"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "511a2f95478b7437ce22d5be252e3d68d1467b0ff4060065cf4d58e49e012229"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d844018965982898b37507f8e222667aa5d36bab9ce29c67a73ea9aea78ed54d"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6162b67f056cf076c2a049237384c801a16ade9bb60aee031f73870b6333cfd9"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d1dd21fa585cf11deef685d886b71382ed9faa140f742698341cea5855391217"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "531a3e60e7d5b9337e39f6eb454082ef9de72642e1f926ed531f3e0326d72f4c"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a332510bb803f6b4a0d2143f5e8d8dc0d1bd64c4f4eee19dc05785ec884c0038"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6ddd02a601a455b9dd13a2e572505bb970519b6ab037d65331559322d652eca2"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "05a0da6edccd21862a4710932820a636e937565943dc66694e282c3314a10743"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "21684d0d904991b9fbc6f04953c0a43c86abc99acaa22525cc7b248e436f5f1f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8fb735e456fea82f375077cca16e15c4715c48fd6b111ede24e40b0626ddee8f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_binding.editors",
+       "roles/pubsub.editor",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "3db9c971d71df05b8fa8d50a62d3ca837af38db4f67a21c6d4b2f19244081d15"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w10": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t9",
+       "google_pubsub_topic_iam_binding.managed9",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "9d0756d3c2b48037ce9658195ac275b782a91968e9cda2db57af934437cb105f"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "5e906d14b7d2183c605a09926afc08228fce42c1129a9ca9025d1f313deaa4d9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "971a09da03a7d716b67c0099f97ef488e807f0cb0b77d0bcc95fedaa9231a4f6"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "adc4adf70f0abf4549ae1d1938d42d445531c74ec2a43e5fb944c2baace02c7d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b0ad5e60334db68ec0d5cd0df8c44a7d9a4ecde70519feac96f236ba5048966b"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "91728c74ed0992603cde5fa141d1388e3dfc740d4ed473bb5501696c8e502210"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "53fb69f7af09a61aa57198228cd7fc0dfe556316c53abf10024d59a6206ecd00"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "59cb5ed67160aeff9ae8a1a9aa788b37f944f3e4c5bacc96cd048224f467c3e9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "dda7a60469cfd97e20dcaa8e5ac5f166d9975ee7891dd07f562989cd8b3f5ae5"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "70c34e1165a4c12e3167d7c9cdd2552e93008f61350081c7d3de4a4927b8e3c8"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b2b8e31e4affddada86a758d5842eea6ab8f7ef5dcc5ae93d8b19bec5fbe7c37"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "927e6ca14cbbf09a60b79889829eca289e6148eaec236f15ebdc679eebdcf85f"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d4eb971956b18e8d0f1766462b0b84f0093c21a14990a2e0584568130f5db5fb"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7bcc5e533f24d5d2141175c847c2177a57ce31c76cc325b8c0aa697da0af29b9"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7214e16fb4cef9224e5d93ae9f602db7df9b70b15e2bf92943a66c8b5e520595"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6f32ec38bc65d5fedd1c194d9c974e6362c22b6ed34ee1c50d89458c54dd28f2"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "aa51e84446d184cfd0283901a498c6c5b6f92b2d8315de14bf1b20796835d6ad"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b8c96012655f8f93f468a16358771404824558dbb2aeab71c10fb770c72b44a6"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "aa93511e01effed5ea64fb6690cb3088d9ee7e817d89f6ffba8bb191ff28d08b"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "25a5bdeb1108b4a2438a29771be1e65a21cd8a7deff83faf9c45c5bd2c0d31e3"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "fe69ea6351a0d3c221546591229a97aa1d1d34afdab0c2ebd2fe4f27d3d15cc7"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "940901102cfdce31aa3259bd6feb6f57a8db38e5905ab76beefe8f4b954a75e6"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d786c4fd38ded052908696fabded0c7b14d356de8be2f45290b1f7c2e0143b8f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "796ad90a9304b6f2bf68d4454042427f7f1c15c9fbdf19b74f2dd48c3e5e41f6"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_member.custom10",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "ca214de900aa4c0ad9c548a7d593d4824e4ab0fc66633637a7d3827dd2d9d501"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w11": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t11",
+       "google_pubsub_topic_iam_member.conditional11",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "526a707055b5685180434bcde00259fb4c158e47605be55443b7c6b0eea0db47"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s11",
+       "google_pubsub_subscription_iam_member.conditional11",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "59112169c4a4363230a593b17fafd05153abe636d156e4d41c4a958e8b53dc0d"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.conditional11 Pub/Sub acknowledgement condition is not deterministic",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t0",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t1",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t2",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t4",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t5",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t6",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t7",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t8",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.conditional11 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t11",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.conditional11 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w2": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s1",
+       "google_pubsub_subscription_iam_binding.managed1",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "fbfeeef9cf3051c112a6b6c4a6ff5f574d3835371280f7d240fafe02f951e520"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a06b44877faba9bce301b2c923bdd5b818d088bd14dfa72c3fb611627abd101b"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7539241c1a94b2b64905a1409a8a9c26453997f321df27c5eed8d0e5714d3c05"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a48fc97e7919eac80a452b810b77b1551f063304db132c1e0418f36883b64f35"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b5630ae926a22728ada46bec127161e947dcd5d8a2298cee46ae7d36995bb850"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "db38e6b0439bc822a5a573853493ef4255d0f8e102a6cdeff83ff13ee8368978"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "edbefa1d514d07ce6a7c9b8e3c56424b5ddbf9aec46a9fe20ff7a7e1ae24d70d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "ebd24c1fe796f173817c002d729de8403f612a1ad6f4482cd67ec6a8f055d05c"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b87b68f8d684cababc88e9e7e14b16fe21eb27bb80ec0bdb8ee31f83fdfa179a"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c3ac781be0fda80eaa996bf9d7c1a595c903895000c29826d36c154784a81e2b"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "80657bad3411501b2c10b5a062c52c03462060de5c503b720682cec656ac4a8e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "4b5444d6f8f8b50e5ae99163488063253172ac25f956a5ac69fc20351274a43c"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b03f4e0b7996925a319c8bf65401f09c7372e124c904992df9a58024fb48598d"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s0",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d1b5047e9052b5bd2fd811c6f3c26f0ef64fa0b93eafce07c2982f2ba1fdb503"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s1",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "0ab3d6676e111139c8779d0ff6e2e74118e8befcf67a081648c7803396f740a7"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s10",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "988069ed5e419f717a4a10dafb546380a235d7fa6cdf7aed47a681d8874a2f91"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s11",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "5116647b7aa3720adc441f1f60a90cae99aa29def44a69e71de85c54f129fcb5"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s2",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "35e76f871b9cd8d68de1252671ae61d9720ee472f3a0e83a8232ba696a5919aa"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s3",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d820e27a66230fbf2a08fa9058bcde57cb0531c45c97d55d186ef9ed1e2149e0"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s4",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b3fc2822fd8e662c4ca9c385836fa12a2286ab4bcacea81e20aeba6c62f83e45"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s5",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "cd63d0bb8e3d952b9d17df9778c2eb27cb4686c5dba03e2043aa695408642f09"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s6",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "01ec2586319e387396eb5f612425d58b2b0bae4476d6f86cbe42dc6be0b64c83"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s7",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1a3bb19f7af9105e22c2a8f3e6c341290af3b5fbb8b2908f11759a88dc6f65c1"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s8",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "868b92c8ed7828bf22e626026d34e642d8667f35d5c10d16f98b36a52f6a0a8b"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s9",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c25d9a14b3889e54ece8c94ce272a0ba459f0fa4eacdae09ab78ccef313636f7"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d5d60127a4045d7a78cdc0441be46dc1eedb69c9450e8620c6672988fad3f637"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "5fb212ea9285befb25954dd8b432165d653ccda8503f2c76883ceda3d359f0f1"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1bf6ebaa96286101c916cda7455e25e975f9c30707c90d1a03e9bf17001b8a50"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "baec03736eef77100f6c3fc4d7c2823bddd78972664a0be741a6797ad0347f12"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7189f30bdffe8fe29b77915146e68f8742a2e7170b121c2fb573ddf11f6a9a64"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a09914f25a2364c0106a83d37761ad6e2406a75726a83322f293b47191e64817"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "e6bcb15e450affd4318296ec0e8c5f89ef7687ad9a660e609270f8172840bd4d"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "33cdc40d61240402a1de6edd458361bd92bdc4ce07c7d0a2e06ad5b529bef211"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "05b844558c074365cf4eb8203a1da1178a4a71aa240dfc95b027837895008cde"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "30e1396e98edddfb0180008343863f066b36780e7acaf8f47121118c0e476f3f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "0f0ff3580889899d22b064ca94b4ef4ffdeb3900a09017574eadf4f9a63bbabb"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_member.admin2",
+       "roles/pubsub.admin",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1393ab9a9c2ac2e834f37a2b8393059c8179d0d89af196efe05f105471280937"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w3": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t3",
+       "google_pubsub_topic_iam_binding.managed3",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "059c3bb98b06fa7df4bdc6fec13e4f899987453085b2947f3f413ba453598bdd"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t3",
+       "google_pubsub_topic_iam_member.overlap3",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "8faa688818f37f15d756da96b9c3f2da687ce5f2ca6b707b4090374c8bc87bd4"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w4": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t3",
+       "google_pubsub_topic_iam_binding.managed3",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "548f27c497fffcf9164df2edfc5b3107ba335ca9dfe1fae822579331017981d7"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f213ad51537d1dabb2dd40c32e668e4a998b0325730ea9ff00877064588aea21"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c1b68b5644377d87a6246e241bf995ba0d0f59bd980e1b66c580a36ceeda084d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "e748177fc21e210c158927c45f2ac5f72388f75a7d34e03e67006e5e989e2e8e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a23b5d4dfdbdffba16bc972d359f6cb41df0945c5a778c0daff6e440f2d4c7c0"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f42175fa3521aaad47b44cfb3acbc4d65ed04aa9069be602ca0682b717df079c"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d94159e3f2a8fa25e0dd6c8db914a2d0ec67be8b0d884aaa79b5eb11002f6b5e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c35258097e7f35c2042a7affa333ce46188056c7c079dba468e2535de0e0fd9f"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "95cf9f5f8b7b49cc81fcbbf73c8637e163afde0488a6cc117109329578befdb6"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "aa73ae042aadad401c9fe47eac38565cb606002b3490296277e4733c45e28865"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d66943dc632ab30dbe26e031076a2dd5f31319f9414912cf9a8d31c6973de1b9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8a8a357c69f1fc8b339bbcb1dba60e539a3585b35791d2ae466199c7176eaed9"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "3ecd078315cb5b874ff65d11b959a614c62811bf238b6171ca8999a8ca218365"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "bb0c7ddc4321469d41a60475cc8750606fd2f84003f9b89c14dbc1c5f1e8ca23"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "43b7c08e7f84c26a4a998bdefce8bf8c0e089b5cff2256a4c8ef209eda750615"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f21ae7f860e9dd7b18d02bda46a0ca8976db55f33d8edc0a4da9f8e610e2126d"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "84aae6ca440bd77e19a72d9a7bd8717b324da5006d34c12c5286264604a86af8"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "03ba6b85d1a02db32b98ad50d2dac7086caef4eed94bc42596552b64fc43f36d"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6bb3f40cde906ba28956037cd7b9a9fe0b11de44ce375b5a18daaf4dbe2b55c6"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "1027166c6048fcf0efe1ac982c42ca2b57c3560a6f0cc361a006e71ae1c62b89"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "42827be3a5b1847e53f7e2f0bc9795d5de8e330743eb2dcfceac9013d50b3f56"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d88f9361665833d8af2d7eed28d8fb087ede805c08bfc802f04477a39e984e9e"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f97440a667ddd4e67b0048704b4f8d85ba4a2bed27636d35a8a751c201c44747"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "d4e085ff4210f9c3969d8f13a1b02d4d36fc31a8d07cf0fcbc7643eec647026e"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "9275f6bf0355aea4ed1a5abc885aa8ecdd6aa7a164c930deb8f541dd0cc64ca5"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w5": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t5",
+       "google_pubsub_topic_iam_member.conditional5",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "825e592d65a1eaf8e5be23b2be7bccfd315490fe3bfa5b2fd8a2e484ca5265a3"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s5",
+       "google_pubsub_subscription_iam_member.conditional5",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "0714c1cdd41854ca74ed0e43a7bc98e5840dac68d42726b4cd76de36db55e4ec"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.conditional5 Pub/Sub acknowledgement condition is not deterministic",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t0",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t1",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t2",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t4",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.conditional5 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t5",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.conditional5 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t6",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t7",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t8",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t11",
+     "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w6": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t6",
+       "google_pubsub_topic_iam_member.local6",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "f2e18327aee455195cba87a9111beea09fe30edeb595010949085b776c974a03"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_pubsub_topic_iam_member.local6",
+       "roles/pubsub.editor",
+       "topic",
+       "projects/tfstride-demo/topics/t6"
+      ],
+      "sha256": "f46b8f33774aa070e3ac8ddc9633ab545a873ffac24d23adfc85715ed47e3db3"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w7": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s7",
+       "google_pubsub_subscription_iam_member.local7",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "32e82d3568c811e7743fc581eb379e2033a3d56a11b75787c3bd4f0ea4a8c676"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s7",
+       "google_pubsub_subscription_iam_binding.managed7",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "5626c3c582755969fd962795b2be864e49812e8560d1966d18ea442a1647a679"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s8",
+       "google_pubsub_subscription_iam_member.cross7",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "3adef92577a62c3b44b3d21789f7f751144304322fa7e49e88e0cf02a7b307c3"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_pubsub_subscription_iam_member.cross7",
+       "roles/pubsub.editor",
+       "subscription",
+       "projects/tfstride-demo/subscriptions/s8"
+      ],
+      "sha256": "df72b8cc0126e6198ea69f82a5acd7bfa8e9a04079fc6538b4113959653d272c"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.delete",
+       "google_pubsub_subscription.s8",
+       "google_pubsub_subscription_iam_member.cross7",
+       "roles/pubsub.editor",
+       "subscription",
+       "projects/tfstride-demo/subscriptions/s8"
+      ],
+      "sha256": "8f97eeb6a9650259474c5e56b5550e3cfc3093a7c152544332dd52c009318530"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w8": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s7",
+       "google_pubsub_subscription_iam_binding.managed7",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "2bfb0f31a8c289a6980d8d0700f0c8f90d4e6feb5e95cc80d4806f6fb0629a6e"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t8",
+       "google_pubsub_topic_iam_member.local8",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "f711112e7a0fa2457ea2e1ec77d5d84f80ac07c7f54a01aa3e1e0437c2881728"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_pubsub_topic_iam_member.local8",
+       "roles/pubsub.admin",
+       "topic",
+       "projects/tfstride-demo/topics/t8"
+      ],
+      "sha256": "8e5a737105a05f50cc33fb5f92476293bef4f59f79ba05b87bc8c7518dd744c5"
+     }
+    ],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  },
+  "google_cloud_run_v2_service.w9": {
+   "access": {
+    "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t9",
+       "google_pubsub_topic_iam_binding.managed9",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "05d5137f3d2289090cfffac2318385ffd49894c74ff62193fa5f6e2802b5019b"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t9",
+       "google_pubsub_topic_iam_member.overlap9",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "e78aa81a7991617d358026e9267a1107e704554590d829ccaa94ded6395719a8"
+     }
+    ],
+    "uncertainties": []
+   },
+   "message_removal": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+    ]
+   },
+   "topology_destruction": {
+    "paths": [],
+    "uncertainties": [
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+    ]
+   }
+  }
+ }
+}
