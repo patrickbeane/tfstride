@@ -37,7 +37,9 @@ def build_pubsub_plan(count: int) -> list[TerraformResource]:
 
 
 def _workload_resources(index: int, count: int) -> list[TerraformResource]:
-    member = service_account_member(index)
+    # Every twelfth workload shares the previous workload's service account.
+    account_index = index - 1 if index % 12 == 5 else index
+    member = service_account_member(account_index)
     next_index = (index + 1) % count
     resources: list[TerraformResource] = [
         _terraform_resource(
@@ -47,7 +49,7 @@ def _workload_resources(index: int, count: int) -> list[TerraformResource]:
                 "name": f"w{index}",
                 "project": PROJECT,
                 "location": "us-central1",
-                "template": [{"service_account": service_account_email(index)}],
+                "template": [{"service_account": service_account_email(account_index)}],
             },
         ),
         _terraform_resource(
@@ -89,6 +91,19 @@ def _workload_resources(index: int, count: int) -> list[TerraformResource]:
         else:
             resources.append(_topic_member(f"local{index}", index, "roles/pubsub.admin", member))
     elif shape == 3:
+        if index % 12 == 3:
+            resources.append(
+                _terraform_resource(
+                    f"google_pubsub_topic_iam_policy.authoritative{index}",
+                    GcpResourceType.PUBSUB_TOPIC_IAM_POLICY,
+                    {
+                        "topic": f"google_pubsub_topic.t{index}.name",
+                        "policy_data": json.dumps(
+                            {"bindings": [{"role": "roles/pubsub.editor", "members": [member]}]},
+                        ),
+                    },
+                )
+            )
         resources.append(
             _terraform_resource(
                 f"google_pubsub_topic_iam_binding.managed{index}",
@@ -103,6 +118,22 @@ def _workload_resources(index: int, count: int) -> list[TerraformResource]:
         resources.append(_topic_member(f"overlap{index}", index, "roles/pubsub.admin", member))
     elif shape == 4:
         resources.append(_project_member(f"custom{index}", CUSTOM_ROLE_NAME, member))
+        if index % 12 == 4:
+            unknown_policy = _terraform_resource(
+                f"google_pubsub_topic_iam_policy.unknown{index}",
+                GcpResourceType.PUBSUB_TOPIC_IAM_POLICY,
+                {"topic": f"google_pubsub_topic.t{index}.name"},
+                unknown_values={"policy_data": True},
+            )
+            resources.append(unknown_policy)
+        else:
+            unknown_role = _terraform_resource(
+                f"google_pubsub_topic_iam_binding.unknown_role{index}",
+                GcpResourceType.PUBSUB_TOPIC_IAM_BINDING,
+                {"topic": f"google_pubsub_topic.t{index}.name", "members": [member]},
+                unknown_values={"role": True},
+            )
+            resources.append(unknown_role)
     else:
         resources.append(
             _subscription_member(

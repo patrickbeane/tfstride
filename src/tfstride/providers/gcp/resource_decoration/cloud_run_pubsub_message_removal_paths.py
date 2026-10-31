@@ -19,6 +19,12 @@ from tfstride.providers.gcp.message_removal_evidence import (
     GcpPubsubMessageRemovalDeliveryEvidence,
 )
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
+from tfstride.providers.gcp.resource_decoration.iam_join_index import (
+    IamBindingStep,
+    TargetIamJoinIndex,
+    build_binding_steps,
+    build_target_iam_join_index,
+)
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import (
@@ -78,6 +84,12 @@ _IamAmbiguity = tuple[
 
 
 @dataclass(frozen=True, slots=True)
+class _SubscriptionJoin:
+    ambiguity: _IamAmbiguity
+    index: TargetIamJoinIndex
+
+
+@dataclass(frozen=True, slots=True)
 class _IamManager:
     source_address: str
     scope_type: Literal["project", "subscription"]
@@ -115,9 +127,10 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
             for resource in resources
             if resource.resource_type in (GCP_PROJECT_IAM_RESOURCE_TYPES | GCP_PUBSUB_SUBSCRIPTION_IAM_RESOURCE_TYPES)
         )
-        # Manager ambiguity depends only on the subscription and the IAM resources, so it is
-        # computed once per subscription and shared across every workload.
-        ambiguity_cache: dict[str, _IamAmbiguity] = {}
+        # Manager ambiguity and the grant index depend only on the subscription and the IAM
+        # resources, so they are computed once per subscription and shared across every workload.
+        steps_by_resource = build_binding_steps(iam_resources, _known_string)
+        join_cache: dict[str, _SubscriptionJoin] = {}
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
                 continue
@@ -125,7 +138,8 @@ class ModelCloudRunPubsubMessageRemovalPathsStage:
                 workload,
                 subscriptions,
                 iam_resources,
-                ambiguity_cache,
+                steps_by_resource,
+                join_cache,
                 context,
                 custom_roles,
                 project_organizations,
@@ -139,7 +153,8 @@ def _cloud_run_pubsub_message_removal_paths(
     workload: NormalizedResource,
     subscriptions: Sequence[NormalizedResource],
     iam_resources: Sequence[NormalizedResource],
-    ambiguity_cache: dict[str, _IamAmbiguity],
+    steps_by_resource: Mapping[str, tuple[IamBindingStep, ...]],
+    join_cache: dict[str, _SubscriptionJoin],
     context: GcpDecorationContext,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
@@ -177,54 +192,53 @@ def _cloud_run_pubsub_message_removal_paths(
             )
             continue
 
-        ambiguity = ambiguity_cache.get(subscription.address)
-        if ambiguity is None:
-            ambiguity = _iam_manager_ambiguities(
-                subscription,
-                subscription_project,
-                iam_resources,
-                context,
-                custom_roles,
+        join = join_cache.get(subscription.address)
+        if join is None:
+            join = _SubscriptionJoin(
+                _iam_manager_ambiguities(
+                    subscription,
+                    subscription_project,
+                    iam_resources,
+                    context,
+                    custom_roles,
+                ),
+                build_target_iam_join_index(
+                    iam_resources,
+                    steps_by_resource,
+                    lambda iam_resource, subscription=subscription, project=subscription_project: _iam_scope(
+                        iam_resource, subscription, project, context
+                    ),
+                ),
             )
-            ambiguity_cache[subscription.address] = ambiguity
-        ambiguous_scopes, ambiguous_roles, manager_uncertainties = ambiguity
+            join_cache[subscription.address] = join
+        ambiguous_scopes, ambiguous_roles, manager_uncertainties = join.ambiguity
         uncertainties.extend(
             f"{workload.address}: {message} for {subscription.address}" for message in manager_uncertainties
         )
 
-        for iam_resource in iam_resources:
-            scope_type, scope, scope_uncertainty = _iam_scope(
-                iam_resource,
-                subscription,
-                subscription_project,
-                context,
-            )
+        for item in join.index.candidates(service_account_member):
+            iam_resource = item.iam_resource
+            scope_type = item.scope_type
+            scope = item.scope
             if scope_type is None or scope is None:
-                if scope_uncertainty is not None:
-                    for binding in iam_bindings(iam_resource):
-                        if _binding_member_applies(binding, service_account_member):
-                            uncertainties.append(
-                                f"{workload.address}: {iam_resource.address} Pub/Sub IAM scope is unresolved "
-                                f"for {subscription.address}"
-                            )
-                continue
-            source_facts = gcp_facts(iam_resource)
-            policy_state = source_facts.iam_policy_data_state
-            if policy_state in {"unknown", "invalid", "not_configured"}:
                 uncertainties.append(
-                    f"{workload.address}: {iam_resource.address} IAM policy_data is {policy_state} "
+                    f"{workload.address}: {iam_resource.address} Pub/Sub IAM scope is unresolved "
                     f"for {subscription.address}"
                 )
                 continue
-            bindings = iam_bindings(iam_resource)
-            if not bindings:
+            if item.unusable_policy_state is not None:
+                uncertainties.append(
+                    f"{workload.address}: {iam_resource.address} IAM policy_data is {item.unusable_policy_state} "
+                    f"for {subscription.address}"
+                )
                 continue
-            for binding in bindings:
-                source = _known_string(binding.get("source")) or iam_resource.address
-                if binding.get("role_state") == "unknown" or binding.get("members_state") == "unknown":
+            for step in item.steps:
+                binding = step.binding
+                source = step.source
+                if step.unresolved:
                     uncertainties.append(f"{workload.address}: {source} Pub/Sub IAM role or members are unresolved")
                     continue
-                if not _binding_member_applies(binding, service_account_member):
+                if service_account_member not in step.members:
                     continue
                 role = _known_string(binding.get("role"))
                 if role is None:

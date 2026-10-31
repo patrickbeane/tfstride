@@ -98,6 +98,8 @@ class GcpPubsubPathSnapshotTests(unittest.TestCase):
         self.assertIn("is ambiguous because authoritative", joined)
         self.assertIn("condition", joined)
         self.assertIn("unresolved", joined)
+        self.assertIn("policy_data is unknown", joined)
+        self.assertIn("role or members are unresolved", joined)
         roles = {
             key[3]
             for entry in snapshot["workloads"].values()

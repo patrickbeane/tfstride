@@ -438,9 +438,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w0: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w0: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w0: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -914,9 +917,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w1: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w1: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w1: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -1214,9 +1220,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w10: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w10: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w10: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -1278,9 +1287,10 @@
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t2",
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
-     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t3",
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t5",
@@ -1295,6 +1305,8 @@
      "google_cloud_run_v2_service.w11: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t9",
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w11: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t10",
      "google_cloud_run_v2_service.w11: google_pubsub_subscription_iam_member.unresolved11 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
      "google_cloud_run_v2_service.w11: google_pubsub_topic_iam_member.conditional11 Pub/Sub topology-deletion condition is not deterministic",
@@ -1730,15 +1742,29 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w2: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w2: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w2: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
   "google_cloud_run_v2_service.w3": {
    "access": {
     "paths": [
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t3",
+       "google_pubsub_topic_iam_policy.authoritative3",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "d0ec867a80427ae4eb8e04d7491a51879f891f0c945ada54eb189e588e932e1e"
+     },
      {
       "key": [
        null,
@@ -1775,9 +1801,12 @@
     "paths": [],
     "uncertainties": [
      "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w3: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w3: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w3: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -1794,6 +1823,28 @@
        null
       ],
       "sha256": "548f27c497fffcf9164df2edfc5b3107ba335ca9dfe1fae822579331017981d7"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_topic.t5",
+       "google_pubsub_topic_iam_member.conditional5",
+       "roles/pubsub.editor",
+       null,
+       null
+      ],
+      "sha256": "12ac55ec324502c33b7dd841a76959d7f2b9014ad5201724911faa6371a3d8bb"
+     },
+     {
+      "key": [
+       null,
+       "google_pubsub_subscription.s5",
+       "google_pubsub_subscription_iam_member.conditional5",
+       "roles/pubsub.subscriber",
+       null,
+       null
+      ],
+      "sha256": "239e5b0599acc70ef2c10fe00f0ce8806be2d02c61dcab544f2d3c855c56a5c7"
      }
     ],
     "uncertainties": []
@@ -1934,8 +1985,21 @@
      }
     ],
     "uncertainties": [
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
      "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7"
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.conditional5 Pub/Sub acknowledgement condition is not deterministic",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
     ]
    },
    "topology_destruction": {
@@ -2074,10 +2138,39 @@
      }
     ],
     "uncertainties": [
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t0",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t1",
      "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t2",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t4",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.conditional5 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t5",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.conditional5 Pub/Sub topology-deletion condition is not deterministic",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s5",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t6",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s6",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t7",
      "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s7",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t8",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s8",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w4: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
+     "google_cloud_run_v2_service.w4: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t11",
+     "google_cloud_run_v2_service.w4: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
     ]
    }
   },
@@ -2087,13 +2180,24 @@
      {
       "key": [
        null,
+       "google_pubsub_topic.t3",
+       "google_pubsub_topic_iam_binding.managed3",
+       "roles/pubsub.admin",
+       null,
+       null
+      ],
+      "sha256": "9d7440704e700efbdd8ed88dc7d5dd80c2dcf601c13671c5af6d319fd056be92"
+     },
+     {
+      "key": [
+       null,
        "google_pubsub_topic.t5",
        "google_pubsub_topic_iam_member.conditional5",
        "roles/pubsub.editor",
        null,
        null
       ],
-      "sha256": "825e592d65a1eaf8e5be23b2be7bccfd315490fe3bfa5b2fd8a2e484ca5265a3"
+      "sha256": "c66ef884c3e667ed4400d13dda45e4e0bfcd8f879f4f46e1838da28f7106c3a7"
      },
      {
       "key": [
@@ -2104,13 +2208,146 @@
        null,
        null
       ],
-      "sha256": "0714c1cdd41854ca74ed0e43a7bc98e5840dac68d42726b4cd76de36db55e4ec"
+      "sha256": "4b688ceead555825e31c6cd7ff995efe603f7c23a16ad385513b255f6b2a2415"
      }
     ],
     "uncertainties": []
    },
    "message_removal": {
-    "paths": [],
+    "paths": [
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b0312ec6b97859a65425da968db08be675ee37f879f96670a063e3023254c7ed"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "06132fc1bd57730acb262185d069c3be3ecc5032227a02ee36b18db13d7ef438"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "3857c17cb66f9a2ee6f4bfde5ad6716e26141dfe1d90d1a06f22307baccb5b8d"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a0da9048554d1381c47706bb889d7bbde6a85257544f3b9609458eacb5fc92f8"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "0751b9fad4f9092a3a92504103e1db94d295b724ff78f46e381961d8be11a466"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "6c0653b4b5f14d286b5e3e04b2309ff45695fbfc383af31fae6ad0873ffb215e"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "acb867855e22f620d13b8cb81129bfb0143dbd462f399a42fb6ed666dc3d9d01"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "7a47951fe0179db2501a956417763fc558768556bb023c1da646335ab561fc40"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "ef6676f087bac9b44a54fcb71128541f7768a846cff629af57d9ca310df26db0"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "597cadd769421bc9ce2251fcc2542a53027d0b2841fec67a0b77f790f89d271a"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c941039e51c08394d7ac33e7374f2348070e43a3ebc011069e2b3abb1bab3c25"
+     },
+     {
+      "key": [
+       "pubsub.subscriptions.consume",
+       null,
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "06efcbcbb7e042d4a92caefd5c42d2eb651cbea4022cb462d7f7d6a0459d97d5"
+     }
+    ],
     "uncertainties": [
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
      "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
@@ -2130,7 +2367,140 @@
     ]
    },
    "topology_destruction": {
-    "paths": [],
+    "paths": [
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t0",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "c27fa3c39016699d4ca60b762878f43f5774143c702c6779b8e6f2af5c29e328"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t1",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "b65b4b34410bf71747f6f0452e5239b39308f066906b310dfb045fa76989ac8d"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t10",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "62a0181b6f0dd591d33a340223454860e4ada22f4af461541f744c753a01a817"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t11",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "2f090ac9cfe04ac642e03e141377353c737bef4b0b7223c46941d2df5f2a2ed4"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t2",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "a35a7e2ade5f7462628c3985d385d994905ab677c25472fdb6ed3b55091fb16f"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t3",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "ae7288344962bdd60c0bb22d924649d0241f511fc9fdbf314a5f5fbd75f09728"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t4",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "f38a8f9b63d027d90791f2f8adbef0e5822728fc0bb9edb1bbce0ac3c9d5e210"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t5",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "efd25dabf932d3e380b7870b7ee13ffcf88525abd8459725df6eabcd650142bd"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t6",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "775c13a7f710c42f21be062aea4b5f611e7b375871f5482b872d1f936bfed6a8"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t7",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "3891c3c7c0009d2593ff16ce848f00d44a3c34bfb1ca714ab6706d91096ec985"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t8",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "54e79dad7cdd3af6ad5c2d8b60d9cae1c99c6548c575764e15fba6543328bc10"
+     },
+     {
+      "key": [
+       "pubsub.topics.delete",
+       "google_pubsub_topic.t9",
+       "google_project_iam_member.custom4",
+       "projects/tfstride-demo/roles/pubsubOperator",
+       "project",
+       "tfstride-demo"
+      ],
+      "sha256": "8fb9fa334bbb60e3a63fce8786cad6b7b53267e92aec0a709752a27b6d5f932c"
+     }
+    ],
     "uncertainties": [
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t0",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s0",
@@ -2139,9 +2509,10 @@
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s1",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t2",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s2",
-     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t3",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s3",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s4",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.conditional5 Pub/Sub topology-deletion condition is not deterministic",
@@ -2158,7 +2529,9 @@
      "google_cloud_run_v2_service.w5: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t9",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s9",
+     "google_cloud_run_v2_service.w5: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s10",
      "google_cloud_run_v2_service.w5: google_pubsub_topic_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_topic.t11",
      "google_cloud_run_v2_service.w5: google_pubsub_subscription_iam_member.unresolved5 Pub/Sub IAM scope is unresolved for google_pubsub_subscription.s11"
@@ -2205,9 +2578,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w6: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w6: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w6: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -2285,9 +2661,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w7: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w7: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w7: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -2342,9 +2721,12 @@
     ],
     "uncertainties": [
      "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w8: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w8: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w8: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   },
@@ -2387,9 +2769,12 @@
     "paths": [],
     "uncertainties": [
      "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s1 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s1",
-     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t3 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_pubsub_topic.t3",
+     "google_cloud_run_v2_service.w9: google_pubsub_topic_iam_policy.unknown4 IAM policy_data is unknown for google_pubsub_topic.t4",
      "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.subscriber at subscription scope projects/tfstride-demo/subscriptions/s7 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_subscription.s7",
-     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9"
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM membership for role role:roles/pubsub.admin at topic scope projects/tfstride-demo/topics/t9 is ambiguous because authoritative role bindings overlap with another Terraform IAM manager for google_pubsub_topic.t9",
+     "google_cloud_run_v2_service.w9: effective Pub/Sub IAM at topic scope projects/tfstride-demo/topics/t10 is unresolved because google_pubsub_topic_iam_binding.unknown_role10 may be an overlapping authoritative IAM manager for google_pubsub_topic.t10",
+     "google_cloud_run_v2_service.w9: google_pubsub_topic_iam_binding.unknown_role10 Pub/Sub IAM role or members are unresolved"
     ]
    }
   }
