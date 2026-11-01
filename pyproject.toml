@@ -161,6 +161,9 @@ include = [
   "src/tfstride/providers/aws/messaging_topology_destruction_evidence.py",
   "src/tfstride/providers/aws/resource_decoration/ecs_messaging_topology_destruction_paths.py",
 
+  # AWS topology-disruption grant-breadth evidence shared by messaging and DynamoDB table rules.
+  "src/tfstride/providers/aws/topology_grant_evidence.py",
+
   # AWS managed-key evidence, authorization, and workload paths.
   "src/tfstride/providers/aws/kms_dependency_evidence.py",
   "src/tfstride/providers/aws/protected_data_evidence.py",
@@ -234,6 +237,7 @@ include = [
   "src/tfstride/providers/gcp/audit_telemetry_disruption_evidence.py",
   "src/tfstride/providers/gcp/resource_decoration/cloud_run_logging_sink_audit_telemetry_disruption_paths.py",
   "src/tfstride/providers/gcp/cloud_run_logging_sink_disruption_rules.py",
+  "src/tfstride/providers/gcp/logging_filter_relevance.py",
 
   # GCP messaging removal and delivery evidence.
   "src/tfstride/providers/gcp/message_removal_evidence.py",
@@ -243,6 +247,9 @@ include = [
   "src/tfstride/providers/gcp/messaging_topology_destruction_evidence.py",
   "src/tfstride/providers/gcp/cloud_run_pubsub_topology_disruption_rules.py",
   "src/tfstride/providers/gcp/resource_decoration/cloud_run_pubsub_topology_destruction_paths.py",
+
+  # GCP Pub/Sub IAM join index shared by message-removal and topology-destruction paths.
+  "src/tfstride/providers/gcp/resource_decoration/iam_join_index.py",
 
   # GCP managed-key evidence, authorization, and workload paths.
   "src/tfstride/providers/gcp/kms_dependency_evidence.py",
@@ -302,6 +309,8 @@ include = [
   # Azure audit-telemetry disruption evidence.
   "src/tfstride/providers/azure/audit_telemetry_disruption_evidence.py",
   "src/tfstride/providers/azure/resource_decoration/app_service_diagnostic_setting_audit_telemetry_disruption_paths.py",
+  "src/tfstride/providers/azure/diagnostic_log_catalog.py",
+  "src/tfstride/providers/azure/diagnostic_audit_relevance.py",
 
   # Azure messaging removal and delivery evidence.
   "src/tfstride/providers/azure/message_removal_evidence.py",
