@@ -118,7 +118,7 @@ class _GcsRoleAccess:
 
 @dataclass(frozen=True, slots=True)
 class GcsGrantConstraintContext:
-    """Indexes scoped to one evaluation; callers rebuild after input mutations."""
+    """Indexes reusable within one evaluation phase; rebuild after input mutations."""
 
     resources: tuple[NormalizedResource, ...]
     index: GcpResourceIndex
@@ -205,26 +205,36 @@ def evaluate_gcs_operation_constraints(
 def evaluate_gcs_bucket_grants(
     principal: str,
     buckets: Sequence[NormalizedResource],
-    custom_roles: GcpCustomRoleIndex,
+    custom_roles: GcpCustomRoleIndex | None = None,
     *,
     resources: Sequence[NormalizedResource] = (),
+    context: GcsGrantConstraintContext | None = None,
 ) -> tuple[list[GcpGcsBucketGrant], list[str]]:
     """Return matching grant evidence and uncertainty without workload-specific prose.
 
     Full inventory inputs supply ancestor grants and deny constraints. Conditions
     remain separate alternatives. Inherited custom roles require grantability and lifecycle proof; basic roles stay unresolved.
+
+    A prepared context supplies the inventory and default custom-role index for
+    this phase. Without one, dependencies are built fresh from resources. An
+    empty inventory retains bucket-local evidence and any supplied custom roles.
     """
     if not buckets:
         return [], []
 
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
-    context = GcsGrantConstraintContext.build(resources)
+    if context is None:
+        context = GcsGrantConstraintContext.build(resources)
+    if custom_roles is None:
+        custom_roles = context.custom_roles
     seen: set[tuple[str, str, str, str]] = set()
     for bucket in buckets:
         if bucket.resource_type != GcpResourceType.STORAGE_BUCKET:
             continue
-        bindings, problems = context.bindings(principal, bucket) if resources else (gcp_facts(bucket).bindings, [])
+        bindings, problems = (
+            context.bindings(principal, bucket) if context.resources else (gcp_facts(bucket).bindings, [])
+        )
         uncertainties.extend(problems)
         for binding in bindings:
             if principal not in binding_members(binding):

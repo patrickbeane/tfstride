@@ -12,7 +12,7 @@ from tfstride.providers.coercion import (
     dedupe,
     dedupe_strings,
 )
-from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex
 from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_operation_constraints
 from tfstride.providers.gcp.iam_reference_utils import (
@@ -136,10 +136,10 @@ class ModelCloudRunGcsObjectDeletionPathsStage:
         buckets = tuple(resource for resource in resources if resource.resource_type == GcpResourceType.STORAGE_BUCKET)
         iam_resources = tuple(resource for resource in resources if resource.resource_type in _IAM_RESOURCE_TYPES)
         resources_by_address = {resource.address: resource for resource in resources}
-        custom_roles = build_gcp_custom_role_index(resources)
-        for workload in resources:
-            if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
-                continue
+        workloads = tuple(resource for resource in resources if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES)
+        grant_context = GcsGrantConstraintContext.build(resources) if buckets and workloads else None
+        custom_roles = grant_context.custom_roles if grant_context is not None else None
+        for workload in workloads:
             paths, uncertainties = _cloud_run_gcs_object_deletion_paths(
                 workload,
                 buckets,
@@ -147,6 +147,7 @@ class ModelCloudRunGcsObjectDeletionPathsStage:
                 resources_by_address,
                 custom_roles,
                 context,
+                grant_context=grant_context,
             )
             facts = gcp_facts(workload)
             facts.set_cloud_run_gcs_object_deletion_paths(paths)
@@ -158,8 +159,10 @@ def _cloud_run_gcs_object_deletion_paths(
     buckets: Sequence[NormalizedResource],
     iam_resources: Sequence[NormalizedResource],
     resources_by_address: Mapping[str, NormalizedResource],
-    custom_roles: GcpCustomRoleIndex,
+    custom_roles: GcpCustomRoleIndex | None,
     context: GcpDecorationContext,
+    *,
+    grant_context: GcsGrantConstraintContext | None = None,
 ) -> tuple[list[GcpCloudRunGcsObjectDeletionPath], list[str]]:
     workload_facts = gcp_facts(workload)
     email = workload_facts.service_account_email
@@ -173,7 +176,10 @@ def _cloud_run_gcs_object_deletion_paths(
 
     paths: list[GcpCloudRunGcsObjectDeletionPath] = []
     uncertainties: list[str] = []
-    grant_context = GcsGrantConstraintContext.build(tuple(resources_by_address.values()))
+    if grant_context is None:
+        grant_context = GcsGrantConstraintContext.build(tuple(resources_by_address.values()))
+    if custom_roles is None:
+        custom_roles = grant_context.custom_roles
     for bucket in buckets:
         bucket_name = _bucket_name(bucket)
         bucket_project = normalize_gcp_project(gcp_facts(bucket).project)

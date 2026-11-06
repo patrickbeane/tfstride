@@ -5,6 +5,7 @@ import unittest
 from itertools import permutations
 from unittest.mock import patch
 
+from tests.helpers.gcp_gcs_plan import CASES, build_gcs_case, service_account_member
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import (
     _BUCKET_ADDRESS,
@@ -19,11 +20,28 @@ from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import (
 from tfstride.providers.gcp.custom_roles import build_gcp_custom_role_index
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_bucket_grants
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
+from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpGcsGrantEvaluationTests(unittest.TestCase):
+    def test_prepared_context_matches_fresh_full_inventory_evaluation(self) -> None:
+        for case in CASES:
+            inventory = GcpNormalizer().normalize(build_gcs_case(case))
+            buckets = inventory.by_type(GcpResourceType.STORAGE_BUCKET)
+            prepared = GcsGrantConstraintContext.build(inventory.resources)
+            for workload in range(3):
+                principal = service_account_member(workload)
+                expected = evaluate_gcs_bucket_grants(principal, buckets, resources=inventory.resources)
+                with (
+                    self.subTest(case=case, workload=workload),
+                    patch.object(
+                        GcsGrantConstraintContext, "build", side_effect=AssertionError("unexpected grant context")
+                    ),
+                ):
+                    self.assertEqual(evaluate_gcs_bucket_grants(principal, buckets, context=prepared), expected)
+
     def test_empty_bucket_selection_does_not_construct_a_grant_context(self) -> None:
         inventory = _normalize([_bucket(), _bucket_iam_member()])
         custom_roles = build_gcp_custom_role_index(inventory.resources)
@@ -80,6 +98,17 @@ class GcpGcsGrantEvaluationTests(unittest.TestCase):
         self.assertEqual(grants[0]["custom_role_permissions"], permissions)
         self.assertEqual(grants[0]["matched_permissions"], ["storage.objects.delete"])
         self.assertEqual(grants[0]["access_classes"], ["delete"])
+        # An empty prepared inventory must still honor caller-supplied local evidence and roles.
+        prepared = GcsGrantConstraintContext.build(())
+        self.assertEqual(
+            evaluate_gcs_bucket_grants(
+                _SERVICE_ACCOUNT_MEMBER,
+                inventory.resources,
+                build_gcp_custom_role_index(inventory.resources),
+                context=prepared,
+            ),
+            (grants, uncertainties),
+        )
 
     def test_deduplication_keeps_distinct_sources_and_conditions(self) -> None:
         inventory = _normalize([_bucket(), _bucket_iam_member()])

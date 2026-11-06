@@ -5,8 +5,11 @@ from collections.abc import Mapping, Sequence
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import STATE_CONFIGURED, dedupe
-from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
-from tfstride.providers.gcp.gcs_grant_evaluation import GCS_ACCESS_IAM_TYPES_BY_BASIS, gcs_path_permissions
+from tfstride.providers.gcp.gcs_grant_evaluation import (
+    GCS_ACCESS_IAM_TYPES_BY_BASIS,
+    GcsGrantConstraintContext,
+    gcs_path_permissions,
+)
 from tfstride.providers.gcp.kms_dependency_evidence import (
     GcpKmsEncryptionDependency,
 )
@@ -47,12 +50,14 @@ class ModelCloudRunGcsProtectedDataConvergenceStage:
     ) -> None:
         del context
         resources_by_address = {resource.address: resource for resource in resources}
-        for workload in resources:
-            if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
-                continue
+        workloads = tuple(resource for resource in resources if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES)
+        has_buckets = any(resource.resource_type == GcpResourceType.STORAGE_BUCKET for resource in resources)
+        grant_context = GcsGrantConstraintContext.build(resources) if has_buckets and workloads else None
+        for workload in workloads:
             convergences, uncertainties = _protected_data_convergences(
                 workload,
                 resources_by_address,
+                grant_context=grant_context,
             )
             facts = gcp_facts(workload)
             facts.set_cloud_run_gcs_protected_data_convergences(convergences)
@@ -62,6 +67,8 @@ class ModelCloudRunGcsProtectedDataConvergenceStage:
 def _protected_data_convergences(
     workload: NormalizedResource,
     resources_by_address: Mapping[str, NormalizedResource],
+    *,
+    grant_context: GcsGrantConstraintContext | None = None,
 ) -> tuple[list[GcpCloudRunGcsProtectedDataConvergence], list[str]]:
     facts = gcp_facts(workload)
     uncertainties = [
@@ -69,10 +76,12 @@ def _protected_data_convergences(
         *facts.cloud_run_kms_operation_path_uncertainties,
     ]
     convergences: list[GcpCloudRunGcsProtectedDataConvergence] = []
-    resources = list(resources_by_address.values())
+    resources = grant_context.resources if grant_context is not None else tuple(resources_by_address.values())
     current_paths: list[GcpCloudRunGcsAccessPath] = []
-    if any(resource.resource_type == GcpResourceType.STORAGE_BUCKET for resource in resources):
-        current_paths = current_cloud_run_gcs_access_paths(workload, resources, build_gcp_custom_role_index(resources))
+    if grant_context is not None or any(
+        resource.resource_type == GcpResourceType.STORAGE_BUCKET for resource in resources
+    ):
+        current_paths = current_cloud_run_gcs_access_paths(workload, resources, grant_context=grant_context)
 
     # Retain diagnostics for cached access evidence whose bucket is no longer modeled.
     for access_path in facts.cloud_run_gcs_access_paths:

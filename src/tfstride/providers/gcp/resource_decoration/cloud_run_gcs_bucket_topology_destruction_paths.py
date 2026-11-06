@@ -6,7 +6,7 @@ from typing import Any, Literal, cast
 
 from tfstride.models import NormalizedResource
 from tfstride.providers.coercion import dedupe
-from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_gcp_custom_role_index
+from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex
 from tfstride.providers.gcp.gcs_custom_role_evaluation import (
     GcsInheritedCustomRoleAssessment,
     assess_inherited_gcs_custom_role,
@@ -126,13 +126,12 @@ class ModelCloudRunGcsBucketTopologyDestructionPathsStage:
     ) -> None:
         targets, target_uncertainties = _bucket_targets(resources)
         iam_resources = _iam_resources(resources)
-        custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
-        grant_context = GcsGrantConstraintContext.build(resources) if targets else None
+        workloads = tuple(resource for resource in resources if resource.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES)
+        grant_context = GcsGrantConstraintContext.build(resources) if targets and workloads else None
+        custom_roles = grant_context.custom_roles if grant_context is not None else None
 
-        for workload in resources:
-            if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
-                continue
+        for workload in workloads:
             paths, uncertainties = _cloud_run_gcs_bucket_topology_destruction_paths(
                 workload,
                 targets,
@@ -153,8 +152,10 @@ def current_cloud_run_gcs_bucket_topology_destruction_paths(
     bucket: NormalizedResource,
     resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
+    *,
+    grant_context: GcsGrantConstraintContext | None = None,
 ) -> list[GcpCloudRunGcsBucketTopologyDestructionPath]:
-    """Recompute every current deterministic proof for one workload and bucket."""
+    """Recompute proofs, optionally reusing dependencies for the same current resources."""
 
     if (
         workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES
@@ -164,14 +165,16 @@ def current_cloud_run_gcs_bucket_topology_destruction_paths(
     target = _bucket_target(bucket)
     if target is None:
         return []
+    if grant_context is None:
+        grant_context = GcsGrantConstraintContext.build(resources)
     paths, _uncertainties = _cloud_run_gcs_bucket_topology_destruction_paths(
         workload,
         (target,),
         _iam_resources(resources),
         context,
-        build_gcp_custom_role_index(resources),
+        grant_context.custom_roles,
         _project_organizations(resources),
-        GcsGrantConstraintContext.build(resources),
+        grant_context,
     )
     return paths
 
@@ -181,7 +184,7 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
     targets: Sequence[_BucketTarget],
     iam_resources: Sequence[NormalizedResource],
     context: GcpDecorationContext,
-    custom_roles: GcpCustomRoleIndex,
+    custom_roles: GcpCustomRoleIndex | None,
     project_organizations: Mapping[str, str],
     grant_context: GcsGrantConstraintContext | None,
 ) -> tuple[list[GcpCloudRunGcsBucketTopologyDestructionPath], list[str]]:
@@ -198,6 +201,7 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
     assert service_account_email is not None
     assert service_account_member is not None
     assert grant_context is not None
+    assert custom_roles is not None
 
     paths: list[GcpCloudRunGcsBucketTopologyDestructionPath] = []
     uncertainties: list[str] = []
