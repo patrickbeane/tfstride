@@ -1,0 +1,3581 @@
+{
+  "conditional_unknown": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "ef52a63ba1ff5a74b19202428253436515ded84b05644b386496c54221a7d2a0"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "dd928ddb74ce9f5806bdbe61a694d6a676432714ff2e863366c7dd76a4dab9c6"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket_iam_member.first"
+        ],
+        "rule_id": "gcp-iam-privileged-assignment",
+        "sha256": "134340aa81a1b34c329e98512b2df96d79b63fb5ad9dcdec5f794f7a8db3585e"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket_iam_member.second"
+        ],
+        "rule_id": "gcp-iam-privileged-assignment",
+        "sha256": "7a2aec4f18fdab0582a6122f6c962e5bbdece76279d2eda1f85170fdd8f1db0f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "05ac31856acc1ea05e65a47ecf1de5f4b1c21cc034186ea85d259e2deb627c1f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "b21dd9454d53b0a820a39bbf5affed051c47361f7453990079c8343b260985a8"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "d90667dec68ec3e3b92dbb854180608a7022da49d8204f9c2af3e44d41882624"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "fe6e01bc3ba23311cc3c895f0db4dde005d14a2cb290d2b8edb7f33a38a1d04c"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "818cf3d5fe1ee73c9b1229075f901a347bf7c8124c94a0a3234f0cd9a4a4b0a9"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "6fb44642c76f35c8dee0150f183e285e59c106fa43301b4b4a15d5812eee56f7"
+      }
+    ],
+    "operation_gaps": {
+      "records": [
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.list",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "ambiguous",
+          "explanation": "The modeled IAM source cannot establish one applicable grant at this scope.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Check overlapping authoritative IAM managers and the source's binding structure.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_storage_bucket_iam_member.missing_role"
+            }
+          ],
+          "reason_code": "iam_grant_source_ambiguous",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "ambiguous",
+          "explanation": "The modeled IAM source cannot establish one applicable grant at this scope.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Check overlapping authoritative IAM managers and the source's binding structure.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_storage_bucket_iam_member.missing_role"
+            }
+          ],
+          "reason_code": "iam_grant_source_ambiguous",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "ambiguous",
+          "explanation": "The modeled IAM source cannot establish one applicable grant at this scope.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Check overlapping authoritative IAM managers and the source's binding structure.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_storage_bucket_iam_member.missing_role"
+            }
+          ],
+          "reason_code": "iam_grant_source_ambiguous",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "conditional",
+          "explanation": "An IAM condition prevents a definite conclusion for this operation.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the binding condition against the request context for the affected operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.first"
+            },
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "condition"
+              ],
+              "resource_address": "google_storage_bucket_iam_member.second"
+            }
+          ],
+          "reason_code": "iam_condition_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "ambiguous",
+          "explanation": "The modeled IAM source cannot establish one applicable grant at this scope.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Check overlapping authoritative IAM managers and the source's binding structure.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_storage_bucket_iam_member.missing_role"
+            }
+          ],
+          "reason_code": "iam_grant_source_ambiguous",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "The IAM binding's membership may include this workload identity.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Resolve the binding's members before assessing the workload's operations.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [
+                "members"
+              ],
+              "resource_address": "google_project_iam_member.unknown_member"
+            }
+          ],
+          "reason_code": "iam_membership_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "missing",
+          "explanation": "The IAM policy document at this modeled scope is unavailable.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Include the policy_data document for this IAM source or review its bindings separately.",
+          "operation": null,
+          "provenance": [
+            {
+              "evidence_kind": "policy_document",
+              "field_path": [
+                "policy_data"
+              ],
+              "resource_address": "google_storage_bucket_iam_policy.unknown"
+            }
+          ],
+          "reason_code": "iam_policy_document_unavailable",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        }
+      ],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "d286efcd7e13793ff4d8a6a47f26640d16ea5ce143c31c610879ebb9f6e3fd25",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w1"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "f8d6d848327d26a4d9bd3a0e90f7ee4018b5428736b1bd4d27657129765666b9",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w2"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "67749c873e19d1d51b6309ca8a6a528e0157229e959fc1c9c860cce868ca8e3b",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_storage_bucket.b0"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_project_iam_member.unknown_member for google_storage_bucket.b0: project IAM role, membership, or condition is unresolved",
+          "google_cloud_run_v2_service.w0: google_project_iam_member.unknown_member for google_storage_bucket.b1: project IAM role, membership, or condition is unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "conditional",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.first",
+            "matched_permissions": [],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectAdmin",
+            "sha256": "e7b29e5339eef422f71b5a2084cf726c94a87a43558d33aa31304597734f452c"
+          },
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "conditional",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.second",
+            "matched_permissions": [],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectAdmin",
+            "sha256": "a9031a8adc0e5e3d53b490ae0c53ca1bf819f8652dcb0ef55111eaac986cc913"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b0 is unresolved because google_storage_bucket_iam_policy.unknown may be an overlapping authoritative IAM manager for google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.first GCS bucket-deletion condition is not deterministic",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.second GCS bucket-deletion condition is not deterministic",
+          "google_cloud_run_v2_service.w0: google_project_iam_member.unknown_member GCS IAM role or members are unresolved",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_policy.unknown GCS IAM scope is unresolved for google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w0: effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b1 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_storage_bucket.b1",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.first GCS IAM scope is unresolved for google_storage_bucket.b1",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.second GCS IAM scope is unresolved for google_storage_bucket.b1",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_policy.unknown IAM policy_data is unknown for google_storage_bucket.b1"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.first GCS deletion authority is condition-dependent for bucket google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.second GCS deletion authority is condition-dependent for bucket google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_policy.unknown IAM policy_data is unresolved for GCS bucket google_storage_bucket.b1",
+          "effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b1 for google_storage_bucket.b1 is ambiguous because authoritative policy and other Terraform IAM managers overlap"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_project_iam_member.unknown_member for google_storage_bucket.b0: project IAM role, membership, or condition is unresolved",
+          "google_cloud_run_v2_service.w0: google_project_iam_member.unknown_member for google_storage_bucket.b1: project IAM role, membership, or condition is unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w1": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_project_iam_member.unknown_member for google_storage_bucket.b0: project IAM role, membership, or condition is unresolved",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_member.missing_role for google_storage_bucket.b1: overlapping authoritative bucket IAM managers",
+          "google_cloud_run_v2_service.w1: google_project_iam_member.unknown_member for google_storage_bucket.b1: project IAM role, membership, or condition is unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w1: effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b0 is unresolved because google_storage_bucket_iam_policy.unknown may be an overlapping authoritative IAM manager for google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w1: google_project_iam_member.unknown_member GCS IAM role or members are unresolved",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_member.missing_role GCS IAM scope is unresolved for google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_policy.unknown GCS IAM scope is unresolved for google_storage_bucket.b0",
+          "google_cloud_run_v2_service.w1: effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b1 is ambiguous because authoritative policy and other Terraform IAM managers overlap for google_storage_bucket.b1",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_member.missing_role custom IAM role projects/tfstride-gcs-contexts/roles/missing is unresolved",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_policy.unknown IAM policy_data is unknown for google_storage_bucket.b1"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_member.missing_role permissions for IAM role projects/tfstride-gcs-contexts/roles/missing are external_or_unresolved for GCS bucket google_storage_bucket.b1",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_policy.unknown IAM policy_data is unresolved for GCS bucket google_storage_bucket.b1",
+          "effective GCS IAM at bucket scope projects/_/buckets/tfstride-gcs-contexts-b1 for google_storage_bucket.b1 is ambiguous because authoritative policy and other Terraform IAM managers overlap"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_project_iam_member.unknown_member for google_storage_bucket.b0: project IAM role, membership, or condition is unresolved",
+          "google_cloud_run_v2_service.w1: google_storage_bucket_iam_member.missing_role for google_storage_bucket.b1: overlapping authoritative bucket IAM managers",
+          "google_cloud_run_v2_service.w1: google_project_iam_member.unknown_member for google_storage_bucket.b1: project IAM role, membership, or condition is unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w2": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved for GCS bucket-deletion modeling"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account identity is unresolved"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved",
+          "google_cloud_run_v2_service.w2: Cloud Run service account identity is unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      }
+    }
+  },
+  "deny": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_project_iam_member.custom",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "fca57dc8ffb8853ab981eca29672d5b456b64a587782ea4f1f8aae83666b14ff"
+      },
+      {
+        "affected_resources": [
+          "google_project_iam_member.inherited",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "8de0b5d7e2f9c0d91b4579cf0bdb868dca2abb1ed0e4e5ae5ee8f50a0c884075"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "5d89fb95ee0cba30554a9b7802f603b063941323e04da7fc3fd39e6b296c33c2"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "2d01070f1ba9d7c6d9c7c470ecf535368b540ee5e04329f610e3f50548d15a4d"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_storage_bucket_iam_member.local",
+          "google_project_iam_member.custom",
+          "google_project_iam_custom_role.storage_operator"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "77f7d8f89253ef453854dd7894668aa2a2d64fb9b34de1fb99a9d3244ef6c2ad"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-bucket-topology-disruption",
+        "sha256": "f33d80dbbdf5b4bec4f598ab969f2de7c9f2449373819abee3792927dbaf1002"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_custom_role.storage_operator",
+          "google_project_iam_member.custom"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-bucket-topology-disruption",
+        "sha256": "f32e6f94aec9ec3d31b541c6eb410dfddc7c3e05ec8189647e51f968132ab31b"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "64a5200ada09754326de9d2c04cbf4e0814f4d6fa1ff364ceb51ce2c7a0dec9b"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.inherited"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "3ad0c0f07c50ee642ce133f00f1712eb710c0c0e1193177ee4f33eeb1f835c0e"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.custom"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "cb932ee72df438d4640570f18d45b9cb88fe5fe43e26ce7eeff172bc6d81a94c"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "6da1bdf1806f7c3e312eb414da179940cf697a72308dfc5d6786ef7610c9b721"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.inherited"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "9e2c26c3dd48ef5c3320cd0177da32f0584d399e53eff34a1ef7d12cadfeb740"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.custom",
+          "google_project_iam_custom_role.storage_operator"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "d6c1b5daa56914a9876d1d44f3a78412a6f9b8d9b11ab8aa82979a0b5e3aac9f"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "ef52a63ba1ff5a74b19202428253436515ded84b05644b386496c54221a7d2a0"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "dd928ddb74ce9f5806bdbe61a694d6a676432714ff2e863366c7dd76a4dab9c6"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-iam-privileged-assignment",
+        "sha256": "87e684444a9d92b8eb802b7f82f1725b140a0ca711bd7a62747894b7e5cb4eec"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "05ac31856acc1ea05e65a47ecf1de5f4b1c21cc034186ea85d259e2deb627c1f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "b21dd9454d53b0a820a39bbf5affed051c47361f7453990079c8343b260985a8"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "d90667dec68ec3e3b92dbb854180608a7022da49d8204f9c2af3e44d41882624"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "fe6e01bc3ba23311cc3c895f0db4dde005d14a2cb290d2b8edb7f33a38a1d04c"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "818cf3d5fe1ee73c9b1229075f901a347bf7c8124c94a0a3234f0cd9a4a4b0a9"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "6fb44642c76f35c8dee0150f183e285e59c106fa43301b4b4a15d5812eee56f7"
+      }
+    ],
+    "operation_gaps": {
+      "records": [],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "d286efcd7e13793ff4d8a6a47f26640d16ea5ce143c31c610879ebb9f6e3fd25",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w1"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "f8d6d848327d26a4d9bd3a0e90f7ee4018b5428736b1bd4d27657129765666b9",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w2"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "c10e84cd34241c3eb311a6b219f9e13568258bc92f6df8eaca0cbc7e12b91161",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "4b3f0fff01fc77ae511fc5f5dd3f00b3541d0896f1282f5fd9fb3671ab1bf99e",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "9e4068c4a9c1cac45c6ad41404620266bfabdde1ba1e989590a3b27dc62672e4",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b1"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "de9407f6214d6aafcd68a8e2f09ff58cf93f2de743ba0673284719568baaf336",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "6a88bb664c9510ee96b037b41f4a3ba8401a45705dce3e25797aa2f5abcc066a",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b1"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete",
+              "administrative"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.admin",
+            "sha256": "85bfb1100aee4913e0d1b860a9d7c74b609b9c19724cfae11ece9161a5ef2809"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.local GCS IAM scope is unresolved for google_storage_bucket.b1"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "gcs_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "exact_gcs_bucket",
+            "role": "roles/storage.admin",
+            "sha256": "0b630c8bf92502cb85fbd4bf1787dad3c7b1d0c98cb8ae419c37171ac12e74d5"
+          }
+        ],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "bucket_iam_additive_member",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.admin",
+            "sha256": "28cf029c0fa62ec1a19aea645e4642c046be3c273dff39806f0ab9be38fdf2b8"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "bucket_iam_additive_member",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.admin",
+            "sha256": "4a9b302b41f8a9076452747f62ea2e354d445bfcf98c272d9b4f4105f82dea87"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w1": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete",
+              "storage.objects.get",
+              "storage.objects.list",
+              "storage.objects.update"
+            ],
+            "permission_constraints": [
+              {
+                "permission": "storage.objects.create",
+                "policy_address": "google_iam_deny_policy.create",
+                "reason": "applicable unconditional IAM deny",
+                "reason_code": "applicable_deny",
+                "state": "denied"
+              }
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectUser",
+            "sha256": "55ab721ba56c3a718e1ca67d1903d1e0efc4b763f2ab6668f174569d069d3f70"
+          },
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete",
+              "storage.objects.get",
+              "storage.objects.list",
+              "storage.objects.update"
+            ],
+            "permission_constraints": [
+              {
+                "permission": "storage.objects.create",
+                "policy_address": "google_iam_deny_policy.create",
+                "reason": "applicable unconditional IAM deny",
+                "reason_code": "applicable_deny",
+                "state": "denied"
+              }
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectUser",
+            "sha256": "bfb08f18da97ffacccf6436b66b8aa9595bf4a56a46b87e78e7ab271b31c60ea"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "6ae7492fdb8ef7a130dc9033f3ab87f4cf9a689b017b3ec450099039a635a005"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "63ae5e31f15ada5d34a6b6a9406597c6f32b59381019e394b5f6dde57d040f93"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "6ee8861994b5a9f132164db92ac6aa815cf5602cfc76a8669432323420fb3acb"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "703ecfe6c6748a1f27ca591c46334eec261f44a0d0a2986be50be585c3464e28"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w2": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "3324217e4ddb4b3fb8216854a8b102bd0306f3090a6b15f61ed4c651579e59f2"
+          },
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "2b5a771bc8ed6bb8a2adc0ca1ddd15262ca4ba689cfbd1dbec058dedf5a0c704"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "gcs_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "gcs_project",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "ce0dee992e391c383859cfadd32f1195174e12d78fb93e97107cb05359defdf7"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "gcs_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "gcs_project",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "200ee6206416b19c3843d245c0ebf652f1d7641284399c089e9b3e30b0d6a068"
+          }
+        ],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "f20047bca054d4c8c4423d495b7068c2cef509306da902ba18cdf24b7b9a3ba7"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "7fd4d20ce5ee73212e183aeb6eab07a1b51b23e81dc47c1affe5eea39137c1ba"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "c8a7a44dc99f633f252597c9fde0fa61dd5caf824d79710e861a914fba0a6f08"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "4cdf5b8355aae0506e1997489f4fb2397021ae6df436fecaa5714e75cb09f7bb"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      }
+    }
+  },
+  "mixed": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_project_iam_member.custom",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "fca57dc8ffb8853ab981eca29672d5b456b64a587782ea4f1f8aae83666b14ff"
+      },
+      {
+        "affected_resources": [
+          "google_project_iam_member.inherited",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "8de0b5d7e2f9c0d91b4579cf0bdb868dca2abb1ed0e4e5ae5ee8f50a0c884075"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "5d89fb95ee0cba30554a9b7802f603b063941323e04da7fc3fd39e6b296c33c2"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "2d01070f1ba9d7c6d9c7c470ecf535368b540ee5e04329f610e3f50548d15a4d"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_storage_bucket_iam_member.local",
+          "google_project_iam_member.custom",
+          "google_project_iam_custom_role.storage_operator"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "77f7d8f89253ef453854dd7894668aa2a2d64fb9b34de1fb99a9d3244ef6c2ad"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-bucket-topology-disruption",
+        "sha256": "f33d80dbbdf5b4bec4f598ab969f2de7c9f2449373819abee3792927dbaf1002"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_custom_role.storage_operator",
+          "google_project_iam_member.custom"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-bucket-topology-disruption",
+        "sha256": "f32e6f94aec9ec3d31b541c6eb410dfddc7c3e05ec8189647e51f968132ab31b"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "64a5200ada09754326de9d2c04cbf4e0814f4d6fa1ff364ceb51ce2c7a0dec9b"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.inherited"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "3ad0c0f07c50ee642ce133f00f1712eb710c0c0e1193177ee4f33eeb1f835c0e"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.custom"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-object-disruption",
+        "sha256": "cb932ee72df438d4640570f18d45b9cb88fe5fe43e26ce7eeff172bc6d81a94c"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_storage_bucket.b0",
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "6da1bdf1806f7c3e312eb414da179940cf697a72308dfc5d6786ef7610c9b721"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.inherited"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "358b2025a9a4bccf6264c42cc2441e71f679c74e1432d51b8928d3a9e342989b"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1",
+          "google_project_iam_member.custom",
+          "google_project_iam_custom_role.storage_operator"
+        ],
+        "rule_id": "gcp-public-cloud-run-gcs-mutation-access",
+        "sha256": "d6c1b5daa56914a9876d1d44f3a78412a6f9b8d9b11ab8aa82979a0b5e3aac9f"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "ef52a63ba1ff5a74b19202428253436515ded84b05644b386496c54221a7d2a0"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "dd928ddb74ce9f5806bdbe61a694d6a676432714ff2e863366c7dd76a4dab9c6"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-iam-privileged-assignment",
+        "sha256": "87e684444a9d92b8eb802b7f82f1725b140a0ca711bd7a62747894b7e5cb4eec"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "05ac31856acc1ea05e65a47ecf1de5f4b1c21cc034186ea85d259e2deb627c1f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "b21dd9454d53b0a820a39bbf5affed051c47361f7453990079c8343b260985a8"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "d90667dec68ec3e3b92dbb854180608a7022da49d8204f9c2af3e44d41882624"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "fe6e01bc3ba23311cc3c895f0db4dde005d14a2cb290d2b8edb7f33a38a1d04c"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "818cf3d5fe1ee73c9b1229075f901a347bf7c8124c94a0a3234f0cd9a4a4b0a9"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "6fb44642c76f35c8dee0150f183e285e59c106fa43301b4b4a15d5812eee56f7"
+      }
+    ],
+    "operation_gaps": {
+      "records": [],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "d286efcd7e13793ff4d8a6a47f26640d16ea5ce143c31c610879ebb9f6e3fd25",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w1"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "f8d6d848327d26a4d9bd3a0e90f7ee4018b5428736b1bd4d27657129765666b9",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w2"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "c10e84cd34241c3eb311a6b219f9e13568258bc92f6df8eaca0cbc7e12b91161",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "4b3f0fff01fc77ae511fc5f5dd3f00b3541d0896f1282f5fd9fb3671ab1bf99e",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "9e4068c4a9c1cac45c6ad41404620266bfabdde1ba1e989590a3b27dc62672e4",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b1"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "de9407f6214d6aafcd68a8e2f09ff58cf93f2de743ba0673284719568baaf336",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "6a88bb664c9510ee96b037b41f4a3ba8401a45705dce3e25797aa2f5abcc066a",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b1"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete",
+              "administrative"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.admin",
+            "sha256": "85bfb1100aee4913e0d1b860a9d7c74b609b9c19724cfae11ece9161a5ef2809"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.local GCS IAM scope is unresolved for google_storage_bucket.b1"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "gcs_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "exact_gcs_bucket",
+            "role": "roles/storage.admin",
+            "sha256": "0b630c8bf92502cb85fbd4bf1787dad3c7b1d0c98cb8ae419c37171ac12e74d5"
+          }
+        ],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "bucket_iam_additive_member",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.admin",
+            "sha256": "28cf029c0fa62ec1a19aea645e4642c046be3c273dff39806f0ab9be38fdf2b8"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "bucket_iam_additive_member",
+            "iam_resource_address": "google_storage_bucket_iam_member.local",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.admin",
+            "sha256": "4a9b302b41f8a9076452747f62ea2e354d445bfcf98c272d9b4f4105f82dea87"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w1": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get",
+              "storage.objects.list",
+              "storage.objects.update"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectUser",
+            "sha256": "261c01bfc54ed76ffca7cdd59369acb47026f190eb5202a08b7c8183fc199510"
+          },
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get",
+              "storage.objects.list",
+              "storage.objects.update"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectUser",
+            "sha256": "b6f3aa0059c01ebac4b0f1cbe07104f35ae40170458efc391fb269069e028a3e"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "6ae7492fdb8ef7a130dc9033f3ab87f4cf9a689b017b3ec450099039a635a005"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "63ae5e31f15ada5d34a6b6a9406597c6f32b59381019e394b5f6dde57d040f93"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "6ee8861994b5a9f132164db92ac6aa815cf5602cfc76a8669432323420fb3acb"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.inherited",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "roles/storage.objectUser",
+            "sha256": "703ecfe6c6748a1f27ca591c46334eec261f44a0d0a2986be50be585c3464e28"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w2": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "3324217e4ddb4b3fb8216854a8b102bd0306f3090a6b15f61ed4c651579e59f2"
+          },
+          {
+            "access_classes": [
+              "read",
+              "write",
+              "delete"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "storage_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.create",
+              "storage.objects.delete",
+              "storage.objects.get"
+            ],
+            "resource_scope": "exact_bucket",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "2b5a771bc8ed6bb8a2adc0ca1ddd15262ca4ba689cfbd1dbec058dedf5a0c704"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "gcs_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "gcs_project",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "ce0dee992e391c383859cfadd32f1195174e12d78fb93e97107cb05359defdf7"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "gcs_project_iam",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.buckets.delete"
+            ],
+            "operation": "storage.buckets.delete",
+            "resource_scope": "gcs_project",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "200ee6206416b19c3843d245c0ebf652f1d7641284399c089e9b3e30b0d6a068"
+          }
+        ],
+        "cloud_run_gcs_object_deletion_paths": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "f20047bca054d4c8c4423d495b7068c2cef509306da902ba18cdf24b7b9a3ba7"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "7fd4d20ce5ee73212e183aeb6eab07a1b51b23e81dc47c1affe5eea39137c1ba"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "c8a7a44dc99f633f252597c9fde0fa61dd5caf824d79710e861a914fba0a6f08"
+          },
+          {
+            "bucket_address": "google_storage_bucket.b1",
+            "grant_basis": "project_iam_additive_member",
+            "iam_resource_address": "google_project_iam_member.custom",
+            "matched_permissions": [
+              "storage.objects.delete"
+            ],
+            "operation": "storage.objects.delete",
+            "role": "projects/tfstride-gcs-contexts/roles/storageOperator",
+            "sha256": "4cdf5b8355aae0506e1997489f4fb2397021ae6df436fecaa5714e75cb09f7bb"
+          }
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      }
+    }
+  },
+  "no_buckets": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "ef52a63ba1ff5a74b19202428253436515ded84b05644b386496c54221a7d2a0"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "dd928ddb74ce9f5806bdbe61a694d6a676432714ff2e863366c7dd76a4dab9c6"
+      }
+    ],
+    "operation_gaps": {
+      "records": [],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "d286efcd7e13793ff4d8a6a47f26640d16ea5ce143c31c610879ebb9f6e3fd25",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w1"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "f8d6d848327d26a4d9bd3a0e90f7ee4018b5428736b1bd4d27657129765666b9",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w2"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w1": {
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w2": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved for GCS bucket-deletion modeling"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account identity is unresolved"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved",
+          "google_cloud_run_v2_service.w2: Cloud Run service account identity is unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      }
+    }
+  },
+  "protected_data": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_kms_crypto_key.data",
+          "google_storage_bucket.b0",
+          "google_kms_crypto_key_iam_member.decrypter",
+          "google_storage_bucket_iam_member.reader"
+        ],
+        "rule_id": "gcp-public-workload-sensitive-data-access",
+        "sha256": "7ae297ef971df1f030c9b5dab5ddc724df101a5d58f40b1b34756a111d0bf22d"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0",
+          "google_kms_crypto_key.data",
+          "google_kms_crypto_key_iam_member.decrypter",
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-public-cloud-run-kms-decrypt-access",
+        "sha256": "23841cb2163eee654dd4df62b9ce23b7ce671bfb2290dfdf34f47318670c6784"
+      },
+      {
+        "affected_resources": [
+          "google_kms_crypto_key.data"
+        ],
+        "rule_id": "gcp-kms-key-rotation-not-configured-or-too-long",
+        "sha256": "c3513cb25e0d6924411a0e7b956f322944370e69bfdb685b589bbd92e5febe32"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "05ac31856acc1ea05e65a47ecf1de5f4b1c21cc034186ea85d259e2deb627c1f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "818cf3d5fe1ee73c9b1229075f901a347bf7c8124c94a0a3234f0cd9a4a4b0a9"
+      }
+    ],
+    "operation_gaps": {
+      "records": [],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "7577450c3a90420ede48f3fb26b1ec706899355ba3adaa808b6f6ba281f9375d",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_kms_crypto_key.data"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "847e999e78234f698c364fa8b6230d6e76e752a5f721afa3804f36a9393643f1",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_storage_bucket.b0"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_paths": [
+          {
+            "access_classes": [
+              "read"
+            ],
+            "access_state": "granted",
+            "bucket_address": "google_storage_bucket.b0",
+            "grant_basis": "storage_bucket_iam",
+            "iam_resource_address": "google_storage_bucket_iam_member.reader",
+            "matched_permissions": [],
+            "resource_scope": "exact_bucket",
+            "role": "roles/storage.objectViewer",
+            "sha256": "257348c894448f71a7219944f56ce7a89ac972112118fa70aa7f83fe5bd87456"
+          }
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergences": [
+          {
+            "bucket_address": "google_storage_bucket.b0",
+            "key_address": "google_kms_crypto_key.data",
+            "operation": "cloudkms.cryptoKeyVersions.useToDecrypt",
+            "sha256": "c30627c25bf3c84b05064b09d03425dbc05421c29e8b969321bb2c4d873ffe45"
+          }
+        ]
+      }
+    }
+  },
+  "unknown_deny": {
+    "findings": [
+      {
+        "affected_resources": [
+          "google_project_iam_member.custom",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "fca57dc8ffb8853ab981eca29672d5b456b64a587782ea4f1f8aae83666b14ff"
+      },
+      {
+        "affected_resources": [
+          "google_project_iam_member.inherited",
+          "google_storage_bucket.b0",
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-inherited-iam-sensitive-resource-access",
+        "sha256": "8de0b5d7e2f9c0d91b4579cf0bdb868dca2abb1ed0e4e5ae5ee8f50a0c884075"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w0"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "3cd29b48477cfa4f6c711c72033613eed769887abf20f59daddba80741605a3a"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w1"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "ef52a63ba1ff5a74b19202428253436515ded84b05644b386496c54221a7d2a0"
+      },
+      {
+        "affected_resources": [
+          "google_cloud_run_v2_service.w2"
+        ],
+        "rule_id": "gcp-cloud-run-public-invoker",
+        "sha256": "dd928ddb74ce9f5806bdbe61a694d6a676432714ff2e863366c7dd76a4dab9c6"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket_iam_member.local"
+        ],
+        "rule_id": "gcp-iam-privileged-assignment",
+        "sha256": "87e684444a9d92b8eb802b7f82f1725b140a0ca711bd7a62747894b7e5cb4eec"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "05ac31856acc1ea05e65a47ecf1de5f4b1c21cc034186ea85d259e2deb627c1f"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-public-access-prevention-not-enforced",
+        "sha256": "b21dd9454d53b0a820a39bbf5affed051c47361f7453990079c8343b260985a8"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "d90667dec68ec3e3b92dbb854180608a7022da49d8204f9c2af3e44d41882624"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-customer-managed-encryption-missing",
+        "sha256": "fe6e01bc3ba23311cc3c895f0db4dde005d14a2cb290d2b8edb7f33a38a1d04c"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b0"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "818cf3d5fe1ee73c9b1229075f901a347bf7c8124c94a0a3234f0cd9a4a4b0a9"
+      },
+      {
+        "affected_resources": [
+          "google_storage_bucket.b1"
+        ],
+        "rule_id": "gcp-gcs-retention-policy-insufficient",
+        "sha256": "6fb44642c76f35c8dee0150f183e285e59c106fa43301b4b4a15d5812eee56f7"
+      }
+    ],
+    "operation_gaps": {
+      "records": [
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.list",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.setIamPolicy",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.list",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.list",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_access",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.get",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.buckets.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.buckets.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_bucket_topology",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.buckets.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.update",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_mutation",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.create",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w0",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w1",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b0",
+          "target_address": "google_storage_bucket.b0"
+        },
+        {
+          "evidence_state": "unknown",
+          "explanation": "An IAM deny rule may constrain this operation, but its applicability is unresolved.",
+          "family": {
+            "name": "cloud_run_gcs_object_deletion",
+            "provider": "gcp"
+          },
+          "next_step": "Review the rule's principal, permission, exception, and condition evidence for this operation.",
+          "operation": "storage.objects.delete",
+          "provenance": [
+            {
+              "evidence_kind": "modeled_relationship",
+              "field_path": [],
+              "resource_address": "google_iam_deny_policy.create"
+            }
+          ],
+          "reason_code": "deny_rule_unresolved",
+          "relationship": "runtime_identity_to_storage",
+          "resource_address": "google_cloud_run_v2_service.w2",
+          "scope": "gs://tfstride-gcs-contexts-b1",
+          "target_address": "google_storage_bucket.b1"
+        }
+      ],
+      "reporting_families": [
+        {
+          "name": "cloud_run_gcs_access",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_bucket_topology",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_mutation",
+          "provider": "gcp"
+        },
+        {
+          "name": "cloud_run_gcs_object_deletion",
+          "provider": "gcp"
+        }
+      ]
+    },
+    "trust_boundaries": [
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "463859df34be101f8d1f3a6a2f14f84a4e31a1a61c3d9b5adb6fe53a82a6237f",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w0"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "d286efcd7e13793ff4d8a6a47f26640d16ea5ce143c31c610879ebb9f6e3fd25",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w1"
+      },
+      {
+        "boundary_type": "internet-to-service",
+        "sha256": "f8d6d848327d26a4d9bd3a0e90f7ee4018b5428736b1bd4d27657129765666b9",
+        "source": "internet",
+        "target": "google_cloud_run_v2_service.w2"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "c10e84cd34241c3eb311a6b219f9e13568258bc92f6df8eaca0cbc7e12b91161",
+        "source": "google_cloud_run_v2_service.w0",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "4b3f0fff01fc77ae511fc5f5dd3f00b3541d0896f1282f5fd9fb3671ab1bf99e",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "9e4068c4a9c1cac45c6ad41404620266bfabdde1ba1e989590a3b27dc62672e4",
+        "source": "google_cloud_run_v2_service.w1",
+        "target": "google_storage_bucket.b1"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "de9407f6214d6aafcd68a8e2f09ff58cf93f2de743ba0673284719568baaf336",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b0"
+      },
+      {
+        "boundary_type": "workload-to-data-store",
+        "sha256": "6a88bb664c9510ee96b037b41f4a3ba8401a45705dce3e25797aa2f5abcc066a",
+        "source": "google_cloud_run_v2_service.w2",
+        "target": "google_storage_bucket.b1"
+      }
+    ],
+    "workloads": {
+      "google_cloud_run_v2_service.w0": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.setIamPolicy: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.buckets.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_storage_bucket_iam_member.local GCS IAM scope is unresolved for google_storage_bucket.b1"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.setIamPolicy: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w0: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w1": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.list: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w1: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.update: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      },
+      "google_cloud_run_v2_service.w2": {
+        "cloud_run_gcs_access_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_access_paths": [],
+        "cloud_run_gcs_bucket_topology_destruction_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.buckets.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.buckets.delete: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_bucket_topology_destruction_paths": [],
+        "cloud_run_gcs_object_deletion_path_uncertainties": [
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_object_deletion_paths": [],
+        "cloud_run_gcs_protected_data_convergence_uncertainties": [
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b0: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.create: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.delete: deny-policy condition, membership, or permission constraints are unresolved",
+          "google_cloud_run_v2_service.w2: google_iam_deny_policy.create for google_storage_bucket.b1: storage.objects.get: deny-policy condition, membership, or permission constraints are unresolved"
+        ],
+        "cloud_run_gcs_protected_data_convergences": []
+      }
+    }
+  }
+}

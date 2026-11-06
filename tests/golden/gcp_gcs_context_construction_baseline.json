@@ -1,0 +1,26 @@
+{
+  "conditional_unknown": {
+    "gcp_resource_index_builds": 21,
+    "gcs_context_builds": 13
+  },
+  "deny": {
+    "gcp_resource_index_builds": 29,
+    "gcs_context_builds": 21
+  },
+  "mixed": {
+    "gcp_resource_index_builds": 29,
+    "gcs_context_builds": 21
+  },
+  "no_buckets": {
+    "gcp_resource_index_builds": 21,
+    "gcs_context_builds": 13
+  },
+  "protected_data": {
+    "gcp_resource_index_builds": 17,
+    "gcs_context_builds": 9
+  },
+  "unknown_deny": {
+    "gcp_resource_index_builds": 26,
+    "gcs_context_builds": 18
+  }
+}
