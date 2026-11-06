@@ -15,7 +15,7 @@ import unittest
 from typing import Any
 
 from tests.helpers.gcp_gcs_evaluation import analyze_with_counts, plan_file, plan_payload
-from tests.helpers.gcp_gcs_plan import CASES, CUSTOM_ROLE, build_gcs_case
+from tests.helpers.gcp_gcs_plan import CASES, CUSTOM_ROLE, build_benchmark_resources, build_gcs_case
 from tests.helpers.paths import GOLDEN_DIR
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import load_terraform_plan
@@ -117,6 +117,7 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
                 self.assertTrue(any(resource.unknown_values for resource in loaded))
 
     def test_empty_targets_preserve_empty_metadata_and_identity_uncertainty(self) -> None:
+        self.assertEqual(self.counts["no_buckets"]["gcs_context_builds"], 0)
         workloads = self.snapshots["no_buckets"]["workloads"]
         for metadata in workloads.values():
             for key in (
@@ -131,6 +132,14 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
             "google_cloud_run_v2_service.w2: Cloud Run service account is unresolved",
             unknown["cloud_run_gcs_access_path_uncertainties"],
         )
+
+    def test_bucket_free_analysis_constructs_no_grant_contexts_as_workloads_grow(self) -> None:
+        engine = TfStride()
+        for workloads in (10, 30):
+            with self.subTest(workloads=workloads), plan_file(build_benchmark_resources(workloads, "pubsub")) as path:
+                result, counts = analyze_with_counts(path, engine)
+                self.assertTrue(result.findings)
+                self.assertEqual(counts["gcs_context_builds"], 0)
 
     def test_mixed_case_exercises_local_inherited_custom_and_disruption_paths(self) -> None:
         workloads = self.snapshots["mixed"]["workloads"]

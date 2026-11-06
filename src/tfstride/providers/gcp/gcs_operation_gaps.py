@@ -76,9 +76,11 @@ def collect_gcs_operation_gaps(inventory: ResourceInventory) -> OperationGapResu
     """Rebuild current scope, role, and deny evidence for each invocation."""
     if inventory.provider != "gcp":
         return OperationGapResults()
+    buckets = inventory.by_type(GcpResourceType.STORAGE_BUCKET)
+    if not buckets:
+        return OperationGapResults(GCS_GAP_FAMILIES, ())
     resources = tuple(inventory.resources)
     context = GcsGrantConstraintContext.build(resources)
-    buckets = inventory.by_type(GcpResourceType.STORAGE_BUCKET)
     sources = tuple(source for source in resources if source.resource_type in _IAM_TYPES)
     records: list[OperationGap] = []
     for workload in resources:

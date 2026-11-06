@@ -166,6 +166,8 @@ def _cloud_run_gcs_object_deletion_paths(
     member = workload_facts.service_account_member
     if not _is_exact_service_account_identity(email, member):
         return [], [f"{workload.address}: Cloud Run service account identity is unresolved"]
+    if not buckets:
+        return [], []
     assert email is not None
     assert member is not None
 

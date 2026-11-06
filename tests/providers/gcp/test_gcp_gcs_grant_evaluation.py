@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from itertools import permutations
+from unittest.mock import patch
 
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import (
@@ -16,13 +17,22 @@ from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import (
     _normalize,
 )
 from tfstride.providers.gcp.custom_roles import build_gcp_custom_role_index
-from tfstride.providers.gcp.gcs_grant_evaluation import evaluate_gcs_bucket_grants
+from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext, evaluate_gcs_bucket_grants
 from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
 
 class GcpGcsGrantEvaluationTests(unittest.TestCase):
+    def test_empty_bucket_selection_does_not_construct_a_grant_context(self) -> None:
+        inventory = _normalize([_bucket(), _bucket_iam_member()])
+        custom_roles = build_gcp_custom_role_index(inventory.resources)
+        with patch.object(GcsGrantConstraintContext, "build", side_effect=AssertionError("unexpected grant context")):
+            self.assertEqual(
+                evaluate_gcs_bucket_grants(_SERVICE_ACCOUNT_MEMBER, (), custom_roles, resources=inventory.resources),
+                ([], []),
+            )
+
     def test_grants_preserve_exact_target_principal_and_operation_without_a_workload(self) -> None:
         other_bucket = _terraform_resource(
             "google_storage_bucket.other",

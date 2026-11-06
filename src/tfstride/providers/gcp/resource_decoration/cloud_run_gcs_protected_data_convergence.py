@@ -70,8 +70,11 @@ def _protected_data_convergences(
     ]
     convergences: list[GcpCloudRunGcsProtectedDataConvergence] = []
     resources = list(resources_by_address.values())
-    current_paths = current_cloud_run_gcs_access_paths(workload, resources, build_gcp_custom_role_index(resources))
+    current_paths: list[GcpCloudRunGcsAccessPath] = []
+    if any(resource.resource_type == GcpResourceType.STORAGE_BUCKET for resource in resources):
+        current_paths = current_cloud_run_gcs_access_paths(workload, resources, build_gcp_custom_role_index(resources))
 
+    # Retain diagnostics for cached access evidence whose bucket is no longer modeled.
     for access_path in facts.cloud_run_gcs_access_paths:
         if not _potential_payload_read(access_path):
             continue

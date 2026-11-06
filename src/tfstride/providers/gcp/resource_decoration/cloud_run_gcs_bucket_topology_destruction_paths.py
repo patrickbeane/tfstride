@@ -128,7 +128,7 @@ class ModelCloudRunGcsBucketTopologyDestructionPathsStage:
         iam_resources = _iam_resources(resources)
         custom_roles = build_gcp_custom_role_index(resources)
         project_organizations = _project_organizations(resources)
-        grant_context = GcsGrantConstraintContext.build(resources)
+        grant_context = GcsGrantConstraintContext.build(resources) if targets else None
 
         for workload in resources:
             if workload.resource_type not in GCP_CLOUD_RUN_RESOURCE_TYPES:
@@ -183,7 +183,7 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
     context: GcpDecorationContext,
     custom_roles: GcpCustomRoleIndex,
     project_organizations: Mapping[str, str],
-    grant_context: GcsGrantConstraintContext,
+    grant_context: GcsGrantConstraintContext | None,
 ) -> tuple[list[GcpCloudRunGcsBucketTopologyDestructionPath], list[str]]:
     workload_facts = gcp_facts(workload)
     service_account_email = _known_string(workload_facts.service_account_email)
@@ -193,8 +193,11 @@ def _cloud_run_gcs_bucket_topology_destruction_paths(
         service_account_member,
     ):
         return [], [f"{workload.address}: Cloud Run service account is unresolved for GCS bucket-deletion modeling"]
+    if not targets:
+        return [], []
     assert service_account_email is not None
     assert service_account_member is not None
+    assert grant_context is not None
 
     paths: list[GcpCloudRunGcsBucketTopologyDestructionPath] = []
     uncertainties: list[str] = []

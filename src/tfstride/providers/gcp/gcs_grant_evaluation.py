@@ -214,6 +214,9 @@ def evaluate_gcs_bucket_grants(
     Full inventory inputs supply ancestor grants and deny constraints. Conditions
     remain separate alternatives. Inherited custom roles require grantability and lifecycle proof; basic roles stay unresolved.
     """
+    if not buckets:
+        return [], []
+
     grants: list[GcpGcsBucketGrant] = []
     uncertainties: list[str] = []
     context = GcsGrantConstraintContext.build(resources)

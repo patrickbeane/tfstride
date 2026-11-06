@@ -68,6 +68,8 @@ class GcpCloudRunGcsAccessRuleDetectors:
     ) -> list[Finding]:
         if context.inventory.provider != "gcp":
             return []
+        if not context.inventory.by_type(GcpResourceType.STORAGE_BUCKET):
+            return []
 
         current_resources = list(context.inventory.resources)
         grant_context = GcsGrantConstraintContext.build(current_resources)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import (
     _bucket_iam_member,
@@ -24,8 +25,14 @@ from tfstride.models import (
     TerraformReferenceResolutionState,
     TerraformResource,
 )
+from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_protected_data_convergence import (
+    ModelCloudRunGcsProtectedDataConvergenceStage,
+)
 from tfstride.providers.gcp.resource_facts import gcp_facts
+from tfstride.providers.gcp.resource_index import GcpDecorationContext, GcpResourceIndexBuilder
+from tfstride.providers.gcp.resource_types import GcpResourceType
 
 _WORKLOAD_ADDRESS = "google_cloud_run_v2_service.orders"
 _KEY_ADDRESS = "google_kms_crypto_key.data"
@@ -56,6 +63,25 @@ def _replace_key_grant(
 
 
 class GcpCloudRunGcsProtectedDataConvergenceTests(unittest.TestCase):
+    def test_removed_bucket_clears_convergence_and_preserves_stale_access_diagnostic(self) -> None:
+        inventory = _normalize(_gcp_resources())
+        facts = _workload_facts(inventory)
+        self.assertTrue(facts.cloud_run_gcs_protected_data_convergences)
+        resources = [
+            resource for resource in inventory.resources if resource.resource_type != GcpResourceType.STORAGE_BUCKET
+        ]
+        context = GcpDecorationContext(GcpResourceIndexBuilder().build(resources))
+        with patch.object(GcsGrantConstraintContext, "build", side_effect=AssertionError("unexpected grant context")):
+            ModelCloudRunGcsProtectedDataConvergenceStage().apply(resources, context)
+        self.assertEqual(facts.cloud_run_gcs_protected_data_convergences, [])
+        self.assertEqual(
+            facts.cloud_run_gcs_protected_data_convergence_uncertainties,
+            [
+                f"{_WORKLOAD_ADDRESS}: GCS access evidence does not retain "
+                "an exact modeled bucket for protected-data convergence"
+            ],
+        )
+
     def test_exact_runtime_read_cmek_dependency_and_decrypt_authority_converge(
         self,
     ) -> None:
