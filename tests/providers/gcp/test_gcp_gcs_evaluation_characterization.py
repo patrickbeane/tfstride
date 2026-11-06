@@ -141,6 +141,15 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
                 self.assertTrue(result.findings)
                 self.assertEqual(counts["gcs_context_builds"], 0)
 
+    def test_full_gcs_analysis_has_bounded_context_construction_as_workloads_grow(self) -> None:
+        engine = TfStride()
+        for workloads in (1, 4, 12):
+            with self.subTest(workloads=workloads), plan_file(build_benchmark_resources(workloads, "gcs")) as path:
+                result, counts = analyze_with_counts(path, engine)
+                self.assertTrue(result.findings)
+                # Four decoration stages, one rule preparation, and one gap collection.
+                self.assertLessEqual(counts["gcs_context_builds"], 6)
+
     def test_mixed_case_exercises_local_inherited_custom_and_disruption_paths(self) -> None:
         workloads = self.snapshots["mixed"]["workloads"]
         access = [path for metadata in workloads.values() for path in metadata["cloud_run_gcs_access_paths"]]

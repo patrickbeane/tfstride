@@ -13,13 +13,13 @@ from tfstride.analysis.finding_helpers import (
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
 from tfstride.providers.coercion import dedupe
+from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context
 from tfstride.providers.gcp.cloud_run_public_invocation import (
     cloud_run_public_exposure_configuration,
     cloud_run_public_invoker_evidence,
     current_cloud_run_public_exposure_reasons,
     current_cloud_run_public_invokers,
 )
-from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
 from tfstride.providers.gcp.gcs_grant_ancestry import ancestor_iam_scope
 from tfstride.providers.gcp.gcs_grant_evaluation import (
     GCS_ACCESS_IAM_TYPES_BY_BASIS,
@@ -68,11 +68,11 @@ class GcpCloudRunGcsAccessRuleDetectors:
     ) -> list[Finding]:
         if context.inventory.provider != "gcp":
             return []
-        if not context.inventory.by_type(GcpResourceType.STORAGE_BUCKET):
+        grant_context = gcp_gcs_grant_context(context.analysis_indexes, context.inventory)
+        if grant_context is None:
             return []
 
         current_resources = list(context.inventory.resources)
-        grant_context = GcsGrantConstraintContext.build(current_resources)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = current_cloud_run_public_invokers(
@@ -163,9 +163,11 @@ class GcpCloudRunGcsAccessRuleDetectors:
     ) -> list[Finding]:
         if context.inventory.provider != "gcp":
             return []
+        grant_context = gcp_gcs_grant_context(context.analysis_indexes, context.inventory)
+        if grant_context is None:
+            return []
 
         current_resources = list(context.inventory.resources)
-        custom_roles = build_gcp_custom_role_index(current_resources)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = current_cloud_run_public_invokers(
@@ -176,7 +178,7 @@ class GcpCloudRunGcsAccessRuleDetectors:
             if not workload.public_access_configured or (not public_invokers and not invoker_iam_check_disabled):
                 continue
 
-            current_paths = current_cloud_run_gcs_access_paths(workload, current_resources, custom_roles)
+            current_paths = current_cloud_run_gcs_access_paths(workload, current_resources, grant_context=grant_context)
             mutation_paths = [
                 path for path in current_paths if _is_deterministic_mutation_path(path, workload, context)
             ]

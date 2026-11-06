@@ -11,7 +11,7 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource, TrustBoundary
-from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
+from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context
 from tfstride.providers.gcp.gcs_grant_evaluation import gcs_path_permissions
 from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_access_paths import current_cloud_run_gcs_access_paths
 from tfstride.providers.gcp.resource_facts import gcp_facts
@@ -32,7 +32,7 @@ class GcpPathChainRuleDetectors:
         findings: list[Finding] = []
         inventory = context.inventory
         paths_by_workload: dict[str, list[_CloudRunDataPath]] = {}
-        custom_roles = build_gcp_custom_role_index(inventory.resources)
+        grant_context = gcp_gcs_grant_context(context.analysis_indexes, inventory)
         gcs_paths: dict[str, Sequence[Mapping[str, Any]]] = {}
 
         for boundary in context.boundary_index.values():
@@ -56,7 +56,7 @@ class GcpPathChainRuleDetectors:
                 continue
             if workload.resource_type in GCP_CLOUD_RUN_RESOURCE_TYPES and workload.address not in gcs_paths:
                 gcs_paths[workload.address] = current_cloud_run_gcs_access_paths(
-                    workload, inventory.resources, custom_roles
+                    workload, inventory.resources, grant_context=grant_context
                 )
             gcs_read_state = _exact_cloud_run_gcs_read_state(workload, data_store, gcs_paths.get(workload.address, ()))
             if gcs_read_state is False:
@@ -70,7 +70,7 @@ class GcpPathChainRuleDetectors:
                 continue
             if workload.address not in gcs_paths:
                 gcs_paths[workload.address] = current_cloud_run_gcs_access_paths(
-                    workload, inventory.resources, custom_roles
+                    workload, inventory.resources, grant_context=grant_context
                 )
             existing = {item[0].address for item in paths_by_workload.get(workload.address, ())}
             for path in gcs_paths[workload.address]:

@@ -14,9 +14,13 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
-from tfstride.providers.gcp.custom_role_index import build_gcp_custom_role_index
-from tfstride.providers.gcp.gcs_grant_evaluation import GCS_ACCESS_IAM_TYPES_BY_BASIS, gcs_path_permissions
+from tfstride.providers.gcp.gcs_grant_evaluation import (
+    GCS_ACCESS_IAM_TYPES_BY_BASIS,
+    GcsGrantConstraintContext,
+    gcs_path_permissions,
+)
 from tfstride.providers.gcp.kms_dependency_evidence import GcpKmsEncryptionDependency
 from tfstride.providers.gcp.kms_evidence import (
     GcpCloudRunKmsManagementPath,
@@ -280,6 +284,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
         if context.inventory.provider != "gcp":
             return []
 
+        grant_context = gcp_gcs_grant_context(context.analysis_indexes, context.inventory) if disclosure else None
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = _unconditional_public_invokers(workload)
@@ -311,6 +316,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
                     paths,
                     workload,
                     context,
+                    grant_context=grant_context,
                 )
                 if disclosure
                 else []
@@ -1174,6 +1180,8 @@ def _resolved_protected_data_convergences(
     paths: Sequence[GcpCloudRunKmsOperationPath],
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    *,
+    grant_context: GcsGrantConstraintContext | None = None,
 ) -> list[GcpCloudRunGcsProtectedDataConvergence]:
     valid_paths = tuple(
         path
@@ -1188,7 +1196,7 @@ def _resolved_protected_data_convergences(
     )
     convergences: list[GcpCloudRunGcsProtectedDataConvergence] = []
     current_gcs_paths = current_cloud_run_gcs_access_paths(
-        workload, context.inventory.resources, build_gcp_custom_role_index(context.inventory.resources)
+        workload, context.inventory.resources, grant_context=grant_context
     )
     for convergence in gcp_facts(workload).cloud_run_gcs_protected_data_convergences:
         if _is_valid_protected_data_convergence(

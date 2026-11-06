@@ -12,12 +12,14 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
+from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context
 from tfstride.providers.gcp.cloud_run_public_invocation import (
     cloud_run_public_exposure_configuration,
     cloud_run_public_invoker_evidence,
     current_cloud_run_public_exposure_reasons,
     current_cloud_run_public_invokers,
 )
+from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext
 from tfstride.providers.gcp.object_storage_topology_destruction_evidence import (
     GcpCloudRunGcsBucketTopologyDestructionPath,
 )
@@ -25,7 +27,7 @@ from tfstride.providers.gcp.resource_decoration.cloud_run_gcs_bucket_topology_de
     current_cloud_run_gcs_bucket_topology_destruction_paths,
 )
 from tfstride.providers.gcp.resource_facts import gcp_facts
-from tfstride.providers.gcp.resource_index import GcpDecorationContext, GcpResourceIndexBuilder
+from tfstride.providers.gcp.resource_index import GcpDecorationContext
 from tfstride.providers.gcp.resource_types import GCP_CLOUD_RUN_RESOURCE_TYPES, GcpResourceType
 
 _DELETE_BUCKET = "storage.buckets.delete"
@@ -68,9 +70,12 @@ class GcpCloudRunGcsBucketTopologyDisruptionRuleDetectors:
     ) -> list[Finding]:
         if context.inventory.provider != "gcp":
             return []
+        grant_context = gcp_gcs_grant_context(context.analysis_indexes, context.inventory)
+        if grant_context is None:
+            return []
 
         resources = list(context.inventory.resources)
-        decoration_context = GcpDecorationContext(GcpResourceIndexBuilder().build(resources))
+        decoration_context = GcpDecorationContext(grant_context.index)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = current_cloud_run_public_invokers(
@@ -88,6 +93,7 @@ class GcpCloudRunGcsBucketTopologyDisruptionRuleDetectors:
                     workload,
                     context,
                     decoration_context,
+                    grant_context,
                 )
                 if current_path is not None:
                     paths.append(current_path)
@@ -165,6 +171,7 @@ def _current_topology_path(
     workload: NormalizedResource,
     context: RuleEvaluationContext,
     decoration_context: GcpDecorationContext,
+    grant_context: GcsGrantConstraintContext,
 ) -> GcpCloudRunGcsBucketTopologyDestructionPath | None:
     if (
         cached_path.get("workload_address") != workload.address
@@ -197,6 +204,7 @@ def _current_topology_path(
         bucket,
         list(context.inventory.resources),
         decoration_context,
+        grant_context=grant_context,
     )
     return next(
         (
