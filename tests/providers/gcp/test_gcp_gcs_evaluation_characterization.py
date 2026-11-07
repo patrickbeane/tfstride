@@ -15,7 +15,13 @@ import unittest
 from typing import Any
 
 from tests.helpers.gcp_gcs_evaluation import analyze_with_counts, plan_file, plan_payload
-from tests.helpers.gcp_gcs_plan import CASES, CUSTOM_ROLE, build_benchmark_resources, build_gcs_case
+from tests.helpers.gcp_gcs_plan import (
+    CASES,
+    CUSTOM_ROLE,
+    build_benchmark_resources,
+    build_gcs_candidate_resources,
+    build_gcs_case,
+)
 from tests.helpers.paths import GOLDEN_DIR
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import load_terraform_plan
@@ -96,6 +102,8 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
         baseline = json.loads(COUNTS_PATH.read_text(encoding="utf-8"))
         self.assertEqual(set(self.counts), set(baseline))
         for case, measured in self.counts.items():
+            with self.subTest(case=case):
+                self.assertLessEqual(measured["gcs_context_builds"], 6)
             for constructor, count in measured.items():
                 with self.subTest(case=case, constructor=constructor):
                     self.assertLessEqual(count, baseline[case][constructor])
@@ -149,6 +157,94 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
                 self.assertTrue(result.findings)
                 # Four decoration stages, one rule preparation, and one gap collection.
                 self.assertLessEqual(counts["gcs_context_builds"], 6)
+
+    def test_context_builds_remain_bounded_as_targets_per_workload_increase(self) -> None:
+        engine = TfStride()
+        required_rules = {
+            "gcp-public-workload-sensitive-data-access",
+            "gcp-public-cloud-run-gcs-mutation-access",
+            "gcp-public-cloud-run-gcs-object-disruption",
+            "gcp-public-cloud-run-gcs-bucket-topology-disruption",
+        }
+        for workloads, buckets in ((1, 1), (1, 6), (4, 6)):
+            with (
+                self.subTest(workloads=workloads, buckets=buckets),
+                plan_file(build_gcs_candidate_resources(workloads, buckets)) as path,
+            ):
+                result, counts = analyze_with_counts(path, engine)
+                self.assertLessEqual(counts["gcs_context_builds"], 6)
+                self.assertLessEqual(counts["gcp_resource_index_builds"], 13)
+                snapshot = _snapshot(result)
+                self.assertEqual(len(snapshot["workloads"]), workloads)
+                expected_targets = {f"google_storage_bucket.b{index}" for index in range(buckets)}
+                for workload_address, metadata in snapshot["workloads"].items():
+                    for field in (
+                        "cloud_run_gcs_access_paths",
+                        "cloud_run_gcs_object_deletion_paths",
+                        "cloud_run_gcs_bucket_topology_destruction_paths",
+                    ):
+                        self.assertEqual({item["bucket_address"] for item in metadata[field]}, expected_targets, field)
+                    finding_rules = {
+                        finding.rule_id for finding in result.findings if workload_address in finding.affected_resources
+                    }
+                    self.assertTrue(required_rules <= finding_rules, workload_address)
+
+    def test_reused_engine_matches_all_characterization_cases_at_the_same_plan_path(self) -> None:
+        expected = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        engine = TfStride()
+        with plan_file(build_gcs_case("mixed")) as path:
+            for case in (
+                "mixed",
+                "no_buckets",
+                "protected_data",
+                "conditional_unknown",
+                "unknown_deny",
+                "deny",
+                "mixed",
+            ):
+                with self.subTest(case=case):
+                    path.write_text(json.dumps(plan_payload(build_gcs_case(case))), encoding="utf-8")
+                    result, counts = analyze_with_counts(path, engine)
+                    self.assertEqual(_snapshot(result), expected[case])
+                    if case == "no_buckets":
+                        self.assertEqual(counts["gcs_context_builds"], 0)
+                    else:
+                        self.assertLessEqual(counts["gcs_context_builds"], 6)
+
+    def test_reused_engine_observes_and_reverses_grant_deny_and_custom_role_edits(self) -> None:
+        engine = TfStride()
+        expected = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        for change, case, workload_name in (
+            ("grant", "mixed", "w0"),
+            ("deny", "deny", "w1"),
+            ("custom_role", "mixed", "w2"),
+        ):
+            with self.subTest(change=change), plan_file(build_gcs_case(case)) as path:
+                before = _snapshot(engine.analyze_plan(path))
+                self.assertEqual(before, expected[case])
+                workload_address = f"google_cloud_run_v2_service.{workload_name}"
+                self.assertTrue(before["workloads"][workload_address]["cloud_run_gcs_object_deletion_paths"])
+                resources = build_gcs_case(case)
+                by_address = {resource.address: resource for resource in resources}
+                if change == "grant":
+                    by_address["google_storage_bucket_iam_member.local"].values["role"] = "roles/storage.objectViewer"
+                elif change == "deny":
+                    rule = by_address["google_iam_deny_policy.create"].values["rules"][0]["deny_rule"][0]
+                    rule["denied_permissions"] = ["storage.googleapis.com/objects.delete"]
+                else:
+                    by_address["google_project_iam_custom_role.storage_operator"].values["permissions"] = [
+                        "storage.objects.get"
+                    ]
+                path.write_text(json.dumps(plan_payload(resources)), encoding="utf-8")
+                changed = _snapshot(engine.analyze_plan(path))
+                self.assertEqual(changed, _snapshot(TfStride().analyze_plan(path)))
+                self.assertNotEqual(changed, before)
+                metadata = changed["workloads"][workload_address]
+                self.assertEqual(metadata["cloud_run_gcs_object_deletion_paths"], [])
+                self.assertTrue(metadata["cloud_run_gcs_access_paths"])
+
+                path.write_text(json.dumps(plan_payload(build_gcs_case(case))), encoding="utf-8")
+                self.assertEqual(_snapshot(engine.analyze_plan(path)), before)
 
     def test_mixed_case_exercises_local_inherited_custom_and_disruption_paths(self) -> None:
         workloads = self.snapshots["mixed"]["workloads"]

@@ -235,3 +235,14 @@ def build_benchmark_resources(workloads: int, scenario: Literal["pubsub", "gcs"]
             ]
         )
     return resources
+
+
+def build_gcs_candidate_resources(workloads: int, buckets: int) -> list[TerraformResource]:
+    """Give every workload inherited read, mutation, and deletion authority on every bucket."""
+    if workloads < 1 or buckets < 1:
+        raise ValueError("workloads and buckets must be positive")
+    return [
+        *(_workload(index) for index in range(workloads)),
+        *(_bucket(index) for index in range(buckets)),
+        *(_project_grant(f"admin{index}", index, "roles/storage.admin") for index in range(workloads)),
+    ]
