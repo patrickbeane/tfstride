@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
 
 from tfstride.analysis.operation_gaps import OperationGapResults
 from tfstride.resource_metadata import (
@@ -17,7 +17,7 @@ from tfstride.resource_metadata import (
 )
 
 _MetadataValue = TypeVar("_MetadataValue")
-_MetadataKey = str | MetadataField[Any]
+_MetadataKey = TypeVar("_MetadataKey", bound=str | MetadataField[Any])
 UNRESOLVED_REFERENCE_PREFIX = "unresolved_"
 _INDEXED_RESOURCE_IDENTITY_FIELDS = frozenset({"address", "provider", "resource_type", "identifier", "arn"})
 
@@ -322,7 +322,7 @@ class IAMPolicyCondition:
     values: list[str] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class NormalizedResource:
     address: str
     provider: str
@@ -345,22 +345,60 @@ class NormalizedResource:
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
     _decoration_state_frozen: bool = field(default=False, init=False, repr=False)
     _indexed_identity_sealed: bool = field(default=False, init=False, repr=False, compare=False)
-    metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
+    if not TYPE_CHECKING:
+        # InitVar lets replace() forward metadata without adding a stored field.
+        # The explicit constructor and property expose its distinct input/read types to static tools.
+        metadata: InitVar[Mapping[_MetadataKey, Any] | None]
+
+    def __init__(
+        self,
+        address: str,
+        provider: str,
+        resource_type: str,
+        name: str,
+        category: ResourceCategory,
+        identifier: str | None = None,
+        arn: str | None = None,
+        vpc_id: str | None = None,
+        subnet_ids: Sequence[str] = (),
+        security_group_ids: Sequence[str] = (),
+        attached_role_arns: Sequence[str] = (),
+        network_rules: Sequence[SecurityGroupRule] = (),
+        policy_statements: Sequence[IAMPolicyStatement] = (),
+        public_access_configured: bool = False,
+        public_exposure: bool = False,
+        data_sensitivity: str = "standard",
+        provider_config_key: str | None = None,
+        reference_resolutions: Sequence[TerraformReferenceResolution] = (),
+        metadata: Mapping[_MetadataKey, Any] | None = None,
+    ) -> None:
+        self.address = address
+        self.provider = provider
+        self.resource_type = resource_type
+        self.name = name
+        self.category = category
+        self.identifier = identifier
+        self.arn = arn
+        self.vpc_id = vpc_id
+        self.subnet_ids = tuple(subnet_ids)
+        self.security_group_ids = tuple(security_group_ids)
+        self.attached_role_arns = tuple(attached_role_arns)
+        self.network_rules = tuple(network_rules)
+        self.policy_statements = tuple(policy_statements)
+        self.public_access_configured = public_access_configured
+        self.public_exposure = public_exposure
+        self.data_sensitivity = data_sensitivity
+        self.provider_config_key = provider_config_key
+        self.reference_resolutions = tuple(reference_resolutions)
+        self._metadata = _normalized_metadata(metadata)
+        self._decoration_state_frozen = False
+        self._indexed_identity_sealed = False
 
     def __setattr__(self, name: str, value: Any) -> None:
         if getattr(self, "_indexed_identity_sealed", False):
             if name in _INDEXED_RESOURCE_IDENTITY_FIELDS or (name == "_indexed_identity_sealed" and value is not True):
                 raise AttributeError(f"NormalizedResource.{name} cannot change after inventory indexing.")
         object.__setattr__(self, name, value)
-
-    def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
-        self.subnet_ids = tuple(self.subnet_ids)
-        self.security_group_ids = tuple(self.security_group_ids)
-        self.attached_role_arns = tuple(self.attached_role_arns)
-        self.network_rules = tuple(self.network_rules)
-        self.policy_statements = tuple(self.policy_statements)
-        self.reference_resolutions = tuple(self.reference_resolutions)
-        self._metadata = _normalized_metadata(metadata)
 
     def _seal_indexed_identity(self) -> None:
         self._indexed_identity_sealed = True
@@ -450,7 +488,9 @@ class NormalizedResource:
         if self._decoration_state_frozen:
             raise RuntimeError("NormalizedResource decoration state is frozen.")
 
-    def _metadata_readview(self) -> Mapping[str, Any]:
+    @property
+    def metadata(self) -> Mapping[str, Any]:
+        """Detached read-only view; use typed properties or metadata field helpers to mutate."""
         return MappingProxyType(self.metadata_snapshot())
 
     @property
@@ -550,26 +590,38 @@ class NormalizedResource:
         self.set_metadata_field(ResourceMetadata.INTERNET_INGRESS_REASONS, values)
 
 
-# Assign after dataclass generation so InitVar keeps a clean metadata=None default.
-NormalizedResource.metadata = property(
-    NormalizedResource._metadata_readview,
-    doc="Detached read-only metadata view. Use typed properties or metadata field helpers to mutate.",
-)
-
-
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class ResourceInventory:
     provider: str
     resources: Sequence[NormalizedResource]
     unsupported_resources: list[str] = field(default_factory=list)
     plan_time_unknown_resources: int = 0
     _metadata: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
-    metadata: InitVar[Mapping[_MetadataKey, Any] | None] = None
+    if not TYPE_CHECKING:
+        # InitVar lets replace() forward metadata without adding a stored field.
+        # The explicit constructor and property expose its distinct input/read types to static tools.
+        metadata: InitVar[Mapping[_MetadataKey, Any] | None]
     _resources_by_type: dict[str, tuple[NormalizedResource, ...]] = field(init=False, repr=False, default_factory=dict)
     _resources_by_address: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resources_by_identifier: dict[str, NormalizedResource] = field(init=False, repr=False, default_factory=dict)
     _resource_positions: dict[int, int] = field(init=False, repr=False, default_factory=dict)
     _indexed_identity_sealed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def __init__(
+        self,
+        provider: str,
+        resources: Sequence[NormalizedResource],
+        unsupported_resources: list[str] | None = None,
+        plan_time_unknown_resources: int = 0,
+        metadata: Mapping[_MetadataKey, Any] | None = None,
+    ) -> None:
+        self.provider = provider
+        self.resources = resources
+        self.unsupported_resources = [] if unsupported_resources is None else unsupported_resources
+        self.plan_time_unknown_resources = plan_time_unknown_resources
+        self._metadata = _normalized_metadata(metadata)
+        self._indexed_identity_sealed = False
+        self._build_resource_indexes()
 
     def __setattr__(self, name: str, value: Any) -> None:
         if getattr(self, "_indexed_identity_sealed", False):
@@ -577,8 +629,7 @@ class ResourceInventory:
                 raise AttributeError(f"ResourceInventory.{name} cannot change after inventory indexing.")
         object.__setattr__(self, name, value)
 
-    def __post_init__(self, metadata: Mapping[_MetadataKey, Any] | None) -> None:
-        self._metadata = _normalized_metadata(metadata)
+    def _build_resource_indexes(self) -> None:
         resources = tuple(self.resources)
         self.resources = resources
         resources_by_type: dict[str, list[NormalizedResource]] = {}
@@ -624,7 +675,9 @@ class ResourceInventory:
     def get_metadata_field(self, field: MetadataField[_MetadataValue]) -> _MetadataValue:
         return field.get(self._metadata)
 
-    def _metadata_readview(self) -> Mapping[str, Any]:
+    @property
+    def metadata(self) -> Mapping[str, Any]:
+        """Detached read-only view; use typed properties or metadata_snapshot() for serialization."""
         return MappingProxyType(self.metadata_snapshot())
 
     def by_type(self, *resource_types: str) -> list[NormalizedResource]:
@@ -646,13 +699,6 @@ class ResourceInventory:
     def get_by_identifier(self, identifier: str) -> NormalizedResource | None:
         """Legacy unscoped first match; use provider reference indexes for security relationships."""
         return self._resources_by_identifier.get(identifier)
-
-
-# Assign after dataclass generation so InitVar keeps a clean metadata=None default.
-ResourceInventory.metadata = property(
-    ResourceInventory._metadata_readview,
-    doc="Detached read-only metadata view. Use typed properties or metadata_snapshot() for serialization.",
-)
 
 
 @dataclass(slots=True)
