@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
+from functools import partial
+from inspect import Parameter, signature
+from types import MappingProxyType
 
 from tfstride.models import (
     IAMPolicyStatement,
@@ -9,9 +13,12 @@ from tfstride.models import (
     ResourceInventory,
     SecurityGroupRule,
     Severity,
+    TerraformReferenceProvenance,
+    TerraformReferenceResolution,
+    TerraformReferenceResolutionState,
 )
 from tfstride.providers.aws.metadata import AwsResourceMetadata
-from tfstride.resource_metadata import ResourceMetadata
+from tfstride.resource_metadata import InventoryMetadata, ResourceMetadata
 
 
 def _resource(
@@ -38,6 +45,19 @@ class _RaisesOnDeepcopy:
         raise AssertionError("runtime metadata reads should not deep copy")
 
 
+_METADATA_MODEL_CONSTRUCTORS = (
+    partial(
+        NormalizedResource,
+        address="aws_instance.web",
+        provider="aws",
+        resource_type="aws_instance",
+        name="web",
+        category=ResourceCategory.COMPUTE,
+    ),
+    partial(ResourceInventory, provider="aws", resources=()),
+)
+
+
 class SeverityTests(unittest.TestCase):
     def test_rank_orders_severities_for_threshold_comparison(self) -> None:
         self.assertLess(Severity.LOW.rank, Severity.MEDIUM.rank)
@@ -53,7 +73,155 @@ class SeverityTests(unittest.TestCase):
         )
 
 
+class ModelMetadataConstructionTests(unittest.TestCase):
+    def test_metadata_constructor_parameter_defaults_to_none(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            with self.subTest(model=constructor.func.__name__):
+                parameter = signature(constructor.func).parameters["metadata"]
+
+                self.assertIsNone(parameter.default)
+                self.assertEqual(parameter.kind, Parameter.POSITIONAL_OR_KEYWORD)
+
+    def test_omitted_none_and_empty_metadata_produce_independent_empty_mappings(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            for arguments in ({}, {"metadata": None}, {"metadata": {}}):
+                with self.subTest(model=constructor.func.__name__, arguments=arguments):
+                    first = constructor(**arguments)
+                    second = constructor(**arguments)
+
+                    self.assertEqual(first.metadata, {})
+                    self.assertEqual(first.metadata_snapshot(), {})
+                    if isinstance(first, NormalizedResource):
+                        first.public_access_reasons = ["public IP"]
+                        self.assertEqual(first.metadata, {"public_access_reasons": ["public IP"]})
+                    else:
+                        first.primary_account_id = "111122223333"
+                        self.assertEqual(first.metadata, {"primary_account_id": "111122223333"})
+                    self.assertEqual(second.metadata, {})
+
+    def test_metadata_property_cannot_be_reassigned_or_deleted(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            with self.subTest(model=constructor.func.__name__):
+                model = constructor(metadata={"review": {"reviewers": ["security"]}})
+
+                with self.assertRaises(AttributeError):
+                    model.metadata = {}
+                with self.assertRaises(AttributeError):
+                    del model.metadata
+                self.assertEqual(model.metadata, {"review": {"reviewers": ["security"]}})
+
+    def test_replace_inherits_current_metadata_with_independent_nested_values(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            with self.subTest(model=constructor.func.__name__):
+                original = constructor(metadata={"review": {"reviewers": ["security"]}})
+                if isinstance(original, NormalizedResource):
+                    original.public_access_reasons = ["public IP"]
+                else:
+                    original.primary_account_id = "111122223333"
+
+                replacement = replace(original)
+
+                self.assertIsNot(replacement, original)
+                self.assertEqual(replacement.metadata, original.metadata)
+                # Public reads copy metadata, so inspect storage to detect aliases hidden by those reads.
+                original._metadata["review"]["reviewers"].append("original")
+                replacement._metadata["review"]["reviewers"].append("replacement")
+                self.assertEqual(original.metadata["review"], {"reviewers": ["security", "original"]})
+                self.assertEqual(replacement.metadata["review"], {"reviewers": ["security", "replacement"]})
+
+                view = replacement.metadata
+                with self.assertRaises(TypeError):
+                    view["review"] = {}
+                view["review"]["reviewers"].append("view")
+                snapshot = replacement.metadata_snapshot()
+                snapshot["review"]["reviewers"].append("snapshot")
+                self.assertEqual(replacement.metadata["review"], {"reviewers": ["security", "replacement"]})
+
+    def test_replace_explicit_metadata_replaces_instead_of_merging_and_copies_input(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            with self.subTest(model=constructor.func.__name__):
+                original = constructor(metadata={"original_only": {"items": ["original"]}})
+                supplied = {"review": {"reviewers": ["security"]}}
+
+                replacement = replace(original, metadata=MappingProxyType(supplied))
+                supplied["review"]["reviewers"].append("caller")
+
+                self.assertEqual(original.metadata, {"original_only": {"items": ["original"]}})
+                self.assertEqual(replacement.metadata, {"review": {"reviewers": ["security"]}})
+
+    def test_replace_none_and_empty_metadata_clear_inherited_values(self) -> None:
+        for constructor in _METADATA_MODEL_CONSTRUCTORS:
+            for metadata in (None, {}):
+                with self.subTest(model=constructor.func.__name__, metadata=metadata):
+                    original = constructor(metadata={"review": {"reviewers": ["security"]}})
+
+                    replacement = replace(original, metadata=metadata)
+
+                    self.assertEqual(replacement.metadata, {})
+                    self.assertEqual(original.metadata, {"review": {"reviewers": ["security"]}})
+
+
 class ResourceInventoryTests(unittest.TestCase):
+    def test_constructor_accepts_all_public_arguments_positionally_and_by_keyword(self) -> None:
+        resource = _resource(address="aws_instance.web", resource_type="aws_instance")
+        arguments = {
+            "provider": "aws",
+            "resources": (resource,),
+            "unsupported_resources": ["aws_unknown.example"],
+            "plan_time_unknown_resources": 3,
+            "metadata": {"primary_account_id": "111122223333"},
+        }
+
+        for style, inventory in (
+            ("positional", ResourceInventory(*arguments.values())),
+            ("keyword", ResourceInventory(**arguments)),
+        ):
+            with self.subTest(style=style):
+                for name, expected in arguments.items():
+                    self.assertEqual(getattr(inventory, name), expected, name)
+                self.assertIs(inventory.get_by_address(resource.address), resource)
+
+    def test_metadata_field_keys_are_normalized_with_field_setters(self) -> None:
+        inventory = ResourceInventory(
+            provider="aws",
+            resources=(),
+            metadata=MappingProxyType(
+                {
+                    InventoryMetadata.PRIMARY_ACCOUNT_ID: " 111122223333 ",
+                    "review": {"reviewers": ["security"]},
+                }
+            ),
+        )
+
+        self.assertEqual(inventory.primary_account_id, "111122223333")
+        self.assertEqual(
+            inventory.metadata,
+            {"primary_account_id": "111122223333", "review": {"reviewers": ["security"]}},
+        )
+
+    def test_replace_rebuilds_indexes_for_changed_resources_and_retains_metadata(self) -> None:
+        old_resource = _resource(address="aws_instance.old", resource_type="aws_instance")
+        new_resource = _resource(address="aws_lambda_function.new", resource_type="aws_lambda_function")
+        original = ResourceInventory(
+            provider="aws",
+            resources=(old_resource,),
+            unsupported_resources=["aws_unknown.example"],
+            plan_time_unknown_resources=3,
+            metadata={"primary_account_id": "111122223333"},
+        )
+
+        replacement = replace(original, resources=(new_resource,))
+
+        self.assertIs(original.get_by_address(old_resource.address), old_resource)
+        self.assertIsNone(original.get_by_address(new_resource.address))
+        self.assertIs(replacement.get_by_address(new_resource.address), new_resource)
+        self.assertIsNone(replacement.get_by_address(old_resource.address))
+        self.assertEqual(replacement.by_type("aws_instance"), [])
+        self.assertEqual(replacement.by_type("aws_lambda_function"), [new_resource])
+        self.assertEqual(replacement.unsupported_resources, ["aws_unknown.example"])
+        self.assertEqual(replacement.plan_time_unknown_resources, 3)
+        self.assertEqual(replacement.metadata, {"primary_account_id": "111122223333"})
+
     def test_by_type_preserves_original_resource_order_for_multiple_types(self) -> None:
         resources = [
             _resource(address="aws_instance.web", resource_type="aws_instance"),
@@ -202,7 +370,7 @@ class ResourceInventoryTests(unittest.TestCase):
             "unsupported_resource_types": {"aws_cloudwatch_log_group": 1},
             "review": {"reviewers": ["security"]},
         }
-        inventory = ResourceInventory(provider="aws", resources=[], metadata=source_metadata)
+        inventory = ResourceInventory(provider="aws", resources=[], metadata=MappingProxyType(source_metadata))
 
         source_metadata["unsupported_resource_types"]["aws_cloudwatch_log_group"] = 2
         view = inventory.metadata
@@ -224,6 +392,69 @@ class ResourceInventoryTests(unittest.TestCase):
 
 
 class NormalizedResourcePropertyTests(unittest.TestCase):
+    def test_constructor_accepts_all_public_arguments_positionally_and_by_keyword(self) -> None:
+        network_rule = SecurityGroupRule(direction="ingress", protocol="tcp", from_port=443, to_port=443)
+        policy_statement = IAMPolicyStatement(effect="Allow", actions=["s3:GetObject"])
+        reference_resolution = TerraformReferenceResolution(
+            path=("vpc_id",),
+            state=TerraformReferenceResolutionState.RESOLVED,
+            provenance=TerraformReferenceProvenance.PLANNED_VALUE,
+            planned_value="vpc-1",
+        )
+        arguments = {
+            "address": "aws_instance.web",
+            "provider": "aws",
+            "resource_type": "aws_instance",
+            "name": "web",
+            "category": ResourceCategory.COMPUTE,
+            "identifier": "i-web",
+            "arn": "arn:aws:ec2:us-east-1:111122223333:instance/i-web",
+            "vpc_id": "vpc-1",
+            "subnet_ids": ("subnet-1",),
+            "security_group_ids": ("sg-1",),
+            "attached_role_arns": ("arn:aws:iam::111122223333:role/web",),
+            "network_rules": (network_rule,),
+            "policy_statements": (policy_statement,),
+            "public_access_configured": True,
+            "public_exposure": False,
+            "data_sensitivity": "sensitive",
+            "provider_config_key": "aws.east",
+            "reference_resolutions": (reference_resolution,),
+            "metadata": {"review": {"reviewers": ["security"]}},
+        }
+
+        for style, resource in (
+            ("positional", NormalizedResource(*arguments.values())),
+            ("keyword", NormalizedResource(**arguments)),
+        ):
+            with self.subTest(style=style):
+                for name, expected in arguments.items():
+                    self.assertEqual(getattr(resource, name), expected, name)
+
+    def test_replace_updates_identity_and_retains_metadata_from_indexed_resource(self) -> None:
+        original = NormalizedResource(
+            address="aws_instance.web",
+            provider="aws",
+            resource_type="aws_instance",
+            name="web",
+            category=ResourceCategory.COMPUTE,
+            identifier="i-web",
+            subnet_ids=("subnet-1",),
+            metadata={"public_access_reasons": ["public IP"]},
+        )
+        inventory = ResourceInventory(provider="aws", resources=(original,))
+
+        replacement = replace(original, address="aws_instance.copy", name="copy", identifier="i-copy")
+
+        self.assertEqual(replacement.address, "aws_instance.copy")
+        self.assertEqual(replacement.name, "copy")
+        self.assertEqual(replacement.identifier, "i-copy")
+        self.assertEqual(replacement.subnet_ids, ("subnet-1",))
+        self.assertEqual(replacement.metadata, {"public_access_reasons": ["public IP"]})
+        self.assertIs(inventory.get_by_address("aws_instance.web"), original)
+        self.assertIs(inventory.get_by_identifier("i-web"), original)
+        self.assertIsNone(inventory.get_by_address("aws_instance.copy"))
+
     def test_resource_placement_ids_are_tuple_backed(self) -> None:
         subnet_ids = ["subnet-1"]
         security_group_ids = ["sg-1"]
@@ -392,7 +623,7 @@ class NormalizedResourcePropertyTests(unittest.TestCase):
             resource_type="aws_s3_bucket",
             name="logs",
             category=ResourceCategory.DATA,
-            metadata=source_metadata,
+            metadata=MappingProxyType(source_metadata),
         )
 
         source_metadata["tags"]["env"] = "dev"
