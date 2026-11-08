@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import replace
+from dataclasses import fields, replace
 from functools import partial
 from inspect import Parameter, signature
 from types import MappingProxyType
@@ -74,6 +74,16 @@ class SeverityTests(unittest.TestCase):
 
 
 class ModelMetadataConstructionTests(unittest.TestCase):
+    def test_constructor_parameters_match_stored_init_fields(self) -> None:
+        for model in (NormalizedResource, ResourceInventory):
+            with self.subTest(model=model.__name__):
+                stored_init_fields = {field.name for field in fields(model) if field.init}
+                constructor_fields = set(signature(model).parameters)
+                # metadata is a constructor input, but InitVar excludes it from fields().
+                constructor_fields.remove("metadata")
+
+                self.assertEqual(constructor_fields, stored_init_fields)
+
     def test_metadata_constructor_parameter_defaults_to_none(self) -> None:
         for constructor in _METADATA_MODEL_CONSTRUCTORS:
             with self.subTest(model=constructor.func.__name__):
