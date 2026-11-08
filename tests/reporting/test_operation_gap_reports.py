@@ -164,6 +164,7 @@ class OperationGapReportTests(unittest.TestCase):
         from tests.helpers.paths import FIXTURES_DIR
 
         finding_result = TfStride().analyze_plan(FIXTURES_DIR / "aws" / "sample_aws_plan.json")
+        finding_result.findings = [*reversed(finding_result.findings), finding_result.findings[0]]
         finding_count = len(finding_result.findings)
         finding_result.operation_gaps = OperationGapResults((_FAMILY,), (_gap(),))
         run = json.loads(render_sarif(finding_result))["runs"][0]
@@ -173,6 +174,19 @@ class OperationGapReportTests(unittest.TestCase):
         self.assertEqual(run["results"][-1]["ruleIndex"], len(run["tool"]["driver"]["rules"]) - 1)
         self.assertTrue(all(item["ruleId"] != SARIF_ANALYSIS_GAP_RULE_ID for item in run["results"][:-1]))
         self.assertTrue(all(item["level"] in {"error", "warning", "note"} for item in run["results"][:-1]))
+
+        rules = run["tool"]["driver"]["rules"]
+        self.assertEqual(
+            [rule["id"] for rule in rules],
+            [*sorted({finding.rule_id for finding in finding_result.findings}), SARIF_ANALYSIS_GAP_RULE_ID],
+        )
+        self.assertEqual(
+            [item["ruleId"] for item in run["results"]],
+            [*(finding.rule_id for finding in finding_result.findings), SARIF_ANALYSIS_GAP_RULE_ID],
+        )
+        for item in run["results"]:
+            with self.subTest(rule_id=item["ruleId"], rule_index=item["ruleIndex"]):
+                self.assertEqual(rules[item["ruleIndex"]]["id"], item["ruleId"])
 
     def test_sarif_preserves_missing_operation_and_target_without_inventing_associations(self):
         gap = replace(_gap(), operation=None, target_address=None, scope=None)

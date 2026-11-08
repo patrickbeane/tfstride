@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from tfstride.models import FilterSummary
 
+# FastAPI/Pydantic require the backport for TypedDict response models on Python 3.11.
+# Core reporting also works without the optional dashboard dependencies.
 try:
     from typing_extensions import TypedDict
 except ImportError:  # pragma: no cover

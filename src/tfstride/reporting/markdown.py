@@ -224,7 +224,7 @@ def _render_analysis_coverage(result: AnalysisResult) -> list[str]:
     return lines
 
 
-def _format_severity_reasoning(finding) -> str:
+def _format_severity_reasoning(finding: Finding) -> str:
     if finding.severity_reasoning is None:
         return finding.severity.value
     reasoning = finding.severity_reasoning

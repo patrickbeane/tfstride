@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from tfstride import __version__
 from tfstride.analysis.rule_registry import default_rule_metadata
@@ -20,6 +21,16 @@ SARIF_LEVELS = {
 }
 SARIF_TAGS = ["terraform", "cloud", "threat-modeling"]
 SARIF_ANALYSIS_GAP_RULE_ID = "tfstride-analysis-gap"
+
+
+class _SarifRuleDescriptor(TypedDict):
+    id: str
+    name: str
+    shortDescription: dict[str, str]
+    fullDescription: dict[str, str]
+    help: NotRequired[dict[str, str]]
+    defaultConfiguration: dict[str, str]
+    properties: dict[str, list[str]]
 
 
 def render_sarif(result: AnalysisResult) -> str:
@@ -61,12 +72,12 @@ def _build_sarif_log(result: AnalysisResult) -> dict[str, object]:
     }
 
 
-def _build_rules(findings: list[Finding]) -> list[dict[str, object]]:
+def _build_rules(findings: list[Finding]) -> list[_SarifRuleDescriptor]:
     findings_by_rule: dict[str, list[Finding]] = {}
     for finding in findings:
         findings_by_rule.setdefault(finding.rule_id, []).append(finding)
 
-    rules: list[dict[str, object]] = []
+    rules: list[_SarifRuleDescriptor] = []
     for rule_id in sorted(findings_by_rule):
         rule_findings = findings_by_rule[rule_id]
         representative = rule_findings[0]
@@ -93,7 +104,7 @@ def _build_rules(findings: list[Finding]) -> list[dict[str, object]]:
     return rules
 
 
-def _build_gap_rule() -> dict[str, object]:
+def _build_gap_rule() -> _SarifRuleDescriptor:
     return {
         "id": SARIF_ANALYSIS_GAP_RULE_ID,
         "name": "Unassessed modeled operation",

@@ -235,8 +235,13 @@ class SarifReportTests(unittest.TestCase):
         self.assertEqual(run["tool"]["driver"]["name"], "tfstride")
         self.assertEqual(run["properties"]["resource_sensitivity"]["basis"], "resource_class_assumption")
         self.assertEqual(run["properties"]["resource_sensitivity"]["data_contents_state"], "not_assessed")
-        self.assertTrue(run["tool"]["driver"]["rules"])
+        rules = run["tool"]["driver"]["rules"]
+        self.assertEqual([rule["id"] for rule in rules], sorted({finding.rule_id for finding in result.findings}))
         self.assertEqual(len(run["results"]), len(result.findings))
+        self.assertEqual([item["ruleId"] for item in run["results"]], [finding.rule_id for finding in result.findings])
+        for item in run["results"]:
+            with self.subTest(rule_id=item["ruleId"], rule_index=item["ruleIndex"]):
+                self.assertEqual(rules[item["ruleIndex"]]["id"], item["ruleId"])
 
         database_result = next(
             sarif_result
