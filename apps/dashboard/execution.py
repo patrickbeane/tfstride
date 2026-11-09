@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from anyio import CancelScope, CapacityLimiter, Lock, to_thread
@@ -25,20 +25,26 @@ class DashboardExecution:
 
     async def run(self, operation: Callable[[], _Result]) -> _Result:
         async with self._admission:
-            task = asyncio.create_task(to_thread.run_sync(operation, limiter=self._thread_limiter))
-            try:
-                return await asyncio.shield(task)
-            except asyncio.CancelledError:
-                # Keep both the admission slot and the caller's resources until
-                # the worker finishes, even if cancellation is requested again.
-                with CancelScope(shield=True):
-                    while not task.done():
-                        try:
-                            await asyncio.shield(task)
-                        except asyncio.CancelledError:
-                            continue
-                        except Exception:
-                            break
-                if not task.cancelled():
-                    task.exception()  # Retrieve a worker failure before propagating cancellation.
-                raise
+            return await await_completion(to_thread.run_sync(operation, limiter=self._thread_limiter))
+
+
+async def await_completion(operation: Awaitable[_Result]) -> _Result:
+    """Defer request cancellation until owned work or resource cleanup finishes."""
+    task = asyncio.ensure_future(operation)
+    try:
+        # wait() leaves the task untouched by request cancellation. Keep ownership
+        # of its result, including failures after cancellation.
+        await asyncio.wait({task})
+        return task.result()
+    except asyncio.CancelledError:
+        # Keep the caller's resources until completion, even if cancellation is
+        # requested again. Shielding also defers AnyIO scope cancellation.
+        with CancelScope(shield=True):
+            while not task.done():
+                try:
+                    await asyncio.wait({task})
+                except asyncio.CancelledError:
+                    continue
+        if not task.cancelled():
+            task.exception()  # Retrieve a failure before propagating cancellation.
+        raise

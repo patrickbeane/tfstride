@@ -9,7 +9,7 @@ from fastapi import Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from apps.dashboard.execution import DashboardExecution
+from apps.dashboard.execution import DashboardExecution, await_completion
 from apps.dashboard.view_models import DashboardAnalysis, _base_context, _sanitize_dashboard_payload
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
@@ -110,7 +110,7 @@ async def analyze_upload(
                     plan_file.write(chunk)
                     bytes_written += len(chunk)
         finally:
-            await upload.close()
+            await await_completion(upload.close())
 
         if bytes_written == 0:
             raise DashboardInputError(EMPTY_UPLOAD_MESSAGE)
