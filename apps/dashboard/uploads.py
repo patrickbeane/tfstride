@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Protocol
@@ -8,6 +9,7 @@ from fastapi import Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from apps.dashboard.execution import DashboardExecution
 from apps.dashboard.view_models import DashboardAnalysis, _base_context, _sanitize_dashboard_payload
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
@@ -85,7 +87,13 @@ async def analyze_upload(
     *,
     title: str,
     engine: TfStride,
+    execution: DashboardExecution | None = None,
 ) -> DashboardAnalysis:
+    """Stage an upload and join its worker before removing the temporary file.
+
+    Standalone calls get a fresh execution gate. Callers sharing an engine should
+    supply the same gate, as the dashboard routes do.
+    """
     filename = Path(upload.filename or "uploaded-plan.json").name or "uploaded-plan.json"
     bytes_written = 0
 
@@ -107,7 +115,9 @@ async def analyze_upload(
         if bytes_written == 0:
             raise DashboardInputError(EMPTY_UPLOAD_MESSAGE)
 
-        return analyze_plan_path(plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
+        return await (execution or DashboardExecution()).run(
+            partial(analyze_plan_path, plan_path, title=title or DEFAULT_REPORT_TITLE, engine=engine)
+        )
 
 
 def analyze_plan_path(

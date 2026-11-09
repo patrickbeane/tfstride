@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -13,6 +14,7 @@ from apps.dashboard.api_models import (
     HealthResponseModel,
     ValidationErrorResponseModel,
 )
+from apps.dashboard.execution import DashboardExecution
 from apps.dashboard.scenarios import (
     KNOWN_DEMO_SCENARIO_IDS,
     get_demo_scenarios,
@@ -29,7 +31,7 @@ from apps.dashboard.uploads import (
     analyze_upload,
     public_dashboard_error_message,
 )
-from apps.dashboard.view_models import _base_context, _report_context
+from apps.dashboard.view_models import DashboardAnalysis, _base_context, _report_context
 from tfstride.app import TfStride
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.reporting.json_report import REPORT_FORMAT_VERSION
@@ -145,6 +147,23 @@ UPLOAD_VALIDATION_ERROR_EXAMPLE = {
 
 
 def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> None:
+    def report_response(
+        request: Request, analysis: DashboardAnalysis, *, scenario: object | None = None
+    ) -> HTMLResponse:
+        return template_response(request, "report.html", _report_context(request, analysis, scenario=scenario))
+
+    def upload_error_response(
+        request: Request, title: str, exc: DashboardInputError | TerraformPlanLoadError
+    ) -> HTMLResponse:
+        context = _base_context(
+            request,
+            max_upload_bytes=MAX_UPLOAD_BYTES,
+            error=public_dashboard_error_message(exc),
+            form_title=title or DEFAULT_REPORT_TITLE,
+            demo_scenarios=get_demo_scenarios(request.app, _engine(request.app)),
+        )
+        return template_response(request, "index.html", context, status_code=400)
+
     @app.get("/api/docs", include_in_schema=False)
     async def api_docs() -> HTMLResponse:
         swagger_ui = get_swagger_ui_html(
@@ -178,25 +197,28 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
 
     @app.get("/scenarios", response_class=HTMLResponse, include_in_schema=False)
     async def scenarios_page(request: Request) -> HTMLResponse:
-        demo_scenarios = get_demo_scenarios(request.app, _engine(request.app))
-        providers = scenario_providers(demo_scenarios)
-        default_provider = providers[0].provider if providers else ""
-        selected_provider = request.query_params.get("provider", default_provider).strip().lower()
-        if selected_provider not in {provider.provider for provider in providers}:
-            selected_provider = default_provider
-        visible_scenarios = tuple(scenario for scenario in demo_scenarios if scenario.provider == selected_provider)
-        return template_response(
-            request,
-            "scenarios.html",
-            _base_context(
+        def render_page() -> HTMLResponse:
+            demo_scenarios = get_demo_scenarios(request.app, _engine(request.app))
+            providers = scenario_providers(demo_scenarios)
+            default_provider = providers[0].provider if providers else ""
+            selected_provider = request.query_params.get("provider", default_provider).strip().lower()
+            if selected_provider not in {provider.provider for provider in providers}:
+                selected_provider = default_provider
+            visible_scenarios = tuple(scenario for scenario in demo_scenarios if scenario.provider == selected_provider)
+            return template_response(
                 request,
-                max_upload_bytes=MAX_UPLOAD_BYTES,
-                page_title="tfSTRIDE Scenarios",
-                demo_scenarios=visible_scenarios,
-                selected_provider=selected_provider,
-                scenario_providers=providers,
-            ),
-        )
+                "scenarios.html",
+                _base_context(
+                    request,
+                    max_upload_bytes=MAX_UPLOAD_BYTES,
+                    page_title="tfSTRIDE Scenarios",
+                    demo_scenarios=visible_scenarios,
+                    selected_provider=selected_provider,
+                    scenario_providers=providers,
+                ),
+            )
+
+        return await _execution(request.app).run(render_page)
 
     @app.get(
         "/healthz",
@@ -243,16 +265,19 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
             examples=["safe"],
         ),
     ) -> HTMLResponse:
-        scenario = get_demo_scenarios_by_id(request.app, _engine(request.app)).get(scenario_id)
-        if scenario is None:
-            raise HTTPException(status_code=404, detail="Demo scenario not found.")
+        def render_demo() -> HTMLResponse:
+            scenario = get_demo_scenarios_by_id(request.app, _engine(request.app)).get(scenario_id)
+            if scenario is None:
+                raise HTTPException(status_code=404, detail="Demo scenario not found.")
 
-        analysis = analyze_plan_path(
-            Path(scenario.fixture_path),
-            title=scenario.report_title,
-            engine=_engine(request.app),
-        )
-        return template_response(request, "report.html", _report_context(request, analysis, scenario=scenario))
+            analysis = analyze_plan_path(
+                Path(scenario.fixture_path),
+                title=scenario.report_title,
+                engine=_engine(request.app),
+            )
+            return report_response(request, analysis, scenario=scenario)
+
+        return await _execution(request.app).run(render_demo)
 
     @app.post(
         "/analyze",
@@ -291,18 +316,13 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
         ),
     ) -> HTMLResponse:
         try:
-            analysis = await analyze_upload(plan, title=title, engine=_engine(request.app))
-        except (DashboardInputError, TerraformPlanLoadError) as exc:
-            context = _base_context(
-                request,
-                max_upload_bytes=MAX_UPLOAD_BYTES,
-                error=public_dashboard_error_message(exc),
-                form_title=title or DEFAULT_REPORT_TITLE,
-                demo_scenarios=get_demo_scenarios(request.app, _engine(request.app)),
+            analysis = await analyze_upload(
+                plan, title=title, engine=_engine(request.app), execution=_execution(request.app)
             )
-            return template_response(request, "index.html", context, status_code=400)
+        except (DashboardInputError, TerraformPlanLoadError) as exc:
+            return await _execution(request.app).run(partial(upload_error_response, request, title, exc))
 
-        return template_response(request, "report.html", _report_context(request, analysis))
+        return await _execution(request.app).run(partial(report_response, request, analysis))
 
     @app.post(
         "/api/analyze",
@@ -342,7 +362,7 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
         ),
     ) -> TFSReportPayload | JSONResponse:
         try:
-            analysis = await analyze_upload(plan, title=title, engine=_engine(app))
+            analysis = await analyze_upload(plan, title=title, engine=_engine(app), execution=_execution(app))
         except (DashboardInputError, TerraformPlanLoadError) as exc:
             return JSONResponse(
                 status_code=400,
@@ -356,3 +376,7 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
 
 def _engine(app: FastAPI) -> TfStride:
     return cast(TfStride, app.state.engine)
+
+
+def _execution(app: FastAPI) -> DashboardExecution:
+    return cast(DashboardExecution, app.state.execution)

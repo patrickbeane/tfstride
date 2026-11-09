@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -8,6 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from apps.dashboard.execution import DashboardExecution
 from apps.dashboard.routes import register_routes
 from apps.dashboard.uploads import UploadSizeLimitMiddleware
 from tfstride.app import TfStride
@@ -17,12 +20,20 @@ TEMPLATES = Jinja2Templates(directory=str(APP_ROOT / "templates"))
 TEMPLATE_RESPONSE_ACCEPTS_REQUEST = "request" in inspect.signature(TEMPLATES.TemplateResponse).parameters
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # AnyIO owns worker-thread shutdown; the gate belongs to this application loop.
+    app.state.execution = DashboardExecution()
+    yield
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="tfSTRIDE Dashboard",
         docs_url=None,
         openapi_url="/openapi.json",
         redoc_url=None,
+        lifespan=_lifespan,
     )
     app.add_middleware(UploadSizeLimitMiddleware, template_response=_template_response)
     app.mount("/static", StaticFiles(directory=str(APP_ROOT / "static")), name="static")

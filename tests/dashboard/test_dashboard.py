@@ -81,7 +81,7 @@ def _dashboard_gap_result(*, include_gap: bool = True) -> AnalysisResult:
 @unittest.skipUnless(FASTAPI_DEPS_AVAILABLE, "dashboard dependencies are not installed")
 class DashboardAppTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = TestClient(dashboard_app)
+        self.client = self.enterContext(TestClient(dashboard_app))
 
     def test_create_app_does_not_analyze_demo_fixtures_eagerly(self) -> None:
         with mock.patch.object(

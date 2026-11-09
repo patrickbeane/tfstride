@@ -302,6 +302,14 @@ Useful routes:
 
 Deployment examples are included under `apps/dashboard/deploy/`.
 
+Uploads, demo analysis, and lazy scenario catalog construction share one analysis
+worker per application process. Analysis, report payload/Markdown generation, and
+HTML report rendering run outside the event loop, leaving health checks responsive.
+Queued work waits asynchronously; a cancelled request waits for any submitted work
+to finish before releasing its temporary files. The example deployment uses two
+Uvicorn processes, allowing two analyses at once. This improves request responsiveness;
+sustained CPU throughput still depends on process capacity.
+
 ## Architecture
 
 `tfstride` is intentionally simple and explainable.
