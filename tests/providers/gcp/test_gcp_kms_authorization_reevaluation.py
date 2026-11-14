@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 from itertools import product
+from pathlib import Path
 from typing import Literal
+from unittest.mock import patch
 
 import pytest
 
+from tests.helpers.gcp_gcs_evaluation import plan_payload
 from tests.helpers.paths import GOLDEN_DIR
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.test_gcp_cloud_run_kms_management_paths import _key_ring
@@ -34,9 +38,12 @@ from tests.providers.test_protected_data_key_authority_convergence import GCP_BU
 from tfstride.analysis.preparation import PreparedAnalysis, prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
+from tfstride.app import TfStride
 from tfstride.models import Finding, NormalizedResource, ResourceInventory, TerraformResource
 from tfstride.providers.catalog import default_provider_boundary_contributor_factories_by_provider
-from tfstride.providers.gcp.analysis_indexes import build_gcp_analysis_indexes
+from tfstride.providers.gcp.analysis_indexes import GcpAnalysisIndexes, build_gcp_analysis_indexes
+from tfstride.providers.gcp.kms_authorization import GcpKmsAuthorizationContext
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
 from tfstride.providers.gcp.resource_decoration.iam import iam_bindings
 from tfstride.providers.gcp.resource_facts import gcp_facts
@@ -319,6 +326,99 @@ def test_replacements_are_coherent_and_withdraw_authority_when_normalized_fresh(
 
 def test_retained_kms_paths_recheck_current_authorization(reevaluation: _Reevaluation) -> None:
     assert reevaluation.retained_findings == reevaluation.fresh_findings
+
+
+def test_same_engine_automatically_prepares_fresh_authorization(case: _KmsCase, reevaluation: _Reevaluation) -> None:
+    engine = StrideRuleEngine()
+    contexts: list[GcpKmsAuthorizationContext] = []
+    build = GcpKmsAuthorizationContext.build
+
+    def record_build(resources: Sequence[NormalizedResource]) -> GcpKmsAuthorizationContext:
+        context = build(resources)
+        contexts.append(context)
+        return context
+
+    before, after, _ = reevaluation.preparations
+    policy = RulePolicy(enabled_rule_ids=frozenset({case.rule_id}))
+    # Reuse the engine's rule set while alternating inventories with identical
+    # resource addresses. Include both repeated negative results and recovery.
+    with patch.object(GcpKmsAuthorizationContext, "build", side_effect=record_build):
+        for prepared, expected in (
+            (before, reevaluation.baseline_findings),
+            (after, []),
+            (after, []),
+            (before, reevaluation.baseline_findings),
+        ):
+            assert engine.evaluate(prepared.inventory, prepared.boundaries, rule_policy=policy) == expected
+    assert len(contexts) == 4
+    assert len({id(context) for context in contexts}) == 4
+    assert {resource.address: resource.metadata_snapshot() for resource in reevaluation.retained.resources} == (
+        reevaluation.retained_metadata
+    )
+
+
+def test_same_inventory_permission_edits_require_fresh_preparation(case: _KmsCase) -> None:
+    inputs = _resources(case, "crypto_key", custom=True)
+    inventory = GcpNormalizer().normalize(inputs)
+    definition = _resource(inventory, inputs[-2].address)
+    original_permissions = gcp_facts(definition).custom_role_permissions
+    workload = _resource(inventory, _WORKLOAD_ADDRESS)
+    original_workload_metadata = workload.metadata_snapshot()
+    engine = StrideRuleEngine()
+    baseline, _ = _evaluate(engine, inventory, (case.rule_id,))
+    assert len(baseline) == 1
+    preparations: list[PreparedAnalysis] = []
+    for permissions, expected in (
+        (["cloudkms.cryptoKeys.get"], []),
+        (original_permissions, baseline),
+        (["cloudkms.cryptoKeys.get"], []),
+        (original_permissions, baseline),
+    ):
+        gcp_facts(definition).set(GcpResourceMetadata.CUSTOM_ROLE_PERMISSIONS, permissions)
+        findings, prepared = _evaluate(engine, inventory, (case.rule_id,))
+        preparations.append(prepared)
+        assert prepared.inventory is inventory
+        assert findings == expected
+    contexts = [
+        prepared.indexes.require_provider_extension(GcpAnalysisIndexes).kms_authorization_context
+        for prepared in preparations
+    ]
+    assert all(context is not None for context in contexts)
+    assert len({id(context) for context in contexts}) == len(preparations)
+    assert workload.metadata_snapshot() == original_workload_metadata
+
+
+@pytest.mark.parametrize("custom", (False, True), ids=("builtin", "custom"))
+def test_reused_application_observes_plan_changes_at_the_same_path(tmp_path: Path, custom: bool) -> None:
+    inputs = _resources(_CASES[0], "crypto_key", custom=custom)
+    changed = deepcopy(inputs)
+    if custom:
+        changed[-2].values["permissions"] = ["cloudkms.cryptoKeys.get"]
+    else:
+        changed[-1].values["member"] = _OTHER_MEMBER
+    empty = [_public_cloud_run(), _public_invoker()]
+    policy = RulePolicy(enabled_rule_ids=frozenset({_CASES[0].rule_id}))
+    engine = TfStride(rule_policy=policy)
+    path = tmp_path / "kms.tfplan.json"
+    baseline: list[Finding] | None = None
+    for resources, authorized, expected_builds in (
+        (inputs, True, 1),
+        (changed, False, 1),
+        (empty, False, 0),
+        (inputs, True, 1),
+    ):
+        path.write_text(json.dumps(plan_payload(resources)), encoding="utf-8")
+        with patch.object(GcpKmsAuthorizationContext, "build", wraps=GcpKmsAuthorizationContext.build) as builds:
+            result = engine.analyze_plan(path)
+        assert builds.call_count == expected_builds
+        assert result.findings == TfStride(rule_policy=policy).analyze_plan(path).findings
+        if authorized:
+            assert len(result.findings) == 1
+            if baseline is None:
+                baseline = result.findings
+            assert result.findings == baseline
+        else:
+            assert result.findings == []
 
 
 def test_removing_grant_invalidates_paths_and_restoring_it_preserves_output(case: _KmsCase, scope: _Scope) -> None:
