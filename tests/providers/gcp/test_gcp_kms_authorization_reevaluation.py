@@ -3,8 +3,6 @@
 Regenerate the valid-output golden only for reviewed behavior changes:
     .venv/bin/python -m tests.providers.gcp.test_gcp_kms_authorization_reevaluation --write
 
-The strict expected failures track the missing current-authorization validation.
-Remove those markers when the next implementation slice fixes these cases.
 """
 
 from __future__ import annotations
@@ -19,6 +17,8 @@ from typing import Literal
 import pytest
 
 from tests.helpers.paths import GOLDEN_DIR
+from tests.providers.gcp.normalizer_support import _terraform_resource
+from tests.providers.gcp.test_gcp_cloud_run_kms_management_paths import _key_ring
 from tests.providers.gcp.test_gcp_cloud_run_kms_operation_paths import (
     _OTHER_MEMBER,
     _custom_role,
@@ -29,6 +29,8 @@ from tests.providers.gcp.test_gcp_cloud_run_kms_operation_paths import (
     _version,
 )
 from tests.providers.gcp.test_gcp_public_cloud_run_firestore_mutation_rules import _public_cloud_run, _public_invoker
+from tests.providers.gcp.test_gcp_public_cloud_run_kms_management_rules import _inventory_with_version_dependency
+from tests.providers.test_protected_data_key_authority_convergence import GCP_BUCKET_ADDRESS, _gcp_resources
 from tfstride.analysis.preparation import PreparedAnalysis, prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
@@ -315,11 +317,6 @@ def test_replacements_are_coherent_and_withdraw_authority_when_normalized_fresh(
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="KMS path validation trusts retained authorization evidence; next slice must recheck current IAM inputs",
-)
 def test_retained_kms_paths_recheck_current_authorization(reevaluation: _Reevaluation) -> None:
     assert reevaluation.retained_findings == reevaluation.fresh_findings
 
@@ -336,6 +333,155 @@ def test_removing_grant_invalidates_paths_and_restoring_it_preserves_output(case
     assert len(baseline) == 1
     assert without_grant == []
     assert restored == baseline
+
+
+@pytest.mark.parametrize("unknown", (False, True), ids=("different", "unknown"))
+def test_current_scope_must_still_cover_the_target(case: _KmsCase, scope: _Scope, unknown: bool) -> None:
+    inputs = _resources(case, scope)
+    changed_inputs = deepcopy(inputs)
+    grant = changed_inputs[-1]
+    field = {"project": "project", "key_ring": "key_ring_id", "crypto_key": "crypto_key_id"}[scope]
+    if unknown:
+        grant.unknown_values[field] = True
+    else:
+        grant.values[field] = {
+            "project": "other-project",
+            "key_ring": "projects/other-project/locations/global/keyRings/other",
+            "crypto_key": "google_kms_crypto_key.other.id",
+        }[scope]
+    original = GcpNormalizer().normalize(inputs)
+    fresh = GcpNormalizer().normalize(changed_inputs)
+    retained = _replace_source(original, _resource(fresh, grant.address))
+    engine = StrideRuleEngine()
+    assert len(_evaluate(engine, original, (case.rule_id,))[0]) == 1
+    assert _evaluate(engine, retained, (case.rule_id,))[0] == _evaluate(engine, fresh, (case.rule_id,))[0] == []
+
+
+def _authoritative_source(grant: TerraformResource, mode: str) -> TerraformResource:
+    values = dict(grant.values)
+    binding = {"role": values.pop("role"), "members": [values.pop("member")]}
+    if mode == "binding":
+        values.update(binding)
+    else:
+        values["policy_data"] = json.dumps({"bindings": [binding]})
+    return _terraform_resource(
+        grant.address.replace("_iam_member.", f"_iam_{mode}."),
+        grant.resource_type.replace("_iam_member", f"_iam_{mode}"),
+        values,
+    )
+
+
+@pytest.mark.parametrize("mode", ("binding", "policy"))
+def test_new_conflicting_iam_manager_invalidates_retained_paths(case: _KmsCase, scope: _Scope, mode: str) -> None:
+    inputs = _resources(case, scope)
+    conflicting_grant = deepcopy(inputs[-1])
+    conflicting_grant.values["member"] = _OTHER_MEMBER
+    if mode == "policy":
+        # A policy conflicts even when its bindings do not grant KMS authority.
+        conflicting_grant.values["role"] = "roles/viewer"
+    conflict = _authoritative_source(conflicting_grant, mode)
+    original = GcpNormalizer().normalize(inputs)
+    fresh = GcpNormalizer().normalize([*inputs, conflict])
+    retained = replace(original, resources=(*original.resources, _resource(fresh, conflict.address)))
+    engine = StrideRuleEngine()
+    assert len(_evaluate(engine, original, (case.rule_id,))[0]) == 1
+    assert _evaluate(engine, retained, (case.rule_id,))[0] == _evaluate(engine, fresh, (case.rule_id,))[0] == []
+
+
+@pytest.mark.parametrize("mode", ("binding", "policy"))
+@pytest.mark.parametrize("unknown", (False, True), ids=("removed_member", "unknown"))
+def test_authoritative_sources_recheck_current_bindings(
+    case: _KmsCase, scope: _Scope, mode: str, unknown: bool
+) -> None:
+    inputs = _resources(case, scope)
+    inputs[-1] = _authoritative_source(inputs[-1], mode)
+    changed_inputs = deepcopy(inputs)
+    grant = changed_inputs[-1]
+    if unknown:
+        grant.unknown_values["members" if mode == "binding" else "policy_data"] = True
+    elif mode == "binding":
+        grant.values["members"] = [_OTHER_MEMBER]
+    else:
+        grant.values["policy_data"] = json.dumps({"bindings": [{"role": case.role, "members": [_OTHER_MEMBER]}]})
+    original = GcpNormalizer().normalize(inputs)
+    fresh = GcpNormalizer().normalize(changed_inputs)
+    retained = _replace_source(original, _resource(fresh, grant.address))
+    engine = StrideRuleEngine()
+    assert len(_evaluate(engine, original, (case.rule_id,))[0]) == 1
+    assert _evaluate(engine, retained, (case.rule_id,))[0] == _evaluate(engine, fresh, (case.rule_id,))[0] == []
+
+
+@pytest.mark.parametrize("ring_scope", ("project", "key_ring"))
+@pytest.mark.parametrize("custom", (False, True), ids=("builtin", "custom"))
+def test_explicit_ring_without_keys_rechecks_current_authority(ring_scope: str, custom: bool) -> None:
+    permission = "cloudkms.keyRings.setIamPolicy"
+    definition = _custom_role("ring_admin", [permission])
+    role = str(definition.values["name"]) if custom else "roles/cloudkms.admin"
+    grant = _project_member("ring_admin", role) if ring_scope == "project" else _ring_member("ring_admin", role)
+    inputs = [_public_cloud_run(), _public_invoker(), _key_ring(), *([definition] if custom else []), grant]
+    changed_inputs = deepcopy(inputs)
+    changed = changed_inputs[-2] if custom else changed_inputs[-1]
+    changed.values["permissions" if custom else "role"] = ["cloudkms.keyRings.get"] if custom else "roles/viewer"
+    original = GcpNormalizer().normalize(inputs)
+    fresh = GcpNormalizer().normalize(changed_inputs)
+    retained = _replace_source(original, _resource(fresh, changed.address))
+    engine = StrideRuleEngine()
+    rule_ids = ("gcp-public-cloud-run-kms-authorization-delegation",)
+    before, _ = _evaluate(engine, original, rule_ids)
+    assert len(before) == 1
+    assert "google_kms_key_ring.application" in before[0].affected_resources
+    assert _evaluate(engine, retained, rule_ids)[0] == _evaluate(engine, fresh, rule_ids)[0] == []
+
+
+def test_revoked_decrypt_path_cannot_contribute_protected_data_convergence() -> None:
+    inputs = [
+        *_gcp_resources(),
+        _key("other", "ENCRYPT_DECRYPT"),
+        _key_member("other_decrypter", "other", "roles/cloudkms.cryptoKeyDecrypter"),
+    ]
+    changed_inputs = deepcopy(inputs)
+    grant_address = "google_kms_crypto_key_iam_member.runtime_decrypter"
+    next(resource for resource in changed_inputs if resource.address == grant_address).values["role"] = (
+        "roles/cloudkms.viewer"
+    )
+    original = GcpNormalizer().normalize(inputs)
+    fresh = GcpNormalizer().normalize(changed_inputs)
+    retained = _replace_source(original, _resource(fresh, grant_address))
+    engine = StrideRuleEngine()
+    rule_ids = ("gcp-public-cloud-run-kms-decrypt-access",)
+    before, _ = _evaluate(engine, original, rule_ids)
+    after, _ = _evaluate(engine, retained, rule_ids)
+    assert len(before) == len(after) == 1
+    assert GCP_BUCKET_ADDRESS in before[0].affected_resources
+    assert GCP_BUCKET_ADDRESS not in after[0].affected_resources
+    assert after == _evaluate(engine, fresh, rule_ids)[0]
+    assert gcp_facts(_resource(retained, _WORKLOAD_ADDRESS)).cloud_run_gcs_protected_data_convergences
+
+
+def test_revoked_destroy_permission_cannot_contribute_downstream_dependencies() -> None:
+    baseline = _inventory_with_version_dependency(
+        coherent=True,
+        custom_role_permissions=["cloudkms.cryptoKeyVersions.update", "cloudkms.cryptoKeyVersions.destroy"],
+    )
+    # Retain update authority so the finding survives, but its destruction
+    # targets and dependent-resource impact must disappear.
+    definition = _custom_role("runtime_admin", ["cloudkms.cryptoKeyVersions.update"])
+    replacement = _resource(GcpNormalizer().normalize([definition]), definition.address)
+    retained = _replace_source(baseline, replacement)
+    engine = StrideRuleEngine()
+    rule_ids = ("gcp-public-cloud-run-kms-key-disruption",)
+    before, _ = _evaluate(engine, baseline, rule_ids)
+    after, _ = _evaluate(engine, retained, rule_ids)
+    assert len(before) == len(after) == 1
+    assert "google_pubsub_topic.orders" in before[0].affected_resources
+    assert "google_pubsub_topic.orders" not in after[0].affected_resources
+    paths = next(item.values for item in after[0].evidence if item.key == "kms_management_paths")
+    assert paths and all("operation=cloudkms.cryptoKeyVersions.update;" in path for path in paths)
+    dependencies = next(item.values for item in after[0].evidence if item.key == "downstream_dependencies")
+    assert dependencies == [
+        "unique_dependency_count=0; unique_dependent_resource_count=0; "
+        "unique_version_target_count=0; blast_radius_basis=no_resolved_downstream_dependents"
+    ]
 
 
 if __name__ == "__main__":

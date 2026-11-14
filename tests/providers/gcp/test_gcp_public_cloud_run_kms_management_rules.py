@@ -4,6 +4,7 @@ import unittest
 
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.test_gcp_cloud_run_kms_operation_paths import (
+    _custom_role,
     _key,
     _key_member,
     _project_member,
@@ -82,7 +83,11 @@ def _evaluate(resources: list[TerraformResource], *rule_ids: str):
     )
 
 
-def _inventory_with_version_dependency(*, coherent: bool) -> ResourceInventory:
+def _inventory_with_version_dependency(
+    *, coherent: bool, custom_role_permissions: list[str] | None = None
+) -> ResourceInventory:
+    definition = _custom_role("runtime_admin", custom_role_permissions or [])
+    role = str(definition.values["name"]) if custom_role_permissions is not None else "roles/cloudkms.admin"
     inventory = GcpNormalizer().normalize(
         [
             _public_cloud_run(),
@@ -94,7 +99,8 @@ def _inventory_with_version_dependency(*, coherent: bool) -> ResourceInventory:
                 "orders",
                 key_name=f"{_RING}/cryptoKeys/data",
             ),
-            _as_resource(_project_member("runtime_admin", "roles/cloudkms.admin")),
+            *([definition] if custom_role_permissions is not None else []),
+            _as_resource(_project_member("runtime_admin", role)),
         ]
     )
     key = inventory.get_by_address("google_kms_crypto_key.data")

@@ -256,6 +256,7 @@ include = [
   "src/tfstride/providers/gcp/kms_dependency_evidence.py",
   "src/tfstride/providers/gcp/protected_data_evidence.py",
   "src/tfstride/providers/gcp/kms_evidence.py",
+  "src/tfstride/providers/gcp/kms_authorization.py",
   "src/tfstride/providers/gcp/metadata.py",
   "src/tfstride/providers/gcp/kms_normalizers.py",
   "src/tfstride/providers/gcp/resource_facts/kms.py",

@@ -10,6 +10,7 @@ from tfstride.providers.gcp.iam_inheritance import (
     build_gcp_iam_inheritance_index,
     empty_gcp_iam_inheritance_index,
 )
+from tfstride.providers.gcp.kms_authorization import GcpKmsAuthorizationContext
 from tfstride.providers.gcp.org_policy_guardrails import (
     GcpOrgPolicyGuardrailIndex,
     build_gcp_org_policy_guardrail_index,
@@ -29,6 +30,7 @@ class GcpAnalysisIndexes:
     iam_inheritance: GcpIamInheritanceIndex
     org_policy_guardrails: GcpOrgPolicyGuardrailIndex
     gcs_grant_context: GcsGrantConstraintContext | None = None
+    kms_authorization_context: GcpKmsAuthorizationContext | None = None
 
 
 _EMPTY_GCP_ANALYSIS_INDEXES = GcpAnalysisIndexes(
@@ -44,6 +46,11 @@ def build_gcp_analysis_indexes(inventory: ResourceInventory) -> GcpAnalysisIndex
         gcs_grant_context=(
             GcsGrantConstraintContext.build(inventory.resources)
             if inventory.by_type(GcpResourceType.STORAGE_BUCKET)
+            else None
+        ),
+        kms_authorization_context=(
+            GcpKmsAuthorizationContext.build(inventory.resources)
+            if inventory.by_type(GcpResourceType.KMS_CRYPTO_KEY, GcpResourceType.KMS_KEY_RING)
             else None
         ),
     )
@@ -73,3 +80,18 @@ def gcp_gcs_grant_context(
 
 def gcp_org_policy_guardrail_index(indexes: AnalysisIndexes) -> GcpOrgPolicyGuardrailIndex:
     return gcp_analysis_indexes(indexes).org_policy_guardrails
+
+
+def gcp_kms_authorization_context(
+    indexes: AnalysisIndexes | None, inventory: ResourceInventory
+) -> GcpKmsAuthorizationContext | None:
+    """Reuse prepared KMS dependencies, or construct fresh ones for standalone callers."""
+    if indexes is not None and isinstance(indexes.provider_extension, GcpAnalysisIndexes):
+        prepared = indexes.provider_extension.kms_authorization_context
+        if prepared is not None:
+            return prepared
+    if inventory.provider != "gcp" or not inventory.by_type(
+        GcpResourceType.KMS_CRYPTO_KEY, GcpResourceType.KMS_KEY_RING
+    ):
+        return None
+    return GcpKmsAuthorizationContext.build(inventory.resources)

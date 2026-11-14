@@ -14,13 +14,14 @@ from tfstride.analysis.finding_helpers import (
 )
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import BoundaryType, Finding, NormalizedResource
-from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context
+from tfstride.providers.gcp.analysis_indexes import gcp_gcs_grant_context, gcp_kms_authorization_context
 from tfstride.providers.gcp.constants import PUBLIC_GCP_IAM_MEMBERS
 from tfstride.providers.gcp.gcs_grant_evaluation import (
     GCS_ACCESS_IAM_TYPES_BY_BASIS,
     GcsGrantConstraintContext,
     gcs_path_permissions,
 )
+from tfstride.providers.gcp.kms_authorization import GcpKmsAuthorizationContext
 from tfstride.providers.gcp.kms_dependency_evidence import GcpKmsEncryptionDependency
 from tfstride.providers.gcp.kms_evidence import (
     GcpCloudRunKmsManagementPath,
@@ -167,6 +168,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
         if context.inventory.provider != "gcp":
             return []
 
+        kms_context = gcp_kms_authorization_context(context.analysis_indexes, context.inventory)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = _unconditional_public_invokers(workload)
@@ -178,7 +180,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
                 path
                 for path in gcp_facts(workload).cloud_run_kms_management_paths
                 if path["management_effect"] == management_effect
-                and _is_deterministic_management_path(path, workload, context, management_effect)
+                and _is_deterministic_management_path(path, workload, context, management_effect, kms_context)
             ]
             if not paths:
                 continue
@@ -189,12 +191,14 @@ class GcpCloudRunKmsOperationRuleDetectors:
             project_scope = any(path.get("scope_type") == "project" for path in paths)
             key_ring_scope = any(path.get("scope_type") == "key_ring" for path in paths)
             version_targets = (
-                _deterministic_version_destruction_targets(paths, workload, context)
+                _deterministic_version_destruction_targets(paths, workload, context, kms_context)
                 if management_effect == "disruption"
                 else set()
             )
             downstream_dependencies = (
-                _resolved_downstream_dependencies(paths, workload, context) if management_effect == "disruption" else []
+                _resolved_downstream_dependencies(paths, workload, context, kms_context)
+                if management_effect == "disruption"
+                else []
             )
             downstream_dependent_addresses = _downstream_dependent_addresses(downstream_dependencies)
             operations = _management_operations(paths)
@@ -285,6 +289,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
             return []
 
         grant_context = gcp_gcs_grant_context(context.analysis_indexes, context.inventory) if disclosure else None
+        kms_context = gcp_kms_authorization_context(context.analysis_indexes, context.inventory)
         findings: list[Finding] = []
         for workload in context.inventory.by_type(*GCP_CLOUD_RUN_RESOURCE_TYPES):
             public_invokers = _unconditional_public_invokers(workload)
@@ -301,6 +306,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
                     workload,
                     context,
                     path["operation_class"],
+                    kms_context,
                 )
             ]
             if not paths:
@@ -316,6 +322,7 @@ class GcpCloudRunKmsOperationRuleDetectors:
                     paths,
                     workload,
                     context,
+                    kms_context,
                     grant_context=grant_context,
                 )
                 if disclosure
@@ -446,11 +453,12 @@ def _deterministic_version_destruction_targets(
     paths: Sequence[GcpCloudRunKmsManagementPath],
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    kms_context: GcpKmsAuthorizationContext | None,
 ) -> set[tuple[str, str]]:
     return {
         (target_address, target_resource_name)
         for path in paths
-        if _is_deterministic_version_destruction_path(path, workload, context)
+        if _is_deterministic_version_destruction_path(path, workload, context, kms_context)
         if (target_address := _known_string(path.get("target_address"))) is not None
         if (target_resource_name := _known_string(path.get("target_resource_name"))) is not None
     }
@@ -460,12 +468,13 @@ def _is_deterministic_version_destruction_path(
     path: GcpCloudRunKmsManagementPath,
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    kms_context: GcpKmsAuthorizationContext | None,
 ) -> bool:
     if (
         path.get("operation") != _VERSION_DESTROY_OPERATION
         or path.get("target_type") != "crypto_key_version"
         or path.get("lifecycle_compatibility_state") != "compatible"
-        or not _is_deterministic_management_path(path, workload, context, "disruption")
+        or not _is_deterministic_management_path(path, workload, context, "disruption", kms_context)
     ):
         return False
 
@@ -506,11 +515,12 @@ def _resolved_downstream_dependencies(
     paths: Sequence[GcpCloudRunKmsManagementPath],
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    kms_context: GcpKmsAuthorizationContext | None,
 ) -> list[_GcpDownstreamDependency]:
     dependencies: list[_GcpDownstreamDependency] = []
     seen: set[tuple[str, str, str, str]] = set()
     for path in paths:
-        if not _is_deterministic_version_destruction_path(path, workload, context):
+        if not _is_deterministic_version_destruction_path(path, workload, context, kms_context):
             continue
 
         version_address = _known_string(path.get("target_address"))
@@ -898,6 +908,7 @@ def _is_deterministic_management_path(
     workload: NormalizedResource,
     context: RuleEvaluationContext,
     management_effect: GcpKmsManagementEffect,
+    kms_context: GcpKmsAuthorizationContext | None,
 ) -> bool:
     operation = _known_string(path.get("operation"))
     if operation is None or operation not in _MANAGEMENT_OPERATION_DEFINITIONS:
@@ -967,7 +978,29 @@ def _is_deterministic_management_path(
         return False
     if not _is_exact_management_target(path, context, key_project, key_ring):
         return False
-    return True
+    if kms_context is None:
+        return False
+
+    # Explicit rings can be authorized without any modeled child keys. An
+    # implicit ring instead uses the key ancestry that established its target.
+    if path.get("target_type") == "key_ring":
+        target_address = path.get("target_address")
+        if target_address is not None:
+            target = context.inventory.get_by_address(target_address)
+            return target is not None and kms_context.authorizes(path, workload_member, target)
+        return any(
+            resource is not None
+            and resource.resource_type == GcpResourceType.KMS_CRYPTO_KEY
+            and (identity := _key_identity(resource)) is not None
+            and _key_ring(identity) == path.get("target_resource_name")
+            and kms_context.authorizes(path, workload_member, resource)
+            for address in path["target_model_evidence_addresses"]
+            for resource in (context.inventory.get_by_address(address),)
+        )
+
+    key_address = path.get("crypto_key_address")
+    key = context.inventory.get_by_address(key_address) if key_address is not None else None
+    return key is not None and kms_context.authorizes(path, workload_member, key)
 
 
 def _is_exact_management_target(
@@ -1062,6 +1095,7 @@ def _is_deterministic_operation_path(
     workload: NormalizedResource,
     context: RuleEvaluationContext,
     operation_class: GcpKmsOperationClass,
+    kms_context: GcpKmsAuthorizationContext | None,
 ) -> bool:
     if (
         path.get("workload_address") != workload.address
@@ -1137,6 +1171,8 @@ def _is_deterministic_operation_path(
         scope_type == expected_scope_type
         and scope == expected_scope
         and path.get("grant_basis") in {"project_iam", "key_ring_iam", "crypto_key_iam"}
+        and kms_context is not None
+        and kms_context.authorizes(path, workload_member, key)
     )
 
 
@@ -1180,6 +1216,7 @@ def _resolved_protected_data_convergences(
     paths: Sequence[GcpCloudRunKmsOperationPath],
     workload: NormalizedResource,
     context: RuleEvaluationContext,
+    kms_context: GcpKmsAuthorizationContext | None,
     *,
     grant_context: GcsGrantConstraintContext | None = None,
 ) -> list[GcpCloudRunGcsProtectedDataConvergence]:
@@ -1192,6 +1229,7 @@ def _resolved_protected_data_convergences(
             workload,
             context,
             _DECRYPT_OPERATION,
+            kms_context,
         )
     )
     convergences: list[GcpCloudRunGcsProtectedDataConvergence] = []

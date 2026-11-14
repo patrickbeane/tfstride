@@ -169,7 +169,7 @@ class NormalizeKmsIamPostureStage:
         for key_ring in resources:
             if key_ring.resource_type != GcpResourceType.KMS_KEY_RING:
                 continue
-            grants, uncertainties = _kms_key_ring_iam_posture(
+            grants, uncertainties = evaluate_kms_key_ring_grants(
                 key_ring,
                 iam_resources,
                 custom_roles,
@@ -183,7 +183,7 @@ class NormalizeKmsIamPostureStage:
         for key in resources:
             if key.resource_type != GcpResourceType.KMS_CRYPTO_KEY:
                 continue
-            grants, uncertainties = _kms_iam_posture(
+            grants, uncertainties = evaluate_kms_key_grants(
                 key,
                 iam_resources,
                 custom_roles,
@@ -195,12 +195,13 @@ class NormalizeKmsIamPostureStage:
             )
 
 
-def _kms_key_ring_iam_posture(
+def evaluate_kms_key_ring_grants(
     key_ring_resource: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
     custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpKmsKeyRingIamGrant], list[str]]:
+    """Evaluate current IAM inputs without reading or mutating decorated grants."""
     key_ring = _key_ring_resource_path(key_ring_resource)
     project = _project_from_path(key_ring)
     if key_ring is None or project is None:
@@ -342,12 +343,13 @@ def _kms_key_ring_iam_posture(
     return grants, dedupe(uncertainties)
 
 
-def _kms_iam_posture(
+def evaluate_kms_key_grants(
     key: NormalizedResource,
     iam_resources: tuple[NormalizedResource, ...],
     custom_roles: GcpCustomRoleIndex,
     context: GcpDecorationContext,
 ) -> tuple[list[GcpKmsIamGrant], list[str]]:
+    """Evaluate current IAM inputs without reading or mutating decorated grants."""
     key_path = _key_path(key)
     key_ring = _key_ring(key_path, gcp_facts(key).kms_key_ring)
     project = _project_from_path(key_path or key_ring)
