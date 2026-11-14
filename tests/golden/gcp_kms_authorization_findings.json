@@ -1,0 +1,1364 @@
+{
+  "decrypt/project": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS decrypt authority",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.decrypt",
+        "google_project_iam_member.runtime_decrypt"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS decrypt authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could attempt Cloud KMS decrypt operations, creating information-disclosure potential. At least one grant is project-applicable and can reach modeled CryptoKeys across the project, so its blast radius is broader than a key-ring- or exact-key-scoped grant. No resolved KMS-protected GCS access convergence is modeled for these keys. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS decrypt permissions and project, key-ring, or CryptoKey scope required. Use separate identities for cryptographic operations that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.decrypt; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ENCRYPT_DECRYPT; operation=cloudkms.cryptoKeyVersions.useToDecrypt; operation_class=decrypt; iam_resource=google_project_iam_member.runtime_decrypt; iam_resource_type=google_project_iam_member; role=roles/cloudkms.cryptoKeyDecrypter; scope_type=project; scope=tfstride-demo; grant_basis=project_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.decrypt;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=1; key_ring_grants=0; exact_key_grants=0; modeled_keys=1; blast_radius_basis=project_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToDecrypt IAM authority for Cloud KMS decrypt operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence",
+            "blast_radius=project-applicable grant is broader than key-ring or exact-key grants"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 8,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "decrypt/key_ring": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS decrypt authority",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.decrypt",
+        "google_kms_key_ring_iam_member.runtime_decrypt"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS decrypt authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could attempt Cloud KMS decrypt operations, creating information-disclosure potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. No resolved KMS-protected GCS access convergence is modeled for these keys. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS decrypt permissions and project, key-ring, or CryptoKey scope required. Use separate identities for cryptographic operations that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.decrypt; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ENCRYPT_DECRYPT; operation=cloudkms.cryptoKeyVersions.useToDecrypt; operation_class=decrypt; iam_resource=google_kms_key_ring_iam_member.runtime_decrypt; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.cryptoKeyDecrypter; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; grant_basis=key_ring_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.decrypt;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=1; exact_key_grants=0; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToDecrypt IAM authority for Cloud KMS decrypt operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "decrypt/crypto_key": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS decrypt authority",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.decrypt",
+        "google_kms_crypto_key_iam_member.runtime_decrypt"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS decrypt authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could attempt Cloud KMS decrypt operations, creating information-disclosure potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. No resolved KMS-protected GCS access convergence is modeled for these keys. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS decrypt permissions and project, key-ring, or CryptoKey scope required. Use separate identities for cryptographic operations that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.decrypt; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ENCRYPT_DECRYPT; operation=cloudkms.cryptoKeyVersions.useToDecrypt; operation_class=decrypt; iam_resource=google_kms_crypto_key_iam_member.runtime_decrypt; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.cryptoKeyDecrypter; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.decrypt;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToDecrypt IAM authority for Cloud KMS decrypt operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "sign/project": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.sign",
+        "google_project_iam_member.runtime_sign"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS sign authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS signatures, creating spoofing potential. At least one grant is project-applicable and can reach modeled CryptoKeys across the project, so its blast radius is broader than a key-ring- or exact-key-scoped grant. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.sign; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ASYMMETRIC_SIGN; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=sign; iam_resource=google_project_iam_member.runtime_sign; iam_resource_type=google_project_iam_member; role=roles/cloudkms.signer; scope_type=project; scope=tfstride-demo; grant_basis=project_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.sign;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign/cryptoKeyVersions/1;state=ENABLED;algorithm=EC_SIGN_P256_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=1; key_ring_grants=0; exact_key_grants=0; modeled_keys=1; blast_radius_basis=project_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS sign operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence",
+            "blast_radius=project-applicable grant is broader than key-ring or exact-key grants"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "sign/key_ring": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.sign",
+        "google_kms_key_ring_iam_member.runtime_sign"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS sign authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS signatures, creating spoofing potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.sign; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ASYMMETRIC_SIGN; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=sign; iam_resource=google_kms_key_ring_iam_member.runtime_sign; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.signer; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; grant_basis=key_ring_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.sign;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign/cryptoKeyVersions/1;state=ENABLED;algorithm=EC_SIGN_P256_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=1; exact_key_grants=0; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS sign operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 6,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "sign/crypto_key": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.sign",
+        "google_kms_crypto_key_iam_member.runtime_sign"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS sign authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS signatures, creating spoofing potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.sign; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ASYMMETRIC_SIGN; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=sign; iam_resource=google_kms_crypto_key_iam_member.runtime_sign; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.signer; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.sign;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign/cryptoKeyVersions/1;state=ENABLED;algorithm=EC_SIGN_P256_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS sign operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 6,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "mac/project": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.mac",
+        "google_project_iam_member.runtime_mac"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS MAC-generation authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS message authentication codes, creating spoofing potential. At least one grant is project-applicable and can reach modeled CryptoKeys across the project, so its blast radius is broader than a key-ring- or exact-key-scoped grant. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.mac; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=MAC; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=mac_generation; iam_resource=google_project_iam_member.runtime_mac; iam_resource_type=google_project_iam_member; role=roles/cloudkms.signer; scope_type=project; scope=tfstride-demo; grant_basis=project_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.mac;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac/cryptoKeyVersions/1;state=ENABLED;algorithm=HMAC_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=1; key_ring_grants=0; exact_key_grants=0; modeled_keys=1; blast_radius_basis=project_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS MAC-generation operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence",
+            "blast_radius=project-applicable grant is broader than key-ring or exact-key grants"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "mac/key_ring": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.mac",
+        "google_kms_key_ring_iam_member.runtime_mac"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS MAC-generation authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS message authentication codes, creating spoofing potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.mac; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=MAC; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=mac_generation; iam_resource=google_kms_key_ring_iam_member.runtime_mac; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.signer; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; grant_basis=key_ring_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.mac;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac/cryptoKeyVersions/1;state=ENABLED;algorithm=HMAC_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=1; exact_key_grants=0; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS MAC-generation operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 6,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "mac/crypto_key": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.mac",
+        "google_kms_crypto_key_iam_member.runtime_mac"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS MAC-generation authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS message authentication codes, creating spoofing potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.mac; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=MAC; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=mac_generation; iam_resource=google_kms_crypto_key_iam_member.runtime_mac; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.signer; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.mac;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac/cryptoKeyVersions/1;state=ENABLED;algorithm=HMAC_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS MAC-generation operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 6,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "disruption/project": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS key disruption authority",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.disruption",
+        "google_kms_crypto_key_version.disruption",
+        "google_project_iam_member.runtime_disruption"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS disruption authority (CryptoKeyVersion update and CryptoKeyVersion destroy) on 1 exact modeled Cloud KMS management target(s). A compromise of the public workload could disrupt key or key-version management. Project-applicable IAM grants have broader blast radius than key-ring or exact-key grants. No resolved downstream encrypted dependent resources are modeled for the exact version destruction targets in these paths. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS version update and destroy permissions and project, key-ring, or CryptoKey scope required. Keep key lifecycle administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeyVersions.destroy; operation_class=destructive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_project_iam_member.runtime_disruption; iam_resource_type=google_project_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.destroy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=project_iam; scope_type=project; scope=tfstride-demo; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.update; operation_class=disruptive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_project_iam_member.runtime_disruption; iam_resource_type=google_project_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.update; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=project_iam; scope_type=project; scope=tfstride-demo; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=1; key_ring_grants=0; exact_key_grants=0; target_paths=2; modeled_targets=1; modeled_keys=1; modeled_versions=1; blast_radius_basis=project_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKeyVersion update and CryptoKeyVersion destroy authority with key disruption effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence",
+            "blast_radius=project-applicable grants are broader than key-ring or exact-key grants"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; unique_version_target_count=1; blast_radius_basis=no_resolved_downstream_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 8,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "disruption/key_ring": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS key disruption authority",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.disruption",
+        "google_kms_crypto_key_version.disruption",
+        "google_kms_key_ring_iam_member.runtime_disruption"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS disruption authority (CryptoKeyVersion update and CryptoKeyVersion destroy) on 1 exact modeled Cloud KMS management target(s). A compromise of the public workload could disrupt key or key-version management. Key-ring IAM grants have broader blast radius than exact-key grants. No resolved downstream encrypted dependent resources are modeled for the exact version destruction targets in these paths. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS version update and destroy permissions and project, key-ring, or CryptoKey scope required. Keep key lifecycle administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeyVersions.destroy; operation_class=destructive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_key_ring_iam_member.runtime_disruption; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.destroy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=key_ring_iam; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.update; operation_class=disruptive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_key_ring_iam_member.runtime_disruption; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.update; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=key_ring_iam; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=1; exact_key_grants=0; target_paths=2; modeled_targets=1; modeled_keys=1; modeled_versions=1; blast_radius_basis=key_ring_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKeyVersion update and CryptoKeyVersion destroy authority with key disruption effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence",
+            "blast_radius=key-ring grants are broader than exact-key grants"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; unique_version_target_count=1; blast_radius_basis=no_resolved_downstream_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 8,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "disruption/crypto_key": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS key disruption authority",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.disruption",
+        "google_kms_crypto_key_version.disruption",
+        "google_kms_crypto_key_iam_member.runtime_disruption"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS disruption authority (CryptoKeyVersion update and CryptoKeyVersion destroy) on 1 exact modeled Cloud KMS management target(s). A compromise of the public workload could disrupt key or key-version management. The modeled IAM grants are limited to exact CryptoKey scope. No resolved downstream encrypted dependent resources are modeled for the exact version destruction targets in these paths. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS version update and destroy permissions and project, key-ring, or CryptoKey scope required. Keep key lifecycle administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeyVersions.destroy; operation_class=destructive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_crypto_key_iam_member.runtime_disruption; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.destroy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.update; operation_class=disruptive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_crypto_key_iam_member.runtime_disruption; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.update; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; target_paths=2; modeled_targets=1; modeled_keys=1; modeled_versions=1; blast_radius_basis=exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKeyVersion update and CryptoKeyVersion destroy authority with key disruption effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; unique_version_target_count=1; blast_radius_basis=no_resolved_downstream_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "delegation/project": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS authorization delegation authority",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.delegation",
+        "google_project_iam_member.runtime_delegation"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS authorization-delegation authority (CryptoKey IAM policy update and key-ring IAM policy update) on 2 exact modeled Cloud KMS management target(s). A compromise of the public workload could change Cloud KMS authorization or delegate further key authority. Project-applicable IAM grants have broader blast radius than key-ring or exact-key grants. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS CryptoKey or key-ring IAM policy permissions and scope required. Keep IAM policy administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeys.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=crypto_key; target_address=google_kms_crypto_key.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_project_iam_member.runtime_delegation; iam_resource_type=google_project_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeys.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=project_iam; scope_type=project; scope=tfstride-demo; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none",
+            "operation=cloudkms.keyRings.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=key_ring; target_address=implicit; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=none; iam_resource=google_project_iam_member.runtime_delegation; iam_resource_type=google_project_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.keyRings.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=project_iam; scope_type=project; scope=tfstride-demo; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=1; key_ring_grants=0; exact_key_grants=0; target_paths=2; modeled_targets=2; modeled_keys=1; modeled_versions=0; blast_radius_basis=project_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKey IAM policy update and key-ring IAM policy update authority with authorization delegation effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence",
+            "blast_radius=project-applicable grants are broader than key-ring or exact-key grants"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 8,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "delegation/key_ring": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS authorization delegation authority",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.delegation",
+        "google_kms_key_ring_iam_member.runtime_delegation"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS authorization-delegation authority (CryptoKey IAM policy update and key-ring IAM policy update) on 2 exact modeled Cloud KMS management target(s). A compromise of the public workload could change Cloud KMS authorization or delegate further key authority. Key-ring IAM grants have broader blast radius than exact-key grants. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS CryptoKey or key-ring IAM policy permissions and scope required. Keep IAM policy administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeys.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=crypto_key; target_address=google_kms_crypto_key.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_kms_key_ring_iam_member.runtime_delegation; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeys.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=key_ring_iam; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none",
+            "operation=cloudkms.keyRings.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=key_ring; target_address=implicit; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=none; iam_resource=google_kms_key_ring_iam_member.runtime_delegation; iam_resource_type=google_kms_key_ring_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.keyRings.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation,cloudkms.keyRings.create,cloudkms.keyRings.createTagBinding,cloudkms.keyRings.deleteTagBinding,cloudkms.keyRings.get,cloudkms.keyRings.getIamPolicy,cloudkms.keyRings.list,cloudkms.keyRings.listEffectiveTags,cloudkms.keyRings.listTagBindings,cloudkms.keyRings.setIamPolicy; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=key_ring_iam; scope_type=key_ring; scope=projects/tfstride-demo/locations/global/keyRings/application; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=1; exact_key_grants=0; target_paths=2; modeled_targets=2; modeled_keys=1; modeled_versions=0; blast_radius_basis=key_ring_applicable_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKey IAM policy update and key-ring IAM policy update authority with authorization delegation effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence",
+            "blast_radius=key-ring grants are broader than exact-key grants"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 8,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "delegation/crypto_key": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS authorization delegation authority",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.delegation",
+        "google_kms_crypto_key_iam_member.runtime_delegation"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS authorization-delegation authority (CryptoKey IAM policy update) on 1 exact modeled Cloud KMS management target(s). A compromise of the public workload could change Cloud KMS authorization or delegate further key authority. The modeled IAM grants are limited to exact CryptoKey scope. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS CryptoKey or key-ring IAM policy permissions and scope required. Keep IAM policy administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeys.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=crypto_key; target_address=google_kms_crypto_key.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_kms_crypto_key_iam_member.runtime_delegation; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeys.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; target_paths=1; modeled_targets=1; modeled_keys=1; modeled_versions=0; blast_radius_basis=exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKey IAM policy update authority with authorization delegation effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "mixed": [
+    {
+      "title": "Public Cloud Run identity has Cloud KMS decrypt authority",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.decrypt",
+        "google_kms_crypto_key_iam_member.runtime_decrypt"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS decrypt authority on 1 exact modeled CryptoKey(s). A compromise of the public workload could attempt Cloud KMS decrypt operations, creating information-disclosure potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. No resolved KMS-protected GCS access convergence is modeled for these keys. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS decrypt permissions and project, key-ring, or CryptoKey scope required. Use separate identities for cryptographic operations that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.decrypt; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ENCRYPT_DECRYPT; operation=cloudkms.cryptoKeyVersions.useToDecrypt; operation_class=decrypt; iam_resource=google_kms_crypto_key_iam_member.runtime_decrypt; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.cryptoKeyDecrypter; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.decrypt;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/decrypt/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=1; modeled_keys=1; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToDecrypt IAM authority for Cloud KMS decrypt operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Public Cloud Run identity has Cloud KMS signing or MAC-generation authority",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.mac",
+        "google_kms_crypto_key.sign",
+        "google_kms_crypto_key_iam_member.runtime_mac",
+        "google_kms_crypto_key_iam_member.runtime_sign"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS sign and MAC-generation authority on 2 exact modeled CryptoKey(s). A compromise of the public workload could generate Cloud KMS signatures or message authentication codes, creating spoofing potential. The modeled grants are limited to key-ring or exact CryptoKey scopes. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can disclose plaintext, or can produce a signature or message authentication code accepted by a relying application. Cloud KMS IAM is modeled at project, key-ring, and CryptoKey scope; it is not treated as CryptoKeyVersion-scoped authority.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS signing or MAC-generation permissions and project, key-ring, or CryptoKey scope required. Use separate identities for signature or MAC generation that do not belong on public workloads.",
+      "rule_id": "gcp-public-cloud-run-kms-signing-access",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=google_kms_crypto_key.mac; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=MAC; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=mac_generation; iam_resource=google_kms_crypto_key_iam_member.runtime_mac; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.signer; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.mac;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/mac/cryptoKeyVersions/1;state=ENABLED;algorithm=HMAC_SHA256;protection_level=SOFTWARE;import_posture=generated']",
+            "key_address=google_kms_crypto_key.sign; key_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; key_project=tfstride-demo; key_ring=projects/tfstride-demo/locations/global/keyRings/application; key_purpose=ASYMMETRIC_SIGN; operation=cloudkms.cryptoKeyVersions.useToSign; operation_class=sign; iam_resource=google_kms_crypto_key_iam_member.runtime_sign; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.signer; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign; grant_basis=crypto_key_iam; authorization_state=granted; management_state=unambiguous; condition_state=not_configured; iam_scope_is_key_version=false; key_version_evidence_scope=modeled_versions_of_crypto_key; key_versions=['address=google_kms_crypto_key_version.sign;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/sign/cryptoKeyVersions/1;state=ENABLED;algorithm=EC_SIGN_P256_SHA256;protection_level=SOFTWARE;import_posture=generated']"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=2; modeled_keys=2; blast_radius_basis=key_ring_or_exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic cloudkms.cryptoKeyVersions.useToSign IAM authority for Cloud KMS sign and MAC-generation operations by the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "excludes=cloudkms.cryptoKeyVersions.useToDecryptViaDelegation for direct Cloud Run API use",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside modeled IAM evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 6,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Public Cloud Run identity has Cloud KMS key disruption authority",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.delegation",
+        "google_kms_crypto_key.disruption",
+        "google_kms_crypto_key_version.delegation",
+        "google_kms_crypto_key_version.disruption",
+        "google_kms_crypto_key_iam_member.runtime_delegation",
+        "google_kms_crypto_key_iam_member.runtime_disruption"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS disruption authority (CryptoKeyVersion update and CryptoKeyVersion destroy) on 2 exact modeled Cloud KMS management target(s). A compromise of the public workload could disrupt key or key-version management. The modeled IAM grants are limited to exact CryptoKey scope. No resolved downstream encrypted dependent resources are modeled for the exact version destruction targets in these paths. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS version update and destroy permissions and project, key-ring, or CryptoKey scope required. Keep key lifecycle administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeyVersions.destroy; operation_class=destructive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_kms_crypto_key_iam_member.runtime_delegation; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.destroy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.delegation;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.destroy; operation_class=destructive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_crypto_key_iam_member.runtime_disruption; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.destroy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.update; operation_class=disruptive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_kms_crypto_key_iam_member.runtime_delegation; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.update; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.delegation;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated",
+            "operation=cloudkms.cryptoKeyVersions.update; operation_class=disruptive_administration; management_effect=disruption; target_type=crypto_key_version; target_address=google_kms_crypto_key_version.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1; target_model_evidence=google_kms_crypto_key_version.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_crypto_key_iam_member.runtime_disruption; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeyVersions.update; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=compatible; iam_scope_is_key_version=false; key_version=address=google_kms_crypto_key_version.disruption;name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption/cryptoKeyVersions/1;state=ENABLED;algorithm=GOOGLE_SYMMETRIC_ENCRYPTION;protection_level=SOFTWARE;import_posture=generated"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=2; target_paths=4; modeled_targets=2; modeled_keys=2; modeled_versions=2; blast_radius_basis=exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKeyVersion update and CryptoKeyVersion destroy authority with key disruption effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; unique_version_target_count=2; blast_radius_basis=no_resolved_downstream_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Public Cloud Run identity has Cloud KMS authorization delegation authority",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "google_cloud_run_v2_service.orders",
+        "google_cloud_run_v2_service_iam_member.public_invoker",
+        "google_kms_crypto_key.delegation",
+        "google_kms_crypto_key.disruption",
+        "google_kms_crypto_key_iam_member.runtime_delegation",
+        "google_kms_crypto_key_iam_member.runtime_disruption"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->google_cloud_run_v2_service.orders",
+      "rationale": "google_cloud_run_v2_service.orders is publicly invokable and its Cloud Run runtime service account has deterministic Cloud KMS authorization-delegation authority (CryptoKey IAM policy update) on 2 exact modeled Cloud KMS management target(s). A compromise of the public workload could change Cloud KMS authorization or delegate further key authority. The modeled IAM grants are limited to exact CryptoKey scope. This establishes Cloud KMS management authority, not proof of successful operation completion, authority over out-of-plan keys or versions, or runtime impact beyond the modeled IAM, lifecycle, and scope evidence.",
+      "recommended_mitigation": "Restrict public invocation of the Cloud Run service and grant its runtime service account only the exact Cloud KMS CryptoKey or key-ring IAM policy permissions and scope required. Keep IAM policy administration on separate identities where possible.",
+      "rule_id": "gcp-public-cloud-run-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "public_invoker_bindings",
+          "values": [
+            "source=google_cloud_run_v2_service_iam_member.public_invoker; role=roles/run.invoker; member=allUsers; condition=none"
+          ]
+        },
+        {
+          "key": "public_exposure_reasons",
+          "values": [
+            "google_cloud_run_v2_service_iam_member.public_invoker grants roles/run.invoker to allUsers"
+          ]
+        },
+        {
+          "key": "runtime_identity",
+          "values": [
+            "service_account=orders@tfstride-demo.iam.gserviceaccount.com; member=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; identity_kind=cloud_run_service_account; credential_context=workload_runtime"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "operation=cloudkms.cryptoKeys.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=crypto_key; target_address=google_kms_crypto_key.delegation; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; target_model_evidence=google_kms_crypto_key.delegation; crypto_key_address=google_kms_crypto_key.delegation; iam_resource=google_kms_crypto_key_iam_member.runtime_delegation; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeys.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/delegation; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none",
+            "operation=cloudkms.cryptoKeys.setIamPolicy; operation_class=authorization_administration; management_effect=delegation; target_type=crypto_key; target_address=google_kms_crypto_key.disruption; target_resource_name=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; target_model_evidence=google_kms_crypto_key.disruption; crypto_key_address=google_kms_crypto_key.disruption; iam_resource=google_kms_crypto_key_iam_member.runtime_disruption; iam_resource_type=google_kms_crypto_key_iam_member; role=roles/cloudkms.admin; role_kind=predefined; role_resolution_state=modeled_subset; matched_permissions=cloudkms.cryptoKeys.setIamPolicy; scope_effective_permissions=cloudkms.cryptoKeys.create,cloudkms.cryptoKeys.delete,cloudkms.cryptoKeys.get,cloudkms.cryptoKeys.getIamPolicy,cloudkms.cryptoKeys.list,cloudkms.cryptoKeys.setIamPolicy,cloudkms.cryptoKeys.update,cloudkms.cryptoKeyVersions.create,cloudkms.cryptoKeyVersions.delete,cloudkms.cryptoKeyVersions.destroy,cloudkms.cryptoKeyVersions.get,cloudkms.cryptoKeyVersions.list,cloudkms.cryptoKeyVersions.restore,cloudkms.cryptoKeyVersions.trustedImportExport,cloudkms.cryptoKeyVersions.update,cloudkms.cryptoKeyVersions.useToDecryptViaDelegation,cloudkms.cryptoKeyVersions.useToEncryptViaDelegation; grant_members=serviceAccount:orders@tfstride-demo.iam.gserviceaccount.com; grant_basis=crypto_key_iam; scope_type=crypto_key; scope=projects/tfstride-demo/locations/global/keyRings/application/cryptoKeys/disruption; management_mode=additive_member; management_state=unambiguous; condition_state=not_configured; authorization_state=granted; lifecycle_compatibility=not_applicable; iam_scope_is_key_version=false; key_version=none"
+          ]
+        },
+        {
+          "key": "scope_breadth",
+          "values": [
+            "project_grants=0; key_ring_grants=0; exact_key_grants=2; target_paths=2; modeled_targets=2; modeled_keys=2; modeled_versions=0; blast_radius_basis=exact_key_grant"
+          ]
+        },
+        {
+          "key": "authorization_scope",
+          "values": [
+            "establishes=deterministic CryptoKey IAM policy update authority with authorization delegation effect for the Cloud Run runtime service account",
+            "iam_scopes=project,key_ring,crypto_key; iam_scope_is_key_version=false",
+            "target_granularity=crypto_key_version,crypto_key,key_ring",
+            "does_not_establish=successful operation completion, authority over keys or versions outside the modeled plan, or runtime impact beyond modeled IAM and lifecycle evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ]
+}
