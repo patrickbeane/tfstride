@@ -1,9 +1,7 @@
-"""Characterize AWS KMS findings before current-authorization revalidation.
+"""Require current AWS KMS authorization while preserving valid finding output.
 
-Strict expected failures identify retained proofs that the next implementation
-slice must invalidate. Passing controls establish coherent source replacements
-and unchanged output for valid evidence. Regenerate the golden only for reviewed
-behavior changes:
+Controls establish coherent source replacements and unchanged valid evidence.
+Regenerate the golden only for reviewed behavior changes:
     .venv/bin/python -m tests.providers.aws.test_aws_kms_authorization_reevaluation --write
 """
 
@@ -39,9 +37,20 @@ from tests.providers.test_protected_data_key_authority_convergence import _aws_r
 from tfstride.analysis.preparation import PreparedAnalysis, prepare_analysis
 from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
-from tfstride.models import Finding, NormalizedResource, ResourceInventory, TerraformResource
+from tfstride.models import (
+    Finding,
+    NormalizedResource,
+    ResourceInventory,
+    TerraformReferenceProvenance,
+    TerraformReferenceResolution,
+    TerraformReferenceResolutionState,
+    TerraformReferenceTarget,
+    TerraformResource,
+)
 from tfstride.providers.aws.analysis_indexes import build_aws_analysis_indexes
+from tfstride.providers.aws.metadata import AwsResourceMetadata
 from tfstride.providers.aws.normalizer import AwsNormalizer
+from tfstride.providers.aws.resource_facts import aws_facts
 from tfstride.providers.catalog import default_provider_boundary_contributor_factories_by_provider
 
 _SNAPSHOT_PATH = GOLDEN_DIR / "aws_kms_authorization_findings.json"
@@ -285,11 +294,6 @@ def test_source_replacements_are_coherent_and_fresh_normalization_withdraws_auth
     _assert_coherent_replacement(reevaluation)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="ECS KMS findings trust retained authorization; next slice must revalidate current inputs",
-)
 def test_retained_paths_recheck_current_authorization(reevaluation: _Reevaluation) -> None:
     assert reevaluation.after == reevaluation.normalized
 
@@ -317,11 +321,6 @@ def test_grant_replacements_withdraw_authority_after_fresh_normalization(grant_r
     _assert_coherent_replacement(grant_reevaluation)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="ECS KMS reevaluation must resolve current grant membership, target, and operation inputs",
-)
 def test_retained_paths_recheck_current_grant_relationships(grant_reevaluation: _Reevaluation) -> None:
     assert grant_reevaluation.after == grant_reevaluation.normalized
 
@@ -386,14 +385,13 @@ def test_removing_key_invalidates_paths_and_restoration_preserves_output(scenari
     assert _evaluate(engine, original, (case.rule_id,))[0] == baseline
 
 
-@pytest.fixture(params=("inline_policy_resource", "managed_policy", "managed_attachment", "key_policy_resource"))
-def document_reevaluation(request: pytest.FixtureRequest) -> _Reevaluation:
+def _document_resources(kind: str) -> tuple[list[TerraformResource], str]:
     # A source-only replacement must not be justified by the old merged policy
     # statements still stored on the role or key.
     case = _CASES[0]
     inputs = _resources(case, "iam_via_account_principal")
     role = _input(inputs, _ROLE_ADDRESS)
-    if request.param == "key_policy_resource":
+    if kind == "key_policy_resource":
         key = _input(inputs, f"aws_kms_key.{case.key_name}")
         source = _terraform_resource(
             "aws_kms_key_policy", "runtime", {"key_id": _KEY_ARNS[case.key_name], "policy": key.values.pop("policy")}
@@ -401,7 +399,7 @@ def document_reevaluation(request: pytest.FixtureRequest) -> _Reevaluation:
     else:
         policy = role.values["inline_policy"][0]["policy"]
         role.values["inline_policy"] = []
-        if request.param == "inline_policy_resource":
+        if kind == "inline_policy_resource":
             source = _terraform_resource("aws_iam_role_policy", "runtime", {"role": _TASK_ROLE_ARN, "policy": policy})
         else:
             policy_arn = "arn:aws:iam::111122223333:policy/runtime-kms"
@@ -412,16 +410,25 @@ def document_reevaluation(request: pytest.FixtureRequest) -> _Reevaluation:
                 )
             )
     inputs.append(source)
+    address = "aws_iam_role_policy_attachment.runtime" if kind == "managed_attachment" else source.address
+    return inputs, address
+
+
+@pytest.fixture(params=("inline_policy_resource", "managed_policy", "managed_attachment", "key_policy_resource"))
+def document_reevaluation(request: pytest.FixtureRequest) -> _Reevaluation:
+    kind = request.param
+    case = _CASES[0]
+    inputs, address = _document_resources(kind)
     changed = deepcopy(inputs)
-    if request.param == "managed_attachment":
-        source = _input(changed, "aws_iam_role_policy_attachment.runtime")
+    source = _input(changed, address)
+    if kind == "managed_attachment":
         source.values["policy_arn"] = "arn:aws:iam::111122223333:policy/unmodeled"
     else:
         statement = _statement(
             "Deny",
             case.operation,
             "*",
-            principal={"AWS": _TASK_ROLE_ARN} if request.param == "key_policy_resource" else None,
+            principal={"AWS": _TASK_ROLE_ARN} if kind == "key_policy_resource" else None,
         )
         _input(changed, source.address).values["policy"] = _policy(statement)
     return _reevaluate(inputs, changed, source.address, case.rule_id)
@@ -435,13 +442,164 @@ def test_document_replacement_preserves_stale_merged_evidence_only_in_retained_i
         assert _resource(document_reevaluation.retained, address) is _resource(document_reevaluation.original, address)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="ECS KMS reevaluation must refresh authorization from separately managed policy sources",
-)
 def test_replaced_policy_documents_invalidate_retained_findings(document_reevaluation: _Reevaluation) -> None:
     assert document_reevaluation.after == document_reevaluation.normalized
+
+
+@pytest.mark.parametrize(
+    "kind", ("inline_policy_resource", "managed_policy", "managed_attachment", "key_policy_resource")
+)
+@pytest.mark.parametrize("change", ("removed", "retargeted", "permission_removed", "equivalent"))
+def test_current_policy_sources_replace_merged_authority(kind: str, change: str) -> None:
+    inputs, address = _document_resources(kind)
+    changed = deepcopy(inputs)
+    source = _input(changed, address)
+    if change == "removed":
+        changed.remove(source)
+    elif change == "retargeted":
+        field, value = {
+            "inline_policy_resource": ("role", _EXECUTION_ROLE_ARN),
+            "managed_policy": ("arn", "arn:aws:iam::111122223333:policy/other"),
+            "managed_attachment": ("role", _EXECUTION_ROLE_ARN),
+            "key_policy_resource": ("key_id", "arn:aws:kms:us-east-1:111122223333:key/other"),
+        }[kind]
+        source.values[field] = value
+    elif change == "permission_removed":
+        if kind == "managed_attachment":
+            source.values["policy_arn"] = "arn:aws:iam::111122223333:policy/other"
+        else:
+            policy = json.loads(str(source.values["policy"]))
+            for statement in policy["Statement"]:
+                statement["Action"] = "kms:DescribeKey"
+            source.values["policy"] = json.dumps(policy)
+    original = AwsNormalizer().normalize(inputs)
+    fresh = AwsNormalizer().normalize(changed)
+    retained = (
+        replace(original, resources=tuple(resource for resource in original.resources if resource.address != address))
+        if change == "removed"
+        else _replace_source(original, _resource(fresh, address))
+    )
+    engine = StrideRuleEngine()
+    rule_ids = (_CASES[0].rule_id,)
+    before, _ = _evaluate(engine, original, rule_ids)
+    expected, _ = _evaluate(engine, fresh, rule_ids)
+    assert len(before) == 1
+    assert expected == (before if change == "equivalent" else [])
+    assert _evaluate(engine, retained, rule_ids)[0] == expected
+
+
+@pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
+@pytest.mark.parametrize("revoked_basis", ("direct_key_policy", "iam_via_account_principal"))
+def test_surviving_authority_refreshes_reported_basis(case: _KmsCase, revoked_basis: _Basis) -> None:
+    inputs = _resources(case, "iam_via_account_principal")
+    key = _input(inputs, f"aws_kms_key.{case.key_name}")
+    policy = json.loads(str(key.values["policy"]))
+    policy["Statement"].append(_statement("Allow", case.operation, "*", principal={"AWS": _TASK_ROLE_ARN}))
+    key.values["policy"] = json.dumps(policy)
+    changed = deepcopy(inputs)
+    address = _change_authorization(changed, case, revoked_basis, "authority_removed")
+    observed = _reevaluate(inputs, changed, address, case.rule_id)
+    assert len(observed.before) == len(observed.normalized) == 1
+    assert observed.before != observed.normalized
+    assert observed.after == observed.normalized
+    basis = "iam_via_key_policy" if revoked_basis == "direct_key_policy" else "key_policy_direct"
+    paths = next(
+        item.values
+        for item in observed.after[0].evidence
+        if item.key in {"kms_operation_paths", "kms_management_paths"}
+    )
+    assert all(f"authorization_bases={basis}" in path.split("; ") for path in paths)
+
+
+def test_changed_grant_target_cannot_reuse_its_decorated_relationship(grant_case: _KmsCase) -> None:
+    original = AwsNormalizer().normalize(_resources(grant_case, "kms_grant"))
+    grant = replace(_resource(original, _GRANT_ADDRESS))
+    aws_facts(grant).set(AwsResourceMetadata.KMS_GRANT_KEY_REFERENCE, "arn:aws:kms:us-east-1:111122223333:key/other")
+    assert aws_facts(grant).kms_grant_resolved_key_address == f"aws_kms_key.{grant_case.key_name}"
+    retained = _replace_source(original, grant)
+    engine = StrideRuleEngine()
+    assert len(_evaluate(engine, original, (grant_case.rule_id,))[0]) == 1
+    assert _evaluate(engine, retained, (grant_case.rule_id,))[0] == []
+
+
+@pytest.mark.parametrize("case", (_CASES[0], _CASES[3]), ids=lambda case: case.name)
+@pytest.mark.parametrize(
+    "change",
+    (
+        "missing_task",
+        "missing_role",
+        "ambiguous_role",
+        "ambiguous_key",
+        "unproven_role_reference",
+        "symbolic_role_reference",
+    ),
+)
+def test_current_task_role_and_key_relationships_must_remain_exact(case: _KmsCase, change: str) -> None:
+    original = AwsNormalizer().normalize(_resources(case, "direct_key_policy"))
+    if change in {"missing_task", "missing_role"}:
+        address = _TASK_ADDRESS if change == "missing_task" else _ROLE_ADDRESS
+        retained = replace(
+            original, resources=tuple(resource for resource in original.resources if resource.address != address)
+        )
+    elif change in {"ambiguous_role", "ambiguous_key"}:
+        address = _ROLE_ADDRESS if change == "ambiguous_role" else f"aws_kms_key.{case.key_name}"
+        source = _resource(original, address)
+        duplicate = replace(source, address=f"{source.resource_type}.duplicate", name="duplicate")
+        retained = replace(original, resources=(*original.resources, duplicate))
+    else:
+        task = replace(_resource(original, _TASK_ADDRESS))
+        aws_facts(task).set(AwsResourceMetadata.TASK_ROLE_ARN, _ROLE_ADDRESS)
+        if change == "symbolic_role_reference":
+            task = replace(
+                task,
+                reference_resolutions=(
+                    TerraformReferenceResolution(
+                        path=("task_role_arn",),
+                        state=TerraformReferenceResolutionState.SYMBOLIC,
+                        provenance=TerraformReferenceProvenance.CONFIGURATION_REFERENCE,
+                        references=(f"{_ROLE_ADDRESS}.arn",),
+                        targets=(TerraformReferenceTarget(address=_ROLE_ADDRESS, reference=f"{_ROLE_ADDRESS}.arn"),),
+                    ),
+                ),
+            )
+        retained = _replace_source(original, task)
+    engine = StrideRuleEngine()
+    before, _ = _evaluate(engine, original, (case.rule_id,))
+    assert len(before) == 1
+    assert _evaluate(engine, retained, (case.rule_id,))[0] == (before if change == "symbolic_role_reference" else [])
+
+
+def test_inconsistent_merged_policy_provenance_cannot_authorize() -> None:
+    inputs, _ = _document_resources("managed_policy")
+    original = AwsNormalizer().normalize(inputs)
+    role = _resource(original, _ROLE_ADDRESS)
+    # Alter the aggregate without replacing its source. Preparation must not
+    # guess which statements are inline and accidentally preserve authority.
+    changed = replace(role, policy_statements=(*role.policy_statements, role.policy_statements[-1]))
+    retained = _replace_source(original, changed)
+    engine = StrideRuleEngine()
+    assert len(_evaluate(engine, original, (_CASES[0].rule_id,))[0]) == 1
+    assert _evaluate(engine, retained, (_CASES[0].rule_id,))[0] == []
+
+
+def test_changed_s3_policy_source_removes_convergence_while_decrypt_authority_survives() -> None:
+    inputs = _protected_data_resources()
+    role = _input(inputs, _ROLE_ADDRESS)
+    policy = json.loads(str(role.values["inline_policy"][0]["policy"]))
+    s3_statement = policy["Statement"].pop()
+    assert s3_statement["Action"] == "s3:GetObject"
+    role.values["inline_policy"][0]["policy"] = json.dumps(policy)
+    source = _terraform_resource("aws_iam_role_policy", "s3", {"role": _TASK_ROLE_ARN, "policy": _policy(s3_statement)})
+    inputs.append(source)
+    changed = deepcopy(inputs)
+    _input(changed, source.address).values["policy"] = _policy(
+        _statement("Allow", "s3:ListBucket", "arn:aws:s3:::orders")
+    )
+    observed = _reevaluate(inputs, changed, source.address, _CASES[0].rule_id)
+    assert len(observed.before) == len(observed.normalized) == 1
+    assert "aws_s3_bucket.orders" in observed.before[0].affected_resources
+    assert "aws_s3_bucket.orders" not in observed.normalized[0].affected_resources
+    assert observed.after == observed.normalized
 
 
 def _downstream_resources() -> list[TerraformResource]:
@@ -498,11 +656,6 @@ def test_revoking_one_key_preserves_other_authority_without_dependent_evidence_a
     assert _resource(observed.retained, _WORKLOAD_ADDRESS) is _resource(observed.original, _WORKLOAD_ADDRESS)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Revoked KMS authority must not contribute protected-data or downstream disruption evidence",
-)
 def test_revoked_key_paths_cannot_contribute_dependent_evidence(
     dependency_reevaluation: tuple[_Reevaluation, str],
 ) -> None:

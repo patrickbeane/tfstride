@@ -7,11 +7,16 @@ from types import MappingProxyType
 from tfstride.analysis.indexes import AnalysisIndexes
 from tfstride.models import NormalizedResource, ResourceInventory
 from tfstride.providers.aws.account_identity import AwsAccountIdentityIndex
+from tfstride.providers.aws.kms_authorization_context import (
+    AwsKmsAuthorizationContext,
+    prepare_kms_authorization_context,
+)
 from tfstride.providers.aws.resource_decoration.ecs_public_ingress import (
     AwsEcsPublicIngressAssessment,
     current_ecs_public_ingress,
 )
 from tfstride.providers.aws.resource_index import (
+    AwsDecorationContext,
     AwsReferenceRelationshipKey,
     AwsResourceIndex,
     AwsResourceIndexBuilder,
@@ -69,6 +74,7 @@ class AwsSecurityGroupRelationships:
 class AwsAnalysisIndexes:
     security_group_relationships: AwsSecurityGroupRelationships
     ecs_public_ingress: Mapping[str, tuple[AwsEcsPublicIngressAssessment, ...]]
+    kms_authorization: AwsKmsAuthorizationContext | None = None
 
     @property
     def account_identities(self) -> AwsAccountIdentityIndex:
@@ -94,6 +100,11 @@ def build_aws_analysis_indexes(inventory: ResourceInventory) -> AwsAnalysisIndex
                 public_resources_by_security_group.setdefault(key, {}).setdefault(resource.address, resource)
 
     return AwsAnalysisIndexes(
+        kms_authorization=(
+            prepare_kms_authorization_context(AwsDecorationContext(resource_index))
+            if resource_index.kms_keys.resources
+            else None
+        ),
         ecs_public_ingress=MappingProxyType(current_ecs_public_ingress(resource_index)),
         security_group_relationships=AwsSecurityGroupRelationships(
             resource_index=resource_index,

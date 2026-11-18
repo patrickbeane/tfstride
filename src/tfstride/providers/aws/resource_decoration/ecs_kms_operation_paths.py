@@ -5,6 +5,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from tfstride.models import NormalizedResource
+from tfstride.providers.aws.ecs_task_role_evidence import task_role_relationship_is_exact
+from tfstride.providers.aws.kms_authorization_context import AwsKmsAuthorizationContext
 from tfstride.providers.aws.kms_evidence import (
     AwsEcsKmsAuthorizationBasis,
     AwsEcsKmsManagementEffect,
@@ -44,6 +46,103 @@ _MANAGEMENT_PATH_DEFINITIONS: dict[
     "kms:DeleteImportedKeyMaterial": ("destructive_administration", "disruption"),
 }
 _MANAGEMENT_OPERATIONS = frozenset(_MANAGEMENT_PATH_DEFINITIONS)
+
+
+def _current_path_authorization(
+    path: Mapping[str, object],
+    service: NormalizedResource,
+    context: AwsKmsAuthorizationContext,
+) -> tuple[NormalizedResource, NormalizedResource, NormalizedResource, AwsKmsOperationAuthorization] | None:
+    index = context.decoration_context.index
+    task_address, role_address, key_address = (
+        path.get("task_definition_address"),
+        path.get("role_address"),
+        path.get("key_address"),
+    )
+    operation = path.get("operation")
+    if not all(isinstance(value, str) and value for value in (task_address, role_address, key_address, operation)):
+        return None
+    assert isinstance(task_address, str) and isinstance(role_address, str) and isinstance(key_address, str)
+    assert isinstance(operation, str)
+    task = index.resources_by_address.get(task_address)
+    role = index.resources_by_address.get(role_address)
+    key = index.resources_by_address.get(key_address)
+    if (
+        service.provider != "aws"
+        or service.resource_type != _ECS_SERVICE
+        or path.get("workload_address") != service.address
+        or path.get("workload_type") != _ECS_SERVICE
+        or path.get("role_kind") != "ecs_task_role"
+        or path.get("credential_context") != "workload_runtime"
+        or path.get("authorization_state") != "allowed"
+        or task is None
+        or task.provider != "aws"
+        or task.resource_type != _ECS_TASK_DEFINITION
+        or role is None
+        or role.provider != "aws"
+        or role.resource_type != "aws_iam_role"
+        or key is None
+        or key.provider != "aws"
+        or key.resource_type != _KMS_KEY
+        or index.ecs_task_definitions.get(aws_facts(service).task_definition_reference, source=service) is not task
+        or index.role_index.get(aws_facts(task).task_role_arn, source=task) is not role
+        or not task_role_relationship_is_exact(task, role, context.decoration_context)
+        or path.get("role_arn") != role.arn
+        or role.arn is None
+        or index.role_index.get(role.arn, source=task) is not role
+        or path.get("key_arn") != (aws_facts(key).kms_key_arn or key.arn)
+        or index.kms_keys.get(aws_facts(key).kms_key_arn or key.arn, source=role) is not key
+    ):
+        return None
+    authorization = context.authorization(key_address, role_address, operation)
+    if (
+        authorization is None
+        or authorization["authorization_state"] != "allowed"
+        or not authorization["identity_policy_complete"]
+        or not authorization["key_policy_complete"]
+        or not authorization["same_account"]
+        or authorization["explicit_deny"]
+        or authorization["authorization_requires_condition_evaluation"]
+    ):
+        return None
+    return task, role, context.keys[key_address], authorization
+
+
+def current_ecs_kms_operation_path(
+    path: AwsEcsKmsOperationPath, service: NormalizedResource, context: AwsKmsAuthorizationContext
+) -> AwsEcsKmsOperationPath | None:
+    """Refresh an existing operation path only when current inputs still prove it."""
+    current = _current_path_authorization(path, service, context)
+    if current is None:
+        return None
+    task, role, key, authorization = current
+    if _OPERATION_BY_KEY_USAGE.get(aws_facts(key).kms_key_usage or "") != path.get("operation"):
+        return None
+    key_arn = aws_facts(key).kms_key_arn or key.arn
+    assert key_arn is not None
+    return _service_record(service, task, _operation_path_record(task, role, key, authorization, key_arn))
+
+
+def current_ecs_kms_management_path(
+    path: AwsEcsKmsManagementPath, service: NormalizedResource, context: AwsKmsAuthorizationContext
+) -> AwsEcsKmsManagementPath | None:
+    """Refresh management evidence, including current origin compatibility."""
+    current = _current_path_authorization(path, service, context)
+    if current is None:
+        return None
+    task, role, key, authorization = current
+    definition = _MANAGEMENT_PATH_DEFINITIONS.get(authorization["operation"])
+    compatibility = authorization["key_origin_compatibility_state"]
+    if definition is None or compatibility not in {"compatible", "not_applicable"}:
+        return None
+    operation_class, effect = definition
+    key_arn = aws_facts(key).kms_key_arn or key.arn
+    assert key_arn is not None
+    return _management_service_record(
+        service,
+        task,
+        _management_path_record(task, role, key, authorization, key_arn, operation_class, effect, compatibility),
+    )
 
 
 class ModelEcsKmsOperationPathsStage:

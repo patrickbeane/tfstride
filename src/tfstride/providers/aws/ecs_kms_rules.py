@@ -7,6 +7,7 @@ from tfstride.analysis.finding_factory import FindingFactory
 from tfstride.analysis.finding_helpers import build_severity_reasoning, collect_evidence, evidence_item
 from tfstride.analysis.rule_definitions import RuleEvaluationContext
 from tfstride.models import EvidenceItem, Finding, NormalizedResource, SeverityReasoning
+from tfstride.providers.aws.analysis_indexes import aws_analysis_indexes
 from tfstride.providers.aws.ecs_path_rule_helpers import (
     internet_boundary_id,
     path_string_values,
@@ -21,10 +22,15 @@ from tfstride.providers.aws.kms_evidence import (
 from tfstride.providers.aws.protected_data_evidence import (
     AwsEcsS3ProtectedDataConvergence,
 )
+from tfstride.providers.aws.resource_decoration.ecs_kms_operation_paths import (
+    current_ecs_kms_management_path,
+    current_ecs_kms_operation_path,
+)
 from tfstride.providers.aws.resource_decoration.ecs_s3_access_paths import current_ecs_s3_access_path
 from tfstride.providers.aws.resource_facts import aws_facts
-from tfstride.providers.aws.resource_index import AwsDecorationContext, AwsResourceIndexBuilder
-from tfstride.providers.aws.s3_bucket_policies import prepare_s3_bucket_policy_sources
+from tfstride.providers.aws.resource_index import AwsDecorationContext
+from tfstride.providers.aws.s3_bucket_policies import S3BucketPolicySources, prepare_s3_bucket_policy_sources
+from tfstride.providers.aws.s3_identity_authorization import S3IdentityPolicyAssessment, assess_s3_identity_policy
 
 _AWS_ECS_SERVICE = "aws_ecs_service"
 _AWS_ECS_TASK_DEFINITION = "aws_ecs_task_definition"
@@ -106,10 +112,25 @@ class AwsEcsKmsOperationRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
+        assert context.analysis_indexes is not None
+        authorization_context = aws_analysis_indexes(context.analysis_indexes, context.inventory).kms_authorization
+        if authorization_context is None:
+            return []
+        decoration_context = authorization_context.decoration_context
+        bucket_policies = (
+            prepare_s3_bucket_policy_sources(list(context.inventory.resources), decoration_context)
+            if disclosure
+            else {}
+        )
+        identity_policies = (
+            {address: assess_s3_identity_policy(role) for address, role in authorization_context.roles.items()}
+            if disclosure
+            else {}
+        )
         findings: list[Finding] = []
         for service in context.inventory.by_type(_AWS_ECS_SERVICE):
             paths = [
-                path
+                current
                 for path in aws_facts(service).ecs_kms_operation_paths
                 if _is_deterministic_operation_path(
                     path,
@@ -117,6 +138,7 @@ class AwsEcsKmsOperationRuleDetectors:
                     context,
                     operations,
                 )
+                and (current := current_ecs_kms_operation_path(path, service, authorization_context)) is not None
             ]
             if not paths:
                 continue
@@ -133,7 +155,11 @@ class AwsEcsKmsOperationRuleDetectors:
             authorization_bases = _authorization_bases(paths)
             matched_operations = _path_operations(paths)
             protected_data_convergences = (
-                _resolved_protected_data_convergences(paths, service, context) if disclosure else []
+                _resolved_protected_data_convergences(
+                    paths, service, context, decoration_context, bucket_policies, identity_policies
+                )
+                if disclosure
+                else []
             )
             protected_data_dependent_addresses = _protected_data_dependent_addresses(
                 protected_data_convergences,
@@ -210,10 +236,14 @@ class AwsEcsKmsOperationRuleDetectors:
         if context.inventory.provider != "aws":
             return []
 
+        assert context.analysis_indexes is not None
+        authorization_context = aws_analysis_indexes(context.analysis_indexes, context.inventory).kms_authorization
+        if authorization_context is None:
+            return []
         findings: list[Finding] = []
         for service in context.inventory.by_type(_AWS_ECS_SERVICE):
             paths = [
-                path
+                current
                 for path in aws_facts(service).ecs_kms_management_paths
                 if _is_deterministic_management_path(
                     path,
@@ -221,6 +251,7 @@ class AwsEcsKmsOperationRuleDetectors:
                     context,
                     management_effect,
                 )
+                and (current := current_ecs_kms_management_path(path, service, authorization_context)) is not None
             ]
             if not paths:
                 continue
@@ -777,20 +808,22 @@ def _resolved_protected_data_convergences(
     paths: Sequence[AwsEcsKmsOperationPath],
     service: NormalizedResource,
     context: RuleEvaluationContext,
+    decoration_context: AwsDecorationContext,
+    bucket_policies: dict[str, S3BucketPolicySources],
+    identity_policies: Mapping[str, S3IdentityPolicyAssessment],
 ) -> list[AwsEcsS3ProtectedDataConvergence]:
-    valid_path_keys = {
+    current_paths = {
         (
             path["task_definition_address"],
             path["role_address"],
             path["role_arn"],
             path["key_address"],
             path["key_arn"],
-        )
+        ): path
         for path in paths
         if path["operation"] == _DECRYPT_OPERATION
     }
-    decoration_context = AwsDecorationContext(AwsResourceIndexBuilder().build(list(context.inventory.resources)))
-    bucket_policies = prepare_s3_bucket_policy_sources(list(context.inventory.resources), decoration_context)
+    valid_path_keys = set(current_paths)
     convergences: list[AwsEcsS3ProtectedDataConvergence] = []
     seen: set[tuple[str, str, str]] = set()
     for convergence in aws_facts(service).ecs_s3_protected_data_convergences:
@@ -807,11 +840,21 @@ def _resolved_protected_data_convergences(
             decoration_context,
             actions=frozenset({"s3:GetObject", "s3:GetObjectVersion"}),
             bucket_policies=bucket_policies,
+            identity_policy=identity_policies[convergence["role_address"]],
         )
         if current_access_path is None:
             continue
         convergence = convergence.copy()
         convergence["access_path"] = current_access_path
+        convergence["key_operation_path"] = current_paths[
+            (
+                convergence["task_definition_address"],
+                convergence["role_address"],
+                convergence["role_arn"],
+                convergence["key_address"],
+                convergence["key_arn"],
+            )
+        ]
         dependency = convergence["encryption_dependency"]
         fingerprint = (
             convergence["bucket_address"],

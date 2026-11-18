@@ -77,6 +77,7 @@ class AwsResourceMetadata:
     INLINE_POLICY_NAMES = StringListMetadataField("inline_policy_names")
     IAM_POLICY_COMPLETENESS_STATE = OptionalStringMetadataField("iam_policy_completeness_state")
     IAM_POLICY_POSTURE_UNCERTAINTIES = StringListMetadataField("iam_policy_posture_uncertainties")
+    IAM_ROLE_POLICY_INPUTS = DictMetadataField("iam_role_policy_inputs")
     IAM_PERMISSIONS_BOUNDARY_ARN = OptionalStringMetadataField("iam_permissions_boundary_arn")
     IAM_PERMISSIONS_BOUNDARY_STATE = OptionalStringMetadataField("iam_permissions_boundary_state")
     IAM_PERMISSIONS_BOUNDARY_UNCERTAINTIES = StringListMetadataField("iam_permissions_boundary_uncertainties")

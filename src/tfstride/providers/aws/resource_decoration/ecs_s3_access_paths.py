@@ -13,6 +13,7 @@ from tfstride.providers.aws.resource_index import AwsDecorationContext
 from tfstride.providers.aws.s3_bucket_policies import S3BucketPolicySources, prepare_s3_bucket_policy_sources
 from tfstride.providers.aws.s3_identity_authorization import (
     S3IdentityAuthorization,
+    S3IdentityPolicyAssessment,
     assess_s3_identity_policy,
     evaluate_s3_identity_authorization,
     s3_access_classes,
@@ -93,6 +94,7 @@ def current_ecs_s3_access_path(
     *,
     actions: frozenset[str] | None = None,
     bucket_policies: dict[str, S3BucketPolicySources] | None = None,
+    identity_policy: S3IdentityPolicyAssessment | None = None,
 ) -> AwsEcsS3AccessPath | None:
     """Re-evaluate only the cached operation/scope pairs against current policy.
 
@@ -150,10 +152,14 @@ def current_ecs_s3_access_path(
             limits.setdefault(action, []).append(resource)
     if not limits:
         return None
+    if identity_policy is None:
+        identity_policy = assess_s3_identity_policy(role)
+    elif identity_policy.role.address != role.address or identity_policy.role.arn != role.arn:
+        return None
     if bucket_policies is None:
         bucket_policies = prepare_s3_bucket_policy_sources(list(context.index.resources_by_address.values()), context)
     authorization = evaluate_s3_identity_authorization(
-        assess_s3_identity_policy(role),
+        identity_policy,
         bucket,
         bucket_policies[bucket.address],
         account_relationship=context.index.account_identities.relationship(role, bucket),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from typing import Any, TypeVar
@@ -174,6 +174,7 @@ class ModelKmsOperationAuthorizationStage:
         context: AwsDecorationContext,
     ) -> None:
         roles = tuple(resource for resource in resources if resource.resource_type == _IAM_ROLE)
+        grants = current_kms_grants_by_key(context)
         for key in resources:
             if key.resource_type != _KMS_KEY:
                 continue
@@ -181,6 +182,7 @@ class ModelKmsOperationAuthorizationStage:
                 key,
                 roles,
                 context,
+                grants=grants.get(key.address, ()),
             )
             aws_facts(key).set_kms_operation_authorization_posture(
                 authorizations=authorizations,
@@ -192,6 +194,8 @@ def current_kms_operation_authorizations(
     key: NormalizedResource,
     roles: tuple[NormalizedResource, ...],
     context: AwsDecorationContext,
+    *,
+    grants: Sequence[NormalizedResource] | None = None,
 ) -> tuple[list[AwsKmsOperationAuthorization], list[str]]:
     key_facts = aws_facts(key)
     key_arn = key_facts.kms_key_arn or key.arn
@@ -206,7 +210,9 @@ def current_kms_operation_authorizations(
     key_policy_complete = key_facts.kms_policy_completeness_state == _COMPLETE and _key_policy_is_representable(
         key.policy_statements
     )
-    uncertainties = _attached_grant_uncertainties(key, context)
+    if grants is None:
+        grants = current_kms_grants_by_key(context).get(key.address, ())
+    uncertainties = _attached_grant_uncertainties(key, grants)
     if not key_policy_complete:
         uncertainties.append(
             f"{key.address}: effective KMS key policy is incomplete, conflicting, malformed, or unknown"
@@ -232,7 +238,7 @@ def current_kms_operation_authorizations(
         grant_matches, grant_uncertainties = _grant_matches(
             key,
             role_arn,
-            context,
+            grants,
         )
         uncertainties.extend(grant_uncertainties)
 
@@ -557,20 +563,25 @@ def _key_policy_matches(
     return direct, delegation, denies, wildcard_allows
 
 
+def current_kms_grants_by_key(context: AwsDecorationContext) -> dict[str, tuple[NormalizedResource, ...]]:
+    """Resolve grant targets from current source inputs, never decorated joins."""
+    grouped: dict[str, list[NormalizedResource]] = {}
+    for grant in context.index.resources_by_address.values():
+        if grant.resource_type != _KMS_GRANT or grant.provider != "aws":
+            continue
+        key = context.index.kms_keys.get(aws_facts(grant).kms_grant_key_reference, source=grant)
+        if key is not None:
+            grouped.setdefault(key.address, []).append(grant)
+    return {address: tuple(grants) for address, grants in grouped.items()}
+
+
 def _attached_grant_uncertainties(
     key: NormalizedResource,
-    context: AwsDecorationContext,
+    grants: Sequence[NormalizedResource],
 ) -> list[str]:
     uncertainties: list[str] = []
-    for raw_grant in aws_facts(key).kms_grants:
-        if not isinstance(raw_grant, Mapping):
-            continue
-        source = _known_string(raw_grant.get("source"))
-        if source is None or raw_grant.get("resolved_key_address") != key.address:
-            continue
-        grant = context.index.resources_by_address.get(source)
-        if grant is None or grant.resource_type != _KMS_GRANT:
-            continue
+    for grant in grants:
+        source = grant.address
         for uncertainty in aws_facts(grant).kms_grant_posture_uncertainties:
             if any(field in uncertainty for field in ("grantee_principal", "operations", "constraints", "key_id")):
                 uncertainties.append(f"{key.address}: {source} authorization evidence is unresolved: {uncertainty}")
@@ -580,22 +591,13 @@ def _attached_grant_uncertainties(
 def _grant_matches(
     key: NormalizedResource,
     role_arn: str,
-    context: AwsDecorationContext,
+    grants: Sequence[NormalizedResource],
 ) -> tuple[list[_GrantMatch], list[str]]:
     matches: list[_GrantMatch] = []
     uncertainties: list[str] = []
-    for raw_grant in aws_facts(key).kms_grants:
-        if not isinstance(raw_grant, Mapping):
-            continue
-        source = _known_string(raw_grant.get("source"))
-        if source is None or raw_grant.get("resolved_key_address") != key.address:
-            continue
-        grant = context.index.resources_by_address.get(source)
-        if grant is None or grant.resource_type != _KMS_GRANT:
-            continue
+    for grant in grants:
+        source = grant.address
         grant_facts = aws_facts(grant)
-        if grant_facts.kms_grant_resolved_key_address != key.address:
-            continue
         if grant_facts.kms_grant_grantee_principal != role_arn:
             continue
 
@@ -823,13 +825,6 @@ def _key_origin_compatibility_state(
 
 def _operation_sort_key(operation: str) -> tuple[int, str]:
     return (_OPERATION_ORDER.get(operation.casefold(), len(_OPERATION_ORDER)), operation.casefold())
-
-
-def _known_string(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    return text or None
 
 
 def _has_wildcard(value: str) -> bool:
